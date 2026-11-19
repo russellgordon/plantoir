@@ -1673,99 +1673,100 @@ a unit test can read a frame from.
 ## Escape and Command-Period stop a running preview or deploy (#988)
 
 The progress panel's Cancel (`TaskProgressView`, `taskCancelButton`) answers
-Escape and Command-Period while a preview builds, a deploy runs, or the plan
-share's console works, unless something else in the window has a use for the
-key. Until #988 it carried no key, and the HIG review (#975, finding D6) found
-both keys did nothing with Keyboard Navigation on or off; with it off, the
-button could not be reached from the keyboard at all. Keyboards
+Escape and Command-Period while a preview builds or a deploy runs, unless
+something else has a use for the key. Until #988 it carried no key, and the
+HIG review (#975, finding D6) found both keys did nothing with Keyboard
+Navigation on or off; with it off, the button could not be reached from the
+keyboard at all. Keyboards
 (https://developer.apple.com/design/human-interface-guidelines/keyboards):
 "Esc: Cancel the current action or process"; "Command-Period: Cancel an
 operation." Progress indicators: "When it's feasible, let people halt
 processing."
 
-**A preview stops at once; a deploy asks first** (Russell, 2026-11-19, on
-#988), by click or by key: an alert, "Stop the deploy?"
-(`DeployStopWording`), "The website may be left partly updated until you
-deploy again.", with Continue Deploy leading and Stop Deploy trailing
-(Alerts: "Always place the default button on the trailing side of a row";
-"Cancel buttons are typically on the leading side"). **No button is the
-default**: Alerts, "If you want to encourage people to read an alert and not
-just automatically press Return to dismiss it, avoid making any button the
-default button", and the quit question, which can also leave a deploy part
-way, has none since #987. Continue Deploy has `role: .cancel` and
-`.keyboardShortcut(.cancelAction)`, so Escape and Command-Period in the alert
-let the deploy run on, and a second Escape never stops a deploy unread. In a
-SwiftUI alert only the destructive role leaves the go-ahead with no Return
-(`AlertKeysTests`), so Stop Deploy is drawn red: the same open point as the
-#987 alerts (#1000), and a question to Russell on #988, since Alerts' Empty
-Trash sentence would not draw a deliberately chosen stop red. If the deploy
-ends while the question is open, the question goes and nothing is stopped.
-A plan share's console, a share rather than a deploy, stops at once as before.
+**The visible button carries the key** (the fourth #988 round). Cancel has
+`.keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)`, the same shape
+as Copy a Page's and the New Course wizard's Cancel. `cancelKeysAreLive`
+(`TaskProgressView.cancelHoldsTheKeys`) is true only while Cancel shows, the
+run is under way, no preview's site covers the panel (below), no question
+about stopping is open, the panel's window is the key window
+(`controlActiveState == .key`: a sheet, an alert or a popover in front is the
+key window then), and nobody is typing in a box there
+(`KeyWindowTextEditing`, which watches the key window's `firstResponder` by
+key-value observing and reports whether it is `NSText`, the field editor
+every text field and search field edits through). A SwiftUI shortcut is a
+key equivalent the window offers before the focused field sees the key, so
+without that last condition Escape typed in a field stopped the deploy and
+the field never saw it (measured on the first #988 shape). Command-Period
+reaches the same button: AppKit treats it as the cancel key.
 
-**The keys come through the responder chain, not through a view** (the second
-#988 review). AppKit turns Escape and Command-Period into one action message,
-`cancelOperation(_:)`, sent to the window's first responder and passed up the
-chain until something answers. `CancelOperationResponder`, an `NSResponder`
-that is not a view and draws nothing, sits in the window's chain between the
-content view and the window while the panel shows, and is taken out, the chain
-joined up as it was, when the panel goes. **Measured on the second Mac
-(`988-diag-3`, 2026-11-19): `NSWindow` answers `cancelOperation(_:)` itself
-and does nothing with it**, so a responder after the window never hears the
-keys; and with focus nowhere (Keyboard Navigation off, the macOS default) the
-window is its own first responder, so the message starts at the window. So
-while the keys are live the responder also takes the first-responder place the
-window would otherwise hold itself, and hands it back when they are not (every
-other key it is sent goes on to the window). `CancelOperationInstaller`, a
-representable that draws nothing, takes no clicks and carries no key, joins
-and removes it as AppKit's view life cycle says the panel joins and leaves a
-window, and `updateNSView` gives the responder the panel's current state on
-every update, with no `@State` copy to keep in step. It hears the message only when nothing
-nearer the focus answered it, and it answers only while the Cancel button shows, the run is under way, nothing
-covers the panel (below), and `somethingElseWantsTheKey(in:)` is false: text
-being edited (`NSText`, the field editor every text field, search field and
-text view edits through), a visible child window (a popover), or an attached
-sheet (an alert is one). Otherwise `responds(to:)` says no and the message goes
-on past it, as though it were not there.
-
-**Rejected:** `CancelKeyCatcher` (the first review's fix), an invisible view
-behind Cancel that took the keys as a key equivalent: the kind of hidden
-key-carrying control Russell rejected on #973, and a character key on a view
-(`KeyEquivalentPlacementScanTests.testNoViewHangsACharacterShortcut` failed
-naming it). `.keyboardShortcut(.cancelAction)` on the button, the first #988
-shape: a SwiftUI shortcut is a key equivalent the window offers before the
-focused field sees the key, so Escape typed in a text field stopped the deploy
-and the field never saw it (the field's `.onExitCommand` ran 0 times).
+**Rejected, in order:** `CancelKeyCatcher` (round one), an invisible view
+that took the keys: the kind of hidden key-carrying control Russell rejected
+on #973. `CancelOperationResponder` (rounds two and three), an `NSResponder`
+put into the window's chain to answer `cancelOperation(_:)`: the third
+review measured that in a window whose content is a hosting CONTROLLER (the
+shape of the app's own windows) it was not in the chain and Escape did
+nothing, and that taking the window's first-responder place depended on
+Keyboard Navigation; it also needed an invisible installer view.
 `.onExitCommand`, which fires only while something in the panel holds the
 keys, and with Keyboard Navigation off nothing does (#973). A list of fields
 that keep Escape, which goes stale with the next field.
 
+**A preview stops at once; a deploy asks first** (Russell, 2026-11-19, on
+#988), by click or by key: an alert, "Stop the deploy?"
+(`DeployStopWording`), "The website may be left partly updated until you
+deploy again.", with **Stop Deploy**, a plain button and the default (Return),
+and **Cancel** (`role: .cancel`, `.keyboardShortcut(.cancelAction)`: Escape and
+Command-Period), which lets the deploy run on. Alerts: "Always use 'Cancel'
+to title a button that cancels the alert's action"; the destructive style is
+for "a destructive action people didn't deliberately choose", and stopping
+is what the teacher chose. macOS stacks the two buttons in this alert, the
+default at the top. If the deploy ends while the question is open, the
+question goes and nothing is stopped. The never-ask-again box on this
+question, and where it is turned back on, wait for Russell's answer to the
+design (`vm-tools/reference/988-stop-questions-design.md`).
+
+**A plan share asks first too** (Russell, 2026-11-19), and its question is
+not built yet: until it is, the share's console passes
+`takesTheCancelKeys: false`, so Escape never stops a share unasked, and a
+click on Cancel stops it at once as before.
+
 **Only while the panel is in front.** In the section window the preview's site
 is drawn OVER the panel once it serves (`websiteLayers`), and the runner is
-still running then. So `TaskProgressView.takesTheCancelKeys` is false while
-`previewURL` is set (`SectionDetailView.progressPanelTakesTheCancelKeys`), and
-Escape on a web page never stops the preview; the Section menu's Stop Preview
-and the toolbar button do. Other tabs (Coverage, Problems) do not hold the
-panel at all (#793). No menu item or shortcut was added: those are #990's.
+still running then. So `takesTheCancelKeys` is false while `previewURL` is set
+(`SectionDetailView.progressPanelTakesTheCancelKeys`), and Escape on a web
+page never stops the preview; the Section menu's Stop Preview and the toolbar
+button do. Other tabs (Coverage, Problems) do not hold the panel at all
+(#793). No menu item or shortcut was added: those are #990's.
 
 **Once per run** (`CancelOncePerRun`, keyed by the runner's `startedAt`): a
-held key repeating faster than the panel redraws ran Cancel three times, and
-a plan share's cancel (`stopByUser`) never sets `wasCancelled`, so its button
-stayed live. Now any stop after the first in a run does nothing, and the
-button goes. A key-down marked as a repeat never presses Cancel.
+held key repeating faster than the panel redraws would run Cancel more than
+once, and a plan share's cancel (`stopByUser`) never sets `wasCancelled`.
+Any stop after the first in a run does nothing, and the button goes.
 
-`ProgressCancelKeysTests` presses each key on the panel drawn in an off-screen
-window and counts the Cancel closure: once per run, never while
-`takesTheCancelKeys` is false, never with a focused field beside it (whose own
-Escape runs instead), once from a held, repeating key; for a deploy, the key
-opens "Stop the deploy?" and stops nothing, Continue Deploy holds Escape and
-Stop Deploy no key, Continue Deploy leaves it running, Stop Deploy stops it
-once, and the question goes when the deploy ends; the responder is in the
-window's chain, is not a view, and leaves the chain with the panel. **For
-Windows (stage 3, #979):** the progress panel's Cancel takes Escape while the
-panel is in front and no text box or popover has focus, acts once per run, and
-for a deploy asks "Stop the deploy?" first with Continue Deploy (Escape, no
-default) and Stop Deploy. The words are Mac-only (`DeployStopWording`), not yet
-in `contracts/`.
+**Tests.** `ProgressCancelKeysTests` presses each key the way a teacher does:
+the panel in a window whose content is an `NSHostingController` (the app's
+own windows' shape, which the class also reads off the host's real window),
+inside a split view with a Filter box, appearing after the window is up,
+the window made the key window of the active app, and the key sent through
+`NSApp.sendEvent`. Escape and Command-Period stop a preview once; a held key
+stops it once; typed in the Filter box, Escape clears the box and neither key
+stops the task, and once focus leaves the box Escape stops it; behind a sheet
+(one whose Cancel holds Escape, and one with no use for it) and behind an
+alert neither key stops it; with the site covering the panel neither does;
+on a deploy either key asks, Escape or Command-Period in the question is
+Cancel and the deploy runs on, Return is Stop Deploy and stops it once, and
+the question goes when the deploy ends. When the host cannot be made the
+active app with that window key (a locked screen, #315), those tests skip and
+say so. Measured on the main Mac with Keyboard Navigation on and off
+(`AppleKeyboardUIMode` 3 and unset), the same results. Source checks: the key
+is on the visible Cancel, and nothing in `Views/Console` is a representable
+or a responder.
+
+**For Windows (stage 3, #979):** the progress panel's Cancel takes Escape
+while the panel is in front and no text box, popover, dialog or flyout has
+focus, acts once per run, and for a deploy asks "Stop the deploy?" first,
+with Stop Deploy the default and Cancel on Escape. The words are Mac-only
+(`DeployStopWording`), not yet in `contracts/`.
 
 ## Red and orange: the colours of a problem, measured (#994)
 

@@ -1,8 +1,9 @@
 import Foundation
 
 /// What a teacher reads when stopping a running deploy (#988, Russell's
-/// ruling of 2026-11-19): a preview stops at once, a deploy asks first,
-/// whether Cancel was clicked or Escape or Command-Period pressed.
+/// rulings of 2026-11-19): a preview stops at once, a deploy asks first,
+/// whether Cancel was clicked or Escape or Command-Period pressed. Stop
+/// Deploy is plain and the default; the other button is Cancel.
 ///
 /// Alerts, https://developer.apple.com/design/human-interface-guidelines/alerts:
 /// a title that is a complete sentence takes sentence case and its ending
@@ -20,10 +21,11 @@ nonisolated enum DeployStopWording {
     /// Why it asks: what stopping part way can do.
     static let message: String = "The website may be left partly updated until you deploy again."
 
-    /// Stops the deploy, trailing.
+    /// Stops the deploy: the default button, with Return.
     static let stopButton: String = "Stop Deploy"
 
-    /// Backs out and lets the deploy go on, leading, with Escape and
-    /// Command-Period.
-    static let continueButton: String = "Continue Deploy"
+    /// Backs out and lets the deploy go on, with Escape and Command-Period.
+    /// Alerts: "Always use 'Cancel' to title a button that cancels the
+    /// alert's action."
+    static let cancelButton: String = "Cancel"
 }

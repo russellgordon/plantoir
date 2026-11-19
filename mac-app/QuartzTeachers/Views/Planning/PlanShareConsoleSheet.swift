@@ -16,6 +16,10 @@ struct PlanShareConsoleSheet: View {
             TaskProgressView(
                 runner: planRunner.runner,
                 title: planRunner.title,
+                // Stopping a share asks first, as a deploy does (Russell,
+                // 2026-11-19, on #988). Until that question is built, its
+                // Cancel holds no key, so Escape never stops a share unasked.
+                takesTheCancelKeys: false,
                 hidesSiteLink: true,
                 onCancel: {
                     planRunner.cancel()

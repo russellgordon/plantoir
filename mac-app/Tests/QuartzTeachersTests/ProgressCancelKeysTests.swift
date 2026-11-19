@@ -1,35 +1,40 @@
 import AppKit
+import ApplicationServices
 import Observation
 import SwiftUI
 import XCTest
 @testable import QuartzTeachers
 
 /// Escape and Command-Period stop a running preview or deploy (#988, the
-/// HIG review's finding D6), pressed for real: the progress panel is drawn
-/// in an `NSWindow` that is never put on the screen, a key-down is sent to
-/// that window, and the test reads whether the panel's Cancel ran.
+/// HIG review's finding D6), pressed for real.
 ///
 /// Keyboards, https://developer.apple.com/design/human-interface-guidelines/keyboards:
 /// "Esc: Cancel the current action or process"; "Command-Period: Cancel an
 /// operation." Progress indicators: "When it's feasible, let people halt
 /// processing."
 ///
+/// **The visible Cancel holds the key** (`.keyboardShortcut(.cancelAction)`
+/// while `TaskProgressView.cancelKeysAreLive`), and lets go of it while a box
+/// is being typed in, while a sheet, an alert or a popover is in front, and
+/// while a preview's site covers the panel. No invisible view, responder or
+/// key catcher (Russell's rule): the third #988 review found the earlier
+/// responder-chain route did nothing in a window whose content is a hosting
+/// CONTROLLER, the shape the app's own windows have.
+///
+/// So every key here is pressed the way a teacher's is: the panel is drawn
+/// in a window whose content is an `NSHostingController`, made the key
+/// window of the active app, with the panel appearing after the window is
+/// up (as a preview's does), and the key-down goes through
+/// `NSApp.sendEvent`, the route a real key takes (key equivalents first,
+/// then the first responder). When the host cannot be made the active app
+/// with that window key (a locked screen, another Space, another account
+/// using the Mac, #315), those tests skip and say so: a key sent to a window
+/// that is not key proves nothing about what a teacher sees. None of them
+/// depends on Keyboard Navigation (System Settings ▸ Keyboard,
+/// `AppleKeyboardUIMode`): measured on the main Mac with it off and on.
+///
 /// Measured failing before #988: the panel's Cancel carried no key, so both
-/// keys reached nothing and `cancelCount` stayed 0.
-///
-/// Since the second #988 review the keys reach Cancel as AppKit's
-/// `cancelOperation(_:)` action, through the window's responder chain
-/// (`CancelOperationResponder`, not a view), and a deploy asks "Stop the
-/// deploy?" before it stops (Russell's ruling, 2026-11-19).
-///
-/// The keys belong to the panel only while it is the thing in front. Once a
-/// preview's site covers the panel (`takesTheCancelKeys` false), Escape is the
-/// web page's, and must not stop the preview underneath it. And they follow
-/// focus (#988 review): typed in a text field in the same window, Escape is
-/// the field's (the Filter field clears, a rename backs out) and the task
-/// keeps running. Measured failing on the first #988 shape
-/// (`.keyboardShortcut(.cancelAction)` on Cancel): the panel took Escape and
-/// the field's `.onExitCommand` never ran.
+/// keys reached nothing.
 @MainActor
 final class ProgressCancelKeysTests: XCTestCase {
 
@@ -39,21 +44,123 @@ final class ProgressCancelKeysTests: XCTestCase {
     enum Key {
         case escape
         case commandPeriod
+        case returnKey
     }
 
-    /// How many times the panel's Cancel ran.
+    /// How many times the panel's Cancel ran, and what else answered a key.
     @Observable
-    final class CancelLedger {
+    final class Ledger {
 
         // MARK: - Stored properties
 
         var cancelCount: Int = 0
+        var text: String = "abc"
+        var fieldEscapeCount: Int = 0
+        var showsPanel: Bool = false
+        var showsSheet: Bool = false
+        var sheetHoldsEscape: Bool = true
+        var sheetCancelCount: Int = 0
+        var showsAlert: Bool = false
+        var alertCancelCount: Int = 0
     }
+
+    /// The section window's shape around the panel: a sidebar, a filter
+    /// box in the detail column, and the panel, which appears only once a
+    /// task starts, after the window is up.
+    struct SectionShape: View {
+
+        // MARK: - Stored properties
+
+        let ledger: Ledger
+        let runner: ScriptRunner
+        let takesTheCancelKeys: Bool
+        let asksBeforeStopping: Bool
+
+        // MARK: - Computed properties
+
+        var body: some View {
+            NavigationSplitView {
+                List {
+                    Text("EXC2O")
+                    Text("Section 1")
+                }
+            } detail: {
+                VStack(alignment: .leading) {
+                    TextField("Filter", text: textBinding)
+                        .frame(width: 200)
+                        .onExitCommand {
+                            ledger.fieldEscapeCount += 1
+                            ledger.text = ""
+                        }
+                    if ledger.showsPanel {
+                        TaskProgressView(
+                            runner: runner,
+                            title: asksBeforeStopping ? "Deploying EXC2O Section 1" : "Previewing EXC2O Section 1",
+                            takesTheCancelKeys: takesTheCancelKeys,
+                            asksBeforeStopping: asksBeforeStopping,
+                            onCancel: {
+                                ledger.cancelCount += 1
+                            }
+                        )
+                    }
+                    Spacer()
+                }
+                .padding()
+            }
+            .frame(width: 900, height: 500)
+            .sheet(isPresented: sheetBinding) {
+                VStack {
+                    Text("A question")
+                    if ledger.sheetHoldsEscape {
+                        Button("Cancel", role: .cancel) {
+                            ledger.sheetCancelCount += 1
+                            ledger.showsSheet = false
+                        }
+                        .keyboardShortcut(.cancelAction)
+                    }
+                }
+                .frame(width: 300, height: 120)
+            }
+            .alert("A question?", isPresented: alertBinding) {
+                Button("Cancel", role: .cancel) {
+                    ledger.alertCancelCount += 1
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+        }
+
+        var textBinding: Binding<String> {
+            return Binding(get: { ledger.text }, set: { (value: String) in ledger.text = value })
+        }
+
+        var sheetBinding: Binding<Bool> {
+            return Binding(get: { ledger.showsSheet }, set: { (value: Bool) in ledger.showsSheet = value })
+        }
+
+        var alertBinding: Binding<Bool> {
+            return Binding(get: { ledger.showsAlert }, set: { (value: Bool) in ledger.showsAlert = value })
+        }
+    }
+
+    // MARK: - Stored properties
+
+    var openWindows: [NSWindow] = []
 
     // MARK: - Functions
 
     override func setUp() async throws {
         useThrowawayTrail(prefix: "progress-cancel-keys-trail")
+    }
+
+    override func tearDown() async throws {
+        for window in openWindows {
+            if let sheet = window.attachedSheet {
+                window.endSheet(sheet)
+            }
+            window.orderOut(nil)
+            window.contentViewController = nil
+        }
+        openWindows = []
     }
 
     private func runUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
@@ -62,9 +169,22 @@ final class ProgressCancelKeysTests: XCTestCase {
             if condition() {
                 return true
             }
-            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
+            // Events are handed out as the app's own loop does, so an
+            // activation and the window becoming key arrive while waiting
+            // (a bare run loop leaves them queued until the test ends).
+            if let event = NSApp.nextEvent(matching: .any, until: Date(timeIntervalSinceNow: 0.02), inMode: .default, dequeue: true) {
+                NSApp.sendEvent(event)
+            }
         }
         return condition()
+    }
+
+    private func runUntilActive(timeout: TimeInterval) -> Bool {
+        return runUntil(timeout: timeout) { NSApp.isActive }
+    }
+
+    private func settle(_ seconds: TimeInterval) {
+        _ = runUntil(timeout: seconds) { false }
     }
 
     /// A runner that reads as a task in progress, as a preview's build does.
@@ -75,30 +195,65 @@ final class ProgressCancelKeysTests: XCTestCase {
         return runner
     }
 
-    /// A window off the screen holding the progress panel, settled.
-    func windowShowing(_ view: some View) -> NSWindow {
+    /// The window, built as the app builds its own (a hosting controller as
+    /// content), made the key window of the active app, with the panel
+    /// appearing after it is up. Skips when the host cannot take the front.
+    func keyWindow(ledger: Ledger, runner: ScriptRunner, takesTheCancelKeys: Bool = true, asksBeforeStopping: Bool = false) throws -> NSWindow {
         let window: NSWindow = NSWindow(
-            contentRect: NSRect(x: -7000, y: -7000, width: 700, height: 400),
-            styleMask: [.titled],
+            contentRect: NSRect(x: 80, y: 80, width: 900, height: 500),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: view)
-        window.orderFrontRegardless()
-        // The keys are given out once the view has first appeared.
-        _ = runUntil(timeout: 0.7) { false }
+        window.contentViewController = NSHostingController(rootView: SectionShape(
+            ledger: ledger,
+            runner: runner,
+            takesTheCancelKeys: takesTheCancelKeys,
+            asksBeforeStopping: asksBeforeStopping
+        ))
+        openWindows.append(window)
+        NSApp.activate(ignoringOtherApps: true)
+        if !NSApp.isActive {
+            let application: AXUIElement = AXUIElementCreateApplication(getpid())
+            AXUIElementSetAttributeValue(application, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        }
+        if !NSApp.isActive {
+            // Both refused (macOS's cooperative activation, with another
+            // app in front, and no accessibility grant for this build):
+            // asked through Launch Services, as opening the app from the
+            // Finder or the Dock asks. It names this running host's own
+            // bundle, so it brings this copy forward and opens no other.
+            let opener: Process = Process()
+            opener.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            opener.arguments = [Bundle.main.bundleURL.path]
+            try? opener.run()
+            opener.waitUntilExit()
+            _ = runUntilActive(timeout: 10)
+        }
+        window.makeKeyAndOrderFront(nil)
+        if !runUntil(timeout: 5, { NSApp.isActive && window.isKeyWindow }) {
+            throw XCTSkip("The test host could not be made the active app with its window key (a locked screen, another Space or another account using the Mac, #315), so a key could not be pressed the way a teacher presses it.")
+        }
+        settle(0.5)
+        // With Keyboard Navigation on, AppKit gives the Filter box the
+        // focus when the window becomes key (measured on the main Mac):
+        // the box then owns Escape, as it should. These tests start with
+        // focus in no box, as after a click on the panel; the box's own
+        // case is `testEscapeInATextFieldIsTheFields`.
+        _ = window.makeFirstResponder(nil)
+        settle(0.3)
+        ledger.showsPanel = true
+        settle(0.7)
         return window
     }
 
-    func close(_ window: NSWindow) {
-        window.orderOut(nil)
-        window.contentView = nil
-    }
-
-    /// Sends `key` to the window as AppKit delivers a key-down: offered as a
-    /// key equivalent first, then sent as an event.
-    func press(_ key: Key, in window: NSWindow, isARepeat: Bool = false) {
+    /// A key-down as the keyboard sends it, through `NSApp.sendEvent`, to
+    /// whichever window is key.
+    func press(_ key: Key, isARepeat: Bool = false) throws {
+        guard let target = NSApp.keyWindow else {
+            throw XCTSkip("No key window when the key was pressed: another app took the front midway (#846).")
+        }
         let characters: String
         let code: UInt16
         var modifiers: NSEvent.ModifierFlags = []
@@ -110,75 +265,18 @@ final class ProgressCancelKeysTests: XCTestCase {
             characters = "."
             code = 47
             modifiers = [.command]
+        case .returnKey:
+            characters = "\r"
+            code = 36
         }
-        guard let event = NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
-            windowNumber: window.windowNumber, context: nil,
+        let event: NSEvent = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: modifiers,
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: target.windowNumber, context: nil,
             characters: characters, charactersIgnoringModifiers: characters,
             isARepeat: isARepeat, keyCode: code
-        ) else {
-            XCTFail("could not make the key")
-            return
-        }
-        if !window.performKeyEquivalent(with: event) {
-            window.sendEvent(event)
-        }
-    }
-
-    /// The panel as the section window draws it for a running task.
-    func panel(runner: ScriptRunner, ledger: CancelLedger, takesTheCancelKeys: Bool, asksBeforeStopping: Bool = false) -> some View {
-        return TaskProgressView(
-            runner: runner,
-            title: "Previewing EXC2O Section 1",
-            takesTheCancelKeys: takesTheCancelKeys,
-            asksBeforeStopping: asksBeforeStopping,
-            onCancel: {
-                ledger.cancelCount += 1
-                runner.wasCancelled = true
-            }
-        )
-        .frame(width: 700, height: 400)
-    }
-
-    func checkTheKeyCancels(_ key: Key, what: String) {
-        let runner: ScriptRunner = runningRunner()
-        let ledger: CancelLedger = CancelLedger()
-        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true))
-        press(key, in: window)
-        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount > 0 }, "\(what) did not stop the running task")
-        // Pressed again once the task is stopping and the panel has redrawn,
-        // nothing more runs: the Cancel button has gone, and its key with it.
-        // (Pressed before the redraw, the key still reaches the button, as a
-        // second click would; measured on the main Mac, 2026-11-19.)
-        _ = runUntil(timeout: 0.7) { false }
-        press(key, in: window)
-        _ = runUntil(timeout: 0.5) { false }
-        XCTAssertEqual(ledger.cancelCount, 1, "\(what): Cancel ran once, not again on a second press")
-        close(window)
-    }
-
-    func testEscapeStopsARunningTask() {
-        checkTheKeyCancels(.escape, what: "Escape")
-    }
-
-    func testCommandPeriodStopsARunningTask() {
-        checkTheKeyCancels(.commandPeriod, what: "Command-Period")
-    }
-
-    /// With the preview's site in front of the panel, Escape and
-    /// Command-Period are not the panel's: a teacher pressing Escape on a
-    /// web page must not stop the preview they are looking at. The same
-    /// panel with the keys given (above) proves the press reaches it.
-    func testNeitherKeyStopsATaskWhoseSiteCoversThePanel() {
-        for key in [Key.escape, Key.commandPeriod] {
-            let runner: ScriptRunner = runningRunner()
-            let ledger: CancelLedger = CancelLedger()
-            let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: false))
-            press(key, in: window)
-            _ = runUntil(timeout: 0.7) { false }
-            XCTAssertEqual(ledger.cancelCount, 0, "\(key) stopped a preview whose site was in front of the panel")
-            close(window)
-        }
+        ))
+        NSApp.sendEvent(event)
     }
 
     func findTextField(in view: NSView) -> NSTextField? {
@@ -193,119 +291,237 @@ final class ProgressCancelKeysTests: XCTestCase {
         return nil
     }
 
-    /// What a field beside the panel did with Escape.
-    @Observable
-    final class FieldLedger {
-
-        // MARK: - Stored properties
-
-        var text: String = "abc"
-        var isRenaming: Bool = true
-        var backedOutCount: Int = 0
-    }
-
-    /// A field beside the running panel, focused, as the sidebar's Filter
-    /// field (Escape clears it) or the course Rename field (Escape backs out
-    /// of the rename, `SidebarView`'s `.onExitCommand`) sits in the window
-    /// while a deploy runs. Stand-ins with the same mechanism, not the
-    /// sidebar itself.
-    func checkEscapeIsTheField(clearsText: Bool, what: String) {
-        let runner: ScriptRunner = runningRunner()
-        let ledger: CancelLedger = CancelLedger()
-        let field: FieldLedger = FieldLedger()
-        let binding: Binding<String> = Binding(
-            get: { field.text },
-            set: { (value: String) in field.text = value }
-        )
-        let view = VStack {
-            TextField(what, text: binding)
-                .frame(width: 200)
-                .onExitCommand {
-                    field.backedOutCount += 1
-                    if clearsText {
-                        field.text = ""
-                    } else {
-                        field.isRenaming = false
-                    }
-                }
-            panel(runner: runner, ledger: ledger, takesTheCancelKeys: true)
+    /// The AppKit buttons of the alert attached to `window`, by title.
+    func alertButtons(in window: NSWindow) -> [String: NSButton] {
+        var found: [String: NSButton] = [:]
+        var queue: [NSView] = []
+        if let contentView = window.attachedSheet?.contentView {
+            queue.append(contentView)
         }
-        let window: NSWindow = windowShowing(view)
-        guard let contentView = window.contentView, let textField = findTextField(in: contentView) else {
-            XCTFail("\(what): no field")
-            close(window)
-            return
-        }
-        XCTAssertTrue(window.makeFirstResponder(textField), "\(what): the field took focus")
-        _ = runUntil(timeout: 0.3) { false }
-        XCTAssertTrue(window.firstResponder is NSText, "\(what): the field is being edited")
-        press(.escape, in: window)
-        _ = runUntil(timeout: 0.7) { false }
-        XCTAssertEqual(ledger.cancelCount, 0, "\(what): Escape in the field stopped the running task")
-        XCTAssertTrue(runner.isRunning && !runner.wasCancelled, "\(what): the task keeps running")
-        XCTAssertEqual(field.backedOutCount, 1, "\(what): the field's own Escape ran")
-        if clearsText {
-            XCTAssertEqual(field.text, "", "\(what): Escape cleared the field")
-        } else {
-            XCTAssertFalse(field.isRenaming, "\(what): Escape backed out of the rename")
-        }
-        // Command-Period in the field is not the panel's either.
-        if !clearsText {
-            press(.commandPeriod, in: window)
-            _ = runUntil(timeout: 0.5) { false }
-            XCTAssertEqual(ledger.cancelCount, 0, "\(what): Command-Period in the field stopped the running task")
-        }
-        close(window)
-    }
-
-    func testEscapeInTheFilterFieldClearsItAndTheTaskKeepsRunning() {
-        checkEscapeIsTheField(clearsText: true, what: "Filter")
-    }
-
-    func testEscapeInTheRenameFieldBacksOutAndTheTaskKeepsRunning() {
-        checkEscapeIsTheField(clearsText: false, what: "Rename")
-    }
-
-    /// With focus on the panel itself (its hosting view the first
-    /// responder), Escape stops the task.
-    func testEscapeWithFocusOnThePanelStopsTheTask() {
-        let runner: ScriptRunner = runningRunner()
-        let ledger: CancelLedger = CancelLedger()
-        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true))
-        if let contentView = window.contentView {
-            _ = window.makeFirstResponder(contentView)
-        }
-        XCTAssertFalse(window.firstResponder is NSText)
-        press(.escape, in: window)
-        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Escape with focus on the panel did not stop the task")
-        close(window)
-    }
-
-    /// A held key repeats faster than the panel redraws, and a plan share's
-    /// cancel never sets `wasCancelled`: Cancel still acts once per run.
-    func testAHeldKeyCancelsOnceEvenWhenTheRunnerIsNotMarkedCancelled() {
-        let runner: ScriptRunner = runningRunner()
-        let ledger: CancelLedger = CancelLedger()
-        let view = TaskProgressView(
-            runner: runner,
-            title: "Sharing",
-            onCancel: {
-                ledger.cancelCount += 1
+        while !queue.isEmpty {
+            let view: NSView = queue.removeFirst()
+            if let button = view as? NSButton, !button.title.isEmpty {
+                found[button.title] = button
             }
-        )
-        .frame(width: 700, height: 400)
-        let window: NSWindow = windowShowing(view)
-        press(.escape, in: window)
-        press(.escape, in: window, isARepeat: true)
-        press(.escape, in: window, isARepeat: true)
-        press(.escape, in: window)
-        _ = runUntil(timeout: 0.7) { false }
-        press(.escape, in: window)
-        press(.commandPeriod, in: window)
-        _ = runUntil(timeout: 0.5) { false }
+            for child in view.subviews {
+                queue.append(child)
+            }
+        }
+        return found
+    }
+
+    // MARK: - Tests: a preview stops at once
+
+    func checkTheKeyStopsAPreview(_ key: Key) throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner)
+        XCTAssertFalse(window.firstResponder is NSText, "nothing is being typed in")
+        try press(key)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "\(key) did not stop the running preview")
+        settle(0.5)
+        XCTAssertNil(window.attachedSheet, "a preview stops with no question")
+        // Once pressed, the run's Cancel has gone, and its key with it.
+        try press(key)
+        settle(0.5)
+        XCTAssertEqual(ledger.cancelCount, 1, "\(key): Cancel ran once, not again on a second press")
+    }
+
+    func testEscapeStopsARunningPreview() throws {
+        try checkTheKeyStopsAPreview(.escape)
+    }
+
+    func testCommandPeriodStopsARunningPreview() throws {
+        try checkTheKeyStopsAPreview(.commandPeriod)
+    }
+
+    /// A held key repeats faster than the panel redraws: Cancel still acts
+    /// once per run.
+    func testAHeldKeyStopsOnce() throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        _ = try keyWindow(ledger: ledger, runner: runner)
+        try press(.escape)
+        try press(.escape, isARepeat: true)
+        try press(.escape, isARepeat: true)
+        try press(.commandPeriod)
+        settle(0.7)
         XCTAssertEqual(ledger.cancelCount, 1, "Cancel ran more than once for one run")
-        XCTAssertFalse(runner.wasCancelled, "the stand-in never marks the runner")
-        close(window)
+    }
+
+    // MARK: - Tests: nothing fires while something else owns the key
+
+    /// Typing in a box, Escape is the box's (the Filter field clears) and
+    /// Command-Period is not the panel's either; the task keeps running.
+    /// Measured failing on the first #988 shape, which held the key always.
+    func testEscapeInATextFieldIsTheFields() throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner)
+        let contentView: NSView = try XCTUnwrap(window.contentView)
+        let field: NSTextField = try XCTUnwrap(findTextField(in: contentView), "the Filter field")
+        XCTAssertTrue(window.makeFirstResponder(field), "the field took focus")
+        settle(0.4)
+        XCTAssertTrue(window.firstResponder is NSText, "the field is being edited")
+        XCTAssertTrue(KeyWindowTextEditing.shared.isEditingText, "the watch saw the field being edited")
+        try press(.escape)
+        settle(0.7)
+        XCTAssertEqual(ledger.cancelCount, 0, "Escape in the field stopped the running task")
+        XCTAssertEqual(ledger.fieldEscapeCount, 1, "the field's own Escape ran")
+        XCTAssertEqual(ledger.text, "", "Escape cleared the field")
+        try press(.commandPeriod)
+        settle(0.7)
+        XCTAssertEqual(ledger.cancelCount, 0, "Command-Period in the field stopped the running task")
+        // Focus leaves the field: the key is Cancel's again.
+        _ = window.makeFirstResponder(nil)
+        settle(0.4)
+        XCTAssertFalse(KeyWindowTextEditing.shared.isEditingText, "the watch saw the editing end")
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Escape stops the task again once no box is being typed in")
+    }
+
+    /// A sheet in front: Escape is the sheet's, and a sheet that has no use
+    /// for Escape does not pass it to the panel behind it either.
+    func testNeitherKeyStopsATaskBehindASheet() throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner)
+        ledger.showsSheet = true
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "the sheet is in front")
+        settle(0.5)
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.sheetCancelCount == 1 }, "the sheet's Cancel took Escape")
+        XCTAssertEqual(ledger.cancelCount, 0, "Escape in a sheet stopped the task behind it")
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil && window.isKeyWindow })
+        settle(0.5)
+        ledger.sheetHoldsEscape = false
+        ledger.showsSheet = true
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "the second sheet is in front")
+        settle(0.5)
+        try press(.escape)
+        try press(.commandPeriod)
+        settle(0.7)
+        XCTAssertEqual(ledger.cancelCount, 0, "a key in a sheet with no use for it stopped the task behind it")
+    }
+
+    /// An alert in front: Escape and Command-Period are its Cancel's.
+    func testNeitherKeyStopsATaskBehindAnAlert() throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner)
+        for key in [Key.escape, Key.commandPeriod] {
+            ledger.showsAlert = true
+            XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "the alert is in front")
+            settle(0.5)
+            try press(key)
+            XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "\(key) closed the alert")
+            settle(0.5)
+        }
+        XCTAssertEqual(ledger.alertCancelCount, 2, "the alert's Cancel took both keys")
+        XCTAssertEqual(ledger.cancelCount, 0, "a key in an alert stopped the task behind it")
+    }
+
+    /// With the preview's site in front of the panel the keys are the web
+    /// page's: they never stop the preview underneath.
+    func testNeitherKeyStopsATaskWhoseSiteCoversThePanel() throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        _ = try keyWindow(ledger: ledger, runner: runner, takesTheCancelKeys: false)
+        try press(.escape)
+        try press(.commandPeriod)
+        settle(0.7)
+        XCTAssertEqual(ledger.cancelCount, 0, "a key stopped a preview whose site was in front of the panel")
+    }
+
+    // MARK: - Tests: a deploy asks first
+
+    /// Escape or Command-Period on a running deploy asks "Stop the deploy?"
+    /// and stops nothing. In the question, Escape and Command-Period are
+    /// Cancel's and the deploy runs on; Return is Stop Deploy's, the plain
+    /// default, and stops it once.
+    func checkADeployAsksFirst(_ key: Key) throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, asksBeforeStopping: true)
+        try press(key)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "\(key) on a running deploy asked first")
+        settle(0.5)
+        XCTAssertEqual(ledger.cancelCount, 0, "\(key) stopped the deploy without asking")
+        let shown: [String: NSButton] = alertButtons(in: window)
+        let stopButton: NSButton = try XCTUnwrap(shown[DeployStopWording.stopButton], "the buttons: \(Array(shown.keys))")
+        let cancelButton: NSButton = try XCTUnwrap(shown[DeployStopWording.cancelButton], "the buttons: \(Array(shown.keys))")
+        XCTAssertEqual(stopButton.keyEquivalent, "\r", "Stop Deploy is the default")
+        XCTAssertEqual(cancelButton.keyEquivalent, "\u{1b}", "Cancel holds Escape")
+        XCTAssertNotEqual(stopButton.bezelColor, NSColor.systemRed, "Stop Deploy is not drawn red")
+        try press(key)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "\(key) in the question chose Cancel")
+        settle(0.7)
+        XCTAssertEqual(ledger.cancelCount, 0, "Cancel in the question stopped the deploy")
+        XCTAssertTrue(runUntil(timeout: 3) { window.isKeyWindow })
+        try press(key)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "\(key) asked again")
+        settle(0.5)
+        try press(.returnKey)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Return chose Stop Deploy and stopped the deploy")
+        settle(0.7)
+        try press(key)
+        settle(0.7)
+        XCTAssertNil(window.attachedSheet, "once stopped, the key asks nothing more")
+        XCTAssertEqual(ledger.cancelCount, 1)
+    }
+
+    func testEscapeOnADeployAsksFirst() throws {
+        try checkADeployAsksFirst(.escape)
+    }
+
+    func testCommandPeriodOnADeployAsksFirst() throws {
+        try checkADeployAsksFirst(.commandPeriod)
+    }
+
+    /// A deploy that ends while its question is open has nothing to stop:
+    /// the question goes, and nothing is stopped.
+    func testTheQuestionGoesWhenTheDeployEnds() throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, asksBeforeStopping: true)
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet != nil }, "Escape asked first")
+        runner.isRunning = false
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "the question went when the deploy ended")
+        XCTAssertEqual(ledger.cancelCount, 0)
+    }
+
+    // MARK: - Tests: the rule and the source
+
+    /// Every case of the rule the visible Cancel's key follows.
+    func testCancelHoldsTheKeysOnlyWhenNothingElseWantsThem() {
+        XCTAssertTrue(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: true, runIsUnderWay: true, isAskingToStop: false, windowIsKey: true, textIsBeingEdited: false))
+        XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: false, cancelIsShowing: true, runIsUnderWay: true, isAskingToStop: false, windowIsKey: true, textIsBeingEdited: false), "a site covers the panel")
+        XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: false, runIsUnderWay: true, isAskingToStop: false, windowIsKey: true, textIsBeingEdited: false), "Cancel is not showing")
+        XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: true, runIsUnderWay: false, isAskingToStop: false, windowIsKey: true, textIsBeingEdited: false), "nothing is running")
+        XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: true, runIsUnderWay: true, isAskingToStop: true, windowIsKey: true, textIsBeingEdited: false), "the question is open")
+        XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: true, runIsUnderWay: true, isAskingToStop: false, windowIsKey: false, textIsBeingEdited: false), "something else is in front")
+        XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: true, runIsUnderWay: true, isAskingToStop: false, windowIsKey: true, textIsBeingEdited: true), "a box is being typed in")
+    }
+
+    /// The key is on the visible Cancel, and the console draws no helper
+    /// view of its own (no representable, no responder): Russell's rule, no
+    /// invisible controls.
+    func testTheKeyIsOnTheVisibleCancel() throws {
+        let consoleURL: URL = TextFieldStyleScanTests.viewsURL().appendingPathComponent("Console")
+        let panel: String = try String(contentsOf: consoleURL.appendingPathComponent("TaskProgressView.swift"), encoding: .utf8)
+        var found: Bool = false
+        for chain in SheetConventionScanTests.chains(of: "Button(", in: panel, file: "TaskProgressView.swift") {
+            if chain.arguments.hasPrefix("(\"Cancel\"") && chain.chain.contains(".keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)") && chain.chain.contains("taskCancelButton") {
+                found = true
+            }
+        }
+        XCTAssertTrue(found, "the panel's visible Cancel holds the cancel key while it is live")
+        for file in UserFacingLabelWordsTests.swiftFiles(under: consoleURL) {
+            let code: String = TextFieldStyleScanTests.codeWithoutComments(try String(contentsOf: file, encoding: .utf8))
+            XCTAssertFalse(code.contains("NSViewRepresentable"), "\(file.lastPathComponent) draws a helper view")
+            XCTAssertFalse(code.contains(": NSResponder"), "\(file.lastPathComponent) adds a responder")
+        }
     }
 
     /// A new run of the same runner can be cancelled again.
@@ -325,221 +541,12 @@ final class ProgressCancelKeysTests: XCTestCase {
         XCTAssertFalse(SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing: true))
     }
 
-    // MARK: - The responder chain, not a view (#988 second review)
-
-    /// The keys arrive through a responder in the window's chain, and that
-    /// responder leaves the chain, joined up as it was, when the panel goes.
-    func testTheKeysComeFromTheResponderChainAndLeaveWithThePanel() {
-        let runner: ScriptRunner = runningRunner()
-        let ledger: CancelLedger = CancelLedger()
-        let shows: PanelShows = PanelShows()
-        let window: NSWindow = windowShowing(PanelOrNothing(shows: shows, runner: runner, ledger: ledger))
-        XCTAssertTrue(ProgressCancelKeysTests.chainHoldsAResponder(window), "the panel put its responder into the window's chain")
-        var current: NSResponder? = window.contentView?.nextResponder
-        while let responder = current {
-            XCTAssertFalse(responder is CancelOperationResponder && responder is NSView, "the responder is not a view")
-            current = responder.nextResponder
-        }
-        // With focus nowhere, the window's own first-responder place is the
-        // responder's while the keys are live (NSWindow answers
-        // cancelOperation itself, measured in 988-diag-3).
-        XCTAssertTrue(window.firstResponder is CancelOperationResponder, "focus nowhere: the responder holds the window's own place")
-        shows.panel = false
-        XCTAssertTrue(runUntil(timeout: 2) { !ProgressCancelKeysTests.chainHoldsAResponder(window) }, "the responder left the chain with the panel")
-        XCTAssertTrue(window.firstResponder === window, "the window has its own place back")
-        press(.escape, in: window)
-        _ = runUntil(timeout: 0.5) { false }
-        XCTAssertEqual(ledger.cancelCount, 0, "with the panel gone, Escape stops nothing")
-        close(window)
-    }
-
-    /// The panel, or nothing once `shows.panel` is false: a view of its own,
-    /// so the change is observed (a `VStack` built in the test function reads
-    /// the flag once and never redraws).
-    struct PanelOrNothing: View {
-
-        // MARK: - Stored properties
-
-        let shows: PanelShows
-        let runner: ScriptRunner
-        let ledger: CancelLedger
-
-        // MARK: - Body
-
-        var body: some View {
-            if shows.panel {
-                TaskProgressView(
-                    runner: runner,
-                    title: "Previewing EXC2O Section 1",
-                    onCancel: {
-                        ledger.cancelCount += 1
-                        runner.wasCancelled = true
-                    }
-                )
-                .frame(width: 700, height: 400)
-            } else {
-                Color.clear.frame(width: 700, height: 400)
-            }
-        }
-    }
-
-    /// Whether the panel is drawn, for the test above.
-    @Observable
-    final class PanelShows {
-
-        // MARK: - Stored properties
-
-        var panel: Bool = true
-    }
-
-    static func chainHoldsAResponder(_ window: NSWindow) -> Bool {
-        var current: NSResponder? = window.contentView?.nextResponder
-        while let responder = current {
-            if responder is CancelOperationResponder {
-                return true
-            }
-            current = responder.nextResponder
-        }
-        return false
-    }
-
-    /// The responder takes itself out of the chain and leaves the rest
-    /// joined up as it was.
-    func testUninstallLeavesTheChainAsItWas() {
-        let window: NSWindow = NSWindow(contentRect: NSRect(x: -7000, y: -7000, width: 10, height: 10), styleMask: [.titled], backing: .buffered, defer: true)
-        window.isReleasedWhenClosed = false
-        let content: NSView = NSView()
-        window.contentView = content
-        XCTAssertTrue(content.nextResponder === window)
-        let responder: CancelOperationResponder = CancelOperationResponder()
-        responder.install(in: window)
-        responder.install(in: window)
-        XCTAssertTrue(content.nextResponder === responder)
-        XCTAssertTrue(responder.nextResponder === window, "installed twice, it is in the chain once, before the window")
-        responder.isEnabled = true
-        XCTAssertTrue(window.firstResponder === responder, "live, it holds the window's own place")
-        responder.isEnabled = false
-        XCTAssertTrue(window.firstResponder === window, "not live, it gives the place back")
-        responder.isEnabled = true
-        responder.uninstall()
-        XCTAssertTrue(content.nextResponder === window)
-        XCTAssertTrue(window.firstResponder === window)
-        XCTAssertFalse(CancelOperationResponder.chain(of: window, contains: responder))
-    }
-
-    // MARK: - A deploy asks first (Russell, 2026-11-19)
-
-    /// The alert attached to the window, once it shows.
-    func stopQuestion(in window: NSWindow) -> NSWindow? {
-        _ = runUntil(timeout: 3) { window.attachedSheet != nil }
-        return window.attachedSheet
-    }
-
-    func buttons(in sheet: NSWindow) -> [String: NSButton] {
-        var found: [String: NSButton] = [:]
-        var queue: [NSView] = []
-        if let contentView = sheet.contentView {
-            queue.append(contentView)
-        }
-        while !queue.isEmpty {
-            let view: NSView = queue.removeFirst()
-            if let button = view as? NSButton, !button.title.isEmpty {
-                found[button.title] = button
-            }
-            for child in view.subviews {
-                queue.append(child)
-            }
-        }
-        return found
-    }
-
-    /// Escape on a running deploy asks "Stop the deploy?" and stops nothing.
-    /// Continue Deploy holds Escape (and so Command-Period), Stop Deploy holds
-    /// no key at all, so neither a second Escape nor a Return stops the
-    /// deploy unread. Continue Deploy leaves it running; Stop Deploy stops it,
-    /// once.
-    func checkADeployAsksFirst(_ key: Key) {
-        let runner: ScriptRunner = runningRunner()
-        let ledger: CancelLedger = CancelLedger()
-        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true, asksBeforeStopping: true))
-        press(key, in: window)
-        guard let sheet = stopQuestion(in: window) else {
-            XCTFail("\(key) on a running deploy did not ask first")
-            close(window)
-            return
-        }
-        XCTAssertEqual(ledger.cancelCount, 0, "\(key) stopped the deploy without asking")
-        let shown: [String: NSButton] = buttons(in: sheet)
-        guard let continueButton = shown[DeployStopWording.continueButton], let stopButton = shown[DeployStopWording.stopButton] else {
-            XCTFail("the question's buttons: \(Array(shown.keys))")
-            close(window)
-            return
-        }
-        XCTAssertEqual(continueButton.keyEquivalent, "\u{1b}", "Continue Deploy holds Escape")
-        XCTAssertEqual(stopButton.keyEquivalent, "", "Stop Deploy is not the default and holds no key")
-        XCTAssertGreaterThan(continueButton.frame.size.width, 0)
-        // Continue Deploy: the question goes and the deploy runs on.
-        continueButton.performClick(nil)
-        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "Continue Deploy closed the question")
-        _ = runUntil(timeout: 0.5) { false }
-        XCTAssertEqual(ledger.cancelCount, 0, "Continue Deploy stopped the deploy")
-        // Asked again, Stop Deploy stops it.
-        press(key, in: window)
-        guard let again = stopQuestion(in: window), let stopAgain = buttons(in: again)[DeployStopWording.stopButton] else {
-            XCTFail("\(key) did not ask again after Continue Deploy")
-            close(window)
-            return
-        }
-        stopAgain.performClick(nil)
-        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Stop Deploy stopped the deploy")
-        _ = runUntil(timeout: 0.7) { false }
-        press(key, in: window)
-        _ = runUntil(timeout: 0.7) { false }
-        XCTAssertNil(window.attachedSheet, "once stopped, the key asks nothing more")
-        XCTAssertEqual(ledger.cancelCount, 1)
-        close(window)
-    }
-
-    func testEscapeOnADeployAsksFirst() {
-        checkADeployAsksFirst(.escape)
-    }
-
-    func testCommandPeriodOnADeployAsksFirst() {
-        checkADeployAsksFirst(.commandPeriod)
-    }
-
     /// The question's words, as ruled.
     func testTheQuestionSaysWhatWasRuled() {
         XCTAssertEqual(DeployStopWording.title, "Stop the deploy?")
         XCTAssertEqual(DeployStopWording.stopButton, "Stop Deploy")
-        XCTAssertEqual(DeployStopWording.continueButton, "Continue Deploy")
+        XCTAssertEqual(DeployStopWording.cancelButton, "Cancel")
         XCTAssertTrue(DeployStopWording.message.contains("partly updated"))
-    }
-
-    /// A deploy that ends while its question is open has nothing to stop:
-    /// the question goes, and nothing is stopped.
-    func testTheQuestionGoesWhenTheDeployEnds() {
-        let runner: ScriptRunner = runningRunner()
-        let ledger: CancelLedger = CancelLedger()
-        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true, asksBeforeStopping: true))
-        press(.escape, in: window)
-        XCTAssertNotNil(stopQuestion(in: window), "Escape asked first")
-        runner.isRunning = false
-        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "the question went when the deploy ended")
-        XCTAssertEqual(ledger.cancelCount, 0)
-        close(window)
-    }
-
-    /// A preview stops at once, with no question (the ruling's other half).
-    func testAPreviewStopsWithNoQuestion() {
-        let runner: ScriptRunner = runningRunner()
-        let ledger: CancelLedger = CancelLedger()
-        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true))
-        press(.escape, in: window)
-        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 })
-        _ = runUntil(timeout: 0.5) { false }
-        XCTAssertNil(window.attachedSheet, "a preview asks nothing")
-        close(window)
     }
 
     /// The section window's deploy panel asks; its preview panel does not.
@@ -553,5 +560,30 @@ final class ProgressCancelKeysTests: XCTestCase {
             }
         }
         XCTAssertEqual(asking, 1, "exactly the deploy's panel asks first")
+    }
+
+    /// Until its question is built, a plan share's Cancel holds no key, so
+    /// Escape never stops a share unasked (Russell, 2026-11-19).
+    func testAShareTakesNoKeyUntilItAsks() throws {
+        let source: String = try String(contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Planning/PlanShareConsoleSheet.swift"), encoding: .utf8)
+        var panels: Int = 0
+        for chain in SheetConventionScanTests.chains(of: "TaskProgressView(", in: source, file: "PlanShareConsoleSheet.swift") {
+            panels += 1
+            XCTAssertTrue(chain.arguments.contains("takesTheCancelKeys: false"), "the share's Cancel holds no key yet")
+        }
+        XCTAssertEqual(panels, 1)
+    }
+
+    /// What the app's own windows are made of, so the window above is the
+    /// same shape: content from a hosting controller.
+    func testTheAppsWindowsAreTheShapeTheseTestsUse() throws {
+        guard let window = WorkspaceModel.windowModels.first?.window else {
+            throw XCTSkip("No app window is registered in this run")
+        }
+        let controller: String = window.contentViewController.map { (shown: NSViewController) -> String in String(describing: type(of: shown)) } ?? "none"
+        let content: String = window.contentView.map { (shown: NSView) -> String in String(describing: type(of: shown)) } ?? "none"
+        print("PROGRESS-CANCEL-KEYS app window: controller=\(controller.prefix(80)) content=\(content.prefix(80))")
+        print("PROGRESS-CANCEL-KEYS Keyboard Navigation on: \(NSApp.isFullKeyboardAccessEnabled)")
+        XCTAssertNotNil(window.contentViewController, "the app's window has a content view controller")
     }
 }

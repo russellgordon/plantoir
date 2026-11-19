@@ -33,7 +33,7 @@ To deploy a section is to send its website to where students read it. A deploy c
 alt: The section's window during a deploy, with a line that says what is happening now.
 
 {{mac}}
-Plantoir asks first, because a deploy stopped part way can leave the website partly updated: choose {{control:stopDeploy}} to stop it, or {{control:continueDeploy}} to let it finish. The Escape key and Command-Period press {{control:cancel}} as well. In the question, they choose {{control:continueDeploy}}. While you are typing in a box, they belong to the box.
+Plantoir asks first, because a deploy stopped part way can leave the website partly updated: choose {{control:stopDeploy}} to stop it, or {{control:cancel}} to let it finish. The Escape key and Command-Period press {{control:cancel}} in the window as well, and in the question they choose {{control:cancel}}; the Return key chooses {{control:stopDeploy}}. While you are typing in a box, the keys belong to the box.
 {{/mac}}
 
 5. Read the result when the window says the deploy is done.

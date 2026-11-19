@@ -113,6 +113,15 @@ struct TaskProgressView: View {
     /// Showing "Stop the deploy?" (`asksBeforeStopping`).
     @State var isAskingToStop: Bool = false
 
+    /// Whether this panel's window is the key window. A sheet or an alert
+    /// in front of it (one of its own questions included) is the key window
+    /// then, so Escape there is the sheet's and never stops the task behind
+    /// it.
+    @Environment(\.controlActiveState) var controlActiveState
+
+    /// Whether a box in the key window is being typed in (#988).
+    var textEditing: KeyWindowTextEditing = KeyWindowTextEditing.shared
+
     // MARK: - Computed properties
 
     /// Whether the task is still under way, as the header reads it.
@@ -128,11 +137,19 @@ struct TaskProgressView: View {
         return !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt)
     }
 
-    /// Whether Escape and Command-Period press Cancel now: while it shows,
-    /// the run is under way, nothing covers the panel, and no question
-    /// about stopping is already open.
+    /// Whether the visible Cancel holds Escape and Command-Period now
+    /// (#988): while it shows, the run is under way, nothing covers the
+    /// panel, no question about stopping is open, the panel's window is
+    /// the key window, and nobody is typing in a box there.
     var cancelKeysAreLive: Bool {
-        return takesTheCancelKeys && cancelIsShowing && runIsUnderWay && !isAskingToStop
+        return TaskProgressView.cancelHoldsTheKeys(
+            takesTheCancelKeys: takesTheCancelKeys,
+            cancelIsShowing: cancelIsShowing,
+            runIsUnderWay: runIsUnderWay,
+            isAskingToStop: isAskingToStop,
+            windowIsKey: controlActiveState == .key,
+            textIsBeingEdited: textEditing.isEditingText
+        )
     }
 
     /// Drives the question alert without writing state during a body.
@@ -210,6 +227,25 @@ struct TaskProgressView: View {
     }
 
     // MARK: - Functions
+
+    /// The rule `cancelKeysAreLive` reads, on its own so a test can read
+    /// every case of it without drawing the panel.
+    static func cancelHoldsTheKeys(
+        takesTheCancelKeys: Bool,
+        cancelIsShowing: Bool,
+        runIsUnderWay: Bool,
+        isAskingToStop: Bool,
+        windowIsKey: Bool,
+        textIsBeingEdited: Bool
+    ) -> Bool {
+        if !takesTheCancelKeys || !cancelIsShowing || !runIsUnderWay {
+            return false
+        }
+        if isAskingToStop || !windowIsKey || textIsBeingEdited {
+            return false
+        }
+        return true
+    }
 
     /// Cancel, clicked or pressed from the keyboard: once per run. A plan
     /// share's cancel never sets `wasCancelled`, so without this the button
@@ -313,33 +349,36 @@ struct TaskProgressView: View {
                             Spacer()
 
                             if cancelIsShowing {
-                                // Escape and Command-Period press it from
-                                // the responder chain while nothing else in
-                                // the window has a use for them (#988): see
-                                // `CancelOperationResponder`.
+                                // The visible button holds Escape and
+                                // Command-Period itself (#988), and lets go
+                                // of them whenever something else has a use
+                                // for them: `cancelKeysAreLive`.
                                 Button("Cancel") {
                                     pressCancel()
                                 }
                                 .buttonStyle(.bordered)
+                                .keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)
                                 .accessibilityIdentifier("taskCancelButton")
-                                // Stopping a deploy asks first (Russell's ruling on #988,
-                                // 2026-11-19). Alerts: "Always place the default button on the
-                                // trailing side"; "If you want to encourage people to read an alert
-                                // and not just automatically press Return to dismiss it, avoid making
-                                // any button the default button." In a SwiftUI alert only the
-                                // destructive role leaves the go-ahead with no Return
-                                // (`AlertKeysTests`), so Stop Deploy is destructive and Continue
-                                // Deploy holds Escape and Command-Period, which therefore never stop
-                                // a deploy without the question being read.
+                                // Stopping a deploy asks first (Russell's rulings on #988,
+                                // 2026-11-19). Stop Deploy is a plain button and the default,
+                                // so Return stops the deploy; Alerts: "Always place the default
+                                // button on the trailing side of a row or at the top of a stack",
+                                // and the destructive style is for "a destructive action people
+                                // didn't deliberately choose", which this is not. The other
+                                // button is Cancel ("Always use 'Cancel' to title a button that
+                                // cancels the alert's action"), with Escape and Command-Period.
+                                // The never-ask-again box waits for Russell's answer to the
+                                // design (vm-tools/reference/988-stop-questions-design.md).
                                 .alert(DeployStopWording.title, isPresented: $isAskingToStop) {
-                                    Button(DeployStopWording.continueButton, role: .cancel) {
-                                    }
-                                    .keyboardShortcut(.cancelAction)
-                                    .accessibilityIdentifier("continueDeployButton")
-                                    Button(DeployStopWording.stopButton, role: .destructive) {
+                                    Button(DeployStopWording.stopButton) {
                                         stopTheTask()
                                     }
+                                    .keyboardShortcut(.defaultAction)
                                     .accessibilityIdentifier("stopDeployButton")
+                                    Button(DeployStopWording.cancelButton, role: .cancel) {
+                                    }
+                                    .keyboardShortcut(.cancelAction)
+                                    .accessibilityIdentifier("cancelStopDeployButton")
                                 } message: {
                                     Text(DeployStopWording.message)
                                 }
@@ -567,15 +606,6 @@ struct TaskProgressView: View {
                 }
             )
         }
-        // Escape and Command-Period reach Cancel as AppKit's
-        // cancelOperation(_:), through the window's responder chain (#988
-        // review): `CancelOperationResponder` joins the chain while this
-        // panel is in a window, and leaves it when the panel goes.
-        .background(
-            CancelOperationInstaller(isEnabled: cancelKeysAreLive) {
-                pressCancel()
-            }
-        )
         .onChange(of: runIsUnderWay) {
             // A deploy that ends while its question is open has nothing
             // left to stop: the question goes.
