@@ -1225,6 +1225,14 @@ nonisolated extension UndoJournal {
                 if let folder = busy.step.workingFolder, resolveRoot(folder) == nil {
                     return .notAvailable
                 }
+                // Nothing is under way: a dead step that keeps a file true
+                // by a rule waits for a recovery that re-derives it (or for a
+                // runner to exist), which this plain path is not. Not
+                // available, never "under way" for ever (the third hard
+                // review of U2b, LOW 2).
+                if UndoRecovery.keepsAFileTrue(busy.step) {
+                    return .notAvailable
+                }
             }
             return .anotherChangeIsUnderWay
         case .step(let step):

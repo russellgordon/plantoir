@@ -211,4 +211,22 @@ final class UndoDoorGuardTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent("new.md").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
     }
+
+    /// The third hard review of U2b, LOW 2 (probe B): a dead step that keeps
+    /// a file true by a rule, behind plain undoNewest (which cannot
+    /// re-derive), is not available, never "under way" for ever.
+    func testAPlainUndoBehindADeadFrontPageStepIsNotAvailable() throws {
+        let made = try UndoContractReplay.scratch(under: parent, named: "b")
+        let root: URL = made.root
+        try UndoContractReplay.write("page\n", to: "courses/TST1O/a.md", in: root)
+        let move: UndoOp = UndoOp.moveFile(from: "courses/TST1O/a.md", to: "courses/TST1O/b.md", sha: UndoHash.sha256(of: Data("page\n".utf8)))
+        let recompute: UndoOp = UndoOp.recompute(path: "courses/TST1O/section1/index.md", maintainer: "sectionFrontPage", section: 1)
+        let dying: UndoJournal = UndoJournal(folderURL: made.journalFolder, process: UndoProcess(host: "h", pid: 2_000_000_002, name: "gone", started: "1"))
+        UndoKillPoints.hook = { point in point == .beforeApplied }
+        _ = JournaledWrite.perform(ops: UndoContractKinds.draft(ops: [move, recompute], blobs: [], root: root, action: "rollOver"), in: dying, mode: .live, places: UndoMemoryPlaces())
+        UndoKillPoints.hook = nil
+        let later: UndoJournal = UndoJournal(folderURL: made.journalFolder, processIsAlive: { process in process.pid != 2_000_000_002 })
+
+        XCTAssertEqual(later.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .notAvailable)
+    }
 }
