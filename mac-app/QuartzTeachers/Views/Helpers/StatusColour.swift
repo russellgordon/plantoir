@@ -23,7 +23,7 @@ import SwiftUI
 /// measures 4.29:1 on a grouped Form row, so Dark gets a lighter red.
 ///
 /// Every value is checked by `StatusColourTests` against the lightest and
-/// darkest backgrounds a sentence sits on, in all four appearances.
+/// darkest backgrounds a sentence sits on, in all four variants.
 enum StatusColour {
 
     // MARK: - Stored properties
@@ -88,38 +88,58 @@ enum StatusColour {
         return Text(words)
     }
 
-    /// The four variants of the caution orange. Light values are darker
-    /// versions of the system orange's hue.
+    /// The caution orange, resolved for the appearance it is drawn in and
+    /// for Increase Contrast.
     static let warningNSColor: NSColor = NSColor(
         name: "plantoirWarning",
-        dynamicProvider: StatusColour.warningVariant(for:)
+        dynamicProvider: StatusColour.resolvedWarning(for:)
     )
 
-    /// The stopping red, in its four variants.
+    /// The stopping red, resolved the same way.
     static let blockingNSColor: NSColor = NSColor(
         name: "plantoirBlocking",
-        dynamicProvider: StatusColour.blockingVariant(for:)
+        dynamicProvider: StatusColour.resolvedBlocking(for:)
     )
 
-    /// The caution orange for one appearance. `nonisolated`, as is
-    /// everything it calls, because AppKit asks a dynamic colour for its
-    /// value wherever it draws, not only on the main actor.
-    nonisolated static func warningVariant(for appearance: NSAppearance) -> NSColor {
-        switch StatusColour.variant(of: appearance) {
+    /// This kind's value in one of the four variants.
+    func value(for variant: AppearanceVariant) -> NSColor {
+        switch self {
+        case .warning:
+            return StatusColour.warningValue(for: variant)
+        case .blocking:
+            return StatusColour.blockingValue(for: variant)
+        }
+    }
+
+    /// The providers AppKit calls. They, and everything they call, are
+    /// `nonisolated` because AppKit asks a dynamic colour for its value
+    /// wherever it draws, not only on the main actor.
+    nonisolated static func resolvedWarning(for appearance: NSAppearance) -> NSColor {
+        return warningValue(for: variant(of: appearance, increasedContrast: systemIncreasesContrast()))
+    }
+
+    nonisolated static func resolvedBlocking(for appearance: NSAppearance) -> NSColor {
+        return blockingValue(for: variant(of: appearance, increasedContrast: systemIncreasesContrast()))
+    }
+
+    /// The caution orange's four values. Light values are darker versions
+    /// of the system orange's hue.
+    nonisolated static func warningValue(for variant: AppearanceVariant) -> NSColor {
+        switch variant {
         case .light:
             return NSColor(srgbRed: 168.0 / 255.0, green: 67.0 / 255.0, blue: 0.0, alpha: 1.0)
         case .lightIncreasedContrast:
             return NSColor(srgbRed: 122.0 / 255.0, green: 48.0 / 255.0, blue: 0.0, alpha: 1.0)
         case .dark, .darkIncreasedContrast:
             // The system orange passes in Dark, and carries its own
-            // Increase Contrast variant.
+            // Increase Contrast variant (R255 G160 B86, lighter still).
             return NSColor.systemOrange
         }
     }
 
-    /// The stopping red for one appearance.
-    nonisolated static func blockingVariant(for appearance: NSAppearance) -> NSColor {
-        switch StatusColour.variant(of: appearance) {
+    /// The stopping red's four values.
+    nonisolated static func blockingValue(for variant: AppearanceVariant) -> NSColor {
+        switch variant {
         case .light:
             return NSColor(srgbRed: 191.0 / 255.0, green: 0.0, blue: 25.0 / 255.0, alpha: 1.0)
         case .lightIncreasedContrast:
@@ -131,27 +151,29 @@ enum StatusColour {
         }
     }
 
-    /// Which of the four an appearance is. Increase Contrast shows itself to
-    /// an app as the high-contrast appearance names. `nonisolated` because
-    /// AppKit calls a dynamic colour's provider wherever it draws.
-    nonisolated static func variant(of appearance: NSAppearance) -> AppearanceVariant {
-        let names: [NSAppearance.Name] = [
-            .aqua,
-            .darkAqua,
-            .accessibilityHighContrastAqua,
-            .accessibilityHighContrastDarkAqua,
-        ]
-        let match: NSAppearance.Name? = appearance.bestMatch(from: names)
-        if match == .darkAqua {
-            return .dark
-        }
-        if match == .accessibilityHighContrastAqua {
-            return .lightIncreasedContrast
-        }
-        if match == .accessibilityHighContrastDarkAqua {
+    /// Which of the four applies. Light or Dark comes from the appearance.
+    /// Increase Contrast does NOT: on current macOS an appearance named
+    /// `.accessibilityHighContrastAqua` reports itself as plain `.aqua`
+    /// (measured 2026-11-19, `bestMatch(from:)` and `name` alike), so the
+    /// setting is read from the system instead.
+    nonisolated static func variant(of appearance: NSAppearance, increasedContrast: Bool) -> AppearanceVariant {
+        let match: NSAppearance.Name? = appearance.bestMatch(from: [.aqua, .darkAqua])
+        let isDark: Bool = match == .darkAqua
+        if isDark && increasedContrast {
             return .darkIncreasedContrast
         }
+        if isDark {
+            return .dark
+        }
+        if increasedContrast {
+            return .lightIncreasedContrast
+        }
         return .light
+    }
+
+    /// Whether the teacher has Increase Contrast turned on.
+    nonisolated static func systemIncreasesContrast() -> Bool {
+        return NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
     }
 
     /// The four appearances a colour must work in (HIG, Color: "Make sure

@@ -10,9 +10,9 @@ import XCTest
 ///
 /// The numbers are WCAG contrast ratios, the measure the HIG's Accessibility
 /// page uses: at least 4.5:1 for text up to 17 points. They are computed from
-/// the colour values; no system setting is changed. Increase Contrast reaches
-/// an app as the high-contrast appearance names, so each colour is resolved
-/// under all four.
+/// the colour values; no system setting is changed. Each colour's value is
+/// taken for all four variants (Light, Dark, and each with Increase
+/// Contrast) and resolved in the matching appearance.
 @MainActor
 final class StatusColourTests: XCTestCase {
 
@@ -69,10 +69,9 @@ final class StatusColourTests: XCTestCase {
     /// default values are the ones nearest the minimum.
     func testIncreaseContrastIsDarkerStillInLight() {
         let light: NSAppearance = NSAppearance(named: .aqua)!
-        let lightIncreased: NSAppearance = NSAppearance(named: .accessibilityHighContrastAqua)!
         for kind in [StatusColour.warning, StatusColour.blocking] {
-            let normal: String = StatusColourTests.hex(of: kind.nsColor, in: light)
-            let increased: String = StatusColourTests.hex(of: kind.nsColor, in: lightIncreased)
+            let normal: String = StatusColourTests.hex(of: kind.value(for: .light), in: light)
+            let increased: String = StatusColourTests.hex(of: kind.value(for: .lightIncreasedContrast), in: light)
             let kindName: String = "\(kind)"
             let normalRatio: Double = StatusColourTests.contrastRatio(normal, "FFFFFF")
             let increasedRatio: Double = StatusColourTests.contrastRatio(increased, "FFFFFF")
@@ -84,20 +83,21 @@ final class StatusColourTests: XCTestCase {
         }
     }
 
-    /// The four appearance names map to the four variants.
-    func testEachAppearanceIsReadAsItsOwnVariant() {
-        let light: StatusColour.AppearanceVariant = StatusColour.variant(of: NSAppearance(named: .aqua)!)
-        let dark: StatusColour.AppearanceVariant = StatusColour.variant(of: NSAppearance(named: .darkAqua)!)
-        let lightIncreased: StatusColour.AppearanceVariant = StatusColour.variant(
-            of: NSAppearance(named: .accessibilityHighContrastAqua)!
-        )
-        let darkIncreased: StatusColour.AppearanceVariant = StatusColour.variant(
-            of: NSAppearance(named: .accessibilityHighContrastDarkAqua)!
-        )
-        XCTAssertEqual(light, .light)
-        XCTAssertEqual(dark, .dark)
-        XCTAssertEqual(lightIncreased, .lightIncreasedContrast)
-        XCTAssertEqual(darkIncreased, .darkIncreasedContrast)
+    /// Light or Dark comes from the appearance, and Increase Contrast from
+    /// the system setting, giving the four variants. (An appearance named
+    /// `.accessibilityHighContrastAqua` reports itself as `.aqua` on current
+    /// macOS, which is why the setting is not read from the appearance.)
+    func testEachAppearanceAndSettingIsReadAsItsOwnVariant() {
+        let light: NSAppearance = NSAppearance(named: .aqua)!
+        let dark: NSAppearance = NSAppearance(named: .darkAqua)!
+        let plainLight: StatusColour.AppearanceVariant = StatusColour.variant(of: light, increasedContrast: false)
+        let plainDark: StatusColour.AppearanceVariant = StatusColour.variant(of: dark, increasedContrast: false)
+        let strongLight: StatusColour.AppearanceVariant = StatusColour.variant(of: light, increasedContrast: true)
+        let strongDark: StatusColour.AppearanceVariant = StatusColour.variant(of: dark, increasedContrast: true)
+        XCTAssertEqual(plainLight, .light)
+        XCTAssertEqual(plainDark, .dark)
+        XCTAssertEqual(strongLight, .lightIncreasedContrast)
+        XCTAssertEqual(strongDark, .darkIncreasedContrast)
     }
 
     // MARK: - Colour is never the only sign
@@ -172,23 +172,23 @@ final class StatusColourTests: XCTestCase {
     /// Fails for every background the colour is below the minimum on, in
     /// every appearance, naming the appearance, the value and the ratio.
     func assertReadable(_ kind: StatusColour, file: StaticString = #filePath, line: UInt = #line) {
-        let cases: [(NSAppearance.Name, [String], Bool)] = [
-            (.aqua, lightBackgrounds, false),
-            (.accessibilityHighContrastAqua, lightBackgrounds, true),
-            (.darkAqua, darkBackgrounds, false),
-            (.accessibilityHighContrastDarkAqua, darkBackgrounds, true),
+        let cases: [(StatusColour.AppearanceVariant, NSAppearance.Name, [String], Bool)] = [
+            (.light, .aqua, lightBackgrounds, false),
+            (.lightIncreasedContrast, .aqua, lightBackgrounds, true),
+            (.dark, .darkAqua, darkBackgrounds, false),
+            (.darkIncreasedContrast, .darkAqua, darkBackgrounds, true),
         ]
         let kindName: String = "\(kind)"
         let minimum: Double = minimumRatio
         let increasedMinimum: Double = increasedContrastRatio
-        for (name, backgrounds, isIncreased) in cases {
+        for (variant, name, backgrounds, isIncreased) in cases {
             let appearance: NSAppearance = NSAppearance(named: name)!
-            let foreground: String = StatusColourTests.hex(of: kind.nsColor, in: appearance)
+            let foreground: String = StatusColourTests.hex(of: kind.value(for: variant), in: appearance)
             for background in backgrounds {
                 let ratio: Double = StatusColourTests.contrastRatio(foreground, background)
                 XCTAssertGreaterThanOrEqual(
                     ratio, minimum,
-                    "\(kindName) in \(name.rawValue): #\(foreground) on #\(background) is \(ratio)",
+                    "\(kindName) in \(variant): #\(foreground) on #\(background) is \(ratio)",
                     file: file, line: line
                 )
             }
@@ -197,7 +197,7 @@ final class StatusColourTests: XCTestCase {
                 let ratio: Double = StatusColourTests.contrastRatio(foreground, plainest)
                 XCTAssertGreaterThanOrEqual(
                     ratio, increasedMinimum,
-                    "\(kindName) in \(name.rawValue): #\(foreground) on #\(plainest) is \(ratio)",
+                    "\(kindName) in \(variant): #\(foreground) on #\(plainest) is \(ratio)",
                     file: file, line: line
                 )
             }

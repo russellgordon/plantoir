@@ -1711,9 +1711,13 @@ Form row. Measured (WCAG ratio, on white / #E0E0E0 in Light, on #1E1E1E /
 | Caution orange | #A84300: 6.06 / 4.59 | #7A3000: 9.33 / 7.07 | system orange: 7.47 / 5.09 | the system's own variant |
 | Stopping red | #BF0019: 6.50 / 4.93 | #9E0014: 8.52 / 6.46 | #FF7D7F: 6.74 / 4.60 | #FF9496: 7.88 / 5.38 |
 
-Increase Contrast reaches the app as the high-contrast appearance names, so
-the dynamic colours pick their variant with `NSAppearance.bestMatch(from:)`.
-`StatusColourTests` resolves each under all four names and checks every
+Light or Dark comes from the appearance (`bestMatch(from: [.aqua,
+.darkAqua])`); Increase Contrast comes from
+`NSWorkspace.accessibilityDisplayShouldIncreaseContrast`, because on current
+macOS an appearance made as `.accessibilityHighContrastAqua` reports itself
+as plain `.aqua` (measured 2026-11-19: `name` and `bestMatch` alike, so a
+first version that read the appearance never chose the stronger values).
+`StatusColourTests` takes each value in all four variants and checks every
 background above; it also scans `Views/` and fails on any `.orange`, `.red`,
 `Color.orange`, `Color.red`, `.systemOrange` or `.systemRed`, so a new
 sentence cannot go back to a colour that fails. **Rejected:** keeping the
