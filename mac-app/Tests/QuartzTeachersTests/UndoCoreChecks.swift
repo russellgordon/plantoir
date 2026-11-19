@@ -370,4 +370,220 @@ enum UndoCoreChecks {
         }
         return failures
     }
+
+    /// A segment of the list that cannot be OPENED (EIO, EACCES, EMFILE) is
+    /// an unreadable list, never a segment skipped (the review of U2a,
+    /// MEDIUM): a fold missing its newest segment would reuse step numbers
+    /// and let Undo act on an older step past a newer one. Only a segment
+    /// that is gone (pruned by another process) is passed over.
+    static func aSegmentThatCannotBeOpenedIsAnUnreadableList(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "open-fails")
+        let page: String = "p.md"
+        try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: page, in: place.root)
+        _ = UndoContractReplay.writeSteps(count: 2, onPage: page, root: place.root, journalFolder: place.journalFolder)
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        _ = try journal.read()
+        defer {
+            UndoKillPoints.openFails = nil
+        }
+        UndoKillPoints.openFails = { url in url.deletingLastPathComponent().standardizedFileURL == place.journalFolder.standardizedFileURL }
+        do {
+            _ = try journal.read()
+            failures.append("reading on with a segment that cannot be opened did not throw")
+        } catch {
+            if error as? UndoJournalError != .couldNotRead {
+                failures.append("reading on threw \(error), not couldNotRead")
+            }
+        }
+        UndoFoldCache.forget(place.journalFolder)
+        do {
+            _ = try journal.read()
+            failures.append("reading whole with a segment that cannot be opened did not throw")
+        } catch {
+            if error as? UndoJournalError != .couldNotRead {
+                failures.append("reading whole threw \(error), not couldNotRead")
+            }
+        }
+        let pageBefore: String? = UndoContractReplay.hash(of: page, in: place.root)
+        let flip: [UndoFileChange] = UndoContractReplay.changes(setting: [(path: page, key: "publish", line: "publish: true")], in: place.root)
+        let live: JournaledWriteOutcome = JournaledWrite.perform(
+            UndoContractReplay.draft(changes: flip, root: place.root, action: "publishPages"), in: journal, mode: .live
+        )
+        if live != .couldNotRecordTheStep {
+            failures.append("a live step came to \(live), not couldNotRecordTheStep")
+        }
+        let undo: UndoOutcome = journal.undoNewest(resolveRoot: { _ in place.root })
+        if undo != .listUnavailable {
+            failures.append("an undo came to \(undo), not listUnavailable")
+        }
+        if UndoContractReplay.hash(of: page, in: place.root) != pageBefore {
+            failures.append("the page was changed while the list could not be opened")
+        }
+        UndoKillPoints.openFails = nil
+        UndoFoldCache.forget(place.journalFolder)
+        let fold: UndoFold = try journal.read()
+        if fold.highestSeq != 2 || fold.records[2]?.phase != .done {
+            failures.append("the list afterwards holds \(fold.highestSeq) steps with the newest \(fold.records[2]?.phase.rawValue ?? "missing"), not 2 with the newest done")
+        }
+        return failures
+    }
+
+    /// A blob that is there but cannot be read is not content missing: an
+    /// Undo is refused as the list being unavailable, and the list is NOT
+    /// cleared (the review of U2a's sweep of `try?` reads). Missing content
+    /// can never come back; a read error can.
+    static func aBlobThatCannotBeReadLeavesTheListAlone(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "blob-fails")
+        let page: String = "p.md"
+        let before: String = "---\npublish: false\n---\nBody.\n"
+        let after: String = "---\npublish: true\n---\nBody.\nA new line.\n"
+        try UndoContractReplay.write(before, to: page, in: place.root)
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        let change: UndoFileChange = UndoFileChange(relativePath: page, before: Data(before.utf8), after: Data(after.utf8))
+        if JournaledWrite.ops(for: change).first?.knownKind != .writeFile {
+            failures.append("the step is not a whole-file step")
+        }
+        try UndoContractReplay.write(before, to: page, in: place.root)
+        let made: JournaledWriteOutcome = JournaledWrite.perform(
+            UndoContractReplay.draft(changes: [change], root: place.root, action: "publishPages"), in: journal, mode: .live
+        )
+        if made != .applied(seq: 1) {
+            failures.append("the step came to \(made)")
+        }
+        defer {
+            UndoKillPoints.openFails = nil
+        }
+        UndoKillPoints.openFails = { url in url.path.contains("/content/") }
+        let refused: UndoOutcome = journal.undoNewest(resolveRoot: { _ in place.root })
+        if refused != .listUnavailable {
+            failures.append("an undo with a blob that cannot be read came to \(refused), not listUnavailable")
+        }
+        if UndoContractReplay.hash(of: page, in: place.root) != UndoHash.sha256(of: Data(after.utf8)) {
+            failures.append("the page was changed")
+        }
+        UndoKillPoints.openFails = nil
+        let fold: UndoFold = try journal.read()
+        if fold.records[1]?.phase != .done || fold.offer(now: Date()).head?.step.seq != 1 {
+            failures.append("the list was changed: the step is \(fold.records[1]?.phase.rawValue ?? "missing")")
+        }
+        let undone: UndoOutcome = journal.undoNewest(resolveRoot: { _ in place.root })
+        if undone != .undone(seq: 1) {
+            failures.append("once the blob could be read the undo came to \(undone)")
+        }
+        return failures
+    }
+
+    /// A folder's identifier file that cannot be read for an error (not one
+    /// holding no identifier) is never set aside: setting it aside would
+    /// give the folder a new identifier, and every step under the old one
+    /// would be out of reach for good. The step is not recorded instead.
+    static func anIdentifierThatCannotBeReadIsNotSetAside(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "identifier-fails")
+        let page: String = "p.md"
+        try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: page, in: place.root)
+        let identifier: String = try FolderIdentityFile.identifier(forWorkingFolder: place.root)
+        let fileURL: URL = FolderIdentityFile.fileURL(forWorkingFolder: place.root)
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        defer {
+            UndoKillPoints.openFails = nil
+        }
+        UndoKillPoints.openFails = { url in url.lastPathComponent == "folder-id" }
+        let flip: [UndoFileChange] = UndoContractReplay.changes(setting: [(path: page, key: "publish", line: "publish: true")], in: place.root)
+        let live: JournaledWriteOutcome = JournaledWrite.perform(
+            UndoContractReplay.draft(changes: flip, root: place.root, action: "publishPages"), in: journal, mode: .live
+        )
+        if live != .couldNotRecordTheStep {
+            failures.append("a live step came to \(live), not couldNotRecordTheStep")
+        }
+        UndoKillPoints.openFails = nil
+        let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: fileURL.deletingLastPathComponent().path)) ?? []
+        for name in names where name.hasPrefix("folder-id.unreadable-") {
+            failures.append("the identifier file was set aside as \(name)")
+        }
+        if (try? FolderIdentityFile.identifier(forWorkingFolder: place.root)) != identifier {
+            failures.append("the folder's identifier changed")
+        }
+        return failures
+    }
+
+    /// Keeping the original under a second name falls back to a copy on a
+    /// volume without hard links, and a copy that fails for room or
+    /// permission is `couldNotWrite`, not `fileIsInUse` (the review of
+    /// U2a, LOW 1). Any other failure there stays `fileIsInUse`.
+    static func keepingTheOriginalWithNoRoomIsCouldNotWrite(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let answers: [(failure: Int32, word: String)] = [(failure: ENOSPC, word: "couldNotWrite"), (failure: EACCES, word: "couldNotWrite"), (failure: EBUSY, word: "fileIsInUse")]
+        defer {
+            UndoKillPoints.keepingTheOriginalFails = nil
+        }
+        var number: Int = 0
+        for answer in answers {
+            number += 1
+            let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "keep-fails-\(number)")
+            let pages: [String] = ["a.md", "b.md"]
+            var edits: [(path: String, key: String, line: String)] = []
+            for page in pages {
+                try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: page, in: place.root)
+                edits.append((path: page, key: "publish", line: "publish: true"))
+            }
+            var before: [String?] = []
+            for page in pages {
+                before.append(UndoContractReplay.hash(of: page, in: place.root))
+            }
+            let failure: Int32 = answer.failure
+            UndoKillPoints.keepingTheOriginalFails = { index in index == 1 ? failure : nil }
+            let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+            let outcome: JournaledWriteOutcome = JournaledWrite.perform(
+                UndoContractReplay.draft(changes: UndoContractReplay.changes(setting: edits, in: place.root), root: place.root, action: "publishPages"),
+                in: journal, mode: .live
+            )
+            UndoKillPoints.keepingTheOriginalFails = nil
+            var word: String = "\(outcome)"
+            if outcome == .refused(.couldNotWrite(path: "b.md")) {
+                word = "couldNotWrite"
+            } else if outcome == .refused(.fileIsInUse(path: "b.md")) {
+                word = "fileIsInUse"
+            }
+            if word != answer.word {
+                failures.append("keeping the original failing with \(failure) came to \(word), not \(answer.word)")
+            }
+            var after: [String?] = []
+            for page in pages {
+                after.append(UndoContractReplay.hash(of: page, in: place.root))
+            }
+            if after != before {
+                failures.append("with \(failure) a page was left changed")
+            }
+            if UndoContractReplay.staysBeside(place.root) {
+                failures.append("with \(failure) a staged file was left beside a page")
+            }
+        }
+        return failures
+    }
+
+    /// A later op on a path whose content is missing from the list is not
+    /// judged against the content as it was before that op (the review of
+    /// U2a, LOW 2): two whole-file ops on one page, the blob between them
+    /// gone, answer contentMissing, never changedSince.
+    static func aLaterOpOnAPathWithMissingContentIsNotJudgedStale(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "stale-path")
+        let first: Data = Data("first\n".utf8)
+        let second: Data = Data("second\n".utf8)
+        let third: Data = Data("third\n".utf8)
+        try third.write(to: place.root.appendingPathComponent("p.md"))
+        let ops: [UndoOp] = [
+            UndoOp.writeFile(path: "p.md", beforeSha: UndoHash.sha256(of: first), afterSha: UndoHash.sha256(of: second)),
+            UndoOp.writeFile(path: "p.md", beforeSha: UndoHash.sha256(of: second), afterSha: UndoHash.sha256(of: third)),
+        ]
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        let plan: UndoPlan = UndoCheck.plan(ops, direction: .backward, root: place.root, journal: journal)
+        if plan != .refused(.contentMissing(path: "p.md")) {
+            failures.append("the plan came to \(plan), not contentMissing for p.md")
+        }
+        return failures
+    }
 }

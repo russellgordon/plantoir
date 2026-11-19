@@ -62,4 +62,29 @@ final class UndoJournalCoreTests: XCTestCase {
     func testAReadThatFailsIsAnUnreadableList() throws {
         XCTAssertEqual(try UndoCoreChecks.aReadThatFailsIsAnUnreadableList(under: scratchURL), [])
     }
+
+    /// The review of U2a: MEDIUM, a segment that cannot be opened.
+    func testASegmentThatCannotBeOpenedIsAnUnreadableList() throws {
+        XCTAssertEqual(try UndoCoreChecks.aSegmentThatCannotBeOpenedIsAnUnreadableList(under: scratchURL), [])
+    }
+
+    /// The review of U2a's sweep: a blob that cannot be read.
+    func testABlobThatCannotBeReadLeavesTheListAlone() throws {
+        XCTAssertEqual(try UndoCoreChecks.aBlobThatCannotBeReadLeavesTheListAlone(under: scratchURL), [])
+    }
+
+    /// The review of U2a's sweep: the folder's identifier file.
+    func testAnIdentifierThatCannotBeReadIsNotSetAside() throws {
+        XCTAssertEqual(try UndoCoreChecks.anIdentifierThatCannotBeReadIsNotSetAside(under: scratchURL), [])
+    }
+
+    /// The review of U2a: LOW 1.
+    func testKeepingTheOriginalWithNoRoomIsCouldNotWrite() throws {
+        XCTAssertEqual(try UndoCoreChecks.keepingTheOriginalWithNoRoomIsCouldNotWrite(under: scratchURL), [])
+    }
+
+    /// The review of U2a: LOW 2.
+    func testALaterOpOnAPathWithMissingContentIsNotJudgedStale() throws {
+        XCTAssertEqual(try UndoCoreChecks.aLaterOpOnAPathWithMissingContentIsNotJudgedStale(under: scratchURL), [])
+    }
 }
