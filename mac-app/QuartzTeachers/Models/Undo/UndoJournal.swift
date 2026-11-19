@@ -711,6 +711,37 @@ nonisolated enum UndoJournalError: Error, Equatable {
     case couldNotEncode
     case notTheNewestStep(Int)
     case identifierBeingMade
+    /// A read of the list itself failed (a failing disk, a network home
+    /// that dropped mid-read): the list is unreadable for this attempt.
+    case couldNotRead
+}
+
+/// The one way the list's own files are read (the Fable sweep of U1, F4).
+///
+/// `FileHandle.read(upToCount:)` throws on a read error, where the legacy
+/// `readData(ofLength:)` raises an Objective-C exception that Swift cannot
+/// catch, which would end the app inside Publish. A throw here makes the
+/// list unreadable for this attempt: a step in shadow goes ahead without a
+/// record, and a live step, Undo or Redo is refused before anything
+/// changes.
+nonisolated enum UndoFileReads {
+
+    // MARK: - Functions
+
+    /// Up to `count` bytes from where the handle stands; empty at the end.
+    static func read(_ handle: FileHandle, upToCount count: Int) throws -> Data {
+        if UndoKillPoints.readOfTheListFails?() == true {
+            throw UndoJournalError.couldNotRead
+        }
+        if count <= 0 {
+            return Data()
+        }
+        do {
+            return try handle.read(upToCount: count) ?? Data()
+        } catch {
+            throw UndoJournalError.couldNotRead
+        }
+    }
 }
 
 /// The one hash.

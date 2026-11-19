@@ -233,4 +233,141 @@ enum UndoCoreChecks {
         }
         return failures
     }
+
+    /// A staging write that fails, as on a full disk, removes the staged
+    /// file it made and refuses with its own word, not `fileIsInUse` (the
+    /// Fable sweep of U1, F1: measured on a 3 MB disk image, a refused step
+    /// left `.a.md.plantoir-undo-2-apply-new` beside the page for good).
+    static func aStagingWriteThatFailsLeavesNothing(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "staging-fails")
+        let pages: [String] = ["courses/TST1O/Section 1/Classes/a.md", "courses/TST1O/Section 1/Classes/b.md"]
+        var edits: [(path: String, key: String, line: String)] = []
+        for page in pages {
+            try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: page, in: place.root)
+            edits.append((path: page, key: "publish", line: "publish: true"))
+        }
+        var before: [String?] = []
+        for page in pages {
+            before.append(UndoContractReplay.hash(of: page, in: place.root))
+        }
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        defer {
+            UndoKillPoints.stagingWriteFailsAt = nil
+        }
+        UndoKillPoints.stagingWriteFailsAt = { index in index == 1 }
+        let changes: [UndoFileChange] = UndoContractReplay.changes(setting: edits, in: place.root)
+        let outcome: JournaledWriteOutcome = JournaledWrite.perform(
+            UndoContractReplay.draft(changes: changes, root: place.root, action: "publishPages"), in: journal, mode: .live
+        )
+        UndoKillPoints.stagingWriteFailsAt = nil
+        if outcome != .refused(.couldNotWrite(path: pages[1])) {
+            failures.append("the step came to \(outcome), not refused couldNotWrite naming b.md")
+        }
+        var after: [String?] = []
+        for page in pages {
+            after.append(UndoContractReplay.hash(of: page, in: place.root))
+        }
+        if after != before {
+            failures.append("a page was written")
+        }
+        if UndoContractReplay.staysBeside(place.root) {
+            failures.append("a staged file was left beside a page")
+        }
+        let fold: UndoFold = try journal.read()
+        if fold.records[1]?.phase != .failed {
+            failures.append("the step is \(fold.records[1]?.phase.rawValue ?? "missing"), not failed")
+        }
+        return failures
+    }
+
+    /// A read of the list that fails, as on a failing disk or a network home
+    /// that drops mid-read, is a throw, never an exception that ends the
+    /// app (the Fable sweep of U1, F4): the list is unreadable for this
+    /// attempt, a live step and an Undo are refused before anything changes,
+    /// and a step in shadow goes ahead without a record.
+    static func aReadThatFailsIsAnUnreadableList(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "read-fails")
+        let page: String = "p.md"
+        try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: page, in: place.root)
+        _ = UndoContractReplay.writeSteps(count: 1, onPage: page, root: place.root, journalFolder: place.journalFolder)
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        _ = try journal.read()
+        defer {
+            UndoKillPoints.readOfTheListFails = nil
+        }
+
+        // Reading on from a warm fold, and reading whole.
+        let back: [UndoFileChange] = UndoContractReplay.changes(setting: [(path: page, key: "publish", line: "publish: false")], in: place.root)
+        let second: JournaledWriteOutcome = JournaledWrite.perform(
+            UndoContractReplay.draft(changes: back, root: place.root, action: "publishPages"), in: journal, mode: .live
+        )
+        if second != .applied(seq: 2) {
+            failures.append("the second step came to \(second), not applied as step 2")
+        }
+        UndoKillPoints.readOfTheListFails = { true }
+        do {
+            _ = try journal.read()
+            failures.append("reading on from a warm fold did not throw")
+        } catch {
+            if error as? UndoJournalError != .couldNotRead {
+                failures.append("reading on threw \(error), not couldNotRead")
+            }
+        }
+        UndoFoldCache.forget(place.journalFolder)
+        do {
+            _ = try journal.read()
+            failures.append("reading whole did not throw")
+        } catch {
+            if error as? UndoJournalError != .couldNotRead {
+                failures.append("reading whole threw \(error), not couldNotRead")
+            }
+        }
+
+        // A live step is refused before anything changes.
+        let pageBefore: String? = UndoContractReplay.hash(of: page, in: place.root)
+        let flip: [UndoFileChange] = UndoContractReplay.changes(setting: [(path: page, key: "publish", line: "publish: true")], in: place.root)
+        let live: JournaledWriteOutcome = JournaledWrite.perform(
+            UndoContractReplay.draft(changes: flip, root: place.root, action: "publishPages"), in: journal, mode: .live
+        )
+        if live != .couldNotRecordTheStep {
+            failures.append("a live step came to \(live), not couldNotRecordTheStep")
+        }
+        if UndoContractReplay.hash(of: page, in: place.root) != pageBefore {
+            failures.append("a live step changed the page")
+        }
+
+        // An Undo is refused before anything changes.
+        let undo: UndoOutcome = journal.undoNewest(resolveRoot: { _ in place.root })
+        if undo != .listUnavailable {
+            failures.append("an undo came to \(undo), not listUnavailable")
+        }
+        if UndoContractReplay.hash(of: page, in: place.root) != pageBefore {
+            failures.append("an undo changed the page")
+        }
+
+        // A step in shadow goes ahead as it would have.
+        let shadow: JournaledWriteOutcome = JournaledWrite.perform(
+            UndoContractReplay.draft(changes: flip, root: place.root, action: "publishPages"), in: journal, mode: .shadow
+        )
+        if shadow != .appliedWithoutARecord {
+            failures.append("a step in shadow came to \(shadow), not appliedWithoutARecord")
+        }
+        if UndoContractReplay.hash(of: page, in: place.root) == pageBefore {
+            failures.append("a step in shadow did not change the page")
+        }
+
+        // Once reads work again, the list is as it was: two steps.
+        UndoKillPoints.readOfTheListFails = nil
+        UndoFoldCache.forget(place.journalFolder)
+        let fold: UndoFold = try journal.read()
+        if fold.highestSeq != 2 {
+            failures.append("the list read afterwards holds \(fold.highestSeq) steps, not 2")
+        }
+        if UndoContractReplay.staysBeside(place.root) {
+            failures.append("a staged file was left beside a page")
+        }
+        return failures
+    }
 }

@@ -52,4 +52,14 @@ final class UndoJournalCoreTests: XCTestCase {
     func testTheLockWaitsForTheGrant() throws {
         XCTAssertEqual(try UndoCoreChecks.lockWaitsForTheGrant(under: scratchURL), [])
     }
+
+    /// F1 of the Fable sweep of U1.
+    func testAStagingWriteThatFailsLeavesNothing() throws {
+        XCTAssertEqual(try UndoCoreChecks.aStagingWriteThatFailsLeavesNothing(under: scratchURL), [])
+    }
+
+    /// F4 of the Fable sweep of U1.
+    func testAReadThatFailsIsAnUnreadableList() throws {
+        XCTAssertEqual(try UndoCoreChecks.aReadThatFailsIsAnUnreadableList(under: scratchURL), [])
+    }
 }

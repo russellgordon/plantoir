@@ -719,7 +719,7 @@ nonisolated extension UndoJournal {
                 return false
             }
             reason = .contentMissing
-        case .fileIsInUse, .notReadable:
+        case .fileIsInUse, .couldNotWrite, .notReadable:
             return false
         }
         if direction == .backward {
