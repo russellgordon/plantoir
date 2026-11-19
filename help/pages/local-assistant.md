@@ -108,7 +108,7 @@ After you have agreed a few times, the assistant may tell you, once, that there 
 
 Each of the two named rows gives its download size and the memory it uses while it works. If you pick one that is too big for this {{machine}}'s memory, an orange caution names both amounts. The caution does not stop you.
 
-**{{control:assistantOnThisMacGroup}}** has a row for each assistant. The row says whether it is downloaded and how large it is. Its button is {{control:assistantDownloadButton}}, {{control:assistantStopButton}} while it downloads, or {{control:assistantRemoveButton}}.
+**{{control:assistantOnThisMacGroup}}** has a row for each assistant. The row says whether it is downloaded and how large it is. Its button is {{control:assistantDownloadButton}}, {{control:assistantStopButton}} while it downloads, or {{control:assistantRemoveButton}}, which asks before it deletes the download.
 
 ## If it does not work
 

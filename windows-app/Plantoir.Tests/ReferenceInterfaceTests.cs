@@ -41,7 +41,7 @@ public class ReferenceInterfaceTests
     }
 
     /// <summary>
-    /// #527: a reference section's ROW offers no Cancel Scheduled Deploy…, so
+    /// #527: a reference section's ROW offers no Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987), so
     /// it agrees with the menu bar (<c>subjectMenus</c> leaves
     /// cancelScheduledDeploy out for a course kept for reference). Nothing is
     /// left for one to stop: every read of the folder turns such a deploy off
@@ -55,7 +55,7 @@ public class ReferenceInterfaceTests
         string sidebar = Source("Plantoir", "Views", "SidebarPane.Reference.cs");
         string courseMenu = Between(sidebar, "private MenuFlyout ReferenceCourseMenu(", "private MenuFlyout ReferenceSectionMenu(");
         string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "// ---- The calm note");
-        foreach (string door in new[] { "Cancel Scheduled Deploy", "ConfirmCancelScheduledDeploy", "TaskScheduling" })
+        foreach (string door in new[] { "Remove Scheduled Deploy", "ScheduledDeployRemovalWording", "ConfirmCancelScheduledDeploy", "TaskScheduling" })
         {
             Assert.DoesNotContain(door, sectionMenu);
             Assert.DoesNotContain(door, courseMenu);

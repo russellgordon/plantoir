@@ -204,6 +204,10 @@ enum QuitConfirmation {
 
         let title: String
         let choice: Choice
+
+        /// The key the button answers: Escape for Cancel, and nothing for
+        /// Quit Anyway, so no button is the default (#987).
+        let keyEquivalent: String
     }
 
     // MARK: - Stored properties
@@ -278,38 +282,34 @@ enum QuitConfirmation {
     static let settingUpMessage: String =
         "Quitting now stops it. The next time Plantoir opens, it finishes the set-up or takes away what it had added."
 
-    /// The first button's title while set-ups are the only work under way
-    /// (#855, Russell 2026-11-13 evening: the set-up question has its own
-    /// buttons). It still means `keepWorking`; `buttons.firstButtonByQuestion`.
-    static let finishSettingUpButton: String = "Finish Setting Up"
-
-    static let keepWorkingButton: String = "Keep Working"
+    /// The button that keeps working (#987, D7). It was "Keep Working", or
+    /// "Finish Setting Up" while set-ups were all that was under way (#855).
+    /// Alerts: "Always use 'Cancel' to title a button that cancels the
+    /// alert's action", and NSAlert gives Escape and Command-Period to the
+    /// button titled Cancel; with neither title titled so, Escape had no
+    /// button (D7). The choice it makes is still `keepWorking`.
+    static let keepWorkingButton: String = "Cancel"
     static let quitAnywayButton: String = "Quit Anyway"
 
-    /// The buttons in the order they are put up. The FIRST is the default
-    /// one, and the safe answer is the default answer: a teacher who presses
-    /// Return without reading keeps their work.
+    /// The buttons in the order `NSAlert` is given them, which puts the
+    /// first on the trailing side (#987): Quit Anyway trails, and Cancel
+    /// leads. Alerts: "Cancel buttons are typically on the leading side of a
+    /// row." NO button is the default, so a Return pressed without reading
+    /// does nothing: Alerts, "Note that you don't want to make a Cancel
+    /// button the default button", and Quit Anyway can leave a deploy part
+    /// way (Buttons ▸ Role: "Don't assign the primary role to a button that
+    /// performs a destructive action"). Until #987 Keep Working was first
+    /// and the default. No default was kept on review (#987, the director's
+    /// call, 2026-11-18).
     static let buttonsInOrder: [Button] = [
-        Button(title: keepWorkingButton, choice: .keepWorking),
-        Button(title: quitAnywayButton, choice: .quitAnyway)
+        Button(title: quitAnywayButton, choice: .quitAnyway, keyEquivalent: ""),
+        Button(title: keepWorkingButton, choice: .keepWorking, keyEquivalent: "\u{1b}")
     ]
 
     // MARK: - Functions
 
-    /// The buttons for the question about `workUnderWay`, in the same order
-    /// and with the same meanings as `buttonsInOrder`: only the first title
-    /// changes, to Finish Setting Up, when set-ups are all that is under way.
-    static func buttons(onlySettingUp: Bool) -> [Button] {
-        if !onlySettingUp {
-            return buttonsInOrder
-        }
-        return [
-            Button(title: finishSettingUpButton, choice: .keepWorking),
-            Button(title: quitAnywayButton, choice: .quitAnyway)
-        ]
-    }
-
-    /// Whether the work under way now is set-ups and nothing else.
+    /// Whether the work under way now is set-ups and nothing else, which
+    /// chooses the message under the question (#855).
     static func onlySettingUpNow() -> Bool {
         return CourseActivity.activePublishes.isEmpty
             && CourseActivity.activePreviewBuilds.isEmpty

@@ -16,8 +16,9 @@ import XCTest
 /// - **Hidden items are skipped**: Edit carries hidden Start Dictation and
 ///   Emoji & Symbols alternates, and Help a hidden ⌥⌘S "Toggle Sidebar".
 /// - **Titles, keys and dividers only** — never enablement, which follows the
-///   selection and is `SubjectMenuRules`' to pin; and the two titles that
-///   change with state (Stop Preview, "Cancel Deploy at 6:30 AM…") are read
+///   selection and is `SubjectMenuRules`' to pin; and the title that
+///   changes with state (Stop Preview; Remove Scheduled Deploy… no longer
+///   carries the time since #987) is read
 ///   back in their resting form — and so are Preview and its Option
 ///   alternate (#504), which the teacher's setting swaps.
 ///
@@ -85,9 +86,6 @@ final class MenuBarTreeTests: XCTestCase {
                 title = PreviewStartPageWording.preview
             } else if title == PreviewStartPageWording.preview && item.isAlternate {
                 title = PreviewStartPageWording.previewAtLastViewed
-            }
-            if title.hasPrefix("Cancel Deploy at ") {
-                title = "Cancel Deploy at…"
             }
             var line: String = pad + title
             let key: String = keyText(item)

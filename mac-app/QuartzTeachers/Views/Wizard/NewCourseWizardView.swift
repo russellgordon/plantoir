@@ -327,6 +327,65 @@ struct NewCourseWizardView: View {
         return NewCourseWizardView.sectionNumbersProblem(sectionNumbersText)
     }
 
+    /// Whether the form holds everything Create Course needs from the
+    /// teacher (#987, D32): a course code with no problem, a name typed,
+    /// section numbers, a class-page word and, for a club, a class folder,
+    /// each of which `startCreation` would accept. Only then is Create
+    /// Course the default button, so a Return typed in the course-code
+    /// field of a half-filled form still does nothing (the #457 review's
+    /// measurement: it once made a club named by its code, its name empty).
+    /// The checks that need Settings (Deploying) stay in `startCreation`,
+    /// which refuses with a sentence as before.
+    var formIsComplete: Bool {
+        if courseCode.trimmingCharacters(in: .whitespaces).isEmpty || courseCodeProblem != nil {
+            return false
+        }
+        if courseName.trimmingCharacters(in: .whitespaces).isEmpty {
+            return false
+        }
+        if NewCourseWizardView.sectionNumbersProblem(sectionNumbersText) != nil {
+            return false
+        }
+        if ClassPageTerm.problem(with: unitWord) != nil {
+            return false
+        }
+        if isClubCourse && NewCourseWizardView.clubClassFolderProblem(classFolderName, perSectionFolders: perSectionFolders) != nil {
+            return false
+        }
+        return workspace.workspaceURL != nil
+    }
+
+    /// Whether Create Course takes Return (#987): once the form is complete
+    /// (D32), and not while the course-code list is shown, where Return
+    /// chooses the highlighted code (the #987 review). A default button's
+    /// key equivalent is offered the press before the focused field's
+    /// `onKeyPress`, so with both, Return created the course instead.
+    static func createCourseIsTheDefault(formIsComplete: Bool, suggestionsAreShown: Bool) -> Bool {
+        if suggestionsAreShown {
+            return false
+        }
+        return formIsComplete
+    }
+
+    /// Whether the Cancel button answers Escape and Command-Period (#987):
+    /// not while the course-code list is shown (the field's Escape puts it
+    /// away first), and not while the course is being made (Russell,
+    /// 2026-11-18: Escape does nothing then, as before #987).
+    static func cancelAnswersEscape(suggestionsAreShown: Bool, isCreating: Bool) -> Bool {
+        if suggestionsAreShown || isCreating {
+            return false
+        }
+        return true
+    }
+
+    /// `cancelAnswersEscape` for the sheet as it stands.
+    var escapeIsCancelNow: Bool {
+        return NewCourseWizardView.cancelAnswersEscape(
+            suggestionsAreShown: courseCodeSuggestionsAreShown,
+            isCreating: creator.isCreating
+        )
+    }
+
     /// The problem with the code as typed, live.
     ///
     /// Shown under the field AND checked again at Create, so the explanation
@@ -949,13 +1008,25 @@ struct NewCourseWizardView: View {
                 // cancel; the affirmative action (Create Course / Done)
                 // is always bottom-right, per macOS convention.
                 if !hasStarted || creator.isCreating {
-                    Button("Cancel") {
+                    // Escape and Command-Period, the same way as every
+                    // Cancel since #987, until Create Course is pressed —
+                    // except while the course-code list is open, when the
+                    // first Escape is the field's, to put the list away
+                    // (`PickerEscape`): a key equivalent on the button would
+                    // be offered the press first. While the course is being
+                    // made Escape does nothing, as before #987 (Russell,
+                    // 2026-11-18): the button still stops it when clicked,
+                    // but a stray Escape must not end a course part way.
+                    // Once it has finished, Escape closes the sheet again
+                    // (`interactiveDismissDisabled` lifts).
+                    Button("Cancel", role: .cancel) {
                         if creator.isCreating {
                             creator.cancel()
                         }
                         workspace.reloadCourses()
                         dismiss()
                     }
+                    .keyboardShortcut(escapeIsCancelNow ? .cancelAction : nil)
                     .accessibilityIdentifier("wizardCloseButton")
                 }
 
@@ -987,14 +1058,31 @@ struct NewCourseWizardView: View {
                     // Greyed while the folder is getting ready (#476), with
                     // the reason; `NewCourseCreator` refuses as well, before
                     // it writes, for a wizard opened before the copy began.
-                    // The accent, but NOT Return (#457, the HIG sweep's
-                    // review, measured 2026-10-08): as the default button,
-                    // a Return typed in the Course code field — with no row
-                    // highlighted — created a club named by the code with
-                    // its name empty and the rest of the form unread. A long
-                    // form is finished with a click; the accent comes off
-                    // while the button cannot be pressed.
-                    .prominentButton(isEnabled: !workspace.folderIsGettingReady)
+                    // The default button once the form is complete (#987,
+                    // D32, Russell's ruling Q7 on #975). Buttons ▸ Role:
+                    // "Assign the primary role to the button people are most
+                    // likely to choose"; "Primary. The button is the default
+                    // button". Until #987 it wore the accent without Return,
+                    // so it looked like the default and was not one. Not
+                    // before the form is complete (`formIsComplete`): as the
+                    // default from the start, a Return typed in the Course
+                    // code field with no row highlighted created a club named
+                    // by the code with its name empty (#457, the HIG sweep's
+                    // review, measured 2026-10-08). The accent comes off
+                    // while it is not the default or cannot be pressed.
+                    // And not while the course-code list is shown (#987
+                    // review): a default button's Return is offered to the
+                    // window before the field's `onKeyPress`, so it would
+                    // create the course where the teacher meant to choose
+                    // the highlighted code (measured,
+                    // `QuestionKeysTests.testReturnInTheCodeFieldChoosesTheSuggestion`).
+                    .defaultButton(
+                        isEnabled: !workspace.folderIsGettingReady,
+                        isTheDefault: NewCourseWizardView.createCourseIsTheDefault(
+                            formIsComplete: formIsComplete,
+                            suggestionsAreShown: courseCodeSuggestionsAreShown
+                        )
+                    )
                     .help(workspace.folderReadinessReason ?? "")
                     .accessibilityIdentifier("createCourseButton")
                 } else {
@@ -1665,9 +1753,11 @@ struct NewCourseWizardView: View {
 
     /// Return pressed in the field: takes the highlighted row if the
     /// teacher has walked to one. Returns false otherwise, so Return
-    /// goes on to the sheet — which has no default button, so it does
-    /// nothing there (#457, the HIG sweep's review: as the default,
-    /// Create Course was pressed with the form unread).
+    /// goes on to the sheet, whose Create Course takes it only once the
+    /// form is complete and the list is away (#987,
+    /// `createCourseIsTheDefault`; #457, the HIG sweep's review: as the
+    /// default from the start, Create Course was pressed with the form
+    /// unread).
     func commitCourseCodeHighlight() -> Bool {
         guard courseCodeSuggestionsAreShown, let entry = highlightedCourseCodeEntry else {
             return false

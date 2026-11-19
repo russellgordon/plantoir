@@ -1428,7 +1428,7 @@
    "page": "quitting",
    "shows": "The question Plantoir asks when quitting during a deploy",
    "labels": [
-    "Keep Working",
+    "Cancel",
     "Quit Anyway"
    ],
    "expectText": [],
@@ -1962,7 +1962,7 @@
    "shows": "The question asked when a new token cannot reach some class websites",
    "labels": [
     "The sections",
-    "Keep My Old Token",
+    "Cancel",
     "Use the New Token"
    ],
    "expectText": [],

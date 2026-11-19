@@ -131,6 +131,7 @@ struct PlanShareBar: View {
             Button("Cancel", role: .cancel) {
                 markerAwaitingStop = nil
             }
+            .keyboardShortcut(.cancelAction)
         } message: {
             Text(PlanSharing.stopMessage(address: markerAwaitingStop?.address ?? ""))
         }

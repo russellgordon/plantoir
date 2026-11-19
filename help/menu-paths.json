@@ -69,8 +69,8 @@
    "mac": "Section \u25b8 Schedule Deploy\u2026",
    "windows": null
   },
-  "cancelDeployAt": {
-   "mac": "Section \u25b8 Cancel Deploy at\u2026",
+  "removeScheduledDeploy": {
+   "mac": "Section \u25b8 Remove Scheduled Deploy\u2026",
    "windows": null
   },
   "reDateClasses": {

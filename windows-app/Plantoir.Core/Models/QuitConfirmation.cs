@@ -102,7 +102,13 @@ public static class QuitConfirmation
                 : ("A copy of a course is still being saved",
                    "Quitting now could leave the copy unfinished. Nothing on the class website changes.");
 
-    public const string KeepWorking = "Keep Working";
+    /// <summary>
+    /// The button that keeps working (#987, D7): "Cancel", as the contract's
+    /// <c>buttons.titles.keepWorking</c> says. It was "Keep Working". Apple's
+    /// HIG, Alerts: "Always use 'Cancel' to title a button that cancels the
+    /// alert's action." The choice it makes is still keepWorking.
+    /// </summary>
+    public const string KeepWorking = "Cancel";
     public const string QuitAnyway = "Quit Anyway";
 
     /// <summary>The trail's line: what was under way, and which button was pressed.</summary>
