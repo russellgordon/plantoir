@@ -13042,10 +13042,20 @@ what is imported).
   `[InstallDelete]` already empties `{app}\runtime\node` before the new one
   is copied; `runtime\quartz\node_modules` is not emptied, so an upgrade
   adds the two module copies beside what 1.9.3 left, which is the whole of
-  the change there. A preview reaches the module copies through the work
-  folder's `node_modules`, a link to (or, without the right to link, a copy
-  of) `runtime\quartz\node_modules` (`build_site.py`, `link_directory`), so
-  the file is beside the module the preview loads either way.
+  the change there.
+- **The work folder's mirror, and why both places are kept.** A preview
+  loads the modules from the section's work folder, whose `node_modules` is
+  a hardlink MIRROR of `runtime\quartz\node_modules` (`build_site.py` →
+  `toolchain_paths.link_directory`; never a junction, which Windows refuses
+  to traverse from the app's processes). The mirror is made when the section
+  is first built and not remade after. On a fresh install the first build
+  mirrors the module copies with everything else (run E below). After an
+  upgrade over 1.9.3, a section 1.9.3 already built keeps its old mirror,
+  which has no module copies (run C below fails there, `ERR_DLOPEN_FAILED`);
+  in that folder the copy beside `node.exe`, on the PATH the launchers set,
+  is the one found (run D). So neither place alone covers every teacher: the
+  module copies cover any Node however started and an older System32 copy,
+  the `node.exe` copy covers mirrors made before this change.
 - `THIRD_PARTY_LICENSES.md` has the licence row (Microsoft's redistributable
   code terms; the file is on the list an application may carry).
 - `NativeModuleImportsTests`: every `.node` file in a fetched runtime, and
@@ -13085,6 +13095,41 @@ placed beside `node.exe` all five loaded, and the installed `preview.ps1
 EXC2O 1 --build-only` built the example course (271 pages, 336 files, exit
 0). Not proven: the end-to-end rehearsal PASSED with a signed installer
 carrying the fix (it needs a signed candidate build).
+
+**What was proven, 2026-11-19 (midday), for the ruled layout.** Two clean
+machines: snapshot 00 (`russellgordon`, an administrator) and 11, the
+standard user (`student`, not an administrator). On each, the released,
+signed 1.9.3 was installed by the rehearsal and stopped at step 6 on #965 as
+before (`runs/win-rehearsal-2026-11-19-110529` and
+`runs/win-rehearsal-2026-11-19-114136-standard-user`, kept running with
+`--keep`). Then a script placed the contract's file (SHA-256 checked, signed
+by Microsoft) in `{app}\runtime\<place>` for each place in `besideNode` and
+`besideModules`, exactly where the branch's installer puts it, and loaded
+every `.node` in the runtime with `node.exe`, with no `vcruntime140.dll` in
+System32 (`runs/proof-965-finish/`, `proof-00.out`, `proof2-00.out`,
+`proof-standard-user.out`, `proof2-standard-user.out`). The same on both
+machines:
+
+| Run | Copies | PATH | lightningcss and Typst | `preview.ps1 EXC2O 1 --build-only` |
+|---|---|---|---|---|
+| A | beside `node.exe` only | no `runtime\node` | `ERR_DLOPEN_FAILED` | - |
+| B | beside `node.exe` only | as the launchers set it | load | - |
+| C | beside the modules only | no `runtime\node` | load | exit 1, `ERR_DLOPEN_FAILED`: the work folder's mirror is 1.9.3's, made before the copies (an upgrade) |
+| D | all three (the ruled layout) | no `runtime\node`, then as the launchers set it | load | exit 0 on the old mirror (271 pages, 336 files) |
+| E | beside the modules only | the launcher's own | - | exit 0 on a new mirror (a fresh install), which carries both module copies |
+| F | all three | the launcher's own | - | exit 0 on a new mirror |
+
+A shows Node does not look beside `node.exe` for a module's libraries;
+C and E show what the mirror changes. On the PC, `fetch-runtime.ps1` at this
+branch repaired the runtime fetched by the first version in place (manifest
+`nodeVcRuntimeLayout` `beside-node-and-modules`, all three copies the
+contract's SHA-256); whether `publish.ps1 -WithoutAssistantEngine`
+(unsigned, nothing uploaded) carried all three into the published `runtime`
+was still running when this was written. Not
+proven: an end-to-end rehearsal PASSED, which needs a signed candidate build
+(Edge holds an unsigned branch build at "isn't commonly downloaded"); and a
+PC whose System32 has an OLDER `vcruntime140.dll` than 14.51, where the copy
+beside the module is reasoned to win, not measured.
 
 **Updates are ours now.** An app-local copy is not patched by Windows Update.
 It is refreshed only when a new Plantoir ships, so revisit
