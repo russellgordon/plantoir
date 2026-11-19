@@ -122,4 +122,32 @@ final class UndoDoorGuardTests: XCTestCase {
         XCTAssertEqual(redo, .refused(.contentMissing(path: "courses/TST1O/made"), clearedTheList: false))
         XCTAssertEqual(try String(contentsOf: folder.appendingPathComponent("a.md"), encoding: .utf8), "precious\n")
     }
+
+    /// The second hard review of U2b, MEDIUM 1: a step with a recompute that
+    /// died after its swaps is settled by the next write, and its front page
+    /// IS re-derived. FAILED on 211f8d213, where the recovery inside the next
+    /// write's begin dropped what it settled.
+    func testTheNextWriteReDerivesAStepItsRecoverySettles() async throws {
+        let made = try UndoContractReplay.scratch(under: parent, named: "n")
+        let root: URL = made.root
+        try UndoContractReplay.write("page\n", to: "courses/TST1O/a.md", in: root)
+        try UndoContractReplay.write("other\n", to: "courses/TST1O/c.md", in: root)
+        let move: UndoOp = UndoOp.moveFile(from: "courses/TST1O/a.md", to: "courses/TST1O/b.md", sha: UndoHash.sha256(of: Data("page\n".utf8)))
+        let recompute: UndoOp = UndoOp.recompute(path: "courses/TST1O/section1/index.md", maintainer: "sectionFrontPage", section: 1)
+        let journal: UndoJournal = UndoJournal(folderURL: made.journalFolder)
+        UndoKillPoints.hook = { point in point == .beforeApplied }
+        _ = JournaledWrite.perform(ops: UndoContractKinds.draft(ops: [move, recompute], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: UndoMemoryPlaces())
+        UndoKillPoints.hook = nil
+        _ = UndoContractReplay.takeTheRederived()
+        let second: UndoOpsDraft = UndoContractKinds.draft(
+            ops: [UndoOp.moveFile(from: "courses/TST1O/c.md", to: "courses/TST1O/d.md", sha: UndoHash.sha256(of: Data("other\n".utf8)))],
+            blobs: [], root: root, action: "rollOver"
+        )
+        let later: UndoJournal = UndoJournal(folderURL: made.journalFolder, process: UndoProcess(host: "h", pid: 999_999, name: "x", started: "x"), processIsAlive: { _ in false })
+
+        _ = await JournaledWrite.performAndRederive(ops: second, in: later, mode: .live, places: UndoMemoryPlaces())
+
+        XCTAssertEqual(try later.read().records[1]?.phase, .done)
+        XCTAssertEqual(UndoContractReplay.takeTheRederived(), ["courses/TST1O/section1/index.md#1"])
+    }
 }

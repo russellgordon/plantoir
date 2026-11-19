@@ -1168,7 +1168,7 @@ nonisolated enum UndoContractReplay {
         "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery", "wholeFile",
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
-        "withATree", "withAPreference", "folderKept", "preference",
+        "withATree", "withAPreference", "folderKept", "preference", "recoveredBy",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1349,7 +1349,26 @@ nonisolated enum UndoContractReplay {
             if testCase["fileInUseDuringRecovery"] as? Bool == true {
                 UndoKillPoints.fileInUseAtSwap = { _ in true }
             }
-            if mode == .live {
+            let recoveredBy: String = string(testCase["recoveredBy"]) ?? "recovery"
+            let otherPage: String = "courses/TST1O/Section 1/Classes/C.md"
+            if recoveredBy != "recovery" {
+                try write(beforeText.replacingOccurrences(of: "title: A", with: "title: C"), to: otherPage, in: root)
+            }
+            if recoveredBy == "theNextWrite" {
+                // The next write through the app's door for ops, which
+                // recovers and re-derives before it begins.
+                let content: Data = UndoItem.read(at: root.appendingPathComponent(otherPage)).data ?? Data()
+                let next: UndoOp = UndoOp.moveFile(from: otherPage, to: otherPage + ".moved", sha: UndoHash.sha256(of: content))
+                _ = await JournaledWrite.performAndRederive(
+                    ops: UndoContractKinds.draft(ops: [next], blobs: [], root: root, action: "rollOver"),
+                    in: survivor, mode: .live, places: places
+                )
+            } else if recoveredBy == "anOrdinaryWrite" {
+                // A write through U1's door, whose recovery cannot re-derive:
+                // it leaves the step for one that will.
+                let thirdChanges: [UndoFileChange] = changes(setting: [(path: otherPage, key: "publish", line: "publish: true")], in: root)
+                _ = JournaledWrite.perform(draft(changes: thirdChanges, root: root, action: "publishPages"), in: survivor, mode: .live)
+            } else if mode == .live {
                 // As the app recovers: under the lock, then the re-derivation
                 // of what it settled, awaited outside it.
                 await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in reachable ? root : nil }, places: places)

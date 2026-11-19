@@ -19517,7 +19517,11 @@ released, AWAIT each runner on its own actor. The main actor is never
 blocked while the lock is held and the lock never waits for the main
 actor. U7 calls `UndoMaintainers.registerTheAppsFrontPage()` with the
 switch. Recovery re-derives every step it settles, whichever way
-(re-deriving is idempotent): judged by its content ops alone, a step that
+(re-deriving is idempotent), and a step that keeps a file true by a rule is
+settled ONLY by a recovery that re-derives: a recovery run inside another
+write's lock (U1's door, `undoNewest` alone) leaves it in flight, and the
+door for ops recovers and re-derives before it begins (the second hard
+review of U2b, MEDIUM 1; `recoveryCases` with `recoveredBy`): judged by its content ops alone, a step that
 died after its swaps and before its re-derivation would otherwise be left
 with its front page stale (the Fable sweep of U1, T5; `recoveryCases` with
 `withAMove`). **Until a runner is registered for a maintainer, a step

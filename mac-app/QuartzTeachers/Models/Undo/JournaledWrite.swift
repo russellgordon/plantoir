@@ -490,6 +490,12 @@ nonisolated enum JournaledWrite {
         mode: UndoMode,
         places: UndoExternalPlaces = UndoAppPreferences()
     ) async -> JournaledWriteOutcome {
+        // A step that died part way and keeps a file true by a rule is
+        // settled AND re-derived first: the recovery inside the begin below
+        // leaves such a step for this one (the second hard review, MEDIUM 1).
+        if mode == .live {
+            await UndoRecovery.recoverAndRederive(journal, resolveRoot: { folder in UndoReach.root(for: folder) }, places: places)
+        }
         let outcome: JournaledWriteOutcome = perform(ops: draft, in: journal, mode: mode, places: places)
         if case .applied = outcome, let root = draft.workingFolderURL {
             await UndoMaintainers.rederive(draft.ops, root: root)

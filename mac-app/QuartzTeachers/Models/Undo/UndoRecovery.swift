@@ -67,7 +67,8 @@ nonisolated enum UndoRecovery {
         mode: UndoMode,
         trySwapsNow: Bool = true,
         resolveRoot: (UndoWorkingFolder) -> URL?,
-        places: UndoExternalPlaces = UndoAppPreferences()
+        places: UndoExternalPlaces = UndoAppPreferences(),
+        leavingStepsThatRederive: Bool = true
     ) -> [UndoRecoveryResult] {
         var results: [UndoRecoveryResult] = []
         let now: Date = writer.journal.now()
@@ -88,6 +89,14 @@ nonisolated enum UndoRecovery {
             // runner for its maintainer exists: never settled with its
             // re-derivation skipped (the hard review of U2b, MEDIUM 5).
             if !UndoMaintainers.canRun(record.step.ops) {
+                continue
+            }
+            // A live step that keeps a file true by a rule is settled only by
+            // a recovery that will re-derive what it settles
+            // (`recoverAndRederive`); a recovery run inside another write's
+            // lock, which drops its results, leaves it in flight for that
+            // one (the second hard review of U2b, MEDIUM 1).
+            if leavingStepsThatRederive && mode == .live && UndoRecovery.keepsAFileTrue(record.step) {
                 continue
             }
             let key: String = UndoRefusedSwaps.key(for: record, in: writer.journal)
@@ -120,7 +129,7 @@ nonisolated enum UndoRecovery {
         var settled: [UndoRecoveryResult] = []
         do {
             settled = try journal.withLock { writer -> [UndoRecoveryResult] in
-                return UndoRecovery.run(writer, mode: .live, resolveRoot: resolveRoot, places: places)
+                return UndoRecovery.run(writer, mode: .live, resolveRoot: resolveRoot, places: places, leavingStepsThatRederive: false)
             }
         } catch {
             return
@@ -177,6 +186,14 @@ nonisolated enum UndoRecovery {
             }
         }
         return allGone
+    }
+
+    /// Whether a step holds a `recompute` op.
+    static func keepsAFileTrue(_ step: UndoStep) -> Bool {
+        for op in step.ops where op.knownKind == .recompute {
+            return true
+        }
+        return false
     }
 
     /// The listing each tree op of a step recorded, by its folder's path:
