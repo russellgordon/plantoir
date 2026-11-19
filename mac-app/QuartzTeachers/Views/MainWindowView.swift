@@ -85,6 +85,9 @@ struct MainWindowView: View {
         // reason.
         .modifier(ObsidianAddOnsOfferDialog())
         .modifier(ObsidianReopenAlert())
+        // Asked before Plantoir closes a running Obsidian to add a course it
+        // has never seen (#995): every route above ends here when it must.
+        .modifier(ObsidianClosingAlert())
         .fileImporter(
             isPresented: $workspace.isChoosingWorkspace,
             allowedContentTypes: [.folder]
@@ -438,7 +441,8 @@ private struct ObsidianAddOnsOfferDialog: ViewModifier {
             titleVisibility: .visible,
             presenting: workspace.obsidianAddOnsOfferRequest
         ) { shown in
-            Button(ObsidianFigureAddOnsWording.offerAdd) {
+            // When the yes closes Obsidian, the button says so (#995, D21).
+            Button(shown.addButtonTitle) {
                 Task { @MainActor in
                     await workspace.answerObsidianAddOnsOffer(shown, .addThem)
                 }
@@ -512,6 +516,54 @@ private struct ObsidianReopenAlert: ViewModifier {
             set: { showing in
                 if !showing {
                     workspace.obsidianReopenRequest = nil
+                }
+            }
+        )
+    }
+}
+
+/// "Close Obsidian to open {course}?" (#995, D21, Russell's ruling Q13 on
+/// #975): Obsidian is running and has never seen the course, and it can add
+/// a course to its list only while it is closed. Plantoir never closes it
+/// unasked, and the button that goes ahead says that it closes Obsidian —
+/// the same shape as the rename's "Close Obsidian and Rename".
+private struct ObsidianClosingAlert: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Environment(WorkspaceModel.self) var workspace
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content.alert(
+            ObsidianClosingWording.titleText(course: workspace.obsidianClosingRequest?.course.code ?? ""),
+            isPresented: isPresented,
+            presenting: workspace.obsidianClosingRequest
+        ) { shown in
+            Button(ObsidianClosingWording.closeAndOpen) {
+                Task { @MainActor in
+                    await workspace.answerObsidianClosing(shown, closeObsidian: true)
+                }
+            }
+            Button(ObsidianClosingWording.cancel, role: .cancel) {
+                Task { @MainActor in
+                    await workspace.answerObsidianClosing(shown, closeObsidian: false)
+                }
+            }
+            // Escape always cancels (#987's rule for every question).
+            .keyboardShortcut(.cancelAction)
+        } message: { shown in
+            Text(ObsidianClosingWording.messageText(course: shown.course.code))
+        }
+    }
+
+    private var isPresented: Binding<Bool> {
+        return Binding(
+            get: { return workspace.obsidianClosingRequest != nil },
+            set: { showing in
+                if !showing {
+                    workspace.obsidianClosingRequest = nil
                 }
             }
         )

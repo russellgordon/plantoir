@@ -1623,6 +1623,12 @@ nonisolated enum ActivityTrail {
         case obsidianReopenedForAddOns = "obsidian reopened for add-ons"
         /// Settings ▸ Obsidian turned the add-ons on or off (#495).
         case obsidianAddOnsSettingChanged = "obsidian add-ons setting changed"
+        /// "Close Obsidian to open {course}?" was answered (#995): the course
+        /// and what came of it — opened after closing Obsidian, Cancel,
+        /// nothing to close by then, Obsidian did not close, or it closed and
+        /// the course could not be added to its list. The two failures show
+        /// nothing on screen, so this line is their only record.
+        case obsidianClosingAsked = "asked to close Obsidian to open a course"
 
         // ---- Runnable Swift (#493, #570, #635) ----
 
