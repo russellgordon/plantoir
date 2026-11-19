@@ -427,8 +427,8 @@ class ContractCaseTests(unittest.TestCase):
                         state = traces.op_state(op, None)
                     else:
                         state = traces.op_state(op, text)
-                undo = {"after": "canUndo", "before": "alreadyBack", "neither": "changedSince"}[state]
-                redo = {"before": "canRedo", "after": "alreadyRedone", "neither": "changedSince"}[state]
+                undo = {"after": "canUndo", "before": "alreadyBack", "neither": "changedSince", "cannotTell": "cannotTell"}[state]
+                redo = {"before": "canRedo", "after": "alreadyRedone", "neither": "changedSince", "cannotTell": "cannotTell"}[state]
                 self.assertEqual(undo, case["undo"])
                 self.assertEqual(redo, case["redo"])
 

@@ -486,6 +486,11 @@ def edit_json_state(op, data):
             break
         current = current[part]
 
+    # A whole number beyond 2^53, in the file or the record, cannot be
+    # compared exactly through a double: cannot tell (the third hard review).
+    if (current is not ABSENT_MEMBER and not _exact(current)) or any(
+            side in op and not _exact(op[side]) for side in ("before", "after")):
+        return "cannotTell"
     def matches(side):
         if side not in op:
             return current is ABSENT_MEMBER
@@ -594,7 +599,7 @@ def _exact(value):
     if isinstance(value, bool):
         return True
     if isinstance(value, (int, float)):
-        return not (float(value).is_integer() and abs(value) > 9007199254740992)
+        return not (float(value).is_integer() and abs(value) >= 9007199254740992)
     if isinstance(value, list):
         return all(_exact(element) for element in value)
     if isinstance(value, dict):

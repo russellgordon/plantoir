@@ -19456,7 +19456,7 @@ off.
   deleted the kept copy, losing last year's site id (`stackCases` 'a deploy
   wrote a new marker in its place'). The move itself is ONE rename that
   never replaces (`renamex_np` with `RENAME_EXCL`), the pair re-read just
-  before it. Rejected: a move as a `writeFile` pair (a copy written and the
+  before it. The containment check (the place inside the working folder, links resolved) runs at plan time, before staging, before each change, before a re-derivation and in the tidying; the change itself is a second system call, so a link swapped in during that one call is not caught (`undo.knownLimits.linkBetweenTheCheckAndTheChange`; closing it needs `renameat` against an open folder handle, U7 or later). Rejected: a move as a `writeFile` pair (a copy written and the
   original deleted), which loses the file's mode (a Cloudflare marker is
   0600, #961) and is two changes where the rename is one.
 - **`createTree` and `removeTree`**: a folder made or removed, everything in

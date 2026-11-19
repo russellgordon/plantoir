@@ -184,7 +184,8 @@ nonisolated enum UndoRecovery {
         for work in ["apply", "undo", "redo"] {
             if !UndoSwap.tidyLeftovers(
                 label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root),
-                onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) }
+                onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) },
+                root: root
             ) {
                 allGone = false
             }
@@ -418,7 +419,8 @@ nonisolated enum UndoRecovery {
         if mode == .live {
             UndoSwap.tidyLeftovers(
                 label: label, beside: urls, asideListings: asideListings(of: step, root: root),
-                onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) }
+                onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) },
+                root: root
             )
         }
 

@@ -49996,6 +49996,41 @@
         },
         "undo": "changedSince",
         "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 9007199254740993}\n"
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell",
+        "why": "The third hard review of U2b, LOW 5: through a double 2^53 + 1 reads as 2^53, so a recorded 2^53 would match a file holding 2^53 + 1."
+      },
+      {
+        "name": "editJSON: a recorded value beyond 2^53: cannot tell",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 9007199254740992,
+          "after": 1
+        },
+        "current": {
+          "text": "{\"k\": 9007199254740993}\n"
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
       }
     ],
     "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. Places, and the places two ops name, are compared without regard to case.",
@@ -52099,7 +52134,8 @@
       "putBackOverOneHandEdit": "A step that died with every file swapped in but before applied, with one page then changed by hand, is put back on every other page (measured: 299 of 300) and closed interrupted, as rule.recovery says: the journal never calls half a step done. For the UI review, not a change of rule.",
       "shadowProcessAfterTheFlip": "A process still running a build with the switch off after the switch goes live (an outside-assistant session that outlives an update: on the mac that server is the app binary; or a build with the switch off run beside a live one on a developer's Mac) goes on writing shadow steps into the same list, and a live reader cannot tell them from live ones. Measured (the Fable sweep of U1, a standalone probe): after goLive and one live step, a shadow-mode step was recorded as step 3 and was the head the live app offered, and Undo took it back past a newer change the shadow process never recorded; a LIVE two-page step killed after its first swap, when the first process to take the lock was in shadow, was recorded interrupted (partlyTookEffect) and cleared, with one page published and the other not, both staged files left, and no trail line. Reaches a teacher only if a build with the switch off is released beside a live one; under ruling 2 none is. No v1 line changes for it: U7 settles it (laterPieces.U7).",
       "stagedFilesOfAFolderAway": "A step closed interrupted while its working folder could not be reached has its staged files removed by the first recovery that reaches the folder again, for as long as the journal still holds the step's lines (until its segment goes, normally some 60 days). A folder away for longer keeps them: hidden dot files beside its pages, which Obsidian and the website builder pass over.",
-      "jsonFileRewritten": "Withdrawn by the hard review of U2b (LOW a): an editJSON no longer rewrites the file; it changes only its member's bytes (file-formats.json -> undoJournal.opKinds.editJSON, undo.editJSONCases) and refuses a file where that cannot be done safely, a key written twice on the path among them. Kept as a key so a reader of an older contract finds it answered."
+      "jsonFileRewritten": "Withdrawn by the hard review of U2b (LOW a): an editJSON no longer rewrites the file; it changes only its member's bytes (file-formats.json -> undoJournal.opKinds.editJSON, undo.editJSONCases) and refuses a file where that cannot be done safely, a key written twice on the path among them. Kept as a key so a reader of an older contract finds it answered. Left as they are for the merge with the journal off (the director's ruling after the third review, to be recorded on #899): the member an editJSON sets has its number spelled by the app (2.0 is written 2), and a new object value's non-ASCII keys are sorted as Foundation sorts them, which the contract does not pin. A whole number beyond 2^53 is never compared or written through a double: cannotTell, or refused.",
+      "linkBetweenTheCheckAndTheChange": "A place is checked inside the working folder (links resolved) immediately before each change, and the change is a separate system call: a folder on the path replaced by a link to outside in the instant between the two calls is not caught. Measured as a window of one system call by the third hard review of U2b (probe C); closing it needs the change made relative to an open handle of the folder (openat/renameat on the mac, a handle opened without following reparse points on Windows), which is U7's or later. The check runs at plan time, before staging, before each swap, before a re-derivation and in the tidying."
     }
   }
 }

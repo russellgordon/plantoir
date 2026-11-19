@@ -339,6 +339,17 @@ nonisolated enum UndoJSONMember {
         if found == .cannotTell {
             return .neither
         }
+        // A whole number beyond 2^53, in the file or in the record, cannot be
+        // compared exactly through a double (2^53 + 1 reads as 2^53): cannot
+        // tell, never a guess either way (the third hard review, LOW 5).
+        if case .value(let value) = found, !UndoJSONBytes.isExact(value) {
+            return .cannotTell
+        }
+        for recorded in [op.valueBefore, op.valueAfter] {
+            if let recorded, !UndoJSONBytes.isExact(recorded) {
+                return .cannotTell
+            }
+        }
         if matches(found, op.valueBefore) {
             return .before
         }
@@ -685,11 +696,11 @@ nonisolated enum UndoJSONBytes {
     }
 
     /// Whether every number in a value is one a double holds exactly as
-    /// written: no whole number beyond 2^53 (the second hard review of U2b).
+    /// written: no whole number of 2^53 or more (the second hard review of U2b).
     static func isExact(_ value: UndoJSON) -> Bool {
         switch value {
         case .number(let number):
-            return !(number.rounded() == number && abs(number) > 9_007_199_254_740_992)
+            return !(number.rounded() == number && abs(number) >= 9_007_199_254_740_992)
         case .array(let list):
             for element in list where !isExact(element) {
                 return false
@@ -1298,6 +1309,11 @@ nonisolated enum UndoMaintainers {
     /// Runs the runner of every `recompute` op among these, in order.
     static func rederive(_ ops: [UndoOp], root: URL) async {
         for op in ops where op.knownKind == .recompute {
+            // Never through a link that leaves the working folder (the third
+            // hard review of U2b, LOW 3).
+            if let path = op.path, !UndoPlaces.staysInside(root, path) {
+                continue
+            }
             if let maintainer = op.maintainer, let run = runner(for: maintainer) {
                 await run(op, root)
             }

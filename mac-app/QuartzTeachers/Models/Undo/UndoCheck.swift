@@ -613,6 +613,13 @@ nonisolated enum UndoSwap {
             let targetIndex: Int = stagingIndex
             stagingIndex += 1
             originals.append(nil)
+            // Nothing is staged through a link that leaves the working folder
+            // (the third hard review of U2b, LOW 3).
+            if let root, !UndoSwap.staysInside(target, root: root) {
+                staged.append(nil)
+                tidy()
+                return .refused(.changedSince(firstPath: target.relativePath, others: 0))
+            }
             if case .makeTree(let listing, let contents) = target.change {
                 let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
                 try? FileManager.default.createDirectory(
@@ -992,7 +999,8 @@ nonisolated enum UndoSwap {
         label: String,
         beside urls: [URL],
         asideListings: [String: String] = [:],
-        onAside: ((UndoAsideFolder) -> Void)? = nil
+        onAside: ((UndoAsideFolder) -> Void)? = nil,
+        root: URL? = nil
     ) -> Bool {
         var allGone: Bool = true
         var folders: [URL] = []
@@ -1003,6 +1011,13 @@ nonisolated enum UndoSwap {
             }
         }
         for folder in folders {
+            // Never tidied through a link that leaves the working folder (the
+            // third hard review of U2b, LOW 3).
+            if let root, let rootReal = UndoPlaces.resolved(root.path),
+               let folderReal = UndoPlaces.resolved(folder.path),
+               folderReal != rootReal && !folderReal.hasPrefix(rootReal + "/") {
+                continue
+            }
             let names: [String]
             do {
                 names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
