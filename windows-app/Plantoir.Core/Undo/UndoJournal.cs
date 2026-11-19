@@ -129,10 +129,10 @@ internal sealed class UndoJournal
         var folded = new UndoFolded();
         long place = 0;
         long torn = 0;
-        for (int index = 0; index < segments.Count; index++)
+        for (int segmentIndex = 0; segmentIndex < segments.Count; segmentIndex++)
         {
-            (int number, string path) = segments[index];
-            byte[]? bytes = ReadShared(path, goneIsEmpty: index < segments.Count - 1);
+            (int number, string path) = segments[segmentIndex];
+            byte[]? bytes = ReadShared(path, goneIsEmpty: segmentIndex < segments.Count - 1);
             if (bytes is null)
                 return new UndoReading { Folded = _lastRead, IsFresh = false, SegmentsOnDisk = segments.Select(s => s.Number).ToList() };
             int start = 0;
