@@ -1693,11 +1693,16 @@ about stopping is open, the panel's window is the key window
 key window then), and nobody is typing in a box there
 (`KeyWindowTextEditing`, which watches the key window's `firstResponder` by
 key-value observing and reports whether it is `NSText`, the field editor
-every text field and search field edits through). A SwiftUI shortcut is a
-key equivalent the window offers before the focused field sees the key, so
-without that last condition Escape typed in a field stopped the deploy and
-the field never saw it (measured on the first #988 shape). Command-Period
-reaches the same button: AppKit treats it as the cancel key.
+every text field and search field edits through). Measured on the main
+Mac with that last condition taken out (`988-r4-sabotage-text`): sent
+through `NSApp.sendEvent`, as a real key is, Escape and Command-Period typed
+in a text field still went to the field and the task kept running, because
+AppKit offers a key without Command to the first responder before any
+button. (The first #988 shape's failure, Escape in a field stopping the
+deploy, was measured by calling `performKeyEquivalent` on the window
+directly, which a real key does not do.) The condition stays, as the second
+guard for a field and the only one for a text view that has no use for
+Escape and would pass it on. Command-Period reaches the same button.
 
 **Rejected, in order:** `CancelKeyCatcher` (round one), an invisible view
 that took the keys: the kind of hidden key-carrying control Russell rejected
@@ -1757,10 +1762,15 @@ on a deploy either key asks, Escape or Command-Period in the question is
 Cancel and the deploy runs on, Return is Stop Deploy and stops it once, and
 the question goes when the deploy ends. When the host cannot be made the
 active app with that window key (a locked screen, #315), those tests skip and
-say so. Measured on the main Mac with Keyboard Navigation on and off
+say so. With Keyboard Navigation on, AppKit puts the focus in the Filter
+box when the window becomes key, so the box owns Escape until the teacher
+clicks elsewhere; the tests start with focus in no box. Measured on the main Mac with Keyboard Navigation on and off
 (`AppleKeyboardUIMode` 3 and unset), the same results. Source checks: the key
 is on the visible Cancel, and nothing in `Views/Console` is a representable
-or a responder.
+or a responder. Only the rule's own test
+(`testCancelHoldsTheKeysOnlyWhenNothingElseWantsThem`) fails when the
+typing condition is taken out; the pressed-key test passes either way, as
+above.
 
 **For Windows (stage 3, #979):** the progress panel's Cancel takes Escape
 while the panel is in front and no text box, popover, dialog or flyout has

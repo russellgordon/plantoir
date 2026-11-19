@@ -6,12 +6,13 @@ import Observation
 /// responder (#988).
 ///
 /// The progress panel's Cancel holds Escape and Command-Period
-/// (`.keyboardShortcut(.cancelAction)`), and a SwiftUI shortcut is a key
-/// equivalent the window offers BEFORE the focused field sees the key. So
-/// while a teacher is typing in a box, Cancel lets go of the key, and Escape
-/// does what the box wants (the Filter field clears, a rename backs out).
-/// Measured on the first #988 shape, which kept the key always: Escape typed
-/// in a field stopped the deploy and the field's `.onExitCommand` ran 0 times.
+/// (`.keyboardShortcut(.cancelAction)`). While a teacher is typing in a box,
+/// Cancel lets go of the key, so Escape is always the box's (the Filter
+/// field clears, a rename backs out), including in a text view that has no
+/// use for Escape and would otherwise pass it on to the button. Measured on
+/// the main Mac (`988-r4-sabotage-text`): through `NSApp.sendEvent` a text
+/// FIELD is offered Escape before any button, so for a field this rule is a
+/// second guard, not the only one.
 ///
 /// This draws nothing, takes no key and is not a view: it watches
 /// `NSWindow.firstResponder` (key-value observing) on whichever window is
