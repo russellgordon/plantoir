@@ -102,11 +102,23 @@ public static class QuitConfirmation
                 : ("A copy of a course is still being saved",
                    "Quitting now could leave the copy unfinished. Nothing on the class website changes.");
 
-    public const string KeepWorking = "Keep Working";
+    /// <summary>
+    /// The button that keeps working (#987, D7): "Cancel", as the contract's
+    /// <c>buttons.titles.keepWorking</c> says. It was "Keep Working". Apple's
+    /// HIG, Alerts: "Always use 'Cancel' to title a button that cancels the
+    /// alert's action." The choice it makes is still keepWorking.
+    /// </summary>
+    public const string KeepWorking = "Cancel";
     public const string QuitAnyway = "Quit Anyway";
 
-    /// <summary>The trail's line: what was under way, and which button was pressed.</summary>
+    /// <summary>The trail's words for keeping working, the mac's (`QuitConfirmation.trailLine`): what was chosen, not the button's title.</summary>
+    public const string ChoseToKeepWorking = "chose to keep working";
+
+    /// <summary>The trail's words for quitting anyway, the mac's.</summary>
+    public const string ChoseToQuitAnyway = "chose to quit anyway";
+
+    /// <summary>The trail's line: what was under way, and what the teacher chose (#987 review: in the mac's words, not "chose Cancel").</summary>
     public static string TrailLine(UnderWay underWay, bool quitAnyway) =>
-        $"asked before quitting with {WhatIsUnderWay(underWay)} under way — the teacher chose " +
-        (quitAnyway ? QuitAnyway : KeepWorking);
+        $"asked before quitting with {WhatIsUnderWay(underWay)} under way — the teacher " +
+        (quitAnyway ? ChoseToQuitAnyway : ChoseToKeepWorking);
 }

@@ -539,6 +539,12 @@ public static partial class AssistWording
 
     public const string MayIAskForYourDates = "May I ask you for your class dates?";
 
+    /// <summary>The dates card's button that opens Class Dates (#987, D9; the mac's giveDatesButton): it was "Enter Class Dates" here, "Yes" on the mac.</summary>
+    public const string GiveDatesButton = "Add Dates…";
+
+    /// <summary>The dates card's decline (#987 review; the mac's declineDatesButton): "Not Now", the title on offers Plantoir raised by itself.</summary>
+    public const string DeclineDatesButton = "Not Now";
+
     public const string DatesNotGivenYet =
         "Right you are. I will not be able to date new classes until I have them — say “I have a revised list of class dates” whenever you would like to give them.";
 

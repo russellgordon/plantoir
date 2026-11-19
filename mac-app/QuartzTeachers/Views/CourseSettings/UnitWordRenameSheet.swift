@@ -144,7 +144,7 @@ struct UnitWordRenameSheet: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") {
+                Button("Cancel", role: .cancel) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)

@@ -28,6 +28,9 @@ public class MachineWordContractTests
     /// </summary>
     private static readonly Dictionary<string, Func<string, string?>> Said = new()
     {
+        // #987, D22: the question before a downloaded assistant is removed.
+        ["shared-rules.json:assistantModelChoice.removal.words.message"] = filled =>
+            filled == AssistModelRemovalWording.Message("{size}") ? null : $"AssistModelRemovalWording says \"{AssistModelRemovalWording.Message("{size}")}\"",
         ["shared-rules.json:appUpdates.wording.elsewhereWork"] = filled =>
             filled == UpdateWording.ElsewhereWork("{course}") ? null : $"UpdateWording says \"{UpdateWording.ElsewhereWork("{course}")}\"",
         // #720 (the mac's #698): the assistant's Open in Obsidian where Obsidian is not installed.

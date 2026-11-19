@@ -224,6 +224,24 @@ final class AssistModelLibrary {
         return AssistActivity.closeTheAssistant(active, "before removing this.")
     }
 
+    /// The question before a download is removed (#987, D22). Alerts: "when
+    /// people take an uncommon destructive action that they can't undo,
+    /// it's important to display an alert in case they initiated the action
+    /// accidentally." A full question, so sentence case and a question mark.
+    /// Contract: `assistantModelChoice.removal.words`.
+    static func removeQuestion(for tier: AssistModelTier) -> String {
+        return "Remove \(tier.displayName)?"
+    }
+
+    /// The sentence under it: what goes, and how to have it back.
+    static func removeMessage(for tier: AssistModelTier) -> String {
+        let size: String = ByteCountFormatter.string(fromByteCount: tier.downloadBytes, countStyle: .file)
+        return "Its \(size) download is deleted from this Mac. To use it again, download it again here."
+    }
+
+    /// The button that removes it.
+    static let removeButton: String = "Remove"
+
     /// Whether the Remove button does anything right now.
     func mayRemove(_ tier: AssistModelTier) -> Bool {
         _ = diskState
