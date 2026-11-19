@@ -1765,9 +1765,27 @@ by itself after a build and from the menu), and Cancel It beside a Cancel.
 as Alerts asks for "an uncommon destructive action that they can't undo".
 
 **Measured with Keyboard Navigation off and on** (`AppleKeyboardUIMode` 0 and
-3, on this Mac, in a copy of the app launched the `IsolatedLaunch` way): see
-the closing comment on #987 for the captured runs. The unit tests press the
-keys without depending on Keyboard Navigation.
+3, put back to 3 afterwards), on 2026-11-18 in a copy of the app built from
+the branch and launched the `IsolatedLaunch` way (its own `--state-dir`, the
+#975 run's example workspace with stub launchers), keys sent through System
+Events only while that copy was in front, results read from its accessibility
+tree and captured with `screencapture -l` (`vm-tools/runs/987-keys/`). The
+same under both settings: Get Ready, Return left the sheet open with Put These
+into Draft plain, Escape and Command-Period closed it; Class Dates, Schedule a
+Deploy, Keep a Copy for Reference and Add a Section, Escape and Command-Period
+each closed the sheet; Copy a Page with its page list open, the first Escape
+put the list away and the second closed the sheet; New Course or Club, Return
+did nothing on the empty form, Create Course was plain until a code and a name
+were typed and blue from then on, a first Escape with the code list showing
+put the list away and the next closed the sheet, Command-Period closed it; the
+quit question (a stub preview being built), Cancel leading and Quit Anyway
+trailing with no blue button, Return did nothing, Escape and Command-Period
+were Cancel and the app stayed open; Remove Section (unchanged, red), Return
+did nothing and Escape closed it. Not reached in the running app, as in the
+inventory's second half, and covered by the unit tests instead: the token
+question (D2), "Set up {tool}?" (D3, every assistant is installed here), Plan
+Share (D4), the assistant's put-back and dates offer (D1, D9) and D22 (no
+downloaded assistant).
 
 **Windows** (#979) follows: the changed contract keys are
 `deployTokens.words.cancelButton` (replacing `keepOldToken` and
