@@ -43,5 +43,5 @@ A school year is one way to arrange the shelf. You can also make groups of your 
 ## If it does not work
 
 - **{{menu:courseSetSchoolYear}} is greyed.** The selected course is not kept for reference. Select a course on the {{control:referenceCourses}} shelf.
-- **An orange sentence appears under the pop-up.** Another reference course with the same code is already filed in that year. Pick another year for this one.
+- **A sentence appears under the pop-up.** Another reference course with the same code is already filed in that year. Pick another year for this one.
 - **The sheet says the school year could not be saved.** Wait a moment, then try again.

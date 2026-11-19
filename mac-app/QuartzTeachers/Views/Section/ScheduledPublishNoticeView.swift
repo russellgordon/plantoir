@@ -42,7 +42,7 @@ struct ScheduledPublishNoticeView: View {
     /// The band's own colour: green for news, orange for a problem.
     var bandColour: Color {
         if needsAttention {
-            return Color.orange
+            return StatusColour.warning.color
         }
         return Color.green
     }

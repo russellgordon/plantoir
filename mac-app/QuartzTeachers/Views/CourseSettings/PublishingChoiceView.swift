@@ -330,19 +330,23 @@ private struct CloudflareDetailFields: View {
         return accountProblem != nil && accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID)
     }
 
-    /// ONE block of text (#668 review, L5 and L4): the ID's problem in
-    /// orange, then — in the new-course window, for a missing ID — the
+    /// ONE block of text (#668 review, L5 and L4): the ID's problem (orange
+    /// when it can wait, red when it stops Create or Save, #994), then — in the new-course window, for a missing ID — the
     /// sentence that says it can wait, in grey, right after the sentence it
     /// qualifies, and then the 25 MB fact in orange.
     var notice: Text {
         var built: Text = Text("")
         if let accountProblem {
-            built = Text(accountProblem + " ").foregroundStyle(.orange)
+            // An ID that may wait is a caution; one that stops Create or
+            // Save is a stopping problem (#994). Either leads with its
+            // symbol, so colour is not the only sign.
+            let kind: StatusColour = saysTheIDCanWait ? .warning : .blocking
+            built = kind.sentence(accountProblem + " ")
             if saysTheIDCanWait {
                 built = built + Text(PublishingDestinations.accountIDCanWait + " ").foregroundStyle(.secondary)
             }
         }
-        return built + Text(PublishingDestinations.cloudflareSizeNote).foregroundStyle(.orange)
+        return built + Text(PublishingDestinations.cloudflareSizeNote).foregroundStyle(StatusColour.warning.color)
     }
 
     // MARK: - Body
@@ -384,9 +388,8 @@ private struct CloudflareDetailFields: View {
                 now: Date(),
                 timeZone: TimeZone.current
             ) {
-                Text(warning)
+                StatusColour.warning.sentence(warning)
                     .font(.caption)
-                    .foregroundStyle(.orange)
                     .accessibilityIdentifier("cloudflareTokenEndWarning")
             }
 
@@ -461,10 +464,10 @@ private struct LocalFolderDetailFields: View {
                 .accessibilityIdentifier(chooseIdentifier)
             }
             if let problem {
-                // The same orange every other inline warning wears.
-                Text(problem)
+                // It must be put right before the course can be saved,
+                // so the stopping red every such problem wears (#994).
+                StatusColour.blocking.sentence(problem)
                     .font(.caption)
-                    .foregroundStyle(.orange)
                     .accessibilityIdentifier(problemIdentifier)
             } else {
                 ExampleCaption("Each section deploys into its own subfolder here — section1, section2 — and only changed files are copied. Upload the folder to your web host however you prefer (e.g. over SFTP). Netlify isn’t involved.")

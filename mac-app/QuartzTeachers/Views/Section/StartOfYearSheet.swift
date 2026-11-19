@@ -364,8 +364,7 @@ struct StartOfYearSheet: View {
         case .done(let done):
             Text(StartOfYearWording.done(pages: StartOfYearWording.pages(done.pagesWritten)))
             if !done.leftAlone.isEmpty {
-                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: done.leftAlone))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: done.leftAlone))
             }
             if let note = done.previewNote {
                 Text(note)
@@ -384,8 +383,7 @@ struct StartOfYearSheet: View {
             }
             fileList(putBack)
             if !skipped.isEmpty {
-                Text(StartOfYearWording.undoSkipped(pages: StartOfYearWording.pages(skipped.count)))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(StartOfYearWording.undoSkipped(pages: StartOfYearWording.pages(skipped.count)))
                 fileList(skipped)
             }
             Text(StartOfYearWording.undoEndsWhenYouQuit)
@@ -397,10 +395,9 @@ struct StartOfYearSheet: View {
                 Text(StartOfYearWording.undone(pages: StartOfYearWording.pages(undone.putBack)))
             } else {
                 Text(StartOfYearWording.undone(pages: StartOfYearWording.pages(undone.putBack)))
-                Text(StartOfYearWording.undoLeftSome(
+                StatusColour.warning.sentence(StartOfYearWording.undoLeftSome(
                     pages: StartOfYearWording.pages(undone.skipped.count), backup: backup
                 ))
-                .foregroundStyle(.orange)
             }
         }
     }
@@ -444,13 +441,12 @@ struct StartOfYearSheet: View {
     @ViewBuilder
     static func mustBeReadBeforeGo(_ plan: StartOfYearPlan, notice: String?) -> some View {
         if let notice {
-            Text(notice)
-                .foregroundStyle(.orange)
+            StatusColour.warning.sentence(notice)
                 .fixedSize(horizontal: false, vertical: true)
         }
         ForEach(plan.warnings(), id: \.self) { (warning: String) in
             Label(warning, systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
+                .foregroundStyle(StatusColour.warning.color)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -552,8 +548,7 @@ struct StartOfYearSheet: View {
                 }
             }
             if !plan.publishPlan.noRoomForAKey.isEmpty {
-                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
                     .fixedSize(horizontal: false, vertical: true)
                     .onGeometryChange(for: CGFloat.self) { (proxy: GeometryProxy) in
                         return proxy.frame(in: .named("startOfYearPlanNotes")).maxY

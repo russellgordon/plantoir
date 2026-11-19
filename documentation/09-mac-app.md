@@ -1181,8 +1181,11 @@ not there yet, geogebra.org out of reach), and for a kind the site says, that
 record's site has said (`siteSaidComplete`). The section's marker stays
 either way: its deployed site still carries the broken page (ruling 11).
 
-**The marker.** ONE `exclamationmark.triangle.fill`, orange, on the row
-(`SidebarView.sectionRowLabel`), shown while the section's OWN record has a
+**The marker.** ONE `exclamationmark.triangle.fill`, in the caution orange
+(`StatusColour.warning`), on the row (`SidebarView.sectionRowLabel`, drawn
+by `SectionRowWarningBadge`); on a SELECTED row it takes the row's own
+colour, white on the blue selection, as the row's words do (#994, D38: the
+orange measured 1.45:1 there), shown while the section's OWN record has a
 row; another section's build never puts it on or takes it off. The stopped
 scheduled deploy already drew the same glyph, so when both apply it is still
 one glyph, and its help and accessibility label say each sentence that applies
@@ -1655,7 +1658,7 @@ control inside read back as the container's name (#832; the rule of #353 and
 before it, and `ContainerIdentifierTripwireTests` names all five.
 
 **The course-code suggestions** in the New Course wizard opened four points
-under the field, over the orange sentence saying the code is already taken
+under the field, over the sentence saying the code is already taken
 (and its Replace It… button), until focus left the field. The field's row,
 field and sentence together, now publishes its own anchor beside the field's
 (`CourseCodeAnchors`, a transform so the field's is kept), and the list opens
@@ -1663,6 +1666,75 @@ below the row (`CourseCodeSuggestionsOverlay.top`). Measured by the geometry
 function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests`);
 the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
 a unit test can read a frame from.
+
+## Red and orange: the colours of a problem, measured (#994)
+
+The HIG review (#975, findings D37, D38 and inconsistency 10) measured the
+orange warning text at **1.98:1 in Light and 3.74:1 with Increase
+Contrast**, against the 4.5:1 the HIG's Accessibility page asks of text up
+to 17 points, and the stopped-deploy badge on a selected sidebar row at
+**1.45:1**. It also found red in some places and orange in others for the
+same kind of problem.
+
+**The rule (Russell, 2026-11-18):** red for a problem that stops the teacher
+going ahead (a name already taken, a form that will not submit, Schedule
+greyed, an act that failed); orange for a caution they can go past (dates
+before today, a domain that does not look like one, a page with no room for
+a key). Each also carries a symbol, so colour is never the only sign (HIG,
+Color, "Inclusive color"): `exclamationmark.triangle` for a caution,
+`xmark.octagon` for a stop. Where one place can be either, it asks which
+applies (Add Section: a number that cannot be added is red, a remark about
+one that can is orange; Cloudflare's Account ID: "it can wait" is orange,
+an ID that stops Create or Save is red).
+
+**One home: `StatusColour`** (`Views/Helpers/StatusColour.swift`).
+`StatusColour.warning` and `.blocking` give the colour (`.color`,
+`.nsColor`), the symbol, and `sentence(_:)`, which returns ONE `Text` with
+the symbol inline, so the modifiers each place already had (font, wrapping,
+identifier) still apply and the sentence wraps as a sentence. VoiceOver hears
+the words alone, exactly as before (`accessibilityLabel`), because the words
+already say what kind of problem it is.
+
+**The values, and why not the system colours.** The HIG says to prefer
+system colours, and Dark keeps the system orange, which passes (7.47:1 on
+the window background). In Light neither passes: the system orange is
+2.31:1 on white and the system red 3.57:1, and even the system's Increase
+Contrast orange (R197 G83 B0, from the HIG's Color page) is 3.45:1 on a
+grey Form row. So Light uses darker values of the same hues, with a darker
+still variant for Increase Contrast, as the Color page asks of a custom
+colour; Dark gets a lighter red, since the system red is 3.31:1 on a dark
+Form row. Measured (WCAG ratio, on white / #E0E0E0 in Light, on #1E1E1E /
+#3A3A3A in Dark):
+
+| | Light | Light, Increase Contrast | Dark | Dark, Increase Contrast |
+|---|---|---|---|---|
+| Caution orange | #A84300: 6.06 / 4.59 | #7A3000: 9.33 / 7.07 | system orange: 7.47 / 5.09 | the system's own variant |
+| Stopping red | #BF0019: 6.50 / 4.93 | #9E0014: 8.52 / 6.46 | #FF7D7F: 6.74 / 4.60 | #FF9496: 7.88 / 5.38 |
+
+Increase Contrast reaches the app as the high-contrast appearance names, so
+the dynamic colours pick their variant with `NSAppearance.bestMatch(from:)`.
+`StatusColourTests` resolves each under all four names and checks every
+background above; it also scans `Views/` and fails on any `.orange`, `.red`,
+`Color.orange`, `Color.red`, `.systemOrange` or `.systemRed`, so a new
+sentence cannot go back to a colour that fails. **Rejected:** keeping the
+system colours and relying on Increase Contrast (the HIG allows that only
+"if your app doesn't provide this minimum contrast by default", and the
+system's own Increase Contrast orange still fails on a sheet); and plain
+text with only a coloured symbol (the ruling asks both colours to meet
+4.5:1, and a reader looking for the problem looks for the colour first).
+
+**The sidebar badge (D38).** A selected row's background is the accent
+blue, on which no orange reaches 3:1. The row's words turn white there, and
+the badge now does the same (`SidebarView.warningBadgeFollowsTheRow`,
+reading the row's `backgroundProminence`): white on the selection is 5.37:1.
+The symbol's shape still says "warning", and its help and VoiceOver label
+are unchanged.
+
+**Not changed, named for whoever comes next:** the Assistant window's Deploy
+button is tinted the system orange (`.tint(.orange)`), white on #FF8D28
+being 2.31:1; and "Done", "Finished" and the console's other green labels
+are the system green, which this piece did not measure. Windows matches in
+stage 3 of #975.
 
 ## Question sheets and alerts after the HIG review (#987)
 

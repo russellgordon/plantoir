@@ -105,9 +105,8 @@ struct SectionSettingsView: View {
                     courseCode: configuration.courseCode,
                     showsGrade: configuration.showsGradeInTitle(forSection: sectionNumber)
                 ) {
-                    Text(warning)
+                    StatusColour.warning.sentence(warning)
                         .font(.caption)
-                        .foregroundStyle(.orange)
                         .accessibilityIdentifier("gradeInTitleWarning-section\(sectionNumber)")
                 } else {
                     ExampleCaption("e.g. “Grade 12” before the course name — applied the next time this section builds")
@@ -152,9 +151,8 @@ struct SectionSettingsView: View {
                             .autocorrectionDisabled()
                             .accessibilityIdentifier("customDomainField-section\(sectionNumber)-\(destination.type)")
                             if let problem = customDomainProblem(forDestinationType: destination.type) {
-                                Text(problem)
+                                StatusColour.warning.sentence(problem)
                                     .font(.caption)
-                                    .foregroundStyle(.orange)
                             } else {
                                 ExampleCaption(SectionSettingsView.customDomainCaption(forDestinationType: destination.type))
                             }

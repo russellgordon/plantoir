@@ -94,9 +94,15 @@ struct ScheduleDeploySheet: View {
             Divider()
 
             ScrollView {
-                Text(shown.plan?.description ?? shown.unreadable ?? "")
+                // A plan that cannot be scheduled stops the teacher going
+                // ahead (Schedule is greyed), so it is said in the stopping
+                // red with its symbol (#994).
+                StatusColour.sentence(
+                    shown.plan?.description ?? shown.unreadable ?? "",
+                    wornAs: shown.plan?.isSchedulable == true ? nil : .blocking
+                )
                     .font(.callout)
-                    .foregroundStyle(shown.plan?.isSchedulable == true ? Color.primary : Color.orange)
+                    .foregroundStyle(shown.plan?.isSchedulable == true ? Color.primary : StatusColour.blocking.color)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
                     .accessibilityIdentifier("scheduleDeployPlan")
@@ -104,9 +110,8 @@ struct ScheduleDeploySheet: View {
             .frame(minHeight: 160)
 
             if let failure {
-                Text(failure)
+                StatusColour.blocking.sentence(failure)
                     .font(.callout)
-                    .foregroundStyle(.red)
                     .accessibilityIdentifier("scheduleDeployFailure")
             }
 

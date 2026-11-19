@@ -202,7 +202,7 @@ struct PlanShareDocumentTable: NSViewRepresentable {
             if identifier.rawValue == "cell." + PlanShareTablesModel.Column.note.rawValue {
                 let image: NSImageView = NSImageView()
                 image.translatesAutoresizingMaskIntoConstraints = false
-                image.contentTintColor = .systemOrange
+                image.contentTintColor = StatusColour.warningNSColor
                 image.isHidden = true
                 cell.addSubview(image)
                 cell.imageView = image

@@ -128,9 +128,8 @@ struct SectionScheduleSheet: View {
 
             if let failure {
                 ScrollView {
-                    Text(failure)
+                    StatusColour.blocking.sentence(failure)
                         .font(.callout)
-                        .foregroundStyle(.orange)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("sectionScheduleFailure")

@@ -250,7 +250,7 @@ struct TaskProgressView: View {
                             Spacer()
                             if runner.wasCancelled {
                                 Label("Cancelled", systemImage: "xmark.circle.fill")
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(StatusColour.warning.color)
                                     .accessibilityIdentifier("cancelledNotice")
                             } else if runner.wasStoppedByUser {
                                 Label("Stopped", systemImage: "stop.circle.fill")
@@ -265,7 +265,7 @@ struct TaskProgressView: View {
                                     .foregroundStyle(.green)
                             } else {
                                 Label("Something went wrong", systemImage: "xmark.circle.fill")
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(StatusColour.blocking.color)
                             }
                         }
 
@@ -351,20 +351,19 @@ struct TaskProgressView: View {
 
                     if runner.isAwaitingInput {
                         Label("Waiting for your answer…", systemImage: "questionmark.bubble")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(StatusColour.warning.color)
                             .accessibilityIdentifier("awaitingInputNotice")
                     }
 
                     // The task is stopping itself; say so while it does.
                     if runner.wasCancelled && runner.isRunning {
                         Label("Cancelling…", systemImage: "xmark.circle")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(StatusColour.warning.color)
                             .accessibilityIdentifier("cancellingNotice")
                     }
 
                     if let problem = runner.launchProblem {
-                        Text(problem)
-                            .foregroundStyle(.red)
+                        StatusColour.blocking.sentence(problem)
                     }
                 }
                 .padding(12)

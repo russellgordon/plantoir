@@ -55,4 +55,4 @@ If the course has Obsidian add-ons, the copy is made without them, and the sheet
 ## If it does not work
 
 - **{{menu:courseKeepACopyForReference}} is greyed.** The course is busy, for example while it is being deployed. Wait until that has finished.
-- **An orange sentence says you already have this course kept for reference from that year.** Two copies of one course cannot share a school year. Choose a different school year, or press {{control:referenceCourseReplaceItButton}} to put the new copy in place of the old one. See [Replace a reference course](page:replace-reference-course).
+- **A sentence says you already have this course kept for reference from that year.** Two copies of one course cannot share a school year. Choose a different school year, or press {{control:referenceCourseReplaceItButton}} to put the new copy in place of the old one. See [Replace a reference course](page:replace-reference-course).

@@ -49,7 +49,7 @@ struct TaskConsoleView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         Label("Failed (exit \(exitCode))", systemImage: "xmark.circle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(StatusColour.blocking.color)
                     }
                 }
             }
@@ -84,8 +84,7 @@ struct TaskConsoleView: View {
             .background(.background.secondary)
 
             if let problem = runner.launchProblem {
-                Text(problem)
-                    .foregroundStyle(.red)
+                StatusColour.blocking.sentence(problem)
                     .padding(8)
             }
 

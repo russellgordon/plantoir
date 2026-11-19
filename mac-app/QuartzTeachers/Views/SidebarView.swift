@@ -718,8 +718,7 @@ struct SidebarView: View {
                 Label("Section \(sectionNumber)", systemImage: "doc.richtext")
                 Spacer()
                 if stoppedPublish != nil || hasProblems {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                    SectionRowWarningBadge()
                         .accessibilityIdentifier(
                             SidebarView.warningIdentifier(
                                 courseCode: courseCode,
@@ -1063,6 +1062,17 @@ struct SidebarView: View {
 
     /// The one warning's words: each sentence that applies, the stopped
     /// deploy's first (#717, `sectionProblems.sectionMarker`).
+    /// Whether the warning badge on a section row takes the row's own
+    /// colour rather than the caution orange (#994, D38). On a selected row
+    /// the selection is blue and the row's words turn white; the orange
+    /// triangle measured 1.45:1 there in Light, so it turns white with them
+    /// (5.37:1). That is what the system does for the rest of a selected
+    /// row's content (HIG, Color: "Make sure all your app's colors work well
+    /// in light, dark, and increased contrast contexts").
+    static func warningBadgeFollowsTheRow(prominence: BackgroundProminence) -> Bool {
+        return prominence == .increased
+    }
+
     static func warningTooltip(stoppedPublish: Bool, hasProblems: Bool) -> String {
         var sentences: [String] = []
         if stoppedPublish {
@@ -2600,7 +2610,7 @@ struct CourseCodeField: View {
                 if let problem {
                     Text(problem)
                         .font(.caption)
-                        .foregroundStyle(Color(nsColor: .systemRed))
+                        .foregroundStyle(StatusColour.blocking.color)
                         // Short enough to fit, and allowed to wrap rather
                         // than truncate if a longer one ever arrives: half a
                         // sentence with an ellipsis explains nothing.
@@ -2911,5 +2921,28 @@ private struct CourseRenameAlerts: ViewModifier {
             } message: { notice in
                 Text(notice.message)
             }
+    }
+}
+
+/// The one warning triangle on a section row: a stopped scheduled deploy,
+/// or problems in the section (#994, D38). Its own view so it can read the
+/// row's background prominence, which the list sets on each row and not on
+/// the sidebar as a whole.
+struct SectionRowWarningBadge: View {
+
+    // MARK: - Stored properties
+
+    @Environment(\.backgroundProminence) var prominence: BackgroundProminence
+
+    // MARK: - Computed properties
+
+    var body: some View {
+        if SidebarView.warningBadgeFollowsTheRow(prominence: prominence) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.foreground)
+        } else {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(StatusColour.warning.color)
+        }
     }
 }
