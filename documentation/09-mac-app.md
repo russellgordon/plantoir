@@ -1455,12 +1455,11 @@ follow Apple's Human Interface Guidelines, and on the risky questions Return
 does nothing again**: "Return does nothing on risky questions" below.
 `QuestionKeysTests` presses the keys on each, through the real modifiers.
 
-**The two-lists sheet is not a facts sheet and is unchanged by #973:** Cancel
-keeps Return (`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives
+**The two-lists sheet is not a facts sheet and was unchanged by #973:** Cancel
+kept Return (`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gave
 the sheet Escape, which its `.interactiveDismissDisabled()` had taken away.
-(That works there because its search field holds the keys; `.onExitCommand`
-alone is not enough on a sheet where nothing does, #973, below.) Whether its
-Cancel should stay the default is part of the interface audit, #975. The
+**Since #987 no button there is the default and Cancel carries Escape**
+("Question sheets and alerts after the HIG review", below). The
 share's console already closed on Escape (SwiftUI closes a sheet with no
 Cancel of its own), measured and pinned, not changed.
 
@@ -1506,7 +1505,7 @@ carries at most one key and the cancelling button leads, the action trails:
 
 | layout | cancelling button | action | Return | Escape |
 |---|---|---|---|---|
-| risky (`goAheadIsTheDefault` false): Replace It…, Remove Group, Start the Groups Again, the public-address warning | `role: .cancel`, `.keyboardShortcut(.cancelAction)` | `role: .destructive`, no key | **nothing**: the sheet stays and nothing is answered | Cancel |
+| risky (`goAheadIsTheDefault` false): Replace It…, Remove Group, Start the Groups Again, the public-address warning | `role: .cancel`, `.keyboardShortcut(.cancelAction)` | a plain button, no key (`role: .destructive`, drawn red, until #987) | **nothing**: the sheet stays and nothing is answered | Cancel |
 | going ahead is the default (`goAheadIsTheDefault` true): after Change Password | `role: .cancel`, `.keyboardShortcut(.cancelAction)` (Later) | `.defaultButton(isEnabled: true)`, Return (Share Again) | the action | the cancelling button |
 
 Before #973 the risky layout put the action first and Cancel second, on the
@@ -1664,6 +1663,119 @@ below the row (`CourseCodeSuggestionsOverlay.top`). Measured by the geometry
 function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests`);
 the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
 a unit test can read a frame from.
+
+## Question sheets and alerts after the HIG review (#987)
+
+Stage 2 of the HIG review (#975), carrying Russell's rulings of 2026-11-18
+(Q1, Q2, Q3, Q7 and Q-B on #975) and the inventory's findings D1 to D5, D7 to
+D9, D22, D32, D33 and D39 (`vm-tools/reference/975-mac-hig-inventory.md`).
+The HIG pages were read on the day of the change, from Apple's own page data:
+Alerts, Sheets, Buttons, Keyboards, Modality, Menus and Context menus. Russell's
+rule: his own rulings do not override the HIG, and where the HIG does not
+settle a case it is a question for him, not a design.
+
+**Escape and Command-Period always cancel, bound one way.** Every button with
+`role: .cancel`, in a sheet or an alert, carries
+`.keyboardShortcut(.cancelAction)`, and every button titled Cancel has that
+role; `SheetConventionScanTests.testEveryCancelAnswersEscape`,
+`testNoCancelIsTheDefault` and `testEveryButtonTitledCancelHasTheCancelRole`
+scan every view for it. Keyboards: "Esc: Cancel the current action or
+process"; "Command-Period: Cancel an operation." Before, Cancel was bound
+three ways (inventory inconsistency 2): by that key, by `.onExitCommand`
+alone (which does not fire with Keyboard Navigation off, #973), or by the
+role alone (D5). Escape and Command-Period already closed the D5 sheets
+(the inventory's second half), whose Cancel only dismisses, so for them the
+change is uniformity. Two Cancels take the key off while a picker field's
+list is open (Copy a Page and the New Course wizard), so the first Escape is
+still the field's, to put the list away (`PickerEscape`, #457 C1): a key
+equivalent on a button is offered the press before the field. Where a sheet's
+Cancel does more than close it, closing by any other route does the same:
+Import Courses for Reference stops a copy under way when the sheet goes
+(`run?.cancel()` in its `onDisappear`), as its Stop does, and the token
+question's binding keeps the old token when the system closes it. Exempt, by
+name in the scan: the folder-refused alert's lone OK and the repair outcome's
+dismissal (an alert's only button), and the progress panel (#988).
+
+**No Cancel is the default, and no button is the default where work can be
+lost** (Q3). Alerts: "Note that you don't want to make a Cancel button the
+default button", and "If you want to encourage people to read an alert and
+not just automatically press Return to dismiss it, avoid making any button the
+default button." Buttons ▸ Role: "Don't assign the primary role to a button
+that performs a destructive action, even if that action is the most likely
+choice." Decided one by one:
+
+| | question | Return before | Return now | why |
+|---|---|---|---|---|
+| D1 | the assistant's "Put {code} Section {n} back to how it was?" | Cancel (and Escape did nothing) | nothing | it loses the teacher's own edits |
+| D2 | "That token cannot reach … class websites" | Keep My Old Token | nothing | the new token moves students' links; Use the New Token is drawn red, because the teacher chose to change the token, not to break links (Alerts: the destructive style is for "a destructive action people didn't deliberately choose") |
+| D3 | "Set up {tool}?" | Cancel | Download and Set Up | nothing is lost; the teacher chose Set Up |
+| D4 | Plan Share's two tables | Cancel | nothing | a share cannot be taken back once students can open it, as Get Ready counts (Q-B) |
+| D39 | Get Ready's Put These into Draft | the action | nothing | Russell's ruling Q-B |
+| D7 | the quit question (`NSAlert`) | Keep Working | nothing | Cancel may not be the default, and Quit Anyway can leave a deploy part way |
+| D32 | New Course or Club's Create Course | nothing (it only looked like the default) | Create Course, once the form is complete | Q7; Buttons ▸ Role, "the button people are most likely to choose" |
+
+"Once the form is complete" is `NewCourseWizardView.formIsComplete`: a code
+with no problem, a name typed, section numbers, a class-page word and, for a
+club, a class folder, each as `startCreation` would accept it. Until then the
+button is plain and Return does nothing, because a Return typed in the code
+field with the rest unread once made a club named by its code (#457's review).
+
+**Order.** Cancel leads and the action or default trails in every row:
+"Always place the default button on the trailing side of a row"; "Cancel
+buttons are typically on the leading side of a row." "Set up {tool}?" had
+them the other way round (D3). The quit question puts Quit Anyway first in
+`QuitConfirmation.buttonsInOrder`, because `NSAlert` puts the first button it
+is given on the trailing side, sets each button's key from the same list
+(NSAlert gives its first button Return by itself), and `QuitAlertKeysTests`
+presses Escape, Command-Period and Return on the real alert shown as a sheet.
+
+**Red** (Q1, D33). The risky facts questions' go-ahead (Replace It…, Remove
+Group, Start the Groups Again, Share Without a Password) is a plain button
+now, still with no key. Alerts: "Use the destructive style to identify a
+button that performs a destructive action people didn't deliberately
+choose." **The SwiftUI alerts were left red**, and this is a question for
+Russell (#987): measured (`AlertKeysTests`), in a SwiftUI `.alert` a plain
+button beside a Cancel takes Return whatever is written on it
+(`.keyboardShortcut(nil)` does not take it away, nor a `.cancelAction` on the
+Cancel); only the destructive role leaves the go-ahead with no key. So an alert
+cannot be both "not red" and "no default", and Q1 asks for both. The HIG itself
+points two ways: Alerts' Empty Trash sentence says the deliberately chosen
+action is not red and "the convenience of pressing Return to confirm" it
+outweighs the warning, while Buttons ▸ Role says not to make a destructive
+action primary. The alerts concerned: Remove (course or section), Delete
+(backup, backups, archive), Cancel It (a scheduled deploy), Remove (a token,
+an assistant, a Course Settings list entry), Stop Sharing, the assistant's
+put-back (D1) and the new Remove for a downloaded model (D22).
+
+**Titles** (Q2). Alerts: "Always use 'Cancel' to title a button that cancels
+the alert's action." Retitled: Keep My Old Token and Don't Save It → Cancel
+(`deployTokens.words.cancelButton`); Leave It Scheduled → Cancel; the locked
+pages note's Not Now → Cancel (the teacher chose Open in Obsidian); the quit
+question's Keep Working and Finish Setting Up → Cancel. On offers Plantoir
+raised by itself, Not Now: Not Today (today's class on the front page; the
+contract key keeps its name) → Not Now; Later (Reopen Obsidian, and Share
+Again after Change Password) → Not Now. D9: the assistant's dates offer's Yes
+→ Add Dates… (`AssistWording.giveDatesButton`): "Aim for a one- or two-word
+title that describes the result", "avoiding 'Yes' and 'No'", and the ellipsis
+because it opens the class-dates sheet (Buttons ▸ macOS). Left as they were,
+and listed as questions: the links checklist's Not Now (the same sheet opens
+by itself after a build and from the menu), and Cancel It beside a Cancel.
+
+**D22.** Removing a downloaded assistant in Settings ▸ Assistant asks first,
+as Alerts asks for "an uncommon destructive action that they can't undo".
+
+**Measured with Keyboard Navigation off and on** (`AppleKeyboardUIMode` 0 and
+3, on this Mac, in a copy of the app launched the `IsolatedLaunch` way): see
+the closing comment on #987 for the captured runs. The unit tests press the
+keys without depending on Keyboard Navigation.
+
+**Windows** (#979) follows: the changed contract keys are
+`deployTokens.words.cancelButton` (replacing `keepOldToken` and
+`dontSaveNewToken`), `quittingWhileWorkIsUnderWay.buttons` (`titles.keepWorking`
+"Cancel", `order`, `default` null, `escape`, `firstButtonByQuestion` gone,
+the cases' `expectCancelButton`), `obsidianAddOnsForFigures.wording.later` and
+`unitPlanning`'s `later` ("Not Now"), `todaysClassOnTheFrontPage.wording.notToday`
+("Not Now"), and `assist-wording.json`'s new `giveDatesButton`.
 
 ## A section's Coverage tab (#793)
 
@@ -3295,7 +3407,8 @@ fixing the quit path is the prerequisite either way rather than the alternative.
 Russell decided on 2026-09-25 to match all three rules; Windows did on
 2026-09-30. **The question**: quitting there is closing the LAST window, so
 `MainWindow`'s `AppWindow.Closing` asks (`QuitConfirmation`, all nine contract
-cases, Keep Working the default) when the app's own records show a publish or a
+cases; Keep Working the default until #987, Cancel with no default since,
+"Question sheets and alerts after the HIG review") when the app's own records show a publish or a
 preview being BUILT (`CourseActivity.BeginPreviewBuild`, from the press until
 the page first answers — never the port lease), and never when Windows is
 ending the session: a window subclass hears `WM_QUERYENDSESSION`, Windows'
@@ -3350,7 +3463,8 @@ up. The reasons are `QuitConfirmation.ClosingReason`:
   which only exists while the quit request is being handled; read inside
   that wait's `Task`, a log out would be written down as the teacher's quit
   (plan review N3). It is KEPT (`AppDelegate.closingReason`) only after
-  "Keep Working" has had its chance, so a quit called off leaves nothing.
+  Cancel ("Keep Working" until #987) has had its chance, so a quit called
+  off leaves nothing.
 - **"To install a new version" comes from where the app decides to
   install**: `installNow` (the teacher's Install, straight away or after held
   work) and `heldWorkIsDone`'s postponed-install branch set
@@ -8008,8 +8122,11 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   2026-10-08 (the implementation review asked for it): as the default button,
   a Return typed in the Course code field with no row highlighted created a
   club named by the code, with its name empty and the rest of the form unread.
-  It wears the accent through `.prominentButton(isEnabled:)` instead, grey
-  while the folder is getting ready; a long form is finished with a click. **Class Dates' Read the Dates does NOT take
+  It wore the accent through `.prominentButton(isEnabled:)` instead, which
+  made it look like the default without being one (finding D32). **Since
+  #987 it is the default once the form is complete**
+  (`NewCourseWizardView.formIsComplete`), plain and without Return before,
+  grey while the folder is getting ready. **Class Dates' Read the Dates does NOT take
   Return while the dates are being typed**: the box needs Return for a new
   line, a default button can take Return before a text box does, and a probe
   app could not put focus in its box to settle which wins — so the risk was
@@ -15872,7 +15989,11 @@ it by hand. Since #397, pressing **Preview** in a section window asks:
 
 > **Show Unit 2, Day 5 on the front page?**
 > Today's class is published, but the front page still shows Unit 2, Day 4.
-> [Show on Front Page] [Not Today]
+> [Show on Front Page] [Not Now]
+
+(The decline was titled Not Today until #987; "Not Now" is the title on offers
+Plantoir raises by itself, Russell's ruling Q2 on #975. The contract key and
+the record keep the name `notToday`.)
 
 The rule, its cases and the sentences are data: `contracts/class-planning.json`
 → `todaysClassOnTheFrontPage` (42 cases, run by
@@ -18538,15 +18659,15 @@ checked before it is saved (#696)"; the words are
   cut). When the new
   token cannot reach some of the folder's class websites the sheet stays open
   behind an alert naming them (a course's shared unit plans as "MPM2D unit
-  plans for 2026", `placeUnitPlans`), with Keep My Old Token (the default:
-  Return chooses it, and Escape does nothing, because `.cancel` and
-  `.defaultAction` on one alert button give it Return only, as #832 measured
-  in `QuestionKeysTests`) and Use the New Token, which saves it with
-  `--use-anyway`. When no token was saved before the change the first button
-  says Don't Save It instead, and the trail says a new token was not saved
-  rather than writing `keptOld` (review M7). Before the pane's first check has
-  answered nothing is known, and it says Don't Save It, which is true either
-  way (the fix review's M-c). The pasted token is held in memory
+  plans for 2026", `placeUnitPlans`), with Cancel and Use the New Token,
+  which saves it with `--use-anyway`. Since #987 neither is the default:
+  Return does nothing, Escape and Command-Period are Cancel, and Use the New
+  Token is red. (Until #987 the first button was Keep My Old Token, or Don't
+  Save It when no token was saved before, and it was the default with Escape
+  doing nothing.) When no token was saved before the change the trail says a
+  new token was not saved rather than writing `keptOld` (review M7). Before
+  the pane's first check has answered nothing is known, and the trail says
+  the token was not saved, which is true either way (the fix review's M-c). The pasted token is held in memory
   only while that alert is open.
 - **Remove Token** asks first and says a deploy set for later will not run.
 - **The end date travels to the Deploy screen** through
@@ -19595,7 +19716,9 @@ run against `outsideAgents.setUp.stateCases`. Set Up… opens
 `AssistantSetUpSheet` (on `SheetTitleScanTests.sheets`): what is downloaded,
 from whom, where it goes, that it is checked once in place, and where the
 course content goes; a link to the maker's plans page; for GitHub Copilot,
-Help's `github-education` page. Cancel is the default answer.
+Help's `github-education` page. Since #987 Download and Set Up is the
+default answer and Cancel leads with Escape (it was Cancel, on the trailing
+side, until then).
 
 `ReviseWithMenu` is always drawn now; the golden (`Tests/Goldens/menu-bar.txt`)
 pins the set-up item and the divider above it (`[if any reviser]`). Quitting

@@ -1717,8 +1717,13 @@ on either side makes a section or old-place marker without its key (each is
 the service's own answer, saved whole), so the plans marker is the one shape
 known to need it; the rule is the same for every kind. Any unreachable stops
 the save with the list; the app asks its `unreachableTitle` question, naming
-them, with Keep My Old Token (the default) and Use the New
-Token (`--use-anyway`). Any unheard stops it with `sitesNotChecked`. Without
+them, with Cancel and Use the New
+Token (`--use-anyway`). Since #987 neither is the default, so Return does
+nothing, Escape and Command-Period are Cancel, and Use the New Token is drawn
+red (Apple's HIG, Alerts: "Note that you don't want to make a Cancel button
+the default button"; the destructive style marks "a destructive action people
+didn't deliberately choose"). Until #987 the back-out button said Keep My Old
+Token, or Don't Save It, and was the default. Any unheard stops it with `sitesNotChecked`. Without
 it a token from another account made the next deploy build a new site at a new
 address and report success: `deploy.py` prints "Creating a fresh Netlify site
 for this section…" on a 404, and `remake_pages_project_if_gone` makes the
@@ -1827,9 +1832,11 @@ being shared (the fix review's M-b): `deploy.sh` does not know the year when
 launcher the school year would be a second copy of that rule; a year whose
 project was deleted by hand stops the share, and Change Token…'s Use the New
 Token is the way past it. Asking the launcher whether a token is saved before
-the unreachable question, so its first button can say Keep My Old Token even
+the unreachable question, so its trail line can say the old token was kept even
 when the pane's first check has not answered (M-c): it would add a request
-and a wait in front of every question, and Don't Save It is true either way.
+and a wait in front of every question, and "not saved" is true either way.
+(Until #987 the same fact chose the button's title, Keep My Old Token or
+Don't Save It; the button is Cancel in both cases now.)
 GitHub Pages: #669.
 
 **Windows.** `deploy.ps1` was not edited: this Mac has no PowerShell, and the
