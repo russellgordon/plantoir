@@ -242,7 +242,8 @@ public sealed class UndoFormatTests
     [InlineData("2026-11-13T21:04:05Z", true)]
     [InlineData("2026-11-13T21:04:05.123Z", true)]
     [InlineData("2026-11-13T21:04:05.1234567Z", true)]
-    [InlineData("2026-11-13T21:04:05+00:00", false)]
+    [InlineData("2026-11-13T21:04:05+00:00", true)]    // an offset is a moment, as the Mac reads it (W1 review, second round)
+    [InlineData("2026-11-13T21:04:05", false)]           // a local time is not
     [InlineData("2026-11-13 21:04:05Z", false)]
     [InlineData("13/11/2026", false)]
     public void TheMomentIsUtcToTheSecondWithFractionsAccepted(string text, bool readable) =>
