@@ -12,10 +12,17 @@ namespace Plantoir.Core.Undo;
 /// available offline, a network share that dropped: the read FAILS, and the
 /// page has not been changed by anyone. Reading that failure as "changed since"
 /// would make ruling 13 clear the WHOLE list for a file that was merely busy.
-/// So it ends the way the contract's <c>fileIsInUse</c> ends
-/// (<c>stepCases</c>, <c>rule.clearing</c>: refused, the file named, nothing on
-/// the list changed, to be tried again). The contract has no check case for it
-/// yet; the proposed cases are the plan review's D1, amended.</para>
+/// So it is refused, the file named, nothing on the list changed, to be
+/// tried again, in one of two ways (<see cref="UndoCheck.StateOf"/>). A
+/// sharing or lock violation (32, 33: another program has it open) ends the
+/// way the contract's <c>fileIsInUse</c> ends (<c>stepCases</c>,
+/// <c>rule.recovery</c>'s "a file is in use", the everyday case on Windows);
+/// the contract has no check case for it, and the proposed cases are the plan
+/// review's D1, amended. Every other failed read (access denied, a cloud file
+/// not downloaded yet, a network share that dropped, a disk error) is the
+/// contract's <c>cannotTell</c> (<c>checkCasesHow</c>, the director's ruling on
+/// U2b's review, 2026-11-19, confirmed by Russell: "a teacher file Undo cannot
+/// read at check time" is refused <c>cannotTellNow</c>, the list kept).</para>
 /// </summary>
 internal abstract record UndoCurrent
 {
@@ -78,14 +85,16 @@ internal enum UndoOpState
     After,
     /// <summary>Neither: changed since, by hand or by something else.</summary>
     Neither,
-    /// <summary>It could not be read at the moment (Windows): never "changed since".</summary>
+    /// <summary>Another program holds it with no read sharing (a sharing or lock violation, Windows): never "changed since".</summary>
     InUse,
+    /// <summary>It is there and could not be read now for any other reason (access denied, a cloud file, a network or disk error): never "changed since" (<c>checkCasesHow</c>'s <c>cannotTell</c>).</summary>
+    CannotTell,
     /// <summary>The op is not one this version can read: never acted on.</summary>
     NotReadable,
 }
 
 /// <summary>The contract's verdicts (<c>checkCasesHow</c>), plus the in-use refusal the contract already names.</summary>
-internal enum UndoVerdict { CanUndo, AlreadyBack, CanRedo, AlreadyRedone, ChangedSince, NotReadable, FileIsInUse }
+internal enum UndoVerdict { CanUndo, AlreadyBack, CanRedo, AlreadyRedone, ChangedSince, CannotTell, NotReadable, FileIsInUse }
 
 /// <summary>
 /// "Has what this step changed been changed by hand since?", asked of what is
@@ -115,10 +124,14 @@ internal static class UndoCheck
         catch (DecoderFallbackException) { return null; }
     }
 
+    private const int SharingViolation = 32;
+    private const int LockViolation = 33;
+
     internal static UndoOpState StateOf(UndoOp op, UndoCurrent current)
     {
         if (!op.Readable) return UndoOpState.NotReadable;
-        if (current is UndoCurrent.CannotReadNow) return UndoOpState.InUse;
+        if (current is UndoCurrent.CannotReadNow cannot)
+            return cannot.ErrorCode is SharingViolation or LockViolation ? UndoOpState.InUse : UndoOpState.CannotTell;
         switch (op.Kind)
         {
             case UndoOp.Recompute:
@@ -157,6 +170,7 @@ internal static class UndoCheck
         UndoOpState.Before => UndoVerdict.AlreadyBack,
         UndoOpState.Neither => UndoVerdict.ChangedSince,
         UndoOpState.InUse => UndoVerdict.FileIsInUse,
+        UndoOpState.CannotTell => UndoVerdict.CannotTell,
         _ => UndoVerdict.NotReadable,
     };
 
@@ -166,6 +180,7 @@ internal static class UndoCheck
         UndoOpState.After => UndoVerdict.AlreadyRedone,
         UndoOpState.Neither => UndoVerdict.ChangedSince,
         UndoOpState.InUse => UndoVerdict.FileIsInUse,
+        UndoOpState.CannotTell => UndoVerdict.CannotTell,
         _ => UndoVerdict.NotReadable,
     };
 
@@ -185,8 +200,15 @@ internal static class UndoCheck
         /// <summary>Content it needs is not in the list's store.</summary>
         internal sealed record ContentMissing(string Path) : PlanResult;
 
-        /// <summary>A file could not be read at the moment: refused, the list unchanged.</summary>
+        /// <summary>A file another program holds could not be read at the moment: refused, the list unchanged.</summary>
         internal sealed record FileIsInUse(string Path) : PlanResult;
+
+        /// <summary>
+        /// A file is there and could not be read now for another reason: the
+        /// contract's refusal <c>cannotTellNow</c>, the list unchanged, to be
+        /// tried again. Only content that was read and differs is changed since.
+        /// </summary>
+        internal sealed record CannotTellNow(string Path) : PlanResult;
 
         /// <summary>An op this version cannot read: never acted on.</summary>
         internal sealed record NotReadable : PlanResult;
@@ -231,6 +253,7 @@ internal static class UndoCheck
         var inTheWay = new List<string>();
         string? missing = null;
         string? inUse = null;
+        string? cannotTell = null;
 
         foreach (UndoOp op in ordered)
         {
@@ -243,6 +266,7 @@ internal static class UndoCheck
             }
             UndoOpState state = StateOf(op, working[path]);
             if (state == UndoOpState.InUse) { inUse ??= path; continue; }
+            if (state == UndoOpState.CannotTell) { cannotTell ??= path; continue; }
             if (state == UndoOpState.Neither)
             {
                 if (!inTheWay.Contains(path, StringComparer.Ordinal)) inTheWay.Add(path);
@@ -292,6 +316,9 @@ internal static class UndoCheck
                 return new PlanResult.FolderCannotBeReached(inTheWay[0]);
             return new PlanResult.ChangedSince(inTheWay[0], inTheWay.Count - 1);
         }
+        // In the mac's order (UndoCheck.plan): a page in the way, then a
+        // page that cannot be read now, then content the list no longer holds.
+        if (cannotTell is not null) return new PlanResult.CannotTellNow(cannotTell);
         if (missing is not null) return new PlanResult.ContentMissing(missing);
         if (inUse is not null) return new PlanResult.FileIsInUse(inUse);
 

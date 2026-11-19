@@ -65,13 +65,28 @@ final class UndoJournalContractTests: XCTestCase {
 
     func testCheckCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runCheckCases(under: scratchURL)
-        XCTAssertGreaterThanOrEqual(result.cases, 20)
+        XCTAssertGreaterThanOrEqual(result.cases, 90)
         XCTAssertEqual(result.failures, [])
     }
 
-    func testStackCases() throws {
-        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runStackCases(under: scratchURL)
-        XCTAssertGreaterThanOrEqual(result.cases, 15)
+    /// An editJSON move changes only its member's bytes, the same on both
+    /// platforms (the hard review of U2b, LOW a).
+    func testEditJSONCases() throws {
+        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runEditJSONCases()
+        XCTAssertGreaterThanOrEqual(result.cases, 6)
+        XCTAssertEqual(result.failures, [])
+    }
+
+    /// U2: a folder's listing is the same text on both platforms.
+    func testListingCases() throws {
+        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runListingCases()
+        XCTAssertGreaterThanOrEqual(result.cases, 3)
+        XCTAssertEqual(result.failures, [])
+    }
+
+    func testStackCases() async throws {
+        let result: (cases: Int, failures: [String]) = try await UndoContractReplay.runStackCases(under: scratchURL)
+        XCTAssertGreaterThanOrEqual(result.cases, 61)
         XCTAssertEqual(result.failures, [])
     }
 
@@ -93,9 +108,9 @@ final class UndoJournalContractTests: XCTestCase {
     /// Every kill point: a process that stops there leaves the files before
     /// or after, never between. (The harness also kills real processes at
     /// the same points with SIGKILL.)
-    func testRecoveryCases() throws {
-        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runRecoveryCases(under: scratchURL)
-        XCTAssertEqual(result.cases, 20)
+    func testRecoveryCases() async throws {
+        let result: (cases: Int, failures: [String]) = try await UndoContractReplay.runRecoveryCases(under: scratchURL)
+        XCTAssertEqual(result.cases, 41)
         XCTAssertEqual(result.failures, [])
     }
 

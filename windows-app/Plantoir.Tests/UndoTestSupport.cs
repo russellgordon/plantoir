@@ -356,6 +356,8 @@ internal sealed class UndoScribe : IDisposable
             }
             case UndoCheck.PlanResult.FileIsInUse inUse:
                 return new Outcome("fileIsInUse", step.Seq, inUse.Path);
+            case UndoCheck.PlanResult.CannotTellNow cannotTell:
+                return new Outcome("cannotTellNow", step.Seq, cannotTell.Path);
             case UndoCheck.PlanResult.Ready ready:
             {
                 string folder = FolderOf(step.Step);
@@ -397,6 +399,8 @@ internal sealed class UndoScribe : IDisposable
             }
             case UndoCheck.PlanResult.FileIsInUse inUse:
                 return new Outcome("fileIsInUse", step.Seq, inUse.Path);
+            case UndoCheck.PlanResult.CannotTellNow cannotTell:
+                return new Outcome("cannotTellNow", step.Seq, cannotTell.Path);
             case UndoCheck.PlanResult.Ready ready:
             {
                 string folder = FolderOf(step.Step);

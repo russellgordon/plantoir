@@ -14814,6 +14814,73 @@ against a reference model of the same rules. It reads the traces with CR LF
 taken as LF, so a checkout with `core.autocrlf=true` is current (measured
 red before the fix by converting the three files to CR LF).
 
+**U2b (the mac, branch `issue/899-u2b-op-kinds`) defines the six reserved op
+kinds** (`replaceText`, `editJSON`, `move`, `createTree`, `removeTree`,
+`external`) and runs `recompute`, all in the contract: their rules in
+`undoJournal.opKinds` (and `opKinds.wholeOps`), 64 more `checkCases` rows,
+`listingCases` (a folder's listing, the one text both platforms must make
+byte for byte: lines in the order of the paths' UTF-8 BYTES, never
+`string.Compare` or a culture's order), 15 `stackCases` and 6
+`recoveryCases`. What Windows must get right that the Swift cannot show: a
+`move` is one `MoveFileEx` WITHOUT `MOVEFILE_REPLACE_EXISTING`, judged as a
+pair (never delete the destination alone); a folder taken out is renamed
+aside and deleted only once every change has gone in; `editJSON` compares
+as JSON (true is not 1) and writes back with `JsonSerializer` only if the
+result reads back as the file with that one member changed; an `external`
+`preference:` names Windows' own settings store; and until the app has a
+runner for a `recompute`'s maintainer, its step is not available. A W1
+reader written before U2b treats every one of these kinds as unreadable,
+which is still safe (a barrier); the rows say what it should answer once it
+reads them. The mac's reasons and what was rejected are in
+`documentation/09-mac-app.md` → "The kinds U2 adds, and `recompute` run".
+
+After U2b's hard review (2026-11-19) five more things bind Windows, each
+with cases: a read of the teacher's file that FAILS (access denied, an I/O
+error, a OneDrive placeholder not yet downloaded) is `cannotTell`, refused
+without clearing the list and retried by recovery, never "changed since"
+(`checkCases` with `cannotBeRead`; on Windows deny read with an ACL);
+`editJSON` changes only the member's bytes (`undo.editJSONCases`, the exact
+bytes, with a Python reference: do not re-serialise the file with
+`System.Text.Json`); places are compared without regard to case; a
+listing never holds a `.DS_Store` (and the Windows twin, `desktop.ini` and
+`Thumbs.db`, is a question for the Windows port to raise, not assumed); and
+a folder set aside by a dead process is renamed back only when its listing
+is the step's, never deleted (`undo.rule.recovery`, `recoveryCases` with
+`withATree`). The door for a step given as ops refuses before anything
+changes when the step would not read back readable, names a path outside
+the working folder (links resolved), or names a blob it was not given.
+
+Three more rules from the second and third reviews bind Windows, each in
+the contract: **who settles a front-page step** (a dead step with a
+`recompute` is settled only by a recovery that re-derives what it settles;
+a recovery inside another write's lock leaves it in flight; `rule.recovery`,
+`recoveryCases` with `recoveredBy`); **containment is checked at every
+change**, not only at the door (every place inside the working folder with
+junctions and links resolved, at plan time and immediately before each
+rename or write; a place that leads outside is `changedSince`;
+`rule.stagedThenSwapped`, `stackCases`); and **a folder set aside is the
+teacher's own** (renamed back whenever its place is free, whatever it holds,
+and in the way when it changed; left untouched and recorded when its place
+is taken; the trail event `undo found a folder set aside`, held in
+`NamedGapLedger` under #899 until Windows writes Undo lines; `recoveryCases`
+with `changeTheFolderSetAside` and `somethingInItsPlace`).
+
+Two more from the fourth review and Russell's ruling of 2026-11-19 bind
+Windows, in `rule.recovery` and `recoveryCases`: **a folder taken out is
+never deleted in place** (once every change has gone in, rename it from
+its `-orig` name to its `-gone` name with one `MoveFileEx` without
+`MOVEFILE_REPLACE_EXISTING`, then delete it; recovery deletes a `-gone`
+remnant as a staged file and never puts it back; `recoveryCases` with
+`halfDeleteTheGoneFolder`, a delete cut short at the kill point
+`whileDeletingAFolder`); and **a folder set aside whose place something
+else holds is renamed to a visible name beside it**, `<name> (kept by
+Undo)`, then `(kept by Undo 2)` and on, never over anything, with the trail
+line written just before the rename (`recoveryCases` with
+`visibleNameTaken` and `recoveryStopsAfterTheTidy`, a recovery that dies
+after it has tidied and before it writes to the list). A place that cannot
+be read (access denied) is neither free nor taken: leave the folder, say
+nothing, try again.
+
 Six things in the format are easy to get wrong and are the reason it was
 revised:
 
@@ -15069,9 +15136,11 @@ and nothing in the app calls it yet.
   check reads asking only to READ and sharing everything
   (`FileShare.ReadWrite | FileShare.Delete`), never with write or delete
   access. A page held with no read sharing, a cloud file not available
-  offline or a network error is `CannotReadNow`, and it ends as the
-  contract's `fileIsInUse` ends: refused, named, nothing on the list changed
-  (the plan review's M3). It is NEVER `changedSince`, which would clear the
+  offline or a network error is `CannotReadNow`, refused, named, nothing on
+  the list changed (the plan review's M3). Since U2b's contract (2026-11-19)
+  it ends in one of two ways: a sharing or lock violation (32, 33) as the
+  contract's `fileIsInUse` ends, every other failed read as its `cannotTell`
+  (refusal `cannotTellNow`); see "What U2b's rows met here" above. It is NEVER `changedSince`, which would clear the
   whole list under ruling 13 for a file that was merely busy. The contract
   has no case for it yet: the tests are named `Proposed_*`, and the proposed
   authored cases (with a failing staging write and the read-only bit) are a
@@ -15119,6 +15188,65 @@ after every line. The traces' writer (`settingEntry`) and the op derivation
 lock, no staged swap, no flush, one process. Each count is asserted at or
 above its value today, so a list cannot silently fall to zero.
 
+**What U2b's rows met here (2026-11-19).** With the mac's U2b in the
+contract, this reader takes its six kinds for kinds it does not know, as
+the plan has W1 do, so their rows are held on the named-gap ledger against
+#899 for W6 (`NamedGapLedger` → `UndoCheckCases`, `UndoStackCases`,
+`UndoTraces`): 60 `checkCases` (every row of a U2 kind whose verdict is not
+`notReadable` both ways), U2b's 19 `stackCases` (each needs a call or a key
+the replay does not know) and the 15 traces that hold a `move`.
+
+A held row is not skipped, and each of these is proved by a test on a real
+held row (`TheDayAHeldCheckCaseIsAnsweredAsTheContractSaysItFails`,
+`TheDayAHeldStackCasePlaysThroughItFails`, `TheDayAHeldTracePlaysThroughItFails`):
+
+- A held check case must still be read as an op this reader cannot read and
+  still be answered `notReadable` both ways. It fails as the gap closing the
+  day its op is read, or the day it is answered as the contract says, and as
+  a real failure if it is answered anything else.
+- A `current` this test cannot place yet (a move's `atFrom`/`atTo`, a
+  `tree`, a `preference`, U2's shapes, which W6 places) is judged on a
+  placeholder, and only while the op cannot be read: an unreadable op is
+  settled before anything at its path is read, and two placeholders a
+  readable op would tell apart (nothing there, a folder) must agree. So the
+  nine such rows that expect `notReadable` both ways (a move onto itself,
+  with a path, to an absolute path and so on, "createTree whose path climbs
+  out", "external with a path") are met here and are not held. An op this
+  reader CAN read with such a `current` fails, naming the shape, until the
+  test places it. (Until the review of 2026-11-19 a held case of such a
+  shape returned after checking only that its op was unreadable, which a
+  correct W6 reader of those nine still satisfies, so they could never have
+  come off the ledger.)
+- A held stack case must still stop at the call or key it is held for; a
+  held trace is asserted call by call exactly as any other and must stop at
+  its FIRST `move`, at that call's number. Either fails as the gap closing
+  the day it plays through, and as a real failure if anything else stops it.
+
+**What the held traces no longer check, for W6 to restore.** Until U2b's
+contract put a `move` in them, W1 replayed all 20 traces call by call to
+their final hashes. Held, the 15 are asserted only up to their first
+`move`, and trace-002, trace-012 and trace-020 open with one, so they check
+nothing at all here; the ledger entry's reason says so, so the coverage
+comes back when W6 replays them whole.
+
+U2b's two `cannotBeRead` rows on kinds W1 reads ("a page that is there and
+cannot be read just now (no permission)", "whole file: cannot be read just
+now") were W1's and are built: a read refused for any reason but a sharing
+or lock violation (32, 33) is now `cannotTell`, refused `cannotTellNow` with
+the list kept, in the mac's order (a page in the way, then a page that
+cannot be read, then content missing, each pinned by a test); a sharing or
+lock violation stays "in use", which `rule.recovery` names apart. The mac
+answers `cannotTell` for every failed read but a missing file or folder;
+the 32/33 split is Windows' own, because there a page held by another
+program is the everyday case and `fileIsInUse` names it. The contract rows
+make the page unreadable through `UndoCurrent.Read`'s seam (access denied),
+so they run under any token; a real deny-read ACE is
+`APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow`. It runs
+and passes over SSH on the PC (run `899u2b-win-11`): a deny ACE on READING
+a file stops the administrator's token there, unlike a deny on LISTING a
+folder, which it passes (`DenyBitesFact`). Its `DenyReadBitesFact` probe
+still skips it, saying why, on any account whose token reads past it.
+
 **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
 .NET 9, the system NTFS volume, other agents of the run sharing the CPU, so
 the spread is wide): a whole read, fold and offer of one segment, by a scratch
@@ -15155,7 +15283,8 @@ readable (4); the next number counted from readable lines only (4).
 
 **Rejected:** a typed deserialiser (the mac's first bug: it threw and the line
 was skipped); a fourth verdict word of Windows' own for a failed read (M3: the
-contract's `fileIsInUse` already says what happens); probing a page with an
+contract's `fileIsInUse` already said what happens, and since U2b its
+`cannotTell` says it for every failed read but a held file); probing a page with an
 exclusive open to find holders (M2: every page Obsidian has open would be
 refused); `File.ReadAllText` anywhere in a check (it drops a BOM and replaces
 bad bytes without a word); a culture-aware compare anywhere (it calls a

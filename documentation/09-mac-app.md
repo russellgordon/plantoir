@@ -19561,8 +19561,9 @@ U1 builds `writeFile` (a whole file, by SHA-256, with both copies as blobs)
 and `editLine` (one top-level front-matter key's entry: its line and the
 lines its value runs on to, carriage returns kept), and records
 `recompute` (a file kept true by a rule, such as the section's front page,
-re-derived after the other ops; run by U2). The rest of plan 3.1 arrives
-with U2 and U5. `JournaledWrite.ops(for:)` chooses `editLine` for a change
+re-derived after the other ops; run since U2). U2 defines the six kinds
+that were reserved (below, "The kinds U2 adds"); `trash` and `storeHeld`
+arrive with U5. `JournaledWrite.ops(for:)` chooses `editLine` for a change
 only when applying its ops to the before text gives the after text byte for
 byte AND undoing them gives the before text back; otherwise the change is
 one `writeFile`. So a page the line model cannot describe exactly falls back
@@ -19582,6 +19583,186 @@ drops a leading one from a file. So the traces carry each fixture page's
 exact bytes as `utf8Hex`, the check cases give such a page as `bytesHex`,
 and the shadow record of a publish takes each page's `before` from the
 disk's own bytes rather than from the text the action read.
+
+### The kinds U2 adds, and `recompute` run (U2b)
+
+U2b (branch `issue/899-u2b-op-kinds`, on U2a) turns the six reserved shapes
+into kinds every reader of this version acts on, each with its rule in
+`file-formats.json` → `undoJournal.opKinds` and its rows in
+`undo.checkCases` (94 rows now, 64 of them U2's), and adds `undo.listingCases`
+(4) for the one piece of text both platforms must make byte for byte. The
+code is `Models/Undo/UndoOpKinds.swift` (the content and the checks),
+`UndoCheck.swift` (the plan and the swap) and `JournaledWrite.perform(ops:)`
+(the door for a step given as ops). Nothing a teacher sees changes: no
+action writes these kinds yet (U3 and U4 wire them), and the switch stays
+off.
+
+- **`replaceText`**: a hunk of a page, held in the op itself. It is found
+  by its WINDOW (the text either side plus the hunk), compared as UTF-8
+  bytes; a window counts only when it occurs exactly once and every
+  occurrence of the other window lies inside it, so a page holding the hunk
+  twice, or holding the old text in one place and the new in another, is a
+  change since rather than a guess. Rejected: the reserved shape's long text
+  in blobs. A change too long for a hunk is a `writeFile`, and a hunk read
+  from a blob would make the check depend on content the list may have lost.
+- **`editJSON`**: one member, by key path, of a JSON file whose top level is
+  an object; before and after are any JSON, compared as JSON (true is never
+  1, 1 equals 1.0, strings code point for code point, objects in any order).
+  A member holding null is not a member that is absent: the op leaves out
+  `before` or `after` for "not there", and `null` means null. **Only the
+  member's own bytes change** (the hard review of U2b, LOW a, after the
+  first version rewrote the whole file in the app's form and turned 0.1
+  into 0.10000000000000001, re-ordered keys and dropped a key written
+  twice): `UndoJSONBytes` scans the file to the member, replaces its value's
+  bytes with the new value spelled compactly (keys sorted, slashes as they
+  are), takes a removed member out with its own comma, and adds a new one
+  after the last member, spaced as that one is; every other byte stays.
+  A key written twice in an object on the path, a file that is not UTF-8
+  or not one JSON object, or bytes that do not scan, refuse the move as a
+  change since; the result must read back as exactly the file with that
+  one member changed. `undo.editJSONCases` pins the bytes for both
+  platforms, and the Python reference produces the same ones. The reserved
+  `element` (an array element) is left to the piece that needs it: an op
+  carrying it cannot be read here, so an older reader can never undo it by
+  the member rule.
+- **`move`**: a file (by its SHA-256) or a folder (by its listing) moved,
+  judged as a PAIR (#897 piece B, seam 1, the piece B review's I1): the
+  place it left free and the place it went holding it is undoable; the
+  original back and the other free is redoable; anything else is a change
+  since, and an undo then leaves BOTH places as they are and never deletes
+  the destination alone. The case that motivated it: a rollover onto a new
+  website moves `.netlify_sites/section<N>.json` aside, a deploy writes a new
+  marker in the emptied place, and an Undo that judged the halves apart
+  deleted the kept copy, losing last year's site id (`stackCases` 'a deploy
+  wrote a new marker in its place'). The move itself is ONE rename that
+  never replaces (`renamex_np` with `RENAME_EXCL`), the pair re-read just
+  before it. The containment check (the place inside the working folder, links resolved) runs at plan time, before staging, before each change, before a re-derivation and in the tidying; the change itself is a second system call, so a link swapped in during that one call is not caught (`undo.knownLimits.linkBetweenTheCheckAndTheChange`; closing it needs `renameat` against an open folder handle, U7 or later). Rejected: a move as a `writeFile` pair (a copy written and the
+  original deleted), which loses the file's mode (a Cloudflare marker is
+  0600, #961) and is two changes where the rename is one.
+- **`createTree` and `removeTree`**: a folder made or removed, everything in
+  it held in the list (the LISTING, `folder <path>` and `file <sha> <path>`
+  lines in the order of the paths' UTF-8 bytes, and every file's bytes, as
+  blobs). A folder matches only when its listing hashes to the recorded one:
+  a file added, changed or removed, or an empty folder added, is a change
+  since. A folder to take out is renamed aside under a staged name and
+  removed only once every change of the step has gone in, so a later swap
+  that is refused puts it back whole (`UndoOpKindsTests`); a folder to make
+  is built beside its place and renamed in, never over anything. A process
+  that dies with a folder set aside never has it deleted by recovery's
+  tidying, as a staged file is: the folder is the teacher's own, so it is
+  renamed back into its place whenever that place is free, whatever it now
+  holds (the director's rule after U2b's third review: an earlier rule that
+  kept a changed folder hidden left the teacher's new file unseen for good).
+  If it is as the step recorded, recovery judges the step as the work left
+  it; if it changed while aside, it is in the way, the step is recorded
+  interrupted and the list cleared, and the trail line "undo found a folder
+  set aside" says what changed. When something else now holds its place,
+  the folder is renamed to a visible name beside it, `<name> (kept by
+  Undo)` (or `(kept by Undo 2)` and on, the first name nothing holds), the
+  step is recorded interrupted, the list cleared, and the line names both
+  (Russell's ruling of 2026-11-19: nothing of the teacher's stays hidden,
+  nothing is merged or overwritten; before it, both were left as they were
+  and the folder stayed hidden for good). Both renames never replace
+  (`RENAME_EXCL`), and the trail line is written just before the rename,
+  so a death between the rename and the list's record loses nothing (the
+  fourth review of U2b, LOW 4; `recoveryCases` with
+  `recoveryStopsAfterTheTidy`). A place that cannot be read now is neither
+  free nor taken: the folder is left as it is, nothing is said, and the
+  step is cannot tell now, tried again (LOW 3: it used to say something
+  else held the place). A folder a step TAKES OUT is never deleted in
+  place: once every change has gone in it is renamed from its `-orig` name
+  to its `-gone` name, which recovery never puts back, and only then
+  deleted (`UndoSwap.removeAFolderTakenOut`). A recursive delete is not
+  atomic, and before this a death part way left a half-deleted `-orig`
+  folder that recovery put back in the teacher's place and judged
+  "neither", clearing the list (the fourth review's MEDIUM); now recovery
+  finishes deleting a `-gone` remnant as a staged file and the step is
+  completed (`recoveryCases` with `halfDeleteTheGoneFolder`, kill point
+  `whileDeletingAFolder`).
+  `heldBy` (content held in a backup zip) is U5's.
+- **`external`**: something outside every working folder, `<family>:<name>`;
+  this version knows `preference:<name>`, the app's own preferences store (`PlantoirDefaults.shared`, which follows `--state-dir`)
+  (`UndoAppPreferences`), and a step of external ops alone needs no working
+  folder. Like a move and a tree it goes in after every file's content has been swapped in, in the order of the step's ops, re-read just before it is set, and is set back if a later change cannot go in.
+  The LaunchAgent of a scheduled deploy (ruling 23) and Obsidian's vault
+  list are families a later piece defines; until then an op naming one
+  cannot be read here.
+- **Whole ops stand alone.** A move, a tree and an external op are judged
+  against the disk as it is, never against what an earlier op of the same
+  step would leave, so no other op of a step may share their places; a step
+  that does is one this version cannot read (a barrier). U3 meets this
+  first: a rollover that moves the published-pages record's fragments into
+  a `…previous-<stamp>/` folder it creates records the moves without a
+  `createTree` for that folder (the folder is left, empty, by an undo), or
+  records the folder's move whole.
+
+**A file that cannot be read now is "cannot tell", never "changed since"**
+(the director's ruling on U2b's review, 2026-11-19, for every kind and for
+U1's own `UndoItem.read`, which until then read a failing read as a file
+changed by hand and so CLEARED the list). Something the op must read that
+is there and fails to read (no permission, a disk error, a file a cloud
+service has not downloaded) gives the state `cannotTell`: Undo and Redo are
+refused with `cannotTellNow`, the list is left as it is, and recovery
+leaves the step in flight and tries again on its schedule, as for a file in
+use. Only content that was read and differs is `changedSince`, and that
+still clears the list (ruling 13). `checkCases` rows with `cannotBeRead`
+pin it for each kind.
+
+**`recompute` is run** (`UndoMaintainers`). Each maintainer is a REGISTERED
+runner, and the runner is `async`: the one maintainer, `sectionFrontPage`,
+is the app's own rule (`UndoSectionFrontPage.rederive`, which calls
+`SectionIndexPointer.repointIndex`, the rule a publish, a re-date and the
+start of the year use), and it lives on the main actor while the list is
+moved off it. So the list never calls a runner itself: the entry points the
+app uses, `undoNewestAndRederive`, `redoNewestAndRederive`,
+`JournaledWrite.performAndRederive(ops:)` and
+`UndoRecovery.recoverAndRederive`, do the journal's work (recovery, the
+check, the swaps, the closing line) synchronously and then, with the lock
+released, AWAIT each runner on its own actor. The main actor is never
+blocked while the lock is held and the lock never waits for the main
+actor. U7 calls `UndoMaintainers.registerTheAppsFrontPage()` with the
+switch. Recovery re-derives every step it settles, whichever way
+(re-deriving is idempotent), and a step that keeps a file true by a rule is
+settled ONLY by a recovery that re-derives: a recovery run inside another
+write's lock (U1's door, `undoNewest` alone) leaves it in flight, and the
+door for ops recovers and re-derives before it begins (the second hard
+review of U2b, MEDIUM 1; `recoveryCases` with `recoveredBy`): judged by its content ops alone, a step that
+died after its swaps and before its re-derivation would otherwise be left
+with its front page stale (the Fable sweep of U1, T5; `recoveryCases` with
+`withAMove`). **Until a runner is registered for a maintainer, a step
+holding its `recompute` is not available to Undo or Redo, and recovery
+holds it open, unsettled, rather than settle it with the re-derivation
+skipped** (the hard review of U2b, MEDIUM 5). The crash window that is
+left: a process that dies after the closing line and before its awaited
+re-derivation leaves the front page stale until the next re-derivation of
+that section (any publish, re-date or Undo there); U7 closes it by
+re-deriving every `recompute` file of the steps on the list at launch,
+which costs nothing when nothing is stale.
+
+**Conditions U7 must meet before the switch (left by U2b's reviews):**
+
+- **Register the app's front-page runner at launch, before any recovery.**
+  No app code calls `UndoMaintainers.registerTheAppsFrontPage()` today;
+  only the tests do. While none is registered, a step a dead process left
+  holding a `recompute` is never settled, so the plain doors refuse
+  ("another change is under way") on that course for as long as the step
+  waits, which, with no runner, is for ever (the fourth review of U2b,
+  LOW 5). U2b deliberately does not register one: the switch is off and
+  nothing is recorded live. U7 registers it with the switch and proves a
+  dead front-page step is settled at the first launch.
+
+Rejected: a synchronous runner
+hopped to the main actor with a blocking wait (GCD, and a deadlock when the
+list is driven from the main actor); making the front-page rule and
+everything it reads (`Course`, `CourseConfiguration`, `AssistSectionGraph`)
+nonisolated in U2, a change across the app for a list still off.
+`UndoOpKindsTests.testTheAppsOwnFrontPageRunnerIsRegisteredAndRunAfterAnUndo`
+registers the app's runner and proves the landing page follows; the suite
+otherwise registers a recording runner.
+
+**Measured** (a standalone build of `Models/Undo/` with the replay, Apple
+M4 Pro, swiftc -O): every check, listing, stack (61), step, recovery (26)
+and deployed case and all 20 traces, 0 failures, before the suite ran them.
 
 ### All or nothing, staged then swapped (ruling 4, W5)
 
