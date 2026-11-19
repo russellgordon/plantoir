@@ -20087,7 +20087,9 @@ repetitive animations".
   the field's name (measured: such a field reads with no description); the
   sidebar's filter field, the Class Dates sheet's "Where these came from"
   field and Publish Pages' Find a Page field are labelled with those same
-  words. Other placeholder-only fields remain (the assistant's composer,
+  words, and Course Settings' club short-label field with "Short label
+  beside emoji" (its placeholder's words without the parenthesis; the
+  second review found it unnamed). Other placeholder-only fields remain (the assistant's composer,
   Class Dates' Google Sheet link, the sidebar's course-code rename field,
   Course Settings' folder path, the list editor's New name, the console's
   answer fields), not yet checked live; they are for the next pass.
@@ -20113,11 +20115,36 @@ repetitive animations".
   while Reduce Motion is on (`AssistTypingIndicator.breathes`), and turning
   it on mid-wait removes the repeating animation rather than leaving it
   running.
-- **Not done here, and why.** The About window's credit links are inline
-  Markdown links in a `Text`, which SwiftUI reports to accessibility as
-  disabled links (D46). Russell ruled on 2026-11-19 that they become
-  separate link views, the design shown to him before it is built:
-  `vm-tools/reference/993-about-window-design.md`.
+- **The About window's links (D46, #993's second piece).** The credit
+  links were inline Markdown links in a `Text`, which SwiftUI reports to
+  accessibility as links with AXEnabled false (measured: "Quartz",
+  "sponsoring him on GitHub", "Phosphor Icons", "Russell Gordon") and which
+  Tab does not reach with Keyboard Navigation on. Russell ruled option A of
+  `vm-tools/reference/993-about-window-design.md` on 2026-11-19: the
+  sponsor sentence stays whole as plain text, with two `Link` views beneath
+  it inside the callout ("Quartz", and "Sponsor Jacky Zhao on GitHub",
+  which starts with a verb as the HIG's Writing page asks of a link); the
+  three credit lines became a label-and-value `Grid` in the shape of the
+  Website and Email rows (Icon, Phosphor Icons (MIT); Design, Russell
+  Gordon; Made with, Claude). Each of the six links is now one enabled
+  AXLink with its own words, listed in the rotor's Links.
+  `AboutWindowLinksTests` reads the real `AboutView` through
+  `AccessibilityTree`: each link by identifier (`aboutQuartzLink` and the
+  rest) is an enabled link with its own words, the window holds exactly
+  those six, the sentence is read whole, the credits' labels are words of
+  their own, and with Keyboard Navigation on, Tab reaches the six in order
+  (that test skips, saying why, with it off). With the inline links put
+  back the first two fail. Rejected: splitting each sentence around its
+  link (SwiftUI wraps mixed `Text` and `Link` pieces as blocks, so the
+  sentence breaks oddly at larger text sizes), a row of four link buttons
+  (reads as actions, wider than the window at larger sizes), and hiding the
+  inline links behind one element with custom actions (VoiceOver would
+  hear no link and the rotor's Links would be empty). The Windows About
+  panel (`AboutDialog.cs`) follows: `HyperlinkButton`s of their own in
+  place of inline `Hyperlink`s, the same words and rows; its source is
+  pinned by `AboutDialogLinksSourceTests`, and the sentence holds the word
+  "Quartz" through a constant so the label scan's one exception (the bare
+  credit name) still covers it.
 - **Tests read what the app exposes.** `AccessibilityTreeTests` hosts the
   real views (the tab bar, the emoji field, Add a Section, the Class Dates
   sheet, the Publish Pages picker, the spinner, a stopping sentence) in an
