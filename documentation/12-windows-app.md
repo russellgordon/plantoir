@@ -2750,8 +2750,82 @@ and the trail lines `deploy.sh` writes beside `task started` and
 `colourSchemePicker` (#920), `deployTokens` (#921), `keptDownloads`,
 `phetFences` and `buildOutputLocation.keptDownloadsSurviveTheSweep` (#936),
 `videoEmbeds` (#939), `quittingWhileWorkIsUnderWay.previewBuildRecord` (#928),
-`undo` and `undo-traces.json` (#949), `problemReportRedaction.redactedAgainCases`
-and `ruleOrder` (#941), and the `undoListDays` of 61 (#912).
+`undo` and `undo-traces.json` (#949), and the `undoListDays` of 61 (#912).
+(`problemReportRedaction.redactedAgainCases` and `ruleOrder` were on this
+list until #941 landed on this branch; see below.)
+
+#### Brought up to `dev` 39d83a0a7, and the redactor fixed (2026-11-18)
+
+The branch waited four days while `dev` moved 94 commits (stack 14: #901a,
+#839, #952; #973, #974, #978, #980 and the roadmap). `dev` merged in without
+a conflict. Nothing under `windows-app/` had changed on `dev`. Before the
+merge, the Windows suite on `origin/dev` 39d83a0a7 read `Failed: 25, Passed:
+3811, Skipped: 0, Total: 3836` (17 m 58 s, over SSH on the PC). This
+section's measurements were made on the same PC, over SSH, in
+`plantoir-wt-compare`.
+
+**#941, the redactor, built from the fourth hold's port.** `PatternRules` is
+the mac's twelve patterns, byte for byte (compared by script against
+`LogRedactor.swift`), in `ruleOrder.order`, with `userFlag` new. `Redacting`
+gained the seam the mac's `redacting(_:applyingInOrder:)` has, and
+`LogRedactorTests` gained the four tests #941 lists: the names in the
+contract's order, `ruleOrder.cases` in the pinned order and with each
+`wrongOrder` move, `redactedAgainCases`, and the linear-time bound (the
+mac's eight slow shapes at 10,000 and 100,000 characters; growth at most 50,
+the best of up to three rounds). The two assembled counts moved from 3 to
+12 and from 1 to 3. Case 20, the line that ends in a carriage return,
+needed no .NET-specific change.
+
+**Two shared tests that were wrong on Windows, fixed in the test, not in the
+product.**
+- `scripts/test_deploy_tokens.py` (#921): the paste and end-date cases now
+  reach bash in the environment (`PLANTOIR_TEST_VALUE`), not as an argument,
+  because Git Bash re-reads its own command line (measured above). The same
+  cases and assertions run on the mac, where the file still passes (22
+  tests).
+- `scripts/freshness_cases.py`, the `pointTheLinkAtAnOlderCopy` change: it
+  renamed a new link over the course folder's link, the way `ln -sfn` does.
+  Windows refuses a rename over a directory link (`PermissionError: [WinError
+  5]`). The case runs only where links can be made: over SSH, with an
+  administrator token, they can, so `test_build_freshness_reuse.py` went red
+  there and nowhere else. On Windows the old link is now removed first
+  (`os.rmdir` removes the link, never what it points at). The mac's path is
+  unchanged (40 tests pass there).
+
+**Re-pointed entries.** The 21 Roll Over entries name #954, which is Windows'
+issue for #897 piece B. The whole-second liveness case names #956, because
+#829 is closed.
+
+**Stack 14's reds, held as four more entries.** Three tests went red from
+what `dev` brought:
+- **#901 (3).** The trail event "site leaves off files no published page
+  uses" (`ActivityTrailEvents`), and the two follow-limit stops in
+  `failureExplanations.cases`, held by `why` up to the first colon
+  (`FailureExplanationCases`). #901a is shared build code, so Windows' build
+  runs it already. What Windows lacks is the trail line and the explanation
+  of the stop: until #901 lands, a stopped build shows its raw output, which
+  is the contract's honest fallback. #901 is open on v2.0.0, and this brief
+  left it alone.
+- **#921 (1).** `netlifyToken` (`CredentialRequestsSaidDifferently`). #952
+  corrected the Netlify token's TTL step on the mac, which now says that the
+  next deploy names a token that no longer works and that Settings shows
+  whether it still works. Windows' Settings does neither until #921 lands, so
+  its older words are the true ones here. The title, label, link and number
+  of steps are still compared exactly.
+
+**Still red, and not held.** `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`
+waits on the mac's answer on #963. Nothing has been posted there since the
+fourth hold filed it.
+
+**The result.** The whole suite on the branch at 1debb04d7, over SSH on the
+PC: `Failed: 6, Passed: 3835, Skipped: 0, Total: 3841, Duration: 15 m 13 s`.
+The six are #963's launcher-question test and five permission tests that
+fail only over SSH, where the token is an administrator's:
+`BuildOutputLocationTests.AFolderThatCannotBeListedMeansRebuild`,
+`ReuseTheLastBuildTests.AFolderThatCannotBeListedCountsAsChanged`,
+`ReopeningTheLastWorkingFolderTests.EveryFolderCaseIsDecidedOnARealFolder`
+and `ReferenceLockTests`' two. Those five were red on `dev` as well. The
+linear-time test took 1.0 s for all eight shapes.
 
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
