@@ -34,15 +34,23 @@ struct DeployDestinationChecklist: View {
 
     static func symbolName(for leg: MultiDestinationDeployRunner.Leg) -> String {
         if leg.isFinished {
-            return leg.succeeded ? "checkmark.circle.fill" : "xmark.circle.fill"
+            // A failed leg stopped: the stop symbol, one per meaning (#994).
+            return leg.succeeded ? "checkmark.circle.fill" : StatusColour.blocking.filledSymbolName
         }
         return leg.runner.isRunning ? "arrow.triangle.2.circlepath.circle.fill" : "circle"
     }
 
-    static func tint(for leg: MultiDestinationDeployRunner.Leg) -> Color {
+    static func tint(for leg: MultiDestinationDeployRunner.Leg) -> AnyShapeStyle {
         if leg.isFinished {
-            return leg.succeeded ? .green : .red
+            if leg.succeeded {
+                return AnyShapeStyle(Color.green)
+            }
+            // A failed leg is the stopping red (#994).
+            return AnyShapeStyle(StatusColour.blocking.style)
         }
-        return leg.runner.isRunning ? .blue : .secondary
+        if leg.runner.isRunning {
+            return AnyShapeStyle(Color.blue)
+        }
+        return AnyShapeStyle(Color.secondary)
     }
 }

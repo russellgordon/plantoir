@@ -102,17 +102,50 @@ class Sabotages(unittest.TestCase):
                 self.assertIn(other, rows, one["name"])
             self.assertTrue(one["reason"].strip(), one["name"])
 
-    def test_every_row_but_embeds_is_proven_red_by_some_sabotage(self):
+    def test_every_row_is_proven_red_by_some_sabotage(self):
         aimed = {one["aims"] for one in ROWS["sabotages"]}
         unproven = [row["name"] for row in ROWS["rows"] if row["name"] not in aimed]
-        # Embeds run on deployed sites only; their proof is #597's second half.
-        self.assertEqual(unproven, ["embeds"])
+        self.assertEqual(unproven, [])
+
+    def test_a_deployed_only_row_is_proven_only_on_its_hosts(self):
+        # Embeds run on deployed sites only (597b): their sabotage names the
+        # same hosts, so verify.sh's local --expect-red all says NOTE for it.
+        rows = {row["name"]: row for row in ROWS["rows"]}
+        for one in ROWS["sabotages"]:
+            if rows[one["aims"]].get("hosts"):
+                self.assertEqual(one.get("hosts"), rows[one["aims"]]["hosts"], one["name"])
 
     def test_every_fixture_page_is_named(self):
         pages = {path.stem for path in plant_rendered.PAGES.glob("*.md")}
         self.assertEqual(pages, set(ROWS["pages"]))
         for page, address in ROWS["pages"].items():
             self.assertEqual(address, "Rendered-Check/" + page.replace(" ", "-"))
+
+    def test_the_dialog_sabotage_says_it_is_due_before_the_sketch_can_open(self):
+        # #974: the drag row read a marker the sabotage set only once the
+        # sketch was open, so a drag in the gap before it met an unbroken
+        # sketch and passed. The page now says so on <html> as its script's
+        # first act, the drag row waits on that, and a sabotage that never
+        # finishes is not read as the row's own reason ("did not move").
+        root = Path(tempfile.mkdtemp(prefix="plantoir-rendered-test-"))
+        try:
+            page = sabotage.page_file(root, "Sketch")
+            page.parent.mkdir(parents=True)
+            page.write_text("<html><head></head><body></body></html>", encoding="utf-8")
+            sabotage.geogebra_dialog(root)
+            script = (root / "static" / "rendered-sabotage" / "geogebra-dialog.js").read_text(encoding="utf-8")
+            first = script.strip().splitlines()[1].strip()
+            self.assertEqual(first, 'document.documentElement.dataset.renderedSabotage = "dialog pending"')
+            self.assertIn('document.documentElement.dataset.renderedSabotage = "dialog removed"', script)
+        finally:
+            shutil.rmtree(root)
+        checks = (HERE.parent / "rendered_features.mjs").read_text(encoding="utf-8")
+        drag = checks[checks.index('ROW_CHECKS["geogebra drag"]'):checks.index('ROW_CHECKS["geogebra reset"]')]
+        self.assertIn("document.documentElement.dataset.renderedSabotage", drag)
+        self.assertNotIn("f.dataset.renderedSabotage", drag)
+        reason = [one["reason"] for one in ROWS["sabotages"] if one["name"] == "geogebra dialog"][0]
+        never_finished = drag[drag.index("if (!settled)"):].split("\n")[0]
+        self.assertNotIn(reason, never_finished)
 
     def test_refuses_a_folder_without_the_pages(self):
         empty = Path(tempfile.mkdtemp(prefix="plantoir-rendered-test-"))

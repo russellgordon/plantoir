@@ -22,6 +22,7 @@ does not run this code). Listed in verify.sh's step 0. Run with:
 """
 
 import json
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 import multiprocessing
 import os
 import shutil

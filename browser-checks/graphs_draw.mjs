@@ -22,10 +22,10 @@
 //
 //   node browser-checks/graphs_draw.mjs <chrome> <math page url> <second page url> <exports page url>
 
-import { spawn } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, mathUrl, secondUrl, exportsUrl] = process.argv.slice(2)
 if (!chromePath || !mathUrl || !secondUrl || !exportsUrl) {
@@ -38,7 +38,7 @@ if (!chromePath || !mathUrl || !secondUrl || !exportsUrl) {
 const DRAWN_PATH = 100
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-graphs-check-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1512,900",
   "--use-mock-keychain", "--password-store=basic",

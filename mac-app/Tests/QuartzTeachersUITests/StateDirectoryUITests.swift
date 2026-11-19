@@ -183,13 +183,7 @@ final class StateDirectoryUITests: XCTestCase {
     /// The user id a process runs as, asked of the kernel (the runner cannot
     /// spawn `ps`). Nil when no process holds that id.
     static func ownerOfProcess(_ processID: Int32) -> uid_t? {
-        var selector: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processID]
-        var processInfo: kinfo_proc = kinfo_proc()
-        var infoSize: Int = MemoryLayout<kinfo_proc>.stride
-        if sysctl(&selector, 4, &processInfo, &infoSize, nil, 0) != 0 || infoSize == 0 {
-            return nil
-        }
-        return processInfo.kp_eproc.e_ucred.cr_uid
+        return LaunchProcesses.owner(ofProcess: processID)
     }
 
     /// Polls a condition for up to `seconds`.

@@ -44,10 +44,11 @@
 //
 // PLANTOIR_PRINT_CHECK_KEEP=<folder> keeps the PDFs there.
 
-import { execFileSync, spawn } from "node:child_process"
+import { execFileSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, pageUrl, plainUrl, tooTallUrl] = process.argv.slice(2)
 if (!chromePath || !pageUrl) {
@@ -191,7 +192,7 @@ const work = mkdtempSync(join(tmpdir(), "plantoir-print-check-"))
 const profile = join(work, "profile")
 const keep = process.env.PLANTOIR_PRINT_CHECK_KEEP || ""
 if (keep) mkdirSync(keep, { recursive: true })
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`,
   "--no-first-run", "--no-default-browser-check",
   // Without these a fresh profile waits on the Mac's keychain, and every

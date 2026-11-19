@@ -114,7 +114,7 @@
    "windows": null
   },
   "notToday": {
-   "label": "Not Today",
+   "label": "Not Now",
    "mac": {
     "say": "class-planning#todaysClassOnTheFrontPage.wording.notToday"
    },
@@ -260,10 +260,38 @@
    },
    "windows": null
   },
-  "addNextClassTitle": {
-   "label": "Add next class",
+  "addClassWayNextInThisUnit": {
+   "label": "As the next class in the unit under way",
    "mac": {
-    "say": "assist-wording#wording.menuAddNextClassTitle"
+    "say": "assist-wording#wording.menuAddClassNextInThisUnit"
+   },
+   "windows": null
+  },
+  "addClassWayInANewUnit": {
+   "label": "In a new unit, as its first class",
+   "mac": {
+    "say": "assist-wording#wording.menuAddClassInANewUnit"
+   },
+   "windows": null
+  },
+  "addClassWayAsACopy": {
+   "label": "As a copy of a class in this section",
+   "mac": {
+    "say": "assist-wording#wording.menuAddClassAsACopy"
+   },
+   "windows": null
+  },
+  "addClassAddButton": {
+   "label": "Add",
+   "mac": {
+    "wording": "AssistWording.menuAddButton"
+   },
+   "windows": null
+  },
+  "addClassDuplicateButton": {
+   "label": "Duplicate",
+   "mac": {
+    "wording": "AssistWording.menuDuplicateButton"
    },
    "windows": null
   },
@@ -358,24 +386,24 @@
    },
    "windows": null
   },
-  "cancelScheduledDeployQuestion": {
-   "label": "Cancel this scheduled deploy?",
+  "removeScheduledDeployQuestion": {
+   "label": "Remove the scheduled deploy?",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.question"
    },
    "windows": null
   },
-  "cancelIt": {
-   "label": "Cancel It",
+  "removeScheduledDeployButton": {
+   "label": "Remove",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.removeButton"
    },
    "windows": null
   },
-  "leaveItScheduled": {
-   "label": "Leave It Scheduled",
+  "removeScheduledDeployCancel": {
+   "label": "Cancel",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.cancelButton"
    },
    "windows": null
   },
@@ -446,6 +474,13 @@
    "label": "Re-date",
    "mac": {
     "say": "assist-wording#wording.menuReDateButton"
+   },
+   "windows": null
+  },
+  "rollOverButton": {
+   "label": "Roll Over",
+   "mac": {
+    "wording": "AssistWording.menuRollOverButton"
    },
    "windows": null
   },
@@ -631,6 +666,27 @@
    },
    "windows": null
   },
+  "addOnsCloseObsidianAndAddThem": {
+   "label": "Close Obsidian and Add Them",
+   "mac": {
+    "say": "shared-rules#obsidianNeverClosedUnasked.wording.offerAddClosingObsidian"
+   },
+   "windows": null
+  },
+  "obsidianCloseAndOpen": {
+   "label": "Close Obsidian and Open",
+   "mac": {
+    "say": "shared-rules#obsidianNeverClosedUnasked.wording.closeAndOpen"
+   },
+   "windows": null
+  },
+  "obsidianClosingCancel": {
+   "label": "Cancel",
+   "mac": {
+    "say": "shared-rules#obsidianNeverClosedUnasked.wording.cancel"
+   },
+   "windows": null
+  },
   "addOnsNotNow": {
    "label": "Not Now",
    "mac": {
@@ -681,7 +737,7 @@
    "windows": null
   },
   "addOnsLater": {
-   "label": "Later",
+   "label": "Not Now",
    "mac": {
     "say": "shared-rules#obsidianAddOnsForFigures.wording.later"
    },
@@ -906,13 +962,6 @@
   },
   "newCourseSheetStructurePart": {
    "label": "Structure",
-   "mac": {
-    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
-   },
-   "windows": null
-  },
-  "newCourseSheetUseLCSSpecificTerminology": {
-   "label": "Use LCS-specific terminology",
    "mac": {
     "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
    },
@@ -1482,6 +1531,69 @@
    "label": "Deploying",
    "mac": {
     "file": "mac-app/QuartzTeachers/Views/Settings/PlantoirSettingsView.swift"
+   },
+   "windows": null
+  },
+  "deployTokensNetlifySection": {
+   "label": "Netlify",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.sectionHeaderNetlify"
+   },
+   "windows": null
+  },
+  "deployTokensChangeToken": {
+   "label": "Change Token…",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.changeButton"
+   },
+   "windows": null
+  },
+  "deployTokensRemoveToken": {
+   "label": "Remove Token",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.removeButton"
+   },
+   "windows": null
+  },
+  "deployTokensCheckAgain": {
+   "label": "Check Again",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.checkAgainButton"
+   },
+   "windows": null
+  },
+  "deployTokensCheckAndSave": {
+   "label": "Check and Save",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.changeConfirm"
+   },
+   "windows": null
+  },
+  "deployTokensKeepMyOldToken": {
+   "label": "Cancel",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.cancelButton"
+   },
+   "windows": null
+  },
+  "deployTokensUseTheNewToken": {
+   "label": "Use the New Token",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.useNewToken"
+   },
+   "windows": null
+  },
+  "deployTokensRemoveConfirm": {
+   "label": "Remove",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.removeConfirm"
+   },
+   "windows": null
+  },
+  "deployTokenEndOpenSettings": {
+   "label": "Open Settings…",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.openSettingsButton"
    },
    "windows": null
   },
@@ -2199,10 +2311,17 @@
    },
    "windows": null
   },
+  "problemsTabKindScienceSimulation": {
+   "label": "Science simulation",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[15].label"
+   },
+   "windows": null
+  },
   "problemsTabKindFileTooLarge": {
    "label": "File too large",
    "mac": {
-    "say": "shared-rules#sectionProblems.kinds[15].label"
+    "say": "shared-rules#sectionProblems.kinds[16].label"
    },
    "windows": null
   },
@@ -2284,7 +2403,7 @@
    "windows": null
   },
   "quitQuestionKeepWorkingButton": {
-   "label": "Keep Working",
+   "label": "Cancel",
    "mac": {
     "wording": "QuitConfirmation.keepWorkingButton"
    },
@@ -2403,7 +2522,7 @@
    "windows": null
   },
   "assistantRemoveButton": {
-   "label": "Remove",
+   "label": "Remove…",
    "mac": {
     "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
    },

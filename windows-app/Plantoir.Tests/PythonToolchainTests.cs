@@ -109,7 +109,7 @@ public class PythonToolchainTests
     [MemberData(nameof(PythonTestFiles))]
     public void SharedPythonTestFilePasses(string fileName)
     {
-        var result = RunPython(ScriptsDirectory, fileName, $"scripts/{fileName}");
+        var result = RunPython(fileName);
         _output.WriteLine($"ran on {Interpreter.Describe()}");
 
         Assert.True(
@@ -120,6 +120,9 @@ public class PythonToolchainTests
     // MARK: - Plantoir Help's tests (#886)
 
     private static string HelpTestsDirectory => Path.Combine(RepoRoot, "help", "tests");
+
+    /// <summary>How a failure names Help's test folder.</summary>
+    private const string HelpTestsLabel = "help/tests";
 
     /// <summary>
     /// Every <c>help/tests/test_*.py</c>, discovered rather than listed (#886).
@@ -150,8 +153,7 @@ public class PythonToolchainTests
     [MemberData(nameof(HelpTestFiles))]
     public void SharedHelpTestFilePasses(string fileName)
     {
-        string relative = Path.Combine("help", "tests", fileName);
-        var result = RunPython(RepoRoot, relative, $"help/tests/{fileName}", withRuntimeNode: true);
+        var result = RunHelpTest(fileName);
         _output.WriteLine($"ran on {Interpreter.Describe()}");
         _output.WriteLine(result.Output);
 
@@ -238,6 +240,58 @@ public class PythonToolchainTests
     }
 
     /// <summary>
+    /// #916: raising the limit must not stop a HUNG file being caught. A file
+    /// that sleeps 300 s, far past a 15-second limit, written into a temporary
+    /// folder (never into <c>scripts/</c>, where both platforms would run it),
+    /// is stopped, fails with 124, and its sentence names the file, the limit
+    /// and how long it ran. A known slow file's sentence names a busy PC as the
+    /// likely cause; any other file's does not. Fifteen seconds rather than two
+    /// so a cold interpreter on a loaded PC still prints before it is stopped
+    /// (the #916 review's M1); anything well under 300 s proves the stop.
+    /// </summary>
+    [Fact]
+    public void AHungFileIsStoppedAtTheLimitAndNamed()
+    {
+        // #882's helper, so a crashed test host's leftover is swept safely by a later run.
+        string folder = RunOwnedTempFolders.Create("plantoir-hung-python-");
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, "test_never_returns.py"), "import time\nprint('started', flush=True)\ntime.sleep(300)\n");
+            var clock = Stopwatch.StartNew();
+            var result = RunPython("test_never_returns.py", TimeSpan.FromSeconds(15), folder);
+            _output.WriteLine(result.Output);
+
+            Assert.Equal(124, result.ExitCode);
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(90), $"The hung file was not stopped promptly: {clock.Elapsed.TotalSeconds:F0} s.");
+            Assert.Contains("scripts/test_never_returns.py", result.Output);
+            Assert.Contains("limit for one shared Python file is 15 seconds", result.Output);
+            Assert.Matches(@"stopped after running \d+ seconds", result.Output);
+            Assert.Contains("suspect a HUNG test", result.Output);
+            Assert.Contains("started", result.Output);
+        }
+        finally
+        {
+            try { Directory.Delete(folder, true); } catch { }
+        }
+
+        foreach (string slow in KnownSlowFiles.Keys)
+            Assert.Contains("a busy PC", TimedOutMessage(slow, Limit, 600));
+        Assert.True(KnownSlowFiles.Count > 0);
+        foreach (string slow in KnownSlowFiles.Keys)
+            Assert.True(File.Exists(Path.Combine(ScriptsDirectory, slow)), $"KnownSlowFiles names scripts/{slow}, which no longer exists.");
+
+        // Help's files (#886) are named by their own folder, and its slow file by its own table.
+        foreach (string slow in KnownSlowHelpFiles.Keys)
+        {
+            string helpMessage = TimedOutMessage(slow, Limit, 600, HelpTestsLabel);
+            Assert.Contains($"help/tests/{slow} was stopped", helpMessage);
+            Assert.Contains("a busy PC", helpMessage);
+            Assert.True(File.Exists(Path.Combine(HelpTestsDirectory, slow)), $"KnownSlowHelpFiles names help/tests/{slow}, which no longer exists.");
+        }
+        Assert.Contains("suspect a HUNG test", TimedOutMessage("test_checks.py", Limit, 600, HelpTestsLabel));
+    }
+
+    /// <summary>
     /// The folder must not go quiet. If discovery returns nothing — a moved
     /// folder, a broken repository-root walk — every case above silently
     /// vanishes and the suite goes green having run none of them, which is the
@@ -263,8 +317,26 @@ public class PythonToolchainTests
 
     // MARK: - Running one
 
-    private static (int ExitCode, string Output) RunPython(
-        string workingDirectory, string script, string displayName, bool withRuntimeNode = false)
+    /// <param name="limit">How long the file may run; <see cref="Limit"/> unless a test of the limit itself says otherwise.</param>
+    /// <param name="folder">The folder the file sits in; <see cref="ScriptsDirectory"/> unless a test of the limit itself says otherwise.</param>
+    internal static (int ExitCode, string Output) RunPython(string fileName, TimeSpan? limit = null, string? folder = null)
+        => RunPythonFile(folder ?? ScriptsDirectory, fileName, fileName, "scripts", limit ?? Limit, withRuntimeNode: false);
+
+    /// <summary>
+    /// Runs one of Help's files (#886) from the REPOSITORY ROOT, as
+    /// <c>verify.sh</c> runs <c>python3 help/tests/test_x.py</c>, with the
+    /// runtime's <c>node</c> on PATH, under the same <see cref="Limit"/> as
+    /// <c>scripts/</c>.
+    /// </summary>
+    private static (int ExitCode, string Output) RunHelpTest(string fileName)
+        => RunPythonFile(RepoRoot, Path.Combine("help", "tests", fileName), fileName, HelpTestsLabel, Limit, withRuntimeNode: true);
+
+    /// <param name="workingDirectory">Where the interpreter runs: <c>scripts/</c> for the toolchain's files, the repository root for Help's.</param>
+    /// <param name="script">The file to run, relative to <paramref name="workingDirectory"/>.</param>
+    /// <param name="fileName">The file's own name, which <see cref="TimedOutMessage"/> looks up.</param>
+    /// <param name="folderLabel">The folder as a person names it in a failure: <c>scripts</c> or <c>help/tests</c>.</param>
+    private static (int ExitCode, string Output) RunPythonFile(
+        string workingDirectory, string script, string fileName, string folderLabel, TimeSpan allowed, bool withRuntimeNode)
     {
         var start = new ProcessStartInfo
         {
@@ -331,6 +403,7 @@ public class PythonToolchainTests
         // one line stops it.
         start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
 
+        var clock = Stopwatch.StartNew();
         using var process = Process.Start(start)
             ?? throw new InvalidOperationException($"Could not start {Interpreter.Path}.");
 
@@ -340,8 +413,9 @@ public class PythonToolchainTests
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
 
-        if (!process.WaitForExit(TimeoutMilliseconds))
+        if (!process.WaitForExit(allowed))
         {
+            double ranFor = clock.Elapsed.TotalSeconds;
             // entireProcessTree, not Kill(): `test_stop_preview.py` launches two
             // dozen child interpreters, and a plain Kill would orphan every one.
             try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
@@ -361,8 +435,7 @@ public class PythonToolchainTests
             }
             catch { /* the pipes went with the process; report the timeout alone */ }
 
-            return (124,
-                $"{displayName} did not finish within {TimeoutMilliseconds / 1000} seconds.\n\n{partial}".Trim());
+            return (124, (TimedOutMessage(fileName, allowed, ranFor, folderLabel) + "\n\n" + partial).Trim());
         }
 
         // unittest writes its report to stderr, so the failure detail is there
@@ -370,7 +443,82 @@ public class PythonToolchainTests
         return (process.ExitCode, (stdout.Result + stderr.Result).Trim());
     }
 
-    private const int TimeoutMilliseconds = 180_000;
+    /// <summary>
+    /// How long one shared file may run before it is stopped as HUNG (#916).
+    ///
+    /// <para><b>A limit for a hang, not a speed check.</b> Nothing here
+    /// measures how fast a file is; the limit exists so that a file which never
+    /// returns stops the run with its name rather than holding the suite
+    /// forever. So it must sit far above anything LOAD alone can produce.
+    /// It was 180 s until #916, and on 2026-11-13/14, with several agents'
+    /// suites on this PC at once, three files were stopped at it while doing
+    /// nothing wrong: <c>test_starting_content_prompts.py</c>,
+    /// <c>test_no_stored_credentials.py</c> (71 s beside one other test host,
+    /// 193 s beside more) and <c>test_shared_writes_two_at_once.py</c>.
+    /// Alone, the slowest files take the times in <see cref="KnownSlowFiles"/>
+    /// (the slowest 78.5 s; all 119 files 10 min 41 s, one after another).
+    /// The worst slowdown seen under load was 5.7 times
+    /// (<c>test_no_stored_credentials.py</c>, 33.8 s alone, 193 s that night),
+    /// which takes the slowest file to about 450 s; 600 s covers that with
+    /// room, and still stops a hung file within ten minutes.</para>
+    ///
+    /// <para><b>Rejected: a per-file allowance table.</b> It must be kept in
+    /// step by hand with a folder the MAC adds files to, and the file that is
+    /// slow under load is not always one somebody listed: the third file
+    /// stopped that night was in no measurement before it. One generous limit
+    /// needs no upkeep. <b>Rejected: splitting the slow files' scans</b> in
+    /// shared Python, which changes files the mac's <c>verify.sh</c> runs, for
+    /// no gain to a teacher.</para>
+    /// </summary>
+    internal static readonly TimeSpan Limit = TimeSpan.FromSeconds(600);
+
+    /// <summary>
+    /// The files that take 30 s or more on their own, with their time ALONE
+    /// (under the suite lock, nothing else running a suite), so a timeout
+    /// names the likely cause. Not a list of allowances: every file gets
+    /// <see cref="Limit"/>, and a file missing from here is still covered.
+    /// Measured 2026-11-14 on the development PC, a Lenovo 20QES70500
+    /// (i5-8365U, 16 GB, Windows 11 Pro 26200), on the runtime's Python
+    /// 3.14.10 — documentation/12-windows-app.md → "A red that is a busy PC".
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, int> KnownSlowFiles = new Dictionary<string, int>
+    {
+        ["test_graded_folders_new_course.py"] = 79,
+        ["test_starting_content_prompts.py"] = 69,
+        ["test_shared_writes_two_at_once.py"] = 60,
+        ["test_deploy_sh_destination.py"] = 46,
+        ["test_share_plan.py"] = 45,
+        ["test_marking_comments.py"] = 45,
+        ["test_no_stored_credentials.py"] = 34,
+    };
+
+    /// <summary>
+    /// Help's files that take 30 s or more on their own (#886), kept apart
+    /// from <see cref="KnownSlowFiles"/> because they sit in
+    /// <c>help/tests/</c>, not <c>scripts/</c>. <c>test_build_help.py</c>
+    /// builds the real <c>help/</c> in nine of its tests: 92 to 94 s alone,
+    /// measured 2026-11-14 on the same PC and Python as
+    /// <see cref="KnownSlowFiles"/>.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, int> KnownSlowHelpFiles = new Dictionary<string, int>
+    {
+        ["test_build_help.py"] = 93,
+    };
+
+    /// <summary>The sentence a stopped file fails with: its folder and name, the limit, how long it ran, and the likely cause.</summary>
+    /// <param name="folderLabel"><c>scripts</c> for the toolchain's files, <c>help/tests</c> for Help's.</param>
+    internal static string TimedOutMessage(string fileName, TimeSpan limit, double ranForSeconds, string folderLabel = "scripts")
+    {
+        IReadOnlyDictionary<string, int> slowFiles = folderLabel == HelpTestsLabel ? KnownSlowHelpFiles : KnownSlowFiles;
+        string message = $"{folderLabel}/{fileName} was stopped after running {ranForSeconds:F0} seconds; "
+                       + $"the limit for one shared Python file is {limit.TotalSeconds:F0} seconds.";
+        if (slowFiles.TryGetValue(fileName, out int alone))
+            message += $" It is one of the known slow files ({alone} s alone on the development PC), so a busy PC — "
+                     + "other test runs or builds at the same time — is the likely cause; run it again on a quiet machine before suspecting the file.";
+        else
+            message += " It is not one of the known slow files, so suspect a HUNG test before a busy PC.";
+        return message;
+    }
 
     /// <summary>
     /// The interpreter to run the shared tests with.

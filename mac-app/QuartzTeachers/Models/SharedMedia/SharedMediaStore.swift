@@ -817,7 +817,7 @@ nonisolated struct SharedMediaStore: Sendable {
 
     // MARK: - Functions: Undo's seam (#899)
 
-    /// Keeps the store files named by `checksums` for 31 days from
+    /// Keeps the store files named by `checksums` for 61 days from
     /// `writtenAt`, for a step on the Undo list (#899 plan 4.5): call it
     /// BEFORE the step deletes or moves a small backup, with the checksums of
     /// that backup's list (`list(ofBackupNamed:zipURL:)`), and

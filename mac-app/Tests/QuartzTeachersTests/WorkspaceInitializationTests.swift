@@ -7,11 +7,10 @@ final class WorkspaceInitializationTests: XCTestCase {
 
     // MARK: - Functions
 
+    /// Removed when the test ends, whatever its outcome (#978): the two
+    /// initialisation tests fill it with about 88 MB each.
     func makeTemporaryFolder() throws -> URL {
-        let url: URL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cq4t-init-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try makeTemporaryFolder(prefix: "cq4t-init")
     }
 
     @MainActor

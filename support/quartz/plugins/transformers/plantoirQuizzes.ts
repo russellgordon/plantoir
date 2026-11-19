@@ -466,6 +466,24 @@ function renderQuiz(
 const SKETCH_NODE = "plantoirGeoGebra"
 const SKETCH_LANGUAGE = "geogebra"
 
+// A PhET simulation anywhere inside a node (#674, phetFences.quizzes): the
+// "plantoirPhet" node the simulations' transformer leaves, or a ```phet
+// code block the build could not show, found the same way as a sketch.
+const SIMULATION_NODE = "plantoirPhet"
+const SIMULATION_LANGUAGE = "phet"
+
+function holdsSimulation(node: AnyNode): boolean {
+  if (node.type === SIMULATION_NODE || (node.type === "code" && node.lang === SIMULATION_LANGUAGE)) {
+    return true
+  }
+  for (const child of node.children ?? []) {
+    if (holdsSimulation(child)) {
+      return true
+    }
+  }
+  return false
+}
+
 function holdsSketch(node: AnyNode): boolean {
   if (node.type === SKETCH_NODE || (node.type === "code" && node.lang === SKETCH_LANGUAGE)) {
     return true
@@ -488,6 +506,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
   let blanks = blanksInTitle(titleHtml)
   let htmlChoices = false
   let sketchInAChoice = false
+  let simulationInAChoice = false
   for (const child of content?.children ?? []) {
     const kind = calloutKind(child)
     if (child.type === "list") {
@@ -499,6 +518,9 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
             choices.push(item.checked === true ? true : item.checked === false ? false : null)
             if (holdsSketch(item)) {
               sketchInAChoice = true
+            }
+            if (holdsSimulation(item)) {
+              simulationInAChoice = true
             }
           }
         }
@@ -523,6 +545,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
     blanks,
     htmlChoices,
     sketchInAChoice,
+    simulationInAChoice,
   }
 }
 
@@ -874,12 +897,14 @@ function withoutAnswers(node: any): any {
     if (classes.includes("plantoir-quiz-answer") || classes.includes("plantoir-quiz-explain")) {
       return null
     }
-    if (node.tagName === "figure" && classes.includes("pl-geogebra")) {
+    if (node.tagName === "figure" && (classes.includes("pl-geogebra") || classes.includes("pl-phet"))) {
       // A GeoGebra sketch reads as its description alone (#578 stage 5), as
       // Description - which runs before the sketch's card is put in - read
       // it on every page without a quiz: never the button, the commands or
       // the attribution. Measured: without this, a quiz page's search text
       // carried "Open the sketch (about 2.9 MB)" and "Made with GeoGebra®".
+      // A PhET simulation's card (#674) reads the same way, for the same
+      // reason: never its button or its credit line.
       const captions: any[] = []
       for (const child of node.children ?? []) {
         if (child?.type === "element" && child.tagName === "figcaption") {

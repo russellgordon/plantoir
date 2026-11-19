@@ -73,8 +73,7 @@ struct SetSchoolYearSheet: View {
             }
 
             if let entryProblem {
-                Text(entryProblem)
-                    .foregroundStyle(.orange)
+                StatusColour.blocking.sentence(entryProblem)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("setSchoolYearProblem")
             }
@@ -84,6 +83,7 @@ struct SetSchoolYearSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 Button("Set School Year") {
                     setSchoolYear()
                 }

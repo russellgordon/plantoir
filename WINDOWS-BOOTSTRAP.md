@@ -70,9 +70,10 @@ pieces into `dev`; a cut still starts with him asking.
    page that explains it. Read the page an issue names rather than all of them.
    Write-ups for work that already shipped on this port are in
    `documentation/13-windows-port-archive.md` — history, not a specification.
-4. **`contracts/README.md`**, then the ten JSON files. The coverage table
-   there says what is shared and what deliberately is not. Three of the ten are
-   GENERATED from the mac and must never be hand-edited; the other seven are
+4. **`contracts/README.md`**, then the eleven JSON files. The coverage table
+   there says what is shared and what deliberately is not. Three of the eleven
+   are GENERATED from the mac and one (`undo-traces.json`) by
+   `scripts/make_undo_traces.py`, and none of those four is hand-edited; the other seven are
    authored and can be corrected from either side — `contracts/README.md` says
    which is which.
 5. **`GUI-IMPROVEMENTS.md`**, newest rows first, for what changed up to
@@ -348,7 +349,10 @@ Split it in two:
   none is; `TheSharedTestsRunOnTheRuntimesPythonWhenOneIsFetched` prints which,
   with its version and OpenSSL. (Before, they ran on PATH's interpreter while
   teachers ran 3.11.9, so the gate had never run them on what ships.) With 93
-  files the run takes about five minutes, not eight seconds. The image's 3.11
+  files the run takes about five minutes, not eight seconds; with 119, on
+  2026-11-14, about eleven minutes alone (10 min 41 s), and each file may run 600 s before it is
+  stopped as hung (#916, `documentation/12-windows-app.md` → "A red that is a
+  busy PC"). The image's 3.11
   is held only by `RuntimePythonTests.TheSharedScriptsParseAsPython311` (a
   grammar check with known limits — `documentation/02-docker-image.md`).
   **Since #886 it also runs Plantoir Help's `help/tests/test_*.py`**

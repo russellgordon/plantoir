@@ -85,10 +85,10 @@ A {{machine}} that was asleep runs the deploy when it next wakes. You choose how
 
 If the {{machine}} wakes later than that, Plantoir cancels the deploy, leaves the website as it was, and tells you so.
 
-## Cancel a scheduled deploy
+## Remove a scheduled deploy
 
-1. Select the section and choose {{menu:cancelDeployAt}} from the menu bar. In the menu, the command's name includes the time of the deploy. The command is also in the menu that opens when you right-click the section.
-2. An alert titled {{control:cancelScheduledDeployQuestion}} opens. Press {{control:cancelIt}}, or press {{control:leaveItScheduled}} to keep the deploy.
+1. Select the section and choose {{menu:removeScheduledDeploy}} from the menu bar. The command is also in the menu that opens when you right-click the section.
+2. An alert titled {{control:removeScheduledDeployQuestion}} opens. It says when the deploy was set for. Press {{control:removeScheduledDeployButton}}, or press {{control:removeScheduledDeployCancel}} to keep the deploy.
 
 Plantoir also turns a scheduled deploy off when you remove the section or the course, or rename the course. It does the same when you start the section on a new website for a new year. Making a copy of a course to keep for reference leaves the course's own scheduled deploys as they are.
 
@@ -96,7 +96,7 @@ Plantoir also turns a scheduled deploy off when you remove the section or the co
 
 While a section has a deploy scheduled, it cannot be given a second one. {{menu:scheduleDeploy}} is greyed in the menu bar, and the menu that opens on a right-click offers only the command that cancels the deploy.
 
-1. Cancel the scheduled deploy, with the steps above.
+1. Remove the scheduled deploy, with the steps above.
 2. Choose {{menu:scheduleDeploy}}, which is live again, and set the new time.
 
 {{assistant}}
@@ -107,7 +107,7 @@ The assistant can change the time in one step. Ask it to schedule a section that
 
 ## If it does not work
 
-- **Orange text takes the place of the plan, and {{control:scheduleButton}} is greyed.** The text says why the deploy cannot be scheduled. The time may have passed, or a folder may need attention. A Cloudflare Account ID may be missing, or the section may never have been deployed to that place.
+- **A sentence takes the place of the plan, and {{control:scheduleButton}} is greyed.** The text says why the deploy cannot be scheduled. The time may have passed, or a folder may need attention. A Cloudflare Account ID may be missing, or the section may never have been deployed to that place.
 - **No notification came.** Notifications for Plantoir are turned off in macOS. The section's window still says how the deploy went.
 - **{{menu:scheduleDeploy}} is greyed.** The section already has a deploy scheduled. Cancel it, then schedule again.
 - **{{menu:scheduleDeploy}} is greyed and the section has no clock beside it.** The course is kept for reference. Such a course is never deployed, and the menu that opens on a right-click does not offer the command.

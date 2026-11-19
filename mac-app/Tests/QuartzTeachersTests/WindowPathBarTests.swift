@@ -13,6 +13,7 @@ final class WindowPathBarTests: XCTestCase {
             throw XCTSkip("The interface is not on screen in this run")
         }
         let folderURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEndsAfterTheWindowLetsGo(folderURL)
         workspace.chooseWorkspace(at: folderURL)
         try await Task.sleep(for: .milliseconds(500))
 

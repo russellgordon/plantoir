@@ -82,9 +82,6 @@ final class RealHomeTripwireTests: XCTestCase {
     /// no home at all; the scan cannot tell that from the text, so it is
     /// said here, once, with the reason.
     static let productAllowances: [String: Int] = [
-        // The redactor's pattern and replacement: text that REMOVES a home
-        // path from a report. It looks one up nowhere.
-        "Scripting/LogRedactor.swift | \"/Users/": 2,
         // A symlink's target and the pages folder, standardised so `..`
         // collapses before two paths are compared. Reads no folder; a link
         // text starting with `~` would compare unequal either way.

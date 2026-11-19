@@ -3,6 +3,7 @@ id: write-in-obsidian
 checked: 2.0.0
 covers:
 - mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift
+- mac-app/QuartzTeachers/Models/ObsidianClosingQuestion.swift
 - mac-app/QuartzTeachers/App/SubjectMenus.swift
 - contracts/shared-rules.json
 - mac-app/Tests/Goldens/menu-bar.txt
@@ -29,6 +30,17 @@ The pages of a course are written in Obsidian, a separate app for notes. This pa
 {{picture:write-in-obsidian-1}}
 alt: A section selected in Plantoir's sidebar, with the Open in Obsidian button marked in the toolbar.
 
+### The first time Obsidian opens a course
+
+Obsidian keeps a list of the courses it has opened. It can add a course to that list only while it is closed. So the first time you open a course from Plantoir while Obsidian is open, Plantoir asks before it closes Obsidian.
+
+- {{control:obsidianCloseAndOpen}} closes Obsidian, adds the course, and opens Obsidian again. Everything you have written is kept.
+- {{control:obsidianClosingCancel}} leaves Obsidian as it is, and the course does not open.
+
+Plantoir never closes Obsidian without asking.
+
+### The page Obsidian opens on
+
 When the section's preview is showing a page, Obsidian opens on that same page. This works for a hidden page too. With a course selected in place of a section, {{menu:courseOpenInObsidian}} opens the course.
 
 ## Find the class page
@@ -40,7 +52,7 @@ When the section's preview is showing a page, Obsidian opens on that same page. 
 {{picture:write-in-obsidian-2}}
 alt: Obsidian with a class page open from the All Classes folder, and the page's settings at the top of the page.
 
-If the page for the next class does not exist yet, make it in Plantoir first. See [Add the next class](page:add-next-class). [Class pages: Unit 1, Day 1](page:class-pages) says how these pages are named and dated.
+If the page for the next class does not exist yet, make it in Plantoir first. See [Add a class](page:add-next-class). [Class pages: Unit 1, Day 1](page:class-pages) says how these pages are named and dated.
 
 ## Write the page
 
@@ -54,7 +66,7 @@ Write the page as ordinary notes, under its settings.
 1. In Plantoir, select the section and press {{control:previewButton}}. The section's website opens in Plantoir's window.
 2. If a preview was already running, choose {{menu:rebuildPreview}}. A preview shows the pages as they were when it was made. A change made since is not in it.
 
-The preview shows only the pages that are published for the section. A class page made with {{menu:addNextClass}} starts unpublished. Publish it when it is written, and it appears in the preview. [Preview a section](page:preview) has more.
+The preview shows only the pages that are published for the section. A class page made with {{menu:addClass}} starts unpublished. Publish it when it is written, and it appears in the preview. [Preview a section](page:preview) has more.
 
 Students see the page after two more things: the page is published for their section, and the section is deployed. [Publishing and deploying](page:publish-and-deploy) explains both.
 

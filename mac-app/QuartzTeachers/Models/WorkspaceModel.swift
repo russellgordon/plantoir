@@ -462,6 +462,10 @@ class WorkspaceModel {
     /// "Reopen Obsidian to show diagrams and graphs?" (#495), the same way.
     var obsidianReopenRequest: ObsidianAddOnsRequest?
 
+    /// "Close Obsidian to open {course}?" (#995), the same way: asked before
+    /// Plantoir closes a running Obsidian to add a course it has never seen.
+    var obsidianClosingRequest: ObsidianClosingRequest?
+
     /// What Open in Obsidian asks of Obsidian and the disk (#495) —
     /// replaced only by a test, so the route can be driven without reaching
     /// the teacher's Obsidian.
@@ -623,7 +627,9 @@ class WorkspaceModel {
 
     /// One of the assistant's functions asked for from a section row's
     /// context menu (#457 batch B) — Publish Pages…, Hide Pages…, Publish
-    /// Class for a Date…, Add Next Class. The row is selected first, so the
+    /// Class for a Date… and Add Class…, which took Add Next Class's place
+    /// in #897 (ruled by Russell on 2026-11-13). The row is
+    /// selected first, so the
     /// section window that answers it is the one for that section: it takes
     /// the request only when it names its own course and section
     /// (`SectionDetailView.takeAVerbRequestIfItIsMine`).

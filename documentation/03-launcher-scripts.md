@@ -2438,7 +2438,9 @@ ending anywhere on the Mac at the wrong moment refused this one with
   (`test_deploy_sh_destination`, `test_deploy_non_interactive`,
   `test_deploy_sh_questions`, `test_deploy_token_refusal`) set
   `PLANTOIR_TRAIL_DIR` to a temporary folder, so a refused run in a test
-  never writes the real activity log (#738 covers the rest).
+  never writes the real activity log. Since #738 every test file that runs
+  a launcher does it the same way, through `scripts/launcher_test_trail.py`
+  ("Python tests and the trail", below).
 
 **The table cannot be read: let it through.** Not for #381's reason (the
 leases do NOT cover a leftover run — that is the fault): failing closed would
@@ -2491,7 +2493,7 @@ ICS4U 2 --build-only --for-deploy`, parent the app) is never refused by
 itself; a build that ends between the table and `lsof` is skipped. Rejected
 (`deployWhileItsSectionDeploys.rejected`): counting only a deploy's build leg
 and letting a plain rebuild through (the plan's first shape), because a
-`deploy.sh` typed in Terminal holds no lease and its build broke the
+`deploy.sh` typed in Terminal held no lease (until #829) and its build broke the
 rebuild's; an environment variable instead of an argument, because `ps -Ao
 args` does not show the environment; passing `--for-deploy` from the
 scheduled wrapper, whose own script is already in the table and counts as
@@ -2546,17 +2548,164 @@ in Terminal (its legs are refused and it is recorded as stopped).
 
 **Windows (#467).** The same guard is in `deploy.ps1` and in `preview.ps1`'s
 build leg, asked at the same points and printing the same lines, from
-`Win32_Process`. All 23 `launcherCases` of #467 run there
-(`test_launcher_rules.ps1` section 5); the 13 #729 added, and the one it
-changed ("a preview being served, or being stopped, is not a build", which
-held a plain `--build-only` until then), are owed by the Windows issue for
-#729. The four cases once marked `appliesOn: ["mac"]` hold on Windows as
+`Win32_Process`. All 36 `launcherCases` run there (`test_launcher_rules.ps1`
+section 5), the 13 #729 added and the one it changed among them, since
+Windows' #828 (828a, 2026-11-13): `preview.ps1` takes `--for-deploy`, the
+block counts `building`, and the app passes the flag on a deploy's build leg
+only. The four cases once marked `appliesOn: ["mac"]` hold on Windows as
 written. Windows' run has the mac's split as well: Task Scheduler starts
 `Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
 course and THEN runs its wrapper as `powershell.exe -File`. And a task set
 since #309 carries its folder's id. Its own limit (a deploy run inside another
 process is not seen) and what was rejected are in the Windows section of this
 page, under "A section still being deployed is not deployed again".
+
+#### A deploy typed in Terminal takes a work lease (#829)
+
+Since v2.0.0 ([#829](https://github.com/russellgordon/plantoir/issues/829)).
+The app greys Deploy for a course another program holds a build, publish or
+preview lease on (#729, [09](09-mac-app.md) → "Deploy waits for another
+program (#729)"). Until #829 a `deploy.sh` typed in Terminal held
+none, so the button stayed pressable and the press was refused only by the
+guard above, in words. Measured before the change, with the real `deploy.sh`
+deploying to a folder in a scratch working folder and a stand-in build that
+listed `courses/.internal/activity` during the deploy's own build: no activity
+folder during the deploy or after it.
+
+**What it does.** Between the `WORK LEASE BLOCK` markers in `deploy.sh` only,
+called straight after the #439 guard lets the run through and before anything
+changes: `take_the_work_leases` writes `<COURSE>.build.<pid>.lease` and
+`<COURSE>.publish.<pid>.lease` for the script's own process, each through a
+`.writing` file and a rename, in `contracts/file-formats.json` →
+`workLease`'s six lines: the pid; `ps -o ucomm`, which is `bash` (the same
+`p_comm` the readers compare against); the moment to the second, written
+`…T08:05:24.0000000Z`; the start in WHOLE seconds; an empty line 5; and
+`sections <N>=<moment>`, so only that section's Deploy greys. It makes
+`courses/.internal` and its `activity` folder only if they are missing, and
+`give_back_the_work_leases` removes the leases by their own paths and those
+folders if they are left empty, so a launcher test's working folder ends as it
+began. The rule and its nine cases are `shared-rules.json` → `workLeases
+.launcherLeases`.
+
+**The start is read in UTC.** `ps -o lstart` prints local time with no zone,
+and `date -j -f` parses it in local time. In the hour the clocks go back that
+text names two seconds an hour apart: measured by the #829 implementation
+review with `TZ=America/Toronto`, a process started at 01:30 EST (1793514600)
+was read as 01:30 EDT (1793511000), so its lease would read as GONE for the
+deploy's whole life. Both calls in `work_lease_start_of` carry `TZ=UTC0`.
+`scripts/test_deploy_sh_work_leases.py` holds it with a fixed clock: a
+stand-in `ps` that prints that one second in whatever zone it is given, the
+function run under `TZ=America/Toronto`; on the file before the fix it reads
+1793511000.
+
+**No start, no lease.** When `work_lease_start_of` prints nothing (`ps` or
+`date` failed), the run takes no lease rather than writing an empty line 4.
+A lease with no start is judged on its name alone (`workLeases.liveness`,
+the case "a bash lease with an EMPTY start"), so any later `bash` handed the
+same id would grey Deploy for its whole life; the review measured exactly that
+(a recycled `bash`, line 4 empty: alive). Taking none errs the way `deploy.sh`
+did before #829: Deploy stays pressable and the guard refuses in words. The
+case "its own start cannot be read" holds it.
+
+**A course it cannot find takes nothing.** The Fable sweep of #829 (F1)
+measured the block alone with course `NOSUCH`: it wrote
+`NOSUCH.build.<pid>.lease` and both trail lines before "Course folder not
+found" refused the run further down. Since then the call refuses a code with no
+folder in `courses/` first, with the same refusal
+(`refuse_a_course_folder_not_found`, one function for both places), so it
+leaves no lease and no line; and `take_the_work_leases` takes none for a code
+holding a slash, since a lease is named after it. Only when `courses/` exists:
+a run in a folder with no `courses/` takes no lease anyway and is still
+refused where it always was, after the recipe check, which
+`test_deploy_non_interactive.py` relies on. The case "a course code with no
+folder in courses/" holds it; the test is red on f36e40783 (the trail held
+the two lines).
+
+**What a window's Preview is told while it runs.** The deploy's build lease
+names its section, so a Preview of that section in a window is declined at the
+LEASE layer before `preview.sh` is reached
+(`previewWhileItsSectionDeploys.layers.lease`). Read from the code and the
+pure decision compiled alone (`WorkLeaseFiles` with `ProcessLiveness`, fed
+the block's exact lease body): until the sweep's fixes it was told
+`wording.sectionIsBeingBuiltElsewhere`, which names an assistant, another
+copy of Plantoir and a scheduled deploy, and not a deploy typed in Terminal.
+It is now told `wording.sectionIsBeingDeployed`, the sentence this app's own
+deploy of the section is told with, whenever another program's publish lease
+names the section (`previewWhileItsSectionDeploys.leaseCases`, five cases).
+
+**On the trail.** When it takes the leases, `deploy.sh` writes one line
+through `note_on_the_trail`, and one more when it gives them back
+(`activityTrail.mustRecord` → "task started" →
+`launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection`, and "task
+finished" → `launcherLineWhenItLetsItsSectionGo`; course code and section
+only). A forgotten Terminal window sitting at one of `deploy.sh`'s questions
+now greys that section until it is closed, and "Deploy was grey all
+afternoon" needs a line to start from (CLAUDE.md rule 5, the review's I2). A
+deploy the app started takes no lease and so writes neither line, so nothing
+is written twice; `kill -9` writes no second line, and its lease reads as gone
+at once.
+
+**When it takes none.** For `--reset-token` and `--logout` (nothing is
+deployed), for `--plans` (course-wide sharing, left as it was), and when
+`PLANTOIR_LEASES_HELD_BY` names a process that is running. The app sets that
+variable to its own id on every launcher it starts
+(`HelperPrograms.environment`), because each door of the app that runs
+`deploy.sh` (the window, the in-app assistant, `--mcp-stdio`, a deploy set for
+later) already holds both leases, and a second pair under the child's id would
+be a stranger's to the app: its window would grey its own other sections in
+another program's words.
+
+**A leftover scheduled run is covered only in part.** The variable is read
+once, when `deploy.sh` starts. A leftover run (#439) is one whose app was
+ended while its script carried on, and that usually happens while `deploy.sh`
+is already running, since a scheduled run spends most of its time there. Such
+a `deploy.sh` saw a live app at its start and holds no lease for the rest of
+its run: measured by the #829 implementation review, the holder alive at the
+start and killed during the deploy's build, leases held `[]`. Only a
+`deploy.sh` that STARTS after its app has gone (the deploy leg after the app
+was ended during the build leg) takes its own. The rest err the old way:
+Deploy stays pressable and the guard refuses in words. Closing it for real
+means the app counting a lease whose holder descends from it as its own (the
+process table gives each process's parent), so the child could always take
+its leases; that is a follow-up issue, not this piece.
+
+**Given back on every way out a trap sees.** A later `trap … EXIT` replaces an
+earlier one, so the two EXIT traps set after the leases (the getting-ready
+turn's, identical in the three launchers, and the token hand-off's) give them
+back too, through a `declare -F` guard that does nothing in `setup.sh` and
+`preview.sh`. ^C is made an ordinary exit 130, as the token block already did,
+because bash 3.2 runs no EXIT trap when a foreground command dies of a ^C sent
+to the group; SIGTERM and SIGHUP stay untrapped, so bash still ends at once and
+runs the EXIT trap (the app's Stop is SIGTERM to bash). Measured by
+`scripts/test_deploy_sh_work_leases.py`: a normal end, a failed deploy, ^C to
+the group, SIGTERM and SIGHUP to bash alone all leave nothing.
+
+**kill -9.** No trap runs, so the leases stay, naming a process that is gone.
+`workLeases.liveness` gained one rule for them: a start with no point in it is
+compared on its whole seconds, because a shell cannot read its own start more
+finely (`ps -o lstart` is to the second, and `sysctl -b kern.proc.pid.<pid>`
+answers "unknown oid" on macOS 26.6). Measured on this Mac (Apple M4 Pro,
+macOS 26.6) with `ProcessLiveness` compiled alone beside a harness: a bash
+that took its leases with the block's own functions was read ALIVE 20 of 20
+times while it ran and GONE 20 of 20 after `kill -9`; with the rule before
+#829 (the start compared as text) it read GONE 5 of 5 while it ran, so the
+button would never have greyed. The second `ps -o lstart` gives was the
+kernel's `p_starttime.tv_sec` 20 of 20.
+
+**Rejected.** Line 4 left empty (judged on the name alone, an id handed to any
+other `bash` would grey Deploy for that process's life); reading the
+microseconds with perl or osascript (not a launcher's tools, and no host
+Python on a teacher's Mac); the child taking leases beside the app's and the
+app telling its own child's from a stranger's (it does not know its children's
+ids at the moment it reads the folder, for the scheduled wrapper's legs; the
+review found the process table can answer that through each holder's parent,
+which is the follow-up above);
+leases from `preview.sh --build-only` typed in Terminal too (not #829's case;
+the guard still refuses it in words). Known limits: the moment is to the
+second, so an app lease taken later in the same second reads the Terminal
+deploy as earlier and backs off, which is the safe direction; the help
+sentence names the programs a lease used to come from and not a deploy typed
+in Terminal (a question for Russell on #829).
 
 #### Before building, preview.sh makes sure this Mac can reach the builder (#234)
 
@@ -2808,6 +2957,18 @@ all XNU compares).
     run against both launchers, against `deploy.sh` since #771 by
     `scripts/test_deploy_token_refusal.py`) —
     `07-deployment.md` → "A token Cloudflare refuses".
+    Since #696 `deploy.sh --token status|save|remove --target
+    netlify|cloudflare` looks after the saved token with no course or
+    section, for Plantoir ▸ Settings ▸ Deploying: it runs before every
+    course-shaped step, answers with one line of JSON, and checks a pasted
+    token (read from standard input) against the folder's class websites
+    before saving it. A deploy's own paste is tidied and checked against its
+    section's website the same way. Every request the mode and the paste
+    checks make hands the token to `curl` on standard input (`http_answer`,
+    `-H @-`), never in an argument `ps` can show. The store's functions and
+    `token_check_answer` now sit above the course code for it —
+    `07-deployment.md` → "Deploy tokens in Settings". `deploy.ps1` has no
+    `--token` mode yet; the `windows` issue for #696 owes it.
   - The token is injected into the container by piping it to a root-only
     temp file (`umask 077`) and reading it inside the `docker exec` shell
     into the `NETLIFY_AUTH_TOKEN` environment variable — it never appears in
@@ -2969,21 +3130,38 @@ and what was measured.
   BLOCK` markers. The block is byte-identical in `deploy.ps1` and
   `preview.ps1`, and #386's reader moved into it rather than being copied.
   `LauncherRulesContractTests.TheDeployGuardBlockIsTheSameInBothLaunchers`
-  keeps the copies equal, and `test_launcher_rules.ps1` section 5 runs all 23
-  `launcherCases` against EACH copy.
+  keeps the copies equal, and `test_launcher_rules.ps1` section 5 runs all 36
+  `launcherCases` against EACH copy (23 until #828), and section 11 runs a
+  cut-off copy of each launcher against a REAL running stand-in build.
   - **Where it asks.** `deploy.ps1` asks on every run that deploys (not
     `--reset-token`/`--logout`), after the Open-code question and the
     reference-course refusal, which is where deploy.sh asks. `preview.ps1`
-    asks on `--build-only` that is not `--stop`. Both ask before anything
-    changes, and both exit 1.
+    asks on `--build-only` that is not `--stop`, with the leg `build`, or
+    `deploy-build` when it also carries `--for-deploy` (#828). Both ask
+    before anything changes, and both exit 1. `--for-deploy` without
+    `--build-only` is refused at the flags (`launcherFlags.preview`), exit 1.
   - **What counts.** `Get-WhatIsDeployingThisSection` answers `later`,
-    `another` or nothing, and `later` wins.
+    `another`, `building` (#828) or nothing. `later` wins at once, then
+    `another`, then `building`, whatever order the rows come in.
     - `later` is a wrapper of C/S in this folder (either name above) running
       as the program. The app's `Plantoir.exe --run-scheduled-deploy` line
       alone does NOT count: that run waits up to ten minutes for the course
       before it writes and starts its wrapper, possibly for the very window
       whose deploy would be refused.
-    - `another` is `deploy.ps1 C S` as the program, in this folder.
+    - `another` is `deploy.ps1 C S` as the program, in this folder, or
+      (#828) a deploy's build leg, `preview.ps1 C S --build-only
+      --for-deploy`, by the same course, section and folder rules.
+    - `building` (#828) is any other `preview.ps1 C S --build-only` in this
+      folder that is not `--stop`: the assistant's rebuild, or one typed at
+      a command line. A preview being served is never counted.
+    - #386's preview guard (`Test-SectionIsBeingDeployed`) counts `later`
+      and `another` only, so a plain rebuild still does not refuse a preview
+      and a deploy's build leg now does.
+    - Which sentence: `Get-DeployRefusalSentence` maps who and leg to the
+      contract's key (`launcherCasesShape`): `deploy` takes the `*Deploy`
+      sentences, `build` the `*Build` ones, and `deploy-build` the `*Build`
+      ones except `buildingDeploy`. The trail's `{leg}` is `build` for both
+      build legs.
     - This run and its ancestors never count. That covers the wrapper's
       in-process legs (`$PID` is the wrapper), its `Start-Process` build and
       Cloudflare legs (the wrapper is their parent), and a folder deploy's own
@@ -3003,6 +3181,21 @@ and what was measured.
       The table shows only the host's own line, which names no script.
       Measured in the drive (2026-10-08): a deploy of ICS40 2 held under
       `-Command`, and a second `-File deploy.ps1 ICS40 2` went past the guard.
+      The same is true of a build (#828): `-Command "& …\preview.ps1 …
+      --build-only"` is only mentioned on its line, and a runner row pins
+      that it is not counted.
+    - Another account's process shows an ordinary one a null `CommandLine`,
+      so it is listed and never counted: the contract's #729 known limit
+      ("listed but never counted") comes free here, by the same mechanism as
+      the elevated case below. Only the elevated case was measured; no
+      second account was available, so this is reasoned from that case and
+      was never measured with a second account.
+    - An older `preview.ps1` refuses `--for-deploy` as an unknown option
+      (`Unknown option: --for-deploy`, exit 1), and `plantoir-mcp` never
+      refreshes a folder's launchers. So the app's one builder
+      (`PreviewCommand.BuildOnlyArguments`) adds the flag only when the
+      folder's own `preview.ps1` carries it (`documentation/12-windows-app.md`
+      → "The launchers refuse an overlapping build (#828, mac #729)").
     - A process started ELEVATED shows an ordinary process a null
       `CommandLine`, so the guard cannot see it either: the Windows form of
       the contract's "another account's process is not seen". The scheduled
@@ -3108,6 +3301,56 @@ handed-over folder and not in the scratch `HOME`'s trail. Neither test reads
 the real trail. Python tests that start a launcher with `os.environ` and a
 scratch `HOME` remove the variable first, because an inherited one would send
 their lines out of the scratch folder.
+
+**Python tests and the trail (#738).** Every `scripts/test_*.py` that runs a
+launcher imports `launcher_test_trail`, which sets `PLANTOIR_TRAIL_DIR` for the
+whole run to a temporary folder removed at exit, so a launcher started with an
+environment built from `os.environ` writes there. The four deploy test files
+that carried their own copy of those three lines since #737 import it instead.
+A test that hands a launcher a scratch `HOME` still removes the variable, as
+above. `scripts/test_launcher_tests_keep_their_trail.py` holds the rule (a
+file that names a launcher and starts a process imports the helper: 26 files
+on 2026-11-13) and runs deploy.sh's own `note_on_the_trail` under a scratch
+`HOME`: the line lands in the helper's folder, and with the variable taken
+away it lands in that `HOME` (the must-fail). **Measured** before the change,
+on `dev` fcd0a51c5: all 119 `scripts/test_*.py`, each run with `HOME` pointed
+at a scratch folder and the variable unset, wrote 0 lines into that `HOME`'s
+trail, so the lines #738 found on 2026-11-01 had already stopped with #737;
+the helper keeps a new test from starting again. Two of the 26 run in the
+image (`test_coverage_tab`, `test_published_pages_record`), and `verify.sh`
+mounts the helper beside them, which `test_image_runs_find_their_modules.py`
+checks.
+
+The helper reaches only an environment copied from `os.environ`. Eleven of
+the 26 files build theirs from scratch, as a dict literal naming `PATH` and
+`HOME`, and the variable never reaches those. They are safe because each
+replaces `HOME` with a scratch folder, so a second rule in the same file
+reads every such literal and fails one whose `HOME` is taken from the real
+one (`os.environ`, `os.getenv`, `Path.home`, `expanduser`) unless it names
+`PLANTOIR_TRAIL_DIR` itself. On 2026-11-13 it found one:
+`test_port_blocks.py`'s run of the port-listing functions passed the real
+`HOME` and no variable. Those functions write no trail, so nothing leaked,
+and it now passes the helper's folder. The rule is a reading of the source,
+so a `HOME` built some other way from the real one would pass it. Off
+POSIX the two runs of the real function are skipped, the way
+`test_trail_lock` skips its own: under Git Bash a temporary folder is a
+drive-letter path, which `note_on_the_trail` rightly does not take, so the
+line would fall back to `HOME`. Rejected: running the 26 launcher tests
+under a scratch `HOME` as the proof, which took 333 s in that measurement
+(`test_port_blocks.py` alone 208 s). That run stays the one proof this
+leaves out.
+
+**`verify-deploy.sh` and the trail (#829's Fable sweep, F2).** It drives
+`./deploy.sh` and `./preview.sh` with the real `HOME`, and until 2026-11-14
+set no `PLANTOIR_TRAIL_DIR`. Since #829 every `deploy.sh` the app did not
+start writes two trail lines, so each publish a run made left two lines in
+the teacher's own trail. The script now sets the variable to `trail/` inside
+its own work folder (`keep_the_launchers_trail_in`, called once, straight
+after the work folder is made and before any launcher starts). Its
+`--self-test` runs deploy.sh's own `note_on_the_trail` with a scratch `HOME`
+after that call, checks the line lands in the run's folder and nothing is
+written under `HOME`, and reads the script for the one top-level call. With
+that call taken out the self-test reads 87 passed, 1 failed.
 
 **Windows (#682).** `Write-TrailLine` in `preview.ps1` and `deploy.ps1` (one
 function, byte-identical in both) takes `PLANTOIR_TRAIL_DIR` when it is

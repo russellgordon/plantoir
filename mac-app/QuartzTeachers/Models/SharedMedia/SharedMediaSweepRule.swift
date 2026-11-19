@@ -18,7 +18,7 @@ import Foundation
 /// 2. **What is still needed** is every checksum named by: a small backup
 ///    that is there; a backup's list whose zip is NOT there yet but that was
 ///    written less than a day ago; a step on the Undo list written less than
-///    31 days ago (#899, by any computer); a backup being written, for a day
+///    61 days ago (#899, by any computer); a backup being written, for a day
 ///    or while its process still runs on this computer; and a FINISHED
 ///    backup's pending list, for a day after it finished. Every age is a
 ///    moment a list wrote down, never a file's date. A pending list and a
@@ -181,9 +181,14 @@ nonisolated enum SharedMediaSweepRule {
     static let pendingHonouredFor: TimeInterval = 24 * 60 * 60
 
     /// How long a step on the Undo list keeps its pictures (#899 plan 4.5):
-    /// 31 days by the list's own written moment, one more than the Undo
-    /// list's own limit of 30 days.
-    static let undoHonouredFor: TimeInterval = 31 * 24 * 60 * 60
+    /// 61 days by the list's own written moment, one more than the 60 days
+    /// the journal keeps a step on the disk (30 offered, and a grace of 30
+    /// so a clock set wrong never destroys the list: `undo.rule.limits`).
+    /// It was 31, which covered what is offered but not that grace: a step
+    /// offered again once a wrong clock was put right would have lost its
+    /// pictures (the core review of #899 U1's second round; the director's
+    /// ruling 11 on its third).
+    static let undoHonouredFor: TimeInterval = 61 * 24 * 60 * 60
 
     /// How long a file must have been found unneeded, by this computer,
     /// before it is deleted, when only this computer writes to the store.
@@ -323,7 +328,7 @@ nonisolated enum SharedMediaSweepRule {
     /// that while the process that wrote it still runs on this computer (a
     /// process id means nothing on another computer). A FINISHED backup's
     /// pending list is honoured for a day after it finished (counted the
-    /// same way), whatever runs. An Undo list is honoured for 31
+    /// same way), whatever runs. An Undo list is honoured for 61
     /// days, whoever wrote it.
     static func holdIsHonoured(_ seen: HoldSeen, _ inputs: Inputs, _ firstSeen: inout [String: Date]) -> Bool {
         switch seen.hold.kind {

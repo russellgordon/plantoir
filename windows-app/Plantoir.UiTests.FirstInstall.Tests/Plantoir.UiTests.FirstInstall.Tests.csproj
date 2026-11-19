@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Plain tests of the first-install rehearsal driver's allow-list (#976):
+    WindowRules.cs, compiled in from the driver's own folder. It holds no UI
+    Automation, so these run on any machine with the .NET 9 SDK, no desktop
+    and no virtual machine needed (net9.0, not net9.0-windows):
+
+      dotnet test windows-app/Plantoir.UiTests.FirstInstall.Tests
+
+    On the Mac, vm-tools/win-rehearsal.py (self-test "rules") runs them with a
+    local SDK; guest/build-first-install-driver.ps1 runs them before every
+    build of the driver. In no solution and no suite, like the driver.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Plantoir.FirstInstall.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Plantoir.UiTests.FirstInstall\WindowRules.cs" Link="WindowRules.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

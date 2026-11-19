@@ -27,7 +27,7 @@ export const PAGE_HEADERS = {
   "Cross-Origin-Embedder-Policy": "require-corp",
 }
 export const ENGINE_HEADERS = { "Cross-Origin-Embedder-Policy": "require-corp" }
-export const ENGINE_FOLDERS = ["static/pyodide", "static/swift"]
+export const ENGINE_FOLDERS = ["static/pyodide", "static/swift", "static/phet"]
 export const ALLOWED_HOSTS = ["cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"]
 const REASONS = ["frame", "picture", "other"]
 const REASON_WORDS = { frame: "notLiveFrame", picture: "notLivePicture", other: "notLiveOther" }

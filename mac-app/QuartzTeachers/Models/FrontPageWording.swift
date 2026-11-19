@@ -24,7 +24,11 @@ nonisolated enum FrontPageWording {
 
     static let show: String = "Show on Front Page"
 
-    static let notToday: String = "Not Today"
+    /// The answer that declines (#987, Russell's ruling Q2 on #975): "Not
+    /// Now" on an offer Plantoir raised by itself, as this one is when the
+    /// teacher presses Preview. It was "Not Today". The decline is still
+    /// remembered for the day and the class (`frontPageNotToday`).
+    static let notToday: String = "Not Now"
 
     // MARK: - When nothing was changed
 

@@ -55,7 +55,7 @@ A representative example:
 | `emojis.sections.section<N>` | string | setup | build (page title) | Single emoji per section, e.g. `"📚"`. Legacy `emojis.default` is honoured as a fallback. **Cleaned where it is read** (#822), as `course_name` is. |
 | `num_sections` | int | setup | setup (prompt default) + build and launchers (fallback when `section_numbers` is absent) | Count of sections; normalized to `len(section_numbers)`. |
 | `section_numbers` | int[] | setup | build (validation); `preview.ps1` also checks it host-side and asks | The teacher's actual timetable section numbers, e.g. `[1,3,4]`. Only these sections can be built or deployed. |
-| `shared_folders` | string[] | setup + build discovery | build | Course-root folders copied into every section's site. `Media` never appears here (symlinked instead). |
+| `shared_folders` | string[] | setup + build discovery | build | Course-root folders copied into every section's site. `Media` never appears here (symlinked instead). A file in them that is not a page reaches the website only when a published page uses it (#901). |
 | `shared_files` | string[] | setup + build discovery | build | Course-root loose `.md` files copied into every section's site. |
 | `per_section_folders` | string[] | setup + build discovery | build | Folder names expected inside each `section<N>/`, copied only into that section's site. |
 | `per_section_files` | string[] | setup + build discovery | build | Loose `.md` files inside each `section<N>/`. |
@@ -67,8 +67,8 @@ A representative example:
 | `fonts.default` / `fonts.sections.section<N>` | object | setup | build → `quartz.config.ts` typography | `header`, `body`, `code` font family names (Google Fonts or system stacks). Section entry wins over default. |
 | `show_section_marker.sections.section<N>` | bool | setup | build (page title + computed landing title) | Whether the header shows `S<N>` and the computed landing title carries ", Section N". The build also accepts several legacy shapes (plain bool, flat map, alternate key names). |
 | `show_grade_in_title.sections.section<N>` | bool (default `true`) | app (per-section settings) — the wizard never writes it, it only honours an existing value when generating a section's starting `index.md` title | build (computed landing title) | Whether the landing title leads with the grade ("Grade 11 …"). Deliberately literal — the switch alone decides; the app shows an orange warning when the name already contains the grade label. A legacy course-wide bool is honoured. |
-| `color_schemes.section<N>` | string | setup, either app's per-section settings | build → `quartz.config.ts` colors + social card | Scheme id from `support/colour_schemes.json` (43 available). The section's social sharing card is drawn in this scheme too. A FLAT map, with no `sections` level. In `contracts/file-formats.json` → `courseConfigKeys` since 2026-09-29 (#373's plan): the mac read it by subscript, so the key count never saw it. |
-| `custom_domains.sections.section<N>` | object (per-destination-type map, e.g. `{"netlify": "…", "cloudflare_pages": "…"}`) | app (Advanced, per-section settings — one field per configured destination) | app (published-site links, per destination) + `build_site.py` (baseUrl, via the PRIMARY destination's own entry only — one build's sitemap/RSS/social-card links can only follow one domain) | The teacher's own domain for ONE destination of the section's published site. Links after a deploy swap that destination's own host for it (path preserved, https) — never another destination's. An OLDER shape (a bare string, from before a course could have more than one destination) is still read, as the domain for whichever destination is currently primary (`deploy_target`). The domain itself must already be configured with that host (Netlify/Cloudflare Pages) — this key only changes what Plantoir LINKS to. Entries are normalized (scheme and path stripped) on the way in. |
+| `color_schemes.section<N>` | string | setup, either app's per-section settings | build → `quartz.config.ts` colors + social card | Scheme id from `support/colour_schemes.json` (43 offered, 44 entries). **One scheme has two ids** (#891): Grove Colours is `grove-colours` for every new pick and, for courses that chose it before 2.0.0, the older id that named a school. The older entry is kept with `"listed": false` and `"sameAs": "grove-colours"`, the same name and the same colours, so a course that stores it looks the same and is never rewritten; the pickers show it only to a section whose own scheme it is, in Grove Colours' place (`shared-rules.json` → `colourSchemePicker`). It cannot be removed without rewriting those courses' files, which was ruled out. The section's social sharing card is drawn in this scheme too. A FLAT map, with no `sections` level. In `contracts/file-formats.json` → `courseConfigKeys` since 2026-09-29 (#373's plan): the mac read it by subscript, so the key count never saw it. |
+| `custom_domains.sections.section<N>` | object (per-destination-type map, e.g. `{"netlify": "…", "cloudflare_pages": "…"}`) | app (Advanced, per-section settings — one field per configured destination) | app (published-site links, per destination) + `build_site.py` (baseUrl, via the PRIMARY destination's own entry only — one build's sitemap/RSS/social-card links can only follow one domain; read through `custom_domains.for_destination`, #904) | The teacher's own domain for ONE destination of the section's published site. Links after a deploy swap that destination's own host for it (path preserved, https) — never another destination's. An OLDER shape (a bare string, from before a course could have more than one destination) is still read, as the domain for whichever destination is currently primary (`deploy_target`), never a folder's, which has no address. Any other shape is no domain (`customDomainReading`, #904). The domain itself must already be configured with that host (Netlify/Cloudflare Pages) — this key only changes what Plantoir LINKS to. Entries are normalized (scheme and path stripped) on the way in. |
 | `prepopulate_example_content` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the ready-made payload for this course code. |
 | `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. Offered for a code whose prefix has a family AND whose teacher is NOT taking the ready-made payload, which is the 39 payload codes as well as the ~1,900 without one: both apps wrote `false` for a payload code whatever the teacher chose until 2026-09-21, so declining the ready-made pages gave empty folders ([#248](https://github.com/russellgordon/plantoir/issues/248); 18 pages against the skeleton's 47, measured on ICS4U). |
 | `include_curriculum_pages` | bool | setup | setup | Whether the curriculum pages written for this course code come with it — every expectation as its own page, and what the coverage map is built from. TWO starting points reach them since [#251](https://github.com/russellgordon/plantoir/issues/251) (2026-09-22): the teacher TAKING the payload gets its Curriculum folder, and the teacher who DECLINES the payload but keeps the subject's skeleton gets those same pages installed into the skeleton's Curriculum folder (ICS4U 2 pages to 61, MCMPR11 to 59 British Columbia standards, ICS2O — no payload — unchanged at 2). Declining it strips the `%%curriculum-start%%`…`%%curriculum-end%%` passages from every payload page and unlinks inline expectation references. |
@@ -87,7 +87,7 @@ A representative example:
 | `include_coverage_notes` | bool (default `true`) | setup | build | Whether that page carries its explanatory sections ("What counts", "Reading it honestly") or the map alone. |
 | `kept_for_reference` | bool (default `false`) | app (Keep a Copy for Reference…, Import Courses for Reference…) | the app, `scripts/reference_course.py`, `deploy.sh`, `deploy.py` | `true` marks a REFERENCE COURSE: last year's course, or a course full of example content, kept in this year's sidebar to be read and never deployed. **Absent means false** — the only safe direction, since the reverse would make a live course silently undeployable. See "Reference courses" below. |
 | `reference_school_year` | integer or null | app (Keep a Copy for Reference…, Import Courses for Reference…, Set School Year…) | the app (sidebar grouping, the MCP course listing) | Which school year a reference course was taught in, as the calendar year it STARTED in: `2025` means 2025–26. The label is derived, never stored. Absent, null, or anything that is not a whole number within the offered range reads as **Other**. |
-| `use_lcs_terminology` | bool | setup | setup (starting folder and file names) | A school-specific mode: swaps the factory shared-folder and shared-file lists for one school's own words — "College Board Curriculum", "SIC Drop-In Sessions.md" and "Grove Time.md" in place of "Extra Help.md". Affects the names a new course starts with, nothing after that. |
+| `use_lcs_terminology` | bool | nothing since 2.0.0 (#891) on the Mac and at the command line; the Windows wizard until its #891 issue lands; setup and both wizards before | nothing | **Retired, left in place.** Until 2.0.0 a wizard switch and a command-line question offered one school's own starting names ("College Board Curriculum", "SIC Drop-In Sessions.md", "Grove Time.md" in place of "Extra Help.md") and recorded the answer here. Nothing ever read it after set-up, since a re-run offers the saved lists. Both were removed in #891: a new course does not write the key, and a course that has it keeps it (setup's saved-keys loop and the apps' config writers carry keys they do not own), along with the names already in its lists. |
 | `print_school_name` | string (absent or `""` = none) | Course Settings → Printing (#454) | build → `quartz/plantoir_print.json` (`scripts/print_settings.py`) | The school's name in a printed handout's corner, on every page. Course-wide: a handout is the same paper for every section. An empty name REMOVES the key, so a course that never set one writes the file it always did. |
 | `print_blanks` | string[] of `name`, `date`, `class_number` (absent or `null` = `["name","date"]`, `[]` = none) | Course Settings → Printing | build | The lines a student fills in, top right on every page, always in the order Name, Date, Class #. Unknown values are ignored, not refused, and are left in the file until the teacher changes the setting. `null` is read as absent because that is what the build prints (`print_settings._blanks`); the corners case "blanks of null are the default" says so, and Windows tests it (#496, 2026-10-15); the mac read it as none until #537 (2026-10-16), and now reads null as absent and runs every corners case through Course Settings' sketch (`PrintablePagesTests.testEveryCornersCaseHoldsAsTheContractSays`), with `freshOpenCases` → "a print_blanks of null opens clean" proving the reading writes nothing. KNOWN, not covered: a list holding a non-string (`["name", 3]`) reads as none on the mac (`as? [String]` fails) but Name in the build; no app writes one, so no case was added. |
 | `print_school_name_at` | `header_left` \| `footer_left` \| `none` (absent or unknown = `header_left`) | Course Settings → Printing | build | Which corner the school name prints in. Sharing a corner with the course code reads "School · CODE". |
@@ -186,6 +186,69 @@ new. REJECTED: cleaning every one-line label a teacher types
 not choose; and escaping a double quote or a backslash in the `pageTitle`
 line, which is a different fault from a control character and is not in this
 piece. Windows plans its readers under #822.
+
+### A section's custom domain is read one way (#904)
+
+Since v2.0.0 ([#904](https://github.com/russellgordon/plantoir/issues/904)).
+`custom_domains.sections.section<N>` is read by one rule with cases,
+`contracts/file-formats.json` → `customDomainReading`: from a map, the
+value under the destination type asked for; from the older bare string, the
+string only when that type is the primary (`deploy_target`, Netlify when
+absent); `local_folder` never has a domain, because a folder has no site
+address; and any other shape (a list, a number, a map whose value is not a
+string, a `sections` that is not a map) is no domain rather than an error.
+The value comes back as stored, and trimming a scheme or a slash is the
+caller's (`clean_base_url`, `normalizedCustomDomain`).
+
+Readers: `scripts/custom_domains.py` → `for_destination` in the shared Python
+(`build_site.resolve_section_domain` asks it for the primary, the address a
+build bakes in; it is baked into the website builder beside `build_site.py`),
+and `CourseConfiguration.customDomain(forSection:destinationType:)` on the mac
+(`FileFormatsContractTests.testACustomDomainIsReadTheContractsWay`).
+`scripts/test_custom_domains.py` runs the cases on the host and
+`scripts/test_build_site_domain_resolution.py` the build's address in the
+image.
+
+Measured before the change, Python 3.14 on the mac and the website builder's
+Python: `resolve_section_domain` returned the bare string for a course whose
+primary is a folder, and RAISED `AttributeError` for an entry that was a list
+or a number, a map whose value was a number, and a `sections` that was a list;
+it is called with no `try` (`build_site.py`, where the baseUrl is patched), so
+each of those stopped the build. The four new build tests fail on the old file
+(2 failures, 6 errors) and pass on the new. The mac's reader handed a
+folder-primary course's bare string to its FOLDER leg (harmless, since a
+folder deploy announces no site address for the link to wear, and corrected
+for the rule's sake). Windows' #799 gave `deploy.py` its own
+`leg_custom_domain`, written at the same time as this. Measured by the Fable
+sweep of the batch on a trial merge with dev: its body and
+`custom_domains.for_destination` differed on 4 of 24 shapes, two of them
+contract cases (a folder asked for its domain got the older bare string, or
+one written under its name) and two that no writer produces (a
+`deploy_target` that is a list or a number). None was reachable, since it is
+called only for `netlify` and `cloudflare_pages`. At the merge with dev
+(2026-11-14) it keeps its read of `course_config.json` and asks
+`custom_domains.for_destination`, and `build_site.py` asks
+`custom_domains.primary_destination_type` for the primary's order of marker
+files, so the shared Python reads the key one way. `test_custom_domains.py` →
+`DeployAsksTheSameReader` runs every case through `leg_custom_domain` too and
+reads `deploy.py` for any other `.get("custom_domains")`; on #799's body it
+fails the two contract cases.
+One baked address moves, and only one (the #904 implementation review, old
+tree against new): a course whose primary is a FOLDER, with the older bare
+string and a Netlify (or Cloudflare) secondary, used to bake the bare string
+into its build's baseUrl, and now bakes what step 2 of
+`resolve_section_domain` finds, the web destination's own site address (for
+Netlify, the `.netlify.app` address from the section's site record). So the
+sitemap, the feed and the sharing card's address follow that host's own
+address. The app's link for the secondary never showed the bare string, so the
+two now agree, and both addresses serve the site. A map entry, and a bare
+string on a web primary, bake the same address as before. An empty
+`deploy_target` is read as Netlify, as an absent one is (the case "an EMPTY
+deploy_target").
+
+REJECTED: leaving the reader inside `build_site.py` for `deploy.py` to import
+(it pulls in the whole build and its `frontmatter` dependency to read one
+key), and moving it into `toolchain_paths.py` (it is not a path).
 
 ### Publishing destination
 
@@ -365,6 +428,7 @@ file — or any file in the working folder.
 | `<CODE>/.merged_output` | **A shortcut, not a folder** (since 2026-09-05): it points at `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>` on macOS, `%LOCALAPPDATA%\Plantoir\builds\<folder id>\<CODE>` on Windows. Built sites are derived and were moved out so that copying, zipping, backing up or syncing a course no longer carries them. Safe to delete; rebuilt on demand. |
 | `<CODE>/.merged_output/section<N>/` | The section's built site as every script names it — `public/` and a copy of `course_config.json`. NOT the Quartz scaffold or `node_modules`: those live on the container's own fast storage and are never mirrored out. |
 | `<CODE>/.merged_output/.geogebra-cache/` (Windows: `%LOCALAPPDATA%\Plantoir\builds\<folder id>\<CODE>\.geogebra-cache\`) | The geogebra.org sketches the course's pages name with `material_id:` (#578), each copied ONCE and kept as `<key>.ggb` and `<key>.json` (id, title, author), where the key is the FENCE's own key (`figureRules.keyOf`), not the sketch's id — so changing the fence (`version: 2`) is how a teacher gets a changed sketch fetched again. Shared by the course's sections; a build whose fence has a copy asks geogebra.org nothing; `--full-rebuild` leaves it alone; a copy unused for 90 days is removed. It survives every clear of the course's builds folder (a course never linked, a missing link, a link from another Mac, the move out of the working folder, a whole course restored from a backup): the built sites go and the copies stay (#789, `buildOutputLocation.keptCopiesSurviveTheClear`). Deleting the folder is safe while online: the next build copies each sketch again — offline, a sketch with no copy becomes a folder problem. Not a course setting. `contracts/shared-rules.json` → `geogebraFences.cache`. (Not to be confused with plantoir.app's `site/mirror/`, the copy of GeoGebra's own download the website builder falls back to when download.geogebra.org does not answer: that is the website's, never in a working folder — RELEASING.md and 02 → `/opt/vendor/geogebra`.) |
+| `~/Library/Application Support/Plantoir/builds/<folder id>/.downloaded/` (Windows: `%LOCALAPPDATA%\Plantoir\builds\<folder id>\.downloaded\`) | What the working folder's pages downloaded the first time they used it, kept for every later build (#674): `phet/<sim>/<version>/` for a PhET simulation (`simulation.html`, `screenshot.png` and `kept.json`, which names each file's SHA-256 and size, where it came from, when, and the simulation's titles by language); #679 adds `sounds/`. ONE copy for every course and section of the working folder, beside their built sites, not inside any course. Every file's hash is checked each time it is used; an entry unused for 90 days is removed; it is never downloaded again on its own. A build that needs something not here and cannot download it stops, saying which page uses what. The app's sweep for courses that are gone keeps it (`buildOutputLocation.keptDownloadsSurviveTheSweep`). Deleting it is safe while online: the next build downloads what its pages use again, offline it stops. Not a course setting. `contracts/shared-rules.json` → `keptDownloads`. |
 | `<CODE>/.netlify_sites/section<N>.json` | Netlify site marker (site id/URL) so re-deploys target the same site. |
 | `<CODE>/.netlify_sites/section<N>.previous-<stamp>.json`<br>`<CODE>/.cloudflare_sites/section<N>.previous-<stamp>.json`<br>the built output's `section<N>/.netlify_site.previous-<stamp>.json` — **and where that is differs by platform**: `<CODE>/.merged_output/section<N>/` on macOS, `%LOCALAPPDATA%\Plantoir\builds\<folder id>\<CODE>\section<N>\` on Windows, because `merged_output_root()` returns `PLANTOIR_BUILD_ROOT/<CODE>` with no `.merged_output` level whenever the launchers set that variable, which on Windows is always | A marker set aside when a section was **rolled over onto a new website** — the assistant renames it rather than deleting it, because it holds the site id and admin address and is the only way back to last year's site. Inert: the scripts build exact marker paths and never scan the folder. See `contracts/file-formats.json` → `firstDeployMarkers.releasedWhenASectionRollsOver`. |
 | `<CODE>/.cloudflare_sites/section<N>.json` | Cloudflare Pages marker (project name/id, subdomain, account) so re-publishing reuses the same project instead of creating a second one. |
@@ -374,6 +438,7 @@ file — or any file in the working folder.
 | `<CODE>/.publish_state/section<N>.front-page-not-today.json` | Not Today, answered to Preview's question about today's class on the front page (#397): the calendar day and the class offered, so that class is not asked about again that day. The app's own file; never removed, since a record for another day or class stops nothing. `frontPageNotToday`. |
 | `<CODE>/.publish_state/section<N>.published-pages/` | A folder of fragments, one per destination a deploy reached, each naming the pages that site showed — what "published before" means when a page hidden again is published once more (#379). On every rollover its fragments are moved into `section<N>.published-pages.previous-<stamp>/` beside it (the folder itself stays, so the rollover's undo can put them back). `publishedPagesRecord`. |
 | the built output's `section<N>/.visible-pages.json` and `.build-id` | Beside `public/`, never inside it: the pages a build for publishing showed, and the id of the build that last started there; what a deploy records from (`visiblePagesList`). |
+| the built output's `section<N>/.site-files.json` | Beside `public/`, never inside it: how many of the course's files the last build carried and left off, and the check's safety counts, counts only; read by the next build to tell whether it is the first to leave files off and whether the count changed (#901, `siteFilesRecord`). |
 | the built output's `section<N>/.page-sources.json` | Beside `public/`, never inside it: which file in the course folder each page of the site came from, written by every build, preview or publish, just before Quartz runs; what a section's Open in Obsidian reads to open the page the preview shows (#518, `pageSourcesList`). |
 | `<CODE>/Media/` | Shared binary assets; symlinked into every build, always hidden from the sidebar. |
 | `<CODE>/.obsidian/` | Obsidian vault settings (seeded from `support/obsidian_defaults`). |
@@ -1335,6 +1400,56 @@ name.
 file mid-flight, and it runs on both platforms — Windows reaches it through
 `PythonToolchainTests`.
 
+## One build reads the settings once (#999)
+
+Shared Python, so both platforms have it (`scripts/build_site.py`,
+`scripts/reference_course.py`); no app code changed.
+
+**Why.** One build used to open `course_config.json` at least five times:
+the load in `build_section_site`, preflight (again on each retry), the
+kept-for-reference question (`reference_course.is_reference` and
+`cannot_tell`, three opens between them), the copy into
+`<output>/quartz/course_config.json` that the site's components import, and
+the copy to the output root that is mirrored beside `public/`. A Save landing
+between two of those gave one build a site of mixed settings, for example a
+sidebar from the new file and pages from the old. Course Settings saving as it
+changes (#986) makes such a Save much likelier, so this landed first.
+
+**What a build does now.** It reads the file once, as bytes, at its start
+(`BuildSettings.read_from`, right after `.build-started.pending` is made), and
+every later step asks that object: preflight starts from those bytes rather
+than opening the file (`preflight_the_build_settings`), the frozen-course
+question is asked of its text (`BuildSettings.is_frozen`, through
+`reference_course.is_reference_in` and `cannot_tell_from`), and both copies
+write its bytes (`_write_the_build_settings`, which leaves a copy alone when it
+already holds them). A Save made after the build started reaches the next
+build, never this one; `.build-started` already tells freshness that.
+
+**The one second read, kept on purpose.** Preflight's compare-and-swap (the
+section above) still re-reads when the file changed while it scanned AND it
+has something to write: writing its older reading back would erase a rename.
+That newer reading then becomes the build's one reading for every step after
+preflight, so the site is still made from one set of settings. Before
+preflight only the section check and the How I Teach "listed before" note have
+looked at the first reading. When preflight writes, the reading's bytes are
+exactly what it wrote (`_settings_file_bytes`, shared with the write-back), so
+the copies in the site match the file it left.
+
+**Rejected:** re-reading the file before each copy and comparing (it narrows
+the window without closing it), and a lock on the file (both apps and the
+launchers would have to take it, and a stuck lock would stop every Save).
+`preflight_update_course_config` keeps its old signature for its tests and
+callers outside the build.
+
+**Not covered here:** the launchers' own section check before the build
+(`preview.sh`, `preview.ps1`) and `deploy.py`'s reads of the settings
+(`scripts/deploy.py`, for the destination and the deploy's rebuild) are
+outside the build and unchanged.
+
+`scripts/test_build_reads_settings_once.py` saves mid-build and checks each
+step follows the build's reading; one case pins that `build_section_site`
+uses the file's path only to check, read once, and hand preflight its target.
+
 ## A rename interrupted after the folders moved was a dead end
 
 **This is an app-level problem, not a toolchain one** — it exists wherever a
@@ -1429,10 +1544,12 @@ Keys the Windows settings UI must round-trip (per-section maps use
   skeleton gets `prepopulate_example_content: false` beside
   `include_curriculum_pages: true`, which is what fetches the
   expectations written for their code
-- `use_lcs_terminology` (entry 94) — whether the factory structure
-  defaults use LCS's own set-up; the two factory sets live as
-  `DEFAULT_*` vs `LCS_*` constants in `scripts/setup_course.py` and the
-  Windows equivalent of `WizardDefaults` must mirror them exactly
+- `use_lcs_terminology` (entry 94) — retired in 2.0.0 (#891): no longer
+  written by the Mac or the command line, never read; an existing value is
+  left where it is. Only the `DEFAULT_*` factory sets remain in
+  `scripts/setup_course.py`. Until #891's `windows` issue lands, the Windows
+  wizard still writes the key and its `WizardDefaults` still holds the
+  second sets
 - `custom_short_name` — the ≤12-character label shown beside the header
   emoji instead of the course code, in club mode. Already implemented on
   Windows (`CourseConfiguration.cs`); listed here because this table is the

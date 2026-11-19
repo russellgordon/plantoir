@@ -207,7 +207,7 @@ enum SkeletonCatalog {
     /// True when a folder list is still one the app offered, rather than
     /// one the teacher has changed.
     static func isOffered(_ folders: [String]) -> Bool {
-        if folders == WizardDefaults.sharedFolders || folders == WizardDefaults.lcsSharedFolders {
+        if folders == WizardDefaults.sharedFolders {
             return true
         }
         for name in everyFamilyName() {

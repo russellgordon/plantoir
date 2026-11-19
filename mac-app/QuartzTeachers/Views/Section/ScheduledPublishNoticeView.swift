@@ -39,10 +39,15 @@ struct ScheduledPublishNoticeView: View {
         return outcome.kind.needsAttention
     }
 
-    /// The band's own colour: green for news, orange for a problem.
+    /// The band's own colour: green for news, orange for a problem. The
+    /// band is this colour at 12% over the window (#994, measured with the
+    /// caution orange): the triangle on it is 5.05:1 in Light (5.85:1 with
+    /// Increase Contrast), 6.05:1 in Dark (6.54:1), and the band's words
+    /// 12.61:1 in Light and 9.75:1 in Dark. The system orange's triangle was
+    /// 2.09:1 on the same band in Light.
     var bandColour: Color {
         if needsAttention {
-            return Color.orange
+            return StatusColour.warning.color
         }
         return Color.green
     }

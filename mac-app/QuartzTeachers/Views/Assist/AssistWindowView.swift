@@ -238,10 +238,20 @@ struct AssistWindowView: View {
             ),
             isPresented: $isConfirmingRestore
         ) {
+            // Cancel answers Escape and Command-Period, and nothing is the
+            // default, so Return does nothing (#987, D1): putting a section
+            // back loses the teacher's own edits. Alerts: "Note that you
+            // don't want to make a Cancel button the default button"; "If
+            // you want to encourage people to read an alert and not just
+            // automatically press Return to dismiss it, avoid making any
+            // button the default button." Cancel with `.defaultAction` had
+            // Return and left Escape with no button (#832). In a SwiftUI
+            // alert the destructive role is the only way a button takes no
+            // Return (`AlertKeysTests`), so the go-ahead keeps it.
             Button("Cancel", role: .cancel) {
                 isConfirmingRestore = false
             }
-            .keyboardShortcut(.defaultAction)
+            .keyboardShortcut(.cancelAction)
             .accessibilityIdentifier("assistCancelRestoreButton")
 
             Button(
@@ -622,7 +632,7 @@ private struct AssistRestoreNoteView: View {
     var body: some View {
         Label(note.text, systemImage: note.isProblem ? "exclamationmark.triangle" : "clock.arrow.circlepath")
             .font(.callout)
-            .foregroundStyle(note.isProblem ? Color.orange : Color.secondary)
+            .foregroundStyle(note.isProblem ? AnyShapeStyle(StatusColour.warning.style) : AnyShapeStyle(Color.secondary))
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("assistRestoreNote")
@@ -723,7 +733,7 @@ private struct AssistEntryView: View {
         case .problem:
             HStack {
                 Label(entry.text, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(StatusColour.warning.style)
                     .textSelection(.enabled)
                     .padding(.leading, 12)
                     .padding(.trailing, 9)
@@ -793,7 +803,8 @@ private struct AssistApprovalView: View {
 /// before they had read the request, and the request was behind the form. A
 /// form nobody asked for is a demand; this makes it an offer.
 ///
-/// "Yes" is the default button here, unlike the plan gate, and the difference
+/// "Add Dates…" (it was "Yes" until #987, D9) is the default button here,
+/// unlike the plan gate, and the difference
 /// is deliberate: a plan asks permission to CHANGE something, where this asks
 /// permission to ask a question. Somebody who pressed Return without reading
 /// gets a form they can close, not an edit they did not want.
@@ -827,9 +838,9 @@ private struct AssistDatesOfferView: View {
             // above and every sheet's (#457, the HIG sweep).
             HStack {
                 Spacer(minLength: 0)
-                Button(AssistWording.cancelled, action: decline)
+                Button(AssistWording.declineDatesButton, action: decline)
                     .accessibilityIdentifier("assistNoDatesButton")
-                Button("Yes", action: accept)
+                Button(AssistWording.giveDatesButton, action: accept)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("assistGiveDatesButton")
             }

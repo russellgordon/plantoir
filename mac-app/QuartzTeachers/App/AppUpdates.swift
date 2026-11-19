@@ -825,7 +825,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             MainActor.assumeIsolated {
                 withObservationTracking {
                     _ = CourseActivity.store.activePublishes
-                    _ = CourseActivity.store.activePreviewBuilds
+                    _ = CourseActivity.store.previewBuildClaims
                 } onChange: {
                     continuation.yield(())
                     continuation.finish()

@@ -24,6 +24,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import toolchain_paths
+import custom_domains
 import reference_course
 import contracts
 import isolation_headers
@@ -277,29 +278,21 @@ def leg_custom_domain(course_dir: Path, section, leg_type: str) -> str:
     custom domain only once it is attached on Netlify's side, so the address a
     leg is built for is this one when it is set (#799's third review, H1:
     otherwise every rebuild baked the service's own host and the sharing
-    cards, sitemap and feed dropped the teacher's domain)."""
+    cards, sitemap and feed dropped the teacher's domain).
+
+    The rule itself is custom_domains.for_destination, the one Python reader
+    of the key (file-formats.json -> customDomainReading, #904), which
+    build_site.py asks for the primary. This kept its own copy when #799 and
+    #904 were written side by side; at their join the two differed on 4 of 24
+    shapes (the Fable sweep of the deploy-freshness batch), so it asks the
+    shared reader instead of keeping a second body that agrees by accident."""
     try:
         config = json.loads((Path(course_dir) / "course_config.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return ""
     if not isinstance(config, dict):
         return ""
-    custom_domains = config.get("custom_domains")
-    if not isinstance(custom_domains, dict):
-        return ""
-    sections = custom_domains.get("sections")
-    if not isinstance(sections, dict):
-        return ""
-    entry = sections.get(f"section{section}")
-    if isinstance(entry, dict):
-        value = entry.get(leg_type)
-    elif isinstance(entry, str) and (config.get("deploy_target") or "netlify") == leg_type:
-        value = entry
-    else:
-        value = None
-    if not isinstance(value, str):
-        return ""
-    return clean_base_url(value)
+    return clean_base_url(custom_domains.for_destination(config, section, leg_type))
 
 
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
@@ -485,12 +478,12 @@ def get_or_prompt_teacher_last_name() -> str | None:
         # First run under this /teaching/courses folder
         print("\nTeacher Surname.")
         print("Your surname is used to create a clear, recognizable web address for your")
-        print("students and families (such as mcv4u-s1-2026-gordon), and to prevent naming")
+        print("students and families (such as mcv4u-s1-2026-quillfeather), and to prevent naming")
         print("conflicts with other classes. It is saved on this computer and only asked once.\n")
         raw = input("First time setup... what is your last name? (letters only): ").strip()
         ln = sanitize_last_name(raw)
         while not ln:
-            raw = input("Please enter letters only for your last name (e.g., 'Gordon'): ").strip()
+            raw = input("Please enter letters only for your last name (e.g., 'Quillfeather'): ").strip()
             ln = sanitize_last_name(raw)
         save_teacher_last_name(ln)
         print(f" Saved teacher last name for future deploys: {ln}")
@@ -598,7 +591,7 @@ def _is_netlify_name_conflict(err: Exception) -> bool:
     return False
 
 def suggest_site_base(course_code: str, section: str, teacher_last_name: str) -> str:
-    """Example: ICD2O + 1 + gordon -> icd2o-s1-2025-gordon"""
+    """Example: ICD2O + 1 + quillfeather -> icd2o-s1-2025-quillfeather"""
     course = (course_code or "").lower()
     sec = f"s{section}"
     base = f"{course}-{sec}-{NOW.year}-{teacher_last_name}"
@@ -638,7 +631,7 @@ def maybe_create_netlify_site_simple(token: str, team_slug: str | None, course_c
                     continue
                 print(f"\n⚠️ Website Address Already Taken.")
                 print(f"The address '{site_name}' is already in use by another site on Netlify.")
-                print("Tip: Add your school's initials (e.g. lcs-mcv4u-s1-2026-gordon) or a number suffix.\n")
+                print("Tip: Add your school's initials (e.g. jhc-mcv4u-s1-2026-quillfeather) or a number suffix.\n")
                 new_name = prompt("Choose a different Netlify site name (or 'q' to cancel)", default=suggestion).strip()
                 if new_name.lower() in {"q", "quit", "exit"}:
                     raise RuntimeError("User cancelled Netlify site creation after name conflict.") from e

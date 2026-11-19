@@ -374,7 +374,7 @@ nonisolated enum ReferenceImportWording {
     }
 
     /// The school year's folder, chosen one level above the courses —
-    /// iCloud's `LCS/2024-25`, whose `Old ICS3U/Class Websites` holds the
+    /// iCloud's `JHC/2024-25`, whose `Old ICS3U/Class Websites` holds the
     /// shortcuts. `noCoursesThere` ("Choose the folder you kept that year's
     /// classes in") would point back at the very folder chosen. True
     /// whether one course or several is down there, which is why it is not

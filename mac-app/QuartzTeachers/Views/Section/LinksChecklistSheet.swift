@@ -398,13 +398,11 @@ struct LinksChecklistSheet: View {
             Text(LinksChecklistWording.published(count: String(count), pages: LinksChecklistWording.pageWord(count)))
                 .fixedSize(horizontal: false, vertical: true)
             ForEach(outcome.changedSince, id: \.self) { name in
-                Text(LinksChecklistWording.pageChangedSince(name: name))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(LinksChecklistWording.pageChangedSince(name: name))
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !outcome.declined.isEmpty {
-                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: outcome.declined))
-                    .foregroundStyle(.orange)
+                StatusColour.warning.sentence(AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: outcome.declined))
                     .fixedSize(horizontal: false, vertical: true)
             }
         case .problem(let sentence):

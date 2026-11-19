@@ -17,6 +17,7 @@ final class CloudflareDeployTests: XCTestCase {
         let data: Data = try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys])
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cloudflare_config_\(UUID().uuidString).json")
+        removeWhenTestEnds(fileURL)
         try data.write(to: fileURL)
         return try CourseConfiguration(contentsOf: fileURL)
     }
@@ -40,6 +41,7 @@ final class CloudflareDeployTests: XCTestCase {
         // through this app untouched.
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cloudflare_rewrite_\(UUID().uuidString).json")
+        removeWhenTestEnds(fileURL)
         try configuration.write(to: fileURL)
         let reread: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
         XCTAssertEqual(reread.deployTarget, "cloudflare_pages")
@@ -73,6 +75,8 @@ final class CloudflareDeployTests: XCTestCase {
 
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cloudflare_keep_\(UUID().uuidString).json")
+
+        removeWhenTestEnds(fileURL)
         try configuration.write(to: fileURL)
         let reread: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
 
@@ -185,6 +189,7 @@ final class CloudflareDeployTests: XCTestCase {
         let courseURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("marker-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
+        removeWhenTestEnds(courseURL)
 
         let cloudflare: Course = Course(
             code: "MCV4U",

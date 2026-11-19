@@ -120,15 +120,7 @@ final class WizardStructureTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            WizardStructure.restoringDefaults(
-                in: editorsLists, adopted: nil, usesLCSTerminology: false
-            ),
-            editorsLists
-        )
-        XCTAssertEqual(
-            WizardStructure.restoringDefaults(
-                in: editorsLists, adopted: nil, usesLCSTerminology: true
-            ),
+            WizardStructure.restoringDefaults(in: editorsLists, adopted: nil),
             editorsLists
         )
     }
@@ -152,7 +144,7 @@ final class WizardStructureTests: XCTestCase {
         )
 
         let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
-            in: withTheirOwnPool, adopted: adopted, usesLCSTerminology: false
+            in: withTheirOwnPool, adopted: adopted
         )
 
         XCTAssertEqual(restored.sharedFolders, WizardDefaults.sharedFolders,
@@ -181,7 +173,7 @@ final class WizardStructureTests: XCTestCase {
         )
 
         let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
-            in: afterUntickingTasks, adopted: adopted, usesLCSTerminology: false
+            in: afterUntickingTasks, adopted: adopted
         )
         XCTAssertEqual(restored.gradedFolders, [],
                        "Thinking Tasks left the editor with the rest of the skeleton")
@@ -438,7 +430,7 @@ final class WizardStructureTests: XCTestCase {
         XCTAssertNotEqual(adopted, factory, "The decline must actually change something")
 
         let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
-            in: adopted, adopted: adopted, usesLCSTerminology: false
+            in: adopted, adopted: adopted
         )
         XCTAssertEqual(restored, factory,
                        "A teacher who changed their mind must end where they started")
@@ -728,11 +720,10 @@ final class WizardStructureTests: XCTestCase {
     /// What the wizard WRITES never names a folder the course will not have,
     /// whatever route the pool took to get there.
     ///
-    /// The route this closes is the terminology switch: turning LCS on,
-    /// ticking `College Board Curriculum` for marks and turning LCS off again
-    /// takes the folder out of the course and leaves the pool naming it —
-    /// that handler is the one place the editor changes a folder list without
-    /// narrowing the pool. Windows narrows as it writes
+    /// The route this closed first was a terminology switch (removed in
+    /// #891) that took a folder ticked for marks out of the course without
+    /// narrowing the pool; the net stays for any route like it. Windows
+    /// narrows as it writes
     /// (`NewCourseDialog.BuildConfiguration`) and now so does this.
     func testTheFileNeverNamesAFolderTheCourseWillNotHave() {
         let wizard: NewCourseWizardView = NewCourseWizardView(
@@ -746,7 +737,7 @@ final class WizardStructureTests: XCTestCase {
 
         XCTAssertEqual(
             configuration["graded_folders"] as? [String], ["Tasks"],
-            "The LCS folder is not in this course's folder lists, so writing it into the "
+            "That folder is not in this course's folder lists, so writing it into the "
             + "marks pool would be a name that matches nothing on disk — and a different "
             + "file from the one Windows writes for the same clicks."
         )

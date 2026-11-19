@@ -1486,6 +1486,22 @@ nonisolated enum AssistWording {
     /// is the same courtesy every other write in the window already gets.
     static let mayIAskForYourDates: String = "May I ask you for your class dates?"
 
+    /// The button that says yes to `mayIAskForYourDates` (#987, D9): it was
+    /// "Yes". Alerts: "Aim for a one- or two-word title that describes the
+    /// result of selecting the button"; "In informational alerts only, you
+    /// can use 'OK' for acceptance, avoiding 'Yes' and 'No.'" The result is
+    /// the class-dates sheet, so the title ends in an ellipsis (Buttons ▸
+    /// macOS: "Append a trailing ellipsis to the title when a push button
+    /// opens another window, view, or app."). "Dates" is the noun in a club
+    /// too, so one title serves both.
+    static let giveDatesButton: String = "Add Dates…"
+
+    /// The button that declines `mayIAskForYourDates` (#987 review): "Not
+    /// Now", because the card is an offer Plantoir raised by itself, and
+    /// "Not Now" is the title for those (Russell's ruling Q2 on #975;
+    /// "Cancel" is for an action the teacher started). It was "Cancel".
+    static let declineDatesButton: String = "Not Now"
+
     /// The same question in the course's own noun (#267). Only the card in
     /// the window says it this way: the sentences that carry the question
     /// back to the model keep `mayIAskForYourDates` as it is.
@@ -2227,7 +2243,8 @@ nonisolated enum AssistWording {
     //
     // The assistant's own functions, reached from Section ▸ Publish Pages…,
     // Hide Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
-    // Change, Add Next Class, Re-date Classes… and Make Room for Classes… —
+    // Change, Add Class… (Add Next Class until #897), Re-date Classes… and
+    // Make Room for Classes… —
     // the same tool code, called with a call built in code and never through
     // a model (`AssistToolRunner.Surface.menu`). What a teacher reads there is
     // not a conversation: nobody said "undo that", there is no "me" to ask
@@ -2423,6 +2440,247 @@ nonisolated enum AssistWording {
     static func menuAddNextClassTitle(noun: ClassNoun = .class) -> String {
         return "Add next \(noun.singular)"
     }
+
+    // #897: what only the built-in assistant's window could do before,
+    // in the menu's voice. The window's own sentences are unchanged.
+
+    /// Section ▸ Add Class…'s sheet: its title, the question, and one
+    /// line per way (`SubjectMenuRules.AddClassWay`), in the sheet's order.
+    static func menuAddClassTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "Add a \(noun.singular) to \(course) Section \(section)"
+    }
+
+    static func menuHowToAddAClass(noun: ClassNoun = .class) -> String {
+        return "How should the new \(noun.singular) be added? It is dated for this section's next "
+             + "\(noun.singular) day and starts hidden."
+    }
+
+    /// The first way: what Add Next Class did. In a numbered course (a club)
+    /// there are no units, and the line says only "the next". `unit` is the
+    /// course's own word, as a teacher reads it in a sentence ("module" in a
+    /// course that calls its units modules; #897a review, finding 10).
+    static func menuAddClassNextInThisUnit(
+        noun: ClassNoun = .class, unit: String = "unit", numbered: Bool = false
+    ) -> String {
+        if numbered {
+            return "As the next \(noun.singular)"
+        }
+        return "As the next \(noun.singular) in the \(unit) under way"
+    }
+
+    /// The second way: Unit 5, Day 1 after Unit 4, in the course's word.
+    static func menuAddClassInANewUnit(noun: ClassNoun = .class, unit: String = "unit") -> String {
+        return "In a new \(unit), as its first \(noun.singular)"
+    }
+
+    /// Under the ways: why one is greyed, in a sentence a teacher can act on
+    /// (`SubjectMenuRules.AddClassGreyedBecause`, #897a review, finding 1).
+    static func menuAddClassGreyedNoUnits(noun: ClassNoun = .class) -> String {
+        return "This course numbers its \(noun.plural) one after another, without units, so there is "
+             + "no new unit to start."
+    }
+
+    static func menuAddClassGreyedNothingToCopy(noun: ClassNoun = .class) -> String {
+        return "This section has no \(noun.singular) pages yet, so there is nothing to copy."
+    }
+
+    /// The rename's line names only the ways the rename holds back
+    /// (`SubjectMenuRules.AddClassReasonLine`): a way greyed for another
+    /// reason is not promised back by finishing it (the fix review's
+    /// finding 1). In a numbered course the word renamed is the pages' own
+    /// name, so the line says that, and only a copy can be held back there.
+    static func menuAddClassGreyedRenameUnfinished(
+        noun: ClassNoun = .class, unit: String = "unit", newUnit: Bool = true, copy: Bool = true,
+        numbered: Bool = false
+    ) -> String {
+        var what: String = "a copy"
+        if newUnit && copy {
+            what = "a new \(unit) or a copy"
+        } else if newUnit {
+            what = "a new \(unit)"
+        }
+        if numbered {
+            return "A rename of what this course calls its \(noun.plural) stopped part way, so some are "
+                 + "named the old way and some the new. Finish the rename in the course's settings to add "
+                 + "\(what)."
+        }
+        return "A rename of what this course calls a \(unit) stopped part way, so some \(noun.plural) "
+             + "are named the old way. Finish the rename in the course's settings to add \(what)."
+    }
+
+    /// A copy asked for after the section's class dates went missing.
+    /// The menu item is titled Class Dates… in every course, a club
+    /// included, and a club's sentences never say "class"
+    /// (`ClubNounTests.testEveryMeetingKeyHasItsClassTwin`), so a club is
+    /// pointed at the Section menu without the item's title.
+    static func menuNeedsClassDatesFirst(noun: ClassNoun = .class) -> String {
+        let firstSentence: String = "This section has no \(noun.singular) dates on file, so nothing was copied."
+        if noun == .meeting {
+            return firstSentence + " Add them from the Section menu, then try again."
+        }
+        return firstSentence + " Add them with Section ▸ Class Dates…, then try again."
+    }
+
+    /// The third way: a copy of one of this section's classes.
+    static func menuAddClassAsACopy(noun: ClassNoun = .class) -> String {
+        return "As a copy of a \(noun.singular) in this section"
+    }
+
+    static func menuPickClassToDuplicate(noun: ClassNoun = .class) -> String {
+        return "Choose the \(noun.singular) to copy. The copy becomes the next \(noun.singular), dated for "
+             + "this section's next \(noun.singular) day, and starts hidden. Nothing else moves."
+    }
+
+    /// The default button for a way that adds at once (a new unit).
+    static let menuAddButton: String = "Add"
+
+    static let menuDuplicateButton: String = "Duplicate"
+
+    /// The finished sheet: the copy's name, its date, and that it is hidden
+    /// (the plan review's amendment 7: `duplicated` alone says neither).
+    static func duplicatedFromTheMenu(page: String, as copy: String, on date: String) -> String {
+        return "Duplicated “\(page)” as “\(copy)”, dated \(date). The copy is hidden: write it, then "
+             + "publish it when it is ready."
+    }
+
+    /// The copy's visibility could not be read back as hidden, so nothing
+    /// was written: the menu writes the copy only once it reads hidden.
+    static func theCopyCouldNotBeMadeHiddenFromTheMenu(page: String) -> String {
+        return "“\(page)” was not copied, and nothing was written: the copy could not be made certainly "
+             + "hidden, and a lesson students can already see must not turn up somewhere new where they "
+             + "can read it. The settings at the top of “\(page)” are written in a way Plantoir cannot "
+             + "read for certain; open it in Obsidian to look."
+    }
+
+    /// The page the copy would become is already there.
+    static func menuTheNextPageIsAlreadyThere(page: String) -> String {
+        return "A page called “\(page)” is already where the copy would go, so nothing was copied. "
+             + "A page is never written over."
+    }
+
+    /// A unit-word rename stopped part way: Add Class… waits for it. Said
+    /// the same way in every course, a numbered one (a club) included, whose
+    /// renamed word is the pages' own name and never a unit (the Fable
+    /// sweep's finding 5): the names given to the pages is true of both.
+    static func menuUnitWordRenameUnfinished(noun: ClassNoun = .class) -> String {
+        return "A rename of the names this course gives its \(noun.plural) stopped part way, so some are "
+             + "named the old way and some the new. Nothing was changed. Finish the rename in the "
+             + "course's settings, then choose this again."
+    }
+
+    // #897 piece B: Section ▸ Roll Over to a New Year…, the rollover the
+    // built-in assistant's window asks about in words, in the menu's voice.
+    // The window's own sentences are unchanged.
+
+    static func menuRollOverTitle(course: String, section: String) -> String {
+        return "Roll over \(course) Section \(section) to a new year"
+    }
+
+    static func menuRollOverIntro(noun: ClassNoun = .class) -> String {
+        return "Rolling over puts this section's \(noun.plural) onto the \(noun.singular) dates on file, "
+             + "and sets aside last year's record of which pages students could reach."
+    }
+
+    /// The dates the rollover will use, first to last.
+    static func menuRollOverDates(first: String, last: String, noun: ClassNoun = .class) -> String {
+        return "The dates on file for this section's \(noun.plural): \(first) to \(last)."
+    }
+
+    /// The last date on file is before today: probably last year's. A club
+    /// is pointed at the Section menu without the item's title, which says
+    /// "Class" (`menuNeedsClassDatesFirst` does the same).
+    static func menuRollOverDatesAreOld(noun: ClassNoun = .class) -> String {
+        let firstSentence: String = "The last of these dates has passed, so they may be last year's."
+        if noun == .meeting {
+            return firstSentence + " To give this year's meeting dates, cancel and add them from the "
+                 + "Section menu first."
+        }
+        return firstSentence + " To give this year's class dates, cancel and choose Section ▸ Class Dates… first."
+    }
+
+    /// The question's two answers, under `rolloverWebsiteQuestion`.
+    static let menuRollOverKeepWebsite: String =
+        "Keep last year's website, so links students saved keep working"
+
+    static let menuRollOverNewWebsite: String =
+        "Start a new website, and leave last year's as it is"
+
+    /// No question: no record ties the section to a website at the moment.
+    /// True of a section never deployed, of one whose website a rollover
+    /// already set aside, of a course that deploys to a folder AND a web host
+    /// (the folder half has been deployed, a website has not), and of
+    /// Cloudflare, which asks for no name (the implementation review's W2).
+    static let menuRollOverNotDeployedYet: String =
+        "This section is not on a website at the moment, so there is no website to keep. A new "
+        + "website is made the next time it is deployed."
+
+    /// No question: a new website started now would get the address the
+    /// section's website already has, and replace it (the implementation
+    /// review's W1; the deploy path's fix is GitHub #915). Said in the sheet,
+    /// in the plan and when it is done, which is why it is in the present.
+    /// Its last sentence is the way forward, and it is true as the name rule
+    /// stands: the name a new website gets carries the calendar year
+    /// (`RollOverFromTheMenu.cloudflareNameStem`), so from January the
+    /// kept names no longer match and the sheet offers a new website again.
+    static let menuRollOverANewWebsiteWouldReuseItsAddress: String =
+        "This section's website was started this calendar year, and a new website started now "
+        + "would get the same address. It keeps deploying to the same website, so links students "
+        + "saved keep working. A new website can be started for this section once the calendar "
+        + "year changes."
+
+    /// No question: the section deploys only to a folder.
+    static let menuRollOverDeploysToAFolder: String =
+        "This section deploys to a folder, so there is no website address to keep or replace."
+
+    static let menuRollOverButton: String = "Roll Over"
+
+    /// The plan, for "same" (the plan review's amendment 14): the card the
+    /// window shows says nothing about the website on that answer.
+    static let menuRollOverPlanKeepsTheWebsite: String =
+        "It would keep deploying this section to the same website as last year."
+
+    /// The plan, for either answer: what `PublishedPagesRecord.release` sets aside.
+    static let menuRollOverPlanSetsTheRecordAside: String =
+        "It would also set aside last year's record of which pages students could reach, and the "
+        + "answers given about them last year, so the new year starts afresh."
+
+    /// `rolloverCouldNotStartANewWebsite` without the first person (the plan
+    /// review's amendment 13).
+    static func rolloverCouldNotStartANewWebsiteFromTheMenu(stillPinned: String) -> String {
+        return "This section could not be moved off \(stillPinned), so deploying it will still "
+             + "replace last year's website there. Try again, or check whether that file is "
+             + "locked or open somewhere else."
+    }
+
+    /// The finished line for a section that deploys only to a folder, in
+    /// place of `rolloverKeptTheSameWebsite`, which says "website".
+    static let rolloverDeploysToAFolderFromTheMenu: String =
+        "This section deploys to a folder, so where it deploys is unchanged. Nothing goes out until "
+        + "you deploy."
+
+    /// The finished line for a new website from the menu, in place of
+    /// `rolloverStartedANewWebsite`, whose last sentence says Plantoir will
+    /// ask what to call the new website. That is true of Netlify and untrue
+    /// of Cloudflare, which names a new website itself (`deploy.py`
+    /// `suggest_pages_name`; the Fable sweep's T1, as the implementation
+    /// review's W2 found for `menuRollOverNotDeployedYet`). The first two
+    /// sentences are the window's; the last is true on both hosts. A course
+    /// that now deploys only to a folder, whose marker an old web host left,
+    /// ends on `menuRollOverDeploysToAFolder` instead, since no website is
+    /// made for it (the sweep's T7).
+    static func rolloverStartedANewWebsiteFromTheMenu(keptAs: String, deploysToAFolder: Bool = false) -> String {
+        var ending: String = rolloverANewWebsiteIsMadeAtTheNextDeploy
+        if deploysToAFolder {
+            ending = menuRollOverDeploysToAFolder
+        }
+        return rolloverIsOnANewWebsite + " Last year's details are "
+             + "kept at \(keptAs), so you can go back to it. " + ending
+    }
+
+    /// The last sentence of that line, named so a test can find it in a
+    /// line whose kept file carries a timestamp.
+    static let rolloverANewWebsiteIsMadeAtTheNextDeploy: String =
+        "A new website is made the next time this section is deployed."
 
     /// Help ▸ Publishing and Deploying…: the difference, said to the teacher
     /// — `whatPublishingMeans` is the assistant's, and says "the teacher".

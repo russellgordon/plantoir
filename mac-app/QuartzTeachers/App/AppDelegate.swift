@@ -237,6 +237,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // must start nothing once the quit goes ahead, whether it ends now
         // or waits on a set-aside update (#793, the 793b fix review's LOW 2).
         SectionCoverage.shared.abandonEveryRefresh()
+        // And a repair's Preview Again still waiting for its stop (#813).
+        PreviewAgainPresses.shared.abandonEvery()
         AppDelegate.letEverythingGo()
 
         if updateAtQuit == .setAside {
@@ -339,24 +341,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if WorkspaceModel.isRunningTests {
             return .quitAnyway
         }
-        let alert: NSAlert = NSAlert()
-        alert.messageText = QuitConfirmation.question(about: workUnderWay)
-        alert.informativeText = QuitConfirmation.explanation()
-        alert.alertStyle = .warning
-        // The titles AND their meanings come from one ordered list, because
-        // `NSAlert` reports a POSITION and nothing else: two `addButton`
-        // calls written out here could be reordered in one line and would
-        // then swap what each answer means, so Keep Working would quit.
-        let buttons: [QuitConfirmation.Button] = QuitConfirmation.buttons(
-            onlySettingUp: QuitConfirmation.onlySettingUpNow()
-        )
-        for button in buttons {
-            alert.addButton(withTitle: button.title)
-        }
+        let alert: NSAlert = quitAlert(about: workUnderWay)
         let response: NSApplication.ModalResponse = alert.runModal()
         return QuitConfirmation.choice(
             atButtonIndex: response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
         )
+    }
+}
+
+extension AppDelegate {
+
+    /// The quit question itself, built but not shown, so `QuitAlertKeysTests`
+    /// can press its keys on a sheet (#987).
+    ///
+    /// The titles, their meanings AND their keys come from one ordered list,
+    /// because `NSAlert` reports a POSITION and nothing else: two
+    /// `addButton` calls written out here could be reordered in one line and
+    /// would then swap what each answer means, so Cancel would quit. NSAlert
+    /// gives its first button Return on its own, so each button's key is set
+    /// from the list after it is added: Quit Anyway none, Cancel Escape.
+    @MainActor
+    static func quitAlert(about workUnderWay: String) -> NSAlert {
+        let alert: NSAlert = NSAlert()
+        alert.messageText = QuitConfirmation.question(about: workUnderWay)
+        alert.informativeText = QuitConfirmation.explanation()
+        alert.alertStyle = .warning
+        for button in QuitConfirmation.buttonsInOrder {
+            let added: NSButton = alert.addButton(withTitle: button.title)
+            added.keyEquivalent = button.keyEquivalent
+        }
+        return alert
     }
 }
 

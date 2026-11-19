@@ -121,22 +121,41 @@ public static class FailureExplainer
     /// What deploy.ps1, or preview.ps1 --build-only, refused with while the
     /// same section was still being deployed (#467 / mac #439,
     /// shared-rules.json -> deployWhileItsSectionDeploys).
-    /// <paramref name="ByALaterDeploy"/> is true when the deploy set for
-    /// later was in the way, false when another deploy of the section was;
-    /// <paramref name="Sentence"/> is the launcher's first line with the
-    /// cross taken off - the sentence the window shows.
+    /// <paramref name="ByALaterDeploy"/> is true when a scheduled deploy's
+    /// run was in the way; <paramref name="ByAnotherBuild"/> when another
+    /// BUILD of the section was (mac #729, Windows #828: the
+    /// <c>buildingDeploy</c> and <c>buildingBuild</c> lines); both false when
+    /// another deploy of the section was. <paramref name="Sentence"/> is the
+    /// launcher's first line with the cross taken off - the sentence the
+    /// window shows.
     /// </summary>
-    public sealed record SectionDeployRefusal(bool ByALaterDeploy, string Sentence);
+    public sealed record SectionDeployRefusal(bool ByALaterDeploy, string Sentence, bool ByAnotherBuild = false);
 
-    /// <summary>The words the refusal always carries, one per leg (sentences.launcher; pinned by a test).</summary>
+    /// <summary>The words the refusal always carries, one per leg and per thing in the way (sentences.launcher; pinned by a test).</summary>
     public static readonly string[] SectionDeployRefusalMarkers =
     {
         "so it cannot be deployed again until that has finished.",
         "so it cannot be built until that has finished.",
+        // #828 (mac #729): another build of the section in the way.
+        "so it cannot be deployed until that has finished.",
+        "so it cannot be built again until that has finished.",
     };
 
-    /// <summary>The part of the first line that names the deploy set for later.</summary>
-    public const string LaterDeployMarker = "is still being deployed by a deploy that was set for later";
+    /// <summary>
+    /// The part of the first line that names a scheduled deploy's run, as
+    /// the launchers say it since #835 (Windows #854, #868).
+    /// </summary>
+    public const string LaterDeployMarker = "is still being deployed by a scheduled deploy that is still running";
+
+    /// <summary>
+    /// The same part as launchers before #835 said it. Still read: a working
+    /// folder whose launchers plantoir-mcp has not refreshed (it never does)
+    /// prints the old line, and that refusal is still a scheduled deploy's.
+    /// </summary>
+    public const string OlderLaterDeployMarker = "is still being deployed by a deploy that was set for later";
+
+    /// <summary>The part of the first line that names another build of the section (#828, mac #729).</summary>
+    public const string AnotherBuildMarker = "is already being built";
 
     /// <summary>
     /// The refusal in a launcher's output, LIFTED as #386's is (the
@@ -164,7 +183,10 @@ public static class FailureExplainer
             int start = 0;
             while (start < line.Length && !char.IsAsciiLetterOrDigit(line[start])) start++;
             string sentence = line[start..];
-            return new SectionDeployRefusal(sentence.Contains(LaterDeployMarker, StringComparison.Ordinal), sentence);
+            bool byALaterDeploy = sentence.Contains(LaterDeployMarker, StringComparison.Ordinal)
+                                  || sentence.Contains(OlderLaterDeployMarker, StringComparison.Ordinal);
+            return new SectionDeployRefusal(byALaterDeploy, sentence,
+                ByAnotherBuild: !byALaterDeploy && sentence.Contains(AnotherBuildMarker, StringComparison.Ordinal));
         }
         return null;
     }

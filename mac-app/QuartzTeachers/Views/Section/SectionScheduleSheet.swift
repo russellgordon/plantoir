@@ -128,9 +128,10 @@ struct SectionScheduleSheet: View {
 
             if let failure {
                 ScrollView {
-                    Text(failure)
+                    // Selectable, so the symbol sits beside the words and is
+                    // not copied with them (#994).
+                    StatusLine(kind: .blocking, words: failure)
                         .font(.callout)
-                        .foregroundStyle(.orange)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("sectionScheduleFailure")
@@ -355,6 +356,7 @@ struct SectionScheduleSheet: View {
             Button("Cancel", role: .cancel) {
                 dismiss()
             }
+            .keyboardShortcut(.cancelAction)
             .accessibilityIdentifier("sectionScheduleCancelButton")
 
             if let plan {

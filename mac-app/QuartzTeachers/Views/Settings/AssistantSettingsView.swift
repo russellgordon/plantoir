@@ -16,6 +16,10 @@ struct AssistantSettingsView: View {
     /// What is on this Mac and what may be done about it.
     @State private var library: AssistModelLibrary = AssistModelLibrary()
 
+    /// The download the teacher pressed Remove beside, while the question
+    /// about it is asked (#987, D22).
+    @State private var removing: AssistModelTier?
+
     // MARK: - Computed properties
 
     var body: some View {
@@ -51,6 +55,35 @@ struct AssistantSettingsView: View {
         // panel that went on insisting it was not there.
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             library.refresh()
+        }
+        // #987, D22. Drawn like the app's other removal alerts: Cancel
+        // answers Escape, and Remove is destructive so that it takes no
+        // Return (in a SwiftUI alert only that role keeps Return off it,
+        // `AlertKeysTests`); whether those alerts keep their red waits on
+        // the question sheet's redesign (#1000).
+        .alert(
+            AssistModelLibrary.removeQuestion(for: removing ?? .small),
+            isPresented: Binding(
+                get: { return removing != nil },
+                set: { (showing: Bool) in
+                    if !showing {
+                        removing = nil
+                    }
+                }
+            ),
+            presenting: removing
+        ) { (tier: AssistModelTier) in
+            Button("Cancel", role: .cancel) {
+                removing = nil
+            }
+            .keyboardShortcut(.cancelAction)
+            Button(AssistModelLibrary.removeButton, role: .destructive) {
+                removing = nil
+                library.remove(tier)
+            }
+            .accessibilityIdentifier("assistantRemoveConfirm")
+        } message: { (tier: AssistModelTier) in
+            Text(AssistModelLibrary.removeMessage(for: tier))
         }
     }
 
@@ -92,7 +125,7 @@ struct AssistantSettingsView: View {
             if let caution = library.confirmationCaution {
                 Label(caution, systemImage: "exclamationmark.triangle")
                     .font(.callout)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(StatusColour.warning.style)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("assistantConfirmationCaution")
             }
@@ -150,7 +183,7 @@ struct AssistantSettingsView: View {
                     if let caution = choice.caution(for: library.budget) {
                         Label(caution, systemImage: "exclamationmark.triangle")
                             .font(.callout)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(StatusColour.warning.style)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("assistantChoiceCaution" + identifier(for: choice))
                     }
@@ -202,8 +235,13 @@ struct AssistantSettingsView: View {
                     }
                     .accessibilityIdentifier("assistantStopDownload" + identifier(for: tier))
                 } else if library.isDownloaded(tier) {
-                    Button("Remove") {
-                        library.remove(tier)
+                    // Asks first (#987, D22): a download of gigabytes is not
+                    // taken back by a click. "Remove…" because it opens a
+                    // question (Buttons ▸ macOS: "Append a trailing ellipsis
+                    // to the title when a push button opens another window,
+                    // view, or app").
+                    Button("Remove…") {
+                        removing = tier
                     }
                     .disabled(!library.mayRemove(tier))
                     .accessibilityIdentifier("assistantRemove" + identifier(for: tier))
@@ -224,9 +262,8 @@ struct AssistantSettingsView: View {
             }
 
             if case .failed(let reason) = store.state {
-                Text(reason)
+                StatusColour.blocking.sentence(reason)
                     .font(.callout)
-                    .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
 

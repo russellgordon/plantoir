@@ -23,7 +23,6 @@ there when no bash can run the launcher (see test_deploy_non_interactive).
     python3 scripts/test_deploy_sh_destination.py
 """
 
-import atexit
 import shutil
 import json
 import os
@@ -33,13 +32,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-# Every launcher run here keeps its trail in a folder of its own (#737, #738):
-# a run refused by a deploy elsewhere on this Mac must never write the
-# teacher's real activity log. Set on this process, so every launcher run
-# below inherits it, whichever way its environment is built.
-_TRAIL_FOLDER = tempfile.mkdtemp(prefix="plantoir-test-trail-")
-os.environ["PLANTOIR_TRAIL_DIR"] = _TRAIL_FOLDER
-atexit.register(shutil.rmtree, _TRAIL_FOLDER, True)
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 

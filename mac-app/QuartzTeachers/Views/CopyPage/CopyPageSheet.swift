@@ -177,8 +177,7 @@ struct CopyPageSheet: View {
             }
 
             if let problem {
-                Text(problem)
-                    .foregroundStyle(.orange)
+                StatusColour.blocking.sentence(problem)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("copyPageProblem")
             }
@@ -374,9 +373,14 @@ struct CopyPageSheet: View {
                 }
                 .keyboardShortcut(.defaultAction)
             } else {
+                // Escape and Command-Period (#987), except while the page
+                // list is open, when the first Escape is the field's, to put
+                // the list away (`PickerEscape`): a key equivalent on the
+                // button would be offered the press first.
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(picker.isShowingSuggestions && stage == .choosing ? nil : .cancelAction)
                 .disabled(stage != .choosing && stage != .checking)
                 Button("Copy") {
                     if stage == .checking {

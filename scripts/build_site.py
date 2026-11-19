@@ -26,15 +26,19 @@ import contracts
 import machine_line
 import class_pages
 import course_names
+import custom_domains
 import markdown_code
 import how_i_teach
 import page_visibility
 import page_features
 import figures
 import geogebra
+import kept_downloads
+import phet
 import swift_blocks
 import section_problems
 import site_said
+import site_files
 import print_settings
 import quizzes
 import my_progress
@@ -189,21 +193,20 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
     # fields are per-destination for exactly this reason (a Netlify-only
     # domain must never leak into a Cloudflare Pages leg's own link), and
     # the primary is the one destination this single build is canonically
-    # published as. An older, single-string shape is read as-is: it was
-    # written back when a course could only ever have one destination, so
-    # there was only ever one destination it could have meant.
-    custom_domains = config.get("custom_domains", {})
-    if isinstance(custom_domains, dict):
-        section_domains = (custom_domains.get("sections") or {}).get(section_key)
-        if isinstance(section_domains, dict):
-            primary_destination_type = config.get("deploy_target") or "netlify"
-            section_custom_domain = section_domains.get(primary_destination_type)
-        else:
-            section_custom_domain = section_domains
-        if section_custom_domain:
-            cleaned = clean_base_url(section_custom_domain)
-            if cleaned:
-                return cleaned
+    # published as. An older, single-string shape is read as the primary's:
+    # it was written back when a course could only ever have one destination,
+    # so there was only ever one destination it could have meant.
+    #
+    # Read by custom_domains.for_destination, the one Python reader of the
+    # format (contracts/file-formats.json -> customDomainReading, #904). Until
+    # #904 this read it itself: a bare string reached a course whose primary
+    # is a FOLDER, which has no address, and a list or a number in the setting
+    # raised AttributeError and stopped the build (measured, Python 3.14).
+    section_custom_domain = custom_domains.for_destination(
+        config, section_number, custom_domains.primary_destination_type(config))
+    cleaned = clean_base_url(section_custom_domain)
+    if cleaned:
+        return cleaned
 
     # 2 and 3. The site markers, the PRIMARY destination's first (#799). The
     # Netlify marker used to be read first whatever the course deployed to,
@@ -260,7 +263,7 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
                 pass
         return ""
 
-    if (config.get("deploy_target") or "netlify") == "cloudflare_pages":
+    if custom_domains.primary_destination_type(config) == "cloudflare_pages":
         order = (cloudflare_marker_domain, netlify_marker_domain)
     else:
         order = (netlify_marker_domain, cloudflare_marker_domain)
@@ -1845,13 +1848,16 @@ def _wire_list_page_toc(layout_ts: Path) -> None:
 def _wire_transformers_index(index_ts: Path) -> None:
     """Export the figures transformer (#485 E1), the runnable code's (#455),
     the self-check quizzes' (#563), the task boxes' (#519), the picture
-    sizes' (#612) and the GeoGebra sketches' (#578) beside Quartz's own."""
+    sizes' (#612), the GeoGebra sketches' (#578), the PhET simulations'
+    (#674) and the videos' (#692) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
                          ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks"),
                          ("PlantoirPictureSizes", "./plantoirPictureSizes"),
-                         ("PlantoirGeoGebra", "./plantoirGeoGebra")):
+                         ("PlantoirGeoGebra", "./plantoirGeoGebra"),
+                         ("PlantoirPhet", "./plantoirPhet"),
+                         ("PlantoirVideo", "./plantoirVideo")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1970,6 +1976,31 @@ def _wire_geogebra_transformer(config_ts: Path) -> None:
     config_ts.write_text(text, encoding="utf-8")
 
 
+def _wire_phet_transformer(config_ts: Path) -> None:
+    """Put the PhET simulations' transformer (#674) straight AFTER the
+    GeoGebra sketches' and so before the self-check quizzes', as GeoGebra's
+    is placed and for its reason (a simulation in a question is a finished
+    figure when the quiz transformer packages the question). Anchored on
+    PlantoirGeoGebra, which every site wired since #578 has, and wired after
+    it in wire_quartz_additions, so the order is Figures, GeoGebra, PhET,
+    Quizzes on a fresh site and an old one alike. Idempotent."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirPhet(" in text:
+        return
+    anchor = "Plugin.PlantoirGeoGebra(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the science simulations: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not add the science simulations: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirPhet()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
 def _wire_tasks_transformer(config_ts: Path) -> None:
     """Put the task boxes' transformer (#519) straight AFTER the self-check
     quizzes': it works at the html stage, and must find every quiz already
@@ -2015,6 +2046,33 @@ def _wire_picture_sizes_transformer(config_ts: Path) -> None:
         print("⚠️ Could not reserve the pictures' space on the site's pages: the site's settings have changed shape.")
         return
     text = text[:at] + "\n" + indent + "Plugin.PlantoirPictureSizes()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_video_transformer(config_ts: Path) -> None:
+    """Put the videos' transformer (#692) straight BEFORE
+    ObsidianFlavoredMarkdown. Quartz runs every transformer's html plugins in
+    the order they are listed, and OFM's own YouTube step replaces a
+    picture's properties, losing the words in its brackets (the player's
+    title). Running first, the videos' transformer turns YouTube and Vimeo
+    pictures into players itself, and OFM's YouTube step finds none left.
+    Anchored on OFM, so a section wired before #692 gets it in the same
+    place as a fresh one. Without that anchor the videos are left to
+    Quartz's own YouTube step, as before #692."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirVideo(" in text:
+        return
+    anchor = "Plugin.ObsidianFlavoredMarkdown("
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the YouTube and Vimeo players: the site's settings have changed shape.")
+        return
+    at = text.index(anchor)
+    line_start = text.rfind("\n", 0, at) + 1
+    indent = text[line_start:at]
+    if indent.strip():
+        print("⚠️ Could not add the YouTube and Vimeo players: the site's settings have changed shape.")
+        return
+    text = text[:line_start] + indent + "Plugin.PlantoirVideo(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -2168,6 +2226,7 @@ def _wire_served_case(script_ts: Path) -> None:
 _PLANTOIR_EMITTERS = (
     ("PlantoirProgress", "./plantoirProgress"),
     ("PlantoirSiteSaid", "./plantoirSiteSaid"),
+    ("PlantoirAssets", "./plantoirAssets"),
 )
 
 
@@ -2186,6 +2245,27 @@ def _wire_emitters_index(index_ts: Path) -> None:
         index_ts.write_text(text, encoding="utf-8")
 
 
+# The line Plantoir's emitters are put before: Quartz's own Assets, or since
+# #901 Plantoir's, which replaces it. Either, so a config already swapped
+# still takes an emitter added later.
+_ASSETS_ANCHORS = ("Plugin.Assets(),", "Plugin.PlantoirAssets(),")
+
+
+def _assets_anchor(text: str) -> str | None:
+    """The one assets line in a section's quartz.config.ts, or None when there
+    is not exactly one."""
+    found = []
+    for anchor in _ASSETS_ANCHORS:
+        count = text.count(anchor)
+        if count > 1:
+            return None
+        if count == 1:
+            found.append(anchor)
+    if len(found) != 1:
+        return None
+    return found[0]
+
+
 def _wire_progress_emitter(config_ts: Path) -> None:
     """Put My Progress's emitter (#545) straight BEFORE Assets: an emitter
     runs after every transformer, so the trees it reads already carry the
@@ -2193,8 +2273,8 @@ def _wire_progress_emitter(config_ts: Path) -> None:
     text = config_ts.read_text(encoding="utf-8")
     if "Plugin.PlantoirProgress(" in text:
         return
-    anchor = "Plugin.Assets(),"
-    if text.count(anchor) != 1:
+    anchor = _assets_anchor(text)
+    if anchor is None:
         print("⚠️ Could not add the My Progress page: the site's settings have changed shape.")
         return
     at = text.index(anchor)
@@ -2218,8 +2298,8 @@ def _wire_site_said_emitter(config_ts: Path) -> None:
     text = config_ts.read_text(encoding="utf-8")
     if "Plugin.PlantoirSiteSaid(" in text:
         return
-    anchor = "Plugin.Assets(),"
-    if text.count(anchor) != 1:
+    anchor = _assets_anchor(text)
+    if anchor is None:
         print("⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): the site's settings have changed shape.")
         return
     at = text.index(anchor)
@@ -2230,6 +2310,46 @@ def _wire_site_said_emitter(config_ts: Path) -> None:
         return
     text = text[:line_start] + indent + "Plugin.PlantoirSiteSaid(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
+
+
+# The course's files a site carries (#901, contracts/shared-rules.json ->
+# siteFiles): Quartz's Assets emitter copied every file in content/ that is
+# not a page; Plantoir's copies only those a published page uses. Swapped in
+# place, so it keeps Assets' place among the emitters. ALWAYS, idempotent.
+SITE_FILES_MARKER = "PLANTOIR-SITE-FILES"
+
+
+def _wire_site_files_emitter(config_ts: Path) -> None:
+    """Replace `Plugin.Assets(),` with `Plugin.PlantoirAssets(),`. When the
+    line is not there exactly once the config is left alone and the build
+    goes on with Quartz's own emitter, which copies every course file: the
+    check after the build then takes off what no page uses and nothing on
+    the site mentions, so a file a page's text names stays on the site and
+    is deployed, counted in unreferenced (siteFiles.check.exposure;
+    assets_emitter_in reports which ran)."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirAssets()" in text:
+        return
+    anchor = "Plugin.Assets(),"
+    if text.count(anchor) != 1:
+        return
+    text = text.replace(anchor, f"Plugin.PlantoirAssets(), // {SITE_FILES_MARKER}", 1)
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def assets_emitter_in(config_ts: Path) -> str:
+    """Which emitter copies the course's files on this build: "plantoir"
+    when the swap is in place and exported, "quartz" otherwise
+    (siteFiles.marker.assetsEmitter)."""
+    try:
+        text = config_ts.read_text(encoding="utf-8")
+        index = (config_ts.parent / "quartz" / "plugins" / "emitters" / "index.ts").read_text(encoding="utf-8")
+    except OSError:
+        return "quartz"
+    if text.count("Plugin.PlantoirAssets()") == 1 and "Plugin.Assets()" not in text \
+            and "export { PlantoirAssets }" in index:
+        return "plantoir"
+    return "quartz"
 
 
 # My Progress (#545) in the sidebar: directly under the class folder. The
@@ -2360,11 +2480,17 @@ def wire_quartz_additions(output_dir: Path) -> None:
     the transformers index, and its script and styles ride the Print
     button's component), the GeoGebra sketches' one (#578: its transformer
     straight after the figures' and so before the quizzes'; export, script
-    and styles ride as the quizzes' do), the task boxes' one (#519: its transformer after
+    and styles ride as the quizzes' do), the PhET simulations' one (#674:
+    its transformer straight after GeoGebra's; export, script and styles
+    ride the same way), the task boxes' one (#519: its transformer after
     the quizzes'; export, script and styles ride as the quizzes' do), the
     picture sizes' one (#612: its transformer after the task boxes'; its
     export rides the transformers index, and its one style rule rides the
-    Print button's component in pictures.scss), My
+    Print button's component in pictures.scss), the videos' one (#692: its
+    transformer straight before ObsidianFlavoredMarkdown, so the player keeps
+    the picture's words as its title; its export rides the transformers
+    index and its one style rule rides the Print button's component in
+    videos.scss), My
     Progress's two (#545: its emitter exported beside Quartz's and put
     before Assets; its script and styles ride as the quizzes' do), the
     emitter that says which runnable blocks the site showed as plain code
@@ -2388,12 +2514,15 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
         (output_dir / "quartz.config.ts", _wire_geogebra_transformer),
+        (output_dir / "quartz.config.ts", _wire_phet_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_picture_sizes_transformer),
+        (output_dir / "quartz.config.ts", _wire_video_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz" / "plugins" / "emitters" / "index.ts", _wire_emitters_index),
         (output_dir / "quartz.config.ts", _wire_progress_emitter),
         (output_dir / "quartz.config.ts", _wire_site_said_emitter),
+        (output_dir / "quartz.config.ts", _wire_site_files_emitter),
         (output_dir / "quartz.layout.ts", _wire_code_runner_component),
         (output_dir / "quartz.layout.ts", _wire_list_page_toc),
         (output_dir / "quartz" / "cli" / "handlers.js", _wire_isolation_serve),
@@ -2558,6 +2687,71 @@ def _prepare_geogebra(content_root: Path, output_dir: Path, course_dir: Path, fu
         shutil.rmtree(output_dir / "quartz" / geogebra.WORKSPACE, ignore_errors=True)
         shutil.rmtree(output_dir / "quartz" / "static" / geogebra.THUMBNAILS, ignore_errors=True)
         return {"counts": {geogebra.ENGINE: 0}, "problems": [], "notes": [], "sketches": 0, "shown": 0}
+
+
+def _prepare_phet(content_root: Path, output_dir: Path, course_dir: Path, config: dict,
+                  course_code: str, section_number) -> dict:
+    """
+    PhET simulations (#674; scripts/phet.py), ALWAYS: every phet fence
+    (```phet and ~~~phet, with or without spaces before the language, so the
+    pages are found by the word `phet` alone) on the pages students can see, by the gate's own
+    visibility rule, read, its simulation found among the copies this
+    computer keeps (keptDownloads: the working folder's builds folder,
+    .downloaded/phet) or downloaded from PhET now and kept, and handed to the
+    site's transformer. Answers phet.prepare's outcome; when that says
+    `stop`, the caller STOPS the build before Quartz runs (phetFences.stop,
+    Russell's ruling of 2026-11-13).
+
+    A fault in this pass ITSELF (an answer of a shape nobody foresaw, a full
+    disk) also stops the build when any page students can see shows a
+    simulation (phetFences.stop.passFails, reason notReady): carrying on
+    would make a site that says it built and shows a code block where the
+    page promises a simulation, the fault the ruling's stop exists to
+    prevent. With no simulation on any such page the build carries on, as
+    nothing is missing.
+    """
+    def list_pages():
+        return phet.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            _vault_source_of, skip=_is_media_name)
+
+    try:
+        pages = list_pages()
+        kept_root = kept_downloads.root_for(course_dir)
+        return phet.prepare(pages, output_dir, kept_root,
+                            course_locale=(config.get("locale") or "en-US"),
+                            course=course_code, section=section_number)
+    except Exception as error:
+        # The plain reason only (a full disk says so in the system's own
+        # words), never a path and never Python's name for the fault: the
+        # console is the teacher's, and goes into problem reports.
+        if isinstance(error, OSError) and error.strerror:
+            print(f"⚠️ Could not prepare the science simulations ({error.strerror}).")
+        else:
+            print("⚠️ Could not prepare the science simulations.")
+        shutil.rmtree(output_dir / "quartz" / phet.WORKSPACE, ignore_errors=True)
+        shutil.rmtree(output_dir / "quartz" / "static" / phet.SITE_FOLDER, ignore_errors=True)
+        places = phet.places_after_a_failed_pass(list_pages, content_root)
+        stop = None
+        if places is None or places:
+            stop = {"reason": "notReady", "missing": places or []}
+        return {"counts": {phet.KIND: 0}, "problems": [], "notes": [], "simulations": 0, "shown": 0,
+                "downloaded": [], "fromBefore": [], "bytes": 0, "seconds": 0.0, "stop": stop}
+
+
+def _stop_for_phet(outcome: dict, course_code: str, section_number) -> None:
+    """
+    The stop phetFences.stop rules (#674): a simulation a page shows is not
+    on this computer and could not be downloaded. Says which, on which page,
+    in the words the apps lift (keptDownloads.stop), prints the marker the
+    trail reads, and exits 1 before Quartz runs, so the site built last
+    stays as it was and no site is made without the simulation.
+    """
+    print()
+    for line in phet.stop_lines(outcome, course_code, section_number):
+        print(line)
+    sys.exit(1)
 
 
 def _count_runner_pages(content_root: Path) -> dict:
@@ -3318,6 +3512,13 @@ BUILD_ID_FILE = ".build-id"
 # by the offer and the visible-pages list, so a reader can tell THIS build's
 # files from an earlier one's (plan review of #379, findings 11 and 14).
 _this_build_id: str | None = None
+
+# Whether this build wrote quartz/plantoir_site_files.json (#901). False
+# only when the write failed: the emitter then reads no page's addresses,
+# the check after the build puts back every file the pages use, and the
+# teacher is told so in one line that says the site is complete
+# (siteFiles.sideFile.whenMissing; 901a fix review, M1).
+_side_file_written: bool = True
 
 
 def _new_build_id() -> str:
@@ -6284,7 +6485,8 @@ def patch_mermaid_pie_colours(mermaid_ts_path: Path):
     and its legend swatch with it.
 
     The palette is SOLVED at render time rather than hardcoded, because
-    Plantoir ships 43 colour schemes and each has a light and a dark mode.
+    Plantoir ships 43 colour schemes (44 entries since #891: Grove Colours
+    is kept under its old id too) and each has a light and a dark mode.
     Fixed blend fractions tuned against one scheme failed 74 of those 86
     combinations — some slices came out barely distinguishable from the
     label text. Instead: build a pool of tints of the scheme's own colours,
@@ -7248,6 +7450,40 @@ def patch_quartz_build_clean(build_ts_path: Path):
     except Exception as e:
         print(f"⚠️ Could not patch quartz/build.ts: {e}")
 
+# The line that tells a preview its site is whole (#901, siteFiles.doneMarker):
+# patches/build.ts carries it, and a section's quartz/build.ts copied before
+# it existed gets it here (ALWAYS section, idempotent).
+EMIT_DONE_PATCH_MARKER = "PLANTOIR-EMIT-DONE"
+_EMIT_DONE_ANCHOR = "  await emitContent(ctx, filteredContent)\n"
+_EMIT_DONE_LINES = (
+    "  // PLANTOIR-EMIT-DONE (#901): every emitter has finished, so the site is whole.\n"
+    "  // A preview's check (scripts/site_files.py) waits for this file before it reads\n"
+    "  // the site, because index.html is written while files are still being copied.\n"
+    "  await (await import(\"fs/promises\")).writeFile(path.join(output, \"..\", \".plantoir-emit-done\"), ctx.buildId).catch(() => {})\n"
+)
+
+
+def patch_quartz_build_done_marker(build_ts_path: Path) -> bool:
+    """Whether the section's quartz/build.ts writes the done marker after its
+    first emit, adding the line when it does not. False when it cannot: the
+    preview then skips the check, since it could not tell a file still being
+    copied from one left out (siteFiles.doneMarker)."""
+    try:
+        src = build_ts_path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if EMIT_DONE_PATCH_MARKER in src:
+        return True
+    if src.count(_EMIT_DONE_ANCHOR) != 1:
+        return False
+    try:
+        build_ts_path.write_text(src.replace(_EMIT_DONE_ANCHOR, _EMIT_DONE_ANCHOR + _EMIT_DONE_LINES, 1),
+                                 encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
 def safe_clean_public_dir(public_dir: Path):
     """
     Safely clean the public output directory before running Quartz build,
@@ -7551,15 +7787,107 @@ def _clear_stale_host_site(host_output_dir: Path, course_code: str, section_numb
     except Exception as error:
         print(f"⚠️  Could not remove the last built website at {stale_public}: {error}")
 
-def _start_public_sync_watcher(output_dir: Path, host_output_dir: Path) -> threading.Thread:
+def _say_now(line: str) -> None:
+    """Print and flush: a preview's check speaks from the watcher thread while
+    the server holds the console."""
+    print(line, flush=True)
+
+
+def _forget_the_done_marker(output_dir: Path) -> None:
+    """Remove an earlier build's done marker, so only this build's is read."""
+    try:
+        (output_dir / site_files.DONE_MARKER).unlink()
+    except OSError:
+        pass
+
+
+def _stop_if_the_follow_limit_was_reached(output_dir: Path, course_code: str, section_number,
+                                          mode: str) -> None:
+    """After Quartz exited non-zero: when the site's emitter stopped it at the
+    follow limit (it writes site_files.FOLLOW_LIMIT_FILE first,
+    siteFiles.followed.limitsRule), say why in a teacher's words, print the
+    marker's stopped line (siteFiles.marker.stoppedRule) and exit 1, so
+    nothing is mirrored, marked or deployed. Otherwise return, and the
+    caller lets Quartz's own failure go on as before. The emitter used to
+    carry every course file here instead, which deployed every answer key
+    with exit 0 (901a's Fable sweep, MUST 2)."""
+    if not site_files.stopped_at_the_follow_limit(output_dir):
+        return
+    for line in site_files.stopped_lines(course=course_code, section=section_number, mode=mode):
+        _say_now(line)
+    sys.exit(1)
+
+
+def _check_the_site_files(output_dir: Path, host_output_dir: Path, course_code: str,
+                          section_number, mode: str) -> bool:
+    """The second reading of which course files the built site carries (#901,
+    scripts/site_files.py): a file a published page needs that is missing is
+    put back and said, one no page names and the site never mentions is
+    taken out, and the marker and the record are written. Runs on the
+    FINISHED build, before the site is mirrored to the host and before it is
+    marked current (plan review 901-3). False when the check itself failed,
+    so the caller leaves the build unmarked and the next deploy builds again."""
+    emitter = assets_emitter_in(output_dir / "quartz.config.ts")
+    try:
+        site_files.after_the_build(output_dir / "public", output_dir / "content", host_output_dir,
+                                   course=course_code, section=section_number, mode=mode,
+                                   emitter=emitter, build_id=_this_build_id or "",
+                                   printer=_say_now, side_file_written=_side_file_written)
+    except Exception as error:
+        _say_now(f"plantoir: error: the built website's files could not be checked ({error}); "
+                 f"it will be built again before it is next deployed.")
+        return False
+    return True
+
+
+def _check_mirror_and_mark(output_dir: Path, host_output_dir: Path, course_code: str,
+                           section_number) -> bool:
+    """A build for deploying, finished: the second reading of which course
+    files the site carries (#901), then the mirror to the host, then the mark
+    that makes the site current (buildFreshness). The check comes first so
+    nothing unchecked reaches the host, and a check that failed leaves the
+    build UNMARKED, so the next deploy builds again rather than sending this
+    site as it is (plan review 901-3). Returns whether a site was mirrored."""
+    checked = True
+    if (output_dir / "public" / "index.html").exists():
+        checked = _check_the_site_files(output_dir, host_output_dir, course_code, section_number, "deploy")
+    if not _sync_public_to_host(output_dir, host_output_dir):
+        return False
+    if checked:
+        _mark_build_finished(host_output_dir)
+    return True
+
+
+def _start_public_sync_watcher(output_dir: Path, host_output_dir: Path,
+                               before_first_mirror=None) -> threading.Thread:
     """
     Start a background daemon thread that periodically syncs public/ to host_output_dir
     when files in public/ are updated.
+
+    With `before_first_mirror` (#901) nothing is mirrored until the build
+    says every emitter has finished (site_files.DONE_MARKER, written by the
+    section's quartz/build.ts): the root index.html is written while the
+    course's files are still being copied, so a check started at its first
+    change would find holes that are only files not copied yet. The check
+    then runs once, on the site the preview's server serves, and the mirror
+    follows it.
     """
+    done_marker = output_dir / site_files.DONE_MARKER
+
     def _watcher():
         last_mtime = None
+        checked = before_first_mirror is None
         while True:
             try:
+                if not checked:
+                    if not done_marker.exists():
+                        time.sleep(0.25)
+                        continue
+                    checked = True
+                    try:
+                        before_first_mirror()
+                    except Exception:
+                        pass
                 index_path = output_dir / "public" / "index.html"
                 if index_path.exists():
                     mtime = index_path.stat().st_mtime
@@ -7797,9 +8125,8 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
     tmp = None
     try:
         tmp = _a_private_temporary_beside(path, ".course_config.")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.write("\n")
+        with open(tmp, "wb") as f:
+            f.write(_settings_file_bytes(data))
         _replace_with_the_mode_of(tmp, path)
         print("✅ Updated course_config.json with discovered items.")
         return True
@@ -7856,9 +8183,102 @@ def _dropping_excluded_items(cfg: dict) -> dict:
     return corrected
 
 
+def _settings_file_bytes(data: dict) -> bytes:
+    """The settings as preflight's write-back writes them: two-space indent,
+    non-ASCII kept, one closing newline. The build's reading takes these bytes
+    when preflight changed the settings, so the copies inside the site are
+    exactly what was written (#999).
+
+    Line ends are the platform's, as the text-mode write this replaced gave
+    (CRLF on Windows), so a file preflight writes is byte for byte what it
+    was before #999. JSON's own escaping means no line end occurs inside a
+    value, so only the breaks between lines change."""
+    text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    return text.replace("\n", os.linesep).encode("utf-8")
+
+
+class BuildSettings:
+    """
+    The one reading of `course_config.json` a build makes (#999).
+
+    A build used to open the file five or more times: to load it, in
+    preflight (again on a retry), to ask whether the course is kept for
+    reference, to copy it into the Quartz folder the site's components
+    import, and to copy it to the output root. A Save landing between two of
+    those gave one build a site of mixed settings: a sidebar from the new
+    file and pages from the old, say. Now the file is read once, at the start,
+    and every later step asks this object.
+
+    `file_bytes` and `config` always describe the same settings: `config` is
+    `file_bytes` parsed, except after preflight's write-back or its
+    reconciled fallback, where `file_bytes` is `config` serialized the way
+    the write-back writes it.
+
+    Preflight's compare-and-swap is the one place the file can be read again:
+    when the file changed while preflight scanned (a rename, which writes at
+    once) and preflight has something to write, it reads the newer file and
+    redoes its discovery rather than erase the rename. That newer reading then
+    becomes this build's one reading for every step after preflight; before
+    preflight only the section check and the How I Teach note had looked.
+    """
+
+    def __init__(self, config: dict, file_bytes: bytes):
+        self.config = config
+        self.file_bytes = file_bytes
+
+    @classmethod
+    def read_from(cls, config_path: Path) -> "BuildSettings":
+        """Read the file once. A file that is not JSON raises, as the build's
+        load always has."""
+        with open(config_path, "rb") as handle:
+            file_bytes = handle.read()
+        config = json.loads(file_bytes.decode("utf-8"))
+        return cls(config, file_bytes)
+
+    @classmethod
+    def from_config(cls, config: dict) -> "BuildSettings":
+        return cls(config, _settings_file_bytes(config))
+
+    def text(self) -> str:
+        """The reading as text, a byte-order mark swallowed the way
+        `reference_course` reads the file."""
+        return self.file_bytes.decode("utf-8-sig")
+
+    def is_frozen(self) -> bool:
+        """Kept for reference, or cannot tell: the build never rewrites a
+        frozen course's files. Asked of this reading, not the file."""
+        settings_text = self.text()
+        if reference_course.is_reference_in(settings_text):
+            return True
+        return reference_course.cannot_tell_from(settings_text)
+
+
 def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path,
                                    _attempt: int = 0) -> dict:
-    """Discover new items and append them to course_config.json. Return updated config dict.
+    """Preflight, for a caller that wants only the settings it ends with.
+    See `preflight_the_build_settings`, which the build itself calls."""
+    settings = _preflight(course_dir, section_dir, config_path, None, _attempt)
+    if settings is None:
+        return {}
+    return settings.config
+
+
+def preflight_the_build_settings(course_dir: Path, section_dir: Path, config_path: Path,
+                                 settings: BuildSettings) -> BuildSettings:
+    """Preflight that starts from the build's own reading rather than opening
+    the file again, and returns the reading every later step uses (#999).
+    A preflight that cannot run hands back the reading it was given."""
+    after = _preflight(course_dir, section_dir, config_path, settings.file_bytes, 0)
+    if after is None:
+        return settings
+    return after
+
+
+def _preflight(course_dir: Path, section_dir: Path, config_path: Path,
+               config_bytes_given, _attempt: int):
+    """Discover new items and append them to course_config.json. Return the
+    BuildSettings it ends with, or None when the settings could not be read.
+    Also: any newly discovered folders are added to the expandable list.
     Also: any newly discovered folders are added to the expandable list.
 
     It NEVER changes `hidden` (issue #265, 2026-09-24). It used to take a
@@ -7895,13 +8315,19 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     # what the config says). It is not add-only — an excluded name is dropped
     # from the copy lists — but that is a function of the same two inputs, so
     # redoing it against newer contents still cannot lose anything.
+    #
+    # The build hands over the bytes it read at its start (#999), so the
+    # first attempt does not open the file again; a retry reads it afresh.
     try:
-        with open(config_path, "rb") as f:
-            config_bytes_when_read = f.read()
+        if config_bytes_given is not None and _attempt == 0:
+            config_bytes_when_read = config_bytes_given
+        else:
+            with open(config_path, "rb") as f:
+                config_bytes_when_read = f.read()
         cfg = json.loads(config_bytes_when_read.decode("utf-8"))
     except Exception as e:
         print(f"❌ Could not read course_config.json for preflight: {e}")
-        return {}
+        return None
 
     # Read current lists (copy so we can mutate safely)
     shared_folders = list(cfg.get("shared_folders", []))
@@ -8051,30 +8477,47 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
                 try:
                     latest = json.loads(config_bytes_now.decode("utf-8"))
                 except Exception:
-                    return cfg
+                    return BuildSettings.from_config(cfg)
                 # Returning the raw file would hand the build a configuration
                 # whose EXCLUSIONS have not been reconciled — and nothing
                 # downstream of preflight consults `excluded_items`, so a folder
                 # the teacher excluded would be published on this build. The
                 # file is still left alone; only what this build is given is
                 # corrected.
-                return _dropping_excluded_items(latest)
+                return BuildSettings.from_config(_dropping_excluded_items(latest))
             print("ℹ️ course_config.json changed while preflight was looking "
                   "(a rename, most likely) — reading it again.")
-            return preflight_update_course_config(
-                course_dir, section_dir, config_path, _attempt + 1
+            return _preflight(
+                course_dir, section_dir, config_path, None, _attempt + 1
             )
         _atomic_write_json_with_backup(config_path, cfg)
-    else:
-        print("ℹ️ No new items discovered; course_config.json unchanged.")
+        # What was written, so the build's copies match the file it left
+        # (and, if the write failed, still match the settings it builds with).
+        return BuildSettings.from_config(cfg)
 
-    return cfg
+    print("ℹ️ No new items discovered; course_config.json unchanged.")
+    return BuildSettings(cfg, config_bytes_when_read)
 # =============================================================================
 
 # === NEW: Fix Netlify static import for course_config.json ====================
-def _copy_course_config_into_quartz(course_dir: Path, output_dir: Path):
+def _write_the_build_settings(destination: Path, settings: BuildSettings):
+    """Put the build's one reading at `destination` (#999), never a fresh copy
+    of the file: a Save since the build started must not reach this site.
+    Left alone when it already holds those bytes."""
+    try:
+        if destination.read_bytes() == settings.file_bytes:
+            return
+    except OSError:
+        pass
+    destination.write_bytes(settings.file_bytes)
+
+
+def _copy_course_config_into_quartz(course_dir: Path, output_dir: Path,
+                                    settings: BuildSettings | None = None):
     """
-    Copy <course_dir>/course_config.json into <output_dir>/quartz/course_config.json.
+    Put the build's settings at <output_dir>/quartz/course_config.json, where
+    the site's components import them. With `settings`, the build's one
+    reading (#999); without, a copy of <course_dir>/course_config.json.
     If missing at the course root, write a minimal default to prevent build errors.
     """
     src = course_dir / "course_config.json"
@@ -8082,7 +8525,10 @@ def _copy_course_config_into_quartz(course_dir: Path, output_dir: Path):
     quartz_dir.mkdir(parents=True, exist_ok=True)
     dst = quartz_dir / "course_config.json"
 
-    if src.exists():
+    if settings is not None:
+        _write_the_build_settings(dst, settings)
+        print(f"✅ Copied course_config.json → {dst.relative_to(output_dir)}")
+    elif src.exists():
         shutil.copy2(src, dst)
         print(f"✅ Copied course_config.json → {dst.relative_to(output_dir)}")
     else:
@@ -8448,7 +8894,7 @@ def _find_curriculum_folders(content_root: Path, configured: list) -> list:
         return found
     # The fallback keeps its pre-#128 answer: a folder holding a LETTER-FIRST
     # code (`A1.1`, the only shape there was) is preferred, and only when none
-    # does is a folder of other codes taken. Without this a scratch LCS course
+    # does is a folder of other codes taken. Without this a scratch two-curricula course
     # whose College Board folder has `1.A` pages silently swapped its Ontario
     # map for College Board's under the same title, because `College Board…`
     # sorts before `Ontario…` (measured on the #128 implementation review).
@@ -10276,8 +10722,11 @@ def build_section_site(
 
     section_dir = course_dir / section_name
 
-    with open(config_file, "r", encoding="utf-8") as f:
-        config = json.load(f)
+    # The build's ONE reading of the settings (#999). Every later step asks
+    # `build_settings` (or `config`, which is its parsed form), never the
+    # file: a Save landing mid-build must not give one site two settings.
+    build_settings = BuildSettings.read_from(config_file)
+    config = build_settings.config
 
     # Validate the requested section number against timetable sections
     allowed_sections = get_allowed_section_numbers(config)
@@ -10301,7 +10750,8 @@ def build_section_site(
             how_i_teach_dropped_places.append(how_i_teach.place_in_the_course(str(name), section_name))
 
     print("\n🔎 Preflight: discovering new shared and per-section items...")
-    config = preflight_update_course_config(course_dir, section_dir, config_file) or config
+    build_settings = preflight_the_build_settings(course_dir, section_dir, config_file, build_settings)
+    config = build_settings.config
     # ========================================================================
 
     # What this course calls a unit, before anything asks what a class page is.
@@ -10423,7 +10873,7 @@ def build_section_site(
         base_scss = output_dir / "quartz" / "styles" / "base.scss"
 
     # ALWAYS: Fix Netlify static import target
-    _copy_course_config_into_quartz(course_dir, output_dir)
+    _copy_course_config_into_quartz(course_dir, output_dir, build_settings)
     _patch_quartz_imports_to_local_config(output_dir / "quartz")
 
     # Apply teacher preference to ContentMeta on each build
@@ -10459,6 +10909,8 @@ def build_section_site(
     install_patched_backlinks(output_dir)
     install_quartz_additions(output_dir)
     patch_quartz_build_clean(output_dir / "quartz" / "build.ts")
+    # #901, ALWAYS: the line that tells a preview its site is whole.
+    emit_done_wired = patch_quartz_build_done_marker(output_dir / "quartz" / "build.ts")
 
     content_root = output_dir / "content"
     if content_root.exists():
@@ -10480,7 +10932,7 @@ def build_section_site(
     # A course kept for reference is last year's, frozen on purpose: the build
     # puts right its site copy (the date pass, #275/#276; the front page's
     # title, #584) but never rewrites its files.
-    frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
+    frozen_course = build_settings.is_frozen()
     copy_the_section_front_page(course_dir, section_dir, content_root, config, section_number,
                                 show_marker, course_code, frozen_course)
 
@@ -10580,6 +11032,16 @@ def build_section_site(
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
     # GeoGebra sketches (#578), ALWAYS, for the same reason.
     geogebra_here = _prepare_geogebra(content_root, output_dir, course_dir, full_rebuild)
+    # PhET simulations (#674), ALWAYS. The one pass here that can STOP a
+    # build: a simulation a page shows that is neither kept nor downloadable
+    # now (phetFences.stop). Before any check is said and before Quartz, so a
+    # stopped build changes nothing.
+    phet_here = _prepare_phet(content_root, output_dir, course_dir, config, course_code, section_number)
+    if phet_here.get("stop"):
+        _stop_for_phet(phet_here, course_code, section_number)
+    downloaded_marker = phet.downloaded_line(phet_here, course_code, section_number)
+    if downloaded_marker is not None:
+        print(downloaded_marker)
     # Runnable code (#455), ALWAYS: which language engines this site carries.
     runner_pages_here = _count_runner_pages(content_root)
     # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into
@@ -10629,6 +11091,8 @@ def build_section_site(
         "quiz_problems": quiz_problems_here,
         # GeoGebra sketches that cannot be shown (#578).
         "geogebra_problems": geogebra.health_finding_facts(geogebra_here),
+        # PhET simulations that cannot be shown (#674).
+        "phet_problems": phet.health_finding_facts(phet_here),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)
@@ -10748,7 +11212,7 @@ def build_section_site(
     # ===========================================================================
 
     # Copy course config into output root (back-compat)
-    shutil.copy2(config_file, output_dir / "course_config.json")
+    _write_the_build_settings(output_dir / "course_config.json", build_settings)
     print("✅ Copied course_config.json to output directory (root copy)")
 
     # Update Quartz layout & footer
@@ -10782,6 +11246,16 @@ def build_section_site(
     
     footer_html = config.get("footer_html", "")
     inject_custom_footer_components(quartz_layout_ts, quartz_footer_tsx, footer_html)
+    # #901, ALWAYS: what the site's emitter reads besides the pages - the files
+    # always carried, the footer's addresses, the places that hold an address
+    # and how a carried file is followed (siteFiles.sideFile).
+    global _side_file_written
+    try:
+        site_files.write_side_file(output_dir / "quartz", footer_html)
+        _side_file_written = True
+    except OSError as error:
+        _side_file_written = False
+        print(f"⚠️  {site_files.rules('words', 'sideFileNotWritten')} ({error})")
 
     # Update page title (now with per-section emoji and optional section marker)
     config_path = output_dir / "quartz.config.ts"
@@ -11000,7 +11474,13 @@ def build_section_site(
         # Static build ONLY (single build)
         print("\n🏗️  Building static site with Quartz → public/")
         safe_clean_public_dir(output_dir / "public")
-        subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1"], cwd=output_dir, env=env, check=True)
+        _forget_the_done_marker(output_dir)
+        site_files.forget_the_follow_limit(output_dir)
+        try:
+            subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1"], cwd=output_dir, env=env, check=True)
+        except subprocess.CalledProcessError:
+            _stop_if_the_follow_limit_was_reached(output_dir, course_code, section_number, "deploy")
+            raise
 
         public_dir = output_dir / "public"
         if not public_dir.exists():
@@ -11012,8 +11492,7 @@ def build_section_site(
         # and they had just built. A build that produced nothing publishable
         # now says so and FAILS, so a publish stops at the build with the
         # reason in front of it instead of at the step that cannot know why.
-        if _sync_public_to_host(output_dir, host_output_dir):
-            _mark_build_finished(host_output_dir)
+        if _check_mirror_and_mark(output_dir, host_output_dir, course_code, section_number):
             # Only now, with the site built and mirrored (#379, finding 11).
             _write_visible_places(host_output_dir, visible_places_here, _this_build_id,
                                   course_code, section_number)
@@ -11067,8 +11546,24 @@ def build_section_site(
             print(f"Preview will be available at: http://localhost:{port}/")
         print(f"\n🚀 Launching Quartz preview on http://localhost:{port}\n")
         safe_clean_public_dir(output_dir / "public")
-        _start_public_sync_watcher(output_dir, host_output_dir)
-        subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
+        _forget_the_done_marker(output_dir)
+        site_files.forget_the_follow_limit(output_dir)
+        # #901: the check runs once the build says it has finished, on the
+        # site the server serves, before the first mirror. A build.ts that
+        # could not be given the done marker skips it (said once).
+        if emit_done_wired:
+            def _check_this_preview():
+                _check_the_site_files(output_dir, host_output_dir, course_code, section_number, "preview")
+            _start_public_sync_watcher(output_dir, host_output_dir, _check_this_preview)
+        else:
+            print("plantoir: error: " + str(site_files.rules("words", "previewNotChecked", optional=True)
+                                            or "this preview's files were not checked."))
+            _start_public_sync_watcher(output_dir, host_output_dir)
+        try:
+            subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
+        except subprocess.CalledProcessError:
+            _stop_if_the_follow_limit_was_reached(output_dir, course_code, section_number, "preview")
+            raise
 
 # How many 10-apart blocks a preview's port is walked through before giving
 # up — the same forty the launchers walk (contracts/app-rules.json ->

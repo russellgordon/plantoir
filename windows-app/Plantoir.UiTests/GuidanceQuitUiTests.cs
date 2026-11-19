@@ -62,14 +62,14 @@ public class GuidanceQuestionAndTheQuitQuestionUiTests
         var quit = Retry.WhileNull(() => QuitQuestion(app), TimeSpan.FromSeconds(10)).Result;
         Assert.NotNull(quit);
         Assert.Null(app.FindOrNull("guidanceAskDialog", TimeSpan.Zero));
-        quit!.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton")).AsButton().Invoke();   // Keep Working
+        quit!.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton")).AsButton().Invoke();   // Cancel, which keeps working
 
         Assert.True(Retry.WhileFalse(() => QuitQuestion(app) is null, TimeSpan.FromSeconds(5)).Result,
                     "the quit question did not go after Keep Working");
         Assert.True(app.Window.IsAvailable, "Keep Working closed the window");
         // Taken down unanswered, so it comes back — on the timer, after the quit question has gone.
         Assert.NotNull(Retry.WhileNull(() => app.FindOrNull("guidanceAskDialog"), TimeSpan.FromSeconds(15)).Result);
-        Assert.Contains(QuitConfirmation.KeepWorking, MenuBar.Trail(app));
+        Assert.Contains("the teacher " + QuitConfirmation.ChoseToKeepWorking, MenuBar.Trail(app));
     }
 
     private static AutomationElement? QuitQuestion(DrivenApp app)

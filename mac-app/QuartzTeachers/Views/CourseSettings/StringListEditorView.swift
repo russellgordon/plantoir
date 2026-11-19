@@ -278,6 +278,7 @@ struct StringListEditorView: View {
             Button("Cancel", role: .cancel) {
                 pendingRemoval = nil
             }
+            .keyboardShortcut(.cancelAction)
         } message: { removal in
             Text(removal.message)
         }
@@ -405,7 +406,7 @@ struct StringListEditorView: View {
                 .accessibilityIdentifier("addField-\(title)")
             HStack {
                 Spacer()
-                Button("Cancel") {
+                Button("Cancel", role: .cancel) {
                     isAddingItem = false
                 }
                 .keyboardShortcut(.cancelAction)
@@ -450,15 +451,14 @@ struct StringListEditorView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let sentence = renameFailure ?? problem {
-                Text(sentence)
+                StatusColour.blocking.sentence(sentence)
                     .font(.callout)
-                    .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("renameProblem")
             }
             HStack {
                 Spacer()
-                Button("Cancel") {
+                Button("Cancel", role: .cancel) {
                     pendingRename = nil
                 }
                 .keyboardShortcut(.cancelAction)

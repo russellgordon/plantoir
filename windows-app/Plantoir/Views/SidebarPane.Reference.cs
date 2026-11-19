@@ -127,7 +127,7 @@ public sealed partial class SidebarPane
 
     /// <summary>
     /// A reference course's SECTION: no assistant, no Schedule Deploy… and no
-    /// Cancel Scheduled Deploy… — the row and the menu bar agree with
+    /// Remove Scheduled Deploy… — the row and the menu bar agree with
     /// <c>subjectMenus</c>, which leaves cancelScheduledDeploy out for a
     /// course kept for reference (#527).
     /// </summary>
@@ -142,7 +142,7 @@ public sealed partial class SidebarPane
     /// refuses itself (<c>keptForReference</c>). That is the mac's arrangement
     /// (<c>ScheduledDeployCleanup</c>): its row has no Cancel either.</para>
     ///
-    /// <para>Until #527 this row kept Cancel Scheduled Deploy…, written when
+    /// <para>Until #527 this row kept Remove Scheduled Deploy… (then titled Cancel), written when
     /// Windows did not yet turn such a schedule off by itself. Since then the
     /// item could only find a task the last read had not removed: one whose
     /// cancel failed (retried on the next read), or one made outside Plantoir

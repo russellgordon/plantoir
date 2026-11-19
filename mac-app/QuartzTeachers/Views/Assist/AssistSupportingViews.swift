@@ -399,9 +399,8 @@ struct AssistDownloadView: View {
                 .accessibilityIdentifier("assistDownloadButton")
 
             if case .failed(let reason) = store.state {
-                Text(reason)
+                StatusColour.blocking.sentence(reason)
                     .font(.callout)
-                    .foregroundStyle(.orange)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }

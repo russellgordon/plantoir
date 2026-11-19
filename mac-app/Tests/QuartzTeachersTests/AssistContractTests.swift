@@ -12,7 +12,9 @@ import XCTest
 ///
 /// Comparison is of PARSED JSON, deliberately, not of bytes. Whitespace and
 /// key order are a formatting argument between two JSON writers; the contract
-/// is the content.
+/// is the content. The one exception is
+/// `testTheCommittedFilesAreWhatTheGeneratorWrites` (#866), which asks a
+/// different question: whether a regeneration would leave a diff at all.
 @MainActor
 final class AssistContractTests: XCTestCase {
 
@@ -71,6 +73,191 @@ final class AssistContractTests: XCTestCase {
                 "contracts/assist-cases.json disagrees about \"\(key)\"." + AssistContractTests.howToFix
             )
         }
+    }
+
+    /// The committed files are byte for byte what `Plantoir --write-contracts`
+    /// writes over them (#866). The tests above compare PARSED JSON on
+    /// purpose, so a generator that only re-ordered keys passed them all,
+    /// and on `dev` 86ae77e53 every run rewrote `app-rules.json` in a
+    /// different order. This runs the real writer on a copy of the three
+    /// generated files and compares the bytes.
+    func testTheCommittedFilesAreWhatTheGeneratorWrites() throws {
+        let scratch: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("contracts-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: scratch)
+        }
+        let names: [String] = [
+            AssistContract.wordingFileName, AssistContract.casesFileName, AppRulesContract.fileName,
+        ]
+        var committed: [String: Data] = [:]
+        for name in names {
+            let data: Data = try Data(contentsOf: AssistContractTests.contractsFolder().appendingPathComponent(name))
+            committed[name] = data
+            try data.write(to: scratch.appendingPathComponent(name))
+        }
+
+        _ = AssistContract.write(into: scratch)
+
+        for name in names {
+            let written: Data = try Data(contentsOf: scratch.appendingPathComponent(name))
+            XCTAssertEqual(
+                written, committed[name],
+                "contracts/\(name) is not byte for byte what the generator writes." + AssistContractTests.howToFix
+            )
+        }
+    }
+
+    /// `ContractText` keeps the committed text of every top-level key whose
+    /// value is unchanged, in its committed order and with its own inner key
+    /// order; writes fresh text only for a changed key; and puts a new key
+    /// where the sorted order would (#866).
+    func testTheWriterKeepsTheTextOfEveryKeyItDoesNotChange() throws {
+        let committedText: String = """
+        {
+          "authored" : {
+            "name" : "a case written by hand",
+            "expect" : true
+          },
+          "generated" : {
+            "keys" : [
+              "readout"
+            ]
+          },
+          "readout" : [
+            "old"
+          ]
+        }
+
+        """
+        let committed: Data = Data(committedText.utf8)
+        var rules: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: committed) as? [String: Any])
+
+        // Nothing changed: no byte changes, and the hand order survives.
+        XCTAssertEqual(try ContractText.encode(rules, keepingTheTextOf: committed), committed)
+
+        // The readout changed and a key arrived: the authored key keeps its
+        // text, the readout is written fresh, the new key goes in sorted place.
+        rules["readout"] = ["new"]
+        rules["between"] = 1
+        let written: String = String(decoding: try ContractText.encode(rules, keepingTheTextOf: committed), as: UTF8.self)
+        let expected: String = """
+        {
+          "authored" : {
+            "name" : "a case written by hand",
+            "expect" : true
+          },
+          "between" : 1,
+          "generated" : {
+            "keys" : [
+              "readout"
+            ]
+          },
+          "readout" : [
+            "new"
+          ]
+        }
+
+        """
+        XCTAssertEqual(written, expected)
+
+        // A second run over that is byte for byte the first.
+        XCTAssertEqual(
+            try ContractText.encode(rules, keepingTheTextOf: Data(written.utf8)), Data(written.utf8)
+        )
+
+        // With no committed file, or one it cannot read, the sorted encoding.
+        XCTAssertEqual(try ContractText.encode(rules, keepingTheTextOf: nil), try AssistContract.encode(rules))
+        XCTAssertEqual(
+            try ContractText.encode(rules, keepingTheTextOf: Data("not json".utf8)), try AssistContract.encode(rules)
+        )
+    }
+
+    /// A GENERATED key is always written in the generator's own text, so a
+    /// hand edit that changed only its spacing or escaping does not survive,
+    /// while the same edit in an AUTHORED key does; and every key the
+    /// committed `generated.keys` names is taken out before the generator's
+    /// values go in, unless the generator does not write it, which is refused
+    /// (#866, the batch review and the Fable sweep).
+    func testAGeneratedKeyIsWrittenInTheGeneratorsTextAndAStaleOneIsRefused() throws {
+        let committedText: String = """
+        {
+          "authored":   {
+            "name" : "a case written by hand"
+          },
+          "generated" : {
+            "keys" : [
+              "readout",
+              "stale"
+            ]
+          },
+          "readout":  [
+            "caf\\u00e9 \\/ bar"
+          ],
+          "stale" : [
+            "left behind"
+          ]
+        }
+
+        """
+        let committed: Data = Data(committedText.utf8)
+        let existing: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: committed) as? [String: Any]
+        )
+
+        // A name in generated.keys the generator does not write is refused,
+        // by name, rather than taken out.
+        XCTAssertThrowsError(try ContractText.withoutGeneratedKeys(existing, generating: ["readout"])) { error in
+            XCTAssertEqual((error as? ContractText.Refusal)?.key, "stale")
+        }
+
+        // What the writers do: take out every key generated.keys names, then
+        // put back the ones the generator still writes.
+        var rules: [String: Any] = try ContractText.withoutGeneratedKeys(existing, generating: ["readout", "stale"])
+        XCTAssertNil(rules["stale"])
+        XCTAssertNil(rules["readout"])
+        XCTAssertNotNil(rules["authored"])
+        rules["readout"] = ["café / bar"]
+        rules["generated"] = ["keys": ["readout"]]
+
+        let written: String = String(
+            decoding: try ContractText.encode(
+                rules, keepingTheTextOf: committed, generatedKeys: ["readout", "generated"]
+            ),
+            as: UTF8.self
+        )
+        let expected: String = """
+        {
+          "authored":   {
+            "name" : "a case written by hand"
+          },
+          "generated" : {
+            "keys" : [
+              "readout"
+            ]
+          },
+          "readout" : [
+            "café / bar"
+          ]
+        }
+
+        """
+        XCTAssertEqual(written, expected)
+
+        // Without naming it generated, the same readout keeps its hand text:
+        // the rule is the caller's list, not the value.
+        var asAuthored: [String: Any] = existing
+        asAuthored.removeValue(forKey: "stale")
+        asAuthored["generated"] = ["keys": ["readout"]]
+        let kept: String = String(
+            decoding: try ContractText.encode(asAuthored, keepingTheTextOf: committed), as: UTF8.self
+        )
+        XCTAssertTrue(kept.contains("\"readout\":  [\n    \"caf\\u00e9 \\/ bar\"\n  ]"), kept)
+
+        // A file with no generated.keys is left as it is.
+        let plain: [String: Any] = ["a": 1]
+        XCTAssertEqual(try ContractText.withoutGeneratedKeys(plain, generating: [])["a"] as? Int, 1)
     }
 
     /// The hand-written half is still there.
@@ -311,6 +498,16 @@ final class AssistContractTests: XCTestCase {
     }
 
     // MARK: - Private
+
+    /// The repository's `contracts/` folder, from this source file's path.
+    private static func contractsFolder() -> URL {
+        return URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QuartzTeachersTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mac-app
+            .deletingLastPathComponent()   // the repository
+            .appendingPathComponent("contracts", isDirectory: true)
+    }
 
     /// The repository's `contracts/` folder, found from this source file's own
     /// path — the test bundle does not carry it, and it must not: the point of

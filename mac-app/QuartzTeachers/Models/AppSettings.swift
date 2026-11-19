@@ -37,6 +37,21 @@ class AppSettings {
         }
     }
 
+    /// The key holding the Cloudflare token's end date (#696).
+    static let cloudflareTokenEndsOnKey: String = "cloudflareTokenEndsOn"
+
+    /// When the saved Cloudflare token ends, as the last check or deploy read
+    /// it from Cloudflare (an ISO 8601 date and time), or empty for none or
+    /// not known. Not a secret: it is what a section's Deploy screen warns
+    /// from without asking Cloudflare each time it opens (#696, review MUST 2).
+    var cloudflareTokenEndsOn: String {
+        didSet {
+            if canRemember {
+                defaults.set(cloudflareTokenEndsOn, forKey: AppSettings.cloudflareTokenEndsOnKey)
+            }
+        }
+    }
+
     /// The key holding which assistant the teacher has asked for.
     static let assistantModelChoiceKey: String = "assistantModelChoice"
 
@@ -176,6 +191,7 @@ class AppSettings {
     init(defaults: UserDefaults = PlantoirDefaults.shared) {
         self.defaults = defaults
         self.cloudflareAccountID = defaults.string(forKey: AppSettings.cloudflareAccountIDKey) ?? ""
+        self.cloudflareTokenEndsOn = defaults.string(forKey: AppSettings.cloudflareTokenEndsOnKey) ?? ""
         let storedChoice: String = defaults.string(forKey: AppSettings.assistantModelChoiceKey) ?? ""
         self.assistantModelChoice = AssistModelChoice(rawValue: storedChoice) ?? .automatic
 

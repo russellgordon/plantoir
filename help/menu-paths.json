@@ -45,8 +45,8 @@
    "mac": "Section \u25b8 Undo Last Change",
    "windows": null
   },
-  "addNextClass": {
-   "mac": "Section \u25b8 Add Next Class",
+  "addClass": {
+   "mac": "Section \u25b8 Add Class\u2026",
    "windows": null
   },
   "publishingAndDeploying": {
@@ -69,8 +69,8 @@
    "mac": "Section \u25b8 Schedule Deploy\u2026",
    "windows": null
   },
-  "cancelDeployAt": {
-   "mac": "Section \u25b8 Cancel Deploy at\u2026",
+  "removeScheduledDeploy": {
+   "mac": "Section \u25b8 Remove Scheduled Deploy\u2026",
    "windows": null
   },
   "reDateClasses": {
@@ -83,6 +83,10 @@
   },
   "classDates": {
    "mac": "Section \u25b8 Class Dates\u2026",
+   "windows": null
+  },
+  "rollOverToANewYear": {
+   "mac": "Section \u25b8 Roll Over to a New Year\u2026",
    "windows": null
   },
   "getReadyForStartOfYear": {
@@ -188,6 +192,10 @@
   },
   "helpReportAProblem": {
    "mac": "Help \u25b8 Report a Problem\u2026",
+   "windows": null
+  },
+  "helpSetUpAnAssistant": {
+   "mac": "Help \u25b8 Set Up an Assistant\u2026",
    "windows": null
   },
   "plantoirCheckForUpdates": {

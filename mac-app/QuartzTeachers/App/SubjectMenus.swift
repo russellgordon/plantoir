@@ -202,16 +202,14 @@ struct SectionMenu: Commands {
         return AppSettings.shared.previewOpensAt
     }
 
-    /// "Cancel Deploy at 6:30 AM…" when it can be used — the context menu's
-    /// own title — and "Cancel Deploy at…" whenever it is greyed, with no
-    /// time (Russell's decision 4): a course kept for reference, a sheet up,
-    /// or nothing scheduled.
+    /// "Remove Scheduled Deploy…", the same whether or not it can be used
+    /// (#987, Russell 2026-11-18: the verb for taking away a scheduled
+    /// deploy is Remove, not Cancel, so the question's own Cancel is not a
+    /// second "cancel"). It was "Cancel Deploy at 6:30 AM…", and "Cancel
+    /// Deploy at…" while greyed; the time is in the question it opens and
+    /// on the sidebar's clock.
     var cancelTitle: String {
-        let canCancel: Bool = SubjectMenuRules.enabledItems(situation).contains(.cancelScheduledDeploy)
-        if canCancel, let scheduledFor = sidebar?.scheduledFor, situation.row == .section {
-            return "Cancel Deploy at \(ScheduledDeploy.timeText(scheduledFor))…"
-        }
-        return "Cancel Deploy at…"
+        return ScheduledDeployRemovalWording.menuItem
     }
 
     // MARK: - Body
@@ -258,9 +256,8 @@ struct SectionMenu: Commands {
             // tools' own code by the section window (`SectionVerbs`) — never
             // through a model, so a teacher who declined the assistant has
             // every one of them. The ellipsis items show the plan before
-            // anything changes; Rebuild Preview, Undo Last Change and Add
-            // Next Class act at once (Russell's decision 11: a new class
-            // page arrives hidden and can be undone).
+            // anything changes; Rebuild Preview and Undo Last Change act
+            // at once.
             item("Publish Pages…", .publishPages, enabled)
             item("Hide Pages…", .hidePages, enabled)
             item("Publish Class for a Date…", .publishClassForADate, enabled)
@@ -276,7 +273,11 @@ struct SectionMenu: Commands {
 
             Divider()
 
-            item("Add Next Class", .addNextClass, enabled)
+            // #897: ONE item whose sheet asks how the class is added — the
+            // next class in this unit, in a new unit, or a copy (Russell,
+            // 2026-11-13 night). It replaces Add Next Class, which had no key
+            // equivalent, so it has none either. An ellipsis: a choice follows.
+            item("Add Class…", .addClass, enabled)
             item("Re-date Classes…", .reDateClasses, enabled)
             item("Make Room for Classes…", .makeRoomForClasses, enabled)
             item("Class Dates…", .classDates, enabled)
@@ -288,6 +289,11 @@ struct SectionMenu: Commands {
 
             Divider()
 
+            // #897 piece B (Russell's ruling): above Get Ready, since the
+            // year's order is the dates and the website, then the drafts.
+            // An ellipsis (a choice and a plan follow); no key; not on the
+            // row's right-click menu, being once a year.
+            item("Roll Over to a New Year…", .rollOverToANewYear, enabled)
             item(StartOfYearWording.menuItem, .getReadyForTheStartOfTheYear, enabled)
             item(StartOfYearWording.undoMenuItem, .undoGettingReady, enabled)
             item(LinksChecklistWording.menuItem, .publishPagesLinksLeadTo, enabled)
@@ -346,7 +352,8 @@ struct SectionMenu: Commands {
             switch item {
             case .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder,
                  .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-                 .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+                 .addClass,
+                 .reDateClasses, .makeRoomForClasses, .classDates, .rollOverToANewYear:
                 site?.perform(item)
             default:
                 sidebar?.perform(item)
