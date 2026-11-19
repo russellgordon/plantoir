@@ -15241,9 +15241,11 @@ the 32/33 split is Windows' own, because there a page held by another
 program is the everyday case and `fileIsInUse` names it. The contract rows
 make the page unreadable through `UndoCurrent.Read`'s seam (access denied),
 so they run under any token; a real deny-read ACE is
-`APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow`, skipped,
-saying why, where the account's token reads past it (an administrator's
-over SSH), the convention of `DenyBitesFact`.
+`APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow`. It runs
+and passes over SSH on the PC (run `899u2b-win-11`): a deny ACE on READING
+a file stops the administrator's token there, unlike a deny on LISTING a
+folder, which it passes (`DenyBitesFact`). Its `DenyReadBitesFact` probe
+still skips it, saying why, on any account whose token reads past it.
 
 **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
 .NET 9, the system NTFS volume, other agents of the run sharing the CPU, so

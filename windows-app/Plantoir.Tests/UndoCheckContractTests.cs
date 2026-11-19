@@ -99,8 +99,9 @@ public sealed class UndoCheckContractTests : IDisposable
     /// <see cref="UndoCurrent.Read"/>'s seam, so every case runs under any
     /// token. A real ACL that denies reading is
     /// <see cref="APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow"/>,
-    /// skipped where an administrator's token over SSH reads past it (the W5
-    /// review's note).
+    /// which runs over SSH on the PC too (a deny on reading a file stops the
+    /// administrator's token there, where a deny on listing a folder does
+    /// not) and skips, saying why, on any token that reads past it.
     /// </summary>
     private static UndoCurrent ReadAsTheCaseHasIt(JsonElement checkCase, string path)
     {
@@ -380,8 +381,9 @@ public sealed class UndoCheckContractTests : IDisposable
     /// The <c>cannotBeRead</c> rows through a real deny ACE on the page, not
     /// the seam: reading denied to this account reaches the mapping as
     /// access denied (5), <c>cannotTell</c> both ways, and the step is refused
-    /// <c>cannotTellNow</c> naming the page. Skipped, saying why, where this
-    /// account's token reads past a deny ACE (an administrator's over SSH);
+    /// <c>cannotTellNow</c> naming the page. Runs over SSH on the PC
+    /// (measured 2026-11-19); skipped, saying why, where this account's token
+    /// reads past a deny ACE;
     /// <see cref="EveryCheckCase"/> covers the rows through the seam there.
     /// </summary>
     [DenyReadBitesFact]

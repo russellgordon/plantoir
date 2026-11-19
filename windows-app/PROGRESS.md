@@ -17,7 +17,7 @@ Read this first; the dated entries below are history, newest first, and an earli
 Branch `issue/899-u2b-op-kinds` (the mac's U2b, with `dev` merged in). Lenovo 20QES70500 over SSH.
 
 - Held on the named-gap ledger against #899 for W6 (the six op kinds and `recompute` run): 60 `checkCases`, 19 `stackCases`, 15 traces. Each held row must still fail for its named gap and fails the day it passes, proved on a real held row of each kind; a check case whose `current` cannot be placed yet is judged on a placeholder while its op cannot be read, so the nine such rows that expect `notReadable` are met, not held (the review's MEDIUM). The 15 held traces are asserted only to their first `move` (002, 012 and 020 check nothing): coverage W6 restores. `documentation/12-windows-app.md` → "What U2b's rows met here".
-- Built (W1's part): a page that cannot be read for any reason but a sharing or lock violation is `cannotTell` (refused `cannotTellNow`, list kept), the contract's two `cannotBeRead` rows on known kinds. Pinned before content missing; a real deny-read ACE test skips over SSH.
+- Built (W1's part): a page that cannot be read for any reason but a sharing or lock violation is `cannotTell` (refused `cannotTellNow`, list kept), the contract's two `cannotBeRead` rows on known kinds. Pinned before content missing; a real deny-read ACE test, which runs and passes over SSH on the PC (`899u2b-win-11`).
 
 ## 2026-11-14 — Undo and Redo, step 8: was what a move takes back already deployed? (#899 piece W5, #949)
 
