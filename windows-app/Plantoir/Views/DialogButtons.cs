@@ -55,11 +55,31 @@ public static class DialogButtons
     /// alert and not just automatically press Return to dismiss it, avoid
     /// making any button the default button."
     /// <c>QuestionDialogScanTests</c> holds every question to this helper.
+    /// <para>The go-ahead never holds the focus at all, even for an instant
+    /// (#979 review): until the dialog has opened, its Primary button is not a
+    /// tab stop (a style based on its own), so WinUI's first focus, which
+    /// takes the first focusable button in the row, lands on Close itself.
+    /// An Enter already queued when the dialog appears then presses Cancel.
+    /// Once it is open the go-ahead's own style comes back, and Tab reaches it
+    /// as before. The focus is then put on Close again, in case the content
+    /// took it. Event-driven, no timed wait. Call this after anything that
+    /// sets the Primary button's style (<see cref="EnablePrimary"/>).</para>
     /// </remarks>
     public static void AskWithNoDefault(ContentDialog dialog)
     {
         dialog.DefaultButton = ContentDialogButton.None;
-        dialog.Opened += (sender, _) => FocusTheCloseButton(sender);
+        Style? goAheadStyle = dialog.PrimaryButtonStyle;
+        var untilOpen = new Style(typeof(Button))
+        {
+            BasedOn = goAheadStyle ?? (Style)Application.Current.Resources["DefaultButtonStyle"],
+        };
+        untilOpen.Setters.Add(new Setter(Control.IsTabStopProperty, false));
+        dialog.PrimaryButtonStyle = untilOpen;
+        dialog.Opened += (sender, _) =>
+        {
+            sender.PrimaryButtonStyle = goAheadStyle;
+            FocusTheCloseButton(sender);
+        };
     }
 
     /// <summary>Put the focus on the dialog's Close button, the one Escape presses.</summary>

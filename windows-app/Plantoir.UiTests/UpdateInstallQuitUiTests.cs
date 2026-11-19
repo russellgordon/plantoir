@@ -151,7 +151,7 @@ public class UpdateInstallQuitUiTests
     /// <c>.signature</c> and the download's <c>sparkle:signature</c>), with a
     /// throwaway key. Plain TCP, so it binds without a URL reservation.
     /// </summary>
-    private sealed class SignedFeed : IDisposable
+    internal sealed class SignedFeed : IDisposable
     {
         private static readonly byte[] Seed = Enumerable.Range(7, 32).Select(i => (byte)i).ToArray();
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
@@ -161,7 +161,7 @@ public class UpdateInstallQuitUiTests
         public string FeedUrl { get; }
         public string PublicKey { get; } = Convert.ToBase64String(Chaos.NaCl.Ed25519.PublicKeyFromSeed(Seed));
 
-        public SignedFeed(string version, string installerName, byte[] installer)
+        public SignedFeed(string version, string installerName, byte[] installer, bool important = false)
         {
             _listener.Start();
             string root = $"http://127.0.0.1:{((IPEndPoint)_listener.LocalEndpoint).Port}/";
@@ -171,7 +171,7 @@ public class UpdateInstallQuitUiTests
                 "<rss version=\"2.0\" xmlns:sparkle=\"http://www.andymatuschak.org/xml-namespaces/sparkle\"><channel><title>Plantoir</title>\n" +
                 $"<item><title>Plantoir {version}</title><description>New in {version}</description><sparkle:version>{version}</sparkle:version>" +
                 $"<enclosure url=\"{root}{installerName}\" sparkle:version=\"{version}\" length=\"{installer.Length}\" " +
-                "sparkle:os=\"windows\" type=\"application/octet-stream\" sparkle:criticalUpdate=\"false\" " +
+                $"sparkle:os=\"windows\" type=\"application/octet-stream\" sparkle:criticalUpdate=\"{(important ? "true" : "false")}\" " +
                 $"sparkle:signature=\"{Sign(installer)}\" /></item>\n" +
                 "</channel></rss>";
             byte[] feedBytes = Encoding.UTF8.GetBytes(feed);

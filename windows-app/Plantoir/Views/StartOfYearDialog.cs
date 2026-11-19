@@ -146,10 +146,15 @@ public static class StartOfYearDialog
             PrimaryButtonText = StartOfYearWording.UndoButton,
             CloseButtonText = "Cancel",
             // The mac's undo sheet: Undo is the default while it would put a
-            // page back (.defaultButton(isEnabled: !putBack.isEmpty)), and a
-            // Cancel is never the default (#979).
+            // page back (.defaultButton(isEnabled: !putBack.isEmpty)), and
+            // greyed otherwise; a Cancel is never the default (#979).
             DefaultButton = ContentDialogButton.Primary,
         };
+        // And Undo cannot be pressed when nothing would go back, as on the mac
+        // (its isEnabled; the #979 review): pressing it then changed nothing
+        // and only ended the undo. EnablePrimary first, since the helper keeps
+        // the button's style as it finds it.
+        DialogButtons.EnablePrimary(dialog, wouldPutBack.Count > 0);
         if (wouldPutBack.Count == 0) DialogButtons.AskWithNoDefault(dialog);
         AutomationProperties.SetAutomationId(dialog, "startOfYearUndoDialog");
         if (await show(dialog) != ContentDialogResult.Primary || folderMovedMeanwhile()) return null;

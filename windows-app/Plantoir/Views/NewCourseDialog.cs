@@ -115,7 +115,6 @@ public sealed class NewCourseDialog : ContentDialog
     private readonly CourseNameCatalog _nameCatalog;
     private readonly TextBlock _gradeWarningSlot;
     private bool _started;
-    private bool _escapeWatched;
 
     // Starting Content (rows 92–94, 130): the ready-made pages and their
     // toggles, plus the terminology switch for the factory structure.
@@ -259,33 +258,28 @@ public sealed class NewCourseDialog : ContentDialog
         // it takes no Enter: as the default from the start, an Enter typed in
         // the code field created a course named by the code with the rest of
         // the form unread (#491 item 2, measured on the mac 2026-10-08). It
-        // wears the accent while it can be pressed (RefreshCreateEnabled).
+        // wears the accent only while it is the default (RefreshCreateEnabled;
+        // the #979 review, as #987 on the mac).
         DefaultButton = ContentDialogButton.None;
         PrimaryButtonClick += OnPrimaryButton;
         // The cursor starts in Course code, as on the mac and as Copy a Page
         // opens; the suggestion list stays closed until something is typed.
-        Opened += (_, _) =>
+        Opened += (_, _) => _codeBox.Focus(FocusState.Programmatic);
+        // Escape does nothing while the course is being made (Russell,
+        // 2026-11-18, on the mac's #987 review); a click on the visible Cancel
+        // still stops it. No key is caught for it (#979 review): WinUI's
+        // Escape closes a ContentDialog with no answer (Result None) whether
+        // or not it has a Close button, so while the work runs Cancel is the
+        // SECONDARY button (BeginProgress), whose click is an answer, and a
+        // close with no answer is refused here. The Windows form of the mac's
+        // .interactiveDismissDisabled(creator.isCreating).
+        Closing += (_, args) =>
         {
-            _codeBox.Focus(FocusState.Programmatic);
-            // Escape does nothing while the course is being made (Russell,
-            // 2026-11-18, on the mac's #987 review); a click on the visible
-            // Cancel still stops it. WinUI's Escape is a press of the Close
-            // button (ContentDialog_Partial.cpp, ExecuteCloseAction), so the
-            // Close button's own click cannot tell the two apart: the key is
-            // withheld from the dialog while QuestionKeys.WizardEscapeIsCancel
-            // says no, and reaches it as before the rest of the time.
-            if (DialogButtons.TemplatePart(this, "LayoutRoot") is { } layoutRoot && !_escapeWatched)
-            {
-                _escapeWatched = true;
-                layoutRoot.PreviewKeyDown += (_, args) =>
-                {
-                    // The code list's own Escape is the code field's (PickerEscape), further in.
-                    if (args.Key == Windows.System.VirtualKey.Escape
-                        && !QuestionKeys.WizardEscapeIsCancel(suggestionsAreShown: false, isCreating: _creator.IsCreating))
-                        args.Handled = true;
-                };
-            }
+            if (args.Result == ContentDialogResult.None
+                && !QuestionKeys.WizardEscapeIsCancel(suggestionsAreShown: false, isCreating: _creator.IsCreating))
+                args.Cancel = true;
         };
+        SecondaryButtonClick += OnCancelWhileMaking;
         CloseButtonClick += OnCloseButton;
         // The list being drawn or put away changes whether Create Course takes Enter.
         _codeBox.RegisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, (_, _) => RefreshCreateEnabled());
@@ -411,7 +405,7 @@ public sealed class NewCourseDialog : ContentDialog
         DialogButtons.EnablePrimary(this, canCreate,
             QuestionKeys.CreateCourseIsTheDefault(formIsComplete, _codeBox.IsSuggestionListOpen)
                 ? PrimaryKind.TakesEnterWhenEnabled
-                : PrimaryKind.NeverTakesEnter);
+                : PrimaryKind.NotTheDefaultYet);
     }
 
     /// <summary>
@@ -1508,6 +1502,16 @@ public sealed class NewCourseDialog : ContentDialog
         if (_creator.IsCreating) _creator.Runner.StopByUser();
     }
 
+    /// <summary>
+    /// Cancel while the course is being made: the Secondary button then
+    /// (BeginProgress), so its click is an answer the Closing rule lets
+    /// through, where Escape's close with no answer is refused.
+    /// </summary>
+    private void OnCancelWhileMaking(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+    {
+        if (_creator.IsCreating) _creator.Runner.StopByUser();   // StopByUser, as OnCloseButton says why
+    }
+
     private async System.Threading.Tasks.Task StartCreation()
     {
         string code = CourseCodeValidator.Normalize(_codeBox.Text);
@@ -1572,14 +1576,18 @@ public sealed class NewCourseDialog : ContentDialog
         // reflows; it becomes usable once the work ends.
         PrimaryButtonText = "Close";
         DialogButtons.EnablePrimary(this, false);
-        CloseButtonText = "Cancel";
+        // Cancel moves to the Secondary button while the work runs (#979
+        // review), in the same place in the footer: its click is an answer,
+        // and the Closing rule refuses Escape's close with none.
+        CloseButtonText = "";
+        SecondaryButtonText = "Cancel";
     }
 
     private void FinishProgress()
     {
         // The work is over and nothing is left to type: Close is the default now.
         DialogButtons.EnablePrimary(this, true);
-        CloseButtonText = "";
+        SecondaryButtonText = "";
     }
 
     private void ShowValidation(string message)

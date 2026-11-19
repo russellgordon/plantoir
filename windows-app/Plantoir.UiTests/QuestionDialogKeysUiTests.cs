@@ -113,12 +113,44 @@ public class QuestionDialogKeysUiTests
             Assert.True(asked is not null, "Delete on a course row asked nothing");
             Assert.Equal("Remove ICS3U?", asked!.Name);
             AssertTheFocusStartsOnCancel(asked, "Remove ICS3U?");
+            // The go-ahead is held out of the tab order only until the dialog
+            // is open (DialogButtons.AskWithNoDefault): Tab still reaches it.
+            var remove = asked.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"));
+            Assert.True(remove is not null && Retry.WhileFalse(() => remove.Properties.IsKeyboardFocusable.ValueOrDefault,
+                                                               TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result,
+                        "Remove could not be reached with the keyboard once the question was open");
 
             Press(app, key);
             Assert.True(Retry.WhileFalse(() => app.OpenDialog() is null, Patience, TimeSpan.FromMilliseconds(200)).Result,
                         $"{key} left Remove ICS3U? up");
             Thread.Sleep(1000);
             Assert.True(app.FindOrNull("sidebar-ICS3U", TimeSpan.FromSeconds(3)) is not null, $"{key} removed ICS3U");
+        }
+    }
+
+    /// <summary>
+    /// An Enter typed straight after Delete, before the question has finished
+    /// opening, presses Cancel and never Remove: the go-ahead is no tab stop
+    /// until the dialog is open, so WinUI's own first focus is Cancel (the
+    /// #979 review's LOW on AskWithNoDefault). A race by nature: a pass on
+    /// the old code proves nothing, a failure here always means Enter removed.
+    /// </summary>
+    [UiFact]
+    public void AnEnterQueuedBehindDeleteNeverRemovesTheCourse()
+    {
+        using var app = new DrivenApp(ReferenceCourseUiTests.WriteCourses);
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            app.SelectCourse("ICS3U");
+            CopyAPageEscapeUiTests.Front(app);
+            Keyboard.Type(VirtualKeyShort.DELETE);
+            Keyboard.Type(VirtualKeyShort.RETURN);
+            Thread.Sleep(1500);
+            if (app.OpenDialog() is not null) Press(app, VirtualKeyShort.ESCAPE);
+            Assert.True(Retry.WhileFalse(() => app.OpenDialog() is null, Patience, TimeSpan.FromMilliseconds(200)).Result,
+                        "the question stayed up");
+            Assert.True(app.FindOrNull("sidebar-ICS3U", TimeSpan.FromSeconds(3)) is not null,
+                        $"an Enter queued behind Delete removed ICS3U (attempt {attempt + 1})");
         }
     }
 
@@ -184,6 +216,10 @@ public class QuestionDialogKeysUiTests
                     "Create was pressed but the wizard never started work");
 
         bool stillMaking = !app.Find("PrimaryButton", "the wizard's closing button").IsEnabled;
+        // While the work runs Cancel is the Secondary button (the #979
+        // review's route): no Close button, so nothing for Escape to press.
+        Assert.Equal("Cancel", app.Find("SecondaryButton", "the wizard's Cancel while the course is being made").Name);
+        app.AssertAbsent("CloseButton", "a Close button while the course is being made");
         Press(app, VirtualKeyShort.ESCAPE);
         Assert.True(stillMaking, "the course was made before Escape could be pressed, so this run proves nothing");
         Assert.True(app.FindOrNull("newCourseDialog", TimeSpan.FromSeconds(1)) is not null,
@@ -196,5 +232,40 @@ public class QuestionDialogKeysUiTests
         Assert.True(Retry.WhileFalse(() => app.FindOrNull("newCourseDialog", TimeSpan.FromMilliseconds(300)) is null,
                                      Patience, TimeSpan.FromMilliseconds(200)).Result,
                     "Escape once the course was made did not close the wizard");
+    }
+
+    /// <summary>
+    /// A click on the visible Cancel still stops the work and closes the
+    /// wizard while the course is being made (Russell, 2026-11-18), now that
+    /// Cancel is the Secondary button then and a close with no answer is
+    /// refused (the #979 review).
+    /// </summary>
+    [UiFact]
+    public void ClickingCancelWhileTheCourseIsBeingMadeStopsItAndClosesTheWizard()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        NewCourseWizardUiTests.OpenWizard(app);
+        NewCourseWizardUiTests.PutCodeIn(app, FreshCode);
+        var create = app.Find("PrimaryButton", "the wizard's Create button");
+        Assert.True(Retry.WhileFalse(() => create.IsEnabled, TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result,
+                    $"Create never became available for {FreshCode}");
+        create.AsButton().Invoke();
+        Assert.True(Retry.WhileNull(() => app.FindOrNull("taskPhaseLabel", TimeSpan.FromMilliseconds(300)),
+                                    TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(100)).Result is not null,
+                    "Create was pressed but the wizard never started work");
+
+        var cancel = app.Find("SecondaryButton", "the wizard's Cancel while the course is being made");
+        bool stillMaking = !app.Find("PrimaryButton", "the wizard's closing button").IsEnabled;
+        cancel.AsButton().Invoke();
+        Assert.True(stillMaking, "the course was made before Cancel could be clicked, so this run proves nothing");
+        Assert.True(Retry.WhileFalse(() => app.FindOrNull("newCourseDialog", TimeSpan.FromMilliseconds(300)) is null,
+                                     Patience, TimeSpan.FromMilliseconds(200)).Result,
+                    "a click on Cancel while the course was being made left the wizard up");
+        // Stopped, not left running behind a closed window: long past the
+        // moment the work would have gone on to write the front page.
+        Thread.Sleep(TimeSpan.FromSeconds(45));
+        Assert.False(File.Exists(Path.Combine(app.WorkspacePath, "courses", FreshCode, "section1", "index.md")),
+                     "the course was still made after Cancel was clicked");
+        Assert.True(app.Window.IsAvailable, "the app went away");
     }
 }

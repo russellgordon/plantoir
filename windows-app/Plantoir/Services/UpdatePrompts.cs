@@ -70,19 +70,12 @@ public sealed class UpdatePrompts : IUpdatePrompts
                 dialog.SecondaryButtonText = UpdateWording.OfferSkip;
                 dialog.CloseButtonText = UpdateWording.OfferLater;
             }
-            else
-            {
-                // #453: no Skip and no Not Now, but never a window the teacher
-                // cannot leave. Esc is handled here rather than trusted to a
-                // dialog with no Close button, so it always closes; it answers
-                // "not now", and the next daily check offers it again.
-                dialog.PreviewKeyDown += (_, key) =>
-                {
-                    if (key.Key != Windows.System.VirtualKey.Escape) return;
-                    key.Handled = true;
-                    dialog.Hide();
-                };
-            }
+            // #453: an important offer has no Skip and no Not Now, but is never
+            // a window the teacher cannot leave. WinUI's Escape closes a
+            // ContentDialog with no answer whether or not it has a Close
+            // button (measured on the Windows VM, #979:
+            // UpdateOfferUiTests), so no key is caught for it; the close
+            // answers "not now", and the next daily check offers it again.
             return dialog;
         });
         return result switch

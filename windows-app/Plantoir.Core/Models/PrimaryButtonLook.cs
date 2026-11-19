@@ -7,14 +7,19 @@ public enum PrimaryKind
     TakesEnterWhenEnabled,
 
     /// <summary>
-    /// Wears the accent while it can be pressed but takes no Enter — the
-    /// new-course wizard's Create Course until its form is complete, and
-    /// while its code list is drawn (<see cref="QuestionKeys.CreateCourseIsTheDefault"/>,
-    /// #979; it never took Enter before). Measured on the mac (2026-10-08):
-    /// as the default from the start, an Enter typed in the Course code field
-    /// created a course named by the code with the rest of the form unread.
+    /// Not the default and no accent, enabled or not: the new-course wizard's
+    /// Create Course while <see cref="QuestionKeys.CreateCourseIsTheDefault"/>
+    /// says no (its form not complete yet, or its code list drawn). The #979
+    /// review, as #987 did on the mac ("The accent comes off while it is not
+    /// the default or cannot be pressed"): a button in the accent that Enter
+    /// does not press looks like the default and is not. Apple's HIG, Buttons:
+    /// the default button is the one drawn prominent, and pressing Return
+    /// activates it. Until #979 this was a kind that wore the accent without
+    /// taking Enter. Measured on the mac (2026-10-08): as the default from
+    /// the start, an Enter typed in the Course code field created a course
+    /// named by the code with the rest of the form unread.
     /// </summary>
-    NeverTakesEnter,
+    NotTheDefaultYet,
 
     /// <summary>
     /// Not the dialog's default at all, enabled or not — All Backups' Delete…,
@@ -52,8 +57,9 @@ public enum DefaultChoice
 /// focusable content that same disabled default loses its accent, initial
 /// focus lands on Close, and Enter dismisses the dialog. So while disabled the
 /// button is NOT the default and carries no accent style; when it can be
-/// pressed it is the default again (or, for <see cref="PrimaryKind.NeverTakesEnter"/>,
-/// wears the accent style without being the default).
+/// pressed it is the default again (or, for <see cref="PrimaryKind.NotTheDefaultYet"/>,
+/// stays plain and not the default). No kind wears the accent without being
+/// the default (#979 review).
 /// </remarks>
 public static class PrimaryButtonLook
 {
@@ -65,7 +71,7 @@ public static class PrimaryButtonLook
     public static Look For(bool enabled, PrimaryKind kind) => kind switch
     {
         PrimaryKind.TakesEnterWhenEnabled => new Look(enabled ? DefaultChoice.Primary : DefaultChoice.None, false),
-        PrimaryKind.NeverTakesEnter => new Look(DefaultChoice.None, enabled),
+        PrimaryKind.NotTheDefaultYet => new Look(DefaultChoice.None, false),
         _ => new Look(DefaultChoice.Keep, false),
     };
 }

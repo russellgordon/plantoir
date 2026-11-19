@@ -30,9 +30,34 @@ public class QuestionDialogScanTests
 
     private static string Relative(string file) => Path.GetRelativePath(AppFolder, file).Replace(Path.DirectorySeparatorChar, '/');
 
-    /// <summary>Every <c>new ContentDialog { … }</c> initialiser in a file, as text.</summary>
-    private static IEnumerable<string> Initialisers(string text) =>
-        Regex.Matches(text, @"new\s+ContentDialog\s*\{.*?\n\s*\}", RegexOptions.Singleline).Select(match => match.Value);
+    /// <summary>
+    /// Every ContentDialog initialiser in a file, as text: <c>new ContentDialog { … }</c>
+    /// (with or without <c>()</c>), and a target-typed <c>new() { … }</c> where the type
+    /// is ContentDialog, as UpdatePrompts' <c>Plain</c> builds one (the #979 review).
+    /// </summary>
+    internal static IEnumerable<string> Initialisers(string text) =>
+        Regex.Matches(text,
+                @"(new\s+ContentDialog\s*(\(\s*\))?|ContentDialog\??\s+\w+\s*(\([^)]*\))?\s*(=>|=)\s*new\s*\(\s*\))\s*\{.*?\n\s*\}",
+                RegexOptions.Singleline)
+            .Select(match => match.Value);
+
+    [Fact]
+    public void TheScanSeesEveryWayADialogIsBuilt()
+    {
+        const string Built =
+            "var first = new ContentDialog\n{\n    Title = \"One\",\n};\n" +
+            "var second = new ContentDialog()\n{\n    Title = \"Two\",\n};\n" +
+            "private static ContentDialog Plain(string title, string text) => new()\n{\n    Title = title,\n};\n" +
+            "ContentDialog fourth = new()\n{\n    Title = \"Four\",\n};\n" +
+            "var notADialog = new TextBlock\n{\n    Text = \"Five\",\n};\n";
+        var found = Initialisers(Built).ToList();
+        Assert.Equal(4, found.Count);
+        Assert.Contains(found, dialog => dialog.Contains("Title = title"));
+        Assert.DoesNotContain(found, dialog => dialog.Contains("Five"));
+        // And on the real file the review named.
+        string prompts = File.ReadAllText(Path.Combine(AppFolder, "Services", "UpdatePrompts.cs"));
+        Assert.Contains(Initialisers(prompts), dialog => dialog.Contains("CloseButtonText = UpdateWording.OkButton"));
+    }
 
     /// <summary>A Close button that cancels: titled Cancel, or by a wording key that names it so.</summary>
     private static readonly Regex CancellingClose =
@@ -115,7 +140,12 @@ public class QuestionDialogScanTests
     {
         string helper = File.ReadAllText(Path.Combine(AppFolder, "Views", "DialogButtons.cs"));
         Assert.Contains("dialog.DefaultButton = ContentDialogButton.None;", helper);
-        Assert.Contains("dialog.Opened += (sender, _) => FocusTheCloseButton(sender);", helper);
+        Assert.Contains("FocusTheCloseButton(sender);", helper);
+        // The go-ahead is no tab stop until the dialog is open, so WinUI's own
+        // first focus is Close and a queued Enter cannot press the go-ahead.
+        Assert.Contains("untilOpen.Setters.Add(new Setter(Control.IsTabStopProperty, false));", helper);
+        Assert.Contains("dialog.PrimaryButtonStyle = untilOpen;", helper);
+        Assert.Contains("sender.PrimaryButtonStyle = goAheadStyle;", helper);
         Assert.Contains("TemplatePart(dialog, \"CloseButton\") is Control close", helper);
     }
 
@@ -143,5 +173,52 @@ public class QuestionDialogScanTests
         Assert.Contains("QuestionKeys.CreateCourseIsTheDefault(", wizard);
         Assert.Contains("QuestionKeys.WizardEscapeIsCancel(", wizard);
         Assert.Contains("AutoSuggestBox.IsSuggestionListOpenProperty", wizard);
+    }
+
+    /// <summary>
+    /// Escape is held back while the course is being made by no key catcher
+    /// (the #979 review: one on the template's LayoutRoot was a hidden key
+    /// catcher): Cancel is the Secondary button while the work runs, so its
+    /// click is an answer, and Closing refuses a close with none, the
+    /// Windows form of the mac's <c>.interactiveDismissDisabled(creator.isCreating)</c>.
+    /// Pressed for real in <c>QuestionDialogKeysUiTests</c>.
+    /// </summary>
+    [Fact]
+    public void TheWizardHoldsEscapeBackByRefusingTheCloseNotByCatchingTheKey()
+    {
+        string wizard = File.ReadAllText(Path.Combine(AppFolder, "Views", "NewCourseDialog.cs"));
+        Assert.DoesNotContain("LayoutRoot", wizard);
+        Assert.Matches(@"Closing \+= \(_, args\) =>\s*\{\s*if \(args\.Result == ContentDialogResult\.None\s*&& !QuestionKeys\.WizardEscapeIsCancel\(suggestionsAreShown: false, isCreating: _creator\.IsCreating\)\)\s*args\.Cancel = true;", wizard);
+        Assert.Contains("SecondaryButtonClick += OnCancelWhileMaking;", wizard);
+        Assert.Matches(@"CloseButtonText = """";\s*SecondaryButtonText = ""Cancel"";", wizard);
+        // The only Escape the wizard reads is the code field's own (PickerEscape, the list first).
+        Assert.Equal(1, Regex.Matches(wizard, @"\.PreviewKeyDown \+=").Count);
+        Assert.Contains("_codeBox.PreviewKeyDown +=", wizard);
+    }
+
+    /// <summary>
+    /// The important update offer has no Close button, and Escape still closes
+    /// it with no key caught (#453; the #979 review deleted its catcher):
+    /// WinUI closes a dialog with no answer on Escape anyway. Pressed for
+    /// real in <c>UpdateOfferUiTests</c>.
+    /// </summary>
+    [Fact]
+    public void TheUpdateOfferCatchesNoKey()
+    {
+        string prompts = File.ReadAllText(Path.Combine(AppFolder, "Services", "UpdatePrompts.cs"));
+        Assert.DoesNotContain("KeyDown", prompts);
+    }
+
+    /// <summary>
+    /// Undo Getting Ready cannot be pressed when nothing would go back, as on
+    /// the mac (<c>.defaultButton(isEnabled: !putBack.isEmpty)</c>; the #979
+    /// review), and its no-default question is asked after the enablement, so
+    /// the helper keeps the style EnablePrimary chose.
+    /// </summary>
+    [Fact]
+    public void UndoGettingReadyIsGreyedWhenNothingWouldGoBack()
+    {
+        string dialog = File.ReadAllText(Path.Combine(AppFolder, "Views", "StartOfYearDialog.cs"));
+        Assert.Matches(@"DialogButtons\.EnablePrimary\(dialog, wouldPutBack\.Count > 0\);\s*if \(wouldPutBack\.Count == 0\) DialogButtons\.AskWithNoDefault\(dialog\);", dialog);
     }
 }
