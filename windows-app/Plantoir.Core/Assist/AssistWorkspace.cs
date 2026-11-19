@@ -1711,7 +1711,9 @@ public sealed partial class AssistWorkspace
         if (buildReason is not null)
         {
             progress?.Report($"Building Section {section} of {course.Code}…");
-            var ran = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+            // A DEPLOY's build leg: --for-deploy (#828, mac #729).
+            var ran = await _launcher.Run("preview",
+                                          PreviewCommand.BuildOnlyArguments(_folder, course.Code, section, forADeploy: true, nonInteractive: true),
                                           _folder, progress, cancellation);
             if (ran.NeededAnAnswer)
                 // The build leg's question is the deploy's, not a destination's:
@@ -1852,7 +1854,7 @@ public sealed partial class AssistWorkspace
 
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's rebuild");
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+        var build = await _launcher.Run("preview", PreviewCommand.BuildOnlyArguments(_folder, course.Code, section, forADeploy: false, nonInteractive: true),
                                         _folder, progress, cancellation);
         if (build.NeededAnAnswer)
             return new AssistResult(false,
@@ -2040,7 +2042,7 @@ public sealed partial class AssistWorkspace
                 Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined) + " " + note,
                 backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+        var build = await _launcher.Run("preview", PreviewCommand.BuildOnlyArguments(_folder, course.Code, section, forADeploy: false, nonInteractive: true),
                                         _folder, progress, cancellation);
         string declinedTail = declined.Count > 0 ? " " + SettingsCannotBeAddedTo(declined) : "";
         // The build stopped for a question nobody here can answer (#478,
@@ -2305,7 +2307,7 @@ public sealed partial class AssistWorkspace
         if (claim is null)
             return new AssistResult(true, summary + " " + note, backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+        var build = await _launcher.Run("preview", PreviewCommand.BuildOnlyArguments(_folder, course.Code, section, forADeploy: false, nonInteractive: true),
                                         _folder, progress, cancellation);
         if (build.Succeeded) return new AssistResult(true, summary, backup);
         // As in Apply: a question (#478), then one clean sentence (#481, #471).

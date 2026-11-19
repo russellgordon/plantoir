@@ -36,11 +36,10 @@ public class DeployWhileItsSectionDeploysTests
         foreach (var c in cases)
         {
             string wordingKey = c!["assistant"]!.ToString();
-            // A case whose assistant sentence is a named gap - no member yet
-            // (#729's building sentence, #828) or one said in older words
-            // (#835's "scheduled deploy that is still running", #854) - must
-            // still FAIL here; the entry that holds the sentence is the one
-            // that holds the case, so the day it passes the entry is closed.
+            // A case whose assistant sentence is a named gap - no member yet,
+            // or one said in older words (none since #828 and #854 landed) -
+            // must still FAIL here; the entry that holds the sentence is the
+            // one that holds the case, so the day it passes the entry is closed.
             var owed = NamedGapLedger.Holding(NamedGapLedger.AssistWordingKeys, wordingKey)
                        ?? NamedGapLedger.Holding(NamedGapLedger.AssistWordingSaidDifferently, wordingKey);
             if (owed is not null)
@@ -64,6 +63,7 @@ public class DeployWhileItsSectionDeploysTests
 
         string said = MultiDestinationDeployRunner.RefusalAnswer("ICS4U", "2", refusal).Message;
         Assert.Equal(wordingKey == "deployRefusedWhileALaterDeployWorks", refusal.ByALaterDeploy);
+        Assert.Equal(wordingKey == "deployRefusedWhileItsSectionIsBeingBuilt", refusal.ByAnotherBuild);
         var sentence = ContractLoader.LoadJson("assist-wording.json")["wording"]![wordingKey];
         Assert.NotNull(sentence);
         Assert.Equal(sentence!.ToString().Replace("{course}", "ICS4U").Replace("{section}", "2"), said);
@@ -72,34 +72,42 @@ public class DeployWhileItsSectionDeploysTests
     /// <summary>
     /// plantoir-mcp reads the launcher without naming an encoding, so the
     /// cross may arrive as '?' or as mojibake; the markers are ASCII, so the
-    /// refusal and which sentence it calls for are still found.
+    /// refusal and which sentence it calls for are still found. The third
+    /// line is a launcher from before #835 (Windows #854, #868), which a
+    /// working folder plantoir-mcp has not refreshed still prints: it is still
+    /// read as a scheduled deploy's. The last is #828's building line.
     /// </summary>
     [Theory]
-    [InlineData("? ICS4U section 2 is still being deployed by a deploy that was set for later, so it cannot be built until that has finished.", true)]
-    [InlineData("\u00e2\u009d\u0152 ICS4U section 2 is already being deployed, so it cannot be deployed again until that has finished.", false)]
-    public void ACrossThatDidNotSurviveTheConsoleDoesNotHideTheRefusal(string line, bool byALaterDeploy)
+    [InlineData("? ICS4U section 2 is still being deployed by a scheduled deploy that is still running, so it cannot be built until that has finished.", true, false)]
+    [InlineData("\u00e2\u009d\u0152 ICS4U section 2 is already being deployed, so it cannot be deployed again until that has finished.", false, false)]
+    [InlineData("? ICS4U section 2 is still being deployed by a deploy that was set for later, so it cannot be built until that has finished.", true, false)]
+    [InlineData("\u00e2\u009d\u0152 ICS4U section 2 is already being built, so it cannot be deployed until that has finished.", false, true)]
+    public void ACrossThatDidNotSurviveTheConsoleDoesNotHideTheRefusal(string line, bool byALaterDeploy, bool byAnotherBuild)
     {
         var refusal = FailureExplainer.SectionDeployRefusalOf("(The launcher exited with code 1.)\n\nLast output:\n\n" + line + "\n   Nothing was changed.");
         Assert.NotNull(refusal);
         Assert.Equal(byALaterDeploy, refusal!.ByALaterDeploy);
+        Assert.Equal(byAnotherBuild, refusal.ByAnotherBuild);
         // Since #471 the server SAYS the lifted sentence, so whatever the
         // cross arrived as is taken off with it, up to the course code.
         Assert.StartsWith("ICS4U section 2 ", refusal.Sentence);
     }
 
     /// <summary>
-    /// The two sentences, against the contract's own placeholders. Also
+    /// The three sentences, against the contract's own placeholders. Also
     /// asserted in <c>ContractTests.AssistWording_MatchesContract</c>; here as
-    /// well so a failure elsewhere in that long test cannot hide these two.
+    /// well so a failure elsewhere in that long test cannot hide these.
     /// </summary>
     [Fact]
-    public void TheTwoAssistantSentencesAreTheContracts()
+    public void TheThreeAssistantSentencesAreTheContracts()
     {
         var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
         ContractTests.SaidAsTheContract(wording, "deployRefusedWhileALaterDeployWorks",
                                         AssistWording.DeployRefusedWhileALaterDeployWorks("{course}", "{section}"));
         Assert.Equal(wording["deployRefusedWhileItsSectionDeploys"]!.ToString(),
                      AssistWording.DeployRefusedWhileItsSectionDeploys("{course}", "{section}"));
+        Assert.Equal(wording["deployRefusedWhileItsSectionIsBeingBuilt"]!.ToString(),
+                     AssistWording.DeployRefusedWhileItsSectionIsBeingBuilt("{course}", "{section}"));
     }
 
     /// <summary>
@@ -127,14 +135,15 @@ public class DeployWhileItsSectionDeploysTests
     [Fact]
     public void EveryLauncherSentenceCarriesAMarkerTheAppReads()
     {
-        // A sentence the app cannot read yet is held open by its key: #729's
-        // two "already being built" lines (#828) end in words no marker
-        // carries, and #835's "later" lines (#854) name the run in words
-        // LaterDeployMarker does not. Every other sentence is checked as before.
+        // A sentence the app cannot read yet is held open by its key (none
+        // since #828 and #854 landed). Each sentence ends in a marker, names a
+        // scheduled deploy's run exactly when its key is a 'later' one, and
+        // names another build exactly when its key is a 'building' one (#828).
         var sentences = Rule["sentences"]!["launcher"]!.AsObject();
         bool Read(string key, string first) =>
             FailureExplainer.SectionDeployRefusalMarkers.Any(marker => first.EndsWith(marker, StringComparison.Ordinal))
-            && key.StartsWith("later", StringComparison.Ordinal) == first.Contains(FailureExplainer.LaterDeployMarker, StringComparison.Ordinal);
+            && key.StartsWith("later", StringComparison.Ordinal) == first.Contains(FailureExplainer.LaterDeployMarker, StringComparison.Ordinal)
+            && key.StartsWith("building", StringComparison.Ordinal) == first.Contains(FailureExplainer.AnotherBuildMarker, StringComparison.Ordinal);
         var keys = sentences.Select(pair => pair.Key).ToList();
         var deferred = NamedGapLedger.GapsIn(NamedGapLedger.LauncherRefusalSentences, keys,
             sentences.Where(pair => Read(pair.Key, pair.Value!.AsArray()[0]!.ToString())).Select(pair => pair.Key));
@@ -144,6 +153,11 @@ public class DeployWhileItsSectionDeploysTests
             Assert.Contains(FailureExplainer.SectionDeployRefusalMarkers, marker => first.EndsWith(marker, StringComparison.Ordinal));
             Assert.Equal(pair.Key.StartsWith("later", StringComparison.Ordinal),
                          first.Contains(FailureExplainer.LaterDeployMarker, StringComparison.Ordinal));
+            Assert.Equal(pair.Key.StartsWith("building", StringComparison.Ordinal),
+                         first.Contains(FailureExplainer.AnotherBuildMarker, StringComparison.Ordinal));
+            // The marker for the older launcher's 'later' line must not match
+            // any sentence the contract has now.
+            Assert.DoesNotContain(FailureExplainer.OlderLaterDeployMarker, first);
         }
     }
 
@@ -214,6 +228,11 @@ public class DeployWhileItsSectionDeploysTests
         var refusedBuild = Leg(Netlify, false, buildFailed: true, refused: ByALater);
         Assert.Equal(AssistWording.DeployRefusedWhileALaterDeployWorks("ICS4U", "2"),
             MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish("ICS4U", "2", refusedBuild)!.Message);
+
+        // #828 (mac #729): another build of the section was in the way.
+        var refusedByABuild = Leg(Netlify, false, buildFailed: true, refused: new(false, "building", ByAnotherBuild: true));
+        Assert.Equal(AssistWording.DeployRefusedWhileItsSectionIsBeingBuilt("ICS4U", "2"),
+            MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish("ICS4U", "2", refusedByABuild)!.Message);
 
         var brokenBuild = Leg(Netlify, false, buildFailed: true);
         Assert.Equal(AssistWording.CouldNotBuildBeforeDeploying("ICS4U", "2"),
