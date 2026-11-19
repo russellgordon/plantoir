@@ -14593,16 +14593,18 @@ Also owed by 889b, from the surface above and the fixes review:
 
 The mac's journal core is described in `documentation/09-mac-app.md` →
 "Undo and Redo: one list for the app (#899)", with what was measured and
-what was rejected. **Do not start it until U1's fix reviews have cleared**:
-the format changed after U1's two reviews and again after its two fix
+what was rejected. U1 merged into `dev` at cadd8eb11 on 2026-11-14 and the
+`windows` issue for it is #949, so steps 1 to 8 below may be built (this
+paragraph said "do not start it until U1's fix reviews have cleared" until
+then). The format changed after U1's two reviews and again after its two fix
 reviews (Russell's rulings 17 to 20 and the director's rulings on them),
 before any Windows reader existed, so that it would not change again under
-one, and the issue says when that is settled. The third round (2026-11-14)
-changed no byte a v1 line holds: it stated what a reader does with a
-`cleared` line, a `note`'s required keys and a segment with no time, and
-what `rule.deployed` reads. The Fable sweep the same day added four
-sentences a reader needs, with cases, and no byte of a v1 line changed
-either: the second bullet below. Steps 1 to 8 may start once U1 merges.
+one. The third round (2026-11-14) changed no byte a v1 line holds: it stated
+what a reader does with a `cleared` line, a `note`'s required keys and a
+segment with no time, and what `rule.deployed` reads. The Fable sweep the
+same day added four sentences a reader needs, with cases, and no byte of a
+v1 line changed either: the second bullet below. What Windows has built so
+far, and the pieces still to come, are the two sections after this one.
 
 Windows inherits free: the format (`contracts/file-formats.json` →
 `undoJournal`, which a reader is meant to be built from alone), the rule and
@@ -14818,3 +14820,250 @@ name), the primary destination only, a folder counted as always deployed
 (which is what `firstDeployMarkers` says of a folder for the scheduled
 deploy's question, and wrong here), and an answer read from the journal
 (which no deploy writes: every offer case red).
+
+### What Windows has built: W1, reading the journal (#899, #949)
+
+Piece W1 (branch `issue/899-w1-reading-the-journal`, 2026-11-14) is the
+READING half of steps 1, 2 and 4 above. Nothing in it writes a journal,
+takes the lock or changes a page; nothing a teacher sees changed; no menu,
+no switch, no trail line (it makes no teacher-visible behaviour, so rule 5
+has nothing to record), and no tool, description, schema or phrasing of the
+built-in assistant moved. Everything is in `windows-app/Plantoir.Core/Undo/`
+and nothing in the app calls it yet.
+
+- **`UndoFormat`**: one line read with `JsonDocument`, never a typed
+  deserialiser, and never throwing. Bytes are decoded as STRICT UTF-8 (a line
+  that is not is unreadable, and the blob names in its bytes are kept). A
+  line, step or op it cannot read comes back marked unreadable with whatever
+  could be read of its seq and its blob names, so the fold KEEPS it. Every
+  sentence of `unknown`, `eventKeys`, `events.note`, `stepKeys` and `opKinds`
+  is one test in `UndoFormatTests`, the four Fable-sweep sentences included
+  (an unknown `maintainer` and an unknown `holds` are barriers; `madeBy`,
+  `class` and `action.key` are open strings; an unknown key on a known op is
+  ignored; `madeBy` split at its ends).
+- **`UndoFold`**: the lines into steps. `UndoFold.Moves` is the contract's
+  `folding.moves` table as text, and `UndoFoldMovesContractTests` compares it
+  with the JSON row for row (a row the mac adds is red here) and exercises
+  every row, the state each must reach read from the row. A clearing marks a
+  step in flight, which leaves the list when its work ends in done or undone;
+  a barrier with no seq stands between the step numbered by the highest seq
+  before it and the next.
+- **`UndoLimits.Offer`**: what Undo and Redo act on, with the 50 steps and 30
+  days judged when the list is read, the step time as the latest `madeAt`
+  so far, and the moment judged at as the clock or a step time up to a day
+  ahead of it; a newer step in flight refuses both, or greys both when its
+  process is gone and its folder cannot be reached.
+- **`UndoPruning`**: pruning (one oldest run; a dead process's step in flight
+  there closed `unsettled`, a running one stopping the run; nothing for age
+  while the clock is behind the journal) and deletion (segments from the
+  oldest end only; one holding a line this version cannot read kept until its
+  own newest `at`, or the first later segment's, is past 60 days; a blob kept
+  while anything on the list or anything unreadable in a kept segment names
+  it), both as PURE decisions. W2 carries them out under the lock.
+- **`UndoEntries` and `UndoCheck`**: the `editLine` entry model (the block
+  found by `PageVisibilityReader.FenceIndices`, used unchanged, the plan
+  review's L5; the entry rule is the reference model's `Layout`), its pure
+  `Move` in either direction, the state of one op against what is on the disk
+  now, and `UndoCheck.Plan`, the all-or-nothing check of a whole step that
+  works out every file's new bytes and writes nothing. U1's F2 is built in
+  from the start: a line op that cannot be placed is `changedSince`, and a
+  page in the way is reported before missing content.
+- **`UndoCurrent.Read`, and what Windows does with a read that fails.** The
+  check reads asking only to READ and sharing everything
+  (`FileShare.ReadWrite | FileShare.Delete`), never with write or delete
+  access. A page held with no read sharing, a cloud file not available
+  offline or a network error is `CannotReadNow`, and it ends as the
+  contract's `fileIsInUse` ends: refused, named, nothing on the list changed
+  (the plan review's M3). It is NEVER `changedSince`, which would clear the
+  whole list under ruling 13 for a file that was merely busy. The contract
+  has no case for it yet: the tests are named `Proposed_*`, and the proposed
+  authored cases (with a failing staging write and the read-only bit) are a
+  `mac` issue. A holder that shares reading (Word, many editors) does not stop
+  a read, measured (the review's M2): only a swap is refused under it, which
+  is W2's.
+- **`FolderIdentityFile`**: `folder-id` and `computer-id`, written lower case
+  with one LF and no BOM, made exclusively (temp, then `CreateHardLinkW` onto
+  the name, 183 meaning another made it; `FileMode.CreateNew` in one write
+  where there are no links), read leniently, an empty file under ten seconds
+  old by the injected clock a creator at work, a damaged one set aside only
+  while it is still the same file (volume serial and file index) and put back
+  if it holds an identifier.
+- **`UndoJournal`**, an INSTANCE (the plan review's H1): its folder, clock
+  (`System.TimeProvider`, the smallest seam: it is in the BCL, so nothing was
+  added to `Plantoir.Core`'s references), liveness, reach and switch are all
+  constructor arguments, and nothing in `Undo/` is static state. Only the
+  app's start-up will hand it the real state folder (W4). Segments are read
+  with delete sharing; a sharing violation is retried for a bounded time
+  (two seconds in the app, zero in tests) and then the reading is the LAST
+  state read, marked not fresh, never "unreadable" and never reset. Lines are
+  split at LF only (a CR before it is JSON white space); bytes after the last
+  LF are a torn line and are not counted. Liveness is `WorkLease.OwnerIsAlive`'s
+  rule (`UndoJournalChecks.ProcessIsAlive`; `WorkLease.StartMoment` did not
+  need to change); a step with no readable `process` is judged gone for the
+  offer and for pruning, so nothing stays in flight for ever, but
+  `UndoJournalChecks.RecoveryMaySettle` says recovery never settles it (the
+  review's M3, below).
+  Reach is "the folder is at `pathAtTheTime` and its `folder-id` is the
+  step's"; U7 adds the recent folders.
+
+**Walked from the contract, never retyped:** `checkCases` (30, each page
+written to the disk from `text` or `bytesHex` and read back through
+`UndoCurrent.Read`), `folding.moves` (20 rows), `stackCases` (all 46) and
+`undo-traces.json` (all 20 traces, all 612 calls, every `expect`, `head` and
+`redo`, and `afterUndoingAll` and `final` as page hashes, the pages written
+from `utf8Hex`). The stack cases and traces run through `UndoScribe`, a
+TEST-ONLY stand-in for W2's door that appends the lines the contract says a
+door writes; every decision it acts on is the product's (`Offer`, `Plan`,
+`Decide`, `Deletable`, `NextSeq`), and the journal is read back from the disk
+after every line. The traces' writer (`settingEntry`) and the op derivation
+(`line_ops`) are test-only too (`UndoLineOps`), ported from
+`scripts/make_undo_traces.py`; W2 moves the writer into the product as
+`JournaledSetting`. What the scribe does NOT have is everything W2 owns: no
+lock, no staged swap, no flush, one process. Each count is asserted at or
+above its value today, so a list cannot silently fall to zero.
+
+**Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
+.NET 9, the system NTFS volume, other agents of the run sharing the CPU, so
+the spread is wide): a whole read, fold and offer of one segment, by a scratch
+harness outside the gate (`work\899w1\measure`), 11 runs each, the first in a
+fresh process:
+
+| Segment | Steps | First | Then (median, min to max) |
+|---|---|---|---|
+| 1.00 MiB of one-page steps | 1,665 | 413 ms | 253 ms (128 to 302) |
+| 1.04 MiB of 233-page steps | 28 | 119 ms | 95 ms (80 to 106) |
+| 4.00 MiB of one-page steps | 6,642 | 538 ms | 433 ms (386 to 493) |
+| 4.03 MiB of 233-page steps | 109 | 339 ms | 178 ms (126 to 311) |
+
+Linear in the bytes and the lines, and slower than the mac's first reads
+(50.8 ms at 1 MB, 170.9 ms at 4 MB, M4 Pro), which read on from where they
+stopped: W1 reads whole, every time. Reading on (W2a's `UndoStore`) is what
+makes the ordinary step cheap; measure the door's first step against these.
+Scanning every line for blob names, which only an unreadable line needs, was
+made lazy after the first measurement (1 MiB one-page: 281 ms to 253 ms
+median, inside the noise). The undo test classes run in about 25 s together
+(the 20 traces about 19 s alone).
+
+**Must-fail proofs** (each wrong implementation put in place, the filtered
+undo tests run, the file put back and touched; 308 tests in the filter):
+a reader that SKIPS what it cannot read (20 red: format, reading, pruning and
+stack cases); a culture-aware compare (1: the "same title in another Unicode
+form" check case); `File.ReadAllText` for the current page (10: check cases,
+the traces, the ReadWrite-holder test); a failed read taken as changed since
+(5: every `Proposed_*` read test); a clearing that checks its reason (8); a
+step's time as its own `madeAt` only (1: "a clock set back for one step");
+deletion that forgets what an unreadable line keeps (2); a clearing that
+leaves a step in flight alone (6); any `recompute` maintainer read as
+readable (4); the next number counted from readable lines only (4).
+
+**Rejected:** a typed deserialiser (the mac's first bug: it threw and the line
+was skipped); a fourth verdict word of Windows' own for a failed read (M3: the
+contract's `fileIsInUse` already says what happens); probing a page with an
+exclusive open to find holders (M2: every page Obsidian has open would be
+refused); `File.ReadAllText` anywhere in a check (it drops a BOM and replaces
+bad bytes without a word); a culture-aware compare anywhere (it calls a
+precomposed é equal to a decomposed one); a static journal, a static clock or
+a static switch (H1: test classes run in parallel); changing
+`PageVisibilityReader` for the BOM case (L5: its publish-path callers pass
+text with no BOM).
+
+**The implementation review's fixes (2026-11-19).** The review (Opus,
+2026-11-14, `reviews\899-w1-impl-review.md` of the v2.0.0 Windows run)
+found 1 HIGH and 4 MEDIUM; each has a test that failed before its fix:
+
+- **H1, a good `folder-id` set aside.** `SetAside` took the file's identity
+  at the moment of the call and compared the file with itself, so the
+  "still the file inspected" guard always passed, and a good identifier
+  another process had just made could be moved aside and lost (measured by
+  the review: 3,000 of 3,000 moved under a concurrent maker), greying Undo
+  for that folder for good. `Read()` now takes the identity (volume serial,
+  file index) from the SAME handle it read the bytes through, and
+  `SetAside(inspected)` opens the name once with delete access (sharing
+  everything), compares THAT handle with the identity inspected, reads it
+  again, and renames through it (`SetFileInformationByHandle`,
+  `FileRenameInfo`, never replacing). The first fix compared by path and
+  then moved by path, which the review's second round showed still lets
+  another process set the damaged file aside and make a good one between
+  the two, so the good one was moved (and a move back fails once a third has
+  made its own). Through the handle, what is moved is provably the file
+  inspected, wherever it now is. `AFileSetAsideByAnotherProcessBetweenThe
+  CheckAndTheRenameIsNeverTheGoodOne` runs exactly that interleaving
+  through a seam between the check and the rename, and a second seam
+  straight after the rename lets a third process make its own identifier
+  if the name is free. The third maker is what makes the test bite: without
+  it the compare-by-path code moved the good file aside, saw it was not the
+  file inspected and moved it back unharmed, so the test passed with the
+  fix reverted (found by the fix review). With it, that code fails (VM run
+  on 41831de19, 2026-11-19: the name held the third identifier, the good
+  one stranded aside), and the handle rename passes. A creator still writing
+  holds its file with no sharing, so the open fails and nothing moves. The
+  mac's equivalent (compare and rename by descriptor) is #1004, item 1.
+- **M1, a page gone with its drive.** A page whose folder is not there reads
+  `Absent`, which is `changedSince`, and ruling 13 would clear the whole list.
+  `UndoCheck.Plan` takes `folderIsReachable` and asks it again when every page
+  in the way is absent; when the folder cannot be reached the answer is
+  `FolderCannotBeReached` (greyed, nothing cleared). W2's door must pass it.
+  This follows the rule the mac adopts in U2b (#899): a failed read or a
+  folder that cannot be reached is "cannot tell now", refused without
+  clearing the list.
+- **M2, a stale reading.** A reading that is not fresh holds the LAST state
+  read (empty on a first read) beside the segments on the disk now, and
+  deletion decided from that mix made live blobs deletable. Pruning and
+  deletion now take one `UndoReading` (fold and segments from the same read)
+  and decide nothing from one that is not fresh; `UndoJournal.Offer(reading)`
+  greys both Undo and Redo for it rather than saying "Nothing to undo".
+- **M3, a process that cannot be identified.** Judged gone for pruning, which
+  is right, but recovery (W3) writes pages, and a live process of another
+  version might still be swapping files: `RecoveryMaySettle(null)` is false.
+  Proposed to the mac as a `recoveryCases` row.
+- **M4, a `madeAt` that does not parse.** Its time was the oldest moment
+  there is, so it expired at once: no barrier, pruned on the next step. It
+  now does what the mac's `effectiveTimes` does: it carries the previous
+  step's time, or has none, and a step with none never ages out (it stands
+  as a barrier and is not pruned for age). The first fix took the begin's
+  `at`, else the clock, which made that step and every later one never age
+  out; the second round removed it. A `madeAt` (or `at`) with an offset such
+  as `+00:00` IS a moment, read into UTC as the mac's `UndoMoment.date`
+  reads it; before, Windows made such a step unreadable. Settling this for
+  both in the contract is #1004, item 4.
+
+**The mac's U2a read rule**, applied at the same time: a file of the list that
+is there and cannot be opened or read is never an empty or shorter list. A
+segment that cannot be read, a folder that cannot be listed, or a NEWEST
+segment gone since the listing makes the reading not fresh; only an older
+segment pruned since the listing is passed over. A blob that is there and
+cannot be read throws `UndoListUnreadableException` (never content missing,
+which clears the list), and so does a content folder that cannot be listed.
+Neither folder is asked `Directory.Exists` first, which answers false for a
+folder it could not look at: only `DirectoryNotFoundException` is "not
+there". Here Windows is stricter than the mac today: a newest segment gone,
+and these listings, are #1004 items 2 and the closing paragraph.
+`UndoJournal` takes an `open` seam for the tests of each.
+
+**Known differences to KNOW** (not to do): a key twice in one object is read
+as unreadable at that level (JSON does not say which is meant); a
+`writeFile`'s `beforeSha`/`afterSha`, when present, must be 64 lower-case hex
+characters; FAT and exFAT file indexes across a re-open were NOT measured (no
+such volume on this PC), which matters only to W2's reading on.
+
+### The pieces still owed for #899 on Windows, and what each waits for
+
+The plan (`plans/899-plan.md` of the v2.0.0 Windows run) as amended by its
+review: W2 is split in two (M8), and W4 no longer records publish and hide in
+shadow (M1: #949 says Windows records nothing in shadow before U3), so that
+recording and the trail event `undo could not record a step` move to W7.
+
+| Piece | What | Waits for |
+|---|---|---|
+| W2a | `UndoLock` (`LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY` on a `CreateFileW` overlapped handle .NET never binds), `UndoStore` (segments, the LF-only append, the torn line cut inside the lock, reading on, blobs by a no-overwrite rename), pruning and deletion carried out, `UndoJournalLocation` | W1 merged |
+| W2b | `UndoSwap` (the POSIX-semantics rename, `MoveFileEx` only on 87 / not supported; the page's own attributes and creation time copied onto the staged file before its rename; the read-only bit classified; staged files removed on every failure path, F1), `UndoDoor` (step, undo, redo, refusal, clearing, dropping), `JournaledSetting`; `stepCases`, the stack cases and traces through the real door instead of the scribe | W2a merged |
+| W3 | recovery, the refused-swap schedule, `interrupted` and `unsettled` closed, staged files tidied; `recoveryCases`; the kill harness outside the gate; the ledger entry for `undo rolled back` out | W2b merged |
+| W4 | doc 12's step 7 and the scaffolding: where the list lives (following `--state-dir`), `madeBy` from `AssistWorkspace.Surface` (L1), the writer scan | W2a merged; no longer after W3 |
+| W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
+| W6 | the reserved op kinds and running `recompute` | the mac's U2 |
+| W7 | every daily page action through the door, publish and hide recorded (M1), `undo could not record a step` | the mac's U3, and #900 and #927 where they rewrite a writer |
+| W8 | settings (`editJSON`, never `writeFile`, on `course_config.json`), renames, New Course, reference courses; rollover and restore | the mac's U4; #897 B; #909 and #873 |
+| W9 | Delete Backup and Delete Archive to the Recycle Bin | the mac's U5 and Windows' 785a (#912) |
+| W10 | the offer to deploy after an Undo or Redo | the mac's U6, and W5 |
+| W11a | the flip, recovery at a windowed launch, holds, reach, titles, `undo_last_change`'s body, today's three histories retired | the mac's U7; #904/#829 |
+| W11b | Edit ▸ Undo and Redo, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, typing first, the two-process UI test | W11a |

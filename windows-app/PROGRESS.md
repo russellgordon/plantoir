@@ -20,6 +20,14 @@ Branch `issue/899-w5-was-it-deployed`. Lenovo 20QES70500 (i5-8365U, 16 GB, Windo
 - `UndoWebsiteContractTests`: the 18 `deployedCases`, pure and through a real course folder; `Proposed_` tests for what the contract does not say (an unlistable record folder, a fragment's version, a non-page op path, a never-deployed content change, an unknown destination type). Nineteen sabotages each turn named cases red. `documentation/12-windows-app.md` → "Step 8 built: was it deployed?".
 - Ledger: nothing added or removed (no #899 entry exists on `dev` for `deployedCases`, which were unrun rather than red).
 
+## 2026-11-14 — Undo and Redo, W1: the journal READ, folded, limited and checked (#899, #949)
+
+Branch `issue/899-w1-reading-the-journal`. Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200), other agents sharing the CPU. Nothing a teacher sees changed, nothing writes a journal, no trail line, the built-in assistant's surface did not move.
+
+- `Plantoir.Core/Undo/`: `UndoFormat` (lenient, keeps what it cannot read), `UndoFold` (`folding.moves` as text), `UndoLimits.Offer`, `UndoPruning` (pure decisions), `UndoEntries` and `UndoCheck` (a read that fails is never "changed since": it ends as `fileIsInUse`, proposed to the mac), `FolderIdentityFile`, and `UndoJournal`, an instance taking its folder, clock, liveness, reach and switch (no statics). `documentation/12-windows-app.md` → "What Windows has built: W1, reading the journal" and "The pieces still owed for #899 on Windows".
+- Walked from the contract: `checkCases` 30, `folding.moves` 20, `stackCases` 46, all 20 traces and 612 calls (through a test-only stand-in for W2's door, `UndoScribe`). Ten must-fails red and restored.
+- Ledger: no entry added or removed.
+
 ## 2026-11-13 — a deployed folder opened in the browser: the Core (#889 piece 889a, the mac's #850)
 
 Branch `issue/889a-deployed-folder-core`. Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200), other agents sharing the CPU.
