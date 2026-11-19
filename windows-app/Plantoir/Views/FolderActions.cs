@@ -166,44 +166,69 @@ public static class FolderActions
     }
 
     /// <summary>
-    /// The full dance. A running Obsidian keeps its vault list in memory and
-    /// overwrites the registry on exit, so an unknown vault means: note the
-    /// vaults open now, quit it, and — only once it is no longer running —
-    /// seed defaults, patch auto-reveal, register, open every vault that was
-    /// open again, then open the link, this course last. Obsidian does NOT
-    /// bring them back by itself when it is started with a link (measured on
-    /// 1.14.4, #581: closing its windows one by one unmarks all but the last).
-    /// If Obsidian did not close (a question of its own on screen), nothing is
-    /// written under it: the link is opened as it is, the course unregistered.
+    /// Opens a folder's landing page, or <paramref name="page"/> when one is
+    /// named (the How I Teach row and a section's previewed page), in
+    /// Obsidian, registering the course first when Obsidian has never seen it.
+    ///
+    /// <para><b>Never closes Obsidian (#1003, the mac's #995, D21).</b> Until
+    /// #1003 a course a running Obsidian had never seen was registered here by
+    /// quitting it, with every vault it had open, and nobody was asked. Now
+    /// that case hands nothing over and answers false: the route
+    /// (<c>ObsidianOpenRoute</c>) asks "Close Obsidian to open {course}?"
+    /// first, and on Close Obsidian and Open calls
+    /// <see cref="CloseObsidianAndRegister"/>, after which the course IS
+    /// registered and this opens it straight away. The false is also the
+    /// backstop for the one moment the route cannot see: Obsidian started
+    /// between its check and this call.</para>
     /// </summary>
-    public static async Task OpenInObsidian(string revealFolder, string vaultPath, string bundledDefaultsPath,
+    public static Task<bool> OpenInObsidian(string revealFolder, string vaultPath, string bundledDefaultsPath,
                                             string? page = null)
     {
-        // A PAGE, when one is named (the How I Teach row opens the page, not the vault).
         string target = page ?? ObsidianTarget(revealFolder, vaultPath);
         string uri = ObsidianUri(target);
         string? registryJson = ReadObsidianRegistry();
+        bool running = ObsidianIsRunning;
 
         if (FolderIsInRegisteredVault(target, registryJson))
         {
-            if (!ObsidianIsRunning) EnableAutoRevealInLayout(vaultPath);
+            if (!running) EnableAutoRevealInLayout(vaultPath);
             OpenUri(uri);
-            return;
+            return Task.FromResult(true);
         }
+        if (running) return Task.FromResult(false);
+        // Obsidian is not running, so its list can be written without closing
+        // anything: it reads the list fresh when the link starts it.
+        RegisterWithDefaults(vaultPath, bundledDefaultsPath);
+        OpenUri(uri);
+        return Task.FromResult(true);
+    }
 
-        var wereOpen = Plantoir.Core.Models.ObsidianFigureAddOnsOffer.VaultsOpen(ObsidianIsRunning, registryJson);
-        await QuitObsidianAndWait();
-        if (ObsidianIsRunning)
-        {
-            // Never write under a running Obsidian: it would write its own list back over ours.
-            OpenUri(uri);
-            return;
-        }
+    /// <summary>
+    /// The answer Close Obsidian and Open (#1003), and ONLY that answer:
+    /// notes every vault Obsidian's list marks open (the add-ons' reopen's
+    /// rule, <c>ObsidianFigureAddOnsOffer.VaultsOpen</c>, so a hidden
+    /// Obsidian's courses come back too), quits Obsidian and waits, and - only
+    /// once it is gone - seeds the defaults, patches auto-reveal, registers the
+    /// course and opens again what was open. The caller then opens the course
+    /// itself, last. If Obsidian did not close (a question of its own on
+    /// screen), nothing is written under it and nothing is handed to it.
+    /// Answers whether Obsidian closed. The rule is <c>ObsidianClosingRule.CloseAndRegisterAsync</c>.
+    /// </summary>
+    public static Task<bool> CloseObsidianAndRegister(string vaultPath, string bundledDefaultsPath) =>
+        Plantoir.Core.Models.ObsidianClosingRule.CloseAndRegisterAsync(
+            vaultPath,
+            vaultsMarkedOpen: () => Plantoir.Core.Models.ObsidianFigureAddOnsOffer.VaultsOpen(ObsidianIsRunning, ReadObsidianRegistry()),
+            quit: () => QuitObsidianAndWait(),
+            stillRunning: () => ObsidianIsRunning,
+            register: vault => RegisterWithDefaults(vault, bundledDefaultsPath),
+            reopen: paths => ReopenVaults(paths));
+
+    /// <summary>The writes that may happen only while Obsidian is closed: the defaults, auto-reveal, and the course in its list.</summary>
+    private static void RegisterWithDefaults(string vaultPath, string bundledDefaultsPath)
+    {
         SeedObsidianDefaultsIfMissing(vaultPath, bundledDefaultsPath);
         EnableAutoRevealInLayout(vaultPath);
         RegisterVault(vaultPath);
-        await ReopenVaults(wereOpen.Where(path => !Plantoir.Core.Models.ObsidianFigureAddOnsOffer.SamePath(path, vaultPath)).ToList());
-        OpenUri(uri);
     }
 
     private static void OpenUri(string uri)

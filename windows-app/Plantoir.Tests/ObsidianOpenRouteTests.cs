@@ -53,17 +53,46 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         public readonly List<string> Asked = new();
         public string? Carried;
         public string? Defaults;
+        /// <summary>The closing question's answer (#1003): true is Close Obsidian and Open.</summary>
+        public bool ClosingAnswer = true;
+        /// <summary>False: the open finds Obsidian running and hands nothing over, as FolderActions does when Obsidian started after the route's check.</summary>
+        public bool OpenHandsOver = true;
+        /// <summary>Runs while the closing question is up (Obsidian quitting, or coming to know the course, before the answer).</summary>
+        public Action? WhileClosingIsUp;
+        public readonly List<ObsidianClosingRequest> ClosingAskedAbout = new();
 
         public bool IsInstalled() => Installed;
         public bool IsRunning() => Running;
         public string? RegistryText() => Registry;
         public string TargetFor(string folder, string vault) => folder;
-        public Task OpenAsync(string folder, string vault, string? page = null)
+        public Task<bool> OpenAsync(string folder, string vault, string? page = null)
         {
+            if (!OpenHandsOver) return Task.FromResult(false);
             Asked.Add(page is null ? "open " + Path.GetFileName(folder) : "open page " + Path.GetFileName(page));
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
         public Task QuitAndWaitAsync() { Asked.Add("quit"); if (!StaysRunningAfterQuit) Running = false; return Task.CompletedTask; }
+        /// <summary>As the real one: an Obsidian that stays is written nothing; one that goes has the course added, and the reopen starts it again.</summary>
+        public Task<bool> CloseAndRegisterAsync(string vault)
+        {
+            Asked.Add("close and register " + Path.GetFileName(vault));
+            if (StaysRunningAfterQuit) return Task.FromResult(false);
+            Registry = ObsidianFigureAddOnsTests.Registry((vault, true));
+            Running = true;
+            return Task.FromResult(true);
+        }
+        public Task<bool> AskClosingAsync(ObsidianClosingRequest request)
+        {
+            Asked.Add("ask closing");
+            ClosingAskedAbout.Add(request);
+            WhileClosingIsUp?.Invoke();
+            return Task.FromResult(ClosingAnswer);
+        }
+        public Task ShowCouldNotOpenAsync(ObsidianClosingRequest request, ObsidianClosingTrail.Outcome outcome)
+        {
+            Asked.Add("could not open " + outcome);
+            return Task.CompletedTask;
+        }
         public Task ReopenAsync(IReadOnlyList<string> vaultPaths) { Asked.Add("reopen " + string.Join(",", vaultPaths.Select(Path.GetFileName))); return Task.CompletedTask; }
         public async Task<(List<ObsidianFigureAddOn> Needed, List<ObsidianFigureAddOn> WouldAdd)> ScanAsync(string coursePath)
         {
@@ -250,7 +279,17 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         var (world, course, route) = Make();
         world.WhileOfferIsUp = () => { world.Running = true; world.Registry = OpenRegistry(course); };
         await route.OpenAsync(course, course.DirectoryPath);
-        Assert.Equal(new[] { "scan", "offer", "answer Yes", "quit", "reopen ICS3U", "open MPM2D" }, world.Asked);
+        // The button pressed said Add Them, not that Obsidian closes, so the
+        // reopen question asks first (#1003, the mac's #995; sequence step 6).
+        Assert.Equal(new[] { "scan", "offer", "answer Yes", "ask reopen", "quit", "reopen ICS3U", "open MPM2D" }, world.Asked);
+
+        // Later: Obsidian is left alone and the course opens as it is.
+        ObsidianFigureAddOnsThisRun.Forget();
+        var (world2, course2, route2) = Make();
+        world2.ReopenAnswer = false;
+        world2.WhileOfferIsUp = () => { world2.Running = true; world2.Registry = OpenRegistry(course2); };
+        await route2.OpenAsync(course2, course2.DirectoryPath);
+        Assert.Equal(new[] { "scan", "offer", "answer Yes", "ask reopen", "open MPM2D" }, world2.Asked);
     }
 
     // Step 7: with yes and the course closed, add them, then open.
@@ -713,6 +752,189 @@ public sealed class ObsidianOpenRouteTests : IDisposable
             throw new InvalidOperationException("open_in_obsidian reached the server: " + name);
     }
 
+    // ---- #1003 (the mac's #995): never closes Obsidian without asking ----
+
+    /// <summary>A world where Obsidian runs and has never seen the course, and the add-ons are no, so the closing question is the only one.</summary>
+    private (FakeWorld World, Course Course, ObsidianOpenRoute Route) MakeUnseen()
+    {
+        var made = Make(figures: false);
+        made.World.Stored = ObsidianFigureAddOnsAnswer.No;
+        made.World.Running = true;
+        made.World.Registry = ObsidianFigureAddOnsTests.Registry((Path.Combine(_root, "courses", "ICS3U"), true));
+        return made;
+    }
+
+    /// <summary>The route D21 found: nothing is closed or opened until the teacher answers; Cancel leaves both alone.</summary>
+    [Fact]
+    public async Task ARunningObsidianIsNeverClosedForACourseItHasNeverSeen()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.ClosingAnswer = false;
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "ask closing" }, world.Asked);
+        Assert.Equal(course.Code, world.ClosingAskedAbout.Single().Course.Code);
+        Assert.Contains(ObsidianClosingTrail.Line(ObsidianClosingTrail.Outcome.Cancelled, "MPM2D"), TrailText);
+        Assert.Contains("asked to close Obsidian to open a course", TrailText);
+    }
+
+    /// <summary>Close Obsidian and Open closes once, adds the course, and opens what was asked for - here the section.</summary>
+    [Fact]
+    public async Task CloseObsidianAndOpenClosesAddsAndOpens()
+    {
+        var (world, course, route) = MakeUnseen();
+        await route.OpenAsync(course, Path.Combine(course.DirectoryPath, "section1"));
+        Assert.Equal(new[] { "ask closing", "close and register MPM2D", "open section1" }, world.Asked);
+        Assert.Contains(ObsidianClosingTrail.Line(ObsidianClosingTrail.Outcome.Opened, "MPM2D"), TrailText);
+    }
+
+    /// <summary>The scanned route asks too: with the add-ons not asked about and nothing to add, the question still comes before the open.</summary>
+    [Fact]
+    public async Task TheScannedRouteAsksToo()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.Stored = ObsidianFigureAddOnsAnswer.Yes;
+        world.ClosingAnswer = false;
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "scan", "ask closing" }, world.Asked);
+    }
+
+    /// <summary>Nothing is asked where nothing closes: Obsidian not running, or the course already in its list, or held by a larger vault.</summary>
+    [Fact]
+    public async Task NothingIsAskedWhenNothingCloses()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.Running = false;
+        await route.OpenAsync(course, course.DirectoryPath);
+        world.Running = true;
+        world.Registry = ObsidianFigureAddOnsTests.Registry((course.DirectoryPath, true));
+        await route.OpenAsync(course, course.DirectoryPath);
+        world.Registry = ObsidianFigureAddOnsTests.Registry((Path.Combine(_root, "courses"), false));
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "open MPM2D", "open MPM2D", "open MPM2D" }, world.Asked);
+        Assert.DoesNotContain("asked to close Obsidian", TrailText);
+    }
+
+    /// <summary>A list that is there and cannot be read holds nothing, so a running Obsidian is asked about: the safe direction.</summary>
+    [Fact]
+    public async Task AnUnreadableListAsks()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.Registry = "";
+        world.ClosingAnswer = false;
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "ask closing" }, world.Asked);
+    }
+
+    /// <summary>The assistant's press (and any section press) reports that it waits for the answer, and opens nothing.</summary>
+    [Fact]
+    public async Task APressWaitingOnTheClosingQuestionSaysSo()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.ClosingAnswer = false;
+        var fell = new PreviewedPageSource.FellBack(PreviewedPageSource.Fallback.NoPageShowing);
+        var (reported, finished) = route.Press(course, Path.Combine(course.DirectoryPath, "section1"), fell, 1);
+        await finished;
+        Assert.Equal(new OpenInObsidianPress.WaitingForAnAnswer(), await reported);
+        Assert.Equal(new[] { "ask closing" }, world.Asked);
+    }
+
+    /// <summary>While the closing question is up the course is asking, so a second press is told it waits and opens nothing.</summary>
+    [Fact]
+    public async Task WhileTheClosingQuestionIsUpTheCourseIsAsking()
+    {
+        var (world, course, route) = MakeUnseen();
+        bool askingWhileUp = false;
+        world.WhileClosingIsUp = () => askingWhileUp = ObsidianFigureAddOnsThisRun.Asking.Contains(course.DirectoryPath);
+        world.ClosingAnswer = false;
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.True(askingWhileUp);
+        Assert.DoesNotContain(course.DirectoryPath, ObsidianFigureAddOnsThisRun.Asking);
+    }
+
+    /// <summary>Obsidian started between the route's check and the open: nothing is handed over, and the question is asked instead of the press doing nothing.</summary>
+    [Fact]
+    public async Task ObsidianStartingAfterTheCheckStillAsks()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.Running = false;
+        world.OpenHandsOver = false;
+        world.ClosingAnswer = false;
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "ask closing" }, world.Asked);
+    }
+
+    /// <summary>At the answer the situation is read again: Obsidian quit meanwhile, or came to know the course, so it just opens and nothing is closed.</summary>
+    [Fact]
+    public async Task TheAnswerLooksAgainBeforeClosing()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.WhileClosingIsUp = () => world.Running = false;
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "ask closing", "open MPM2D" }, world.Asked);
+        Assert.Contains(ObsidianClosingTrail.Line(ObsidianClosingTrail.Outcome.NotNeeded, "MPM2D"), TrailText);
+
+        var (world2, course2, route2) = MakeUnseen();
+        world2.WhileClosingIsUp = () => world2.Registry = ObsidianFigureAddOnsTests.Registry((course2.DirectoryPath, true));
+        await route2.OpenAsync(course2, course2.DirectoryPath);
+        Assert.Equal(new[] { "ask closing", "open MPM2D" }, world2.Asked);
+    }
+
+    /// <summary>Obsidian did not close: it is handed nothing (it does not know the course), the trail says why, and the alert says so on screen (ruling 2 on #995).</summary>
+    [Fact]
+    public async Task AnObsidianThatDoesNotCloseIsHandedNothingAndTheTeacherIsTold()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.StaysRunningAfterQuit = true;
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "ask closing", "close and register MPM2D", "could not open DidNotClose" }, world.Asked);
+        Assert.Contains(ObsidianClosingTrail.Line(ObsidianClosingTrail.Outcome.DidNotClose, "MPM2D"), TrailText);
+    }
+
+    /// <summary>Obsidian closed but the hand-over still failed (its list could not be written): nothing more is tried, never a second close, and the teacher is told.</summary>
+    [Fact]
+    public async Task AHandOverThatFailsAfterTheCloseIsNotedAndShown()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.WhileClosingIsUp = () => world.OpenHandsOver = false;
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "ask closing", "close and register MPM2D", "could not open NotAdded" }, world.Asked);
+        Assert.Contains(ObsidianClosingTrail.Line(ObsidianClosingTrail.Outcome.NotAdded, "MPM2D"), TrailText);
+    }
+
+    /// <summary>
+    /// How I Teach's page and a course kept for reference open through the
+    /// same question (<see cref="ObsidianOpenRoute.OpenWithoutTheScanAsync"/>),
+    /// without the add-ons scan, and report as a press does.
+    /// </summary>
+    [Fact]
+    public async Task OpeningWithoutTheScanAsksTheSameQuestion()
+    {
+        var (world, course, route) = MakeUnseen();
+        world.Stored = ObsidianFigureAddOnsAnswer.Yes;
+        world.ClosingAnswer = false;
+        string page = Path.Combine(course.DirectoryPath, "How I Teach.md");
+        var report = new TaskCompletionSource<OpenInObsidianPress>();
+        await route.OpenWithoutTheScanAsync(course, course.DirectoryPath, page, null, report);
+        Assert.Equal(new[] { "ask closing" }, world.Asked);
+        Assert.Equal(page, world.ClosingAskedAbout.Single().Page);
+        Assert.Equal(new OpenInObsidianPress.WaitingForAnAnswer(), await report.Task);
+
+        world.ClosingAnswer = true;
+        await route.OpenWithoutTheScanAsync(course, course.DirectoryPath, page);
+        Assert.Equal(new[] { "ask closing", "ask closing", "close and register MPM2D", "open page How I Teach.md" }, world.Asked);
+    }
+
+    /// <summary>The add-ons offer's Add Them, shown while the course is open, closes Obsidian without a second question; the closing question never follows the reopen.</summary>
+    [Fact]
+    public async Task TheAddOnsReopenNeverAsksTheClosingQuestionAfterIt()
+    {
+        var (world, course, route) = Make();
+        world.Running = true;
+        world.Registry = OpenRegistry(course);
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.DoesNotContain("ask closing", world.Asked);
+    }
+
     /// <summary>Every Open in Obsidian route in the app goes through the one function, which goes through this route.</summary>
     [Fact]
     public void EveryRouteIsStillTheOneFunction()
@@ -722,9 +944,10 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         Assert.Contains("ObsidianOpenRoute", menus);
         var direct = Directory.EnumerateFiles(views, "*.cs")
             .Where(f => File.ReadAllText(f).Contains("FolderActions.OpenInObsidian(")).Select(Path.GetFileName).OrderBy(f => f).ToList();
-        // The world itself, the reference route (step 1), and How I Teach's
-        // "open the page" (a page, not Open in Obsidian — as on the mac).
-        Assert.Equal(new[] { "CourseSettingsView.xaml.cs", "ObsidianWorld.cs", "SidebarPane.Reference.cs" }, direct);
+        // The world itself, and nothing else: since #1003 the reference route
+        // (step 1) and How I Teach's page go through the route too, so the
+        // closing question cannot be skipped.
+        Assert.Equal(new[] { "ObsidianWorld.cs" }, direct);
         string section = File.ReadAllText(Path.Combine(views, "SectionDetailView.xaml.cs"));
         Assert.Contains("AfterAPreviewAsync(", section);
     }

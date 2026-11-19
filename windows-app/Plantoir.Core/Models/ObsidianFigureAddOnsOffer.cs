@@ -61,7 +61,8 @@ public static class ObsidianFigureAddOnsWording
     public const string DontAskAgain = "Don't ask again";
     public const string ReopenTitle = "Reopen Obsidian to show diagrams and graphs?";
     public const string ReopenMessage = "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”.";
-    public const string Reopen = "Reopen Obsidian";
+    /// <summary>Russell's ruling 1 on #995 (2026-11-19): the go-ahead says that it closes Obsidian, as every button that closes it does. It was "Reopen Obsidian".</summary>
+    public const string Reopen = "Close and Reopen Obsidian";
     /// <summary>"Not Now" on an offer Plantoir raised by itself (#987; it was "Later").</summary>
     public const string Later = "Not Now";
     public const string PaneTitle = "Obsidian";
