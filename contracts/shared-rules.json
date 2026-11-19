@@ -50175,6 +50175,21 @@
         },
         "direction": "undo",
         "result": null
+      },
+      {
+        "name": "a whole number beyond 2^53 is refused, never written through a double",
+        "file": "{\"k\": 1}",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 12345678901234567890,
+          "after": 1
+        },
+        "direction": "undo",
+        "result": null
       }
     ],
     "editJSONCasesHow": "An editJSON move on the bytes of a file (file-formats.json -> undoJournal.opKinds.editJSON): file is the file's text, op the op (its before and after any JSON, a missing one meaning no such member), direction undo (towards before) or redo (towards after), and result the file's exact text afterwards, or null when the move is refused (as changed since). Both platforms must produce these bytes exactly: only the member's own bytes change, and a new value is spelled compactly with keys sorted.",

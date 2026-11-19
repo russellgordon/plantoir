@@ -325,4 +325,62 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertTrue(UndoMaintainers.canRun(ops))
         XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }), .undone(seq: 1))
     }
+
+    /// The second hard review of U2b, LOW: called from the main actor, the
+    /// async entry points do the journal's work (the lock's wait, the check,
+    /// the swaps) OFF it (`@concurrent`; the project builds with approachable
+    /// concurrency, where a plain nonisolated async function would stay on
+    /// the caller's actor).
+    @MainActor
+    func testTheJournalsWorkRunsOffTheMainActorWhenCalledFromIt() async throws {
+        let made = try UndoContractReplay.scratch(under: scratchURL, named: "offmain")
+        let root: URL = made.root
+        try UndoContractReplay.write("Line one: old.\n", to: "courses/TST1O/notes.md", in: root)
+        let op: UndoOp = UndoOp.replaceText(path: "courses/TST1O/notes.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n")
+        let journal: UndoJournal = UndoJournal(folderURL: made.journalFolder)
+        XCTAssertEqual(JournaledWrite.perform(ops: UndoContractKinds.draft(ops: [op], blobs: [], root: root, action: "editPage"), in: journal, mode: .live), .applied(seq: 1))
+        let seenOnMain: UndoMainThreadFlag = UndoMainThreadFlag()
+        UndoKillPoints.hook = { point in
+            if point == .afterTheCheck {
+                seenOnMain.record(Thread.isMainThread)
+            }
+            return false
+        }
+        defer {
+            UndoKillPoints.hook = nil
+        }
+
+        let outcome: UndoOutcome = await journal.undoNewestAndRederive(resolveRoot: { _ in root })
+
+        XCTAssertEqual(outcome, .undone(seq: 1))
+        XCTAssertEqual(seenOnMain.value, false, "the check ran on the main thread")
+    }
+}
+
+/// Whether a hook saw the main thread, safe to set from any thread.
+final class UndoMainThreadFlag: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    private var seen: Bool? = nil
+
+    private let guardLock: NSLock = NSLock()
+
+    // MARK: - Computed properties
+
+    var value: Bool? {
+        guardLock.lock()
+        defer {
+            guardLock.unlock()
+        }
+        return seen
+    }
+
+    // MARK: - Functions
+
+    func record(_ onMain: Bool) {
+        guardLock.lock()
+        seen = onMain
+        guardLock.unlock()
+    }
 }

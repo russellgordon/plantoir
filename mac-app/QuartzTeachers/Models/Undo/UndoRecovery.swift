@@ -121,6 +121,7 @@ nonisolated enum UndoRecovery {
     /// re-derivation of every step it settled (`UndoMaintainers`). The
     /// runner is awaited on its own actor, so the main actor is never
     /// blocked while the lock is held, and the lock never waits on it.
+    @concurrent
     static func recoverAndRederive(
         _ journal: UndoJournal,
         resolveRoot: @escaping @Sendable (UndoWorkingFolder) -> URL?,

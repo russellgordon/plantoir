@@ -588,7 +588,23 @@ def _scan_object(data, at):
         return None
 
 
+def _exact(value):
+    """A double holds every number exactly as written: no whole number
+    beyond 2^53 (the second hard review of U2b)."""
+    if isinstance(value, bool):
+        return True
+    if isinstance(value, (int, float)):
+        return not (float(value).is_integer() and abs(value) > 9007199254740992)
+    if isinstance(value, list):
+        return all(_exact(element) for element in value)
+    if isinstance(value, dict):
+        return all(_exact(element) for element in value.values())
+    return True
+
+
 def _spell(value):
+    if not _exact(value):
+        return None
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
@@ -621,6 +637,8 @@ def json_bytes_moved(op, backward, data):
                 return data
             value = _spell(op[wanted_key])
             name = _spell(part)
+            if value is None:
+                return None
             if members:
                 tail = members[-1]
                 insert = b"," + tail[5] + name + tail[2] + value
@@ -634,7 +652,10 @@ def json_bytes_moved(op, backward, data):
             start = member[3]
             continue
         if wanted_key in op:
-            return data[:member[3]] + _spell(op[wanted_key]) + data[member[4]:]
+            spelled = _spell(op[wanted_key])
+            if spelled is None:
+                return None
+            return data[:member[3]] + spelled + data[member[4]:]
         position = members.index(member)
         if position + 1 < len(members):
             return data[:member[1]] + data[members[position + 1][1]:]

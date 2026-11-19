@@ -484,6 +484,7 @@ nonisolated enum JournaledWrite {
     /// files, awaited outside the lock (`UndoMaintainers`). In shadow too:
     /// the door made the change itself, so it keeps the files a rule keeps
     /// true itself (the hard review of U2b, LOW c).
+    @concurrent
     static func performAndRederive(
         ops draft: UndoOpsDraft,
         in journal: UndoJournal,

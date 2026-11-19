@@ -1113,6 +1113,7 @@ nonisolated extension UndoJournal {
     /// outside its lock. Any step recovery settled first is re-derived too.
     /// This is the entry point the app uses (U7); `undoNewest` alone never
     /// re-derives.
+    @concurrent
     func undoNewestAndRederive(
         resolveRoot: @escaping @Sendable (UndoWorkingFolder) -> URL? = UndoReach.root,
         places: UndoExternalPlaces = UndoAppPreferences()
@@ -1126,6 +1127,7 @@ nonisolated extension UndoJournal {
     }
 
     /// Redo, then the re-derivation, as `undoNewestAndRederive`.
+    @concurrent
     func redoNewestAndRederive(
         resolveRoot: @escaping @Sendable (UndoWorkingFolder) -> URL? = UndoReach.root,
         places: UndoExternalPlaces = UndoAppPreferences()

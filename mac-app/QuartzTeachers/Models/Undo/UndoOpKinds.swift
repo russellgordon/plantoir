@@ -684,9 +684,36 @@ nonisolated enum UndoJSONBytes {
         return nil
     }
 
+    /// Whether every number in a value is one a double holds exactly as
+    /// written: no whole number beyond 2^53 (the second hard review of U2b).
+    static func isExact(_ value: UndoJSON) -> Bool {
+        switch value {
+        case .number(let number):
+            return !(number.rounded() == number && abs(number) > 9_007_199_254_740_992)
+        case .array(let list):
+            for element in list where !isExact(element) {
+                return false
+            }
+            return true
+        case .object(let members):
+            for (_, element) in members where !isExact(element) {
+                return false
+            }
+            return true
+        default:
+            return true
+        }
+    }
+
     /// A value's bytes, written compactly with keys sorted and slashes as
     /// they are: only the new value is ever spelled by the app.
+    ///
+    /// Nil for a whole number beyond 2^53, which a double cannot hold
+    /// exactly: such a value is refused rather than written approximately.
     static func spell(_ value: UndoJSON) -> [UInt8]? {
+        if !UndoJSONBytes.isExact(value) {
+            return nil
+        }
         let options: JSONSerialization.WritingOptions = [.sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed]
         guard let data = try? JSONSerialization.data(withJSONObject: value.foundation(), options: options) else {
             return nil
@@ -1218,10 +1245,11 @@ nonisolated struct UndoAppPreferences: UndoExternalPlaces, @unchecked Sendable {
 /// front-page rule (`SectionIndexPointer.repointIndex`, on the main actor:
 /// `UndoSectionFrontPage.rederive`), while the list is moved off the main
 /// actor. Until the app registers its runner (U7, with the switch), a
-/// step holding a `recompute` is NOT AVAILABLE to Undo or Redo: it is never
-/// undone with its re-derivation skipped. Recovery settles such a step's
-/// content all the same (its files must never stay half done) and re-derives
-/// whatever runner is registered; re-deriving is idempotent.
+/// step holding a `recompute` is NOT AVAILABLE to Undo or Redo, and
+/// recovery holds such a step open: it is never undone or settled with its
+/// re-derivation skipped. Only `recoverAndRederive` settles a live step that
+/// keeps a file true by a rule, and it re-derives what it settles, outside
+/// the lock; re-deriving is idempotent.
 nonisolated enum UndoMaintainers {
 
     // MARK: - Stored properties
