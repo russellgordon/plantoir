@@ -47,11 +47,17 @@ struct TaskProgressView: View {
     /// everywhere else the panel is in front whenever it shows.
     let takesTheCancelKeys: Bool
 
-    /// True for a section's deploy: stopping it asks "Stop the deploy?"
-    /// first, by click or by key (Russell's ruling on #988, 2026-11-19),
-    /// because a deploy stopped part way can leave the website partly
-    /// updated. A preview or a plan share stops at once.
-    let asksBeforeStopping: Bool
+    /// The question stopping this task asks first, by click or by key
+    /// (Russell's rulings on #988, 2026-11-19): "Stop the deploy?" for a
+    /// section's deploy, "Stop this share?" for a share of unit plans, each
+    /// because a task stopped part way can leave things partly done. `nil`
+    /// for a preview, which stops at once.
+    let stopQuestion: StopQuestion?
+
+    /// Where whether `stopQuestion` is still asked is read and remembered.
+    /// The app's own settings; a test passes its own, so ticking "Don't ask
+    /// again" there never reaches the teacher's.
+    let settings: AppSettings
 
     /// TESTS ONLY: told the height the folder publish's render note was
     /// actually drawn at, so a test can say whether it kept every line
@@ -76,7 +82,8 @@ struct TaskProgressView: View {
         showingDetailsForTesting: Bool = false,
         canCancel: Bool = true,
         takesTheCancelKeys: Bool = true,
-        asksBeforeStopping: Bool = false,
+        stopQuestion: StopQuestion? = nil,
+        settings: AppSettings = AppSettings.shared,
         hidesSiteLink: Bool = false,
         allLegs: [MultiDestinationDeployRunner.Leg]? = nil,
         onCancel: (() -> Void)? = nil,
@@ -87,7 +94,8 @@ struct TaskProgressView: View {
         self.title = title
         self.canCancel = canCancel
         self.takesTheCancelKeys = takesTheCancelKeys
-        self.asksBeforeStopping = asksBeforeStopping
+        self.stopQuestion = stopQuestion
+        self.settings = settings
         self.hidesSiteLink = hidesSiteLink
         self.allLegs = allLegs
         self.onCancel = onCancel
@@ -110,8 +118,12 @@ struct TaskProgressView: View {
     /// Makes Cancel act once per run, however it is pressed (#988 review).
     @State var cancelOnce: CancelOncePerRun = CancelOncePerRun()
 
-    /// Showing "Stop the deploy?" (`asksBeforeStopping`).
+    /// Showing the stop question (`stopQuestion`).
     @State var isAskingToStop: Bool = false
+
+    /// The question's "Don't ask again" box, unticked each time it opens.
+    /// Read only when the teacher chooses to stop (ruling 3).
+    @State var dontAskAgain: Bool = false
 
     /// Whether this panel's window is the key window. A sheet or an alert
     /// in front of it (one of its own questions included) is the key window
@@ -123,6 +135,27 @@ struct TaskProgressView: View {
     var textEditing: KeyWindowTextEditing = KeyWindowTextEditing.shared
 
     // MARK: - Computed properties
+
+    /// Whether stopping this task asks first now: it has a question, and
+    /// the teacher has not turned that question off. While it is off,
+    /// Cancel, Escape and Command-Period stop the task at once, as a
+    /// preview's do.
+    var asksBeforeStopping: Bool {
+        if let stopQuestion {
+            return stopQuestion.isAsked(in: settings)
+        }
+        return false
+    }
+
+    /// The question the alert shows. Only ever presented when
+    /// `asksBeforeStopping`, so `stopQuestion` is set then; the deploy's
+    /// words stand in otherwise, never shown.
+    var questionShown: StopQuestion {
+        if let stopQuestion {
+            return stopQuestion
+        }
+        return StopQuestion.deploy
+    }
 
     /// Whether the task is still under way, as the header reads it.
     var runIsUnderWay: Bool {
@@ -254,6 +287,7 @@ struct TaskProgressView: View {
     func pressCancel() {
         if asksBeforeStopping {
             if runIsUnderWay && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt) {
+                dontAskAgain = false
                 isAskingToStop = true
             }
             return
@@ -261,8 +295,18 @@ struct TaskProgressView: View {
         stopTheTask()
     }
 
+    /// The stopping button in the question: a ticked "Don't ask again"
+    /// turns this question off (only now, never on Cancel), then the task
+    /// stops.
+    func chooseStop() {
+        if let stopQuestion, runIsUnderWay {
+            stopQuestion.stopWasChosen(dontAskAgainTicked: dontAskAgain, in: settings)
+        }
+        stopTheTask()
+    }
+
     /// Stops the task: what Cancel does for a preview, and what Stop Deploy
-    /// does in "Stop the deploy?". Once per run, and never for a run that
+    /// or Stop Share does in its question. Once per run, and never for a run that
     /// has already ended while the question was open.
     func stopTheTask() {
         if !runIsUnderWay {
@@ -359,29 +403,35 @@ struct TaskProgressView: View {
                                 .buttonStyle(.bordered)
                                 .keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)
                                 .accessibilityIdentifier("taskCancelButton")
-                                // Stopping a deploy asks first (Russell's rulings on #988,
-                                // 2026-11-19). Stop Deploy is a plain button and the default,
-                                // so Return stops the deploy; Alerts: "Always place the default
-                                // button on the trailing side of a row or at the top of a stack",
-                                // and the destructive style is for "a destructive action people
-                                // didn't deliberately choose", which this is not. The other
-                                // button is Cancel ("Always use 'Cancel' to title a button that
-                                // cancels the alert's action"), with Escape and Command-Period.
-                                // The never-ask-again box waits for Russell's answer to the
-                                // design (vm-tools/reference/988-stop-questions-design.md).
-                                .alert(DeployStopWording.title, isPresented: $isAskingToStop) {
-                                    Button(DeployStopWording.stopButton) {
-                                        stopTheTask()
+                                // Stopping a deploy or a share asks first (Russell's rulings on
+                                // #988, 2026-11-19). Stop Deploy and Stop Share are plain buttons
+                                // and the default, so Return stops the task; Alerts: "Always place
+                                // the default button on the trailing side of a row or at the top
+                                // of a stack", and the destructive style is for "a destructive
+                                // action people didn't deliberately choose", which this is not.
+                                // The other button is Cancel ("Always use 'Cancel' to title a
+                                // button that cancels the alert's action"), with Escape and
+                                // Command-Period.
+                                .alert(questionShown.title, isPresented: $isAskingToStop) {
+                                    Button(questionShown.stopButton) {
+                                        chooseStop()
                                     }
                                     .keyboardShortcut(.defaultAction)
-                                    .accessibilityIdentifier("stopDeployButton")
-                                    Button(DeployStopWording.cancelButton, role: .cancel) {
+                                    .accessibilityIdentifier(questionShown.stopButtonIdentifier)
+                                    // Cancel remembers nothing, the box included (ruling 3).
+                                    Button(questionShown.cancelButton, role: .cancel) {
                                     }
                                     .keyboardShortcut(.cancelAction)
-                                    .accessibilityIdentifier("cancelStopDeployButton")
+                                    .accessibilityIdentifier(questionShown.cancelButtonIdentifier)
                                 } message: {
-                                    Text(DeployStopWording.message)
+                                    Text(questionShown.message)
                                 }
+                                // "macOS alerts can add a suppression checkbox" (Alerts). On
+                                // this button, so it reaches this question and no other: a
+                                // suppression toggle applies to every dialog presented within
+                                // the view it is on (#731), and the panel's other questions are
+                                // presented from the panel as a whole.
+                                .dialogSuppressionToggle(StopQuestionSettingsWording.dontAskAgain, isSuppressed: $dontAskAgain)
                             }
                         }
                     } else if let exitCode = runner.lastExitCode {

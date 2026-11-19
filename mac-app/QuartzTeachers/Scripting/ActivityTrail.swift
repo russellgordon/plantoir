@@ -1623,6 +1623,11 @@ nonisolated enum ActivityTrail {
         case obsidianReopenedForAddOns = "obsidian reopened for add-ons"
         /// Settings ▸ Obsidian turned the add-ons on or off (#495).
         case obsidianAddOnsSettingChanged = "obsidian add-ons setting changed"
+        /// "Stop the deploy?" or "Stop this share?" was turned off by its
+        /// "Don't ask again" box with the stop, or on or off in Settings ▸
+        /// Deploying (#988). While one is off a key stops that task at once,
+        /// so "Escape stopped my deploy without asking" is answered here.
+        case stopQuestionSettingChanged = "stop question setting changed"
         /// "Close Obsidian to open {course}?" was answered (#995): the course
         /// and what came of it — opened after closing Obsidian, Cancel,
         /// nothing to close by then, Obsidian did not close, or it closed and

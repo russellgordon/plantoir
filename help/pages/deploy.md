@@ -4,6 +4,8 @@ checked: 2.0.0
 covers:
 - mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift
 - mac-app/QuartzTeachers/Views/Console/TaskProgressView.swift
+- mac-app/QuartzTeachers/Models/StopQuestion.swift
+- mac-app/QuartzTeachers/Views/Settings/StopQuestionSettingsSection.swift
 - mac-app/QuartzTeachers/Views/Section/DeployDestinationLinks.swift
 - contracts/app-rules.json
 - contracts/shared-rules.json
@@ -33,7 +35,9 @@ To deploy a section is to send its website to where students read it. A deploy c
 alt: The section's window during a deploy, with a line that says what is happening now.
 
 {{mac}}
-Plantoir asks first, because a deploy stopped part way can leave the website partly updated: choose {{control:stopDeploy}} to stop it, or {{control:cancel}} to let it finish. The Escape key and Command-Period press {{control:cancel}} in the window as well, and in the question they choose {{control:cancel}}; the Return key chooses {{control:stopDeploy}}. While you are typing in a box, the keys belong to the box.
+Plantoir asks first, because a deploy stopped part way can leave the website partly updated: choose {{control:stopDeploy}} to stop it, or {{control:cancel}} to let it finish. The Escape key and Command-Period press {{control:cancel}} in the window as well. In the question they choose {{control:cancel}}, and the Return key chooses {{control:stopDeploy}}. While you are typing in a box, the keys belong to the box.
+
+To stop deploys without being asked, tick {{control:stopQuestionDontAskAgain}} in the question and choose {{control:stopDeploy}}. Ticking it and choosing {{control:cancel}} changes nothing. From then on, {{control:cancel}}, the Escape key and Command-Period stop a deploy at once. To be asked again, choose {{menu:settings}}, open the {{control:plantoirSettingsDeployingPane}} pane, and turn on {{control:asksBeforeStoppingADeploy}} under {{control:stopQuestionSection}}.
 {{/mac}}
 
 5. Read the result when the window says the deploy is done.

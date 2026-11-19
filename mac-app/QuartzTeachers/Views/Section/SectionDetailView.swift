@@ -2101,7 +2101,7 @@ struct SectionDetailView: View {
                             runner: deployRunner.activeRunner,
                             title: deployProgressTitle,
                             takesTheCancelKeys: SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing: previewURL != nil),
-                            asksBeforeStopping: true,
+                            stopQuestion: .deploy,
                             hidesSiteLink: deployRunner.legs.count > 1,
                             allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
                             onCancel: {

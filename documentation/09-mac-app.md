@@ -1229,7 +1229,8 @@ this alert too (#731, found driving this piece) — ticking it silently turned
 the add-ons offer off. The offer is now presented from a view of its own
 behind the content (`ObsidianAddOnsOfferDialog.offerHost`), and
 `testOnlyTheAddOnsOfferCarriesASuppressionToggle` holds that there is one
-toggle in the app's views, there. Every answer is remembered by alert key in
+toggle for it in the app's views, there (the only other is the stop
+questions' box on the progress panel's Cancel, #988). Every answer is remembered by alert key in
 `~/Library/Application Support/Plantoir/problems-acknowledged/<folder id>.json`
 (last 20 per section), so a relaunch does not raise yesterday's alert again
 (plan review, HIGH 2) — never in the record, which the build rewrites. A record
@@ -1670,7 +1671,7 @@ function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests
 the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
 a unit test can read a frame from.
 
-## Escape and Command-Period stop a running preview or deploy (#988)
+## Escape and Command-Period stop a running preview, deploy or plan share (#988)
 
 The progress panel's Cancel (`TaskProgressView`, `taskCancelButton`) answers
 Escape and Command-Period while a preview builds or a deploy runs, unless
@@ -1725,15 +1726,50 @@ Command-Period), which lets the deploy run on. Alerts: "Always use 'Cancel'
 to title a button that cancels the alert's action"; the destructive style is
 for "a destructive action people didn't deliberately choose", and stopping
 is what the teacher chose. macOS stacks the two buttons in this alert, the
-default at the top. If the deploy ends while the question is open, the
-question goes and nothing is stopped. The never-ask-again box on this
-question, and where it is turned back on, wait for Russell's answer to the
-design (`vm-tools/reference/988-stop-questions-design.md`).
+default at the top (with the box below, AppKit draws them in a row, the
+default trailing). If the deploy ends while the question is open, the
+question goes and nothing is stopped.
 
-**A plan share asks first too** (Russell, 2026-11-19), and its question is
-not built yet: until it is, the share's console passes
-`takesTheCancelKeys: false`, so Escape never stops a share unasked, and a
-click on Cancel stops it at once as before.
+**A plan share asks first too** (Russell's rulings on the design,
+`vm-tools/reference/988-stop-questions-design.md`, 2026-11-19): "Stop this
+share?", "The unit plans may be left partly shared until you share them
+again.", **Stop Share** (plain, default) and **Cancel** (`ShareStopWording`),
+and its Cancel holds the stop keys as the deploy's does. The title is not
+"Stop Sharing", which already names taking shared plans down in the
+Planning tab. The sentence becomes "The unit plans stay as they were before
+this share began." when #992's all-or-nothing share lands; a comment on #992
+says so. `TaskProgressView` takes `stopQuestion: StopQuestion?` (`.deploy`
+from the section window, `.share` from `PlanShareConsoleSheet`, `nil` for a
+preview).
+
+**"Don't ask again" on both questions, each its own setting** (rulings 2 and
+3). The box is `.dialogSuppressionToggle` on the panel's Cancel button itself,
+so it reaches the stop question and no other: a suppression toggle applies to
+every dialog presented within the view it is on, which is how the add-ons
+offer's box once reached the Problems alert (#731). It starts unticked each
+time the question opens and is read only by the stopping button
+(`StopQuestion.stopWasChosen`): ticked with Stop Deploy or Stop Share, that
+question is off (`AppSettings.asksBeforeStoppingADeploy` or
+`.asksBeforeStoppingAShare`, both on by default); ticked with Cancel, nothing
+is remembered, so a teacher who backed out is not surprised next time by a
+key that stops at once. Two settings, not one: the HIG's words are "the same
+alert", and one setting would let a tick on a share silently turn off the
+deploy's question (the #731 lesson again). **Once a question is off**,
+`asksBeforeStopping` is false, and Cancel, Escape and Command-Period stop that
+task at once, as a preview's do.
+
+**The way back is Plantoir ▸ Settings ▸ Deploying ▸ Stopping**
+(`StopQuestionSettingsSection`, the pane's first section): "Ask before
+stopping a deploy" and "Ask before stopping a share of unit plans", with the
+footer "When one is off, Cancel stops that task at once, and so do the Escape
+key and Command-Period." They are the grouped form's switches, as the
+Obsidian and Assistant panes draw theirs (Toggles: "Within a grouped form,
+consider using a mini switch"; "In general, don't replace a checkbox with a
+switch"). Each change, from the box or the pane, writes one
+`stop question setting changed` line (`appliesOn: mac` in the contract until
+Windows has the questions). Rejected: one setting for both (above), and
+Xcode's "Reset all questions" button, which says nothing about which
+question it brings back.
 
 **Only while the panel is in front.** In the section window the preview's site
 is drawn OVER the panel once it serves (`websiteLayers`), and the runner is
@@ -1760,7 +1796,11 @@ stops the task, and once focus leaves the box Escape stops it; behind a sheet
 alert neither key stops it; with the site covering the panel neither does;
 on a deploy either key asks, Escape or Command-Period in the question is
 Cancel and the deploy runs on, Return is Stop Deploy and stops it once, and
-the question goes when the deploy ends. They take the front from
+the question goes when the deploy ends; ticked with Stop Deploy the box turns
+the deploy's question off and leaves the share's on, ticked with Cancel it is
+not remembered and the next question opens unticked; with a question off,
+Escape and Command-Period stop that task at once; and a share still asks
+with the deploy's question off, Return choosing Stop Share. They take the front from
 the person at the Mac, so they are **opt-in**: `TEST_RUNNER_PLANTOIR_KEY_TESTS=1`
 on the `xcodebuild` line, on a Mac nobody is using; without it they skip and
 say so, and the rule and source tests run. Bringing the host forward goes
@@ -1779,11 +1819,22 @@ or a responder. Only the rule's own test
 typing condition is taken out; the pressed-key test passes either way, as
 above.
 
+`StopQuestionTests` (in every suite) holds the rest without a key: both on by
+default, the tick counts only with the stop, each setting silences only its
+own question, the Settings rows turn each back on and write their line, the
+answers are remembered apart, Stopping is the pane's first section, and the
+words are the ruled ones.
+
 **For Windows (stage 3, #979):** the progress panel's Cancel takes Escape
 while the panel is in front and no text box, popover, dialog or flyout has
-focus, acts once per run, and for a deploy asks "Stop the deploy?" first,
-with Stop Deploy the default and Cancel on Escape. The words are Mac-only
-(`DeployStopWording`), not yet in `contracts/`.
+focus, acts once per run, and for a deploy or a plan share asks first ("Stop
+the deploy?", "Stop this share?"), with the stopping button the default and
+Cancel on Escape, a "Don't ask again" box that counts only with the stop,
+one setting per question, and both turned back on in the Deploying part of
+Settings. The words are Mac-only (`DeployStopWording`, `ShareStopWording`,
+`StopQuestionSettingsWording`), not yet in `contracts/`; the trail event
+`stop question setting changed` is in `activityTrail.mustRecord` with
+`appliesOn: mac`.
 
 ## Red and orange: the colours of a problem, measured (#994)
 

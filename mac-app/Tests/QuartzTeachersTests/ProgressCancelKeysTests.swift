@@ -80,7 +80,8 @@ final class ProgressCancelKeysTests: XCTestCase {
         let ledger: Ledger
         let runner: ScriptRunner
         let takesTheCancelKeys: Bool
-        let asksBeforeStopping: Bool
+        let stopQuestion: StopQuestion?
+        let settings: AppSettings
 
         // MARK: - Computed properties
 
@@ -101,9 +102,10 @@ final class ProgressCancelKeysTests: XCTestCase {
                     if ledger.showsPanel {
                         TaskProgressView(
                             runner: runner,
-                            title: asksBeforeStopping ? "Deploying EXC2O Section 1" : "Previewing EXC2O Section 1",
+                            title: stopQuestion == nil ? "Previewing EXC2O Section 1" : "Deploying EXC2O Section 1",
                             takesTheCancelKeys: takesTheCancelKeys,
-                            asksBeforeStopping: asksBeforeStopping,
+                            stopQuestion: stopQuestion,
+                            settings: settings,
                             onCancel: {
                                 ledger.cancelCount += 1
                             }
@@ -152,10 +154,21 @@ final class ProgressCancelKeysTests: XCTestCase {
 
     var openWindows: [NSWindow] = []
 
+    /// This test's own settings, so a ticked "Don't ask again" never
+    /// reaches the teacher's preferences or another test.
+    /// Made in `setUp`.
+    var settings: AppSettings!
+
+    /// The suite behind `settings`, removed when the test ends.
+    var settingsSuiteName: String = ""
+
     // MARK: - Functions
 
     override func setUp() async throws {
         useThrowawayTrail(prefix: "progress-cancel-keys-trail")
+        settingsSuiteName = "ProgressCancelKeysTests-" + UUID().uuidString
+        let defaults: UserDefaults = try XCTUnwrap(UserDefaults(suiteName: settingsSuiteName))
+        settings = AppSettings(defaults: defaults)
     }
 
     override func tearDown() async throws {
@@ -167,6 +180,7 @@ final class ProgressCancelKeysTests: XCTestCase {
             window.contentViewController = nil
         }
         openWindows = []
+        UserDefaults.standard.removePersistentDomain(forName: settingsSuiteName)
         // The unit host is an accessory app with no Dock tile or menu bar
         // (#633); bringing it forward made it a regular one.
         if NSApp.activationPolicy() != .accessory {
@@ -209,7 +223,7 @@ final class ProgressCancelKeysTests: XCTestCase {
     /// The window, built as the app builds its own (a hosting controller as
     /// content), made the key window of the active app, with the panel
     /// appearing after it is up. Skips when the host cannot take the front.
-    func keyWindow(ledger: Ledger, runner: ScriptRunner, takesTheCancelKeys: Bool = true, asksBeforeStopping: Bool = false) throws -> NSWindow {
+    func keyWindow(ledger: Ledger, runner: ScriptRunner, takesTheCancelKeys: Bool = true, stopQuestion: StopQuestion? = nil) throws -> NSWindow {
         let window: NSWindow = NSWindow(
             contentRect: NSRect(x: -7000, y: -7000, width: 900, height: 500),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -227,7 +241,8 @@ final class ProgressCancelKeysTests: XCTestCase {
             ledger: ledger,
             runner: runner,
             takesTheCancelKeys: takesTheCancelKeys,
-            asksBeforeStopping: asksBeforeStopping
+            stopQuestion: stopQuestion,
+            settings: settings
         ))
         openWindows.append(window)
         NSApp.activate(ignoringOtherApps: true)
@@ -463,7 +478,7 @@ final class ProgressCancelKeysTests: XCTestCase {
     func checkADeployAsksFirst(_ key: Key) throws {
         let ledger: Ledger = Ledger()
         let runner: ScriptRunner = runningRunner()
-        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, asksBeforeStopping: true)
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, stopQuestion: .deploy)
         try press(key)
         XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "\(key) on a running deploy asked first")
         settle(0.5)
@@ -504,12 +519,111 @@ final class ProgressCancelKeysTests: XCTestCase {
     func testTheQuestionGoesWhenTheDeployEnds() throws {
         let ledger: Ledger = Ledger()
         let runner: ScriptRunner = runningRunner()
-        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, asksBeforeStopping: true)
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, stopQuestion: .deploy)
         try press(.escape)
         XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet != nil }, "Escape asked first")
         runner.isRunning = false
         XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "the question went when the deploy ended")
         XCTAssertEqual(ledger.cancelCount, 0)
+    }
+
+    // MARK: - Tests: "Don't ask again" and a question turned off
+
+    /// The suppression box in the question attached to `window`.
+    func dontAskAgainBox(in window: NSWindow) throws -> NSButton {
+        let shown: [String: NSButton] = alertButtons(in: window)
+        return try XCTUnwrap(shown[StopQuestionSettingsWording.dontAskAgain], "the question's box; the buttons: \(Array(shown.keys))")
+    }
+
+    /// Ticked, then Stop Deploy: the deploy's question is off from then on,
+    /// and the share's is still on. Measured failing before ruling 2 was
+    /// built: the question had no box.
+    func testTheTickWithStopIsRemembered() throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, stopQuestion: .deploy)
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "Escape asked first")
+        settle(0.5)
+        let box: NSButton = try dontAskAgainBox(in: window)
+        XCTAssertEqual(box.state, .off, "the box starts unticked")
+        box.performClick(nil)
+        settle(0.3)
+        XCTAssertEqual(box.state, .on)
+        try press(.returnKey)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Stop Deploy stopped the deploy")
+        XCTAssertFalse(settings.asksBeforeStoppingADeploy, "the tick with Stop Deploy turned the deploy's question off")
+        XCTAssertTrue(settings.asksBeforeStoppingAShare, "the share's question is its own setting")
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains(StopQuestion.trailLine(for: .deploy, asked: false, from: .dontAskAgain)), trail)
+    }
+
+    /// Ticked, then Cancel: nothing is remembered, and the next press asks
+    /// again with the box unticked (ruling 3).
+    func testTheTickWithCancelIsNotRemembered() throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, stopQuestion: .deploy)
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "Escape asked first")
+        settle(0.5)
+        try dontAskAgainBox(in: window).performClick(nil)
+        settle(0.3)
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "Escape in the question chose Cancel")
+        settle(0.5)
+        XCTAssertEqual(ledger.cancelCount, 0, "Cancel stopped nothing")
+        XCTAssertTrue(settings.asksBeforeStoppingADeploy, "the tick with Cancel was remembered")
+        XCTAssertTrue(runUntil(timeout: 3) { window.isKeyWindow })
+        try press(.commandPeriod)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "the question is asked again")
+        settle(0.5)
+        XCTAssertEqual(try dontAskAgainBox(in: window).state, .off, "the box is unticked again")
+    }
+
+    /// With a question off, Cancel's keys stop that task at once, as a
+    /// preview's do: no question, once per run.
+    func checkTheKeyStopsAtOnceWhenOff(_ key: Key, question: StopQuestion) throws {
+        question.setAsked(false, in: settings, from: .settings)
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, stopQuestion: question)
+        try press(key)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "\(key) did not stop the task at once with \(question) off")
+        settle(0.5)
+        XCTAssertNil(window.attachedSheet, "nothing was asked")
+        try press(key)
+        settle(0.5)
+        XCTAssertEqual(ledger.cancelCount, 1, "once per run")
+    }
+
+    func testEscapeStopsADeployAtOnceWhenItsQuestionIsOff() throws {
+        try checkTheKeyStopsAtOnceWhenOff(.escape, question: .deploy)
+    }
+
+    func testCommandPeriodStopsAShareAtOnceWhenItsQuestionIsOff() throws {
+        try checkTheKeyStopsAtOnceWhenOff(.commandPeriod, question: .share)
+    }
+
+    /// The deploy's question off leaves the share's asking: Escape on a
+    /// share asks "Stop this share?", Return is Stop Share's.
+    func testAShareStillAsksWithTheDeploysQuestionOff() throws {
+        StopQuestion.deploy.setAsked(false, in: settings, from: .settings)
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, stopQuestion: .share)
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "Escape on a share asked first")
+        settle(0.5)
+        XCTAssertEqual(ledger.cancelCount, 0)
+        let shown: [String: NSButton] = alertButtons(in: window)
+        let stopButton: NSButton = try XCTUnwrap(shown[ShareStopWording.stopButton], "the buttons: \(Array(shown.keys))")
+        XCTAssertEqual(stopButton.keyEquivalent, "\r", "Stop Share is the default")
+        XCTAssertNotEqual(stopButton.bezelColor, NSColor.systemRed, "Stop Share is not drawn red")
+        XCTAssertNil(shown[DeployStopWording.stopButton], "the share's question, not the deploy's")
+        try press(.returnKey)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Return chose Stop Share")
+        XCTAssertTrue(settings.asksBeforeStoppingAShare, "an unticked box changed nothing")
     }
 
     // MARK: - Tests: the rule and the source
@@ -575,7 +689,8 @@ final class ProgressCancelKeysTests: XCTestCase {
         let source: String = try String(contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Section/SectionDetailView.swift"), encoding: .utf8)
         var asking: Int = 0
         for chain in SheetConventionScanTests.chains(of: "TaskProgressView(", in: source, file: "SectionDetailView.swift") {
-            if chain.arguments.contains("asksBeforeStopping: true") {
+            if chain.arguments.contains("stopQuestion:") {
+                XCTAssertTrue(chain.arguments.contains("stopQuestion: .deploy"), "the section window asks the deploy's question")
                 asking += 1
                 XCTAssertTrue(chain.arguments.contains("cancelDeploy()"), "the panel that asks is the deploy's")
             }
@@ -583,14 +698,15 @@ final class ProgressCancelKeysTests: XCTestCase {
         XCTAssertEqual(asking, 1, "exactly the deploy's panel asks first")
     }
 
-    /// Until its question is built, a plan share's Cancel holds no key, so
-    /// Escape never stops a share unasked (Russell, 2026-11-19).
-    func testAShareTakesNoKeyUntilItAsks() throws {
+    /// A plan share asks "Stop this share?", and its Cancel holds the stop
+    /// keys as the deploy's does (Russell, 2026-11-19, ruling 1).
+    func testAShareAsksAndItsCancelHoldsTheKeys() throws {
         let source: String = try String(contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Planning/PlanShareConsoleSheet.swift"), encoding: .utf8)
         var panels: Int = 0
         for chain in SheetConventionScanTests.chains(of: "TaskProgressView(", in: source, file: "PlanShareConsoleSheet.swift") {
             panels += 1
-            XCTAssertTrue(chain.arguments.contains("takesTheCancelKeys: false"), "the share's Cancel holds no key yet")
+            XCTAssertTrue(chain.arguments.contains("stopQuestion: .share"), "the share asks its own question")
+            XCTAssertFalse(chain.arguments.contains("takesTheCancelKeys: false"), "the share's Cancel holds the keys")
         }
         XCTAssertEqual(panels, 1)
     }
