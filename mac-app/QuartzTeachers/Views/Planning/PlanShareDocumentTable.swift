@@ -188,7 +188,7 @@ struct PlanShareDocumentTable: NSViewRepresentable {
         /// A cell of words; the Note column's has room for the warning
         /// symbol before them.
         static func makeCell(identifier: NSUserInterfaceItemIdentifier) -> NSTableCellView {
-            let cell: NSTableCellView = NSTableCellView()
+            let cell: NSTableCellView = StatusTintedTableCellView()
             cell.identifier = identifier
             let field: NSTextField = NSTextField(labelWithString: "")
             field.translatesAutoresizingMaskIntoConstraints = false
@@ -202,7 +202,7 @@ struct PlanShareDocumentTable: NSViewRepresentable {
             if identifier.rawValue == "cell." + PlanShareTablesModel.Column.note.rawValue {
                 let image: NSImageView = NSImageView()
                 image.translatesAutoresizingMaskIntoConstraints = false
-                image.contentTintColor = .systemOrange
+                image.contentTintColor = StatusColour.warning.nsColor
                 image.isHidden = true
                 cell.addSubview(image)
                 cell.imageView = image
@@ -508,3 +508,31 @@ struct PlanShareSearchField: NSViewRepresentable {
         }
     }
 }
+
+/// A table cell whose caution symbol follows the row (#994, D38's rule in
+/// an AppKit table): the caution orange on a plain row, and the selected
+/// row's text colour on a selected (emphasized) one, where the orange
+/// measured 1.13:1 on the blue selection. AppKit sets `backgroundStyle` on
+/// the cell as the row's selection changes, so the tint follows it with no
+/// observing of our own.
+final class StatusTintedTableCellView: NSTableCellView {
+
+    // MARK: - Stored properties
+
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet {
+            imageView?.contentTintColor = StatusTintedTableCellView.symbolTint(for: backgroundStyle)
+        }
+    }
+
+    // MARK: - Functions
+
+    /// The symbol's tint for a row's background style.
+    static func symbolTint(for style: NSView.BackgroundStyle) -> NSColor {
+        if style == .emphasized {
+            return NSColor.alternateSelectedControlTextColor
+        }
+        return StatusColour.warning.nsColor
+    }
+}
+

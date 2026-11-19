@@ -249,6 +249,8 @@ struct TaskProgressView: View {
                                 .font(.headline)
                             Spacer()
                             if runner.wasCancelled {
+                                // Not a problem but a status, so not a
+                                // status colour (#994): its colour as before.
                                 Label("Cancelled", systemImage: "xmark.circle.fill")
                                     .foregroundStyle(.orange)
                                     .accessibilityIdentifier("cancelledNotice")
@@ -264,8 +266,8 @@ struct TaskProgressView: View {
                                 Label("Done", systemImage: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                             } else {
-                                Label("Something went wrong", systemImage: "xmark.circle.fill")
-                                    .foregroundStyle(.red)
+                                Label("Something went wrong", systemImage: StatusColour.blocking.filledSymbolName)
+                                    .foregroundStyle(StatusColour.blocking.style)
                             }
                         }
 
@@ -350,6 +352,7 @@ struct TaskProgressView: View {
                     }
 
                     if runner.isAwaitingInput {
+                        // A status, not a problem (#994): its colour as before.
                         Label("Waiting for your answer…", systemImage: "questionmark.bubble")
                             .foregroundStyle(.orange)
                             .accessibilityIdentifier("awaitingInputNotice")
@@ -357,14 +360,14 @@ struct TaskProgressView: View {
 
                     // The task is stopping itself; say so while it does.
                     if runner.wasCancelled && runner.isRunning {
+                        // A status, not a problem (#994): its colour as before.
                         Label("Cancelling…", systemImage: "xmark.circle")
                             .foregroundStyle(.orange)
                             .accessibilityIdentifier("cancellingNotice")
                     }
 
                     if let problem = runner.launchProblem {
-                        Text(problem)
-                            .foregroundStyle(.red)
+                        StatusColour.blocking.sentence(problem)
                     }
                 }
                 .padding(12)

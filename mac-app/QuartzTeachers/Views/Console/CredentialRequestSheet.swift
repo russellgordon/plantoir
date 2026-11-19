@@ -128,9 +128,8 @@ struct CredentialRequestSheet: View {
                 }
                 .accessibilityIdentifier("credentialBusy")
             } else if let problem {
-                Text(problem)
+                StatusColour.blocking.sentence(problem)
                     .font(.callout)
-                    .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("credentialProblem")
             }

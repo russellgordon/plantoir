@@ -60,6 +60,6 @@ A later deploy copies only the files that have changed. Upload again after each 
 
 ## If it does not work
 
-- **Orange text shows under the {{control:deployingPartFolderField}} field.** The text says what is wrong. No folder is chosen, or what you typed is not a full location. The folder does not exist, is a file, or cannot be written to. Press {{control:deployingPartChooseFolderButton}} to pick a folder or make one.
+- **A sentence shows under the {{control:deployingPartFolderField}} field.** The text says what is wrong. No folder is chosen, or what you typed is not a full location. The folder does not exist, is a file, or cannot be written to. Press {{control:deployingPartChooseFolderButton}} to pick a folder or make one.
 - **An alert titled {{control:cannotDeployYet}} appears.** No folder is chosen. Choose one in the course's settings, save, and deploy again.
 - **The copy into the folder did not finish.** Plantoir counts that as a failure, even if part of the website was copied, and does not say the section was deployed. Deploy again. See [A deploy did not work](page:deploy-failed).

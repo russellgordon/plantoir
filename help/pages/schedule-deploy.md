@@ -107,7 +107,7 @@ The assistant can change the time in one step. Ask it to schedule a section that
 
 ## If it does not work
 
-- **Orange text takes the place of the plan, and {{control:scheduleButton}} is greyed.** The text says why the deploy cannot be scheduled. The time may have passed, or a folder may need attention. A Cloudflare Account ID may be missing, or the section may never have been deployed to that place.
+- **A sentence takes the place of the plan, and {{control:scheduleButton}} is greyed.** The text says why the deploy cannot be scheduled. The time may have passed, or a folder may need attention. A Cloudflare Account ID may be missing, or the section may never have been deployed to that place.
 - **No notification came.** Notifications for Plantoir are turned off in macOS. The section's window still says how the deploy went.
 - **{{menu:scheduleDeploy}} is greyed.** The section already has a deploy scheduled. Cancel it, then schedule again.
 - **{{menu:scheduleDeploy}} is greyed and the section has no clock beside it.** The course is kept for reference. Such a course is never deployed, and the menu that opens on a right-click does not offer the command.

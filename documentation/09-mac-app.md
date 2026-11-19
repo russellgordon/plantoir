@@ -1181,8 +1181,11 @@ not there yet, geogebra.org out of reach), and for a kind the site says, that
 record's site has said (`siteSaidComplete`). The section's marker stays
 either way: its deployed site still carries the broken page (ruling 11).
 
-**The marker.** ONE `exclamationmark.triangle.fill`, orange, on the row
-(`SidebarView.sectionRowLabel`), shown while the section's OWN record has a
+**The marker.** ONE `exclamationmark.triangle.fill`, in the caution orange
+(`StatusColour.warning.style`), on the row (`SidebarView.sectionRowLabel`, drawn
+by `SectionRowWarningBadge`); on a SELECTED row it takes the row's own
+colour, white on the blue selection, as the row's words do (#994, D38: the
+orange measured 1.45:1 there), shown while the section's OWN record has a
 row; another section's build never puts it on or takes it off. The stopped
 scheduled deploy already drew the same glyph, so when both apply it is still
 one glyph, and its help and accessibility label say each sentence that applies
@@ -1658,7 +1661,7 @@ control inside read back as the container's name (#832; the rule of #353 and
 before it, and `ContainerIdentifierTripwireTests` names all five.
 
 **The course-code suggestions** in the New Course wizard opened four points
-under the field, over the orange sentence saying the code is already taken
+under the field, over the sentence saying the code is already taken
 (and its Replace It… button), until focus left the field. The field's row,
 field and sentence together, now publishes its own anchor beside the field's
 (`CourseCodeAnchors`, a transform so the field's is kept), and the list opens
@@ -1666,6 +1669,95 @@ below the row (`CourseCodeSuggestionsOverlay.top`). Measured by the geometry
 function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests`);
 the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
 a unit test can read a frame from.
+
+## Red and orange: the colours of a problem, measured (#994)
+
+The HIG review (#975, findings D37, D38 and inconsistency 10) measured the
+orange warning text at **1.98:1 in Light and 3.74:1 with Increase
+Contrast**, against the 4.5:1 the HIG's Accessibility page asks of text up
+to 17 points, and the stopped-deploy badge on a selected sidebar row at
+**1.45:1**. It also found red in some places and orange in others for the
+same kind of problem.
+
+**The rule (Russell, 2026-11-18):** red for a problem that stops the teacher
+going ahead (a name already taken, a form that will not submit, Schedule
+greyed, an act that failed); orange for a caution they can go past (dates
+before today, a domain that does not look like one, a page with no room for
+a key). Each also carries a symbol, so colour is never the only sign (HIG,
+Color, "Inclusive color"): `exclamationmark.triangle` for a caution,
+`xmark.octagon` for a stop. Where one place can be either, it asks which
+applies (Add Section: a number that cannot be added is red, a remark about
+one that can is orange; Cloudflare's Account ID: "it can wait" is orange,
+an ID that stops Create or Save is red).
+
+**One home: `StatusColour`** (`Views/Helpers/StatusColour.swift`), with
+the values in a Color Set each (`QuartzTeachers/StatusColours.xcassets`:
+`StatusWarning`, `StatusBlocking`), with Any, Dark, and High Contrast
+variants of both, so the system resolves the variant and redraws when the
+teacher changes appearance or Increase Contrast (HIG, Dark Mode: "When you
+need a custom color, add a Color Set asset to your app's asset catalog").
+The first version read `accessibilityDisplayShouldIncreaseContrast` inside a
+colour provider and observed nothing, so a change while the app ran was
+never shown; it is gone. `StatusColour.style` is the style a sentence or
+symbol wears; on a selected row (`backgroundProminence == .increased`) it
+gives way to the selected row's text colour, as the row's words do.
+`sentence(_:)` returns ONE `Text` with the symbol inline, so the modifiers
+each place had still apply; VoiceOver hears the words alone. Where the
+words can be selected and copied (Schedule a Deploy's plan, a section
+schedule's failure) `StatusLine` puts the symbol beside the words, so a copy
+carries the words alone. One symbol per meaning, app-wide: the console's
+"Failed" and "Something went wrong" and a failed deploy leg use the stop
+symbol too.
+
+**The values.** Dark keeps the system orange's own published values (R255
+G146 B48, and R255 G160 B86 with Increase Contrast, the HIG's Color page).
+In Light neither system colour passes: the orange is 2.31:1 on white and
+the red 3.57:1, and the system's Increase Contrast orange (R197 G83 B0) is
+3.45:1 on a grey Form row. Measured (WCAG ratio; Light on white / #E0E0E0,
+Dark on #1E1E1E / #3C3C3C, the lightest dark grey the app draws a sentence
+on):
+
+| | Light | Light, Increase Contrast | Dark | Dark, Increase Contrast |
+|---|---|---|---|---|
+| Caution orange | #A84300: 6.06 / 4.59 | #983C00: 7.04 / 5.34 | #FF9230: 7.47 / 4.94 | #FFA056: 8.27 / 5.47 |
+| Stopping red | #BF0019: 6.50 / 4.93 | #9E0014: 8.52 / 6.46 | #FF8587: 7.11 / 4.70 | #FF9496: 7.88 / 5.22 |
+
+#983C00 is the brightest orange that reaches 7:1 on white; it is dark, so
+the triangle carries the kind as much as the hue. (#7A3000, the first
+choice, read as brown, 1.62:1 from body text.)
+
+`StatusColourTests` reads the four values from the Color Sets and checks
+each against those backgrounds, checks that the app draws the catalog's
+Light and Dark values, that the orange keeps an orange hue and the red a
+red one, and scans every Swift file in the app target for `.orange`,
+`.red` (any use: `.tint`, `return`, `.fill`, `.foregroundColor`,
+`Color.`/`NSColor.`) and `systemOrange`/`systemRed`, with four named
+exemptions: the Assistant's Deploy button tint, and the console's
+"Cancelled", "Waiting for your answer…" and "Cancelling…", which are
+statuses, not problems, and keep their colour. **Rejected:** keeping the
+system colours and relying on Increase Contrast (the HIG allows that only
+"if your app doesn't provide this minimum contrast by default", and the
+system's own Increase Contrast orange still fails on a sheet); plain text
+with only a coloured symbol (the ruling asks both colours to meet 4.5:1);
+and reading Increase Contrast by hand (above).
+
+**Selected rows (D38).** A selected row's background is the accent blue,
+on which no orange or red reaches 3:1. The sidebar's badge
+(`SectionRowWarningBadge`) wears `StatusColour.warning.style`, so on the
+selection it turns white with the row's words (5.37:1; it was 1.45:1). The
+Plan Share documents table is AppKit: its cells are
+`StatusTintedTableCellView`, which sets the caution symbol's tint from the
+cell's `backgroundStyle`, white when AppKit marks the row `.emphasized`
+(it was 1.13:1 there). The stopped-deploy band is the orange at 12% over
+the window: its triangle is 5.05:1 in Light and 6.05:1 in Dark (2.09:1
+with the system orange).
+
+**Not changed, named for whoever comes next:** the Assistant window's Deploy
+button is tinted the system orange (`.tint(.orange)`), white on #FF8D28
+being 2.31:1; and "Done", "Finished" and the console's other green labels
+are the system green (2.22:1, measured by the review). VoiceOver hears a
+red sentence and an orange one alike; that belongs to #993. Windows matches in
+stage 3 of #975.
 
 ## Question sheets and alerts after the HIG review (#987)
 

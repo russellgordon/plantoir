@@ -73,9 +73,8 @@ struct DeployingSettingsView: View {
                 // Cloudflare has no reason to fill it in, and the course
                 // that needs one says so itself.
                 if let problem = DeployingSettingsView.problem(with: settings.cloudflareAccountID) {
-                    Text(problem)
+                    StatusColour.warning.sentence(problem)
                         .font(.caption)
-                        .foregroundStyle(.orange)
                         .accessibilityIdentifier("cloudflareAccountProblem")
                 }
 
