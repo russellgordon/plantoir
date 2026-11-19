@@ -43,3 +43,26 @@ enum UndoSectionFrontPage {
         return true
     }
 }
+
+/// The app's own runner for `sectionFrontPage`.
+nonisolated extension UndoMaintainers {
+
+    // MARK: - Functions
+
+    /// Registers the app's front-page rule as the `sectionFrontPage` runner,
+    /// for U7 to call with the switch. The runner is async and awaits
+    /// `UndoSectionFrontPage.rederive` ON THE MAIN ACTOR, where that rule
+    /// lives; the list calls it only after its own work, outside its lock
+    /// (`undoNewestAndRederive`, `UndoRecovery.recoverAndRederive`), so the
+    /// main actor is never blocked while the lock is held and the lock
+    /// never waits for the main actor. Rejected: a synchronous runner hopped
+    /// to the main actor with a blocking wait (DispatchQueue.main.sync or a
+    /// semaphore: GCD, and a deadlock whenever the list is moved from the
+    /// main actor); making the front-page rule and everything it reads
+    /// nonisolated (a change across the app for a list still off).
+    static func registerTheAppsFrontPage() {
+        register("sectionFrontPage") { op, root in
+            await UndoSectionFrontPage.rederive(op, root: root)
+        }
+    }
+}

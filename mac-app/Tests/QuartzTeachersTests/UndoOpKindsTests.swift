@@ -249,13 +249,60 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }), .undone(seq: 1))
     }
 
+    /// The hard review of U2b, MEDIUM 5: the app's OWN runner (on the main
+    /// actor) can be registered and is awaited after an Undo, outside the
+    /// list's lock: the landing page follows the newest class.
+    @MainActor
+    func testTheAppsOwnFrontPageRunnerIsRegisteredAndRunAfterAnUndo() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-08", body: "one", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "true", date: "2026-09-10", body: "two", in: made.course)
+        let indexURL: URL = SectionIndexPointer.indexURL(forSection: 1, in: made.course)
+        try "---\ntitle: Section 1\ncreated: 2026-08-01T09:00:00.000-0400\npublish: true\n---\n# Most Recent Class\n![[Unit 1, Day 1]]\n".write(to: indexURL, atomically: true, encoding: .utf8)
+        let root: URL = made.course.directoryURL.deletingLastPathComponent().deletingLastPathComponent()
+        let indexPath: String = try XCTUnwrap(UndoShadowPublish.relativePath(of: indexURL, under: root))
+        let notes: String = "courses/\(made.course.code)/notes.md"
+        try UndoContractReplay.write("Line one: old.\n", to: notes, in: root)
+        let ops: [UndoOp] = [
+            UndoOp.replaceText(path: notes, before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"),
+            UndoOp.recompute(path: indexPath, maintainer: "sectionFrontPage", section: 1),
+        ]
+        let journal: UndoJournal = UndoJournal(folderURL: scratchURL.appendingPathComponent("undo", isDirectory: true))
+        UndoMaintainers.registerTheAppsFrontPage()
+        XCTAssertEqual(JournaledWrite.perform(ops: UndoContractKinds.draft(ops: ops, blobs: [], root: root, action: "editPage"), in: journal, mode: .live), .applied(seq: 1))
+
+        let outcome: UndoOutcome = await journal.undoNewestAndRederive(resolveRoot: { _ in root })
+
+        XCTAssertEqual(outcome, .undone(seq: 1))
+        let index: String = try String(contentsOf: indexURL, encoding: .utf8)
+        XCTAssertTrue(index.contains("![[Unit 1, Day 2]]"), index)
+    }
+
     /// Without a runner for its maintainer, a step holding a `recompute` is
-    /// not available: it is never undone with its re-derivation skipped.
+    /// not available: it is never undone with its re-derivation skipped
+    /// (the hard review of U2b, LOW d: Undo itself is asked, not only
+    /// `canRun`).
     func testAStepWhoseMaintainerHasNoRunnerIsNotAvailable() throws {
+        let made = try UndoContractReplay.scratch(under: scratchURL, named: "norunner")
+        let root: URL = made.root
+        let notes: String = "courses/TST1O/notes.md"
+        try UndoContractReplay.write("Line one: old.\n", to: notes, in: root)
+        let ops: [UndoOp] = [
+            UndoOp.replaceText(path: notes, before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"),
+            UndoOp.recompute(path: "courses/TST1O/section1/index.md", maintainer: "sectionFrontPage", section: 1),
+        ]
+        let journal: UndoJournal = UndoJournal(folderURL: made.journalFolder)
+        XCTAssertEqual(JournaledWrite.perform(ops: UndoContractKinds.draft(ops: ops, blobs: [], root: root, action: "editPage"), in: journal, mode: .live), .applied(seq: 1))
         UndoMaintainers.forget("sectionFrontPage")
-        let ops: [UndoOp] = [UndoOp.recompute(path: "courses/X/section1/index.md", maintainer: "sectionFrontPage", section: 1)]
         XCTAssertFalse(UndoMaintainers.canRun(ops))
+
+        XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }), .notAvailable)
+
         UndoContractReplay.registerTheFrontPageMaintainer()
         XCTAssertTrue(UndoMaintainers.canRun(ops))
+        XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }), .undone(seq: 1))
     }
 }

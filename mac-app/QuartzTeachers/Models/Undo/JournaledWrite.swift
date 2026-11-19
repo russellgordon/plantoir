@@ -410,9 +410,9 @@ nonisolated enum JournaledWrite {
         if UndoKillPoints.stopsHere(.beforeApplied) {
             return .stoppedByATest
         }
-        if mode == .live {
-            UndoMaintainers.rederive(recomputes, root: root)
-        }
+        // Re-derived by the caller once this answers
+        // (`performAndRederive(ops:)`), outside the lock.
+        _ = recomputes
         finish(seq: seq, with: .applied, phase: nil, reason: nil, in: journal, mode: mode)
         return .applied(seq: seq)
     }
@@ -478,6 +478,25 @@ nonisolated enum JournaledWrite {
             return .listUnreadable
         }
         return .acceptable
+    }
+
+    /// `perform(ops:)`, then the re-derivation of the step's `recompute`
+    /// files, awaited outside the lock (`UndoMaintainers`). In shadow too:
+    /// the door made the change itself, so it keeps the files a rule keeps
+    /// true itself (the hard review of U2b, LOW c).
+    static func performAndRederive(
+        ops draft: UndoOpsDraft,
+        in journal: UndoJournal,
+        mode: UndoMode,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) async -> JournaledWriteOutcome {
+        let outcome: JournaledWriteOutcome = perform(ops: draft, in: journal, mode: mode, places: places)
+        if case .applied = outcome, let root = draft.workingFolderURL {
+            await UndoMaintainers.rederive(draft.ops, root: root)
+        } else if case .appliedWithoutARecord = outcome, let root = draft.workingFolderURL {
+            await UndoMaintainers.rederive(draft.ops, root: root)
+        }
+        return outcome
     }
 
     /// Phase one for a step given as ops: the same as `begin`, with the

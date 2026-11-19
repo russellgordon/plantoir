@@ -19496,27 +19496,39 @@ use. Only content that was read and differs is `changedSince`, and that
 still clears the list (ruling 13). `checkCases` rows with `cannotBeRead`
 pin it for each kind.
 
-**`recompute` is run** (`UndoMaintainers`). Undo, Redo and the door run each
-`recompute` op's maintainer after the swaps, and recovery re-derives a
-step's `recompute` files whenever it settles the step, whichever way
-(re-deriving is idempotent): judged by its content ops alone, a step that
-died after its swaps and before its re-derivation would otherwise be
-settled with its front page stale (the Fable sweep of U1, T5;
-`recoveryCases` with `withAMove`). The re-derivation runs after the last
-kill point, so a death between the swaps and it is a case the suite holds.
-The one maintainer, `sectionFrontPage`, is `UndoSectionFrontPage.rederive`:
+**`recompute` is run** (`UndoMaintainers`). Each maintainer is a REGISTERED
+runner, and the runner is `async`: the one maintainer, `sectionFrontPage`,
+is the app's own rule (`UndoSectionFrontPage.rederive`, which calls
 `SectionIndexPointer.repointIndex`, the rule a publish, a re-date and the
-start of the year already use. It is on the main actor and the list is
-moved off it, so the maintainer is a REGISTERED runner rather than a call:
-**until a runner is registered for a maintainer, a step holding its
-`recompute` is not available** (greyed, as a step this version cannot read
-is), never undone with its re-derivation skipped. U7 registers the app's
-runner with the switch and settles how it reaches the main actor from the
-list's thread; the suite registers a recording runner, and
-`UndoOpKindsTests.testTheFrontPageIsRederivedByTheAppsOwnRule` runs the
-app's own. Rejected: making `repointIndex` and everything it reads
-(`Course`, `CourseConfiguration`, `AssistSectionGraph`) nonisolated in U2,
-a change across the app for a list that is still off.
+start of the year use), and it lives on the main actor while the list is
+moved off it. So the list never calls a runner itself: the entry points the
+app uses, `undoNewestAndRederive`, `redoNewestAndRederive`,
+`JournaledWrite.performAndRederive(ops:)` and
+`UndoRecovery.recoverAndRederive`, do the journal's work (recovery, the
+check, the swaps, the closing line) synchronously and then, with the lock
+released, AWAIT each runner on its own actor. The main actor is never
+blocked while the lock is held and the lock never waits for the main
+actor. U7 calls `UndoMaintainers.registerTheAppsFrontPage()` with the
+switch. Recovery re-derives every step it settles, whichever way
+(re-deriving is idempotent): judged by its content ops alone, a step that
+died after its swaps and before its re-derivation would otherwise be left
+with its front page stale (the Fable sweep of U1, T5; `recoveryCases` with
+`withAMove`). **Until a runner is registered for a maintainer, a step
+holding its `recompute` is not available to Undo or Redo, and recovery
+holds it open, unsettled, rather than settle it with the re-derivation
+skipped** (the hard review of U2b, MEDIUM 5). The crash window that is
+left: a process that dies after the closing line and before its awaited
+re-derivation leaves the front page stale until the next re-derivation of
+that section (any publish, re-date or Undo there); U7 closes it by
+re-deriving every `recompute` file of the steps on the list at launch,
+which costs nothing when nothing is stale. Rejected: a synchronous runner
+hopped to the main actor with a blocking wait (GCD, and a deadlock when the
+list is driven from the main actor); making the front-page rule and
+everything it reads (`Course`, `CourseConfiguration`, `AssistSectionGraph`)
+nonisolated in U2, a change across the app for a list still off.
+`UndoOpKindsTests.testTheAppsOwnFrontPageRunnerIsRegisteredAndRunAfterAnUndo`
+registers the app's runner and proves the landing page follows; the suite
+otherwise registers a recording runner.
 
 **Measured** (a standalone build of `Models/Undo/` with the replay, Apple
 M4 Pro, swiftc -O): every check, listing, stack (61), step, recovery (26)

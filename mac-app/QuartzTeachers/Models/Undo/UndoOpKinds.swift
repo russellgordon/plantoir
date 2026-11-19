@@ -942,7 +942,10 @@ nonisolated enum UndoMaintainers {
 
     // MARK: - Stored properties
 
-    typealias Runner = @Sendable (UndoOp, URL) -> Void
+    /// Async, so a maintainer that lives on the main actor (the front
+    /// page's) is awaited there, and never called synchronously from the
+    /// list's thread or inside its lock (the hard review of U2b, MEDIUM 5).
+    typealias Runner = @Sendable (UndoOp, URL) async -> Void
 
     nonisolated(unsafe) private static var runners: [String: Runner] = [:]
 
@@ -981,11 +984,24 @@ nonisolated enum UndoMaintainers {
     }
 
     /// Runs the runner of every `recompute` op among these, in order.
-    static func rederive(_ ops: [UndoOp], root: URL) {
+    static func rederive(_ ops: [UndoOp], root: URL) async {
         for op in ops where op.knownKind == .recompute {
             if let maintainer = op.maintainer, let run = runner(for: maintainer) {
-                run(op, root)
+                await run(op, root)
             }
         }
+    }
+
+    /// The same for a step on the list, found by its number.
+    static func rederive(
+        stepNumbered seq: Int,
+        in journal: UndoJournal,
+        resolveRoot: @escaping @Sendable (UndoWorkingFolder) -> URL?
+    ) async {
+        guard let record = (try? journal.read())?.records[seq],
+              let root = UndoCheck.root(of: record.step, resolveRoot: resolveRoot) else {
+            return
+        }
+        await rederive(record.step.ops, root: root)
     }
 }

@@ -1062,6 +1062,37 @@ nonisolated extension UndoJournal {
         return move(.backward, resolveRoot: resolveRoot, places: places)
     }
 
+    /// Undo, then the re-derivation of every file the undone step keeps true
+    /// by a rule, awaited on whatever actor each maintainer's runner needs
+    /// (the front page's is the main actor), AFTER the journal's work and
+    /// outside its lock. Any step recovery settled first is re-derived too.
+    /// This is the entry point the app uses (U7); `undoNewest` alone never
+    /// re-derives.
+    func undoNewestAndRederive(
+        resolveRoot: @escaping @Sendable (UndoWorkingFolder) -> URL? = UndoReach.root,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) async -> UndoOutcome {
+        await UndoRecovery.recoverAndRederive(self, resolveRoot: resolveRoot, places: places)
+        let outcome: UndoOutcome = undoNewest(resolveRoot: resolveRoot, places: places)
+        if case .undone(let seq) = outcome {
+            await UndoMaintainers.rederive(stepNumbered: seq, in: self, resolveRoot: resolveRoot)
+        }
+        return outcome
+    }
+
+    /// Redo, then the re-derivation, as `undoNewestAndRederive`.
+    func redoNewestAndRederive(
+        resolveRoot: @escaping @Sendable (UndoWorkingFolder) -> URL? = UndoReach.root,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) async -> UndoOutcome {
+        await UndoRecovery.recoverAndRederive(self, resolveRoot: resolveRoot, places: places)
+        let outcome: UndoOutcome = redoNewest(resolveRoot: resolveRoot, places: places)
+        if case .redone(let seq) = outcome {
+            await UndoMaintainers.rederive(stepNumbered: seq, in: self, resolveRoot: resolveRoot)
+        }
+        return outcome
+    }
+
     /// Redoes the most recently undone step.
     func redoNewest(
         resolveRoot: (UndoWorkingFolder) -> URL? = UndoReach.root,
@@ -1177,10 +1208,10 @@ nonisolated extension UndoJournal {
         if UndoKillPoints.stopsHere(direction == .backward ? .beforeUndone : .beforeRedone) {
             return .stoppedByATest
         }
-        // After the swaps: a process that dies between them and this leaves
-        // the front page stale, and recovery re-derives it when it settles
-        // the step (`undo.laterPieces.U2`, recoveryCases).
-        UndoMaintainers.rederive(recomputes, root: root)
+        // The files kept true by a rule are re-derived by the caller once
+        // this answers, outside the lock and off this thread
+        // (`undoNewestAndRederive`, `UndoMaintainers`).
+        _ = recomputes
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
         return direction == .backward ? .undone(seq: seq) : .redone(seq: seq)
     }

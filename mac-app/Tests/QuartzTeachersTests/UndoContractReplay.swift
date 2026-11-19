@@ -71,10 +71,14 @@ nonisolated enum UndoContractReplay {
     /// (`UndoMaintainers`).
     static func registerTheFrontPageMaintainer() {
         UndoMaintainers.register("sectionFrontPage") { op, _ in
-            rederivedLock.lock()
-            rederived.append((op.path ?? "") + "#" + String(op.section ?? 0))
-            rederivedLock.unlock()
+            recordARederivation(op)
         }
+    }
+
+    static func recordARederivation(_ op: UndoOp) {
+        rederivedLock.lock()
+        rederived.append((op.path ?? "") + "#" + String(op.section ?? 0))
+        rederivedLock.unlock()
     }
 
     static func takeTheRederived() -> [String] {
@@ -659,7 +663,7 @@ nonisolated enum UndoContractReplay {
         return result
     }
 
-    static func runStackCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
+    static func runStackCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
         registerTheFrontPageMaintainer()
         let cases: [[String: Any]] = try undoBlock()["stackCases"] as? [[String: Any]] ?? []
         let traces: [String: Any] = try contract("undo-traces.json")
@@ -825,9 +829,9 @@ nonisolated enum UndoContractReplay {
                 } else if value.hasPrefix("clock:") {
                     clockDays = Double(value.dropFirst("clock:".count).replacingOccurrences(of: "+", with: "")) ?? 0
                 } else if value == "undo" {
-                    last = outcomeWord(journal().undoNewest(resolveRoot: resolve, places: places))
+                    last = outcomeWord(await journal().undoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places))
                 } else if value == "redo" {
-                    last = outcomeWord(journal().redoNewest(resolveRoot: resolve, places: places))
+                    last = outcomeWord(await journal().redoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places))
                 } else if UndoContractKinds.calls.contains(value) {
                     if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
                         last = answered
@@ -1123,7 +1127,7 @@ nonisolated enum UndoContractReplay {
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
     ]
 
-    static func runRecoveryCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
+    static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
         registerTheFrontPageMaintainer()
         let cases: [[String: Any]] = try undoBlock()["recoveryCases"] as? [[String: Any]] ?? []
         var failures: [String] = []
@@ -1270,8 +1274,14 @@ nonisolated enum UndoContractReplay {
             if testCase["fileInUseDuringRecovery"] as? Bool == true {
                 UndoKillPoints.fileInUseAtSwap = { _ in true }
             }
-            try survivor.withLock { writer in
-                UndoRecovery.run(writer, mode: mode, resolveRoot: resolveRoot)
+            if mode == .live {
+                // As the app recovers: under the lock, then the re-derivation
+                // of what it settled, awaited outside it.
+                await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in reachable ? root : nil })
+            } else {
+                try survivor.withLock { writer in
+                    UndoRecovery.run(writer, mode: mode, resolveRoot: resolveRoot)
+                }
             }
             UndoKillPoints.fileInUseAtSwap = nil
             let rederivedByRecovery: Int = takeTheRederived().count

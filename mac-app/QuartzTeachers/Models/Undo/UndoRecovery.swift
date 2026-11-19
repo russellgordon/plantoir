@@ -84,6 +84,12 @@ nonisolated enum UndoRecovery {
             guard let root = UndoCheck.root(of: record.step, resolveRoot: resolveRoot) else {
                 continue
             }
+            // A step that keeps a file true by a rule is held open until a
+            // runner for its maintainer exists: never settled with its
+            // re-derivation skipped (the hard review of U2b, MEDIUM 5).
+            if !UndoMaintainers.canRun(record.step.ops) {
+                continue
+            }
             let key: String = UndoRefusedSwaps.key(for: record, in: writer.journal)
             if !trySwapsNow && !UndoRefusedSwaps.isDue(key, now: now) {
                 continue
@@ -100,6 +106,28 @@ nonisolated enum UndoRecovery {
             tidyClosedSteps(writer, resolveRoot: resolveRoot)
         }
         return results
+    }
+
+    /// Recovery under the lock, then, with the lock released, the
+    /// re-derivation of every step it settled (`UndoMaintainers`). The
+    /// runner is awaited on its own actor, so the main actor is never
+    /// blocked while the lock is held, and the lock never waits on it.
+    static func recoverAndRederive(
+        _ journal: UndoJournal,
+        resolveRoot: @escaping @Sendable (UndoWorkingFolder) -> URL?,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) async {
+        var settled: [UndoRecoveryResult] = []
+        do {
+            settled = try journal.withLock { writer -> [UndoRecoveryResult] in
+                return UndoRecovery.run(writer, mode: .live, resolveRoot: resolveRoot, places: places)
+            }
+        } catch {
+            return
+        }
+        for result in settled where result.outcome != .leftAlone {
+            await UndoMaintainers.rederive(stepNumbered: result.seq, in: journal, resolveRoot: resolveRoot)
+        }
     }
 
     /// Removes the staged files of every step closed `interrupted` that this
@@ -388,15 +416,12 @@ nonisolated enum UndoRecovery {
         if !UndoRecovery.write(events, step: step, writer) {
             return nil
         }
-        // The files kept true by a rule are re-derived whichever way the
-        // step was settled (re-deriving is idempotent): judged by its content
-        // ops alone, a step that died after its swaps and before its
-        // re-derivation would otherwise be settled with its front page stale
-        // (`undo.laterPieces.U2`; the Fable sweep of U1, T5). Never in
-        // shadow, which writes nothing into a working folder.
-        if mode == .live {
-            UndoMaintainers.rederive(step.ops, root: root)
-        }
+        // The files kept true by a rule are re-derived, whichever way the
+        // step was settled, by `recoverAndRederive` once the lock is
+        // released (re-deriving is idempotent): judged by its content ops
+        // alone, a step that died after its swaps and before its
+        // re-derivation would otherwise be left with its front page stale
+        // (`undo.laterPieces.U2`; the Fable sweep of U1, T5).
         return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: outcome)
     }
 

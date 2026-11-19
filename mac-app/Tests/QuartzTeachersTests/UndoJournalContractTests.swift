@@ -76,8 +76,8 @@ final class UndoJournalContractTests: XCTestCase {
         XCTAssertEqual(result.failures, [])
     }
 
-    func testStackCases() throws {
-        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runStackCases(under: scratchURL)
+    func testStackCases() async throws {
+        let result: (cases: Int, failures: [String]) = try await UndoContractReplay.runStackCases(under: scratchURL)
         XCTAssertGreaterThanOrEqual(result.cases, 61)
         XCTAssertEqual(result.failures, [])
     }
@@ -100,8 +100,8 @@ final class UndoJournalContractTests: XCTestCase {
     /// Every kill point: a process that stops there leaves the files before
     /// or after, never between. (The harness also kills real processes at
     /// the same points with SIGKILL.)
-    func testRecoveryCases() throws {
-        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runRecoveryCases(under: scratchURL)
+    func testRecoveryCases() async throws {
+        let result: (cases: Int, failures: [String]) = try await UndoContractReplay.runRecoveryCases(under: scratchURL)
         XCTAssertEqual(result.cases, 26)
         XCTAssertEqual(result.failures, [])
     }
