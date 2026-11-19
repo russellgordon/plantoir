@@ -1165,6 +1165,12 @@
         "why": "#495. The toggle is the only way back from \"Don't ask again\" and changes what happens in every course, on the 'preview start page chosen in Settings' precedent."
       },
       {
+        "event": "asked to close Obsidian to open a course",
+        "carries": "the course's code and what the answer to obsidianNeverClosedUnasked's question came to: opened after closing Obsidian, Cancel, nothing to close by then, Obsidian did not close, or it closed and the course could not be added to its list. The exact words are obsidianNeverClosedUnasked.trail.",
+        "line": "MPM2D · closed Obsidian to add the course to its list, and opened it",
+        "why": "#995. Plantoir closes the teacher's Obsidian here, on their click; and the two failures show nothing on screen, so this line is their only record."
+      },
+      {
         "event": "Swift got ready on this computer",
         "carries": "how many seconds getting Swift ready took and how much was downloaded, and the course and section whose preview needed it",
         "marker": "PLANTOIR_SWIFT: with ready true (codeRunnerBlocks.swift.windows.marker; printed on a Mac by preview.sh since #635, codeRunnerBlocks.swift.mac)",
@@ -36818,7 +36824,7 @@
       {
         "step": 6,
         "when": "the answer is notAsked",
-        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian, or wording.offerWhileObsidianIsOpen instead when Plantoir cannot tell (openStateCases). Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
+        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian, or wording.offerWhileObsidianIsOpen instead when Plantoir cannot tell (openStateCases). Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Since #995 (obsidianNeverClosedUnasked) Add Them is titled obsidianNeverClosedUnasked.wording.offerAddClosingObsidian whenever pressing it closes Obsidian (openStateCases: open or cannotTell), and when the course was closed as the offer was shown but is open by the time Add Them is pressed, Obsidian is not closed: step 8's reopen question asks first. Mac since #995; Windows owes both, #1003. Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
       },
       {
         "step": 7,
@@ -37784,10 +37790,10 @@
       "closesLabel": "Closes",
       "closesValue": "Obsidian, with every course open in it, not only {course}",
       "opensAgainLabel": "Opens again",
-      "opensAgainValue": "{course} only",
+      "opensAgainValue": "{course}, and everything else Obsidian had open",
       "keptLabel": "Kept",
       "keptValue": "Everything you have written",
-      "closingRule": "#834 (Russell, 2026-11-13, on #742): under offerWhileOpen or offerWhileObsidianIsOpen the offer lists three facts, each on a line of its own as Label: value, in this order: closesLabel with closesValue, opensAgainLabel with opensAgainValue, keptLabel with keptValue. Add Them closes the whole of Obsidian, so any OTHER course or vault open in it closes too, and only this course is opened again; the sentence said neither before. Rejected by him: leaving Obsidian alone and telling the teacher to restart it, and offering both at that moment. The offer stays a dialog with its Don't ask again box (#731), so the rows are lines of its message rather than a form.",
+      "closingRule": "#834 (Russell, 2026-11-13, on #742): under offerWhileOpen or offerWhileObsidianIsOpen the offer lists three facts, each on a line of its own as Label: value, in this order: closesLabel with closesValue, opensAgainLabel with opensAgainValue, keptLabel with keptValue. Add Them closes the whole of Obsidian, so any OTHER course or vault open in it closes too; the sentence said that not before. What opens again is every vault Obsidian's list marks open, this course last (sequence step 8), which is only this course when the list cannot be read (knownLimits); opensAgainValue said \"{course} only\" until #995, true only in that second case. Rejected by him: leaving Obsidian alone and telling the teacher to restart it, and offering both at that moment. The offer stays a dialog with its Don't ask again box (#731), so the rows are lines of its message rather than a form.",
       "offerAdd": "Add Them",
       "offerNotNow": "Not Now",
       "dontAskAgain": "Don't ask again",
@@ -52137,5 +52143,103 @@
       "jsonFileRewritten": "Withdrawn by the hard review of U2b (LOW a): an editJSON no longer rewrites the file; it changes only its member's bytes (file-formats.json -> undoJournal.opKinds.editJSON, undo.editJSONCases) and refuses a file where that cannot be done safely, a key written twice on the path among them. Kept as a key so a reader of an older contract finds it answered. Left as they are for the merge with the journal off (the director's ruling after the third review, to be recorded on #899): the member an editJSON sets has its number spelled by the app (2.0 is written 2), and a new object value's non-ASCII keys are sorted as Foundation sorts them, which the contract does not pin. A whole number beyond 2^53 is never compared or written through a double: cannotTell, or refused.",
       "linkBetweenTheCheckAndTheChange": "A place is checked inside the working folder (links resolved) immediately before each change, and the change is a separate system call: a folder on the path replaced by a link to outside in the instant between the two calls is not caught. Measured as a window of one system call by the third hard review of U2b (probe C); closing it needs the change made relative to an open handle of the folder (openat/renameat on the mac, a handle opened without following reparse points on Windows), which is U7's or later. The check runs at plan time, before staging, before each swap, before a re-derivation and in the tidying."
     }
+  },
+  "obsidianNeverClosedUnasked": {
+    "note": "#995 (HIG stage 2, finding D21 of #975), v2.0.0, mac first; Windows meets it under #1003 (v2.0.0), and until then its tests do not read this key. Obsidian keeps its list of vaults in memory and writes it back whole when it quits, so a course it has never seen can be added only while it is closed. Until #995 the mac app quit a running Obsidian for that without asking, with every course open in it. Russell's ruling Q13 on #975 (2026-11-18): Plantoir never closes Obsidian without asking, and the button that goes ahead says plainly that Obsidian will be closed. documentation/09-mac-app.md -> \"Plantoir never closes Obsidian unasked (#995)\".",
+    "rule": "Every route that hands Obsidian a file (Open in Obsidian from any menu, button or the assistant, a Coverage tab code, Course Settings' How I Teach row) asks wording.title BEFORE closing Obsidian whenever closeCases says ask; Cancel opens nothing and closes nothing, and wording.closeAndOpen closes Obsidian, adds the course, opens again each course Obsidian had on screen, then opens what was asked for. What opens again is every vault Obsidian's list (obsidian.json) marks open, read before the quit: the add-ons' reopen's own rule (obsidianAddOnsForFigures.sequence step 8). Three more rules (#995 reviews): (1) at the answer closeCases is read again, and if it no longer says ask (Obsidian has quit, or now knows the course) the file is simply opened and nothing is closed; (2) if Obsidian is still running after the quit and the wait, nothing is written into its list and nothing is handed to it (it does not know the course, so a link would only show its own error), and trail.didNotClose is written; if it closed but the file still cannot be handed over (the list could not be written), trail.notAdded is written; neither shows anything on screen yet, because the route has no report for a course that could not be opened in Obsidian (#995's morning question); (3) if Obsidian starts between the press's check and the hand-over, nothing is handed over and the question is asked instead of the press doing nothing. Every answer writes one trail line (activityTrail.mustRecord: asked to close Obsidian to open a course). The add-ons offer (obsidianAddOnsForFigures) titles its yes wording.offerAddClosingObsidian instead of offerAdd whenever that yes closes Obsidian (the course is open in it, or Plantoir cannot tell: openStateCases open or cannotTell). When the course was closed while the offer was shown and is open by the time Add Them is pressed, Obsidian is not closed: the reopen question (obsidianAddOnsForFigures.wording.reopenTitle) asks first. The rename's question (Close Obsidian and Rename) already met the ruling.",
+    "closeCases": {
+      "note": "Whether handing Obsidian the file means asking first: Obsidian is running and no vault in its list (obsidian.json) is the file's folder or holds it. `registryVaults` null means there is no list at all; a list that cannot be read counts as holding nothing, the safe direction.",
+      "cases": [
+        {
+          "name": "Obsidian not running, course not in its list",
+          "running": false,
+          "registryVaults": [
+            "/w/ICS3U"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian not running, no list at all",
+          "running": false,
+          "registryVaults": null,
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, course in its list",
+          "running": true,
+          "registryVaults": [
+            "/w/MPM2D"
+          ],
+          "target": "/w/MPM2D/Section 1/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, a larger vault holds the course",
+          "running": true,
+          "registryVaults": [
+            "/w"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, course not in its list",
+          "running": true,
+          "registryVaults": [
+            "/w/ICS3U"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        },
+        {
+          "name": "Obsidian running, a course whose name starts the same is not this one",
+          "running": true,
+          "registryVaults": [
+            "/w/MPM2"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        },
+        {
+          "name": "Obsidian running, no list at all",
+          "running": true,
+          "registryVaults": null,
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        }
+      ]
+    },
+    "wording": {
+      "title": "Close Obsidian to open {course}?",
+      "message": "Obsidian has not opened {course} before. It can add a course to its list only while it is closed, so Plantoir closes Obsidian, adds {course}, and opens it again.",
+      "factsRule": "After message, a blank line, then three facts each on a line of its own as Label: value, in this order: closesLabel with closesValue, opensAgainLabel with opensAgainValue, keptLabel with keptValue (#834's shape, as obsidianAddOnsForFigures.wording.closingRule).",
+      "closesLabel": "Closes",
+      "closesValue": "Obsidian, with every course open in it",
+      "opensAgainLabel": "Opens again",
+      "opensAgainValue": "{course}, and everything else Obsidian had open",
+      "keptLabel": "Kept",
+      "keptValue": "Everything you have written",
+      "closeAndOpen": "Close Obsidian and Open",
+      "cancel": "Cancel",
+      "offerAddClosingObsidian": "Close Obsidian and Add Them"
+    },
+    "trail": {
+      "note": "One line per answer, under the event \"asked to close Obsidian to open a course\". {course} is the course's code.",
+      "opened": "{course} · closed Obsidian to add the course to its list, and opened it",
+      "cancelled": "{course} · chose Cancel: Obsidian was not closed and the course did not open",
+      "notNeeded": "{course} · opened in Obsidian without closing it: by the answer, Obsidian had quit or knew the course",
+      "didNotClose": "{course} · Obsidian did not close, so the course was not added to its list and did not open",
+      "notAdded": "{course} · Obsidian closed, but the course could not be added to its list, so it did not open"
+    },
+    "knownLimits": [
+      "Opens again names everything Obsidian's list marks open, read before the quit. A mark Obsidian left behind on a vault it had closed (FolderActions' own measurement) reopens that vault too: the over-report is the safe direction, as in the add-ons' reopen. A vault is not always a course (a parent folder opened as one), hence everything, not each course.",
+      "A course with diagrams and graphs, never seen by a running Obsidian, and never asked about the add-ons, meets two questions in a row: the add-ons offer, then this one. Folding them was rejected: Not Now also opens Obsidian, so the offer would have to carry the closing in all three answers."
+    ],
+    "rejected": [
+      "Opening the course without adding it to the list: Obsidian's open link finds only vaults it knows, so it would show its own error.",
+      "Adding the course to the list while Obsidian runs: Obsidian writes its in-memory list back on quit and the addition is lost (FolderActions.openInObsidian's measurement)."
+    ]
   }
 }
