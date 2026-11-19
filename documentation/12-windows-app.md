@@ -13215,8 +13215,11 @@ what is imported).
   Pinned by `scripts/test_mirror_module_libraries.py` (a mirror laid out as
   1.9.3 left it gains both copies through the build's own dependency step).
   The `node.exe` copy stays beside them.
-- `THIRD_PARTY_LICENSES.md` has the licence row (Microsoft's redistributable
-  code terms; the file is on the list an application may carry).
+- `THIRD_PARTY_LICENSES.md` has the licence row, as Russell ruled on #1006
+  (2026-11-19): Microsoft's Distributable Code terms in the Visual Studio
+  licence, with Russell Gordon as the licence holder under the free Community
+  or Build Tools terms; the file is on the Distributable List for Visual
+  Studio 2026 (any file in `VC\redist`, unmodified, with the program).
 - `NativeModuleImportsTests`: every `.node` file in a fetched runtime, and
   every library beside it that it pulls in, finds each import **beside
   itself** or on `windowsSystemLibraries`, a named list that deliberately
