@@ -104,19 +104,39 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: to), Data("b".utf8))
     }
 
-    /// Setting one member writes the file in the app's own JSON form and
-    /// keeps every other member, numbers as they were read.
-    func testAJSONMemberKeepsItsNeighbours() throws {
-        let original: Data = Data("{\"big\": 12345678901234, \"half\": 0.5, \"nested\": {\"list\": [1, \"two\", null]}, \"school_year\": \"2026-2027\"}\n".utf8)
+    /// The hard review of U2b, LOW a (probe F): an editJSON changes only
+    /// the bytes of the value at its key path; every other byte of the file
+    /// (spacing, key order, 1.50, an escaped slash, a key written twice
+    /// elsewhere) stays as it was. FAILED on c1c0624e5, which rewrote the
+    /// whole file.
+    func testAJSONMemberIsChangedByItsOwnBytesAlone() throws {
+        let original: String = "{\n    \"zeta\": 1.50,\n    \"alpha\": \"a\\/b \\u00e9\",\n    \"dup\": 1,\n    \"dup\": 2,\n    \"school_year\": \"2026-2027\"\n}\n"
         let op: UndoOp = UndoOp.editJSON(path: "c.json", keyPath: ["school_year"], before: .string("2025-2026"), after: .string("2026-2027"))
-        let moved: UndoItem = try XCTUnwrap(UndoJSONMember.moved(op, from: .file(original), direction: .backward))
-        let data: Data = try XCTUnwrap(moved.data)
-        let object: [String: Any] = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertEqual(object["school_year"] as? String, "2025-2026")
-        XCTAssertEqual((object["big"] as? NSNumber)?.int64Value, 12_345_678_901_234)
-        XCTAssertEqual((object["half"] as? NSNumber)?.doubleValue, 0.5)
-        XCTAssertEqual(data.last, 0x0A)
-        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("\"school_year\" : \"2025-2026\""))
+        let moved: UndoItem = try XCTUnwrap(UndoJSONMember.moved(op, from: .file(Data(original.utf8)), direction: .backward))
+        let text: String = String(decoding: try XCTUnwrap(moved.data), as: UTF8.self)
+        XCTAssertEqual(text, original.replacingOccurrences(of: "\"2026-2027\"", with: "\"2025-2026\""))
+    }
+
+    /// A member added goes after the last one, spaced as that one is; a
+    /// member taken out takes its own comma; nothing else moves.
+    func testAJSONMemberAddedAndTakenOutTouchesOnlyItsOwnBytes() throws {
+        let original: String = "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n"
+        let added: UndoOp = UndoOp.editJSON(path: "c.json", keyPath: ["c"], before: nil, after: .string("x"))
+        let withIt: UndoItem = try XCTUnwrap(UndoJSONMember.moved(added, from: .file(Data(original.utf8)), direction: .forward))
+        let addedText: String = String(decoding: try XCTUnwrap(withIt.data), as: UTF8.self)
+        XCTAssertEqual(addedText, "{\n  \"a\" : 1,\n  \"b\" : 0.10,\n  \"c\" : \"x\"\n}\n")
+        let back: UndoItem = try XCTUnwrap(UndoJSONMember.moved(added, from: withIt, direction: .backward))
+        XCTAssertEqual(String(decoding: try XCTUnwrap(back.data), as: UTF8.self), original)
+        let first: UndoOp = UndoOp.editJSON(path: "c.json", keyPath: ["a"], before: nil, after: .number(1))
+        let without: UndoItem = try XCTUnwrap(UndoJSONMember.moved(first, from: .file(Data(original.utf8)), direction: .backward))
+        XCTAssertEqual(String(decoding: try XCTUnwrap(without.data), as: UTF8.self), "{\n  \"b\" : 0.10\n}\n")
+    }
+
+    /// The key written twice on the path: refused, never a guess.
+    func testAJSONKeyWrittenTwiceOnThePathIsRefused() throws {
+        let original: String = "{\"school_year\": \"2026-2027\", \"school_year\": \"2026-2027\"}\n"
+        let op: UndoOp = UndoOp.editJSON(path: "c.json", keyPath: ["school_year"], before: .string("2025-2026"), after: .string("2026-2027"))
+        XCTAssertNil(UndoJSONMember.moved(op, from: .file(Data(original.utf8)), direction: .backward))
     }
 
     /// A folder taken out by an undo is renamed aside, never deleted, until

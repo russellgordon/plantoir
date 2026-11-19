@@ -408,30 +408,290 @@ nonisolated enum UndoJSONMember {
         return members
     }
 
+    /// Moves the member by changing ONLY its bytes: the value's bytes are
+    /// replaced (or the member's are removed, or a member is added after the
+    /// last one, spaced as that one is); every other byte of the file stays
+    /// as it was (the hard review of U2b, LOW a: a rewrite changed 0.1 to
+    /// 0.10000000000000001, key order, spellings, and dropped a duplicate).
+    /// Refused (nil, which the plan reads as changed since) when that cannot
+    /// be done safely: the file not UTF-8 or not one JSON object, a key
+    /// written twice in any object on the path, a part on the way missing
+    /// when a value must be set. The result must read back as exactly the
+    /// file with that one member changed.
     static func moved(_ op: UndoOp, from item: UndoItem, direction: UndoDirection) -> UndoItem? {
-        guard let data = item.data, let keyPath = op.keyPath,
+        guard let data = item.data, let keyPath = op.keyPath, !keyPath.isEmpty,
               let object = topLevel(of: data), let tree = UndoJSON.from(foundation: object) else {
             return nil
         }
         let wanted: UndoJSON? = direction == .backward ? op.valueBefore : op.valueAfter
-        guard let expected = setting(keyPath, to: wanted, in: tree),
-              let changedObject = setting(keyPath, to: wanted, in: object) else {
+        guard let expected = setting(keyPath, to: wanted, in: tree) else {
             return nil
         }
-        let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        guard var written = try? JSONSerialization.data(withJSONObject: changedObject, options: options) else {
+        let bytes: [UInt8] = Array(data)
+        guard let place = UndoJSONBytes.locate(keyPath, in: bytes) else {
             return nil
         }
-        if data.last == 0x0A {
-            written.append(0x0A)
+        var result: [UInt8] = []
+        switch (place, wanted) {
+        case (.member(let member), .some(let value)):
+            guard let spelled = UndoJSONBytes.spell(value) else {
+                return nil
+            }
+            result = Array(bytes[0..<member.valueStart]) + spelled + Array(bytes[member.valueEnd..<bytes.count])
+        case (.member(let member), .none):
+            result = Array(bytes[0..<member.removeStart]) + Array(bytes[member.removeEnd..<bytes.count])
+        case (.missing(let gap), .some(let value)):
+            guard let spelled = UndoJSONBytes.spell(value), let name = UndoJSONBytes.spell(.string(keyPath[keyPath.count - 1])) else {
+                return nil
+            }
+            let inserted: [UInt8] = gap.lead + name + gap.colon + spelled
+            result = Array(bytes[0..<gap.at]) + inserted + Array(bytes[gap.at..<bytes.count])
+        case (.missing, .none):
+            return item
         }
-        // Read back: exactly the file with that one member changed, or no
-        // write at all.
+        let written: Data = Data(result)
         guard let readBack = topLevel(of: written), let readTree = UndoJSON.from(foundation: readBack),
               readTree == expected else {
             return nil
         }
         return .file(written)
+    }
+}
+
+/// Where a member is in a JSON file's bytes, found with a scanner of its own
+/// so nothing else of the file is ever re-spelled (`UndoJSONMember.moved`).
+nonisolated enum UndoJSONBytes {
+
+    // MARK: - Stored properties
+
+    struct Member: Equatable {
+        /// Where the member's own bytes go from, when it is taken out:
+        /// with the comma before it, or the one after it.
+        let removeStart: Int
+        let removeEnd: Int
+        let valueStart: Int
+        let valueEnd: Int
+    }
+
+    struct Gap: Equatable {
+        /// Where a new member's bytes go.
+        let at: Int
+        /// What comes before the new member's name: a comma and the space
+        /// the last member had before it, or nothing in an empty object.
+        let lead: [UInt8]
+        /// What goes between its name and its value, as the last member had.
+        let colon: [UInt8]
+    }
+
+    enum Place: Equatable {
+        case member(Member)
+        case missing(Gap)
+    }
+
+    /// One member as scanned: where its name starts and its value ends, and
+    /// the bytes between its name and value.
+    struct Scanned {
+        let name: String
+        let nameStart: Int
+        let colonBytes: [UInt8]
+        let valueStart: Int
+        let valueEnd: Int
+        let leadBytes: [UInt8]
+    }
+
+    // MARK: - Functions
+
+    static func isSpace(_ byte: UInt8) -> Bool {
+        return byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D
+    }
+
+    static func skipSpace(_ bytes: [UInt8], _ index: Int) -> Int {
+        var at: Int = index
+        while at < bytes.count && isSpace(bytes[at]) {
+            at += 1
+        }
+        return at
+    }
+
+    /// The end of the string starting at `index` (its opening quote), and
+    /// its text, or nil.
+    static func scanString(_ bytes: [UInt8], _ index: Int) -> (end: Int, text: String)? {
+        guard index < bytes.count, bytes[index] == 0x22 else {
+            return nil
+        }
+        var at: Int = index + 1
+        while at < bytes.count {
+            if bytes[at] == 0x5C {
+                at += 2
+                continue
+            }
+            if bytes[at] == 0x22 {
+                let raw: Data = Data(bytes[index...at])
+                guard let text = (try? JSONSerialization.jsonObject(with: raw, options: [.fragmentsAllowed])) as? String else {
+                    return nil
+                }
+                return (end: at + 1, text: text)
+            }
+            at += 1
+        }
+        return nil
+    }
+
+    /// The end of the value starting at `index`, or nil.
+    static func scanValue(_ bytes: [UInt8], _ index: Int) -> Int? {
+        guard index < bytes.count else {
+            return nil
+        }
+        let first: UInt8 = bytes[index]
+        if first == 0x22 {
+            return scanString(bytes, index)?.end
+        }
+        if first == 0x7B || first == 0x5B {
+            // An object or an array: to its matching close, strings skipped.
+            var depth: Int = 0
+            var at: Int = index
+            while at < bytes.count {
+                let byte: UInt8 = bytes[at]
+                if byte == 0x22 {
+                    guard let end = scanString(bytes, at)?.end else {
+                        return nil
+                    }
+                    at = end
+                    continue
+                }
+                if byte == 0x7B || byte == 0x5B {
+                    depth += 1
+                } else if byte == 0x7D || byte == 0x5D {
+                    depth -= 1
+                    if depth == 0 {
+                        return at + 1
+                    }
+                }
+                at += 1
+            }
+            return nil
+        }
+        // A number, true, false or null: to the next delimiter.
+        var at: Int = index
+        while at < bytes.count {
+            let byte: UInt8 = bytes[at]
+            if isSpace(byte) || byte == 0x2C || byte == 0x7D || byte == 0x5D {
+                break
+            }
+            at += 1
+        }
+        return at > index ? at : nil
+    }
+
+    /// Every member of the object starting at `index` (its `{`), and where
+    /// its `}` is, or nil.
+    static func scanObject(_ bytes: [UInt8], _ index: Int) -> (members: [Scanned], close: Int)? {
+        guard index < bytes.count, bytes[index] == 0x7B else {
+            return nil
+        }
+        var members: [Scanned] = []
+        var at: Int = index + 1
+        var leadStart: Int = at
+        while true {
+            at = skipSpace(bytes, at)
+            guard at < bytes.count else {
+                return nil
+            }
+            if bytes[at] == 0x7D {
+                return (members: members, close: at)
+            }
+            let lead: [UInt8] = Array(bytes[leadStart..<at])
+            guard let name = scanString(bytes, at) else {
+                return nil
+            }
+            var colon: Int = skipSpace(bytes, name.end)
+            guard colon < bytes.count, bytes[colon] == 0x3A else {
+                return nil
+            }
+            colon += 1
+            let valueStart: Int = skipSpace(bytes, colon)
+            guard let valueEnd = scanValue(bytes, valueStart) else {
+                return nil
+            }
+            members.append(Scanned(
+                name: name.text, nameStart: at, colonBytes: Array(bytes[name.end..<valueStart]),
+                valueStart: valueStart, valueEnd: valueEnd, leadBytes: lead
+            ))
+            at = skipSpace(bytes, valueEnd)
+            guard at < bytes.count else {
+                return nil
+            }
+            if bytes[at] == 0x2C {
+                at += 1
+                leadStart = at
+                continue
+            }
+            if bytes[at] == 0x7D {
+                return (members: members, close: at)
+            }
+            return nil
+        }
+    }
+
+    /// Where the member at the key path is, or the gap where it would go,
+    /// or nil when it cannot be found safely (a key twice on the path, a
+    /// part on the way missing or not an object, bytes that do not scan).
+    static func locate(_ keyPath: [String], in bytes: [UInt8]) -> Place? {
+        var objectStart: Int = skipSpace(bytes, 0)
+        var depth: Int = 0
+        while depth < keyPath.count {
+            guard let object = scanObject(bytes, objectStart) else {
+                return nil
+            }
+            var found: [Scanned] = []
+            for member in object.members where member.name == keyPath[depth] {
+                found.append(member)
+            }
+            if found.count > 1 {
+                // The key written twice on the path: never a guess at which.
+                return nil
+            }
+            let isLast: Bool = depth == keyPath.count - 1
+            guard let member = found.first else {
+                if !isLast {
+                    return nil
+                }
+                if let last = object.members.last {
+                    return .missing(Gap(at: last.valueEnd, lead: [0x2C] + last.leadBytes, colon: last.colonBytes))
+                }
+                return .missing(Gap(at: object.close, lead: [], colon: Array(": ".utf8)))
+            }
+            if isLast {
+                // Taken out with the comma after it, or else the one before.
+                var index: Int = 0
+                for (position, candidate) in object.members.enumerated() where candidate.nameStart == member.nameStart {
+                    index = position
+                }
+                if index + 1 < object.members.count {
+                    let next: Scanned = object.members[index + 1]
+                    return .member(Member(removeStart: member.nameStart, removeEnd: next.nameStart, valueStart: member.valueStart, valueEnd: member.valueEnd))
+                }
+                if index > 0 {
+                    let previous: Scanned = object.members[index - 1]
+                    return .member(Member(removeStart: previous.valueEnd, removeEnd: member.valueEnd, valueStart: member.valueStart, valueEnd: member.valueEnd))
+                }
+                let inside: Int = skipSpace(bytes, objectStart + 1)
+                return .member(Member(removeStart: inside, removeEnd: member.valueEnd, valueStart: member.valueStart, valueEnd: member.valueEnd))
+            }
+            objectStart = member.valueStart
+            depth += 1
+        }
+        return nil
+    }
+
+    /// A value's bytes, written compactly with keys sorted and slashes as
+    /// they are: only the new value is ever spelled by the app.
+    static func spell(_ value: UndoJSON) -> [UInt8]? {
+        let options: JSONSerialization.WritingOptions = [.sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed]
+        guard let data = try? JSONSerialization.data(withJSONObject: value.foundation(), options: options) else {
+            return nil
+        }
+        return Array(data)
     }
 }
 

@@ -498,6 +498,153 @@ def edit_json_state(op, data):
     return "neither"
 
 
+def _skip(data, at):
+    while at < len(data) and data[at] in b" \t\n\r":
+        at += 1
+    return at
+
+
+def _scan_string(data, at):
+    if at >= len(data) or data[at] != 0x22:
+        return None
+    index = at + 1
+    while index < len(data):
+        if data[index] == 0x5C:
+            index += 2
+            continue
+        if data[index] == 0x22:
+            return index + 1, json.loads(data[at:index + 1].decode("utf-8"))
+        index += 1
+    return None
+
+
+def _scan_value(data, at):
+    if at >= len(data):
+        return None
+    first = data[at]
+    if first == 0x22:
+        found = _scan_string(data, at)
+        return found[0] if found else None
+    if first in (0x7B, 0x5B):
+        depth = 0
+        index = at
+        while index < len(data):
+            byte = data[index]
+            if byte == 0x22:
+                found = _scan_string(data, index)
+                if not found:
+                    return None
+                index = found[0]
+                continue
+            if byte in (0x7B, 0x5B):
+                depth += 1
+            elif byte in (0x7D, 0x5D):
+                depth -= 1
+                if depth == 0:
+                    return index + 1
+            index += 1
+        return None
+    index = at
+    while index < len(data) and data[index] not in b" \t\n\r,}]":
+        index += 1
+    return index if index > at else None
+
+
+def _scan_object(data, at):
+    """[(name, nameStart, colonBytes, valueStart, valueEnd, leadBytes)], close."""
+    if at >= len(data) or data[at] != 0x7B:
+        return None
+    members = []
+    index = at + 1
+    lead_start = index
+    while True:
+        index = _skip(data, index)
+        if index >= len(data):
+            return None
+        if data[index] == 0x7D:
+            return members, index
+        lead = data[lead_start:index]
+        found = _scan_string(data, index)
+        if not found:
+            return None
+        name_end, name = found
+        colon = _skip(data, name_end)
+        if colon >= len(data) or data[colon] != 0x3A:
+            return None
+        value_start = _skip(data, colon + 1)
+        value_end = _scan_value(data, value_start)
+        if value_end is None:
+            return None
+        members.append((name, index, data[name_end:value_start], value_start, value_end, lead))
+        index = _skip(data, value_end)
+        if index >= len(data):
+            return None
+        if data[index] == 0x2C:
+            index += 1
+            lead_start = index
+            continue
+        if data[index] == 0x7D:
+            return members, index
+        return None
+
+
+def _spell(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def json_bytes_moved(op, backward, data):
+    """opKinds.editJSON's move: only the member's bytes change (the hard
+    review of U2b, LOW a). None when it cannot be done safely."""
+    try:
+        data.decode("utf-8")
+        top = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if not isinstance(top, dict):
+        return None
+    wanted_key = "before" if backward else "after"
+    key_path = op["keyPath"]
+    start = _skip(data, 0)
+    for depth, part in enumerate(key_path):
+        scanned = _scan_object(data, start)
+        if scanned is None:
+            return None
+        members, close = scanned
+        found = [member for member in members if member[0] == part]
+        if len(found) > 1:
+            return None
+        last = depth == len(key_path) - 1
+        if not found:
+            if not last:
+                return None
+            if wanted_key not in op:
+                return data
+            value = _spell(op[wanted_key])
+            name = _spell(part)
+            if members:
+                tail = members[-1]
+                insert = b"," + tail[5] + name + tail[2] + value
+                at = tail[4]
+            else:
+                insert = name + b": " + value
+                at = close
+            return data[:at] + insert + data[at:]
+        member = found[0]
+        if not last:
+            start = member[3]
+            continue
+        if wanted_key in op:
+            return data[:member[3]] + _spell(op[wanted_key]) + data[member[4]:]
+        position = members.index(member)
+        if position + 1 < len(members):
+            return data[:member[1]] + data[members[position + 1][1]:]
+        if position > 0:
+            return data[:members[position - 1][4]] + data[member[4]:]
+        inside = _skip(data, start + 1)
+        return data[:inside] + data[member[4]:]
+    return None
+
+
 def tree_reading(item):
     """An item spec of the cases: absent, a file, or a folder (listing)."""
     if item is None or item.get("absent"):

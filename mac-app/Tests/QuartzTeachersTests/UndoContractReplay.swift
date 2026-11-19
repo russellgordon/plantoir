@@ -600,6 +600,30 @@ nonisolated enum UndoContractReplay {
         return (cases: cases.count, failures: failures)
     }
 
+    // MARK: - undo.editJSONCases
+
+    /// The bytes of an editJSON move, exactly (the hard review of U2b, LOW a).
+    static func runEditJSONCases() throws -> (cases: Int, failures: [String]) {
+        let cases: [[String: Any]] = try undoBlock()["editJSONCases"] as? [[String: Any]] ?? []
+        var failures: [String] = []
+        for testCase in cases {
+            let name: String = string(testCase["name"]) ?? "?"
+            failures += unknownKeys(in: testCase, allowed: ["name", "file", "op", "direction", "result"], list: "editJSONCases", name: name)
+            let given: [String: Any] = testCase["op"] as? [String: Any] ?? [:]
+            let op: UndoOp = try JSONDecoder().decode(UndoOp.self, from: JSONSerialization.data(withJSONObject: given))
+            let direction: UndoDirection = string(testCase["direction"]) == "undo" ? .backward : .forward
+            let file: Data = Data((string(testCase["file"]) ?? "").utf8)
+            var result: String? = nil
+            if let moved = UndoJSONMember.moved(op, from: .file(file), direction: direction), let data = moved.data {
+                result = String(decoding: data, as: UTF8.self)
+            }
+            if result != string(testCase["result"]) {
+                failures.append("editJSONCases '\(name)': came to \(String(describing: result))")
+            }
+        }
+        return (cases: cases.count, failures: failures)
+    }
+
     // MARK: - undo.listingCases
 
     static func runListingCases() throws -> (cases: Int, failures: [String]) {

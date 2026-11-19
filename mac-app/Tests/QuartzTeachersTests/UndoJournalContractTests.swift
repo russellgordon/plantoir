@@ -69,6 +69,14 @@ final class UndoJournalContractTests: XCTestCase {
         XCTAssertEqual(result.failures, [])
     }
 
+    /// An editJSON move changes only its member's bytes, the same on both
+    /// platforms (the hard review of U2b, LOW a).
+    func testEditJSONCases() throws {
+        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runEditJSONCases()
+        XCTAssertGreaterThanOrEqual(result.cases, 6)
+        XCTAssertEqual(result.failures, [])
+    }
+
     /// U2: a folder's listing is the same text on both platforms.
     func testListingCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runListingCases()

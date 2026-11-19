@@ -432,6 +432,15 @@ class ContractCaseTests(unittest.TestCase):
                 self.assertEqual(undo, case["undo"])
                 self.assertEqual(redo, case["redo"])
 
+    def test_edit_json_cases(self):
+        # The bytes of an editJSON move (the hard review of U2b, LOW a).
+        cases = shared_undo()["editJSONCases"]
+        self.assertGreaterEqual(len(cases), 6)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                out = traces.json_bytes_moved(case["op"], case["direction"] == "undo", case["file"].encode("utf-8"))
+                self.assertEqual(None if out is None else out.decode("utf-8"), case["result"])
+
     def test_listing_cases(self):
         cases = shared_undo()["listingCases"]
         self.assertGreaterEqual(len(cases), 3)

@@ -19429,15 +19429,22 @@ off.
   an object; before and after are any JSON, compared as JSON (true is never
   1, 1 equals 1.0, strings code point for code point, objects in any order).
   A member holding null is not a member that is absent: the op leaves out
-  `before` or `after` for "not there", and `null` means null. The file is
-  written back in the app's own form (`CourseConfiguration`'s options:
-  pretty-printed, keys sorted, slashes unescaped, the final line feed kept)
-  with every other member as `JSONSerialization` read it, and the result is
-  read back and compared with the file with that one member changed: a
-  write that would alter anything else is refused as a change since. The
-  reserved `element` (an array element) is left to the piece that needs it:
-  an op carrying it cannot be read here, so an older reader can never undo
-  it by the member rule.
+  `before` or `after` for "not there", and `null` means null. **Only the
+  member's own bytes change** (the hard review of U2b, LOW a, after the
+  first version rewrote the whole file in the app's form and turned 0.1
+  into 0.10000000000000001, re-ordered keys and dropped a key written
+  twice): `UndoJSONBytes` scans the file to the member, replaces its value's
+  bytes with the new value spelled compactly (keys sorted, slashes as they
+  are), takes a removed member out with its own comma, and adds a new one
+  after the last member, spaced as that one is; every other byte stays.
+  A key written twice in an object on the path, a file that is not UTF-8
+  or not one JSON object, or bytes that do not scan, refuse the move as a
+  change since; the result must read back as exactly the file with that
+  one member changed. `undo.editJSONCases` pins the bytes for both
+  platforms, and the Python reference produces the same ones. The reserved
+  `element` (an array element) is left to the piece that needs it: an op
+  carrying it cannot be read here, so an older reader can never undo it by
+  the member rule.
 - **`move`**: a file (by its SHA-256) or a folder (by its listing) moved,
   judged as a PAIR (#897 piece B, seam 1, the piece B review's I1): the
   place it left free and the place it went holding it is undoable; the
