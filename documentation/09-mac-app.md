@@ -19316,6 +19316,37 @@ the list); anything else reads the journal whole again. This is safe because not
 rewritten: the one truncation, of a torn last line, only ever cuts bytes
 after the last line feed, which is where every remembered end sits.
 
+**Every read of the list throws rather than ends the app** (U2a, the
+sweep's F4). The fold cache, the tail check and the torn-line cut read
+with `FileHandle.read(upToCount:)` through `UndoFileReads.read`, never the
+legacy `readData(ofLength:)`, which on a read error (a failing disk, a
+network home that drops mid-read) raises an Objective-C exception Swift
+cannot catch, inside Publish. A failed read is `UndoJournalError.couldNotRead`:
+the list is unreadable for that attempt, so a step in shadow goes ahead
+without a record (a trail line, "the list could not be read"), and a live
+step, Undo or Redo is refused before anything changes. A tail that cannot
+be read makes the remembered fold untrusted, so the next read is a whole
+one. The review of U2a found the same hole one step earlier: a segment
+that could not be OPENED (EIO, EACCES, EMFILE) was skipped as if it were
+gone, and a failed seek read as an empty segment, so a fold missing its
+newest segment passed as valid, would have reused step numbers and let
+Undo act on an older step past a newer one. Now `UndoFileReads.openFile`
+answers nil only for a file that is gone (a segment pruned since it was
+listed), and throws for everything else; the torn-line cut, the tail
+check, the blobs and the folder's identifier file all open through it. A
+blob that is there and cannot be read is the list unavailable, never
+`contentMissing` (which clears the list for good); an identifier file that
+cannot be read is never set aside (that would give the folder a new
+identifier and put every step under the old one out of reach). Left as
+they are, and why: the fold's size and file-number checks (a failure only
+makes the fold untrusted, and the whole read then throws), a page that
+cannot be read (`UndoItem.read` calls it neither, so changed since: a
+teacher's page, not the list, and a question for U7 before the switch),
+the published-pages record (`cannotTell`), and the blob sweep's listing
+(it then deletes nothing). Not reproduced on a real failing disk; the seam
+`UndoKillPoints.readOfTheListFails` proves the path
+(`UndoJournalCoreTests.testAReadThatFailsIsAnUnreadableList`).
+
 ### Write-ahead, and recovery from the content
 
 A step runs in three phases (`JournaledWrite.perform`): under the lock,
@@ -19458,6 +19489,47 @@ mode and owner are its own; a copy on a volume without links) until every
 swap is in. If one cannot go in, the swaps already made are reversed and
 the file is named (`undo.stepCases`). A rename happened or it did not, so
 a process killed part way leaves each file wholly old or wholly new.
+
+**A staging write that fails leaves nothing, and says so in its own word**
+(U2a, the Fable sweep of U1's F1). On a 3 MB disk image filled to the brim
+the sweep measured a refused step leaving `.a.md.plantoir-undo-2-apply-new`
+(0 bytes) and a refused Undo leaving `.a.md.plantoir-undo-1-undo-new` beside
+the page, both still there after room came back and two more steps ran:
+the exclusive create had made the file, the write into it failed, and the
+catch dropped it. Recovery never saw it, because it tidies only steps
+closed `interrupted` and these closed `failed`. Now the staging loop
+removes the file it made before it refuses (`UndoSwap.removeStaged`), and
+the refusal is `UndoRefusal.couldNotWrite` (contract word `couldNotWrite`:
+the disk is full, or the folder will not take a new file), not
+`fileIsInUse`, which would have had U7 tell the teacher a file was open
+somewhere. Like a file in use it changes nothing on the list: the step is
+still offered, and nothing is cleared or dropped. Every failure of the
+staging step is this word (making the folder, the exclusive create, the
+write, the flush): none of them is another program holding the target,
+which only a rename can meet. Keeping the original before the swap is the
+same word when it fails for room or permission (`UndoSwap.isRoomOrPermission`:
+on a volume without hard links the original is copied, and the copy can
+fill the disk); anything else there stays `fileIsInUse` (the review of
+U2a, LOW 1). Recovery retries a `couldNotWrite` swap on the schedule a
+file in use has. The `stepCases` row `stagingFailsAt` pins it,
+through a test seam (`UndoKillPoints.stagingWriteFailsAt`) that creates the
+staged file and then fails as a full disk does; the disk image itself is
+not in the suite.
+
+**A line op that cannot be placed is a change since** (U2a, the sweep's
+F2). The sweep made a step turn `draft: true` into `publish: false` (two
+line ops), removed the page's front matter by hand, and Undo answered
+`contentMissing`: the `draft` op still read "as the step left it" (absent),
+but putting its line back needs a block that is gone, and `UndoCheck.plan`
+returned the moment `moved` gave nil, before it reported the pages already
+in the way. With M9 built as it is the list was cleared either way and
+only the reason was wrong; with M9 turned the other way, this hand edit
+would have stopped clearing the list, against ruling 13. Now a line op
+that cannot be placed puts its page in the way, the check goes on through
+every op, and every page in the way is reported (`changedSince`) before
+any content found missing from the list. `contentMissing` is left for a
+blob the list no longer holds. The `stepCases` row with `step: twoLines`
+pins it.
 
 ### Linear, cleared, pruned
 
