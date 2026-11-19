@@ -648,7 +648,8 @@ struct SectionDetailView: View {
                 DetailTabs(
                     tabs: tabsInTheBar,
                     selection: selectedTabBinding,
-                    name: AccessibilityNames.sectionTabs,
+                    // Named by the window's own title (#993, D16).
+                    name: sectionName,
                     identifier: "sectionTabs"
                 )
             }

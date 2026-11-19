@@ -312,7 +312,7 @@ final class DetailTabsLayoutTests: XCTestCase {
                                 (tab: CourseDetailTab.planning, title: PlanningWording.tabPlanning),
                             ],
                             selection: .constant(CourseDetailTab.planning),
-                            name: AccessibilityNames.courseTabs,
+                            name: course.displayCode,
                             identifier: "courseTabs"
                         )
                         CourseDetailContent(course: course, session: CourseSettingsSession(), showsPlanning: true) {

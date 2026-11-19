@@ -5,47 +5,53 @@ import Foundation
 /// D20, D40 and D41).
 ///
 /// Apple's VoiceOver guidance: "Provide alternative labels for all key
-/// interface elements." Each name is the control's visible title where it
-/// has one, or a plain two- or three-word label, and never the control's
-/// kind ("button", "pop-up"), which VoiceOver says by itself. Kept in one
-/// place so the wording review (#1001) can read them all together.
+/// interface elements." A control with a visible title or a printed label
+/// beside it is named by those words, passed where it is drawn; the names
+/// here are for controls that show no words at all. Each is a plain one-
+/// to three-word label in sentence case, like the app's printed field
+/// labels ("Course name", "Folder name"): the HIG's Writing page asks for
+/// one style per kind of element ("Choose a style for each UI element type
+/// and use it consistently"), and Apple's accessibility programming guide
+/// asks that a label begin with a capitalized word, not end with a period,
+/// and not name the control's kind ("button", "pop-up"), which VoiceOver
+/// says by itself. Kept in one place so the wording review (#1001) can
+/// read them all together.
 nonisolated enum AccessibilityNames {
 
     // MARK: - Stored properties
-
-    /// A section's Website | Coverage | Problems bar (D16).
-    static let sectionTabs: String = "Section View"
-
-    /// A course's Settings | Planning bar (D16).
-    static let courseTabs: String = "Course View"
 
     /// The assistant composer's arrow button (D17), which VoiceOver read
     /// as "Arrow Up Circle", the symbol's own name.
     static let send: String = "Send"
 
     /// The smiley button beside an emoji field (D18), which VoiceOver read
-    /// as "face.smiling". The same words as its tooltip, in title case.
-    static let chooseEmoji: String = "Choose Emoji"
+    /// as "face.smiling". Its tooltip's words, shortened.
+    static let chooseEmoji: String = "Choose emoji"
 
     /// Publish Class for a Date: the date field (D18).
-    static let classDate: String = "Class Date"
+    static let classDate: String = "Class date"
 
     /// Make Room: which class to make room before (D18).
     static let makeRoomClass: String = "Class"
 
     /// Make Room: how many classes of room (D18). VoiceOver reads the
     /// number as the stepper's value after this name.
-    static let makeRoomHowMany: String = "Number of Classes"
+    static let makeRoomHowMany: String = "Number of classes"
 
     /// Add Class: the radio group of ways (D18).
-    static let addClassWay: String = "Way to Add"
+    static let addClassWay: String = "Way to add"
 
     /// Roll Over: the new-or-same website radio group (D18).
     static let rollOverWebsite: String = "Website"
 
-    /// Add a Section: the number field and its stepper, named by the words
-    /// printed beside them, "Section number:" (D18).
+    /// Add a Section: the number field, named by the words printed beside
+    /// it, "Section number:" (D18). Its stepper is not given this name: the
+    /// stepper's own title already says it, and a second name made
+    /// VoiceOver read "Section number, Section number".
     static let sectionNumber: String = "Section number"
+
+    /// The spinner a restored window shows before its folder opens (D18).
+    static let openingFolder: String = "Opening folder"
 
     /// The Class Dates sheet's typing area (D41).
     static let classDates: String = "Class dates"
@@ -62,11 +68,7 @@ nonisolated enum AccessibilityNames {
     static let sourceTable: String = "Classes"
 
     /// Deploy's later-classes table (D41).
-    static let laterClassesTable: String = "Later Classes"
-
-    /// The Copy a Page sheet's problem line, said before the sentence so
-    /// it is not told apart by its orange alone (D19).
-    static let warning: String = "Warning"
+    static let laterClassesTable: String = "Later classes"
 
     /// The multi-destination deploy checklist, one state per destination
     /// (D19): before this, the state was only a coloured symbol.

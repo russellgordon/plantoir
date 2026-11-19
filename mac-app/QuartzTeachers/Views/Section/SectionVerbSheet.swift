@@ -968,6 +968,8 @@ struct SectionVerbSheet: View {
                     set: { text in model.search = text }
                 ))
                 .borderedTextField()
+                // Its placeholder is not a name (#993, D18): the same words.
+                .accessibilityLabel(Text(AssistWording.menuFindAPage))
                 .accessibilityIdentifier("sectionVerbSheetSearch")
                 pickerTable
             }
@@ -1036,6 +1038,8 @@ struct SectionVerbSheet: View {
                     set: { text in model.searchTheSources(for: text) }
                 ))
                 .borderedTextField()
+                // Its placeholder is not a name (#993, D18): the same words.
+                .accessibilityLabel(Text(AssistWording.menuFindAPage))
                 .accessibilityIdentifier("sectionVerbSheetSearch")
                 sourceTable
             }

@@ -34,13 +34,14 @@ final class AccessibilityNamesTests: XCTestCase {
         XCTAssertTrue(AccessibilityNamesTests.modifier(".accessibilityLabel(Text(label))", comesJustBefore: "emojiChoiceField", in: view))
     }
 
-    /// Both bars are given their names where they are drawn.
-    func testBothTabBarsArePassedTheirNames() throws {
+    /// Both bars are named by their window's title where they are drawn
+    /// (what a bar given a name says is read live, in
+    /// `AccessibilityTreeTests`).
+    func testBothTabBarsAreNamedByTheirWindowsTitle() throws {
         let section: String = try AccessibilityNamesTests.source("Views/Section/SectionDetailView.swift")
-        XCTAssertNotNil(section.range(of: "name: AccessibilityNames.sectionTabs,"))
+        XCTAssertNotNil(section.range(of: "name: sectionName,"))
         let course: String = try AccessibilityNamesTests.source("Views/CourseSettings/CourseDetailView.swift")
-        XCTAssertNotNil(course.range(of: "name: AccessibilityNames.courseTabs,"))
-        XCTAssertNotEqual(AccessibilityNames.sectionTabs, AccessibilityNames.courseTabs)
+        XCTAssertNotNil(course.range(of: "name: course.displayCode,"))
     }
 
     /// The send button says "Send" (D17), not its symbol's name.
@@ -65,7 +66,6 @@ final class AccessibilityNamesTests: XCTestCase {
             ("Views/Section/StartOfYearSheet.swift", "planTable", "startOfYearPlanTable"),
             ("Views/Section/SectionScheduleSheet.swift", "classDates", "sectionScheduleTypedField"),
             ("Views/Wizard/AddSectionSheet.swift", "sectionNumber", "addSectionNumberField"),
-            ("Views/Wizard/AddSectionSheet.swift", "sectionNumber", "addSectionStepper"),
         ]
         for entry in expected {
             let view: String = try AccessibilityNamesTests.source(entry.file)
@@ -152,11 +152,27 @@ final class AccessibilityNamesTests: XCTestCase {
         XCTAssertEqual(Set([waiting, deploying, done, failed]).count, 4)
     }
 
-    /// Copy a Page's problem line carries a named warning symbol (D19), so
-    /// it is told apart by more than its orange.
-    func testCopyAPageProblemLineIsNotColourAlone() throws {
-        let view: String = try AccessibilityNamesTests.source("Views/CopyPage/CopyPageSheet.swift")
-        XCTAssertNotNil(view.range(of: ".accessibilityLabel(Text(AccessibilityNames.warning))\n                    Text(problem)"))
+    /// The sidebar's filter field and the Class Dates sheet's source field
+    /// were named only by their placeholders, which VoiceOver does not
+    /// read as a name (D18, the first review).
+    func testTheFilterAndSourceFieldsAreNamed() throws {
+        let sidebar: String = try AccessibilityNamesTests.source("Views/SidebarView.swift")
+        XCTAssertTrue(AccessibilityNamesTests.modifier(".accessibilityLabel(Text(\"Filter\"))", comesJustBefore: "courseFilterField", in: sidebar))
+        let schedule: String = try AccessibilityNamesTests.source("Views/Section/SectionScheduleSheet.swift")
+        XCTAssertTrue(AccessibilityNamesTests.modifier(
+            ".accessibilityLabel(Text(\"Where these came from\"))", comesJustBefore: "sectionScheduleSourceField", in: schedule
+        ))
+    }
+
+    /// Plan Share's three lines that say a share may not be what the
+    /// teacher expects wear the caution's colour and triangle (D19); the
+    /// plain status lines do not.
+    func testPlanSharesCautionLinesAreNotWordsAlone() throws {
+        let bar: String = try AccessibilityNamesTests.source("Views/Planning/PlanShareBar.swift")
+        XCTAssertNotNil(bar.range(of: "StatusColour.warning.sentence(PlanSharingWording.lastShareUnfinished)"))
+        XCTAssertNotNil(bar.range(of: "StatusColour.warning.sentence(PlanSharingWording.stopUnconfirmed)"))
+        XCTAssertNotNil(bar.range(of: "StatusColour.warning.sentence(PlanSharingWording.newPasswordNotInUse)"))
+        XCTAssertNil(bar.range(of: "StatusColour.warning.sentence(PlanSharingWording.openToAnyone)"))
     }
 
     /// The assistant's breathing dots stand still under Reduce Motion.

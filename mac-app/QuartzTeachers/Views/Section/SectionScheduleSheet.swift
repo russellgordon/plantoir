@@ -280,6 +280,8 @@ struct SectionScheduleSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             TextField("Where these came from", text: $source)
                 .borderedTextField()
+                // Its placeholder is not a name (#993, D18): the same words.
+                .accessibilityLabel(Text("Where these came from"))
                 .accessibilityIdentifier("sectionScheduleSourceField")
             Text("In your own words — “timetable.xlsx, block H”. This is what you will read months from now when you wonder where these dates came from.")
                 .font(.caption)

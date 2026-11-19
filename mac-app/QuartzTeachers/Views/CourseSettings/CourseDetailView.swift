@@ -114,7 +114,8 @@ struct CourseDetailView: View {
                         (tab: CourseDetailTab.planning, title: PlanningWording.tabPlanning),
                     ],
                     selection: tabBinding,
-                    name: AccessibilityNames.courseTabs,
+                    // Named by the window's own title (#993, D16).
+                    name: course.displayCode,
                     identifier: "courseTabs"
                 )
             }

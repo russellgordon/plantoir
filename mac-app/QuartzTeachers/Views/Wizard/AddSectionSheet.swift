@@ -107,7 +107,8 @@ struct AddSectionSheet: View {
                     step(by: -1)
                 })
                 .labelsHidden()
-                .accessibilityLabel(Text(AccessibilityNames.sectionNumber))
+                // Its own title names it; a label as well made VoiceOver
+                // say "Section number, Section number" (#993 review).
                 .accessibilityIdentifier("addSectionStepper")
             }
 

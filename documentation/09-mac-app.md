@@ -20053,40 +20053,83 @@ VoiceOver"; its Accessibility page asks it to "convey information with more
 than color alone" and, under Reduce Motion, to reduce "automatic and
 repetitive animations".
 
-- **One home for the names.** `AccessibilityNames` (`Views/Helpers/`) holds
-  every name given to a control whose visible title is empty, hidden or only
-  a symbol, so the wording can be read in one place. A name is the control's
-  visible title or a plain two- or three-word label, never its kind
-  ("button"), which VoiceOver says itself. A control whose row already prints
-  its label (`LabeledContent`, a Course Settings row) is named with that same
-  text.
+- **Whose words a name is.** A control with a visible title, a printed
+  label beside it (`LabeledContent`, a Course Settings row, "Section
+  number:"), or a placeholder standing in for one ("Filter", "Where these
+  came from") is named with exactly those words, passed where it is drawn.
+  `AccessibilityNames` (`Views/Helpers/`) holds only the names of controls
+  that show no words at all, so the wording can be read in one place. Each
+  is a plain one- to three-word label in **sentence case**, the case of the
+  app's printed field labels ("Course name", "Folder name"): the HIG's
+  Writing page asks for one capitalisation style per kind of element, and
+  Apple's accessibility programming guide asks that a label begin with a
+  capitalised word, not end with a period, and not name the control's kind
+  ("button"), which VoiceOver says itself. The first version mixed title
+  case ("Choose Emoji", "Later Classes") with sentence case; the review
+  caught it.
 - **Why names were wrong rather than missing.** An icon-only button with no
   label is named by SwiftUI from its symbol: the send button read "Arrow Up
   Circle", the emoji button "face.smiling", the unsaved-settings icon
-  "Info". `DetailTabs` now takes a `name` ("Section View", "Course View"),
-  because a segmented `Picker("")` with hidden labels gave its radio group
-  no name although each segment had one.
+  "Info". A segmented `Picker("")` with hidden labels gave its radio group
+  no name although each segment had one, so `DetailTabs` takes a `name`:
+  the window's own title ("EXC2O-S1" on a section, "EXC2O" on a course),
+  words already on the screen. The first version invented "Section View"
+  and "Course View", which appear nowhere a sighted teacher can see; a bar
+  with no title of its own is named after the page whose views it
+  switches.
+- **A name said once.** A `Stepper` with a title already carries that title
+  as its name even with `.labelsHidden()`; giving it an
+  `.accessibilityLabel` of the same words as well made VoiceOver read
+  "Section number, Section number" (Add a Section, the first review). Only
+  the number field beside it is labelled.
+- **Placeholders are not names.** A `TextField("Filter", …)` shows its title
+  as placeholder text, which assistive apps read as a placeholder, not as
+  the field's name; the sidebar's filter field and the Class Dates sheet's
+  "Where these came from" field are labelled with those same words.
 - **Decorative icons are hidden.** An `info.circle` (or the token notice's
   triangle) beside a sentence that says everything is `accessibilityHidden`,
   so VoiceOver reads the sentence alone.
-- **State in words.** The multi-destination deploy checklist names each
-  destination's state ("Waiting", "Deploying", "Done", "Failed",
-  `DeployDestinationChecklist.stateName`) and reads as one element per
-  destination; Copy a Page's orange problem line carries a warning symbol
-  named "Warning".
+- **State in words, and in more than colour.** The multi-destination deploy
+  checklist names each destination's state ("Waiting", "Deploying",
+  "Done", "Failed", `DeployDestinationChecklist.stateName`) and reads as
+  one element per destination. Copy a Page's problem line is #994's
+  `StatusColour.blocking.sentence`, the stop symbol inside the sentence,
+  VoiceOver hearing the words alone; the branch's own symbol for it was
+  dropped at the merge. Plan Share's three status lines that say a share
+  may not be what the teacher expects (the last share did not finish, Stop
+  Sharing not confirmed, the new password not in use yet) are
+  `StatusColour.warning.sentence`: the caution's orange and triangle. They
+  were done here rather than left for #992, because #992's design changes
+  the sheet and leaves the bar's lines as they are.
+- **The restoring-folder spinner** is its own view,
+  `RestoringFolderPlaceholder` (`MainWindowView.swift`), named "Opening
+  folder"; a bare `ProgressView` gave VoiceOver nothing to say.
 - **Reduce Motion.** The assistant's breathing dots stand still and dim
   while Reduce Motion is on (`AssistTypingIndicator.breathes`), and turning
   it on mid-wait removes the repeating animation rather than leaving it
   running.
 - **Not done here, and why.** The About window's credit links are inline
   Markdown links in a `Text`, which SwiftUI reports to accessibility as
-  disabled links (D46); fixing that means drawing them as separate `Link`
-  views, a change to the window's look, so it waits for a ruling. Plan
-  Share's status lines (part of D19) wait for the Plan Share sheet (#992).
-- **Tests.** `AccessibilityNamesTests`: the tab bar's and the emoji field's
-  names are read back from the accessibility tree AppKit builds for a hosted
-  view; controls deep inside sheets are checked by reading the view source
-  for the naming modifier on the line above the control's identifier.
+  disabled links (D46). Russell ruled on 2026-11-19 that they become
+  separate link views, the design shown to him before it is built:
+  `vm-tools/reference/993-about-window-design.md`.
+- **Tests read what the app exposes.** `AccessibilityTreeTests` hosts the
+  real views (the tab bar, the emoji field, Add a Section, the Class Dates
+  sheet, the page picker sheet, the spinner, a status sentence) in an
+  off-screen window and reads the tree AppKit hands an assistive app,
+  through `NSAccessibilityProtocol` from the hosting view down
+  (`AccessibilityTree`, in the test target): each element's role, label,
+  title and identifier. A name that is missing, or a control that says its
+  name twice, fails there, which reading the source cannot show (the
+  doubled stepper passed every source check). `AccessibilityNamesTests`
+  still reads the view source for controls deep inside views that need a
+  whole window to draw (the sidebar's filter field, the wizard, Course
+  Settings, the send button), looking for the naming modifier on the line
+  above the control's identifier; those are checks that a name is given,
+  not of what VoiceOver hears. The first review's outside reader of an
+  isolated debug build (`AXUIElement`, `vm-tools/reference/993-review-1/
+  ax993tools`) is the same idea from outside the process; inside the test
+  host no permission is needed.
 
 **For Windows:** each name here has a WinUI counterpart in
 `AutomationProperties.Name`; stage 3 of #975 mirrors this piece.

@@ -29,7 +29,10 @@ struct DetailTabs<Tab: Hashable>: View {
     @Binding var selection: Tab
 
     /// What VoiceOver calls the bar (#993, D16): the segments are named by
-    /// their titles, but the group around them had no name of its own.
+    /// their titles, but the group around them had no name of its own. The
+    /// bar has no visible title, so it takes the window's ("EXC2O-S1",
+    /// "EXC2O"): the page whose views it switches, in words already on
+    /// the screen, rather than an invented "Section View".
     let name: String
 
     /// For UI tests.
