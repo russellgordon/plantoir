@@ -215,6 +215,7 @@ struct SectionScheduleSheet: View {
                     .font(.body.monospaced())
                     .frame(minHeight: 150)
                     .border(Color.secondary.opacity(0.3))
+                    .accessibilityLabel(Text(AccessibilityNames.classDates))
                     .accessibilityIdentifier("sectionScheduleTypedField")
             }
 

@@ -82,6 +82,8 @@ struct AgentGuidanceNoticeView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "info.circle")
                     .foregroundStyle(.secondary)
+                    // Decorative: the sentence beside it says it all (#993, D20).
+                    .accessibilityHidden(true)
                 Text(message)
                     .font(.callout)
                     .foregroundStyle(.secondary)

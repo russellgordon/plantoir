@@ -114,6 +114,7 @@ struct CourseDetailView: View {
                         (tab: CourseDetailTab.planning, title: PlanningWording.tabPlanning),
                     ],
                     selection: tabBinding,
+                    name: AccessibilityNames.courseTabs,
                     identifier: "courseTabs"
                 )
             }

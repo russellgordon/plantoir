@@ -742,6 +742,9 @@ struct SidebarView: View {
                             SidebarView.clockIdentifier(courseCode: courseCode, sectionNumber: sectionNumber)
                         )
                         .help(SidebarView.scheduledDeployTooltip(for: scheduledFor))
+                        // The same sentence twice, as on the warning badge
+                        // above (#993, D18).
+                        .accessibilityLabel(Text(SidebarView.scheduledDeployTooltip(for: scheduledFor)))
                 }
             }
         } else {

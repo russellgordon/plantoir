@@ -346,6 +346,7 @@ struct StringListEditorView: View {
                 requestRemoval(of: selectedItem)
             }
         }
+        .accessibilityLabel(Text(title))
         .accessibilityIdentifier("table-\(title)")
     }
 

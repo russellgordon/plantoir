@@ -28,6 +28,10 @@ struct DetailTabs<Tab: Hashable>: View {
 
     @Binding var selection: Tab
 
+    /// What VoiceOver calls the bar (#993, D16): the segments are named by
+    /// their titles, but the group around them had no name of its own.
+    let name: String
+
     /// For UI tests.
     let identifier: String
 
@@ -44,6 +48,7 @@ struct DetailTabs<Tab: Hashable>: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
+            .accessibilityLabel(Text(name))
             .accessibilityIdentifier(identifier)
             Spacer()
         }

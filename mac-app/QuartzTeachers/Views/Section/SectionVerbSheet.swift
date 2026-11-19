@@ -952,6 +952,7 @@ struct SectionVerbSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(planTableHeight)
+        .accessibilityLabel(Text(AccessibilityNames.planTable))
         .accessibilityIdentifier("sectionVerbSheetPlanTable")
     }
 
@@ -977,6 +978,7 @@ struct SectionVerbSheet: View {
             ), displayedComponents: [.date])
             .labelsHidden()
             .datePickerStyle(.field)
+            .accessibilityLabel(Text(AccessibilityNames.classDate))
             .accessibilityIdentifier("sectionVerbSheetDay")
         case .makeRoom:
             Picker("", selection: Binding(
@@ -988,6 +990,7 @@ struct SectionVerbSheet: View {
                 }
             }
             .labelsHidden()
+            .accessibilityLabel(Text(AccessibilityNames.makeRoomClass))
             .accessibilityIdentifier("sectionVerbSheetClass")
             Stepper(value: Binding(
                 get: { return model.howMany },
@@ -996,6 +999,8 @@ struct SectionVerbSheet: View {
                 Text("\(model.howMany)")
                     .monospacedDigit()
             }
+            .accessibilityLabel(Text(AccessibilityNames.makeRoomHowMany))
+            .accessibilityValue(Text("\(model.howMany)"))
             .accessibilityIdentifier("sectionVerbSheetHowMany")
         case .addClass:
             // One line per way, in the contract's order; a way this section
@@ -1013,6 +1018,7 @@ struct SectionVerbSheet: View {
             }
             .pickerStyle(.radioGroup)
             .labelsHidden()
+            .accessibilityLabel(Text(AccessibilityNames.addClassWay))
             .accessibilityIdentifier("sectionVerbSheetAddClassWay")
             // Each line its own identifier, by its reason (the fix review's
             // finding 8), so a test can tell two apart.
@@ -1063,6 +1069,7 @@ struct SectionVerbSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(sourceTableHeight)
+        .accessibilityLabel(Text(AccessibilityNames.sourceTable))
         .accessibilityIdentifier("sectionVerbSheetSourceTable")
     }
 
@@ -1102,6 +1109,7 @@ struct SectionVerbSheet: View {
             model.flipTick(ofRowWithID: pickedRowID)
             return .handled
         }
+        .accessibilityLabel(Text(AccessibilityNames.pagesTable))
         .accessibilityIdentifier("sectionVerbSheetPickerTable")
     }
 
@@ -1128,6 +1136,7 @@ struct SectionVerbSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(laterClassesTableHeight)
+        .accessibilityLabel(Text(AccessibilityNames.laterClassesTable))
         .onKeyPress(.space) {
             if pickedLaterClassID == nil {
                 return .ignored

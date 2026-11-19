@@ -1232,6 +1232,7 @@ struct NewCourseWizardView: View {
                             // and all four fields became the same height
                             // by construction.
                             TextField("", text: $courseName)
+                                .accessibilityLabel(Text(WizardWording.panelWords(isClub: isClubCourse).nameLabel))
                                 .accessibilityIdentifier("wizardCourseNameField")
                                 .borderedTextField()
                         }
@@ -1274,6 +1275,7 @@ struct NewCourseWizardView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         LabeledContent("Short label") {
                             TextField("", text: $customShortName)
+                                .accessibilityLabel(Text("Short label"))
                                 .accessibilityIdentifier("wizardCustomShortNameField")
                                 .borderedTextField()
                         }
@@ -1302,6 +1304,7 @@ struct NewCourseWizardView: View {
                         LabeledContent("Timetable section numbers") {
                             // See Course Name's own note.
                             TextField("", text: $sectionNumbersText)
+                                .accessibilityLabel(Text("Timetable section numbers"))
                                 .accessibilityIdentifier("wizardSectionNumbersField")
                                 .borderedTextField()
                         }
@@ -1504,6 +1507,7 @@ struct NewCourseWizardView: View {
                             }
                         ))
                         .borderedTextField()
+                        .accessibilityLabel(Text(WizardWording.clubClassFolderLabel))
                         .accessibilityIdentifier("clubClassFolderField")
                     }
                     if let problem = NewCourseWizardView.clubClassFolderProblem(
@@ -1517,11 +1521,13 @@ struct NewCourseWizardView: View {
                     LabeledContent(WizardWording.clubFrontPageHeadingLabel) {
                         TextField("", text: $frontPageHeading)
                             .borderedTextField()
+                            .accessibilityLabel(Text(WizardWording.clubFrontPageHeadingLabel))
                             .accessibilityIdentifier("clubFrontPageHeadingField")
                     }
                     LabeledContent(WizardWording.clubPageWordLabel) {
                         TextField("", text: $unitWord)
                             .borderedTextField()
+                            .accessibilityLabel(Text(WizardWording.clubPageWordLabel))
                             .accessibilityIdentifier("unitWordField")
                     }
                     if let problem = ClassPageTerm.problem(with: unitWord) {
@@ -1545,6 +1551,7 @@ struct NewCourseWizardView: View {
                 LabeledContent(UnitWordRenameWording.fieldLabel) {
                     TextField("", text: $unitWord, prompt: Text(ClassPageTerm.standard))
                         .borderedTextField()
+                        .accessibilityLabel(Text(UnitWordRenameWording.fieldLabel))
                         .accessibilityIdentifier("unitWordField")
                 }
                 if let problem = ClassPageTerm.problem(with: unitWord) {

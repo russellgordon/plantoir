@@ -648,6 +648,7 @@ struct SectionDetailView: View {
                 DetailTabs(
                     tabs: tabsInTheBar,
                     selection: selectedTabBinding,
+                    name: AccessibilityNames.sectionTabs,
                     identifier: "sectionTabs"
                 )
             }

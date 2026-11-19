@@ -506,6 +506,7 @@ struct StartOfYearSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(StartOfYearSheet.planTableHeight(for: rows))
+        .accessibilityLabel(Text(AccessibilityNames.planTable))
         .accessibilityIdentifier("startOfYearPlanTable")
     }
 

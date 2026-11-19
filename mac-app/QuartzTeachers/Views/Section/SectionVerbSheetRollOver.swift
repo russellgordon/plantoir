@@ -41,6 +41,7 @@ extension SectionVerbSheet {
             }
             .pickerStyle(.radioGroup)
             .labelsHidden()
+            .accessibilityLabel(Text(AccessibilityNames.rollOverWebsite))
             .accessibilityIdentifier("sectionVerbSheetRollOverWebsite")
         case .notDeployedYet:
             Text(AssistWording.menuRollOverNotDeployedYet)
