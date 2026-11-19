@@ -90,7 +90,21 @@ enum StatusColour {
 
     /// The four variants of the caution orange. Light values are darker
     /// versions of the system orange's hue.
-    static let warningNSColor: NSColor = NSColor(name: "plantoirWarning") { (appearance: NSAppearance) in
+    static let warningNSColor: NSColor = NSColor(
+        name: "plantoirWarning",
+        dynamicProvider: StatusColour.warningVariant(for:)
+    )
+
+    /// The stopping red, in its four variants.
+    static let blockingNSColor: NSColor = NSColor(
+        name: "plantoirBlocking",
+        dynamicProvider: StatusColour.blockingVariant(for:)
+    )
+
+    /// The caution orange for one appearance. `nonisolated`, as is
+    /// everything it calls, because AppKit asks a dynamic colour for its
+    /// value wherever it draws, not only on the main actor.
+    nonisolated static func warningVariant(for appearance: NSAppearance) -> NSColor {
         switch StatusColour.variant(of: appearance) {
         case .light:
             return NSColor(srgbRed: 168.0 / 255.0, green: 67.0 / 255.0, blue: 0.0, alpha: 1.0)
@@ -103,8 +117,8 @@ enum StatusColour {
         }
     }
 
-    /// The four variants of the stopping red.
-    static let blockingNSColor: NSColor = NSColor(name: "plantoirBlocking") { (appearance: NSAppearance) in
+    /// The stopping red for one appearance.
+    nonisolated static func blockingVariant(for appearance: NSAppearance) -> NSColor {
         switch StatusColour.variant(of: appearance) {
         case .light:
             return NSColor(srgbRed: 191.0 / 255.0, green: 0.0, blue: 25.0 / 255.0, alpha: 1.0)
@@ -118,8 +132,9 @@ enum StatusColour {
     }
 
     /// Which of the four an appearance is. Increase Contrast shows itself to
-    /// an app as the high-contrast appearance names.
-    static func variant(of appearance: NSAppearance) -> AppearanceVariant {
+    /// an app as the high-contrast appearance names. `nonisolated` because
+    /// AppKit calls a dynamic colour's provider wherever it draws.
+    nonisolated static func variant(of appearance: NSAppearance) -> AppearanceVariant {
         let names: [NSAppearance.Name] = [
             .aqua,
             .darkAqua,
@@ -142,7 +157,7 @@ enum StatusColour {
     /// The four appearances a colour must work in (HIG, Color: "Make sure
     /// all your app's colors work well in light, dark, and increased contrast
     /// contexts").
-    enum AppearanceVariant {
+    nonisolated enum AppearanceVariant {
         case light
         case lightIncreasedContrast
         case dark
