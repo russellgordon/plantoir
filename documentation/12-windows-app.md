@@ -10579,7 +10579,14 @@ elevated):
 5. A trim to the measured set (`trim.remove` / `mustKeep`): from
    1,874,323,927 B to 533,231,069 B. The VC++ runtime DLLs from the runtime
    MSI (`trim.vcRuntime`) go beside the tools, because a PC without the
-   redistributable lacks VCRUNTIME140, VCRUNTIME140_1 and MSVCP140.
+   redistributable lacks VCRUNTIME140, VCRUNTIME140_1 and MSVCP140. The
+   website builder's runtime does the same for Node since #965
+   (`vcruntime140.dll` beside `runtime\node\node.exe`; "The Visual C++
+   runtime beside node.exe (#965)", below). **Both are app-local copies, and
+   Windows Update never patches them**: they are refreshed only when a new
+   Plantoir (or a new Swift pin) ships. Revisit `swiftWindows` →
+   `trim.vcRuntime` and `windowsNodeVcRuntime` together whenever Node,
+   Python, the Swift pin or a native module moves.
 6. The mac's own wasm SDK pin (92,760,992 B), unpacked with `tar.exe`, and
    binaryen version_133 x86_64-windows (111,045,528 B), of which only
    `wasm-opt.exe` is kept, OUTSIDE the toolchain's `bin`.
@@ -12954,6 +12961,196 @@ and a base bump rebuilds every Mac. Staying, which the owner ruled out on
 which makes this the lowest-risk splice. It was not chosen: python.org never
 built or tested that pairing, and 3.11.9 stays nine releases behind on
 CPython's own security fixes.
+
+## The Visual C++ runtime beside node.exe (#965)
+
+Written 2026-11-19 for [#965](https://github.com/russellgordon/plantoir/issues/965),
+and corrected the same day for Russell's second ruling: the file sits beside
+`node.exe` **and** beside each of the two modules that import it. The
+contract half is `contracts/toolchain.json` → `windowsNodeVcRuntime` (the
+file, its version, size and SHA-256, the places it is carried, the libraries
+every Windows has, how Windows finds it, what is not carried, the licence,
+what was rejected). The mac owes
+nothing: its builder runs in the Linux image.
+
+**What happened.** On a clean Windows 11 (Parallels, ARM64, x64 emulation,
+`C:\Windows\System32\vcruntime140.dll` absent) the released 1.9.3 installed
+and opened, and the first preview stopped with `ERR_DLOPEN_FAILED` at the
+Typst compiler's `.node` (the first-install rehearsal, #976, on every clean
+machine tried). The installed app carried one copy of `vcruntime140.dll`, in
+`runtime\python`, which is on no PATH the launchers set.
+
+**How Windows finds a module's libraries.** Node loads a `.node` file through
+libuv's `uv_dlopen`, which calls `LoadLibraryExW` with
+`LOAD_WITH_ALTERED_SEARCH_PATH`. With that flag the libraries the module
+imports are looked for first in the **module's own folder**, then System32,
+the 16-bit system folder and the Windows folder, then the current folder,
+and last on PATH. `node.exe`'s folder is not on that list except through
+PATH. (This section first said Windows looks in the loading program's
+folder; that is the order without the flag, and it is wrong for Node.) So a
+copy beside `node.exe` alone is found only because the launchers put
+`runtime\node` on PATH, and only after any older copy in System32; a copy
+beside the module is found first, by any Node however started. Measured on
+clean machines below (run A: beside `node.exe` only and no `runtime\node` on
+PATH, both modules fail).
+
+**What the modules import, measured 2026-11-19** by reading the import and
+delay-load tables of every native file in the runtime (fetched on the
+development PC from `dev`, all `x64`):
+
+| File | Visual C++ runtime imported | Everything else |
+|---|---|---|
+| `lightningcss.win32-x64-msvc.node` (linked with MSVC 14.43) | `VCRUNTIME140.dll` | Windows' own (kernel32, ntdll, advapi32, bcrypt, bcryptprimitives, UCRT `api-ms-win-crt-*`) |
+| `typst-ts-node-compiler.win32-x64-msvc.node` (MSVC 14.42) | `VCRUNTIME140.dll` | Windows' own |
+| `simple-git.win32-x64-msvc.node` | none | Windows' own |
+| both `sharp-win32-x64*.node` | none | `libvips-42.dll` and `libvips-cpp*.dll` beside it (which import only Windows' own and UCRT), and `node.exe` (delay-loaded) |
+| `node.exe` 22.23.4 | none | Windows' own |
+| `workerd.exe` (wrangler's local Workers runtime; an executable, not a module) | `MSVCP140`, `VCRUNTIME140`, `VCRUNTIME140_1` | not covered by a copy beside `node.exe`: an executable looks in its own folder. Plantoir's Pages deploy is not known to start it; not measured on a clean machine |
+
+So exactly one file is carried: `vcruntime140.dll`. `vcruntime140_1.dll`
+and `msvcp140.dll` are imported by no module (Russell's ruling: carry only
+what is imported).
+
+**What landed.**
+- `fetch-runtime.ps1` → `Install-NodeVcRuntime` copies `vcruntime140.dll`
+  from `runtime\python` (the Python 3.14.10 embeddable zip, already checked
+  by SHA-256; the file is Microsoft's, Authenticode-signed, version
+  14.51.36247.0, newer than the 14.43 and 14.42 toolsets the modules were
+  built with) to three places, each checked by SHA-256 and size before and
+  after:
+
+  | Place (under `runtime\`) | Why |
+  |---|---|
+  | `node` | beside `node.exe`, the first ruling; reached through PATH |
+  | `quartz\node_modules\lightningcss-win32-x64-msvc` | beside `lightningcss.win32-x64-msvc.node`, found first |
+  | `quartz\node_modules\@myriaddreamin\typst-ts-node-compiler-win32-x64-msvc` | beside `typst-ts-node-compiler.win32-x64-msvc.node`, found first |
+
+  The module folders are `$NodeVcRuntimeModuleFolders`, held to the
+  contract's `besideModules`; a folder that holds no `.node` file refuses
+  the run, so a Quartz or npm change that moves a module fails the fetch
+  instead of shipping a copy beside nothing. The manifest records
+  `nodeVcRuntime` (the version) and `nodeVcRuntimeLayout`
+  (`beside-node-and-modules`). A runtime made before #965, or with the
+  `node.exe` copy alone (this branch's first version, on the PC and the dev
+  VM), is repaired in place: the file copied, no download. A Python bump that
+  brings another copy refuses until the contract and the `$NodeVcRuntime*`
+  lines move with it.
+- `Plantoir.csproj` → `CheckNativeRuntimeManifest` refuses a runtime whose
+  manifest has no `nodeVcRuntime` at that version, or no
+  `nodeVcRuntimeLayout` of `beside-node-and-modules`, so a release cannot
+  ship without every copy.
+- The installer needs no change: `runtime\` is published whole (robocopy
+  `/MIR`) and packed whole (`Source: "{#PublishDir}\*"`, `recursesubdirs`).
+  `[InstallDelete]` already empties `{app}\runtime\node` before the new one
+  is copied; `runtime\quartz\node_modules` is not emptied, so an upgrade
+  adds the two module copies beside what 1.9.3 left, which is the whole of
+  the change there.
+- **The work folder's mirror, and why both places are kept.** A preview
+  loads the modules from the section's work folder, whose `node_modules` is
+  a hardlink MIRROR of `runtime\quartz\node_modules` (`build_site.py` →
+  `toolchain_paths.link_directory`; never a junction, which Windows refuses
+  to traverse from the app's processes). The mirror is made when the section
+  is first built and not remade after. On a fresh install the first build
+  mirrors the module copies with everything else (run E below). After an
+  upgrade over 1.9.3, a section 1.9.3 already built keeps its old mirror,
+  which has no module copies (run C below fails there, `ERR_DLOPEN_FAILED`);
+  in that folder the copy beside `node.exe`, on the PATH the launchers set,
+  is the one found (run D). So neither place alone covers every teacher: the
+  module copies cover any Node however started and an older System32 copy,
+  the `node.exe` copy covers mirrors made before this change.
+- `THIRD_PARTY_LICENSES.md` has the licence row (Microsoft's redistributable
+  code terms; the file is on the list an application may carry).
+- `NativeModuleImportsTests`: every `.node` file in a fetched runtime, and
+  every library beside it that it pulls in, finds each import **beside
+  itself** or on `windowsSystemLibraries`, a named list that deliberately
+  holds no Visual C++ runtime name (a test says so); a copy beside
+  `node.exe` no longer counts for a module. The rule is its own function
+  (`NativeModuleImports.Unreachable`), and a plain fact runs it on a made-up
+  runtime on every PC: a module whose library is beside `node.exe` only is
+  reported, the same module with the library beside it is not. On a fetched
+  runtime: every copy is the contract's file byte for byte, the manifest
+  carries the version and the layout, and each `besideModules` folder holds a
+  `.node` that imports the file. This fails on a pre-#965 runtime, or one
+  with the `node.exe` copy alone, on ANY PC, the development PC included,
+  which loading the modules there could not do (its System32 has the
+  redistributable). Source checks hold the recipe's pin lines, its folder
+  list and layout, and the build's two guards to the contract.
+
+**What was proven first, 2026-11-19 (early morning), for the `node.exe` copy alone.** On the PC (`dev` runtime fetched 2026-11-14),
+`fetch-runtime.ps1` at this branch repaired the existing runtime in place
+(manifest `nodeVcRuntime` 14.51.36247.0, the copy's SHA-256 the contract's),
+and `publish.ps1 -WithoutAssistantEngine` (unsigned, nothing uploaded) put it
+in the published `runtime\node` that the installer packs; the Windows unit
+suite on the branch was 4,059 passed, 6 failed (`dev`'s known six), 1
+skipped, the six new tests passing. On the clean VM (snapshot 00) the
+UNSIGNED installer, downloaded through Edge, was held by SmartScreen
+("PlantoirSetup.exe isn't commonly downloaded. Make sure you trust
+PlantoirSetup.exe before you open it."), so the rehearsal stopped at step 1
+(`runs/win-rehearsal-2026-11-19-044259`); a signed release is not held this
+way. So the fix was proven from a clean machine another way
+(`runs/win-rehearsal-2026-11-19-045704`, `proof-965/`): the released, signed
+1.9.3 installed by the rehearsal and stopped at step 6 on #965 as before;
+then, with PATH as the launchers set it and no `vcruntime140.dll` in
+System32, lightningcss and typst-ts-node-compiler failed to load
+(`ERR_DLOPEN_FAILED`) and the other three loaded; with only this one file
+placed beside `node.exe` all five loaded, and the installed `preview.ps1
+EXC2O 1 --build-only` built the example course (271 pages, 336 files, exit
+0). Not proven: the end-to-end rehearsal PASSED with a signed installer
+carrying the fix (it needs a signed candidate build).
+
+**What was proven, 2026-11-19 (midday), for the ruled layout.** Two clean
+machines: snapshot 00 (`russellgordon`, an administrator) and 11, the
+standard user (`student`, not an administrator). On each, the released,
+signed 1.9.3 was installed by the rehearsal and stopped at step 6 on #965 as
+before (`runs/win-rehearsal-2026-11-19-110529` and
+`runs/win-rehearsal-2026-11-19-114136-standard-user`, kept running with
+`--keep`). Then a script placed the contract's file (SHA-256 checked, signed
+by Microsoft) in `{app}\runtime\<place>` for each place in `besideNode` and
+`besideModules`, exactly where the branch's installer puts it, and loaded
+every `.node` in the runtime with `node.exe`, with no `vcruntime140.dll` in
+System32 (`runs/proof-965-finish/`, `proof-00.out`, `proof2-00.out`,
+`proof-standard-user.out`, `proof2-standard-user.out`). The same on both
+machines:
+
+| Run | Copies | PATH | lightningcss and Typst | `preview.ps1 EXC2O 1 --build-only` |
+|---|---|---|---|---|
+| A | beside `node.exe` only | no `runtime\node` | `ERR_DLOPEN_FAILED` | - |
+| B | beside `node.exe` only | as the launchers set it | load | - |
+| C | beside the modules only | no `runtime\node` | load | exit 1, `ERR_DLOPEN_FAILED`: the work folder's mirror is 1.9.3's, made before the copies (an upgrade) |
+| D | all three (the ruled layout) | no `runtime\node`, then as the launchers set it | load | exit 0 on the old mirror (271 pages, 336 files) |
+| E | beside the modules only | the launcher's own | - | exit 0 on a new mirror (a fresh install), which carries both module copies |
+| F | all three | the launcher's own | - | exit 0 on a new mirror |
+
+A shows Node does not look beside `node.exe` for a module's libraries;
+C and E show what the mirror changes. On the PC, `fetch-runtime.ps1` at this
+branch repaired the runtime fetched by the first version in place (manifest
+`nodeVcRuntimeLayout` `beside-node-and-modules`, all three copies the
+contract's SHA-256); whether `publish.ps1 -WithoutAssistantEngine`
+(unsigned, nothing uploaded) carried all three into the published `runtime`
+was still running when this was written. Not
+proven: an end-to-end rehearsal PASSED, which needs a signed candidate build
+(Edge holds an unsigned branch build at "isn't commonly downloaded"); and a
+PC whose System32 has an OLDER `vcruntime140.dll` than 14.51, where the copy
+beside the module is reasoned to win, not measured.
+
+**Updates are ours now.** An app-local copy is not patched by Windows Update.
+It is refreshed only when a new Plantoir ships, so revisit
+`windowsNodeVcRuntime` when Node, Python or a native module moves (beside the
+Swift tools' own copies, `swiftWindows` → `trim.vcRuntime`). On a PC that has
+the redistributable, a module loads the copy beside it (its own folder comes
+first, ahead of System32) and the system's is untouched. Within one Node
+process Windows keeps one library per name, so the second module to load
+gets the copy the first one loaded; the copies are the same file, so that is
+harmless.
+
+**Rejected.** Adding `runtime\python` to PATH in the three launchers (smaller,
+but it leans on Python's copy and on every Node being started by a launcher).
+The copy beside `node.exe` alone, this issue's first version: a module finds
+it only through PATH and only after an older copy in System32 (run A below);
+it is kept beside the module copies because the first ruling asked for it.
+Fetching `VC_redist.x64.exe` and unpacking it: a WiX Burn bundle, so a second
+unpacker (as `swift_windows_fetch.py` carves the Swift installer) for one
+178,616-byte file the pinned Python zip already carries, signed by Microsoft.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 

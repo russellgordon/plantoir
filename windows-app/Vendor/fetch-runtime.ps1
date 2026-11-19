@@ -7,7 +7,10 @@ used to bake into the Linux image is fetched here as pinned, portable
 Windows pieces, and the app ships the folder the same way it ships llama/.
 
     runtime\node\       Node.js 22.23.4 (win-x64 zip distribution - no
-                        installer)
+                        installer), and vcruntime140.dll beside node.exe
+                        (#965, copied from the pinned Python zip; the same
+                        file also sits beside the two .node modules in
+                        runtime\quartz that import it)
     runtime\python\     Python 3.14.10 embeddable (OpenSSL 3.5.9, #764) +
                         python-frontmatter 1.3.0, PyYAML 6.0.3, Pillow 12.3.0
                         (wheels by version AND SHA-256)
@@ -165,6 +168,36 @@ $PythonWheels = @(
     "PyYAML==6.0.3 --hash=sha256:4a2e8cebe2ff6ab7d1050ecd59c25d4c8bd7e6f400f5f82b96557ac0abafd0ac",
     "Pillow==12.3.0 --hash=sha256:fdafc9cce40277e0f7a0feabce0ee50dd2fa1800f3b38015e51296b5e814048d"
 )
+# The Visual C++ runtime beside node.exe AND beside the two modules that
+# import it (#965): contracts/toolchain.json -> windowsNodeVcRuntime.
+# lightningcss and the Typst compiler's .node files import VCRUNTIME140.dll,
+# which a clean Windows does not have. Node loads a .node file with
+# LoadLibraryExW(LOAD_WITH_ALTERED_SEARCH_PATH), so Windows looks for that
+# module's libraries first in the MODULE's own folder, then in System32 and
+# the Windows folder, and only then on PATH: node.exe's folder is reached
+# only because the launchers put it on PATH, and behind any older copy in
+# System32. So the copy beside each module is the one found, with or without
+# PATH and ahead of System32; the copy beside node.exe (Russell's first
+# ruling) stays for anything Node itself, or a PATH search, would want.
+# The file is Microsoft's redistributable copy that the Python embeddable zip
+# above carries (signed by Microsoft), so it is pinned twice: by that zip's
+# hash and by its own below. A Python bump that brings another copy refuses
+# here until the contract and these three lines move with it.
+# NativeModuleImportsTests holds these lines, spacing included, to the contract.
+$NodeVcRuntimeVersion = "14.51.36247.0"
+$NodeVcRuntimeSha256  = "d1f4225df2cd877dbf130d5668a021dce3f94118455ff5ec952061c30afc9ce7"
+$NodeVcRuntimeLength  = 178616
+# The module folders, relative to runtime\ (windowsNodeVcRuntime ->
+# besideModules). Each must exist and hold a .node file, or the run refuses:
+# a Quartz or npm change that moves a module must move this list with it.
+# The manifest's nodeVcRuntimeLayout says the copies are in all these places,
+# so a runtime that has the node.exe copy only (this branch's first version)
+# is repaired in place too.
+$NodeVcRuntimeLayout  = "beside-node-and-modules"
+$NodeVcRuntimeModuleFolders = @(
+    "quartz\node_modules\lightningcss-win32-x64-msvc",
+    "quartz\node_modules\@myriaddreamin\typst-ts-node-compiler-win32-x64-msvc"
+)
 $EmojiFontSha256 = "39ee3c587e10e89669b9ff32703261d10d5f9c4dd5ad147b6b5a1c5200591817"
 # The vendor tarballs' hashes are the contract's own (toolchain.json ->
 # pins -> sha256, and fileSha256 for the one file kept), checked here as the
@@ -242,6 +275,7 @@ $BasePins   = [ordered]@{
 # the base phase cannot be redone in place); before #675 only the keys were
 # checked, and a Node bump was answered "already in place".
 $runBase = $true
+$vcRuntimeOnly = $false
 $existing = $null
 if (Test-Path $Manifest) {
     $existing = Get-Content $Manifest -Raw | ConvertFrom-Json
@@ -261,13 +295,23 @@ if (Test-Path $Manifest) {
     foreach ($key in $VendorPins.Keys) {
         if ($names -notcontains $key -or [string]$existing.$key -ne $VendorPins[$key]) { $vendorCurrent = $false }
     }
-    if ($vendorCurrent) {
+    # nodeVcRuntime (#965) is repaired IN PLACE: one file copied from
+    # runtime\python to its places, no fetch at all.
+    $vcRuntimeCurrent = ($names -contains "nodeVcRuntime") -and ([string]$existing.nodeVcRuntime -eq $NodeVcRuntimeVersion) -and
+                        ($names -contains "nodeVcRuntimeLayout") -and ([string]$existing.nodeVcRuntimeLayout -eq $NodeVcRuntimeLayout)
+    if ($vendorCurrent -and $vcRuntimeCurrent) {
         Write-Host "[OK] Runtime already in place ($Runtime)." -ForegroundColor Green
         Write-Host "     Delete that folder and re-run to fetch it again."
         exit 0
     }
-    Write-Host "The runtime predates the current page-feature pins: fetching runtime\vendor only." -ForegroundColor Cyan
     $runBase = $false
+    if ($vendorCurrent) {
+        Write-Host "The runtime predates the Visual C++ runtime beside node.exe and its modules (#965): placing it only." -ForegroundColor Cyan
+        $vcRuntimeOnly = $true
+    }
+    else {
+        Write-Host "The runtime predates the current page-feature pins: fetching runtime\vendor only." -ForegroundColor Cyan
+    }
 }
 
 New-Item -ItemType Directory -Force $Runtime | Out-Null
@@ -310,7 +354,53 @@ function Get-BaseFields {
         $fields.wrangler = $WranglerVersion
         $fields.emoji    = $EmojiFontTag
     }
+    # Every caller runs Install-NodeVcRuntime BEFORE it writes these fields,
+    # so the manifest never names a copy that is not there (#965).
+    $fields.nodeVcRuntime = $NodeVcRuntimeVersion
+    $fields.nodeVcRuntimeLayout = $NodeVcRuntimeLayout
     return $fields
+}
+
+# #965: vcruntime140.dll from the runtime's Python (whose zip was checked by
+# SHA-256) to beside node.exe and beside each module in
+# $NodeVcRuntimeModuleFolders, every copy checked by its own SHA-256 and size
+# before and after. A module's own folder is where Windows looks first for
+# the libraries of a .node file Node loads (see the pin lines above), so
+# every Node however started finds it, launcher or not, and ahead of an
+# older copy in System32.
+# BEGIN Install-NodeVcRuntime
+function Install-NodeVcRuntime([string]$From, [string]$To) {
+    $source = Join-Path $From "vcruntime140.dll"
+    if (-not (Test-Path -LiteralPath $source)) {
+        throw "$From has no vcruntime140.dll to place beside node.exe and its modules (#965): the Python zip no longer carries it, so contracts/toolchain.json -> windowsNodeVcRuntime -> source needs another answer."
+    }
+    Assert-Sha256 $source $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+    $places = @($To)
+    foreach ($relative in $NodeVcRuntimeModuleFolders) {
+        $folder = Join-Path $Runtime $relative
+        if (-not (Get-ChildItem -LiteralPath $folder -Filter "*.node" -File -ErrorAction SilentlyContinue)) {
+            throw "$folder holds no .node file (#965): the module that imports vcruntime140.dll has moved, so contracts/toolchain.json -> windowsNodeVcRuntime -> besideModules and `$NodeVcRuntimeModuleFolders here must move with it."
+        }
+        $places += $folder
+    }
+    foreach ($place in $places) {
+        $target = Join-Path $place "vcruntime140.dll"
+        Copy-Item -LiteralPath $source -Destination $target -Force
+        Assert-Sha256 $target $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+        Write-Host "vcruntime140.dll $NodeVcRuntimeVersion in $place." -ForegroundColor Green
+    }
+}
+# END Install-NodeVcRuntime
+
+if ($vcRuntimeOnly) {
+    Install-NodeVcRuntime $pyDir $nodeDir
+    $fields = Get-BaseFields
+    foreach ($key in $VendorPins.Keys) { $fields[$key] = $VendorPins[$key] }
+    Write-RuntimeManifest $fields
+    Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host ""
+    Write-Host "[OK] Native runtime ready at $Runtime" -ForegroundColor Green
+    exit 0
 }
 
 # $CurlOptions: how hard to try. The default is what every download here has
@@ -520,6 +610,7 @@ try {
     # first manifest written, right after the base phases): from here until
     # the end, a failure leaves a runtime the build refuses and a re-run
     # finishes by fetching runtime\vendor alone.
+    Install-NodeVcRuntime $pyDir $nodeDir
     Write-RuntimeManifest (Get-BaseFields)
     if (Test-Path $VendorOut) { Remove-Item $VendorOut -Recurse -Force }
     New-Item -ItemType Directory -Force $VendorOut | Out-Null
