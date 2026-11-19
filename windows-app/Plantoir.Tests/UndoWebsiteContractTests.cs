@@ -336,6 +336,57 @@ public class UndoWebsiteContractTests : IDisposable
     }
 
     [Fact]
+    public void AFragmentWhoseTextIsNotValidUnicodeCannotTell()
+    {
+        // The W5 review's M1: bytes that are not UTF-8 inside a place, and an
+        // escaped half of a surrogate pair, are a fragment that "cannot be
+        // read" (the rule's CANNOT TELL), never an exception out of Inputs.
+        byte[] invalidUtf8 = Encoding.ASCII.GetBytes("{\"version\": 1, \"places\": [\"Section 1/")
+            .Concat(new byte[] { 0xFF, 0xFE })
+            .Concat(Encoding.ASCII.GetBytes("\"]}\n")).ToArray();
+        byte[] loneSurrogate = Encoding.ASCII.GetBytes("{\"version\": 1, \"places\": [\"Section 1/\\ud800x\"]}\n");
+        foreach (byte[] bytes in new[] { invalidUtf8, loneSurrogate })
+        {
+            var course = Course("netlify");
+            string path = Fragment(course, "20261113T090000Z-netlify.json");
+            File.WriteAllBytes(path, bytes);
+            Assert.Null(UndoWebsite.ReadPlaces(path));
+            Assert.Equal(UndoWebsiteAnswer.CannotTell, AnswerFor(course));
+
+            // Beneath a readable newer one it is never opened.
+            WriteFragment(Fragment(course, "20261114T090000Z-netlify.json"), new[] { "Section 1/index" });
+            Assert.Equal(UndoWebsiteAnswer.NoOffer, AnswerFor(course));
+        }
+    }
+
+    [Fact]
+    public void AnUnpairedSurrogateInAMoveOrAPlaceCannotTell()
+    {
+        // The W5 review's M1, the pure half: NTFS allows a name holding half a
+        // surrogate pair, which cannot be put in normalization form C. Such a
+        // path is not a page the record could name, and such a place is a
+        // fragment that cannot be read: both CANNOT TELL, never an exception.
+        string halfPair = "courses/TST1O/Section 1/Classes/Day \ud800.md";
+        Assert.Null(UndoWebsite.PlaceOf(halfPair));
+        var shown = new[] { new UndoWebsiteFragment("20261113T090000Z-netlify.json", new[] { "Section 1/index" }) };
+        Assert.Equal(UndoWebsiteAnswer.CannotTell, UndoWebsite.Answer(
+            new[] { new UndoWebsiteMove(halfPair, true, false) }, false, shown, new[] { "netlify" }, Array.Empty<string>()));
+
+        var unreadable = new[] { new UndoWebsiteFragment("20261113T090000Z-netlify.json", new[] { "Section 1/Day \udc00" }) };
+        Assert.Equal(UndoWebsiteAnswer.CannotTell, UndoWebsite.Answer(
+            new[] { HideDay1 }, false, unreadable, new[] { "netlify" }, Array.Empty<string>()));
+
+        // Another destination that gives the offer still gives it.
+        var both = new[]
+        {
+            new UndoWebsiteFragment("20261113T090000Z-netlify.json", new[] { "Section 1/Day \udc00" }),
+            new UndoWebsiteFragment("20261113T090000Z-cloudflare.json", new[] { Day1 }),
+        };
+        Assert.Equal(UndoWebsiteAnswer.OfferToDeploy, UndoWebsite.Answer(
+            new[] { HideDay1 }, false, both, new[] { "netlify", "cloudflare" }, Array.Empty<string>()));
+    }
+
+    [Fact]
     public void Proposed_AFragmentIsReadByItsPlacesWhateverItsVersion()
     {
         foreach (string? version in new[] { null, "2" })
