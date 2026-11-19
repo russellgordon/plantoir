@@ -91,7 +91,7 @@ nonisolated enum UndoContractKinds {
             try UndoContractReplay.write("C\n", to: extraFolder + "/c.md", in: root)
             return nil
         case "removeTheFolder":
-            guard case .tree(let listing, let contents) = UndoTreeReading.read(at: root.appendingPathComponent(extraFolder)) else {
+            guard case .tree(let listing, let contents) = UndoTreeReading.read(at: root.appendingPathComponent(extraFolder), keepingContents: true) else {
                 return "noFolderToRemove"
             }
             var blobs: [Data] = [listing.data]

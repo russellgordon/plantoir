@@ -1248,7 +1248,7 @@ nonisolated enum UndoContractReplay {
                 for (path, content) in UndoContractKinds.extraFiles {
                     try write(content, to: UndoContractKinds.extraFolder + "/" + path, in: root)
                 }
-                if case .tree(let listing, let contents) = UndoTreeReading.read(at: root.appendingPathComponent(UndoContractKinds.extraFolder)) {
+                if case .tree(let listing, let contents) = UndoTreeReading.read(at: root.appendingPathComponent(UndoContractKinds.extraFolder), keepingContents: true) {
                     treeBlobs.append(listing.data)
                     for (_, data) in contents {
                         treeBlobs.append(data)

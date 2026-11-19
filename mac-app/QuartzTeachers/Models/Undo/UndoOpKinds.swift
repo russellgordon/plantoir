@@ -814,7 +814,11 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
 
     // MARK: - Functions
 
-    static func read(at url: URL) -> UndoTreeReading {
+    /// `keepingContents` keeps every file's bytes (a test, or a caller that
+    /// will store them); otherwise each file is hashed as it is read, a
+    /// megabyte at a time, and nothing is held (the hard review of U2b,
+    /// LOW b: a check read the whole tree into memory twice).
+    static func read(at url: URL, keepingContents: Bool = false) -> UndoTreeReading {
         var information: stat = stat()
         let result: Int32 = url.withUnsafeFileSystemRepresentation { path in
             guard let path else {
@@ -835,7 +839,7 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         var files: [UndoTreeListing.File] = []
         var contents: [String: Data] = [:]
         var couldNotRead: Bool = false
-        if !walk(url, prefix: "", folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
+        if !walk(url, prefix: "", keepingContents: keepingContents, folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
             return couldNotRead ? .cannotRead : .notATree
         }
         return .tree(UndoTreeListing(folders: folders, files: files), contents: contents)
@@ -844,6 +848,7 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
     private static func walk(
         _ folder: URL,
         prefix: String,
+        keepingContents: Bool,
         folders: inout [String],
         files: inout [UndoTreeListing.File],
         contents: inout [String: Data],
@@ -877,16 +882,24 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
             let type: mode_t = information.st_mode & S_IFMT
             if type == S_IFDIR {
                 folders.append(path)
-                if !walk(url, prefix: path, folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
+                if !walk(url, prefix: path, keepingContents: keepingContents, folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
                     return false
                 }
             } else if type == S_IFREG {
-                guard let data = try? Data(contentsOf: url) else {
-                    couldNotRead = true
-                    return false
+                if keepingContents {
+                    guard let data = try? Data(contentsOf: url) else {
+                        couldNotRead = true
+                        return false
+                    }
+                    files.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: data)))
+                    contents[path] = data
+                } else {
+                    guard let sha = UndoHash.sha256(ofFileAt: url) else {
+                        couldNotRead = true
+                        return false
+                    }
+                    files.append(UndoTreeListing.File(path: path, sha: sha))
                 }
-                files.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: data)))
-                contents[path] = data
             } else {
                 return false
             }

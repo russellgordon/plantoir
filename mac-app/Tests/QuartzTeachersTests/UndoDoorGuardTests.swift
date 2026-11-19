@@ -102,7 +102,7 @@ final class UndoDoorGuardTests: XCTestCase {
         let root: URL = made.root
         try UndoContractReplay.write("precious\n", to: "courses/TST1O/made/a.md", in: root)
         let folder: URL = root.appendingPathComponent("courses/TST1O/made")
-        guard case .tree(let listing, let contents) = UndoTreeReading.read(at: folder) else {
+        guard case .tree(let listing, let contents) = UndoTreeReading.read(at: folder, keepingContents: true) else {
             return XCTFail("no listing")
         }
         var blobs: [Data] = [listing.data]
