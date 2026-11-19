@@ -14534,7 +14534,31 @@ It owes, in this order (the contract review's recommendation):
    `FileShare.ReadWrite | FileShare.Delete`, retry a sharing violation for a
    bounded time and never call the list unreadable for it (W2).
 4. The checks: `checkCases`, then `stepCases` and the staged swap that
-   retries a refused rename and names the file still in use (W5).
+   retries a refused rename and names the file still in use (W5). Two
+   rows came with the mac's U2a (the Fable sweep of U1, F1 and F2), and
+   both are behaviour, not format: `stagingFailsAt` (a staging write that
+   fails, as on a full disk, removes the staged file it made and every
+   other, swaps nothing, and refuses with its own word `couldNotWrite`,
+   never `fileIsInUse`; the list is left as it was), and `step: twoLines`
+   with the page's front matter removed by hand (a line op that cannot be
+   placed is `changedSince`, and every page in the way is reported before
+   any content found missing; `contentMissing` is only a blob the list no
+   longer holds). On Windows the staging write can fail for the same
+   reasons (`ERROR_DISK_FULL`, `ERROR_ACCESS_DENIED` on a read-only
+   folder), and a `FileStream` opened with `FileMode.CreateNew` leaves its
+   file behind exactly as the mac's exclusive create did: delete it in the
+   catch. Keeping the original is `couldNotWrite` too when it fails for
+   room or permission (on the mac a volume without hard links copies it);
+   any other failure at the swap (keeping the original, or the rename
+   onto the target) stays `fileIsInUse`. A `couldNotWrite` swap during
+   recovery is retried on the same schedule as a file in use. A file of
+   the list that exists and cannot be opened or read throws: only a file
+   that is GONE (`FileNotFoundException`, a segment pruned since it was
+   listed) is passed over, and a blob that cannot be read is never
+   `contentMissing` (which clears the list).
+   Every read of the list must throw rather than crash, and a throw is an
+   unreadable list for that attempt (shadow goes ahead, live refuses
+   before anything changes; the mac's F4).
 5. Write-ahead and recovery, and the `recoveryCases`, including
    `interrupted` (a file changed by hand stops recovery putting the whole
    step back: what can be verified is put back and the list is cleared),

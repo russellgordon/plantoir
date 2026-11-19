@@ -86,7 +86,7 @@ final class UndoJournalContractTests: XCTestCase {
 
     func testStepCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runStepCases(under: scratchURL)
-        XCTAssertEqual(result.cases, 3)
+        XCTAssertEqual(result.cases, 5)
         XCTAssertEqual(result.failures, [])
     }
 

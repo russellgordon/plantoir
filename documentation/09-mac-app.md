@@ -1619,8 +1619,11 @@ value wrapped. The test fails on that version and passes on this one.
 
 **The Obsidian add-ons offer** (#742, Russell 2026-11-13) takes the same
 shape inside its dialog. When Obsidian is running, Add Them closes the whole of
-Obsidian, so any OTHER course open in it closes too, and only this course
-opens again; the sentence said neither. `offerWhileOpen` and
+Obsidian, so any OTHER course open in it closes too; the sentence did not
+say so. (This said "and only this course opens again" until #995: the code
+reopens every course the list marks open, this one last, and only this one
+when the list cannot be read; `opensAgainValue` now says "{course}, and
+everything else Obsidian had open", the closing question's words too.) `offerWhileOpen` and
 `offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
 line as "label: value" (`closesLabel`/`closesValue`,
 `opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
@@ -8459,7 +8462,10 @@ which needs a window on screen for the rename feature's sake and is left as it
 is there, read MPM2D as closed while it was loaded). A registry that cannot
 be read while Obsidian runs counts as open too: Obsidian rewrites it in place,
 so a read can land mid-write. Add Them checks again when it is answered, in
-case the course was opened while the question was up. A hidden, minimised,
+case the course was opened while the question was up; since #995 that case
+asks the reopen question rather than closing Obsidian at once, because the
+button pressed said "Add Them", not that Obsidian would close ("Plantoir never
+closes Obsidian unasked (#995)", below). A hidden, minimised,
 full-screen or other-Space Obsidian holds the list in memory all the same. The
 rule over-reports (a stale mark), which is the safe direction: the pass waits
 and Open in Obsidian asks to reopen. The vaults reopened afterwards are every
@@ -8991,6 +8997,86 @@ of the Option alternate, Alt read at the click, WebView2's `SourceChanged` and
 `ContentLoading` in place of KVO and didCommit, and the page kept in its own
 file — `12-windows-app.md` → "Preview at Last Viewed on Windows (#514, the
 mac's #504)".
+
+## Plantoir never closes Obsidian unasked (#995)
+
+Finding D21 of the HIG review (#975); Russell's ruling Q13 (2026-11-18): never
+quit Obsidian without asking, and the button that goes ahead says plainly that
+Obsidian will be closed. HIG, Alerts: an alert can "warn them when their
+action might destroy data, and give them an opportunity to confirm … another
+important action they initiated"; "Aim for a one- or two-word title that
+describes the result of selecting the button"; "Always use 'Cancel' to title a
+button that cancels the alert's action."
+
+**What was wrong.** Obsidian's `open?path=` link reaches only vaults in its
+list (`obsidian.json`), and a running Obsidian holds that list in memory and
+writes it back whole when it quits. So `FolderActions.open`, on a course
+Obsidian had never seen, quit a running Obsidian (`application.terminate()`,
+every vault with it), wrote the list and reopened what had a window on
+screen, with no question at all. It was reached from every route: the
+toolbar, both menus, a row's menu, the assistant, a Coverage tab code, and
+Course Settings' How I Teach row, which called FolderActions directly.
+
+**What it does now.** `FolderActions.open` never closes Obsidian: registered,
+it opens the link; not registered with Obsidian not running, it writes the
+list and opens (the link starts Obsidian, which reads the list fresh);
+not registered with Obsidian running, it does nothing. The route asks first:
+`WorkspaceModel.openObsidian`, which every open in `OpenInObsidianRoute.swift`
+goes through, checks `ObsidianClosingRule.mustAsk` (Obsidian running and no
+vault in the list holds the file; an unreadable list holds nothing, so it
+asks) and sets `obsidianClosingRequest`, which `MainWindowView`'s
+`ObsidianClosingAlert` shows: "Close Obsidian to open {course}?", a sentence,
+then Closes / Opens again / Kept as lines (#834's shape), and the buttons
+Cancel and "Close Obsidian and Open" (the rename's "Close Obsidian and Rename"
+shape). Cancel opens and closes nothing. The go-ahead calls
+`ObsidianOpening.closeAndRegister` (`FolderActions.closeObsidianAndRegister`:
+note what is on screen, quit, seed defaults, register, reopen), then hands
+Obsidian the file. How I Teach goes through `openHowITeachPageInObsidian`,
+the same question without the add-ons scan or the reference note it never had.
+
+**The add-ons offer** titles its yes "Close Obsidian and Add Them" whenever
+that yes closes Obsidian (`ObsidianAddOnsRequest.addButtonTitle`: open or
+cannot tell), and "Add Them" otherwise. When the course was closed as the
+offer was shown and is open by the time Add Them is pressed, the reopen
+question asks rather than closing straight away (it used to close at once).
+
+**The rename** already asked, with "Close Obsidian and Rename"; unchanged.
+
+**Words and cases:** `contracts/shared-rules.json` → `obsidianNeverClosedUnasked`
+(`closeCases`, `wording`, `knownLimits`, `rejected`). Tests:
+`ObsidianNeverClosedUnaskedTests`, and `ObsidianFigureAddOnsTests.testAddThemChecksAgainWhenAnswered`
+(changed on purpose: it asserted the old unasked close). Windows owes the same
+under #1003 (v2.0.0); its tests do not read the new key yet. The add-ons
+offer's step 6 in `obsidianAddOnsForFigures.sequence` says the same.
+
+**Asked again at the answer** (reviews of #995): if Obsidian has quit or now
+knows the course, it just opens. If Obsidian does not close after the wait,
+nothing is written under it and nothing is handed to it: it does not know
+the course, so a link would only show Obsidian's own error
+(`FolderActions.closeObsidianAndRegister` answers whether it closed). If it
+closed but the hand-over still fails (the list could not be written), nothing
+more is tried. Both failures are on the trail only ("asked to close Obsidian
+to open a course", `obsidianNeverClosedUnasked.trail`): the route has no
+on-screen report for a course that could not be opened in Obsidian, and
+designing one is Russell's (a morning question, recommending the nearest
+existing words). And if Obsidian starts between the route's check and the
+open, `FolderActions.open` hands nothing over and answers false, and the
+route asks instead of the press doing nothing. What opens again after the
+close is every vault Obsidian's list marks open, read before the quit — the
+add-ons' reopen's own rule — so both questions' "Opens again" lines read
+"{course}, and everything else Obsidian had open". It replaced
+`openVaultPathsNow` (a window on screen required), which left a hidden
+Obsidian's courses closed. "Everything", not "each course": a vault can be a
+parent folder.
+
+**Rejected:** opening the course without registering it (Obsidian shows its
+own "vault not found"); registering under a running Obsidian (the addition is
+lost when it quits); folding the question into the add-ons offer (Not Now
+opens Obsidian too, so all three answers would have to carry the closing).
+
+**Left as it was, for Russell:** the reopen question's "Reopen Obsidian"
+button (#995's morning question). The trail event "asked to close Obsidian to
+open a course" is held open on Windows in `NamedGapLedger.cs`, owned by #1003.
 
 ## Open in Obsidian opens the page the preview shows (#518)
 
@@ -18244,9 +18330,11 @@ the course has a page — found by listing, so the teacher's own spelling counts
 a page that appears between the look and the write is the teacher's and is
 what opens) and nothing else: #209 rejected a starter text because an assistant
 reads the page as the teacher's own approach. It opens in Obsidian through
-`FolderActions.openPageInObsidian`, which shares the register/quit/reopen body
-with `openInObsidian` but targets the PAGE — `obsidianTarget` is for folders
-and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
+`WorkspaceModel.openHowITeachPageInObsidian` (since #995; until then
+`FolderActions.openPageInObsidian` directly), so a course a running Obsidian
+has never seen is added only after the teacher answers "Close Obsidian to open
+{course}?" ("Plantoir never closes Obsidian unasked (#995)"). It targets the
+PAGE — `obsidianTarget` is for folders and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
 Obsidian is not installed. Whether a page is there is read on every drawing and
 redrawn when the window becomes key (#152's `marksWalkGeneration`). Trail:
 "How I Teach page started" (or could not be, and why); opening writes nothing.
@@ -19240,6 +19328,37 @@ the list); anything else reads the journal whole again. This is safe because not
 rewritten: the one truncation, of a torn last line, only ever cuts bytes
 after the last line feed, which is where every remembered end sits.
 
+**Every read of the list throws rather than ends the app** (U2a, the
+sweep's F4). The fold cache, the tail check and the torn-line cut read
+with `FileHandle.read(upToCount:)` through `UndoFileReads.read`, never the
+legacy `readData(ofLength:)`, which on a read error (a failing disk, a
+network home that drops mid-read) raises an Objective-C exception Swift
+cannot catch, inside Publish. A failed read is `UndoJournalError.couldNotRead`:
+the list is unreadable for that attempt, so a step in shadow goes ahead
+without a record (a trail line, "the list could not be read"), and a live
+step, Undo or Redo is refused before anything changes. A tail that cannot
+be read makes the remembered fold untrusted, so the next read is a whole
+one. The review of U2a found the same hole one step earlier: a segment
+that could not be OPENED (EIO, EACCES, EMFILE) was skipped as if it were
+gone, and a failed seek read as an empty segment, so a fold missing its
+newest segment passed as valid, would have reused step numbers and let
+Undo act on an older step past a newer one. Now `UndoFileReads.openFile`
+answers nil only for a file that is gone (a segment pruned since it was
+listed), and throws for everything else; the torn-line cut, the tail
+check, the blobs and the folder's identifier file all open through it. A
+blob that is there and cannot be read is the list unavailable, never
+`contentMissing` (which clears the list for good); an identifier file that
+cannot be read is never set aside (that would give the folder a new
+identifier and put every step under the old one out of reach). Left as
+they are, and why: the fold's size and file-number checks (a failure only
+makes the fold untrusted, and the whole read then throws), a page that
+cannot be read (`UndoItem.read` calls it neither, so changed since: a
+teacher's page, not the list, and a question for U7 before the switch),
+the published-pages record (`cannotTell`), and the blob sweep's listing
+(it then deletes nothing). Not reproduced on a real failing disk; the seam
+`UndoKillPoints.readOfTheListFails` proves the path
+(`UndoJournalCoreTests.testAReadThatFailsIsAnUnreadableList`).
+
 ### Write-ahead, and recovery from the content
 
 A step runs in three phases (`JournaledWrite.perform`): under the lock,
@@ -19382,6 +19501,47 @@ mode and owner are its own; a copy on a volume without links) until every
 swap is in. If one cannot go in, the swaps already made are reversed and
 the file is named (`undo.stepCases`). A rename happened or it did not, so
 a process killed part way leaves each file wholly old or wholly new.
+
+**A staging write that fails leaves nothing, and says so in its own word**
+(U2a, the Fable sweep of U1's F1). On a 3 MB disk image filled to the brim
+the sweep measured a refused step leaving `.a.md.plantoir-undo-2-apply-new`
+(0 bytes) and a refused Undo leaving `.a.md.plantoir-undo-1-undo-new` beside
+the page, both still there after room came back and two more steps ran:
+the exclusive create had made the file, the write into it failed, and the
+catch dropped it. Recovery never saw it, because it tidies only steps
+closed `interrupted` and these closed `failed`. Now the staging loop
+removes the file it made before it refuses (`UndoSwap.removeStaged`), and
+the refusal is `UndoRefusal.couldNotWrite` (contract word `couldNotWrite`:
+the disk is full, or the folder will not take a new file), not
+`fileIsInUse`, which would have had U7 tell the teacher a file was open
+somewhere. Like a file in use it changes nothing on the list: the step is
+still offered, and nothing is cleared or dropped. Every failure of the
+staging step is this word (making the folder, the exclusive create, the
+write, the flush): none of them is another program holding the target,
+which only a rename can meet. Keeping the original before the swap is the
+same word when it fails for room or permission (`UndoSwap.isRoomOrPermission`:
+on a volume without hard links the original is copied, and the copy can
+fill the disk); anything else there stays `fileIsInUse` (the review of
+U2a, LOW 1). Recovery retries a `couldNotWrite` swap on the schedule a
+file in use has. The `stepCases` row `stagingFailsAt` pins it,
+through a test seam (`UndoKillPoints.stagingWriteFailsAt`) that creates the
+staged file and then fails as a full disk does; the disk image itself is
+not in the suite.
+
+**A line op that cannot be placed is a change since** (U2a, the sweep's
+F2). The sweep made a step turn `draft: true` into `publish: false` (two
+line ops), removed the page's front matter by hand, and Undo answered
+`contentMissing`: the `draft` op still read "as the step left it" (absent),
+but putting its line back needs a block that is gone, and `UndoCheck.plan`
+returned the moment `moved` gave nil, before it reported the pages already
+in the way. With M9 built as it is the list was cleared either way and
+only the reason was wrong; with M9 turned the other way, this hand edit
+would have stopped clearing the list, against ruling 13. Now a line op
+that cannot be placed puts its page in the way, the check goes on through
+every op, and every page in the way is reported (`changedSince`) before
+any content found missing from the list. `contentMissing` is left for a
+blob the list no longer holds. The `stepCases` row with `step: twoLines`
+pins it.
 
 ### Linear, cleared, pruned
 
