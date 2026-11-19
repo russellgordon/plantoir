@@ -13021,6 +13021,28 @@ what is imported).
   Source checks hold the recipe's three pin lines and the build's guard to
   the contract.
 
+**What was proven, 2026-11-19.** On the PC (`dev` runtime fetched 2026-11-14),
+`fetch-runtime.ps1` at this branch repaired the existing runtime in place
+(manifest `nodeVcRuntime` 14.51.36247.0, the copy's SHA-256 the contract's),
+and `publish.ps1 -WithoutAssistantEngine` (unsigned, nothing uploaded) put it
+in the published `runtime\node` that the installer packs; the Windows unit
+suite on the branch was 4,059 passed, 6 failed (`dev`'s known six), 1
+skipped, the six new tests passing. On the clean VM (snapshot 00) the
+UNSIGNED installer, downloaded through Edge, was held by SmartScreen
+("PlantoirSetup.exe isn't commonly downloaded. Make sure you trust
+PlantoirSetup.exe before you open it."), so the rehearsal stopped at step 1
+(`runs/win-rehearsal-2026-11-19-044259`); a signed release is not held this
+way. So the fix was proven from a clean machine another way
+(`runs/win-rehearsal-2026-11-19-045704`, `proof-965/`): the released, signed
+1.9.3 installed by the rehearsal and stopped at step 6 on #965 as before;
+then, with PATH as the launchers set it and no `vcruntime140.dll` in
+System32, lightningcss and typst-ts-node-compiler failed to load
+(`ERR_DLOPEN_FAILED`) and the other three loaded; with only this one file
+placed beside `node.exe` all five loaded, and the installed `preview.ps1
+EXC2O 1 --build-only` built the example course (271 pages, 336 files, exit
+0). Not proven: the end-to-end rehearsal PASSED with a signed installer
+carrying the fix (it needs a signed candidate build).
+
 **Updates are ours now.** An app-local copy is not patched by Windows Update.
 It is refreshed only when a new Plantoir ships, so revisit
 `windowsNodeVcRuntime` when Node, Python or a native module moves (beside the
