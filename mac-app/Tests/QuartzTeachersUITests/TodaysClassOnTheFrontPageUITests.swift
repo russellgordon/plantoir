@@ -24,7 +24,7 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
     // MARK: - Tests
 
     func testPreviewAsksShowsAndRemembersNotToday() throws {
-        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        let fixtureURL: URL = try UITestFolders.makeFixture()
         let sectionURL: URL = fixtureURL.appendingPathComponent("courses/EXC2O/section1")
         let classesURL: URL = sectionURL.appendingPathComponent("All Classes")
         try FileManager.default.createDirectory(at: classesURL, withIntermediateDirectories: true)
@@ -73,7 +73,7 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
         // 2. The page moved back by hand → asked again → Not Today.
         try showingYesterday.write(to: indexURL, atomically: true, encoding: .utf8)
         application.buttons["previewButton"].firstMatch.click()
-        let notToday: XCUIElement = application.windows.buttons["Not Today"].firstMatch
+        let notToday: XCUIElement = application.windows.buttons["Not Now"].firstMatch
         XCTAssertTrue(notToday.waitForExistence(timeout: 15), "Preview did not ask the second time")
         notToday.click()
         XCTAssertTrue(application.webViews.firstMatch.waitForExistence(timeout: 90),
@@ -88,7 +88,7 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
 
         // 3. Asked no more today: Preview goes straight to the preview.
         application.buttons["previewButton"].firstMatch.click()
-        XCTAssertFalse(application.windows.buttons["Not Today"].firstMatch.waitForExistence(timeout: 4), "asked again after Not Today")
+        XCTAssertFalse(application.windows.buttons["Not Now"].firstMatch.waitForExistence(timeout: 4), "asked again after Not Today")
         XCTAssertTrue(application.webViews.firstMatch.waitForExistence(timeout: 90))
         application.buttons["stopPreviewButton"].firstMatch.click()
         application.terminate()

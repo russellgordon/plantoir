@@ -60,7 +60,8 @@ public static class ObsidianFigureAddOnsWording
     public const string ReopenTitle = "Reopen Obsidian to show diagrams and graphs?";
     public const string ReopenMessage = "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”.";
     public const string Reopen = "Reopen Obsidian";
-    public const string Later = "Later";
+    /// <summary>"Not Now" on an offer Plantoir raised by itself (#987; it was "Later").</summary>
+    public const string Later = "Not Now";
     public const string PaneTitle = "Obsidian";
     public const string SettingLabel = "Add the add-ons that draw diagrams and graphs to courses that have them";
     /// <summary><c>windowsWording.settingFooter</c>: Enter, not Return.</summary>

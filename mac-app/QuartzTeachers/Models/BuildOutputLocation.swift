@@ -104,7 +104,7 @@ nonisolated enum BuildOutputLocation {
     /// through `CourseArchiver` or `CourseRenamer` without setting an override
     /// still cannot touch the real one.
     static let buildsRootWhileTesting: URL = FileManager.default.temporaryDirectory
-        .appendingPathComponent("plantoir-builds-under-test-\(ProcessInfo.processInfo.processIdentifier)")
+        .appendingPathComponent("plantoir-builds-under-test-" + RealHome.testRunIdentifier)
 
     // MARK: - Computed properties
 

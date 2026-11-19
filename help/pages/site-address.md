@@ -53,7 +53,7 @@ At a section's first deploy to Netlify, a sheet titled {{control:websiteAddressS
 
 1. Read the name in the {{control:websiteAddressSheetAddressField}} field. Plantoir has filled it in from the four parts above.
 2. Keep it, or type another. You may put your school's abbreviation in front. The sheet gives the rule:
-   {{say:app-rules#credentialRequests.requests[5].steps[2]}}
+   {{say:app-rules#credentialRequests.requests[5].steps[2] ~ Use only lowercase letters, numbers}}
 3. Press {{control:credentialSheetContinueButton}}.
 
 {{picture:site-address-1}}

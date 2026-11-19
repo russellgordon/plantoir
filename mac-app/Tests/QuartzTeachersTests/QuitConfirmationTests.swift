@@ -117,13 +117,15 @@ final class QuitConfirmationTests: XCTestCase {
                 expectAsk,
                 "\(name): the rule and the contract disagree"
             )
-            // #855: the question's first button, where the case names it.
-            if let firstButton = testCase["expectFirstButton"] as? String {
-                let buttons: [QuitConfirmation.Button] = QuitConfirmation.buttons(
-                    onlySettingUp: QuitConfirmation.onlySettingUpNow()
-                )
-                XCTAssertEqual(buttons[0].title, firstButton, name)
-                XCTAssertEqual(buttons[0].choice, .keepWorking, name)
+            // #855, then #987: the question's Cancel, where the case names
+            // it. Every question has the same one since #987.
+            if let cancelTitle = testCase["expectCancelButton"] as? String {
+                var cancelling: [QuitConfirmation.Button] = []
+                for button in QuitConfirmation.buttonsInOrder where button.choice == .keepWorking {
+                    cancelling.append(button)
+                }
+                XCTAssertEqual(cancelling.count, 1, name)
+                XCTAssertEqual(cancelling.first?.title, cancelTitle, name)
             }
         }
     }
@@ -374,32 +376,42 @@ final class QuitConfirmationTests: XCTestCase {
         XCTAssertTrue(went.contains("quit anyway"))
     }
 
-    /// Keep Working is the DEFAULT button, and the contract says so rather
-    /// than the code saying so alone.
+    /// Which button leads, which answers Escape and that none is the
+    /// default, as the contract says rather than the code saying so alone.
     ///
     /// **The ORDER is what this pins, not a spelling.** `NSAlert` reports a
     /// POSITION — `.alertFirstButtonReturn` for whichever title went in
     /// first — so putting the two titles up as two separate lines meant a
-    /// one-line reorder could swap what each answer MEANS and make Keep
-    /// Working quit, with nothing red anywhere. Title and meaning now travel
+    /// one-line reorder could swap what each answer MEANS and make Cancel
+    /// quit, with nothing red anywhere. Title and meaning now travel
     /// together in one ordered list that the alert builds itself from, and
     /// this reads the same list.
-    func testTheSafeAnswerIsTheDefaultOne() throws {
+    ///
+    /// Since #987 (Apple's HIG, Alerts) the safe answer is Cancel, which
+    /// answers Escape, leads, and is NOT the default: no button is, so a
+    /// Return pressed without reading does nothing.
+    func testCancelLeadsAndAnswersEscapeAndNoButtonIsTheDefault() throws {
         let section: [String: Any] = try QuitConfirmationTests.section("quittingWhileWorkIsUnderWay")
         let buttons: [String: Any] = try XCTUnwrap(section["buttons"] as? [String: Any])
-        let defaultChoice: String = try XCTUnwrap(buttons["default"] as? String)
-        XCTAssertEqual(defaultChoice, "keepWorking")
+        XCTAssertTrue(buttons["default"] is NSNull, "the contract names no default button")
+        XCTAssertEqual(buttons["escape"] as? String, "keepWorking")
+        XCTAssertEqual(buttons["order"] as? [String], ["keepWorking", "quitAnyway"])
         XCTAssertNotNil(buttons["keepWorking"] as? String)
         XCTAssertNotNil(buttons["quitAnyway"] as? String)
 
+        // NSAlert's first button trails, so the leading-to-trailing order
+        // is the list read backwards.
         XCTAssertEqual(QuitConfirmation.buttonsInOrder.count, 2)
-        XCTAssertEqual(
-            QuitConfirmation.buttonsInOrder.first?.choice.rawValue, defaultChoice,
-            "The first button is the default one, and the contract says which answer that has to be"
-        )
-        XCTAssertEqual(QuitConfirmation.buttonsInOrder.first?.title, QuitConfirmation.keepWorkingButton)
-        XCTAssertEqual(QuitConfirmation.choice(atButtonIndex: 0), .keepWorking)
-        XCTAssertEqual(QuitConfirmation.choice(atButtonIndex: 1), .quitAnyway)
+        XCTAssertEqual(QuitConfirmation.buttonsInOrder.last?.choice, .keepWorking, "Cancel leads")
+        XCTAssertEqual(QuitConfirmation.buttonsInOrder.first?.choice, .quitAnyway, "Quit Anyway trails")
+        XCTAssertEqual(QuitConfirmation.buttonsInOrder.last?.title, QuitConfirmation.keepWorkingButton)
+        XCTAssertEqual(QuitConfirmation.keepWorkingButton, "Cancel")
+        for button in QuitConfirmation.buttonsInOrder {
+            XCTAssertNotEqual(button.keyEquivalent, "\r", "\(button.title) is the default")
+        }
+        XCTAssertEqual(QuitConfirmation.buttonsInOrder.last?.keyEquivalent, "\u{1b}", "Cancel answers Escape")
+        XCTAssertEqual(QuitConfirmation.choice(atButtonIndex: 0), .quitAnyway)
+        XCTAssertEqual(QuitConfirmation.choice(atButtonIndex: 1), .keepWorking)
         XCTAssertEqual(
             QuitConfirmation.choice(atButtonIndex: 7), .keepWorking,
             "An answer nobody recognises must be the safe one"

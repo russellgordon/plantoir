@@ -5,8 +5,8 @@
  "voice": "Documentation, not marketing: one task a page, steps in order, what you see after each, what to do when it goes wrong. Written by Fable from an Opus fact sheet; reviewed adversarially for accuracy, clarity, simple language and tone.",
  "anchorRule": "One anchor a page, written <a name=\"<anchor>\"></a> before the title; the file is <anchor>.html; a Help button opens a PAGE, never a place inside one (measured 2026-11-13: every anchor on a page resolves to its first).",
  "pageCount": 102,
- "sceneCount": 194,
- "pictureFilesMac": 388,
+ "sceneCount": 195,
+ "pictureFilesMac": 390,
  "readingTimeTotalMinutes": 272,
  "landingPage": {
   "indexed": false,
@@ -741,8 +741,8 @@
     },
     {
      "anchor": "add-next-class",
-     "title": "Add the next class",
-     "question": "How do I make the page for the next class, numbered and dated?",
+     "title": "Add a class",
+     "question": "How do I add the next class, start a new unit, or copy a class?",
      "about": "Section > Add Class…: the next class in this unit, in a new unit, or a copy of a class; the page made, numbered and dated, unpublished, backed up first, undoable.",
      "steps": [
       "Select the section (it needs class dates on file: link class-dates)",
@@ -765,9 +765,17 @@
         "The new page"
        ],
        "scene": "add-next-class-2"
+      },
+      {
+       "shows": "The Add Class sheet with its three ways, the first chosen",
+       "labels": [
+        "The three ways",
+        "Add"
+       ],
+       "scene": "add-next-class-3"
       }
      ],
-     "scenes": 2,
+     "scenes": 3,
      "readMinutes": 2,
      "notes": "Needs class dates first (link to Give Plantoir your class dates); the fact sheet says what happens without them (class-planning contract).",
      "id": "add-next-class",
@@ -787,7 +795,8 @@
      "needsPictures": true,
      "sceneIds": [
       "add-next-class-1",
-      "add-next-class-2"
+      "add-next-class-2",
+      "add-next-class-3"
      ],
      "indexed": true
     },
@@ -1171,14 +1180,14 @@
      "anchor": "schedule-deploy",
      "title": "Schedule a deploy for later",
      "question": "Can a section deploy itself tomorrow morning?",
-     "about": "Schedule Deploy (Deploy at), the clock in the sidebar, the notification, Cancel Deploy at, and how late it may still run.",
+     "about": "Schedule Deploy (Deploy at), the clock in the sidebar, the notification, Remove Scheduled Deploy, and how late it may still run.",
      "steps": [
       "Select the section",
       "Section > Schedule Deploy… (also in the section row's right-click menu)",
       "In Schedule a deploy, set Deploy at (it starts at tomorrow, 6:30), then Schedule",
       "A clock appears beside the section in the sidebar; its hover text says when, and that this Mac must be on and awake",
       "A notification says how it went; click it to open that section",
-      "Section > Cancel Deploy at (the time)… removes it, after asking",
+      "Section > Remove Scheduled Deploy… removes it, after asking",
       "Course Settings' How late a scheduled deploy may still run"
      ],
      "pictures": [
@@ -1211,7 +1220,7 @@
      "id": "schedule-deploy",
      "section": "Every week",
      "status": "amended",
-     "v4": "Field is Deploy at; a clock with hover text, no 'Deploys at' label; Cancel Deploy at carries the time (FS-3 corrections 7, 8).",
+     "v4": "Field is Deploy at; a clock with hover text, no 'Deploys at' label; the command that removes it carried the time until #987 renamed it Remove Scheduled Deploy (FS-3 corrections 7, 8).",
      "factSheets": [
       "FS-3-every-week.md"
      ],
@@ -2160,7 +2169,7 @@
       "Plantoir > Settings > Deploying: a Netlify part and a Cloudflare Pages part",
       "The status line: Connected, the end date where Cloudflare gives one, or what is wrong; Check Again",
       "Change Token...: the same steps a first deploy shows, then Check and Save; Cancel waits while the token is checked",
-      "A new token that cannot reach your class websites: Keep My Old Token (or Don't Save It), or Use the New Token",
+      "A new token that cannot reach your class websites: Cancel, or Use the New Token",
       "Remove Token, and what it means for a deploy set for later",
       "The Deploy screen's warning when a Cloudflare token ends in under 30 days, with Open Settings..."
      ],
@@ -2188,7 +2197,28 @@
       "deploy-tokens-1",
       "deploy-tokens-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Deploying pane of Plantoir's settings, with its Netlify part and its Cloudflare Pages part, each connected",
+       "labels": [
+        "Status line",
+        "Change Token…",
+        "Remove Token",
+        "Check Again"
+       ],
+       "scene": "deploy-tokens-1"
+      },
+      {
+       "shows": "The question asked when a new token cannot reach some class websites",
+       "labels": [
+        "The sections",
+        "Cancel",
+        "Use the New Token"
+       ],
+       "scene": "deploy-tokens-2"
+      }
+     ]
     },
     {
      "anchor": "github-pages",
@@ -2349,7 +2379,24 @@
       "videos-1",
       "videos-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A page in Obsidian with a video's address on a line of its own, in the picture form",
+       "labels": [
+        "The video's address",
+        "What the video is"
+       ],
+       "scene": "videos-1"
+      },
+      {
+       "shows": "The same page on the class website, with the video's player",
+       "labels": [
+        "The player"
+       ],
+       "scene": "videos-2"
+      }
+     ]
     },
     {
      "anchor": "printing",
@@ -2978,7 +3025,26 @@
       "phet-1",
       "phet-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A phet block as typed in Obsidian",
+       "labels": [
+        "sim:",
+        "alt:"
+       ],
+       "scene": "phet-1"
+      },
+      {
+       "shows": "A simulation's card on the class website, before it is opened",
+       "labels": [
+        "The simulation's picture",
+        "Open the simulation",
+        "PhET's credit line"
+       ],
+       "scene": "phet-2"
+      }
+     ]
     },
     {
      "anchor": "circuits",
@@ -3286,7 +3352,31 @@
       "subject-science-2",
       "subject-science-3"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "SCH3U's page Combustion on the class website, with its chemical equations typeset",
+       "labels": [
+        "Chemical equations"
+       ],
+       "scene": "subject-science-1"
+      },
+      {
+       "shows": "SPH3U's page The Doppler Effect on the class website, with its diagram",
+       "labels": [
+        "Diagram drawn from text"
+       ],
+       "scene": "subject-science-2"
+      },
+      {
+       "shows": "SCH3U's page Solubility Rules on the class website, with its table",
+       "labels": [
+        "Reference",
+        "The rules"
+       ],
+       "scene": "subject-science-3"
+      }
+     ]
     },
     {
      "anchor": "subject-computer-studies",
@@ -4371,10 +4461,10 @@
      "anchor": "quitting",
      "title": "Quitting while something is running",
      "question": "Plantoir asked before quitting: what happens if I quit anyway?",
-     "about": "The quit question: what Plantoir asks about, Keep Working and Quit Anyway, and when it never asks.",
+     "about": "The quit question: what Plantoir asks about, Cancel and Quit Anyway, and when it never asks.",
      "steps": [
       "What Plantoir asks about: deploying, building a preview until its page first answers, saving a copy of a course, sharing unit plans",
-      "Keep Working (the default) or Quit Anyway, and what each does",
+      "Cancel or Quit Anyway, and what each does",
       "When it never asks: a preview that is only open, another program's work, and logging out, restarting or shutting down"
      ],
      "scenes": 1,
@@ -4406,7 +4496,7 @@
       {
        "shows": "The question Plantoir asks when quitting during a deploy",
        "labels": [
-        "Keep Working",
+        "Cancel",
         "Quit Anyway"
        ],
        "scene": "quitting-1"

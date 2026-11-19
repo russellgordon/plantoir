@@ -99,7 +99,7 @@ final class MenuKeysBehindASheetTests: XCTestCase {
 
     func testShiftCommandDDoesNotDeployBehindASheet() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
-        defer { try? FileManager.default.removeItem(at: fixtureURL) }
+        removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first, let window = workspace.window else {
             XCTFail("No window model registered; the interface is not on screen")
             return

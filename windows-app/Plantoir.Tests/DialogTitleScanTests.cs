@@ -37,6 +37,7 @@ public class DialogTitleScanTests
         ["Services/UpdatePrompts.cs"] = 1,
         ["Views/AboutDialog.cs"] = 1,
         ["Views/AddSectionDialog.cs"] = 1,
+        ["Views/AssistantSettingsPane.cs"] = 1,   // #987, D22: the question before a downloaded assistant is removed
         ["Views/AssistWindow.xaml.cs"] = 2,
         ["Views/CopyAPageDialog.cs"] = 1,
         ["Views/CourseSettingsView.xaml.cs"] = 2,

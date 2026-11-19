@@ -278,6 +278,7 @@ struct StringListEditorView: View {
             Button("Cancel", role: .cancel) {
                 pendingRemoval = nil
             }
+            .keyboardShortcut(.cancelAction)
         } message: { removal in
             Text(removal.message)
         }
@@ -405,7 +406,7 @@ struct StringListEditorView: View {
                 .accessibilityIdentifier("addField-\(title)")
             HStack {
                 Spacer()
-                Button("Cancel") {
+                Button("Cancel", role: .cancel) {
                     isAddingItem = false
                 }
                 .keyboardShortcut(.cancelAction)
@@ -458,7 +459,7 @@ struct StringListEditorView: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel") {
+                Button("Cancel", role: .cancel) {
                     pendingRename = nil
                 }
                 .keyboardShortcut(.cancelAction)

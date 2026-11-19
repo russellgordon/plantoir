@@ -24,6 +24,7 @@ final class BuildOutputLocationTests: XCTestCase {
     override func setUpWithError() throws {
         let base: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cq4t-builds-\(UUID().uuidString)")
+        removeWhenTestEnds(base)
         buildsRoot = base.appendingPathComponent("builds")
         workingFolder = base.appendingPathComponent("Course Notes")
         try FileManager.default.createDirectory(
@@ -716,6 +717,7 @@ final class BuildOutputLocationTests: XCTestCase {
     func testOnlyBuildsForFoldersUnderTheHomeFolderAreSwept() throws {
         let home: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cq4t-home-\(UUID().uuidString)")
+        removeWhenTestEnds(home)
         let gone: URL = buildsRoot.appendingPathComponent("aaaaaaaa")
         let onAnotherDisk: URL = buildsRoot.appendingPathComponent("bbbbbbbb")
         let unmarked: URL = buildsRoot.appendingPathComponent("cccccccc")
@@ -792,6 +794,7 @@ final class BuildOutputLocationTests: XCTestCase {
     func testAFolderThatCannotBeLookedAtIsNotTreatedAsDeleted() throws {
         let home: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cq4t-home-\(UUID().uuidString)")
+        removeWhenTestEnds(home)
         let closed: URL = home.appendingPathComponent("closed")
         let inside: URL = closed.appendingPathComponent("Course Notes")
         try FileManager.default.createDirectory(at: inside, withIntermediateDirectories: true)

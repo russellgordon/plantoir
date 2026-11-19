@@ -383,7 +383,6 @@ final class DeployTokenTests: XCTestCase {
         }
         panel.isShowingChange = true
         await panel.save(pasted: "invented-token")
-        XCTAssertEqual(panel.keepButtonTitle, DeployTokenWording.dontSaveNewToken)
         panel.keepTheOldToken()
         XCTAssertFalse(trail().contains("kept the old"), trail())
         XCTAssertTrue(trail().contains("a new Netlify token was not saved: tokenCannotReachSites"), trail())
@@ -391,7 +390,8 @@ final class DeployTokenTests: XCTestCase {
         panel.status = .answered(DeployTokenAnswer(saved: true, answer: "accepted", endsOn: nil, problem: nil, unreachable: []))
         panel.isShowingChange = true
         await panel.save(pasted: "invented-token")
-        XCTAssertEqual(panel.keepButtonTitle, DeployTokenWording.keepOldToken)
+        panel.keepTheOldToken()
+        XCTAssertTrue(trail().contains("kept the old"), trail())
     }
 
     /// Review I4: the end date the Deploy screen warns from goes on the trail

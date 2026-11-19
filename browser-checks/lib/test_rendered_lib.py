@@ -121,6 +121,32 @@ class Sabotages(unittest.TestCase):
         for page, address in ROWS["pages"].items():
             self.assertEqual(address, "Rendered-Check/" + page.replace(" ", "-"))
 
+    def test_the_dialog_sabotage_says_it_is_due_before_the_sketch_can_open(self):
+        # #974: the drag row read a marker the sabotage set only once the
+        # sketch was open, so a drag in the gap before it met an unbroken
+        # sketch and passed. The page now says so on <html> as its script's
+        # first act, the drag row waits on that, and a sabotage that never
+        # finishes is not read as the row's own reason ("did not move").
+        root = Path(tempfile.mkdtemp(prefix="plantoir-rendered-test-"))
+        try:
+            page = sabotage.page_file(root, "Sketch")
+            page.parent.mkdir(parents=True)
+            page.write_text("<html><head></head><body></body></html>", encoding="utf-8")
+            sabotage.geogebra_dialog(root)
+            script = (root / "static" / "rendered-sabotage" / "geogebra-dialog.js").read_text(encoding="utf-8")
+            first = script.strip().splitlines()[1].strip()
+            self.assertEqual(first, 'document.documentElement.dataset.renderedSabotage = "dialog pending"')
+            self.assertIn('document.documentElement.dataset.renderedSabotage = "dialog removed"', script)
+        finally:
+            shutil.rmtree(root)
+        checks = (HERE.parent / "rendered_features.mjs").read_text(encoding="utf-8")
+        drag = checks[checks.index('ROW_CHECKS["geogebra drag"]'):checks.index('ROW_CHECKS["geogebra reset"]')]
+        self.assertIn("document.documentElement.dataset.renderedSabotage", drag)
+        self.assertNotIn("f.dataset.renderedSabotage", drag)
+        reason = [one["reason"] for one in ROWS["sabotages"] if one["name"] == "geogebra dialog"][0]
+        never_finished = drag[drag.index("if (!settled)"):].split("\n")[0]
+        self.assertNotIn(reason, never_finished)
+
     def test_refuses_a_folder_without_the_pages(self):
         empty = Path(tempfile.mkdtemp(prefix="plantoir-rendered-test-"))
         try:

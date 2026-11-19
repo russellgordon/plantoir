@@ -134,6 +134,8 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
 | `PtyDriver/` | A console harness that runs a command under a ConPTY and answers prompts from scripted rules. It exercises the same `ConPtyProcess` the app uses, which is the point: it tests the launchers the way the app drives them. |
 | `Plantoir.Mcp/` | A standalone MCP server exposing one working folder to an AI assistant. It SHIPS: `publish.ps1` copies `plantoir-mcp.exe` beside `Plantoir.exe` and signs it. |
 | `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
+| `Plantoir.UiTests.FirstInstall/` | The first-install rehearsal driver (#976). Not a test project and in no solution or suite: a self-contained single-file `win-arm64` console program that runs inside a CLEAN Windows machine's desktop session and does what a teacher does — downloads `PlantoirSetup.exe` through Edge (so it carries the from-the-internet mark), runs it, opens Plantoir, sets up a working folder, adds the example course and previews it. Each step names the windows it expects (`WindowRules.cs`); any other window or dialog ends the run, named, with a screenshot. Three kinds of window get a 20 s grace instead of an answer: one of Plantoir's still being made (no readable class or title), one with no title and no words, and one UI Automation lists but cannot read at all (its properties throw). A window in its grace is tolerated, not allowed. Each unreadable window is numbered and recorded when it appears, and again when it can be read or is gone. UI Automation's element comparison tells such windows apart, because their handles all read 0x0, and a comparison that throws is recorded. A readable window is then judged by the ordinary rules; one still unreadable after 20 s ends the run. Separately, if at least one unreadable window has been present at every look for 20 s, the run ends whichever windows they were, so a window the comparison cannot follow is still caught. No watch and no step may finish while any window is in its grace: when the time is up, the driver goes on looking (a SETTLING line in the log) until each such window is judged, has gone, or has ended the run, for at most 60 s more, and running out of that time is not PASSED. After the last step the driver watches the desktop for 60 s more (step 7: a firewall alert raised when the preview server binds comes a second after the address answers). It writes PASSED only if that minute, and any settling after it, is clean, with at least one successful look per three seconds of the minute and no stretch of it longer than 10 s without one. Every look is recorded: a look that could not read the desktop is counted as failed, not as a look, and the record's gaps run on through it. No step, watch or PASSED is decided except on a successful look made within the last 5 s; when the last look failed, or is older, the driver looks again, and if no look succeeds in 60 s the run is a DRIVER PROBLEM, cause coverage (the fifth review: a final minute whose last 40 s were all failed reads used to end clean on the pending set of an older look). A popup inside Plantoir's window that cannot be read is pending like any unreadable window. PASSED is written straight after a look made for it; the notes, screenshot and uploads come after `result.txt`. The installer's launch call must have had real looks too. `result.txt` carries the record as values (looks, failed looks, the largest gap and the stage it was in, the age of the last look at the decision, the final watch's largest gap, and the times of the final watch's start, the decision and the first sighting of the window stopped on); `--self-test-fail-looks-after N` makes every look from N s into the final watch fail, for the Mac's failed-looks self-test. Driven from a Mac by `vm-tools/win-rehearsal.py`, which restores the Parallels VM's clean snapshot. It also watches for a UAC prompt from outside the guest, asking as SYSTEM whether consent.exe is running, on a thread of its own: once a second (a probe takes about 0.2 s) from before the driver, and so the installer, is launched until the decision, with a probe asked after the driver's result that must be answered. Its screen captures and their OCR, every 5 s, run beside it and cannot delay a probe. Failed probes are counted by the gap they leave between answered ones, not in a row: a PASSED needs no gap over 10 s anywhere in the run, and a gap of 120 s stops it. Measured, not assumed: Windows did not withdraw an unanswered UAC prompt in 20 minutes (`win-rehearsal.py --measure-uac-timeout`, snapshot 00, run `win-uac-timeout-2026-11-18-192158`: consent.exe seen 5.6 s after the request, still running, with the prompt's words on the capture, when the measurement stopped at 20 minutes), so a prompt cannot come and go inside a 10 s gap. A UAC prompt is reported ahead of any stray window found beside it. The driver sees nothing of a UAC prompt, so UAC is caught by the Mac side alone. In `--self-test uac` (runs `win-rehearsal-2026-11-18-180608-selftest-uac` and `-182736-selftest-uac`, snapshot 00 with PromptOnSecureDesktop 0) the prompt was on the ordinary desktop and on the Mac's capture for 45 s. In those 45 s the driver kept looking every second, and it recorded no new top-level window and no unreadable one: UI Automation gave it no element for the prompt at all. Its consent rule in `WindowRules.cs` and its unreadable-window rules therefore cannot catch a UAC prompt. So the uac self-test proves the Mac side is enough on its own, deciding by values. It requires that a periodic probe, not the one after the result, saw consent.exe while the prompt was held up, that the capture taken at once shows the prompt (OCR reads its words), and that the run's outcome is PRODUCT STOPPED with UAC as its cause whatever the driver said (a driver PASSED included); a test pins that the rehearsal's own decision path makes that call. It records what the driver noted only as information. One earlier run (`win-rehearsal-2026-11-18-132158-selftest-uac`) noted one unreadable window, handle 0x0, 2 s before the Mac saw consent.exe; later runs never saw one, so it was not the prompt, or not reliably. The Mac decides the outcome. The driver's `result.txt` carries fixed fields (status, stage, cause, the window's process, whether it stopped while settling, and the look record above), it sends small value files as it goes (`driver-started-PID.txt`, `step-N.txt`, `final-watch-began.txt`), and the Mac and its self-tests decide by those values, never by searching a sentence or a log. A driver PASSED stands only with proof of looking on both sides for the whole run: the Mac's probes as above, the driver's record with no gap over 10 s and its decision on a look under 5 s old, and the final minute seen by the Mac to run its length; otherwise the outcome is DRIVER PROBLEM, cause coverage. The failed-looks and probe-gap self-tests make each kind of gap happen for real and show it refuses a clean result. The last line of every report is the Mac's final outcome (PASSED, PRODUCT STOPPED or DRIVER PROBLEM); the driver's own line in it is labelled as the driver's. References nothing in this repository, because the machine it runs on has only the released app. |
+| `Plantoir.UiTests.FirstInstall.Tests/` | Plain xUnit tests of that allow-list, `net9.0` (not `-windows`), compiling `WindowRules.cs` alone, so they run on any machine with the .NET 9 SDK, a Mac included, with no desktop and no VM: `dotnet test windows-app/Plantoir.UiTests.FirstInstall.Tests`. In no solution and no suite; every build of the driver runs them first. |
 
 The one house-style rule worth stating: **this is ordinary idiomatic C#, LINQ
 included, and that is deliberate.** The Swift follows Russell's machine-wide
@@ -1981,6 +1983,75 @@ sides, the accept loop, the reads and writes, HttpClient's continuations
 and the timers, so it would change nothing. A dedicated server thread
 instead of `Task.Run` — the client side starves too, so it cures half.
 
+### A red that is a busy PC: the shared Python limit and one refused write (#916)
+
+Two more reds of the same family turned three gate runs red on 2026-11-13/14,
+while several agents ran suites and filtered runs on this PC (Lenovo
+20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200) at once. Both fixes are
+test code only.
+
+**`PythonToolchainTests` stopped healthy files at 180 s.** The limit is there
+to stop a HUNG file with its name, not to judge speed, and three files met
+it doing nothing wrong: `test_starting_content_prompts.py` (116 s and 151 s
+under load), `test_no_stored_credentials.py` (71 s beside one other test
+host, 193 s beside more) and `test_shared_writes_two_at_once.py`. Timed one
+after another under the suite lock on 2026-11-14 with the runtime's Python
+3.14.10, the way the runner starts them, all 119 files took 10 min 41 s and
+every one passed; the seven at 30 s or more:
+
+| File | Alone |
+|---|---|
+| `test_graded_folders_new_course.py` | 78.5 s |
+| `test_starting_content_prompts.py` | 68.5 s |
+| `test_shared_writes_two_at_once.py` | 59.8 s |
+| `test_deploy_sh_destination.py` | 46.1 s |
+| `test_share_plan.py` | 45.1 s |
+| `test_marking_comments.py` | 44.6 s |
+| `test_no_stored_credentials.py` | 33.8 s |
+
+The worst slowdown seen under load is 5.7 times (33.8 s to 193 s), which
+would take the slowest file to about 450 s. **The limit is now 600 s for
+every file** (`PythonToolchainTests.Limit`): above anything load has
+produced, and a hung file still stops the run inside ten minutes. A timeout
+says the file, the limit and how long it ran, and, for a file in
+`KnownSlowFiles` (the table above), that a busy PC is the likely cause; for
+any other file, to suspect a hang first. `AHungFileIsStoppedAtTheLimitAndNamed`
+proves the limit still bites: a file that sleeps 300 s, written into a
+`RunOwnedTempFolders` folder (never into `scripts/`, which both platforms
+run), is stopped at a 15 s limit with exit 124 and that sentence (15 s, not
+2, so a cold interpreter on a loaded PC still prints before it is stopped).
+**Nothing bounds the class's TOTAL time:** there is no `.runsettings`,
+`--blame-hang-timeout` or session timeout under `windows-app/`, so if every
+file hung (an interpreter that wedges at start, say) the run would take
+119 × 600 s, about 20 hours (about 6 at 180 s). The realistic case, one
+hung file, costs ten minutes and names its file; a hang common to every file
+shows in the first file's message. **Rejected:** a per-file
+allowance table, because it is kept in step by hand with a folder the mac
+adds files to, and the third file stopped that night was in no earlier
+measurement, so the table would have missed exactly the file that needed it
+(`KnownSlowFiles` only words the message; every file gets the same limit).
+Splitting the slow files' scans in shared Python, because it changes files
+the mac's `verify.sh` runs, for no gain to a teacher.
+
+**`LastViewedPagesTests.OnlyTheNewestAreKept` read `Actual: "P3"` once.** It
+wrote 503 entries through `LastViewedPages.Remember` and ignored what each
+call returned. The stamps were never the cause: each is injected, a minute
+apart, and the same test with every stamp EQUAL passes (newest-first order is
+kept by `Insert(0)` and a stable sort). What fails it is one refused write:
+`Remember` saves through a temporary file and a rename onto
+`last-viewed-pages.json`, and a rename onto a file something else holds open
+(a scanner reading the file just written is the usual holder) throws, is
+caught, and returns false. One entry fewer means only P1 and P2 are pushed
+out, so P3 survives at the second assertion. Reproduced with a scratch test,
+not committed: holding the file open (`FileShare.Read`) for write 502 gives
+`Assert.Null() Failure … Actual: "P3"` exactly. The test now SEEDS the 500
+kept entries in one write of its own, oldest first (so the order is also
+proved to come from the stamps, not the file), and sends only the three that
+evict through `Remember`, each asserted to have written and retried up to
+five times; 23 s became under a second. The product's behaviour, one
+remembered page silently not saved when the file is held, is a separate
+matter and is not changed here.
+
 ### And when the failure IS real: a red contract test is a handover
 
 Everything above is about telling a genuine failure from a crash or an empty
@@ -2433,7 +2504,8 @@ alone afterwards, they passed in 116 s and 193 s, the second already over
 the limit with one other suite running. One repository scan in the second
 file took 57.9 s over 15,274 files, `help/` is not among its costliest
 files, and the merge grew the repository by 0.6% in bytes, so the merge did
-not cause it (see "A red that is a clock", above). The same method as the
+not cause it (see "A red that is a clock", above). *(Since #916 the limit is
+600 s, with these files' times alone: "A red that is a busy PC", above.)* The same method as the
 two sections above: nothing a teacher sees today differs, and every red is
 held by name against the open `windows` issue that builds it.
 
@@ -2560,6 +2632,272 @@ test). The other classes that walk `mustRecord` (`AgentGuidanceTests`,
 `ActivityTrailWiringTests`, `DoorCourseHoldTests`, `SectionRestoreTests`,
 `CourseBackupTests`) passed, 123 of 123. `scripts/test_held_skills.py`, which
 reads `help/`, passed in 9 s.
+
+### After the mac's fourteen pieces: held by name a fourth time (2026-11-14)
+
+At about 05:15 EST the mac merged fourteen pieces into `dev`
+(d75c36543..cadd8eb11, 263 files): #899's journal core (switched off), #897
+pieces A and C, #785a, #597's second half, #891, #696, #812 and #813, the
+"checks that mislead" batch (#802, #905, #906, #907, #738), #674 (PhET), #692
+(video players), #853 and #876 (the redactor), and #879, #887, #791 and #866.
+Nothing under `windows-app/` changed. `verify-deploy.ps1` changed in one line
+(the surname prompt it expects, `deploy.py`'s new example). The shared Python
+it changed runs here today through `PythonToolchainTests`. A full suite on
+cadd8eb11 read `Failed: 19, Passed: 3809, Skipped: 1, Total: 3829, Duration:
+19 m 43 s`. It ran on this PC (a Lenovo 20QES70500, i5-8365U, 16 GB,
+Windows 11 Pro 26200) after a 92-minute wait for the suite lock. Each red is
+sorted below by the open `windows` issue of v2.0.0 whose body names it.
+
+Two of the 19 are not the mac's requests:
+- **`LastViewedPagesTests.OnlyTheNewestAreKept`** (`Actual: "P3"`, 25 s), the
+  ordering flake #916 already names.
+- **`PythonToolchainTests` on `scripts/test_deploy_tokens.py`.** #921 owns
+  it, and its body said to read a red there as a platform question first. It
+  is one. The file's `TheEndDateReading` (6 cases) and two more subtests pass
+  a JSON body to deploy.sh's cut-out functions as an ARGUMENT to Git Bash,
+  and Git Bash's own command-line reading changes such an argument before
+  bash sees it. Measured with `subprocess.run([Git Bash, "-c", 'printf "[%s]"
+  "$1"', "_", arg])` on the runtime's Python:
+  - `{"a":"b"}` arrives empty;
+  - `a"b` arrives as `a\b`;
+  - `{a:b}` arrives as `a:b`;
+  - `"status":"active"` arrives as `\status":"active"`.
+
+  The function itself reads the body right when it is typed into Git Bash
+  (`[active][2027-07-01T00:00:00Z]`). So the red is the shared test's way of
+  passing the body, not `deploy.sh` and not Windows. The fix is in shared
+  Python: hand the body over on standard input or in the environment. It is
+  owed by #921 with the mac, and left red here, because a shared test is not
+  held by name.
+
+**Held, 61 entries from these fourteen, all v2.0.0** (22 more from stack 13, below).
+
+| Issue | Entries | Area: what |
+|---|---|---|
+| #928 | 3 | `ActivityTrailEvents`: `preview already starting`, `preview again abandoned`, `preview could not start` |
+| #921 | 9 | `ActivityTrailEvents`: the four `deploy token …` events and `Cloudflare token end date learned`; `MachineWordUsedIn`: `deployTokens.words.problemCouldNotSave`; `CredentialRequestsSaidDifferently`: `cloudflareToken` (the TTL step now promises an end date in Settings and a warning, which Windows does not show yet); `FailureExplanationCases`: the two #696 refusals |
+| #936 | 8 | `ActivityTrailEvents`: `files for the site downloaded`, `… could not be downloaded`; `FailureExplanationCases`: the five PhET stops; `SectionProblemKinds`: `phetSimulationsNotReady` |
+| #899 | 2 | `ActivityTrailEvents`: `undo could not record a step`, `undo rolled back` (as #949 asks: the owner is the whole of Undo, of which #949 is the first Windows piece) |
+| #920 | 3 | `CredentialRequestsSaidDifferently`: `teacherSurname`, `siteName`, `siteNameConflict` (the invented sample names) |
+| #927 | 35 | `SubjectMenuItemsUnderAnOlderName`: `addClass`, said here as `addNextClass`; `AssistWordingKeys`: the 34 Add Class… sentences |
+| #946 | 1 | `AgentGuidanceWordsSaidDifferently`: `askFound` (it names GitHub Copilot) |
+
+The 34 Add Class… sentences are held, not added: nothing the built-in
+assistant is shown changes. `scripts/test_tool_surface_digest.py` and
+`research/ai-assist/toolhash.py` are untouched by the merge, so the digest's
+expectation did not move. The test passed in the baseline, so Windows'
+surface still matches it.
+Add Next Class is not renamed: the issue says renaming the item is the fix,
+and the item is a menu a teacher sees, so it waits for #927's dialog.
+
+**Five new areas, each read where its red was** (a sixth came with stack 13, below).
+- `SubjectMenuItemsUnderAnOlderName` (`subjectMenus.items`, with an older
+  name in `NamedGapLedger.SubjectMenuItemsOlderNames`). Both
+  `SubjectMenusContractTests` facts read the older name in the held name's
+  place. The older name must be an item here and gone from the contract, it
+  keeps the item list's order, and every case's `enabled` is compared exactly
+  with the held name read as the older one. At least three run cases must
+  enable it (five in the contract; two name #889's held situation keys).
+  `NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose` keeps
+  the map and the entries one to one.
+- `CredentialRequestsSaidDifferently` (`credentialRequests.requests`, by
+  name). A held request's title, label, secrecy, link and number of steps are
+  still compared exactly. Its explanation and steps together must still
+  differ. The number of held requests met must equal the entries.
+- `FailureExplanationCases` (`failureExplanations.cases`, by the case's `why`
+  up to its first colon, since the cases carry no name). A held key must name
+  exactly one case, and that case must be explained by NOTHING here: the
+  contract's honest fallback, the raw output shown. A sentence of another
+  kind fails as a wrong explanation, not a missing one.
+- `SectionProblemKinds` (`sectionProblems.kinds`, by kind; "has it" is
+  `SectionProblemsWording.KindLabels`). The sixteen kinds this app has are
+  still counted and compared label by label and scope by scope. A held kind
+  must be in none of this app's rule lists.
+- `AgentGuidanceWordsSaidDifferently` (`printablePages.agentGuidance.words`,
+  by key). A held sentence must still differ, it is still checked for the
+  machinery, and the count met must equal the entries.
+
+**Fixed in test code only, small and certain (#920 items 3 and 5).**
+`WizardSkeletonToggleTests` and `ClubWizardTests` read a case without
+`usesLCSTerminology` as the switch off, which is what the contract now means
+(there is no switch). A case that still carries the key is read as before.
+The toggle's floor is 15 cases (`contracts/README.md`'s census), and the
+school's list is compared only while the contract carries one: it has
+`factory` alone now. Every case's outcome is still compared exactly, and all
+15 pass with this app's switch off. `PreviewAppearanceTests.TheCloudflareMarkersExamplesAreRead`
+expects the marker example's new invented project name. No product code
+changed.
+
+**A defect, not held: the redactor (#941).** `LogRedactorTests` is red. Two
+of its tests fail: `LogRedactor_AllContractCases_Pass` (24 of the 50
+`problemReportRedaction.cases`, as #941 counts them) and
+`TheAssembledCasesAreFilledBeforeTheyAreRedacted` (3 assembled cases
+expected, 12 found). The 24 are credential shapes and the second word of a
+two-word account name that today's Windows redactor writes into a trail line
+and a problem report. Those are shipped behaviour, so a ledger entry would
+ship the leak quietly. They stay red until #941 lands. **Measured for
+#941 on this PC:** #941's twelve C# patterns pasted verbatim into
+`PatternRules`, in the contract's order (a scratch copy, never committed).
+They pass all 50 `problemReportRedaction.cases`, all 15 `redactedAgainCases`,
+and both `ruleOrder.cases` under .NET's engine. That includes the case ending
+in a carriage return, which #941 feared would differ. With today's patterns,
+24 of 50, 8 of 15 and both rule-order cases differ, exactly as #941 counted
+under ICU. What is left for #941 is the two counts in
+`TheAssembledCasesAreFilledBeforeTheyAreRedacted` (3 to 12 and 1 to 3), the
+three tests it lists, and the linear-time bound, which is unmeasured on .NET.
+The port is kept at `S\work\hold4\LogRedactor.port.cs` for that piece.
+
+**No owner, left red: `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`.**
+#696 put `read -rsp "Paste the token: "` inside `deploy.sh`'s
+`run_token_mode()`, and that function does not start with `assert_can_ask`.
+The question cannot be reached by a scheduled deploy, read rather than run:
+token mode refuses every option but its own, `--non-interactive` included,
+and asks only on a terminal. No `windows` issue names it, and relaxing the
+test would soften it, so the director raises it with the mac.
+
+**Proved three ways** by mutation over the hooked classes, restoring
+`NamedGapLedger.cs` by writing its bytes back (`S\work\hold4\mutation-*.txt`).
+Each round ran the 94 tests of the hooked classes in about 7 s.
+- **Closed.** One entry per new area for something this app already has:
+  `undoLastChange` under an older name, `netlifyToken`, a failure case it
+  explains as the contract does, `mediaFolderMissing` and `askTitle`. Each
+  failed with the closed message ("… it now EXISTS on this side"): 7 failed.
+  The seventh was the menu cases' fact, which read the older name where
+  `undoLastChange` is enabled.
+- **Withdrawn.** One entry per new area for a key the contract lacks. Each
+  failed with the withdrawn message: 6 failed (the kind in both of its facts).
+- **Removal.** Taking out every entry this piece added brought back the ten
+  baseline reds of those classes: trail events, wording, the machine word,
+  the credential requests, the failure explanations, both kinds facts, both
+  menu facts and the guidance words.
+- **Restored:** `Passed! - Failed: 0, Passed: 94`.
+- **Counts that cannot fall to zero unseen.** The held credential requests,
+  failure cases and guidance words met must equal their entries, so an entry
+  that matches nothing fails. Sixteen problem kinds are still compared. At
+  least three run menu cases must enable the renamed item. An item held as
+  missing outright may not also be held under an older name
+  (`NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose`).
+
+**Then stack 13, folded into the same branch.** At about 06:30 EST `dev`
+moved again, to 956defd43: #800, #829 (a deploy typed in Terminal takes a
+work lease), #897 piece B (Roll Over to a New Year… on the Section menu),
+#904, and follow-ups to #674 and #597. Nothing under `windows-app/` changed.
+It turned four tests red here, held as 22 more entries:
+- **#897 (21).** The item `rollOverToANewYear` (`SubjectMenuItems`, so it is
+  taken out of every case's `enabled`) and its 20 sentences
+  (`AssistWordingKeys`).
+- **#829 (1).** The liveness case "#829: a deploy typed in Terminal - bash,
+  its start in whole seconds - is alive while that bash runs"
+  (`LeaseLivenessCases`, a sixth new area).
+
+Windows decides that liveness case as gone today, because `WorkLease.IsAlive`
+compares the start as text. It is held rather than called a defect because
+nothing on Windows writes a whole-second start: `deploy.ps1` takes no lease
+yet, and this app's own leases write six decimal places
+(`WorkLease.LeaseBody`). So no Windows hold is read as gone this way. When
+#829 has Windows write such a lease, Windows must also compare on whole
+seconds. A held liveness case must still be decided opposite to `expect`,
+the number of held cases met must equal the entries, and at least 17 cases
+are still decided exactly.
+
+Proved the same way (`mutation-closed2`, `-withdrawn2`, `-removal2`, 95
+tests):
+- An entry for the kill -9 case, which this app decides as the contract
+  does, failed with the closed message.
+- An entry for a case the contract lacks failed with the withdrawn message.
+- Taking out the 22 entries brought back the four reds.
+- Restored: `Passed! - Failed: 0, Passed: 95`.
+
+In all, the hold is 83 entries. Stack 13's other new lists have no Windows
+reader yet: `workLeases.launcherLeases`,
+`previewWhileItsSectionDeploys.leaseCases`, the two new
+`returningToASectionMidDeploy.heldElsewhere` cases,
+`subjectMenus.rollOverSheet`, `file-formats.json` → `customDomainReading`,
+and the trail lines `deploy.sh` writes beside `task started` and
+`task finished`.
+
+**Unrun rather than red**, read by key with no Windows reader yet:
+`activityTrail.lineShape.placeCases` (#946), `subjectMenus.addClassSheet` and
+`class-planning.json` → `duplicatingAsTheNextClass` (#927),
+`colourSchemePicker` (#920), `deployTokens` (#921), `keptDownloads`,
+`phetFences` and `buildOutputLocation.keptDownloadsSurviveTheSweep` (#936),
+`videoEmbeds` (#939), `quittingWhileWorkIsUnderWay.previewBuildRecord` (#928),
+`undo` and `undo-traces.json` (#949), and the `undoListDays` of 61 (#912).
+(`problemReportRedaction.redactedAgainCases` and `ruleOrder` were on this
+list until #941 landed on this branch; see below.)
+
+#### Brought up to `dev` 39d83a0a7, and the redactor fixed (2026-11-18)
+
+The branch waited four days while `dev` moved 94 commits (stack 14: #901a,
+#839, #952; #973, #974, #978, #980 and the roadmap). `dev` merged in without
+a conflict. Nothing under `windows-app/` had changed on `dev`. Before the
+merge, the Windows suite on `origin/dev` 39d83a0a7 read `Failed: 25, Passed:
+3811, Skipped: 0, Total: 3836` (17 m 58 s, over SSH on the PC). This
+section's measurements were made on the same PC, over SSH, in
+`plantoir-wt-compare`.
+
+**#941, the redactor, built from the fourth hold's port.** `PatternRules` is
+the mac's twelve patterns, byte for byte (compared by script against
+`LogRedactor.swift`), in `ruleOrder.order`, with `userFlag` new. `Redacting`
+gained the seam the mac's `redacting(_:applyingInOrder:)` has, and
+`LogRedactorTests` gained the four tests #941 lists: the names in the
+contract's order, `ruleOrder.cases` in the pinned order and with each
+`wrongOrder` move, `redactedAgainCases`, and the linear-time bound (the
+mac's eight slow shapes at 10,000 and 100,000 characters; growth at most 50,
+the best of up to three rounds). The two assembled counts moved from 3 to
+12 and from 1 to 3. Case 20, the line that ends in a carriage return,
+needed no .NET-specific change.
+
+**Two shared tests that were wrong on Windows, fixed in the test, not in the
+product.**
+- `scripts/test_deploy_tokens.py` (#921): the paste and end-date cases now
+  reach bash in the environment (`PLANTOIR_TEST_VALUE`), not as an argument,
+  because Git Bash re-reads its own command line (measured above). The same
+  cases and assertions run on the mac, where the file still passes (22
+  tests).
+- `scripts/freshness_cases.py`, the `pointTheLinkAtAnOlderCopy` change: it
+  renamed a new link over the course folder's link, the way `ln -sfn` does.
+  Windows refuses a rename over a directory link (`PermissionError: [WinError
+  5]`). The case runs only where links can be made: over SSH, with an
+  administrator token, they can, so `test_build_freshness_reuse.py` went red
+  there and nowhere else. On Windows the old link is now removed first
+  (`os.rmdir` removes the link, never what it points at). The mac's path is
+  unchanged (40 tests pass there).
+
+**Re-pointed entries.** The 21 Roll Over entries name #954, which is Windows'
+issue for #897 piece B. The whole-second liveness case names #956, because
+#829 is closed.
+
+**Stack 14's reds, held as four more entries.** Three tests went red from
+what `dev` brought:
+- **#901 (3).** The trail event "site leaves off files no published page
+  uses" (`ActivityTrailEvents`), and the two follow-limit stops in
+  `failureExplanations.cases`, held by `why` up to the first colon
+  (`FailureExplanationCases`). #901a is shared build code, so Windows' build
+  runs it already. What Windows lacks is the trail line and the explanation
+  of the stop: until #901 lands, a stopped build shows its raw output, which
+  is the contract's honest fallback. #901 is open on v2.0.0, and this brief
+  left it alone.
+- **#921 (1).** `netlifyToken` (`CredentialRequestsSaidDifferently`). #952
+  corrected the Netlify token's TTL step on the mac, which now says that the
+  next deploy names a token that no longer works and that Settings shows
+  whether it still works. Windows' Settings does neither until #921 lands, so
+  its older words are the true ones here. The title, label, link and number
+  of steps are still compared exactly.
+
+**Still red, and not held.** `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`
+waits on the mac's answer on #963. Nothing has been posted there since the
+fourth hold filed it.
+
+**The result.** The whole suite on the branch at 1debb04d7, over SSH on the
+PC: `Failed: 6, Passed: 3835, Skipped: 0, Total: 3841, Duration: 15 m 13 s`.
+The six are #963's launcher-question test and five permission tests that
+fail only over SSH, where the token is an administrator's:
+`BuildOutputLocationTests.AFolderThatCannotBeListedMeansRebuild`,
+`ReuseTheLastBuildTests.AFolderThatCannotBeListedCountsAsChanged`,
+`ReopeningTheLastWorkingFolderTests.EveryFolderCaseIsDecidedOnARealFolder`
+and `ReferenceLockTests`' two. Those five were red on `dev` as well. The
+linear-time test took 1.0 s for all eight shapes.
 
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
@@ -6116,7 +6454,7 @@ Deploy…, Rename (the File menu item, F2 and the context menu all ask
 `CourseThatCanBeRenamed`), Add Section…, Keep a Copy…, every Revise item,
 the Site Health REPAIR button (and `SiteHealthRepair.OutcomeOfRepairing`
 refuses on its own), and the Course Settings form, replaced by
-`ReferenceSummaryView`. Cancel Scheduled Deploy… stays (gate by direction).
+`ReferenceSummaryView`. Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) stays (gate by direction).
 On a reference course's SECTION, the − button, the Delete key and the
 section's menu offer no removal at all (− is greyed, Delete does nothing, the
 menu has no Remove Section…); the course row's Remove Course… removes it all.
@@ -7174,8 +7512,8 @@ half old and half new until the app next ran — and a launcher typed at a
 prompt, or (before #477) a scheduled run, hashed and built from that mix.
 
 **What it does.** `MainWindow.AskBeforeQuittingThroughWork` (the Closing
-handler) asks the #231 quit question FIRST, unchanged — Keep Working leaves
-everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
+handler) asks the #231 quit question FIRST — Cancel (Keep Working until #987,
+and no longer the default since) leaves everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
 the last window) and a copy is WRITING (`ToolchainReadiness.AnyCopyIsWriting`),
 it cancels the close synchronously, before any await, opens the banner at
 once (the one-second delay treated as passed) — the "Getting this folder
@@ -7651,7 +7989,7 @@ when they land.
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
 | Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
-| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
@@ -7839,7 +8177,7 @@ the `mac` issue:** the section row keeps **Change Deploy Time (…)…**, which
 Deploy… greyed while one is set, Cancel live).
 
 **There were two until #527 (2026-11-13).** A reference section's row also
-kept **Cancel Scheduled Deploy…**, which the menu bar greys, on the reasoning
+kept **Remove Scheduled Deploy…** (then Cancel Scheduled Deploy…), which the menu bar greys, on the reasoning
 (written for #488 on 2026-10-15) that Windows did not turn such a schedule off
 by itself and the row was the teacher's only way to stop it. That reasoning
 was already stale when #527 was opened: since #241 every read of the working
@@ -13760,6 +14098,344 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+
+## A deployed folder opened in the browser (#889, the mac's #850)
+
+The mac's #850 (`09-mac-app.md` → "A deployed folder opened in the browser
+(#850)" has the design, what a teacher sees and the rulings) comes to Windows
+in two halves, as unit planning did. **889a**, this section, is Core only:
+the resolver, the address, the offer rule, the server and the registry of
+shows, with every contract case over a real socket. Nothing a teacher sees
+changed, and no `NamedGapLedger` entry was removed: the six #889 entries
+(three trail events, `stopShowingDeployedFolder`, `deployedFolderReady`,
+`deployedFolderShown`) close with **889b**, which builds the window, the
+menus, quit, the trail lines and the UI tests on the surface below, after
+884a's Copilot items (the three new `subjectMenus.cases` name
+`sectionReviseWithCopilot`).
+
+### The surface 889b calls (none of it changes for 889b)
+
+All in `Plantoir.Core/Models`:
+
+- **Whether Open in Browser is offered for a section, and why not:**
+  `DeployedFolderOffer.LookUp(course, sectionNumber, workingFolder)` →
+  `Lookup(Facts, Decision, SectionFolder)`. It reads the SAVED
+  `course_config.json`, the disk, this app's own deploy of the section
+  (`CourseActivity.IsPublishingSection`) and any other program's `publish`
+  lease on the course (`WorkLease.IsHeld`). Call it on the events
+  `offeredWhen` names, never on a clock. `Decision.Kind` is `Offered`,
+  `Greyed` (with `ReasonKey` `deployIsRunning`, `folderNotFound` or
+  `notDeployedYet`) or `Absent`; `DeployedFolderOffer.Sentence(reasonKey)`
+  is the sentence to show (`CourseActivity.AvailableOnceDeployCompleted`,
+  named as a constant by this piece, for a deploy under way).
+- **The words:** `DeployedFolderWording` (all sixteen `wording` keys;
+  `Notice(section)` fills the notice).
+- **Start, or open again:** `DeployedFolderShows.Shared.OpenAsync(sectionFolder,
+  course, section, workingFolder, from, openInBrowser)` → `OpenOutcome(Address,
+  Why)`. `sectionFolder` is `Lookup.SectionFolder`; `from` is a
+  `DeployedFolderFrom` (`Result`, `SectionMenu`, `Toolbar`, `Sidebar`);
+  `openInBrowser` is the window's handing of the address to the browser
+  (`ExternalLinks`) and says whether it took it. A null `Address` with a
+  `Why` is a failure to show `couldNotOpen` for; a null `Address` with no
+  `Why` is a Stop pressed while it started (show nothing).
+- **Stop:** `Stop(course, section, workingFolder)` (the notice's Stop and the
+  menu item: every show of the section, and a start still under way);
+  `StopEverything()` from the quit path, synchronous.
+- **What is being shown:** `ShowFor(course, section, workingFolder)` (null, or
+  the `Show` with its `Address`), `Shows`, `Count` (for
+  `QuitConfirmation.UnderWay`'s `deployedFoldersShown`, which never asks),
+  `FolderWentAway(…)` and `DismissFolderWentAway(…)` for the
+  `stoppedFolderGone` line and its Dismiss.
+- **Redraw:** the `Changed` event (a show started or stopped, a folder went
+  away). **The trail:** the `Happened` event carries a
+  `DeployedFolderHappening` (`Opened` with `From`, `AlreadyOpen`,
+  `AddressMoved`; `Stopped` with `Reason`, `Requests`, `Missing`;
+  `CouldNotOpen` with `Why`), each with the course, the section and its
+  `TrailLine`, the contract's sentence, held against the three
+  `activityTrail.mustRecord` templates by `DeployedFolderShowsTests`. 889b
+  adds the three `ActivityTrail.Event` members and writes
+  `ActivityTrail.Note(event, happening.TrailLine, course, section)`. No
+  address or path is in any of them, and this Core writes no trail line
+  itself. Both events are raised on whatever thread caused them (a
+  listener's own thread when a folder goes or a listener ends): marshal to
+  the dispatcher.
+- **The remembered port:** `AppSettings.DeployedFolderPorts` (canonical path
+  → port). 889b calls `DeployedFolderShows.Shared.RememberPortsIn(App.Settings,
+  action => dispatcher.TryEnqueue(() => action()))` once at start-up; until
+  then ports are remembered in the process only. `SettingsDeployedFolderPorts`
+  reads its own copy and writes and saves `App.Settings` only through that
+  action, on the UI thread, as the rest of the app saves it (the
+  implementation review's L3: the first version wrote `AppSettings.Current`,
+  a SECOND copy of the settings loaded from disk, from a pool thread, and its
+  save would have written over `App.Settings`' and been written over in
+  turn). A port that had to move is remembered where it moved to and tried
+  first next time, the usual one (the hash's) after it, as `address.rule`
+  says: the remembered port first, then the block from the hash.
+- **Never throws at its caller's expense:** a subscriber of `Changed` or
+  `Happened` that throws is called on its own and its exception dropped
+  (the implementation review's M1: an unguarded `Changed` on the listener's
+  own thread, when a folder went or a listener ended, ENDED THE PROCESS,
+  0xE0434352; shown again here against the unguarded copy: "Test host process
+  crashed: Unhandled exception").
+  `ASubscriberThatThrowsLeavesTheAppAliveAndTheShowStopped`.
+- **"Opened" goes on the trail only after the browser took the address**
+  (the review's L4): a Stop pressed while it started leaves no line at all,
+  and a browser that refuses a NEW show leaves one line, "could not open …
+  the browser did not open it", with nothing left running
+  (`OpenedIsSaidOnlyAfterTheBrowserTookTheAddress`).
+- **Saved settings that cannot be read** make the item absent, never offered
+  on the window's unsaved copy (the review's L7).
+
+### Who serves it: a TcpListener of the app's own
+
+`DeployedFolderServer` is a `TcpListener` on `IPAddress.Loopback` with the
+app's own small HTTP/1.1 reader, as the mac's `NWListener` is raw TCP (the
+plan's D5, upheld by its review). `ExclusiveAddressUse` is set before it
+starts, so no other program can bind the same address beside it, even asking
+to share (`ItListensOnTheLoopbackAddressAloneAndExclusively`).
+
+**Rejected, measured by the planner on this PC** (2026-11-13, Windows
+PowerShell 5.1's `HttpListener`, which is HTTP.sys as .NET 9's is): an
+`HttpListener` on `http://127.0.0.1:<port>/`, as the issue first suggested.
+Unelevated it starts on `127.0.0.1` and `localhost` (and is refused `+`), but
+HTTP.sys answers some requests ITSELF before the app sees them: `/../x` is
+**403** (the contract allows 400 or 404), a request line of 8,300 bytes and
+headers of 16,500 are **400** (the contract says 414 and 431; its limits are
+machine-wide registry values only an administrator can change), it does not
+check `Host` at all for a `127.0.0.1` prefix (so the exact check is the
+app's anyway), and it gives the app no connection to close when every place
+is taken. Four contract cases could not be met, and the contract would have
+had to loosen for Windows. `netsh int ipv4 show excludedportrange
+protocol=tcp` showed nothing reserved in or near 41000-41399 (5357,
+50000-50059, 50131; the dynamic range from 49152). Also rejected: Kestrel (a
+framework reference of several MB in a self-contained app, and its
+connection cap refuses the newcomer, which `limits` forbids) and a Python
+`http.server` (a second process, and it answers 404 for every page link:
+5,869 of 8,811 links below).
+
+**Which folder** (the plan review's M5): `DeployedFolderOffer.SectionFolder`
+mirrors `deploy.ps1`'s `Resolve-PublishFolder` plus deploy.ps1's own
+`[IO.Path]::Combine($folderAsked.TrimEnd('\','/'), "section{N}")`: the
+setting trimmed (the trim `DeployCommand.Arguments` makes before handing it
+over); a drive and a separator, or a UNC path, made full; a drive-relative
+(`C:out`) or root-relative (`\out`) path refused, so it is "not found"
+rather than a folder resolved against the app's current folder; anything
+else taken from the working folder. `DeployedFolderOfferTests` walks the
+portable `folderPublishTarget.cases`, and also cuts the launcher's own
+function out of `deploy.ps1` and runs it in Windows PowerShell 5.1 beside
+the app's on sixteen settings (`TheAppResolvesTheFolderExactlyAsDeployPs1Does`),
+so a change to either side that the other has not made fails.
+
+**How a request is answered** (`DeployedFolderResolver`) follows the mac's
+rules case for case; the Windows parts:
+
+- **790a's disk layer, reused** (the plan review's M8), not a second one:
+  `ILocalFiles` gained one member, `List(path)`, and every file is opened
+  ONCE through `WindowsLocalFiles.Open` (links followed); that handle's own
+  `GetFinalPathNameByHandle` must be inside the folder's final path
+  (`LocalSiteGuard.IsWithin`), it must be an ordinary disk file, and its
+  bytes are read from the same handle, so a junction swapped between the
+  check and the read changes nothing. `LocalSiteGuard.IsAcceptableSegment`
+  refuses devices (COM0 and LPT0 too), a colon (so no alternate data
+  stream), and a trailing dot or space; the resolver adds a leading dot and
+  `_headers` / `_redirects`.
+- **Every name is matched against its folder's listing**, exactly after NFC:
+  NTFS ignores case and expands 8.3 short names, a strict host does neither,
+  so `/concepts/` does not find `Concepts\`, and the short name of
+  `Long Folder Name` finds nothing (`AnEightDotThreeShortNameFindsNothing`;
+  8.3 names are on for this PC's C:).
+- **The raw target is read**, decoded ONCE and strictly: the request is read
+  as Latin-1 (one char per byte), so a raw UTF-8 name arrives as its bytes,
+  and broken escapes or bytes that are not UTF-8 are refused.
+- **Both link cases run through the seam on this account**, which cannot
+  make a FILE symbolic link (WinError 1314, Developer Mode off):
+  `DiskWithLinks` lays the case's links over the real disk and asks
+  `WindowsLocalFiles` at the place each leads, so the containment check on
+  the opened handle is what refuses them. Over a socket, the folder link is
+  a real junction; only `TheFileLinkCaseOverASocket` skips, by name.
+- **Every folder and file looked at on the way must be inside the folder's
+  real path**, not only the one served (the implementation review's L1): a
+  junction inside the folder that leads out answered 308 to `/junc` when the
+  outside folder held an `index.html`, which told a caller that file exists.
+  It now answers exactly as a missing path does, status and body
+  (`AJunctionLeadingOutAnswersAsAMissingPathDoes`, over a real junction; red
+  with the check taken out, `/junc: 308`).
+
+**Limits.** 64 connections; when every place is taken the connection quiet
+longest is RESET to make room (a reset, not a graceful close, which would
+wait behind bytes a stalled reader never takes); a request line over 8 KiB
+is 414, headers over 16 KiB 431; 10 s to send the headers and 30 s idle
+between requests; each piece of an answer (256 KiB) must be taken within
+30 s or the connection is reset. Sockets are `NoDelay`: an answer is its
+head and then its body, and with Nagle the second send waited for the
+client's delayed acknowledgement of the first (measured below). **Each
+listener and each connection has a thread of its own**, with blocking calls
+whose deadlines are the socket's own `ReceiveTimeout` and `SendTimeout`,
+rather than tasks on the thread pool: with the pool starved (the full suite,
+below), a task-based first version left a plain GET unanswered for 20 s and
+fired the 10 s header deadline late. At most 65 background threads a show.
+**An answer over 1 MiB (a video) is sent through a send buffer of one
+piece** rather than Windows' autotuned one: with autotuning the system took
+so much of a 200 MB answer into its buffers that 64 readers that never read
+were still not blocked at 47 s while another suite ran, so the piece
+deadline never started; with one piece they are reset at 30 s. Not for
+every answer: set on every connection it cost about 130 ms a request (the
+ENG2D crawl below took 38.8 s instead of 4.8 s), so pages keep the
+system's buffer.
+
+**The address.** `DeployedFolderAddress.CanonicalPath` is the folder's
+ON-DISK spelling (`GetFinalPathNameByHandle`, `\\?\` taken off), because the
+hash is of the spelling: `C:\Users\teacher\Sites\ics3u\section1` starts at
+41143 and its lower-case spelling at 41047 (`AWindowsPathHashesByItsSpelling`,
+against the planner's independent FNV-1a). The remembered port first, then
+the block from the hash. **A port another program holds on 127.0.0.1 OR on
+0.0.0.0 is passed over** before binding (`IsHeldByAnotherListener`, from the
+system's listener table): measured on this PC, an exclusive bind to
+`127.0.0.1:41399` SUCCEEDED while another socket held `0.0.0.0:41399`, and
+would then have taken that program's loopback connections. A second copy of
+Plantoir on the same folder finds the first copy's port held and shows the
+folder at the next one, the trail saying the address moved
+(`ASecondCopyOfPlantoirShowsTheSameFolderAtTheNextAddress`). Two sections
+can be shown at once, each at its own address (`QuittingStopsEveryShowAtOnce`).
+
+**A known limit, accepted as on the mac** (Russell, 2026-11-13): every
+account on this PC, in any session (fast user switching, Remote Desktop),
+can reach `127.0.0.1:<port>` while a folder is shown, as it can a preview.
+Shared school PCs make that more likely here than on a teacher's own Mac.
+No other computer can: a connection to this PC's network address is refused
+(`TheNetworkAddressIsRefused`, 192.168.1.81).
+
+**Lifetime.** `Stop` closes the listener and every connection and frees the
+port, and the same folder gets the same address back at once, even when a
+request the server closed first left TIME_WAIT on its side (measured: an
+exclusive rebind succeeds; `StopFreesThePortAndTheSameAddressComesBack`).
+Nothing is written to disk and no lease is taken, so a Plantoir that is
+force-killed leaves nothing to clean up: Windows closes its sockets with it.
+
+### Measured (2026-11-13, Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200)
+
+- **No firewall prompt for a loopback-only listener**, measured where a
+  prompt COULD appear: from a program path the firewall has never seen
+  (this worktree's own `testhost.exe` has a rule now, below, so a count
+  around it can no longer show a new prompt). `DeployedFolderProbe.exe`, a
+  console program of a few lines that starts the product's
+  `DeployedFolderServer` with the real block's candidates on a built site,
+  asks it for `/` and stops, copied to a newly named folder: it listened on
+  `127.0.0.1:41050` alone (`Get-NetTCPConnection` while it ran) and answered
+  200; `Get-NetFirewallApplicationFilter` listed 0 entries for its path
+  before and after, 585 rules before and after, no rule-added event (2097)
+  in the firewall's log, and the `PickerHost` processes the same two (the
+  prompts below). The same held for a copy of the test output at a new
+  path running the server's and the registry's 34 tests. Read with
+  `Get-NetTCPConnection`, `Get-NetFirewallRule`,
+  `Get-NetFirewallApplicationFilter` and `Get-WinEvent` only; nothing added,
+  nothing removed, nothing elevated. `TheListenersOwnEndpointIsTheLoopbackAddress`
+  reads the listener's own `LocalEndpoint`, and the source rule
+  `TheServerBindsTheLoopbackAddressAndNothingElse` allows one
+  `new TcpListener(IPAddress.Loopback, port)` in the server's file and no
+  wildcard, IPv6, dual-mode, `localhost`, prefix or `Bind` form (shown red
+  on a copy that bound `IPAddress.Any`, run alone so nothing listened), and
+  no `IPAddress.Any` bind in any of the deployed folder's test files.
+- **A listen on 0.0.0.0 DOES raise it, and this piece did so twice by
+  mistake**, neither from the product's listener: at 22:22, a hand
+  measurement in Windows PowerShell that bound
+  `[IPAddress]::Any` port 41399 to see whether a loopback bind could sit
+  beside it (the `powershell.exe` prompt and rules); at 22:28, a first
+  version of `APortAnotherProgramHoldsOnEveryAddressIsPassedOver` that
+  stood the other program in with a real `new TcpListener(IPAddress.Any, 0)`
+  (this worktree's `testhost.exe`; that version was never committed, the
+  first commit at 22:31 already had the stand-in). Each prompt's
+  `PickerHost` process started within two seconds of its pair of inbound
+  "Query User" BLOCK rules (TCP and UDP) in the firewall's log. Both
+  prompts are still on the desktop and the four rules are still there:
+  closing a prompt was refused to this session, and removing a rule needs
+  an administrator. The test now stands the other program in through
+  `DeployedFolderServer.ActiveListeners` and binds nothing. So: never bind
+  anything but `127.0.0.1` in a test here.
+- **The crawl** (`browser-checks/crawl_deployed_folder.py --url`, against
+  the server started in-process by the opt-in `DeployedFolderCrawlMeasurement`,
+  on copies of two sites built on this PC): ICS3U section 1, 399 pages,
+  8,811 links, 403 addresses, **0 not found** in 6.4 s; ENG2D section 2, 275
+  pages, 6,334 links, 284 addresses, 5 not found in 4.7 s, all five a link
+  to `Exercises/Media-Analysis-Practice`, a page that build does not hold (a
+  link to a page not published: missing on any host). On the final,
+  threaded server, with another suite running: 9.6 s and 5.0 s. The must-fail, the
+  same folders through `python -m http.server`: **5,869** and **3,252** not
+  found. Before `NoDelay` the ENG2D crawl took **43.9 s** (about 155 ms a
+  request: Nagle and the delayed acknowledgement); after, 5.5 s. The
+  resolver alone answers 200 pages in 481 to 573 ms. One ICS3U crawl of
+  files copied seconds before took 57.4 s; not explained, and not seen again.
+- **The deadlines over a socket:** a connection that sent only its request
+  line closed at 10 s; 64 readers of a 200 MB file that never read were all
+  reset by about 30 s (`ReadersThatStopReadingDoNotShutTheSiteOut`), while a
+  normal request was answered at once.
+- **Must-fails**, each by putting a plausible wrong version of the one rule
+  in place and running the tests (the originals copied back, the tree clean
+  after): a Host check by prefix (`Host: another port`, `Host: a name that
+  starts with the address`, through the resolver and over a socket); a
+  case-blind name match (the three `case counts` cases, both ways); no
+  containment check on the opened handle (both link cases through the seam,
+  the folder link over a socket); no join of a second press
+  (`TwoQuickPressesStartOneShowAndStopEndsIt`); a Stop while starting
+  ignored (`StopWhileStartingEndsItOnceStartedAndLeavesNothingListening`);
+  the drive-relative refusal dropped (`ADriveOrRootRelativeFolderIsNotFound`,
+  `TheAppResolvesTheFolderExactlyAsDeployPs1Does`); the 0.0.0.0 pass-over
+  dropped (`APortAnotherProgramHoldsOnEveryAddressIsPassedOver`); the
+  newcomer refused instead of making room (`AConnectionPastTheMaximumMakesRoom`
+  and the readers test); no send deadline (the readers test: 63 readers
+  still open at 47 s). **Under the full suite's load** (3,925 tests sharing
+  the thread pool) the first full run failed three of these wall-clock tests:
+  a plain GET unanswered within 20 s, the header deadline not closed by
+  15 s, the readers reset at 42.8 s instead of by 40; a second run, with
+  those classes alone, lost two answers of the resolution cases over a
+  socket (no answer in 20 s). That was the server's own work waiting for
+  pool threads, so the server moved to threads of its own (above), and the
+  server, registry and readers classes also run in their own collection
+  with parallelism off (`DeployedFolderTimings`), with the over-socket
+  resolution cases and the PowerShell 5.1 resolver test
+  (`DeployedFolderLauncherFolderTests`) since the review's L5. The readers
+  test's clock starts once all 64 places are taken, and it asserts the
+  contract's case as written (A stalled reader closed within 40 s, and not
+  before the 30 s piece deadline), then every reader gone within 30 s more.
+  **Not measured** (the review's L2): a program listening dual-mode on
+  `[::]:<port>` is not passed over the way one on 0.0.0.0 is; measuring it
+  needs a non-loopback bind, which raises the firewall's prompt. And one fault the tests
+  found in the first version:
+  a request that found the folder gone stopped the show from inside its own
+  answer, so the browser got a reset instead of the 404; the folder going is
+  now reported after the answer has gone.
+
+### What 889b owes
+
+The window, menus, quit and trail on the surface above: the toolbar's and
+Section ▸ Open in Browser opening the preview while one shows and the
+deployed folder otherwise (`previewHelp` / `help` / the greyed reason as the
+tooltip and the Narrator name), Open in Browser beside Show in File Explorer
+under a finished folder deploy (single and multi-destination) with
+`renderNote` in place of `publishedFolderRenderNote`'s sentence, the section
+row's context menu, the notice with Stop and `stopHint`, `stoppedFolderGone`
+with Dismiss, the `couldNotOpen` dialog; `subjectMenus`' item, situation
+keys and three cases; `QuitConfirmation.UnderWay` gaining
+`deployedFoldersShown` and the quit path calling `StopEverything`; the three
+`ActivityTrail.Event` members written from `Happened`; the six ledger
+entries removed; and the UI tests, through a browser seam that never opens a
+real browser. No `--serve-deployed-folder` flag: the crawl runs against the
+in-process server.
+
+Also owed by 889b, from the surface above and the fixes review:
+
+- **Once at start-up**, `DeployedFolderShows.Shared.RememberPortsIn(App.Settings,
+  action => dispatcher.TryEnqueue(() => action()))`, and
+  `DeployedFolderShows.Diagnostic = App.LogDiagnostic`. Without the first,
+  ports are remembered for the session only.
+- **Marshal both events** (`Changed`, `Happened`) to the dispatcher before
+  touching a control: they arrive on a listener's thread when a folder goes
+  or a listener ends. A handler that throws is dropped and written to the
+  diagnostic log; it does not end the app, but its redraw is lost.
+- **The fixes review's L-c, to build:** the press that STARTED a show stops
+  it when the browser refuses only if no other press has joined it; a press
+  handed a show re-checks `ShowFor` afterwards, so it never opens the
+  address of a show that was stopped meanwhile.
 
 ## Undo and Redo: the journal Windows owes (#899, piece U1)
 

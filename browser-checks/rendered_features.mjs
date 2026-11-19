@@ -1148,8 +1148,13 @@ ROW_CHECKS["geogebra drag"] = async ({ page, engine }) => {
   if (!state?.open) return { fail: "did not move: the file sketch is not open" }
   // The sabotage that removes a dialog the old way (#755) acts once the
   // sketch is open; wait for it to finish when it is there, so the drag
-  // meets the state it made.
-  await waitInPage(page, () => { const f = document.querySelector("figure.pl-geogebra"); return !f.dataset.renderedSabotage || f.dataset.renderedSabotage === "dialog removed" }, 10000)
+  // meets the state it made. It says it is due on <html> from the page's
+  // first moment (lib/sabotage.py): reading the figure's marker instead
+  // let a drag slip in before the sabotage had started and pass (#974).
+  // A sabotage that never finishes is said as itself, never as a drag
+  // that did not move, so it cannot count as the row seeing it.
+  const settled = await waitInPage(page, () => { const said = document.documentElement.dataset.renderedSabotage; return !said || said === "dialog removed" }, 30000)
+  if (!settled) return { fail: "the drag could not be tried: the page's dialog sabotage never finished removing its dialog within 30 s" }
   const why = await dragPoint(page, 0)
   if (why) return { fail: `did not move: the drag could not run (${why})` }
   const moved = await pointAMoved(page, state.start, 3000)

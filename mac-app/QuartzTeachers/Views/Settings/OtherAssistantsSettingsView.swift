@@ -62,6 +62,7 @@ struct OtherAssistantsSettingsView: View {
             }
             Button(AssistantSetUpWording.cancelButton, role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { (choice: AssistantSetUpChoice) in
             Text(AssistantSetUpWording.filled(AssistantSetUpWording.removeBody, for: choice.agent))
         }
@@ -208,8 +209,17 @@ struct AssistantSetUpChoice: Identifiable {
 /// downloads, from whom, where it goes, that it is checked once it is in
 /// place, and where the course content goes; a link to the maker's page on
 /// which accounts include it; and, for GitHub Copilot, Help's page on
-/// GitHub's education benefits (Russell, 2026-11-13). Cancel is the default
-/// answer: going ahead runs another company's program.
+/// GitHub's education benefits (Russell, 2026-11-13).
+///
+/// The keys (#987, D3, Russell's ruling Q3 on #975): going ahead loses no
+/// work, so Download and Set Up is the default button and takes Return; Cancel
+/// leads and takes Escape and Command-Period. Until #987 Cancel was the
+/// default, on the trailing side, against Alerts: "Note that you don't want
+/// to make a Cancel button the default button"; "Always place the default
+/// button on the trailing side of a row"; "Cancel buttons are typically on
+/// the leading side of a row." Buttons ▸ Role: the primary role goes to "the
+/// button people are most likely to choose", and a teacher opens this sheet
+/// by choosing Set Up.
 struct AssistantSetUpSheet: View {
 
     // MARK: - Stored properties
@@ -240,15 +250,16 @@ struct AssistantSetUpSheet: View {
             }
             HStack {
                 Spacer()
-                Button(AssistantSetUpWording.confirmButton) {
-                    setUp()
-                }
-                .accessibilityIdentifier("assistantSetUpGoAhead")
                 Button(AssistantSetUpWording.cancelButton, role: .cancel) {
                     cancel()
                 }
-                .defaultButton(isEnabled: true)
+                .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("assistantSetUpCancel")
+                Button(AssistantSetUpWording.confirmButton) {
+                    setUp()
+                }
+                .defaultButton(isEnabled: true)
+                .accessibilityIdentifier("assistantSetUpGoAhead")
             }
             .padding(.top, 8)
         }
@@ -263,8 +274,5 @@ struct AssistantSetUpSheet: View {
             }
         )
         .frame(width: AssistantSetUpSheet.width)
-        .onExitCommand {
-            cancel()
-        }
     }
 }
