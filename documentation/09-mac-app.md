@@ -1760,7 +1760,14 @@ stops the task, and once focus leaves the box Escape stops it; behind a sheet
 alert neither key stops it; with the site covering the panel neither does;
 on a deploy either key asks, Escape or Command-Period in the question is
 Cancel and the deploy runs on, Return is Stop Deploy and stops it once, and
-the question goes when the deploy ends. When the host cannot be made the
+the question goes when the deploy ends. They take the front from
+the person at the Mac, so they are **opt-in**: `TEST_RUNNER_PLANTOIR_KEY_TESTS=1`
+on the `xcodebuild` line, on a Mac nobody is using; without it they skip and
+say so, and the rule and source tests run. Bringing the host forward goes
+through Launch Services when macOS refuses `activate` (cooperative
+activation, no accessibility grant), which makes the accessory host a
+regular app; `tearDown` makes it an accessory again
+(`UnitTestHostWindowsTests`, #633). When the host still cannot be made the
 active app with that window key (a locked screen, #315), those tests skip and
 say so. With Keyboard Navigation on, AppKit puts the focus in the Filter
 box when the window becomes key, so the box owns Escape until the teacher

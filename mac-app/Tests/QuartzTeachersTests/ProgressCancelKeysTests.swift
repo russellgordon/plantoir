@@ -33,6 +33,12 @@ import XCTest
 /// depends on Keyboard Navigation (System Settings ▸ Keyboard,
 /// `AppleKeyboardUIMode`): measured on the main Mac with it off and on.
 ///
+/// **Opt-in** (`PLANTOIR_KEY_TESTS=1`, passed to xcodebuild as
+/// `TEST_RUNNER_PLANTOIR_KEY_TESTS=1`): bringing the host forward takes the
+/// front from the person at the Mac, and a key they type meanwhile goes to
+/// the test host. Without it the pressed-key tests skip, saying so, and the
+/// rule and source tests below still run.
+///
 /// Measured failing before #988: the panel's Cancel carried no key, so both
 /// keys reached nothing.
 @MainActor
@@ -161,6 +167,11 @@ final class ProgressCancelKeysTests: XCTestCase {
             window.contentViewController = nil
         }
         openWindows = []
+        // The unit host is an accessory app with no Dock tile or menu bar
+        // (#633); bringing it forward made it a regular one.
+        if NSApp.activationPolicy() != .accessory {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 
     private func runUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
@@ -200,11 +211,17 @@ final class ProgressCancelKeysTests: XCTestCase {
     /// appearing after it is up. Skips when the host cannot take the front.
     func keyWindow(ledger: Ledger, runner: ScriptRunner, takesTheCancelKeys: Bool = true, asksBeforeStopping: Bool = false) throws -> NSWindow {
         let window: NSWindow = NSWindow(
-            contentRect: NSRect(x: 80, y: 80, width: 900, height: 500),
+            contentRect: NSRect(x: -7000, y: -7000, width: 900, height: 500),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
+        // These tests take the front from whatever the person at the Mac is
+        // using, so they run only when asked (#988, 2026-11-19: a key typed
+        // by the person while one runs would go to the test host).
+        if ProcessInfo.processInfo.environment["PLANTOIR_KEY_TESTS"] != "1" {
+            throw XCTSkip("Takes the front to press real keys; set PLANTOIR_KEY_TESTS=1 (TEST_RUNNER_PLANTOIR_KEY_TESTS=1 for xcodebuild) on a Mac nobody is using.")
+        }
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(rootView: SectionShape(
             ledger: ledger,
@@ -218,12 +235,13 @@ final class ProgressCancelKeysTests: XCTestCase {
             let application: AXUIElement = AXUIElementCreateApplication(getpid())
             AXUIElementSetAttributeValue(application, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
         }
-        if !NSApp.isActive {
+        for _ in 1...2 where !NSApp.isActive {
             // Both refused (macOS's cooperative activation, with another
             // app in front, and no accessibility grant for this build):
-            // asked through Launch Services, as opening the app from the
-            // Finder or the Dock asks. It names this running host's own
-            // bundle, so it brings this copy forward and opens no other.
+            // asked through Launch Services, as the Dock asks. It names this
+            // running host's own bundle, so it brings this copy forward and
+            // opens no other. It also makes the host a regular app, which
+            // `tearDown` undoes (`UnitTestHostWindowsTests`).
             let opener: Process = Process()
             opener.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             opener.arguments = [Bundle.main.bundleURL.path]
@@ -232,6 +250,9 @@ final class ProgressCancelKeysTests: XCTestCase {
             _ = runUntilActive(timeout: 10)
         }
         window.makeKeyAndOrderFront(nil)
+        if !runUntil(timeout: 5, { NSApp.isActive && window.isKeyWindow }) {
+            window.makeKeyAndOrderFront(nil)
+        }
         if !runUntil(timeout: 5, { NSApp.isActive && window.isKeyWindow }) {
             throw XCTSkip("The test host could not be made the active app with its window key (a locked screen, another Space or another account using the Mac, #315), so a key could not be pressed the way a teacher presses it.")
         }
