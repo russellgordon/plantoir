@@ -14618,9 +14618,13 @@ the answer.
 contract): a record folder that cannot be listed is `CannotTell` for every
 destination (none: `NoOffer`); a fragment is read by its `places`
 whatever its `version` says, absent included; a fragment whose `places`
-is missing, not a list, or holds a non-string is unreadable (only matters
-when it is the newest); an op path not of the shape
-`courses/<CODE>/<place>.md` is `CannotTell`; a change to what a page says
+is missing, not a list, or holds a non-string is unreadable, and so is
+one whose bytes are not valid UTF-8 or whose text holds half of a
+surrogate pair (only matters when it is the newest; before the W5
+review's M1 those two threw out of `Inputs` instead); an op path not of
+the shape `courses/<CODE>/<place>.md`, or one holding half of a surrogate
+pair (NTFS allows it in a name, and it has no normalization form C), is
+`CannotTell`; a change to what a page says
 in a section never deployed is `NoOffer` (the rule's own NO OFFER sentence
 comes first); a destination type no deploy accepts is not read. Also
 pinned, from the rule's words: a missing record folder is no fragments; a

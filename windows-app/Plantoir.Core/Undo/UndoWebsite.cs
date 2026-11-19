@@ -131,7 +131,13 @@ public static class UndoWebsite
                 cannotTell = true;
                 continue;
             }
-            var shown = new HashSet<string>(fragment.Places.Select(Composed), StringComparer.Ordinal);
+            var shown = ShownPlaces(fragment.Places);
+            if (shown is null)
+            {
+                // A place that is not valid Unicode: the fragment cannot be read (the W5 review's M1).
+                cannotTell = true;
+                continue;
+            }
             foreach (var move in moves)
             {
                 if (move.VisibleBefore == move.VisibleAfter) continue;
@@ -187,8 +193,35 @@ public static class UndoWebsite
         return Composed(rest[..^3]);
     }
 
-    private static string Composed(string text) =>
-        text.IsNormalized(NormalizationForm.FormC) ? text : text.Normalize(NormalizationForm.FormC);
+    /// <summary>
+    /// <paramref name="text"/> in normalization form C, or null when it is not
+    /// valid Unicode (half of a surrogate pair, which NTFS allows in a name and
+    /// a test can build), so the caller answers CANNOT TELL instead of throwing.
+    /// </summary>
+    private static string? Composed(string text)
+    {
+        try
+        {
+            return text.IsNormalized(NormalizationForm.FormC) ? text : text.Normalize(NormalizationForm.FormC);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>A fragment's places in normalization form C; null when any of them is not valid Unicode.</summary>
+    private static HashSet<string>? ShownPlaces(IReadOnlyList<string> places)
+    {
+        var shown = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string place in places)
+        {
+            string? composed = Composed(place);
+            if (composed is null) return null;
+            shown.Add(composed);
+        }
+        return shown;
+    }
 
     // -------------------------------------------------------------------
     // The one reader of the disk.
@@ -248,8 +281,8 @@ public static class UndoWebsite
 
     /// <summary>
     /// A fragment's <c>places</c>, or null when it cannot be read: the file
-    /// will not open, is not JSON, or has no <c>places</c> that is a list of
-    /// strings. <c>version</c> is not read: the rule reads only the places, and
+    /// will not open, is not JSON, holds text that is not valid UTF-8 or
+    /// Unicode, or has no <c>places</c> that is a list of strings. <c>version</c> is not read: the rule reads only the places, and
     /// a fragment with no version, or a later one, still says which pages its
     /// site shows (a proposal, not a contract case: drafts/899-w5-mac-issue.md).
     /// </summary>
@@ -277,8 +310,11 @@ public static class UndoWebsite
             }
             return result;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException
+                                          or InvalidOperationException or ArgumentException)
         {
+            // InvalidOperationException: GetString on bytes that are not UTF-8 or on an
+            // escaped half of a surrogate pair (the W5 review's M1). Unreadable, so CANNOT TELL.
             return null;
         }
     }
