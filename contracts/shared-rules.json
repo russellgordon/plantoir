@@ -1165,6 +1165,12 @@
         "why": "#495. The toggle is the only way back from \"Don't ask again\" and changes what happens in every course, on the 'preview start page chosen in Settings' precedent."
       },
       {
+        "event": "asked to close Obsidian to open a course",
+        "carries": "the course's code and what the answer to obsidianNeverClosedUnasked's question came to: opened after closing Obsidian, Cancel, nothing to close by then, Obsidian did not close, or it closed and the course could not be added to its list. The exact words are obsidianNeverClosedUnasked.trail.",
+        "line": "MPM2D · closed Obsidian to add the course to its list, and opened it",
+        "why": "#995. Plantoir closes the teacher's Obsidian here, on their click; and the two failures show nothing on screen, so this line is their only record."
+      },
+      {
         "event": "Swift got ready on this computer",
         "carries": "how many seconds getting Swift ready took and how much was downloaded, and the course and section whose preview needed it",
         "marker": "PLANTOIR_SWIFT: with ready true (codeRunnerBlocks.swift.windows.marker; printed on a Mac by preview.sh since #635, codeRunnerBlocks.swift.mac)",
@@ -1520,6 +1526,14 @@
       "refusedWhileAnyAssistantWindowIsOpen": true,
       "messageNamesTheSectionToClose": true,
       "theCurrentlyChosenOneMayBeRemoved": true,
+      "asksFirst": true,
+      "asksFirstWhy": "#987 (finding D22; Apple's HIG, Alerts: when people take an uncommon destructive action that they can't undo, it's important to display an alert in case they initiated the action accidentally). Remove… beside a download asks words.question, with words.message under it; Cancel answers Escape and Command-Period, and Remove takes no Return.",
+      "words": {
+        "question": "Remove {assistant}?",
+        "message": "Its {size} download is deleted from this {machine}. To use it again, download it again here.",
+        "removeButton": "Remove",
+        "fill": "{assistant} is the assistant's name in a sentence (the small assistant, the larger assistant); {size} is its download's size as the platform writes a file size; the computer's name in message is specialNames.platformWording.machine's placeholder (Mac, PC)."
+      },
       "why": "The refusal is about ANY open assistant, not about whether that window happens to use that rung: working out which file is genuinely mapped means tracking state neither app keeps, and getting it wrong deletes weights out from under a running engine. Removing the CHOSEN one is allowed on purpose - it is not a broken state, it is the state every machine is in before its first download, and refusing would trap a teacher who wants their disk space back behind a choice they did not want to change."
     },
     "guidance": {
@@ -4434,6 +4448,17 @@
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
   },
   "scheduledDeployCancellation": {
+    "removingOne": {
+      "rule": "#987 (Russell, 2026-11-18): the verb for taking away a scheduled deploy is Remove, not cancel. The command (the menu bar's and a section's right-click menu) is menuItem; it asks question, with message (or messageWithoutTime) under it; its buttons are cancelButton, leading, which answers Escape and Command-Period, and removeButton, trailing. Neither is the default. Until #987 the command, the question and both of its buttons used the verb cancel, so the button that backed out and the button that went ahead said the same word.",
+      "words": {
+        "menuItem": "Remove Scheduled Deploy…",
+        "question": "Remove the scheduled deploy?",
+        "message": "{course} Section {section} is set to deploy on its own at {time} on {day}. Removing it means it will not go out then, and the site stays as it is until you deploy it yourself.",
+        "messageWithoutTime": "This section will no longer deploy on its own.",
+        "cancelButton": "Cancel",
+        "removeButton": "Remove"
+      }
+    },
     "note": "Which acts turn a scheduled deploy off without being asked, which deliberately turn none off, and how late is too late for one to still run. The MECHANISM is not shared and never was - launchd against Task Scheduler - but which act cancels what is a rule with inputs and outputs, it is true of both products, and on 2026-09-20 the two apps disagreed about it by accident rather than by decision: Windows cancels when a SECTION is removed and does not when a COURSE is (Plantoir.Core/Models/CourseArchiver.cs), and the mac did neither. That is exactly the quiet difference this folder exists to catch.",
     "theFault": "A scheduled deploy outliving the course it was set for. The alarm lives OUTSIDE the working folder and is addressed by the course code (and, until #237, by nothing else), so removing the course left it standing, and on the mac StartCalendarInterval carries no year - so a job that never ran came due on the same date twelve months later, against whatever was in the folder by then. Which direction it errs in was MEASURED on the mac, 2026-09-20, and it is worse than it first looked: a course that publishes to NETLIFY refuses (scripts/deploy.py:1204, refuse_to_ask, exit 3) because the site marker lived inside the course folder and went with it; a course that publishes to CLOUDFLARE PAGES does NOT refuse - publish_to_cloudflare contains no refuse_to_ask at all, the teacher's surname is read from courses/.internal/profile.json which is in the WORKING folder and survives the removal, and suggest_pages_name is deterministic - so it builds the new course, creates or reuses a Pages project and reports success; and a course that publishes to a FOLDER does not refuse either, because a folder destination asks nothing ever. So the failure that REPORTS SUCCESS is not a rare edge: it is every folder and every Cloudflare course.",
     "order": "CANCEL FIRST, then archive and remove - and this is the opposite of a RENAME's order, deliberately. A rename that cancelled before a failed move would silently drop a deploy for a course still sitting there under its old name, so it archives first; a REMOVAL that archived before a failed cancel would leave the very thing this rule exists to prevent, a course that is gone with a live alarm still addressed to it. So: a cancel that FAILS stops the removal, and the teacher is told in a plain sentence. If the removal then fails, the deploy stays cancelled and the sentence says so.",
@@ -13170,6 +13195,7 @@
           "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
           "shared-rules.json:appUpdates.wording.elsewhereWork",
+          "shared-rules.json:assistantModelChoice.removal.words.message",
           "shared-rules.json:coverageTab.tab.words.cannotShowDescription",
           "shared-rules.json:deployTokens.words.problemCouldNotSave",
           "shared-rules.json:coverageTab.tab.words.noObsidian",
@@ -15141,15 +15167,16 @@
     "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
     "buttons": {
       "titles": {
-        "keepWorking": "Keep Working",
+        "keepWorking": "Cancel",
         "quitAnyway": "Quit Anyway"
       },
-      "firstButtonByQuestion": {
-        "whileAnAssistantIsSetUp": "Finish Setting Up"
-      },
-      "firstButtonByQuestionWhy": "#855, Russell 2026-11-13 evening: the quit question while an outside assistant is being set up has its own first button, Finish Setting Up, which means keepWorking. It is used when set-ups are the only work under way (the question then names them); with a publish, a preview build or a copy also under way the question names those and keeps Keep Working. The meanings and their order never change: only the first title does. Each case may say expectFirstButton.",
-      "default": "keepWorking",
-      "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
+      "titlesWhy": "#987 (Apple's HIG, Alerts): \"Always use 'Cancel' to title a button that cancels the alert's action.\" keepWorking was titled Keep Working, and Finish Setting Up while set-ups were all that was under way (#855); with no button titled Cancel, Escape had no button (finding D7). Both questions now say Cancel.",
+      "order": ["keepWorking", "quitAnyway"],
+      "orderWhy": "Leading to trailing, as the teacher sees them (#987). Alerts: \"Cancel buttons are typically on the leading side of a row.\" On the mac NSAlert puts the first button it is given on the trailing side, so it is given quitAnyway first.",
+      "default": null,
+      "defaultWhy": "No button is the default (#987), so a Return pressed without reading does nothing. Alerts: \"Note that you don't want to make a Cancel button the default button\"; Buttons, Role: \"Don't assign the primary role to a button that performs a destructive action\", and quitting can leave a deploy part way. Until #987 keepWorking was the default. Kept on review (#987, the director's call, 2026-11-18): quitAnyway takes no Return either.",
+      "escape": "keepWorking",
+      "escapeWhy": "Escape and Command-Period are Cancel, which is keepWorking. Alerts: \"Provide alternative ways to cancel an alert\", pressing Escape or Command-Period.",
       "keepWorking": "the app stays open and nothing is stopped or released",
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
     },
@@ -15797,7 +15824,7 @@
       ]
     },
     "whileAnAssistantIsSetUp": {
-      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with its own first button (buttons.firstButtonByQuestion: Finish Setting Up, which is keepWorking) and Quit Anyway. Quit Anyway asks the set-up to end, gives it at most outsideAgents.setUp.quitGraceMilliseconds, and then ends its whole process group outright before the app goes, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
+      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with Cancel (keepWorking; its own first button, Finish Setting Up, until #987) and Quit Anyway. Quit Anyway asks the set-up to end, gives it at most outsideAgents.setUp.quitGraceMilliseconds, and then ends its whole process group outright before the app goes, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
       "words": {
         "settingUpOne": "setting up {tool}",
         "settingUpSeveral": "setting up {n} assistants",
@@ -15828,7 +15855,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Keep Working",
+        "expectCancelButton": "Cancel",
         "why": "The case this exists for."
       },
       {
@@ -15938,7 +15965,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Finish Setting Up",
+        "expectCancelButton": "Cancel",
         "why": "#855 (Russell, 2026-11-13). A set-up stopped part way can leave a half-written program in the home folder; the teacher is asked, and Quit Anyway stops it for the next launch to settle. assistantsBeingSetUp is 0 when a case leaves it out."
       },
       {
@@ -15965,8 +15992,8 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Keep Working",
-        "why": "#855 (fix review 4): the question names the deploy, whose loss reaches the class website, so it keeps Keep Working; Finish Setting Up is only for a question about set-ups alone (buttons.firstButtonByQuestionWhy)."
+        "expectCancelButton": "Cancel",
+        "why": "#855 (fix review 4): the question names the deploy, whose loss reaches the class website. Until #987 that kept Keep Working where a question about set-ups alone said Finish Setting Up; both say Cancel now (buttons.titlesWhy)."
       }
     ]
   },
@@ -16480,7 +16507,7 @@
       "withheldNotRefused": "Every act that would CHANGE a reference course is not offered at all - hidden, never greyed. A greyed control that can never become available is a standing invitation to wonder what is wrong, and this sidebar already follows that rule for Schedule/Cancel Deploy. The refusals stay underneath: a teacher meets the absence, and any other caller meets the refusal.",
       "whatIsWithheld": [
         "the section window's Deploy button",
-        "Schedule Deploy... (Cancel Deploy at... is always offered - gate by direction)",
+        "Schedule Deploy... (Remove Scheduled Deploy..., Cancel Deploy at... until #987, is always offered - gate by direction)",
         "Rename (Course ▸ Rename and the row's menu; \"Rename Course\" before the HIG sweep, #457) (the folder carries the year and course_code carries the real code; the two are allowed to disagree only here, and a rename would collapse them)",
         "Add Section...",
         "Remove Section N (removing the whole course stays)",
@@ -27120,7 +27147,7 @@
       ]
     },
     "reachability": {
-      "rule": "Before a pasted token is saved, it is tried against every class website this working folder has deployed to that destination, by the LIVE markers only: Netlify, courses/<COURSE>/.netlify_sites/section<N>.json, or for a section with none there the old place deploy.py still reads and moves, courses/<COURSE>/.merged_output/section<N>/.netlify_site.json (top-level id is the site); Cloudflare, courses/<COURSE>/.cloudflare_sites/section<N>.json and a course's shared unit plans, courses/<COURSE>/.cloudflare_sites/plans-<year>.json (top-level name is the project in the Account ID's account). A name in any other shape is not a live marker and is never tried: section<N>.previous-<stamp>.json is last year's, kept when a section is cut loose for a new year (file-formats.json -> firstDeployMarkers), and no deploy reads it (review W1: before this rule one deleted site from last year stopped every save after a rollover). A place is COURSE/SECTION, or COURSE/plans-<year> for unit plans. Netlify: GET /sites/{id}. Cloudflare: GET /accounts/{account}/pages/projects/{name}, and not asked without an Account ID. 2xx is reachable; the service's own 401, 403 or 404 (its refusal pattern in the body) is unreachable; a live marker that cannot be read, or names its site in a shape no host gives, is unheard rather than passed over (review I2); a live marker that names no site at all, a JSON object whose top level has no id (Netlify) or name (Cloudflare) or an empty one, is passed over (the fix review N1: the app writes a course's unit-plans marker holding only the teacher's choices before the share's question is answered, and share_plan.py and deploy.py both read it as naming no site), while a key holding anything but a string stays unheard; anything else is unheard. In Settings, any unreachable stops the save with tokenCannotReachSites and the list, and the teacher chooses Keep My Old Token (the default, nothing changed) or Use the New Token (--use-anyway); any unheard stops it with sitesNotChecked. At a deploy's own paste only THAT deploy's markers are tried (the section's, or for a share of unit plans the course's plans markers), and a deploy with no marker has nothing to try: unreachable and unheard each stop the deploy with their two lines (deployTimeRefusals) and nothing is saved. A case's releasedMarkers, legacyMarkers, planMarkers and unreadableMarkers are written beside its markers: section<N>.previous-<stamp>.json, the old Netlify place, plans-<year>.json (with no value, the app's own shape before a first share: {\"documents\": {…}} alone, pretty-printed with sorted keys), and a section<N>.json that is not JSON. A deploy case with plans true is a share of the course's unit plans (deploy.sh <COURSE> --plans), and its planMarker is written as planMarkers' are.",
+      "rule": "Before a pasted token is saved, it is tried against every class website this working folder has deployed to that destination, by the LIVE markers only: Netlify, courses/<COURSE>/.netlify_sites/section<N>.json, or for a section with none there the old place deploy.py still reads and moves, courses/<COURSE>/.merged_output/section<N>/.netlify_site.json (top-level id is the site); Cloudflare, courses/<COURSE>/.cloudflare_sites/section<N>.json and a course's shared unit plans, courses/<COURSE>/.cloudflare_sites/plans-<year>.json (top-level name is the project in the Account ID's account). A name in any other shape is not a live marker and is never tried: section<N>.previous-<stamp>.json is last year's, kept when a section is cut loose for a new year (file-formats.json -> firstDeployMarkers), and no deploy reads it (review W1: before this rule one deleted site from last year stopped every save after a rollover). A place is COURSE/SECTION, or COURSE/plans-<year> for unit plans. Netlify: GET /sites/{id}. Cloudflare: GET /accounts/{account}/pages/projects/{name}, and not asked without an Account ID. 2xx is reachable; the service's own 401, 403 or 404 (its refusal pattern in the body) is unreachable; a live marker that cannot be read, or names its site in a shape no host gives, is unheard rather than passed over (review I2); a live marker that names no site at all, a JSON object whose top level has no id (Netlify) or name (Cloudflare) or an empty one, is passed over (the fix review N1: the app writes a course's unit-plans marker holding only the teacher's choices before the share's question is answered, and share_plan.py and deploy.py both read it as naming no site), while a key holding anything but a string stays unheard; anything else is unheard. In Settings, any unreachable stops the save with tokenCannotReachSites and the list, and the teacher chooses Cancel (nothing changed; Keep My Old Token, the default, until #987; neither button is the default since, words.cancelButton and placeholders.apps) or Use the New Token (--use-anyway); any unheard stops it with sitesNotChecked. At a deploy's own paste only THAT deploy's markers are tried (the section's, or for a share of unit plans the course's plans markers), and a deploy with no marker has nothing to try: unreachable and unheard each stop the deploy with their two lines (deployTimeRefusals) and nothing is saved. A case's releasedMarkers, legacyMarkers, planMarkers and unreadableMarkers are written beside its markers: section<N>.previous-<stamp>.json, the old Netlify place, plans-<year>.json (with no value, the app's own shape before a first share: {\"documents\": {…}} alone, pretty-printed with sorted keys), and a section<N>.json that is not JSON. A deploy case with plans true is a share of the course's unit plans (deploy.sh <COURSE> --plans), and its planMarker is written as planMarkers' are.",
       "why": "Without it a token from another account makes the next deploy build a NEW site at a NEW address and report success (deploy.py: a 404 on the saved Netlify site prints 'Creating a fresh Netlify site for this section', and remake_pages_project_if_gone makes a Cloudflare project again under the same name), and the students' bookmarks stop working with nothing said. A 404 can also mean the teacher deleted the site on purpose; the list and the choice let them say so. Whether Netlify answers another account's site with 404 or with 401 is to be measured with two test accounts; both are read as unreachable.",
       "cases": [
         {"name": "Settings: no class websites yet, so nothing to try", "action": "save", "service": "netlify", "markers": [], "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}}, "expect": {"saved": true, "answer": "accepted", "endsOn": null, "problem": null, "unreachable": []}, "stored": true},
@@ -27243,9 +27270,8 @@
       "unreachableTitle": "That token cannot reach {count} of your class websites",
       "unreachableTitleOne": "That token cannot reach one of your class websites",
       "unreachableMessage": "Deployed with your old token: {sections}. A deploy with this one would make a new website at a new address, so students' links would stop working. The token may belong to another {service} account.",
-      "keepOldToken": "Keep My Old Token",
+      "cancelButton": "Cancel",
       "useNewToken": "Use the New Token",
-      "dontSaveNewToken": "Don't Save It",
       "placeSection": "{course} section {section}",
       "placeUnitPlans": "{course} unit plans for {year}",
       "deployScreenEndsSoon": "The Cloudflare token ends on {date}. Make a new one and change it in {deployingSettings} before then.",
@@ -27255,10 +27281,10 @@
     "placeholders": {
       "rule": "Two placeholders the words and the deploy-time lines carry besides {service}, {date}, {count}, {sections}, {course}, {section} and {year}. The computer's name is the contract's own machine placeholder (specialNames.platformWording.machine). {deployingSettings} is the path to the Deploying settings, which differs by platform; each app puts in its own (review W5).",
       "deployingSettings": {"mac": "Plantoir ▸ Settings ▸ Deploying", "windows": "File ▸ Settings ▸ Deploying"},
-      "apps": "dontSaveNewToken replaces keepOldToken on the question when no token was saved before the change (review M7). notAnswered (answerShape.fields.answer) is shown with statusNotAnswered and problemNotAnswered (review M2)."
+      "apps": "The unreachable question's buttons (#987, Apple's HIG, Alerts): cancelButton, which answers Escape and Command-Period, then useNewToken, drawn as destructive; neither is the default, so Return does nothing, because the new token would move students' links. cancelButton replaced keepOldToken (\"Keep My Old Token\") and dontSaveNewToken (\"Don't Save It\"): \"Always use 'Cancel' to title a button that cancels the alert's action.\" Its trail line still depends on whether a token was saved before the change: keptOld when one was, refused with tokenCannotReachSites when none was (review M7). notAnswered (answerShape.fields.answer) is shown with statusNotAnswered and problemNotAnswered (review M2)."
     },
     "trail": {
-      "rule": "Five events (activityTrail.mustRecord): token changed in Settings, token removed in Settings, token change refused in Settings, old token kept in Settings, and the Cloudflare token's end date learned. Each carries the destination and, where it applies, the problem key, how many sections could not be reached, or the end date and what read it ({source}: sourceSettings, sourceDeploy or sourceScheduledDeploy). The end-date line is written only when the date the app keeps changes, so a deploy that reads the same date again writes nothing (review I4). Never the token, the Account ID, a site's name or an address. When no token was saved before the change, Don't Save It writes the refused line with tokenCannotReachSites rather than keptOld.",
+      "rule": "Five events (activityTrail.mustRecord): token changed in Settings, token removed in Settings, token change refused in Settings, old token kept in Settings, and the Cloudflare token's end date learned. Each carries the destination and, where it applies, the problem key, how many sections could not be reached, or the end date and what read it ({source}: sourceSettings, sourceDeploy or sourceScheduledDeploy). The end-date line is written only when the date the app keeps changes, so a deploy that reads the same date again writes nothing (review I4). Never the token, the Account ID, a site's name or an address. When no token was saved before the change, Cancel on the unreachable question writes the refused line with tokenCannotReachSites rather than keptOld.",
       "lines": {
         "changed": "Settings ▸ Deploying — changed the {service} token",
         "changedAnyway": "Settings ▸ Deploying — changed the {service} token, though it cannot reach {count} class website(s)",
@@ -36792,7 +36818,7 @@
       {
         "step": 6,
         "when": "the answer is notAsked",
-        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian, or wording.offerWhileObsidianIsOpen instead when Plantoir cannot tell (openStateCases). Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
+        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian, or wording.offerWhileObsidianIsOpen instead when Plantoir cannot tell (openStateCases). Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Since #995 (obsidianNeverClosedUnasked) Add Them is titled obsidianNeverClosedUnasked.wording.offerAddClosingObsidian whenever pressing it closes Obsidian (openStateCases: open or cannotTell), and when the course was closed as the offer was shown but is open by the time Add Them is pressed, Obsidian is not closed: step 8's reopen question asks first. Mac since #995; Windows owes both, #1003. Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
       },
       {
         "step": 7,
@@ -37758,17 +37784,17 @@
       "closesLabel": "Closes",
       "closesValue": "Obsidian, with every course open in it, not only {course}",
       "opensAgainLabel": "Opens again",
-      "opensAgainValue": "{course} only",
+      "opensAgainValue": "{course}, and everything else Obsidian had open",
       "keptLabel": "Kept",
       "keptValue": "Everything you have written",
-      "closingRule": "#834 (Russell, 2026-11-13, on #742): under offerWhileOpen or offerWhileObsidianIsOpen the offer lists three facts, each on a line of its own as Label: value, in this order: closesLabel with closesValue, opensAgainLabel with opensAgainValue, keptLabel with keptValue. Add Them closes the whole of Obsidian, so any OTHER course or vault open in it closes too, and only this course is opened again; the sentence said neither before. Rejected by him: leaving Obsidian alone and telling the teacher to restart it, and offering both at that moment. The offer stays a dialog with its Don't ask again box (#731), so the rows are lines of its message rather than a form.",
+      "closingRule": "#834 (Russell, 2026-11-13, on #742): under offerWhileOpen or offerWhileObsidianIsOpen the offer lists three facts, each on a line of its own as Label: value, in this order: closesLabel with closesValue, opensAgainLabel with opensAgainValue, keptLabel with keptValue. Add Them closes the whole of Obsidian, so any OTHER course or vault open in it closes too; the sentence said that not before. What opens again is every vault Obsidian's list marks open, this course last (sequence step 8), which is only this course when the list cannot be read (knownLimits); opensAgainValue said \"{course} only\" until #995, true only in that second case. Rejected by him: leaving Obsidian alone and telling the teacher to restart it, and offering both at that moment. The offer stays a dialog with its Don't ask again box (#731), so the rows are lines of its message rather than a form.",
       "offerAdd": "Add Them",
       "offerNotNow": "Not Now",
       "dontAskAgain": "Don't ask again",
       "reopenTitle": "Reopen Obsidian to show diagrams and graphs?",
       "reopenMessage": "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”.",
       "reopen": "Reopen Obsidian",
-      "later": "Later",
+      "later": "Not Now",
       "paneTitle": "Obsidian",
       "settingLabel": "Add the add-ons that draw diagrams and graphs to courses that have them",
       "settingFooter": "Plantoir adds them when you open such a course in Obsidian from Plantoir, and after you preview it. The first time each course opens with them, Obsidian asks whether you trust its author: click “Trust author and enable plugins” — pressing Return chooses “Browse vault in Restricted Mode”. If a course still shows a drawing's text, open Obsidian's Settings ▸ “Community plugins” and click “Exit Restricted mode”. Turning this off adds nothing new and leaves what was added in place."
@@ -43761,7 +43787,7 @@
         "whatChangesItValue": "Sharing these plans again",
         "earlierYearsLabel": "Earlier years",
         "earlierYearsValue": "Keep the password they were shared with",
-        "later": "Later",
+        "later": "Not Now",
         "newPasswordNotInUse": "The new password is not in use yet: people who open the address are still asked for the old one until these plans are shared again."
       },
       "refusals": {
@@ -48019,8 +48045,8 @@
       "appendOnly": "Nothing in undo/ is replaced in place. Events are appended, one per line; a blob is written under a temporary name and renamed onto a name that does not exist yet, with a rename that fails if the name exists. A reader counts only complete lines; a torn last line is ignored by readers and cut off by the next writer inside the lock (W2).",
       "unknown": "What a version cannot read it KEEPS (file-formats.json -> undoJournal.unknown): a line, a step or an op it cannot read is never skipped as if absent, its step number is never reused, nothing it might name is deleted while it is kept (file-formats.json -> undoJournal.unknown.deleting), and while it stands at or above the head Undo and Redo are simply NOT AVAILABLE (greyed, plain \"Undo\", as ruling 10 has it for an unreachable folder): never undone past, never a reason to clear the list. An older outside-assistant process kept running across an app update is the everyday case (the reviews of U1).",
       "writeAhead": "A step is written down BEFORE its change: under the lock, the next number (one more than the highest seq in ANY line, readable or not), its content blobs, and a begin line naming every op's expected state, made durable; then the change, outside the lock; then, under the lock, applied (with the redo branch dropped at that moment, so a step that is refused leaves Redo as it was). Undo (undoing, undone) and redo (redoing, redone) have the same shape. A process that dies leaves each file as it was before its step or as it was after it; recovery then settles the whole step: recoveryCases.",
-      "recovery": "Runs inside the lock before every new step, undo and redo (and, from U7, at every launch). For an unfinished event whose process is gone, judged FILE BY FILE by the content of what each op changed: every file where the work started -> failed (an undo or redo ends, the step back where it stood); every file where it was going -> completed; some of each -> what took effect is put back, rolledBack, one trail line; any file NEITHER (changed by hand since the process died) -> every file that can be verified is put back where the work started, the step is recorded `interrupted` naming the files in the way by path (never content), the whole list is CLEARED with reason `interrupted` (as ruling 13 clears for a refused step) and a trail line is written. The journal never says done or failed for a step that is half applied. While switched off (shadow) recovery never writes into a working folder: a step that partly took effect is recorded interrupted, and the list cleared. A step whose put-back cannot even be planned (content it needs is missing, measured with its blobs removed) can never be settled later either: it is closed the same way, `interrupted` (reason couldNotPutBack, naming the files left part way) and the list CLEARED. A swap refused because a file is in use (W5, the everyday case on Windows) is tried again on a bounded schedule that costs nothing on the ordinary path: at once at an Undo or a Redo, where the teacher is waiting for it; otherwise, per process, at its first lock, then one minute after a refusal, doubling, never more than an hour apart; and once the step is past the limits, pruning closes it (below). Measured before this rule (the core review of U1's second round): retried at every lock, a refused 300-page put-back cost each of the next 50 actions 187 to 255 ms, against 7 to 11 ms for a free page (the one figure every document cites for it). Rejected: once per process (a file held for a minute would wait for the next launch). A step closed interrupted leaves nothing of the journal's in a course: its staged files (file-formats.json -> undoJournal.stagedFiles) are removed when it is closed, and, when its folder cannot be reached then, by the first recovery in each process that reaches it (the director's ruling 6 on U1's third round). A step whose working folder cannot be reached, or that this version cannot read, is left unsettled while it is on the list, and Undo is NOT AVAILABLE while it is the newest (ruling 10); once it is past the limits, pruning closes it `interrupted` (reason unsettled, naming every file it names) with NO clearing, because nothing older than it is offered any more and a clearing would take every newer step (limits). So nothing stays in flight for ever: measured before this rule, one such step stopped all pruning (121 steps on the list, none pruned; the director's ruling 4 on U1's second reviews).",
-      "stagedThenSwapped": "An undo or redo checks EVERY op first and writes nothing if any is in the way (ruling 4); otherwise writes every new content BESIDE its target (same folder, a dot-file name), and only when all are written swaps them in, one rename each, re-reading each target first; a swap that cannot go in (a file in use, W5) reverses the swaps already made and names the file. Never a half-undone step.",
+      "recovery": "Runs inside the lock before every new step, undo and redo (and, from U7, at every launch). For an unfinished event whose process is gone, judged FILE BY FILE by the content of what each op changed: every file where the work started -> failed (an undo or redo ends, the step back where it stood); every file where it was going -> completed; some of each -> what took effect is put back, rolledBack, one trail line; any file NEITHER (changed by hand since the process died) -> every file that can be verified is put back where the work started, the step is recorded `interrupted` naming the files in the way by path (never content), the whole list is CLEARED with reason `interrupted` (as ruling 13 clears for a refused step) and a trail line is written. The journal never says done or failed for a step that is half applied. While switched off (shadow) recovery never writes into a working folder: a step that partly took effect is recorded interrupted, and the list cleared. A step whose put-back cannot even be planned (content it needs is missing, measured with its blobs removed) can never be settled later either: it is closed the same way, `interrupted` (reason couldNotPutBack, naming the files left part way) and the list CLEARED. A swap refused because a file is in use (W5, the everyday case on Windows), or refused `couldNotWrite` (the disk full or the folder not taking a new file, which can change as room comes back), or a put-back whose content is there and cannot be read just now, is tried again on the same bounded schedule that costs nothing on the ordinary path: at once at an Undo or a Redo, where the teacher is waiting for it; otherwise, per process, at its first lock, then one minute after a refusal, doubling, never more than an hour apart; and once the step is past the limits, pruning closes it (below). Measured before this rule (the core review of U1's second round): retried at every lock, a refused 300-page put-back cost each of the next 50 actions 187 to 255 ms, against 7 to 11 ms for a free page (the one figure every document cites for it). Rejected: once per process (a file held for a minute would wait for the next launch). A step closed interrupted leaves nothing of the journal's in a course: its staged files (file-formats.json -> undoJournal.stagedFiles) are removed when it is closed, and, when its folder cannot be reached then, by the first recovery in each process that reaches it (the director's ruling 6 on U1's third round). A step whose working folder cannot be reached, or that this version cannot read, is left unsettled while it is on the list, and Undo is NOT AVAILABLE while it is the newest (ruling 10); once it is past the limits, pruning closes it `interrupted` (reason unsettled, naming every file it names) with NO clearing, because nothing older than it is offered any more and a clearing would take every newer step (limits). So nothing stays in flight for ever: measured before this rule, one such step stopped all pruning (121 steps on the list, none pruned; the director's ruling 4 on U1's second reviews).",
+      "stagedThenSwapped": "An undo or redo checks EVERY op first and writes nothing if any is in the way (ruling 4); otherwise writes every new content BESIDE its target (same folder, a dot-file name), and only when all are written swaps them in, one rename each, re-reading each target first; a swap that cannot go in (a file in use, W5) reverses the swaps already made and names the file. A new content that cannot be written beside its target (the disk full, a folder that will not take a new file) removes every staged file, the one it was writing included, swaps nothing, and is refused `couldNotWrite`, never `fileIsInUse` (the Fable sweep of U1, F1: the file the exclusive create had made was left beside the page for good); so is keeping the original when that fails for room or permission (on a volume without hard links it is a copy); like a file in use it changes nothing on the list (stepCases). A file of the list that is there and cannot be opened or read (a failing disk, a permission, too many open files) makes the list unreadable for that attempt: never passed over as if it were gone (only a segment pruned since it was listed is), never content missing, so nothing is cleared. An op that is as the step left it but cannot be placed (a line whose front matter block is gone) is a change since, and every page in the way is named before any content missing from the list (F2). Never a half-undone step.",
       "contentNotTimes": "Whether a file has changed since is judged by the content of EXACTLY what the op changed: a front-matter entry byte for byte (carriage returns, comments and a byte-order mark kept; never Unicode-equivalence), a whole file by SHA-256. Never modification or creation times (ruling 4, W6).",
       "linear": "Strictly linear (ruling 9): Undo acts only on the newest step offered that is not undone, then the one before it; Redo only on the most recently undone. A newer step still being made, undone or redone refuses both (anotherChangeIsUnderWay), unless its process is gone and its folder cannot be reached, when both are not available. Any new step, from any process, drops the redo branch when it takes effect. One list across every course and every working folder (ruling 5), and the newest step is undone with no question wherever it was made (ruling 11): stackCases 'rulings 5 and 11'.",
       "clearing": "The whole list is CLEARED by one `cleared` line carrying its reason and, as its seq, the highest step number in the journal when it is written. A reader honours a `cleared` line WHATEVER its reason says, a reason it does not know included: it never checks the reason (stackCases 'a cleared line clears whatever its reason says'), so a later version can clear for a reason of its own; `clearReasons` are the reasons this version writes. This version clears in four cases: when Undo refuses the newest step because what it changed was changed by hand since, whether the check or the swap finds it (ruling 13: the page is named once, at the refusal); when Undo refuses the newest step because content it needs is missing from the list, which never comes back (refused once with its reason, then cleared as ruling 13 does: held question M9 on U1's second reviews, built as recommended behind one constant, UndoSwitch.undoRefusedForMissingContentClearsTheList; turned off, the newest step would be offered and refused on every try until it aged out, and nothing earlier could be undone); when recovery closes a step interrupted (recovery); and once, when the switch goes live (shadow). Every step done or undone at that point with a number up to the line's leaves the list, and so do lines a newer version wrote before it. A step another process has IN FLIGHT when the clearing is written (begun, undoing or redoing, with a number up to the line's) leaves the list too: its own applied, undone or redone, when it comes, records nothing undoable. That is one fixed rule for every clearing (the director's ruling 3 on U1's second reviews, replacing the constant held for Russell when a deploy still cleared). A REFUSED REDO clears nothing: whether what it changed was changed by hand or content it needs is missing, it is refused once with its reason, then the undone steps from it upward are `dropped` (reason redoRefused), so Redo has nothing and Undo still works for everything earlier, and the Redo is never offered and refused again (ruling 20). A refusal because a file is in use changes nothing on the list, to be tried again. WHAT IS COUNTED: what the app does to a course is a step (ruling 17: 'anything else done through the app is counted'). A DEPLOY (from the app, typed in Terminal, or a deploy set for later when it runs) and sharing or stopping sharing unit plans are NOT on the list and do NOT clear it: everything done before them can still be undone after them (rulings 17 and 18, which replaced 14 and 16). Whether SETTING or CANCELLING a deploy for later is a step is held for Russell (M10, raised by the Fable sweep of U1: the reserved `external` op names the LaunchAgent, and a rollover turns a schedule off): until he answers it is counted as not a step and clears nothing (the writer scan's ScheduledDeploy.swift entry says so), and the scan will be relabelled `waitsFor` if he rules it is one. Setting up an outside assistant is not on the list either: it changes no course and writes only outside every course (held question M8 on U1's second reviews, built as recommended; ruling 16 said so, and rulings 17 and 18 replaced it without naming it). The writer scan (UndoWriterScanTests) lists every file that writes, with which of these it is.",
@@ -49283,6 +49309,30 @@
         "others": 0,
         "files": "unchanged",
         "phase": "done"
+      },
+      {
+        "name": "the second staging write fails, as on a full disk: nothing written, no staged file left, refused with its own word",
+        "pages": 2,
+        "handEdit": "none",
+        "stagingFailsAt": 1,
+        "undo": "couldNotWrite",
+        "named": "page 1",
+        "others": 0,
+        "files": "unchanged",
+        "phase": "done",
+        "why": "`stagingFailsAt` makes the staging write at that index (the order the undo meets its pages: page 2, then page 1) create its staged file and then fail to write into it, as a full disk does. The staged file it made is removed with every other, nothing is swapped, and the refusal is `couldNotWrite` (the disk is full or the folder will not take a new file), never `fileIsInUse`. Like a file in use it changes nothing on the list: the step is still offered. Measured by the Fable sweep of U1 (F1) on a 3 MB disk image: the file was left beside the page for good and the refusal said a file was in use."
+      },
+      {
+        "name": "a page whose front matter was taken out by hand since a two-line step: changedSince, never contentMissing",
+        "pages": 2,
+        "step": "twoLines",
+        "handEdit": "front matter of page 2 removed",
+        "undo": "changedSince",
+        "named": "page 2",
+        "others": 0,
+        "files": "unchanged",
+        "phase": "cleared",
+        "why": "`step` twoLines: each page begins `---`, `title: Page N`, `draft: true`, `---`, `Body.` and the step takes `draft: true` away and adds `publish: false` (two editLine ops). The hand edit leaves page 2 holding only `Body.`. Undoing the `draft` op would put a line back into a block that is gone, so the op cannot be placed: that is a change since (ruling 13), never content missing from the list. A line op that cannot be placed is `changedSince`, and every page found in the way is reported before any content found missing. Measured by the Fable sweep of U1 (F2): it answered contentMissing."
       }
     ],
     "recoveryCases": [
@@ -49893,5 +49943,103 @@
       "shadowProcessAfterTheFlip": "A process still running a build with the switch off after the switch goes live (an outside-assistant session that outlives an update: on the mac that server is the app binary; or a build with the switch off run beside a live one on a developer's Mac) goes on writing shadow steps into the same list, and a live reader cannot tell them from live ones. Measured (the Fable sweep of U1, a standalone probe): after goLive and one live step, a shadow-mode step was recorded as step 3 and was the head the live app offered, and Undo took it back past a newer change the shadow process never recorded; a LIVE two-page step killed after its first swap, when the first process to take the lock was in shadow, was recorded interrupted (partlyTookEffect) and cleared, with one page published and the other not, both staged files left, and no trail line. Reaches a teacher only if a build with the switch off is released beside a live one; under ruling 2 none is. No v1 line changes for it: U7 settles it (laterPieces.U7).",
       "stagedFilesOfAFolderAway": "A step closed interrupted while its working folder could not be reached has its staged files removed by the first recovery that reaches the folder again, for as long as the journal still holds the step's lines (until its segment goes, normally some 60 days). A folder away for longer keeps them: hidden dot files beside its pages, which Obsidian and the website builder pass over."
     }
+  },
+  "obsidianNeverClosedUnasked": {
+    "note": "#995 (HIG stage 2, finding D21 of #975), v2.0.0, mac first; Windows meets it under #1003 (v2.0.0), and until then its tests do not read this key. Obsidian keeps its list of vaults in memory and writes it back whole when it quits, so a course it has never seen can be added only while it is closed. Until #995 the mac app quit a running Obsidian for that without asking, with every course open in it. Russell's ruling Q13 on #975 (2026-11-18): Plantoir never closes Obsidian without asking, and the button that goes ahead says plainly that Obsidian will be closed. documentation/09-mac-app.md -> \"Plantoir never closes Obsidian unasked (#995)\".",
+    "rule": "Every route that hands Obsidian a file (Open in Obsidian from any menu, button or the assistant, a Coverage tab code, Course Settings' How I Teach row) asks wording.title BEFORE closing Obsidian whenever closeCases says ask; Cancel opens nothing and closes nothing, and wording.closeAndOpen closes Obsidian, adds the course, opens again each course Obsidian had on screen, then opens what was asked for. What opens again is every vault Obsidian's list (obsidian.json) marks open, read before the quit: the add-ons' reopen's own rule (obsidianAddOnsForFigures.sequence step 8). Three more rules (#995 reviews): (1) at the answer closeCases is read again, and if it no longer says ask (Obsidian has quit, or now knows the course) the file is simply opened and nothing is closed; (2) if Obsidian is still running after the quit and the wait, nothing is written into its list and nothing is handed to it (it does not know the course, so a link would only show its own error), and trail.didNotClose is written; if it closed but the file still cannot be handed over (the list could not be written), trail.notAdded is written; neither shows anything on screen yet, because the route has no report for a course that could not be opened in Obsidian (#995's morning question); (3) if Obsidian starts between the press's check and the hand-over, nothing is handed over and the question is asked instead of the press doing nothing. Every answer writes one trail line (activityTrail.mustRecord: asked to close Obsidian to open a course). The add-ons offer (obsidianAddOnsForFigures) titles its yes wording.offerAddClosingObsidian instead of offerAdd whenever that yes closes Obsidian (the course is open in it, or Plantoir cannot tell: openStateCases open or cannotTell). When the course was closed while the offer was shown and is open by the time Add Them is pressed, Obsidian is not closed: the reopen question (obsidianAddOnsForFigures.wording.reopenTitle) asks first. The rename's question (Close Obsidian and Rename) already met the ruling.",
+    "closeCases": {
+      "note": "Whether handing Obsidian the file means asking first: Obsidian is running and no vault in its list (obsidian.json) is the file's folder or holds it. `registryVaults` null means there is no list at all; a list that cannot be read counts as holding nothing, the safe direction.",
+      "cases": [
+        {
+          "name": "Obsidian not running, course not in its list",
+          "running": false,
+          "registryVaults": [
+            "/w/ICS3U"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian not running, no list at all",
+          "running": false,
+          "registryVaults": null,
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, course in its list",
+          "running": true,
+          "registryVaults": [
+            "/w/MPM2D"
+          ],
+          "target": "/w/MPM2D/Section 1/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, a larger vault holds the course",
+          "running": true,
+          "registryVaults": [
+            "/w"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, course not in its list",
+          "running": true,
+          "registryVaults": [
+            "/w/ICS3U"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        },
+        {
+          "name": "Obsidian running, a course whose name starts the same is not this one",
+          "running": true,
+          "registryVaults": [
+            "/w/MPM2"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        },
+        {
+          "name": "Obsidian running, no list at all",
+          "running": true,
+          "registryVaults": null,
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        }
+      ]
+    },
+    "wording": {
+      "title": "Close Obsidian to open {course}?",
+      "message": "Obsidian has not opened {course} before. It can add a course to its list only while it is closed, so Plantoir closes Obsidian, adds {course}, and opens it again.",
+      "factsRule": "After message, a blank line, then three facts each on a line of its own as Label: value, in this order: closesLabel with closesValue, opensAgainLabel with opensAgainValue, keptLabel with keptValue (#834's shape, as obsidianAddOnsForFigures.wording.closingRule).",
+      "closesLabel": "Closes",
+      "closesValue": "Obsidian, with every course open in it",
+      "opensAgainLabel": "Opens again",
+      "opensAgainValue": "{course}, and everything else Obsidian had open",
+      "keptLabel": "Kept",
+      "keptValue": "Everything you have written",
+      "closeAndOpen": "Close Obsidian and Open",
+      "cancel": "Cancel",
+      "offerAddClosingObsidian": "Close Obsidian and Add Them"
+    },
+    "trail": {
+      "note": "One line per answer, under the event \"asked to close Obsidian to open a course\". {course} is the course's code.",
+      "opened": "{course} · closed Obsidian to add the course to its list, and opened it",
+      "cancelled": "{course} · chose Cancel: Obsidian was not closed and the course did not open",
+      "notNeeded": "{course} · opened in Obsidian without closing it: by the answer, Obsidian had quit or knew the course",
+      "didNotClose": "{course} · Obsidian did not close, so the course was not added to its list and did not open",
+      "notAdded": "{course} · Obsidian closed, but the course could not be added to its list, so it did not open"
+    },
+    "knownLimits": [
+      "Opens again names everything Obsidian's list marks open, read before the quit. A mark Obsidian left behind on a vault it had closed (FolderActions' own measurement) reopens that vault too: the over-report is the safe direction, as in the add-ons' reopen. A vault is not always a course (a parent folder opened as one), hence everything, not each course.",
+      "A course with diagrams and graphs, never seen by a running Obsidian, and never asked about the add-ons, meets two questions in a row: the add-ons offer, then this one. Folding them was rejected: Not Now also opens Obsidian, so the offer would have to carry the closing in all three answers."
+    ],
+    "rejected": [
+      "Opening the course without adding it to the list: Obsidian's open link finds only vaults it knows, so it would show its own error.",
+      "Adding the course to the list while Obsidian runs: Obsidian writes its in-memory list back on quit and the addition is lost (FolderActions.openInObsidian's measurement)."
+    ]
   }
 }

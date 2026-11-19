@@ -712,9 +712,11 @@ final class CoverageTabTests: XCTestCase {
         opening.registryData = { return nil }
         opening.open = { folder, _ in
             log.openedFolders.append(folder.path)
+            return true
         }
         opening.openPage = { page, _ in
             log.openedPages.append(page.path)
+            return true
         }
         opening.quitAndWait = {}
         opening.reopen = { _ in }

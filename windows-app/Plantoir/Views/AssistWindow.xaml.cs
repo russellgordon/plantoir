@@ -1114,7 +1114,7 @@ public sealed partial class AssistWindow : Window
 
     /// <summary>
     /// Presents an inline card asking whether the teacher would like to enter class dates,
-    /// with "Enter Class Dates" (opens SectionScheduleDialog) and "Not Now" buttons, title case
+    /// with Add Dates… (opens SectionScheduleDialog; "Enter Class Dates" until #987) and Not Now buttons, title case
     /// and on the trailing end (#491 item 9), the commit button first as Windows orders them.
     /// </summary>
     private void ShowDatesOffer()
@@ -1145,18 +1145,18 @@ public sealed partial class AssistWindow : Window
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
         var enterBtn = new Button
         {
-            Content = "Enter Class Dates",
+            Content = AssistWording.GiveDatesButton,
             Style = (Style)Application.Current.Resources["AccentButtonStyle"],
         };
         var notNowBtn = new Button
         {
-            Content = "Not Now",
+            Content = AssistWording.DeclineDatesButton,
         };
 
         enterBtn.Click += async (_, _) =>
         {
             buttons.Visibility = Visibility.Collapsed;
-            Say("You", "Enter Class Dates");
+            Say("You", AssistWording.GiveDatesButton);
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             var xamlRoot = Root.XamlRoot ?? Content?.XamlRoot;
             if (xamlRoot is null)
@@ -1190,7 +1190,7 @@ public sealed partial class AssistWindow : Window
         notNowBtn.Click += (_, _) =>
         {
             buttons.Visibility = Visibility.Collapsed;
-            Say("You", "Not Now");
+            Say("You", AssistWording.DeclineDatesButton);
             Say("Assistant", "No class dates recorded. You can add them anytime.");
         };
 

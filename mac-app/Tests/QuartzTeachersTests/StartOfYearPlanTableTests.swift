@@ -161,13 +161,16 @@ final class StartOfYearPlanTableTests: XCTestCase {
                        "the table's frame and its rows disagree: a scroll inside, or an empty band")
     }
 
-    /// Return is Go while the table has focus — the table must not swallow
-    /// the sheet's default key. The backup is made to fail, so the press is
-    /// seen by the sheet refusing and nothing is written. (Escape goes
-    /// through `dismiss`, which this host cannot observe; the opt-in
-    /// `ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
+    /// Return does NOT press Put These into Draft (#987, D39, Russell's
+    /// ruling Q-B on #975), with the table focused or not: the sheet's own
+    /// warning says students lose classes, so no button is the default.
+    /// Until #987 Return was Go, and this test pinned that the table did not
+    /// swallow it. The backup is made to fail, so a press that did reach Go
+    /// would show as the sheet refusing; nothing is written either way.
+    /// (Escape goes through `dismiss`, which this host cannot observe; the
+    /// opt-in `ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
     /// presses it in the running app, after clicking the table's header.)
-    func testReturnGoesWhileTheTableHasFocus() async throws {
+    func testReturnDoesNotPutThePagesIntoDraft() async throws {
         let made = try AssistFixture.makeRunner()
         defer {
             try? FileManager.default.removeItem(at: made.root)
@@ -179,23 +182,72 @@ final class StartOfYearPlanTableTests: XCTestCase {
             host.close()
         }
         let table: NSTableView = try XCTUnwrap(host.tables().first)
-        host.select(row: 1, in: table)
-        XCTAssertTrue(host.window.firstResponder === table, "the table did not take focus")
-        host.press(keyCode: 36, characters: "\r")
-        var waited: Int = 0
-        while waited < 20 {
-            if case .problem = model.stage {
-                break
+        for focusTheTable in [false, true] {
+            if focusTheTable {
+                host.select(row: 1, in: table)
+                XCTAssertTrue(host.window.firstResponder === table, "the table did not take focus")
             }
-            // Go starts a Task on the main actor; let it run.
-            try await Task.sleep(for: .milliseconds(100))
-            host.pump(0.05)
-            waited += 1
+            guard case .ready = model.stage else {
+                return XCTFail("the sheet is not ready to be answered")
+            }
+            // What decides it: no button in the sheet answers Return.
+            XCTAssertEqual(StartOfYearPlanTableTests.buttonsAnsweringReturn(in: host.window), [],
+                           "a button takes Return (table focused: \(focusTheTable))")
+            host.press(keyCode: 36, characters: "\r")
+            await StartOfYearPlanTableTests.runWhatTheKeyStarted(in: host)
+            guard case .ready = model.stage else {
+                return XCTFail("Return went ahead (table focused: \(focusTheTable), notice: \(model.notice ?? "none"))")
+            }
         }
-        guard case .problem(let sentence) = model.stage else {
-            return XCTFail("Return did not reach Go with the table focused (notice: \(model.notice ?? "none"))")
+
+        // The positive check (#987 review), in place of the timed wait this
+        // test had: Go clicked, and the same settling as after Return above,
+        // is enough for Go to have started. Its first step, before anything
+        // it awaits, leaves the ready stage (`goAhead` sets `.working`), so
+        // a Return that had reached Go would have been seen above.
+        // Pressed through its accessibility action, as a click would (the
+        // SwiftUI button is not found as an `NSButton` by its title here).
+        XCTAssertTrue(AccessibilityInspector.press(identifier: "startOfYearGo"), "Put These into Draft could not be pressed")
+        await StartOfYearPlanTableTests.runWhatTheKeyStarted(in: host)
+        if case .ready = model.stage {
+            XCTFail("a click on Go had not started it after the settling the Return checks rely on")
         }
-        XCTAssertEqual(sentence, StartOfYearWording.backupFailed(course: "ICS3U"))
+    }
+
+    /// Lets everything a key press could have started run: the run loop's
+    /// turn that delivers the button's action, then the main actor's queued
+    /// work (a `Task { @MainActor in }` from the action), which a run loop
+    /// turned inside a test on the main actor never reaches.
+    static func runWhatTheKeyStarted(in host: TableHost) async {
+        var turn: Int = 0
+        while turn < 3 {
+            host.pump(0)
+            await Task.yield()
+            turn += 1
+        }
+    }
+
+    /// Every view under `view`, `view` first.
+    static func allViews(in view: NSView?) -> [NSView] {
+        guard let view else {
+            return []
+        }
+        var found: [NSView] = [view]
+        for child in view.subviews {
+            found.append(contentsOf: allViews(in: child))
+        }
+        return found
+    }
+
+    /// The titles of the buttons in `window` whose key is Return.
+    static func buttonsAnsweringReturn(in window: NSWindow) -> [String] {
+        var titles: [String] = []
+        for view in allViews(in: window.contentView) {
+            if let button = view as? NSButton, button.keyEquivalent == "\r" {
+                titles.append(button.title)
+            }
+        }
+        return titles
     }
 
     // MARK: - The height budget

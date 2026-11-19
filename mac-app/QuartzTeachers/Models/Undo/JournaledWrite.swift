@@ -78,6 +78,14 @@ nonisolated enum UndoRefusal: Equatable, Sendable {
     /// reversed (`undo.wording.fileIsInUse`).
     case fileIsInUse(path: String)
 
+    /// A new content could not be written beside its page: the disk is
+    /// full, or the folder will not take a new file (read-only, no
+    /// permission). Nothing was swapped and nothing of the step is left
+    /// beside any page (`undo.rule.stagedThenSwapped`; the Fable sweep of
+    /// U1, F1). Never `fileIsInUse`, which would tell the teacher a file is
+    /// open somewhere when it is not.
+    case couldNotWrite(path: String)
+
     /// Content the step needs is missing from the list.
     case contentMissing(path: String)
 
@@ -807,6 +815,28 @@ nonisolated enum UndoKillPoints {
     /// reversed and the file is named.
     nonisolated(unsafe) static var fileInUseAtSwap: ((Int) -> Bool)?
 
+    /// Answers true to make the staging write at this index fail as a full
+    /// disk does: the staged file is CREATED, then writing into it fails
+    /// (measured by the Fable sweep of U1 on a 3 MB disk image: the file is
+    /// left at 0 bytes). Set only by tests.
+    nonisolated(unsafe) static var stagingWriteFailsAt: ((Int) -> Bool)?
+
+    /// Answers true to make a read of the list fail as a failing disk or a
+    /// network home that drops mid-read does (`UndoFileReads`). Set only by
+    /// tests.
+    nonisolated(unsafe) static var readOfTheListFails: (() -> Bool)?
+
+    /// Answers true to make opening this file of the list (a segment, a
+    /// blob, or a working folder's identifier file) fail as a failing disk,
+    /// a permission or too many open files does (`UndoFileReads.openFile`):
+    /// never as a file that is gone. Set only by tests.
+    nonisolated(unsafe) static var openFails: ((URL) -> Bool)?
+
+    /// Answers an error number to make keeping the original at this index
+    /// fail as the copy a volume without hard links falls back to does
+    /// (`UndoSwap.keep`); nil lets it go ahead. Set only by tests.
+    nonisolated(unsafe) static var keepingTheOriginalFails: ((Int) -> Int32?)?
+
     // MARK: - Functions
 
     static func stopsHere(_ point: UndoKillPoint) -> Bool {
@@ -856,6 +886,8 @@ nonisolated enum UndoTrailHook {
                 return "the list could not be written"
             case .couldNotSync:
                 return "the list could not be saved to the disk"
+            case .couldNotRead:
+                return "the list could not be read"
             case .couldNotEncode:
                 return "the step could not be written as a line"
             case .notTheNewestStep:

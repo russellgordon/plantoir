@@ -1455,12 +1455,11 @@ follow Apple's Human Interface Guidelines, and on the risky questions Return
 does nothing again**: "Return does nothing on risky questions" below.
 `QuestionKeysTests` presses the keys on each, through the real modifiers.
 
-**The two-lists sheet is not a facts sheet and is unchanged by #973:** Cancel
-keeps Return (`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives
+**The two-lists sheet is not a facts sheet and was unchanged by #973:** Cancel
+kept Return (`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gave
 the sheet Escape, which its `.interactiveDismissDisabled()` had taken away.
-(That works there because its search field holds the keys; `.onExitCommand`
-alone is not enough on a sheet where nothing does, #973, below.) Whether its
-Cancel should stay the default is part of the interface audit, #975. The
+**Since #987 no button there is the default and Cancel carries Escape**
+("Question sheets and alerts after the HIG review", below). The
 share's console already closed on Escape (SwiftUI closes a sheet with no
 Cancel of its own), measured and pinned, not changed.
 
@@ -1506,7 +1505,7 @@ carries at most one key and the cancelling button leads, the action trails:
 
 | layout | cancelling button | action | Return | Escape |
 |---|---|---|---|---|
-| risky (`goAheadIsTheDefault` false): Replace It…, Remove Group, Start the Groups Again, the public-address warning | `role: .cancel`, `.keyboardShortcut(.cancelAction)` | `role: .destructive`, no key | **nothing**: the sheet stays and nothing is answered | Cancel |
+| risky (`goAheadIsTheDefault` false): Replace It…, Remove Group, Start the Groups Again, the public-address warning | `role: .cancel`, `.keyboardShortcut(.cancelAction)` | a plain button, no key (`role: .destructive`, drawn red, until #987) | **nothing**: the sheet stays and nothing is answered | Cancel |
 | going ahead is the default (`goAheadIsTheDefault` true): after Change Password | `role: .cancel`, `.keyboardShortcut(.cancelAction)` (Later) | `.defaultButton(isEnabled: true)`, Return (Share Again) | the action | the cancelling button |
 
 Before #973 the risky layout put the action first and Cancel second, on the
@@ -1620,8 +1619,11 @@ value wrapped. The test fails on that version and passes on this one.
 
 **The Obsidian add-ons offer** (#742, Russell 2026-11-13) takes the same
 shape inside its dialog. When Obsidian is running, Add Them closes the whole of
-Obsidian, so any OTHER course open in it closes too, and only this course
-opens again; the sentence said neither. `offerWhileOpen` and
+Obsidian, so any OTHER course open in it closes too; the sentence did not
+say so. (This said "and only this course opens again" until #995: the code
+reopens every course the list marks open, this one last, and only this one
+when the list cannot be read; `opensAgainValue` now says "{course}, and
+everything else Obsidian had open", the closing question's words too.) `offerWhileOpen` and
 `offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
 line as "label: value" (`closesLabel`/`closesValue`,
 `opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
@@ -1664,6 +1666,172 @@ below the row (`CourseCodeSuggestionsOverlay.top`). Measured by the geometry
 function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests`);
 the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
 a unit test can read a frame from.
+
+## Question sheets and alerts after the HIG review (#987)
+
+Stage 2 of the HIG review (#975), carrying Russell's rulings of 2026-11-18
+(Q1, Q2, Q3, Q7 and Q-B on #975) and the inventory's findings D1 to D5, D7 to
+D9, D22, D32, D33 and D39 (`vm-tools/reference/975-mac-hig-inventory.md`).
+The HIG pages were read on the day of the change, from Apple's own page data:
+Alerts, Sheets, Buttons, Keyboards, Modality, Menus and Context menus. Russell's
+rule: his own rulings do not override the HIG, and where the HIG does not
+settle a case it is a question for him, not a design.
+
+**Escape and Command-Period always cancel, bound one way.** Every button with
+`role: .cancel`, in a sheet or an alert, carries
+`.keyboardShortcut(.cancelAction)`, and every button titled Cancel has that
+role; `SheetConventionScanTests.testEveryCancelAnswersEscape`,
+`testNoCancelIsTheDefault` and `testEveryButtonTitledCancelHasTheCancelRole`
+scan every view for it. Keyboards: "Esc: Cancel the current action or
+process"; "Command-Period: Cancel an operation." Before, Cancel was bound
+three ways (inventory inconsistency 2): by that key, by `.onExitCommand`
+alone (which does not fire with Keyboard Navigation off, #973), or by the
+role alone (D5). Escape and Command-Period already closed the D5 sheets
+(the inventory's second half), whose Cancel only dismisses, so for them the
+change is uniformity. Two Cancels take the key off while a picker field's
+list is open (Copy a Page and the New Course wizard), so the first Escape is
+still the field's, to put the list away (`PickerEscape`, #457 C1): a key
+equivalent on a button is offered the press before the field. Where a sheet's
+Cancel does more than close it, closing by any other route does the same:
+Import Courses for Reference stops a copy under way when the sheet goes
+(`run?.cancel()` in its `onDisappear`), as its Stop does, and the token
+question's binding keeps the old token when the system closes it. Exempt, by
+name in the scan: the folder-refused alert's lone OK and the repair outcome's
+dismissal (an alert's only button), and the progress panel (#988).
+
+**No Cancel is the default, and no button is the default where work can be
+lost** (Q3). Alerts: "Note that you don't want to make a Cancel button the
+default button", and "If you want to encourage people to read an alert and
+not just automatically press Return to dismiss it, avoid making any button the
+default button." Buttons ▸ Role: "Don't assign the primary role to a button
+that performs a destructive action, even if that action is the most likely
+choice." Decided one by one:
+
+| | question | Return before | Return now | why |
+|---|---|---|---|---|
+| D1 | the assistant's "Put {code} Section {n} back to how it was?" | Cancel (and Escape did nothing) | nothing | it loses the teacher's own edits |
+| D2 | "That token cannot reach … class websites" | Keep My Old Token | nothing | the new token moves students' links; Use the New Token is drawn red, because the teacher chose to change the token, not to break links (Alerts: the destructive style is for "a destructive action people didn't deliberately choose") |
+| D3 | "Set up {tool}?" | Cancel | Download and Set Up | nothing is lost; the teacher chose Set Up |
+| D4 | Plan Share's two tables | Cancel | nothing | a share cannot be taken back once students can open it, as Get Ready counts (Q-B) |
+| D39 | Get Ready's Put These into Draft | the action | nothing | Russell's ruling Q-B |
+| D7 | the quit question (`NSAlert`) | Keep Working | nothing | Cancel may not be the default, and Quit Anyway can leave a deploy part way |
+| D32 | New Course or Club's Create Course | nothing (it only looked like the default) | Create Course, once the form is complete | Q7; Buttons ▸ Role, "the button people are most likely to choose" |
+
+"Once the form is complete" is `NewCourseWizardView.formIsComplete`: a code
+with no problem, a name typed, section numbers, a class-page word and, for a
+club, a class folder, each as `startCreation` would accept it. Until then the
+button is plain and Return does nothing, because a Return typed in the code
+field with the rest unread once made a club named by its code (#457's review).
+Nor is it the default while the course-code list is shown
+(`NewCourseWizardView.createCourseIsTheDefault`, the #987 review): a default
+button is offered Return before the field's `onKeyPress`, so Return with a
+code highlighted made the course instead of choosing the code. Measured, and
+pinned by `QuestionKeysTests.testReturnInTheCodeFieldChoosesTheSuggestion`,
+which presses Return in the wizard's own `CourseCodePickerView` beside a
+Create Course that follows the wizard's rule (and failed with the rule that
+looked at the form alone). **Escape while the course is being made does
+nothing** (Russell, 2026-11-18, on the #987 review), as before #987: the
+wizard's Cancel answers Escape and Command-Period until Create Course is
+pressed and, through the sheet, again once the course is made; a click on
+Cancel still stops the making (`NewCourseWizardView.cancelAnswersEscape`).
+
+**Order.** Cancel leads and the action or default trails in every row:
+"Always place the default button on the trailing side of a row"; "Cancel
+buttons are typically on the leading side of a row." "Set up {tool}?" had
+them the other way round (D3). The quit question puts Quit Anyway first in
+`QuitConfirmation.buttonsInOrder`, because `NSAlert` puts the first button it
+is given on the trailing side, sets each button's key from the same list
+(NSAlert gives its first button Return by itself), and `QuitAlertKeysTests`
+presses Escape, Command-Period and Return on the real alert shown as a sheet.
+
+**Red** (Q1, D33). The risky facts questions' go-ahead (Replace It…, Remove
+Group, Start the Groups Again, Share Without a Password) is a plain button
+now, still with no key. Alerts: "Use the destructive style to identify a
+button that performs a destructive action people didn't deliberately
+choose." **The SwiftUI alerts were left red, a known open point: Russell
+wants the question sheet itself redesigned first (#1000), and until then the
+alerts stay exactly as they are here, none moved to a sheet.** Measured (`AlertKeysTests`), in a SwiftUI `.alert` a plain
+button beside a Cancel takes Return whatever is written on it
+(`.keyboardShortcut(nil)` does not take it away, nor a `.cancelAction` on the
+Cancel); only the destructive role leaves the go-ahead with no key. So an alert
+cannot be both "not red" and "no default", and Q1 asks for both. The HIG itself
+points two ways: Alerts' Empty Trash sentence says the deliberately chosen
+action is not red and "the convenience of pressing Return to confirm" it
+outweighs the warning, while Buttons ▸ Role says not to make a destructive
+action primary. The alerts concerned: Remove (course or section), Delete
+(backup, backups, archive), Remove (a scheduled deploy), Remove (a token,
+an assistant, a Course Settings list entry), Stop Sharing, the assistant's
+put-back (D1) and the new Remove for a downloaded model (D22).
+
+**Ruled since, by the director on 2026-11-18:** the quit question keeps no
+default button, as built; the Plan Share tables (D4) keep no default; the
+links checklist's Not Now stays until #991.
+
+**Titles** (Q2). Alerts: "Always use 'Cancel' to title a button that cancels
+the alert's action." Retitled: Keep My Old Token and Don't Save It → Cancel
+(`deployTokens.words.cancelButton`); Leave It Scheduled → Cancel; the locked
+pages note's Not Now → Cancel (the teacher chose Open in Obsidian); the quit
+question's Keep Working and Finish Setting Up → Cancel. On offers Plantoir
+raised by itself, Not Now: Not Today (today's class on the front page; the
+contract key keeps its name) → Not Now; Later (Reopen Obsidian, and Share
+Again after Change Password) → Not Now. D9: the assistant's dates offer's Yes
+→ Add Dates… (`AssistWording.giveDatesButton`): "Aim for a one- or two-word
+title that describes the result", "avoiding 'Yes' and 'No'", and the ellipsis
+because it opens the class-dates sheet (Buttons ▸ macOS). Its decline, Cancel
+until the #987 review, is Not Now (`AssistWording.declineDatesButton`): the
+offer is one the assistant raised by itself. Left as they were,
+and listed as questions: the links checklist's Not Now (the same sheet opens
+by itself after a build and from the menu), ruled since: it stays as it is
+until #991 stops that sheet opening by itself. The scheduled deploy's question
+is ruled too (Russell, 2026-11-18): its verb is Remove, so the command is
+Remove Scheduled Deploy…, the question "Remove the scheduled deploy?", and its
+buttons Cancel (leading, Escape) and Remove
+(`ScheduledDeployRemovalWording`, `scheduledDeployCancellation.removingOne`).
+
+**D22.** Removing a downloaded assistant in Settings ▸ Assistant asks first,
+as Alerts asks for "an uncommon destructive action that they can't undo".
+
+**Measured with Keyboard Navigation off and on** (`AppleKeyboardUIMode` 0 and
+3, put back to 3 afterwards), on 2026-11-18 in a copy of the app built from
+the branch and launched the `IsolatedLaunch` way (its own `--state-dir`, the
+#975 run's example workspace with stub launchers), keys sent through System
+Events only while that copy was in front, results read from its accessibility
+tree and captured with `screencapture -l` (`vm-tools/runs/987-keys/`). The
+same under both settings: Get Ready, Return left the sheet open with Put These
+into Draft plain, Escape and Command-Period closed it; Class Dates, Schedule a
+Deploy, Keep a Copy for Reference and Add a Section, Escape and Command-Period
+each closed the sheet; Copy a Page with its page list open, the first Escape
+put the list away and the second closed the sheet; New Course or Club, Return
+did nothing on the empty form, Create Course was plain until a code and a name
+were typed and blue from then on, a first Escape with the code list showing
+put the list away and the next closed the sheet, Command-Period closed it; the
+quit question (a stub preview being built), Cancel leading and Quit Anyway
+trailing with no blue button, Return did nothing, Escape and Command-Period
+were Cancel and the app stayed open; Remove Section (unchanged, red), Return
+did nothing and Escape closed it. Not reached in the running app, as in the
+inventory's second half, and covered by the unit tests instead: the token
+question (D2), "Set up {tool}?" (D3, every assistant is installed here), Plan
+Share (D4), the assistant's put-back and dates offer (D1, D9) and D22 (no
+downloaded assistant).
+
+**Windows** (#979) follows: the changed contract keys are
+`deployTokens.words.cancelButton` (replacing `keepOldToken` and
+`dontSaveNewToken`), `quittingWhileWorkIsUnderWay.buttons` (`titles.keepWorking`
+"Cancel", `order`, `default` null, `escape`, `firstButtonByQuestion` gone,
+the cases' `expectCancelButton`), `obsidianAddOnsForFigures.wording.later` and
+`unitPlanning`'s `later` ("Not Now"), `todaysClassOnTheFrontPage.wording.notToday`
+("Not Now"), `assist-wording.json`'s new `giveDatesButton` and
+`declineDatesButton`, `scheduledDeployCancellation.removingOne`, and
+`assistantModelChoice.removal` (`asksFirst`, `words`, whose message carries
+`{machine}`). Since the #987 review the Windows app says them too: the quit
+question's Cancel with no default button, Not Now on today's class and on
+Reopen Obsidian, the scheduled deploy's removal question in
+`ScheduledDeployRemovalWording` with no default, and Remove… beside a
+downloaded assistant asking first (`AssistModelRemovalWording`), each read
+from the contract by `QuitConfirmationTests`, `TodaysClassContractTests`,
+`ObsidianFigureAddOnsTests` and `RemovalQuestionsContractTests`. Still owed
+under #979: the dates card's titles, and the ContentDialog's fixed button
+order (its Close button always trails).
 
 ## A section's Coverage tab (#793)
 
@@ -3295,7 +3463,8 @@ fixing the quit path is the prerequisite either way rather than the alternative.
 Russell decided on 2026-09-25 to match all three rules; Windows did on
 2026-09-30. **The question**: quitting there is closing the LAST window, so
 `MainWindow`'s `AppWindow.Closing` asks (`QuitConfirmation`, all nine contract
-cases, Keep Working the default) when the app's own records show a publish or a
+cases; Keep Working the default until #987, Cancel with no default since,
+"Question sheets and alerts after the HIG review") when the app's own records show a publish or a
 preview being BUILT (`CourseActivity.BeginPreviewBuild`, from the press until
 the page first answers — never the port lease), and never when Windows is
 ending the session: a window subclass hears `WM_QUERYENDSESSION`, Windows'
@@ -3350,7 +3519,8 @@ up. The reasons are `QuitConfirmation.ClosingReason`:
   which only exists while the quit request is being handled; read inside
   that wait's `Task`, a log out would be written down as the teacher's quit
   (plan review N3). It is KEPT (`AppDelegate.closingReason`) only after
-  "Keep Working" has had its chance, so a quit called off leaves nothing.
+  Cancel ("Keep Working" until #987) has had its chance, so a quit called
+  off leaves nothing.
 - **"To install a new version" comes from where the app decides to
   install**: `installNow` (the teacher's Install, straight away or after held
   work) and `heldWorkIsDone`'s postponed-install branch set
@@ -7121,7 +7291,7 @@ be opened with no course behind it. `FileCommands` replaces `.newItem`:
 ### A course kept for reference: the menu bar and its rows agree
 
 Two disagreements the implementation review found, both decided by the
-director: **Section ▸ Cancel Deploy at…** is greyed on a course kept for
+director: **Section ▸ Remove Scheduled Deploy…** (Cancel Deploy at… until #987) is greyed on a course kept for
 reference — its section row's context menu has no Cancel, nothing deploys from
 a kept course, and Plantoir turns any schedule it still has off itself
 (`ScheduledDeployCleanup.Reason.theCourseIsKeptForReference`); the plan's
@@ -8008,8 +8178,11 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   2026-10-08 (the implementation review asked for it): as the default button,
   a Return typed in the Course code field with no row highlighted created a
   club named by the code, with its name empty and the rest of the form unread.
-  It wears the accent through `.prominentButton(isEnabled:)` instead, grey
-  while the folder is getting ready; a long form is finished with a click. **Class Dates' Read the Dates does NOT take
+  It wore the accent through `.prominentButton(isEnabled:)` instead, which
+  made it look like the default without being one (finding D32). **Since
+  #987 it is the default once the form is complete**
+  (`NewCourseWizardView.formIsComplete`), plain and without Return before,
+  grey while the folder is getting ready. **Class Dates' Read the Dates does NOT take
   Return while the dates are being typed**: the box needs Return for a new
   line, a default button can take Return before a text box does, and a probe
   app could not put focus in its box to settle which wins — so the risk was
@@ -8289,7 +8462,10 @@ which needs a window on screen for the rename feature's sake and is left as it
 is there, read MPM2D as closed while it was loaded). A registry that cannot
 be read while Obsidian runs counts as open too: Obsidian rewrites it in place,
 so a read can land mid-write. Add Them checks again when it is answered, in
-case the course was opened while the question was up. A hidden, minimised,
+case the course was opened while the question was up; since #995 that case
+asks the reopen question rather than closing Obsidian at once, because the
+button pressed said "Add Them", not that Obsidian would close ("Plantoir never
+closes Obsidian unasked (#995)", below). A hidden, minimised,
 full-screen or other-Space Obsidian holds the list in memory all the same. The
 rule over-reports (a stale mark), which is the safe direction: the pass waits
 and Open in Obsidian asks to reopen. The vaults reopened afterwards are every
@@ -8821,6 +8997,86 @@ of the Option alternate, Alt read at the click, WebView2's `SourceChanged` and
 `ContentLoading` in place of KVO and didCommit, and the page kept in its own
 file — `12-windows-app.md` → "Preview at Last Viewed on Windows (#514, the
 mac's #504)".
+
+## Plantoir never closes Obsidian unasked (#995)
+
+Finding D21 of the HIG review (#975); Russell's ruling Q13 (2026-11-18): never
+quit Obsidian without asking, and the button that goes ahead says plainly that
+Obsidian will be closed. HIG, Alerts: an alert can "warn them when their
+action might destroy data, and give them an opportunity to confirm … another
+important action they initiated"; "Aim for a one- or two-word title that
+describes the result of selecting the button"; "Always use 'Cancel' to title a
+button that cancels the alert's action."
+
+**What was wrong.** Obsidian's `open?path=` link reaches only vaults in its
+list (`obsidian.json`), and a running Obsidian holds that list in memory and
+writes it back whole when it quits. So `FolderActions.open`, on a course
+Obsidian had never seen, quit a running Obsidian (`application.terminate()`,
+every vault with it), wrote the list and reopened what had a window on
+screen, with no question at all. It was reached from every route: the
+toolbar, both menus, a row's menu, the assistant, a Coverage tab code, and
+Course Settings' How I Teach row, which called FolderActions directly.
+
+**What it does now.** `FolderActions.open` never closes Obsidian: registered,
+it opens the link; not registered with Obsidian not running, it writes the
+list and opens (the link starts Obsidian, which reads the list fresh);
+not registered with Obsidian running, it does nothing. The route asks first:
+`WorkspaceModel.openObsidian`, which every open in `OpenInObsidianRoute.swift`
+goes through, checks `ObsidianClosingRule.mustAsk` (Obsidian running and no
+vault in the list holds the file; an unreadable list holds nothing, so it
+asks) and sets `obsidianClosingRequest`, which `MainWindowView`'s
+`ObsidianClosingAlert` shows: "Close Obsidian to open {course}?", a sentence,
+then Closes / Opens again / Kept as lines (#834's shape), and the buttons
+Cancel and "Close Obsidian and Open" (the rename's "Close Obsidian and Rename"
+shape). Cancel opens and closes nothing. The go-ahead calls
+`ObsidianOpening.closeAndRegister` (`FolderActions.closeObsidianAndRegister`:
+note what is on screen, quit, seed defaults, register, reopen), then hands
+Obsidian the file. How I Teach goes through `openHowITeachPageInObsidian`,
+the same question without the add-ons scan or the reference note it never had.
+
+**The add-ons offer** titles its yes "Close Obsidian and Add Them" whenever
+that yes closes Obsidian (`ObsidianAddOnsRequest.addButtonTitle`: open or
+cannot tell), and "Add Them" otherwise. When the course was closed as the
+offer was shown and is open by the time Add Them is pressed, the reopen
+question asks rather than closing straight away (it used to close at once).
+
+**The rename** already asked, with "Close Obsidian and Rename"; unchanged.
+
+**Words and cases:** `contracts/shared-rules.json` → `obsidianNeverClosedUnasked`
+(`closeCases`, `wording`, `knownLimits`, `rejected`). Tests:
+`ObsidianNeverClosedUnaskedTests`, and `ObsidianFigureAddOnsTests.testAddThemChecksAgainWhenAnswered`
+(changed on purpose: it asserted the old unasked close). Windows owes the same
+under #1003 (v2.0.0); its tests do not read the new key yet. The add-ons
+offer's step 6 in `obsidianAddOnsForFigures.sequence` says the same.
+
+**Asked again at the answer** (reviews of #995): if Obsidian has quit or now
+knows the course, it just opens. If Obsidian does not close after the wait,
+nothing is written under it and nothing is handed to it: it does not know
+the course, so a link would only show Obsidian's own error
+(`FolderActions.closeObsidianAndRegister` answers whether it closed). If it
+closed but the hand-over still fails (the list could not be written), nothing
+more is tried. Both failures are on the trail only ("asked to close Obsidian
+to open a course", `obsidianNeverClosedUnasked.trail`): the route has no
+on-screen report for a course that could not be opened in Obsidian, and
+designing one is Russell's (a morning question, recommending the nearest
+existing words). And if Obsidian starts between the route's check and the
+open, `FolderActions.open` hands nothing over and answers false, and the
+route asks instead of the press doing nothing. What opens again after the
+close is every vault Obsidian's list marks open, read before the quit — the
+add-ons' reopen's own rule — so both questions' "Opens again" lines read
+"{course}, and everything else Obsidian had open". It replaced
+`openVaultPathsNow` (a window on screen required), which left a hidden
+Obsidian's courses closed. "Everything", not "each course": a vault can be a
+parent folder.
+
+**Rejected:** opening the course without registering it (Obsidian shows its
+own "vault not found"); registering under a running Obsidian (the addition is
+lost when it quits); folding the question into the add-ons offer (Not Now
+opens Obsidian too, so all three answers would have to carry the closing).
+
+**Left as it was, for Russell:** the reopen question's "Reopen Obsidian"
+button (#995's morning question). The trail event "asked to close Obsidian to
+open a course" is held open on Windows in `NamedGapLedger.cs`, owned by #1003.
 
 ## Open in Obsidian opens the page the preview shows (#518)
 
@@ -15872,7 +16128,11 @@ it by hand. Since #397, pressing **Preview** in a section window asks:
 
 > **Show Unit 2, Day 5 on the front page?**
 > Today's class is published, but the front page still shows Unit 2, Day 4.
-> [Show on Front Page] [Not Today]
+> [Show on Front Page] [Not Now]
+
+(The decline was titled Not Today until #987; "Not Now" is the title on offers
+Plantoir raises by itself, Russell's ruling Q2 on #975. The contract key and
+the record keep the name `notToday`.)
 
 The rule, its cases and the sentences are data: `contracts/class-planning.json`
 → `todaysClassOnTheFrontPage` (42 cases, run by
@@ -18070,9 +18330,11 @@ the course has a page — found by listing, so the teacher's own spelling counts
 a page that appears between the look and the write is the teacher's and is
 what opens) and nothing else: #209 rejected a starter text because an assistant
 reads the page as the teacher's own approach. It opens in Obsidian through
-`FolderActions.openPageInObsidian`, which shares the register/quit/reopen body
-with `openInObsidian` but targets the PAGE — `obsidianTarget` is for folders
-and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
+`WorkspaceModel.openHowITeachPageInObsidian` (since #995; until then
+`FolderActions.openPageInObsidian` directly), so a course a running Obsidian
+has never seen is added only after the teacher answers "Close Obsidian to open
+{course}?" ("Plantoir never closes Obsidian unasked (#995)"). It targets the
+PAGE — `obsidianTarget` is for folders and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
 Obsidian is not installed. Whether a page is there is read on every drawing and
 redrawn when the window becomes key (#152's `marksWalkGeneration`). Trail:
 "How I Teach page started" (or could not be, and why); opening writes nothing.
@@ -18538,15 +18800,15 @@ checked before it is saved (#696)"; the words are
   cut). When the new
   token cannot reach some of the folder's class websites the sheet stays open
   behind an alert naming them (a course's shared unit plans as "MPM2D unit
-  plans for 2026", `placeUnitPlans`), with Keep My Old Token (the default:
-  Return chooses it, and Escape does nothing, because `.cancel` and
-  `.defaultAction` on one alert button give it Return only, as #832 measured
-  in `QuestionKeysTests`) and Use the New Token, which saves it with
-  `--use-anyway`. When no token was saved before the change the first button
-  says Don't Save It instead, and the trail says a new token was not saved
-  rather than writing `keptOld` (review M7). Before the pane's first check has
-  answered nothing is known, and it says Don't Save It, which is true either
-  way (the fix review's M-c). The pasted token is held in memory
+  plans for 2026", `placeUnitPlans`), with Cancel and Use the New Token,
+  which saves it with `--use-anyway`. Since #987 neither is the default:
+  Return does nothing, Escape and Command-Period are Cancel, and Use the New
+  Token is red. (Until #987 the first button was Keep My Old Token, or Don't
+  Save It when no token was saved before, and it was the default with Escape
+  doing nothing.) When no token was saved before the change the trail says a
+  new token was not saved rather than writing `keptOld` (review M7). Before
+  the pane's first check has answered nothing is known, and the trail says
+  the token was not saved, which is true either way (the fix review's M-c). The pasted token is held in memory
   only while that alert is open.
 - **Remove Token** asks first and says a deploy set for later will not run.
 - **The end date travels to the Deploy screen** through
@@ -18824,12 +19086,16 @@ as it is.
 ### What Windows owes
 
 The same three places in the window, the same wording keys and trail
-events, and an `HttpListener` on `http://127.0.0.1:<port>/` running every
-case. What HTTP.sys answers itself before the app sees a request (a Host it
-does not match, a canonicalised `..`), the excluded port ranges inside and
-below the block (`netsh int ipv4 show excludedportrange protocol=tcp`), and
-whether an unelevated shell may listen on the block are to be measured
-there. The `windows` issue for #850 carries the list.
+events, and a server running every case. The `windows` issue for #850
+(#889) carries the list. Measured there on 2026-11-13: an `HttpListener`
+(HTTP.sys) answers some requests itself before the app sees them (403 for
+`..`, 400 rather than 414 and 431) and gives the app no connection to close
+when full, so four cases could not be met; Windows serves with a
+`TcpListener` and its own HTTP/1.1 reader instead, as this side does with
+`NWListener`, and the contract is unchanged. Nothing is reserved in the
+block, an unelevated process listens there, and a loopback-only listener
+raises no firewall prompt. `12-windows-app.md` → "A deployed folder opened
+in the browser (#889, the mac's #850)".
 
 ## Undo and Redo: one list for the app (#899)
 
@@ -19062,6 +19328,37 @@ the list); anything else reads the journal whole again. This is safe because not
 rewritten: the one truncation, of a torn last line, only ever cuts bytes
 after the last line feed, which is where every remembered end sits.
 
+**Every read of the list throws rather than ends the app** (U2a, the
+sweep's F4). The fold cache, the tail check and the torn-line cut read
+with `FileHandle.read(upToCount:)` through `UndoFileReads.read`, never the
+legacy `readData(ofLength:)`, which on a read error (a failing disk, a
+network home that drops mid-read) raises an Objective-C exception Swift
+cannot catch, inside Publish. A failed read is `UndoJournalError.couldNotRead`:
+the list is unreadable for that attempt, so a step in shadow goes ahead
+without a record (a trail line, "the list could not be read"), and a live
+step, Undo or Redo is refused before anything changes. A tail that cannot
+be read makes the remembered fold untrusted, so the next read is a whole
+one. The review of U2a found the same hole one step earlier: a segment
+that could not be OPENED (EIO, EACCES, EMFILE) was skipped as if it were
+gone, and a failed seek read as an empty segment, so a fold missing its
+newest segment passed as valid, would have reused step numbers and let
+Undo act on an older step past a newer one. Now `UndoFileReads.openFile`
+answers nil only for a file that is gone (a segment pruned since it was
+listed), and throws for everything else; the torn-line cut, the tail
+check, the blobs and the folder's identifier file all open through it. A
+blob that is there and cannot be read is the list unavailable, never
+`contentMissing` (which clears the list for good); an identifier file that
+cannot be read is never set aside (that would give the folder a new
+identifier and put every step under the old one out of reach). Left as
+they are, and why: the fold's size and file-number checks (a failure only
+makes the fold untrusted, and the whole read then throws), a page that
+cannot be read (`UndoItem.read` calls it neither, so changed since: a
+teacher's page, not the list, and a question for U7 before the switch),
+the published-pages record (`cannotTell`), and the blob sweep's listing
+(it then deletes nothing). Not reproduced on a real failing disk; the seam
+`UndoKillPoints.readOfTheListFails` proves the path
+(`UndoJournalCoreTests.testAReadThatFailsIsAnUnreadableList`).
+
 ### Write-ahead, and recovery from the content
 
 A step runs in three phases (`JournaledWrite.perform`): under the lock,
@@ -19204,6 +19501,47 @@ mode and owner are its own; a copy on a volume without links) until every
 swap is in. If one cannot go in, the swaps already made are reversed and
 the file is named (`undo.stepCases`). A rename happened or it did not, so
 a process killed part way leaves each file wholly old or wholly new.
+
+**A staging write that fails leaves nothing, and says so in its own word**
+(U2a, the Fable sweep of U1's F1). On a 3 MB disk image filled to the brim
+the sweep measured a refused step leaving `.a.md.plantoir-undo-2-apply-new`
+(0 bytes) and a refused Undo leaving `.a.md.plantoir-undo-1-undo-new` beside
+the page, both still there after room came back and two more steps ran:
+the exclusive create had made the file, the write into it failed, and the
+catch dropped it. Recovery never saw it, because it tidies only steps
+closed `interrupted` and these closed `failed`. Now the staging loop
+removes the file it made before it refuses (`UndoSwap.removeStaged`), and
+the refusal is `UndoRefusal.couldNotWrite` (contract word `couldNotWrite`:
+the disk is full, or the folder will not take a new file), not
+`fileIsInUse`, which would have had U7 tell the teacher a file was open
+somewhere. Like a file in use it changes nothing on the list: the step is
+still offered, and nothing is cleared or dropped. Every failure of the
+staging step is this word (making the folder, the exclusive create, the
+write, the flush): none of them is another program holding the target,
+which only a rename can meet. Keeping the original before the swap is the
+same word when it fails for room or permission (`UndoSwap.isRoomOrPermission`:
+on a volume without hard links the original is copied, and the copy can
+fill the disk); anything else there stays `fileIsInUse` (the review of
+U2a, LOW 1). Recovery retries a `couldNotWrite` swap on the schedule a
+file in use has. The `stepCases` row `stagingFailsAt` pins it,
+through a test seam (`UndoKillPoints.stagingWriteFailsAt`) that creates the
+staged file and then fails as a full disk does; the disk image itself is
+not in the suite.
+
+**A line op that cannot be placed is a change since** (U2a, the sweep's
+F2). The sweep made a step turn `draft: true` into `publish: false` (two
+line ops), removed the page's front matter by hand, and Undo answered
+`contentMissing`: the `draft` op still read "as the step left it" (absent),
+but putting its line back needs a block that is gone, and `UndoCheck.plan`
+returned the moment `moved` gave nil, before it reported the pages already
+in the way. With M9 built as it is the list was cleared either way and
+only the reason was wrong; with M9 turned the other way, this hand edit
+would have stopped clearing the list, against ruling 13. Now a line op
+that cannot be placed puts its page in the way, the check goes on through
+every op, and every page in the way is reported (`changedSince`) before
+any content found missing from the list. `contentMissing` is left for a
+blob the list no longer holds. The `stepCases` row with `step: twoLines`
+pins it.
 
 ### Linear, cleared, pruned
 
@@ -19595,7 +19933,9 @@ run against `outsideAgents.setUp.stateCases`. Set Up… opens
 `AssistantSetUpSheet` (on `SheetTitleScanTests.sheets`): what is downloaded,
 from whom, where it goes, that it is checked once in place, and where the
 course content goes; a link to the maker's plans page; for GitHub Copilot,
-Help's `github-education` page. Cancel is the default answer.
+Help's `github-education` page. Since #987 Download and Set Up is the
+default answer and Cancel leads with Escape (it was Cancel, on the trailing
+side, until then).
 
 `ReviseWithMenu` is always drawn now; the golden (`Tests/Goldens/menu-bar.txt`)
 pins the set-up item and the divider above it (`[if any reviser]`). Quitting

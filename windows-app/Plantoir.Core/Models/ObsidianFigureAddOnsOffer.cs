@@ -47,11 +47,13 @@ public static class ObsidianFigureAddOnsWording
     public const string OfferWhileObsidianIsOpen = "Obsidian is open now, so adding them closes it and opens it again.";
     // The three facts under either lead, each a "Label: value" line of the
     // message, in closingRule's order (#834, Windows #843): Add Them closes
-    // the whole of Obsidian, other courses included, and opens only this one.
+    // the whole of Obsidian, other courses included, and opens again every
+    // vault the list marks open, then this course (only this one when the
+    // list cannot be read): the mac's #995 corrected "{course} only".
     public const string ClosesLabel = "Closes";
     public const string ClosesValue = "Obsidian, with every course open in it, not only {course}";
     public const string OpensAgainLabel = "Opens again";
-    public const string OpensAgainValue = "{course} only";
+    public const string OpensAgainValue = "{course}, and everything else Obsidian had open";
     public const string KeptLabel = "Kept";
     public const string KeptValue = "Everything you have written";
     public const string OfferAdd = "Add Them";
@@ -60,7 +62,8 @@ public static class ObsidianFigureAddOnsWording
     public const string ReopenTitle = "Reopen Obsidian to show diagrams and graphs?";
     public const string ReopenMessage = "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”.";
     public const string Reopen = "Reopen Obsidian";
-    public const string Later = "Later";
+    /// <summary>"Not Now" on an offer Plantoir raised by itself (#987; it was "Later").</summary>
+    public const string Later = "Not Now";
     public const string PaneTitle = "Obsidian";
     public const string SettingLabel = "Add the add-ons that draw diagrams and graphs to courses that have them";
     /// <summary><c>windowsWording.settingFooter</c>: Enter, not Return.</summary>

@@ -135,7 +135,7 @@ nonisolated enum ActivityTrail {
         /// A new token not saved from Settings ▸ Deploying (#696): the
         /// destination and the problem key the teacher was shown.
         case deployTokenChangeRefused = "deploy token change refused in Settings"
-        /// Keep My Old Token, after a new one could not reach the folder's
+        /// Cancel (Keep My Old Token until #987), after a new one could not reach the folder's
         /// class websites (#696, the second ruling): the destination and how
         /// many websites, never which.
         case deployTokenKeptOld = "old deploy token kept in Settings"
@@ -1623,6 +1623,12 @@ nonisolated enum ActivityTrail {
         case obsidianReopenedForAddOns = "obsidian reopened for add-ons"
         /// Settings ▸ Obsidian turned the add-ons on or off (#495).
         case obsidianAddOnsSettingChanged = "obsidian add-ons setting changed"
+        /// "Close Obsidian to open {course}?" was answered (#995): the course
+        /// and what came of it — opened after closing Obsidian, Cancel,
+        /// nothing to close by then, Obsidian did not close, or it closed and
+        /// the course could not be added to its list. The two failures show
+        /// nothing on screen, so this line is their only record.
+        case obsidianClosingAsked = "asked to close Obsidian to open a course"
 
         // ---- Runnable Swift (#493, #570, #635) ----
 

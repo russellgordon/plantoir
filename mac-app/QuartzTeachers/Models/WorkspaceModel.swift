@@ -462,6 +462,10 @@ class WorkspaceModel {
     /// "Reopen Obsidian to show diagrams and graphs?" (#495), the same way.
     var obsidianReopenRequest: ObsidianAddOnsRequest?
 
+    /// "Close Obsidian to open {course}?" (#995), the same way: asked before
+    /// Plantoir closes a running Obsidian to add a course it has never seen.
+    var obsidianClosingRequest: ObsidianClosingRequest?
+
     /// What Open in Obsidian asks of Obsidian and the disk (#495) —
     /// replaced only by a test, so the route can be driven without reaching
     /// the teacher's Obsidian.

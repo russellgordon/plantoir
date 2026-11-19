@@ -186,6 +186,8 @@ nonisolated enum UndoContractReplay {
                 return "changedSince"
             case .fileIsInUse:
                 return "fileIsInUse"
+            case .couldNotWrite:
+                return "couldNotWrite"
             case .contentMissing:
                 return "contentMissing"
             case .notReadable:
@@ -1187,7 +1189,8 @@ nonisolated enum UndoContractReplay {
     // MARK: - undo.stepCases
 
     static let stepKeys: Set<String> = [
-        "name", "pages", "handEdit", "undo", "named", "others", "files", "phase", "fileInUseAtSwap", "why",
+        "name", "pages", "step", "handEdit", "undo", "named", "others", "files", "phase", "fileInUseAtSwap",
+        "stagingFailsAt", "why",
     ]
 
     static func runStepCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
@@ -1196,6 +1199,7 @@ nonisolated enum UndoContractReplay {
         var number: Int = 0
         defer {
             UndoKillPoints.fileInUseAtSwap = nil
+            UndoKillPoints.stagingWriteFailsAt = nil
         }
         for testCase in cases {
             number += 1
@@ -1207,29 +1211,64 @@ nonisolated enum UndoContractReplay {
             }
             let place: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "steps-\(number)")
             let root: URL = place.root
+            let stepKind: String = string(testCase["step"]) ?? "oneLine"
+            if stepKind != "oneLine" && stepKind != "twoLines" {
+                failures.append("stepCases '\(name)': step '\(stepKind)' is not a value this replay knows")
+                continue
+            }
             var paths: [String] = []
             var edits: [(path: String, key: String, line: String)] = []
+            var twoLineChanges: [UndoFileChange] = []
             var index: Int = 1
             while index <= pageCount {
                 let path: String = "courses/TST1O/Section 1/Classes/Page \(index).md"
-                try write("---\ntitle: Page \(index)\npublish: false\n---\nBody.\n", to: path, in: root)
+                if stepKind == "twoLines" {
+                    // The step takes `draft: true` away and adds
+                    // `publish: false`: two line ops on one page.
+                    let before: String = "---\ntitle: Page \(index)\ndraft: true\n---\nBody.\n"
+                    let after: String = "---\ntitle: Page \(index)\npublish: false\n---\nBody.\n"
+                    try write(before, to: path, in: root)
+                    twoLineChanges.append(UndoFileChange(relativePath: path, before: Data(before.utf8), after: Data(after.utf8)))
+                } else {
+                    try write("---\ntitle: Page \(index)\npublish: false\n---\nBody.\n", to: path, in: root)
+                    edits.append((path: path, key: "publish", line: "publish: true"))
+                }
                 paths.append(path)
-                edits.append((path: path, key: "publish", line: "publish: true"))
                 index += 1
             }
             let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
-            _ = JournaledWrite.perform(draft(changes: changes(setting: edits, in: root), root: root, action: "publishPages"), in: journal, mode: .live)
+            let stepChanges: [UndoFileChange] = stepKind == "twoLines" ? twoLineChanges : changes(setting: edits, in: root)
+            if stepKind == "twoLines" {
+                for change in stepChanges {
+                    var lineOps: Int = 0
+                    for op in JournaledWrite.ops(for: change) where op.knownKind == .editLine {
+                        lineOps += 1
+                    }
+                    if lineOps != 2 {
+                        failures.append("stepCases '\(name)': the step on \(change.relativePath) is \(lineOps) line ops, not 2")
+                    }
+                }
+            }
+            _ = JournaledWrite.perform(draft(changes: stepChanges, root: root, action: "publishPages"), in: journal, mode: .live)
             let handEdit: String = string(testCase["handEdit"]) ?? ""
             var edited: [Int] = []
+            var frontMatterRemoved: [Int] = []
             if handEdit == "line of page 2" {
                 edited = [2]
             } else if handEdit == "lines of pages 1 and 3" {
                 edited = [1, 3]
+            } else if handEdit == "front matter of page 2 removed" {
+                frontMatterRemoved = [2]
             } else if handEdit != "none" {
                 failures.append("stepCases '\(name)': handEdit '\(handEdit)' is not a value this replay knows")
             }
             for page in edited {
                 try UndoContractReplay.handEdit("sameLine", at: paths[page - 1], in: root)
+            }
+            for page in frontMatterRemoved {
+                // The whole block, both fences included, taken out by hand:
+                // only the body is left.
+                try write("Body.\n", to: paths[page - 1], in: root)
             }
             var snapshot: [String?] = []
             for path in paths {
@@ -1238,8 +1277,12 @@ nonisolated enum UndoContractReplay {
             if let swapIndex = int(testCase["fileInUseAtSwap"]) {
                 UndoKillPoints.fileInUseAtSwap = { candidate in candidate == swapIndex }
             }
+            if let stagingIndex = int(testCase["stagingFailsAt"]) {
+                UndoKillPoints.stagingWriteFailsAt = { candidate in candidate == stagingIndex }
+            }
             let outcome: UndoOutcome = journal.undoNewest(resolveRoot: { _ in root })
             UndoKillPoints.fileInUseAtSwap = nil
+            UndoKillPoints.stagingWriteFailsAt = nil
             if outcomeWord(outcome) != string(testCase["undo"]) {
                 failures.append("stepCases '\(name)': undo came to \(outcomeWord(outcome))")
             }
@@ -1252,6 +1295,10 @@ nonisolated enum UndoContractReplay {
                     others = count
                 }
                 if case .refused(.fileIsInUse(let path), _) = outcome {
+                    namedPath = path
+                    others = 0
+                }
+                if case .refused(.couldNotWrite(let path), _) = outcome {
                     namedPath = path
                     others = 0
                 }

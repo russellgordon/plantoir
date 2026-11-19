@@ -9835,10 +9835,11 @@ ends its whole process group outright, unless the set-up has already been
 reaped (its number may by then belong to something else). `stop()`'s later outright end is a
 task a quitting app never lives to run; measured with a stand-in that
 ignores the request to end: after `stop()` it was still running 1 s later,
-after `stopNow()` it was gone. The question has its own first button,
-Finish Setting Up (Russell, 2026-11-13 evening;
-`quittingWhileWorkIsUnderWay.buttons.firstButtonByQuestion`), which still
-means Keep Working; Quit Anyway is unchanged.
+after `stopNow()` it was gone. The question had its own first button,
+Finish Setting Up (Russell, 2026-11-13 evening), until #987: since then
+both quit questions say Cancel, which answers Escape and keeps working, and
+no button is the default (`quittingWhileWorkIsUnderWay.buttons.titlesWhy`);
+Quit Anyway is unchanged.
 
 **The menu item is "Set Up an Assistant…" in Revise With and in Help**
 (Russell, 2026-11-13 evening): "Another" read wrongly when none is set up;

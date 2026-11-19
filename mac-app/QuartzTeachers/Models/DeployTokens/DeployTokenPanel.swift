@@ -140,12 +140,13 @@ final class DeployTokenPanel {
     /// them is open; empty otherwise.
     var unreachablePlaces: [String] = []
 
-    /// Whether a token was saved when the question opened, so its first
-    /// button can say Keep My Old Token only when there is one to keep
+    /// Whether a token was saved when the question opened, so Cancel's trail
+    /// line can say the old token was kept only when there is one to keep
     /// (review M7). Before the pane's first check has answered, nothing is
-    /// known, and the button says Don't Save It and the trail says the new
-    /// token was not saved: both are true whether or not an old one exists,
-    /// and the token store is unchanged either way (the fix review's M-c).
+    /// known, and the trail says the new token was not saved: true whether
+    /// or not an old one exists, and the token store is unchanged either
+    /// way (the fix review's M-c). (The button itself said Keep My Old Token
+    /// or Don't Save It until #987; it is Cancel in both cases now.)
     /// Asking the launcher first was rejected: it would add a request, and a
     /// wait, in front of every question.
     var hadATokenBeforeTheChange: Bool = false
@@ -187,15 +188,6 @@ final class DeployTokenPanel {
             return answer.saved
         }
         return false
-    }
-
-    /// The question's first button: Keep My Old Token, or Don't Save It
-    /// when no token was saved before the change.
-    var keepButtonTitle: String {
-        if hadATokenBeforeTheChange {
-            return DeployTokenWording.keepOldToken
-        }
-        return DeployTokenWording.dontSaveNewToken
     }
 
     // MARK: - Initializer
@@ -290,8 +282,8 @@ final class DeployTokenPanel {
         }
     }
 
-    /// Keep My Old Token (or Don't Save It, when there was none): nothing
-    /// changes, and the sheet closes.
+    /// Cancel on the unreachable question: nothing changes, and the sheet
+    /// closes.
     func keepTheOldToken() {
         let count: Int = unreachablePlaces.count
         heldPaste = nil
