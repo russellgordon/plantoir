@@ -19,7 +19,12 @@ import XCTest
 ///
 /// The keys belong to the panel only while it is the thing in front. Once a
 /// preview's site covers the panel (`takesTheCancelKeys` false), Escape is the
-/// web page's, and must not stop the preview underneath it.
+/// web page's, and must not stop the preview underneath it. And they follow
+/// focus (#988 review): typed in a text field in the same window, Escape is
+/// the field's (the Filter field clears, a rename backs out) and the task
+/// keeps running. Measured failing on the first #988 shape
+/// (`.keyboardShortcut(.cancelAction)` on Cancel): the panel took Escape and
+/// the field's `.onExitCommand` never ran.
 @MainActor
 final class ProgressCancelKeysTests: XCTestCase {
 
@@ -88,7 +93,7 @@ final class ProgressCancelKeysTests: XCTestCase {
 
     /// Sends `key` to the window as AppKit delivers a key-down: offered as a
     /// key equivalent first, then sent as an event.
-    func press(_ key: Key, in window: NSWindow) {
+    func press(_ key: Key, in window: NSWindow, isARepeat: Bool = false) {
         let characters: String
         let code: UInt16
         var modifiers: NSEvent.ModifierFlags = []
@@ -105,7 +110,7 @@ final class ProgressCancelKeysTests: XCTestCase {
             with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
             windowNumber: window.windowNumber, context: nil,
             characters: characters, charactersIgnoringModifiers: characters,
-            isARepeat: false, keyCode: code
+            isARepeat: isARepeat, keyCode: code
         ) else {
             XCTFail("could not make the key")
             return
@@ -168,6 +173,143 @@ final class ProgressCancelKeysTests: XCTestCase {
             XCTAssertEqual(ledger.cancelCount, 0, "\(key) stopped a preview whose site was in front of the panel")
             close(window)
         }
+    }
+
+    func findTextField(in view: NSView) -> NSTextField? {
+        for child in view.subviews {
+            if let field = child as? NSTextField, field.isEditable {
+                return field
+            }
+            if let found = findTextField(in: child) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    /// What a field beside the panel did with Escape.
+    @Observable
+    final class FieldLedger {
+
+        // MARK: - Stored properties
+
+        var text: String = "abc"
+        var isRenaming: Bool = true
+        var backedOutCount: Int = 0
+    }
+
+    /// A field beside the running panel, focused, as the sidebar's Filter
+    /// field (Escape clears it) or the course Rename field (Escape backs out
+    /// of the rename, `SidebarView`'s `.onExitCommand`) sits in the window
+    /// while a deploy runs. Stand-ins with the same mechanism, not the
+    /// sidebar itself.
+    func checkEscapeIsTheField(clearsText: Bool, what: String) {
+        let runner: ScriptRunner = runningRunner()
+        let ledger: CancelLedger = CancelLedger()
+        let field: FieldLedger = FieldLedger()
+        let binding: Binding<String> = Binding(
+            get: { field.text },
+            set: { (value: String) in field.text = value }
+        )
+        let view = VStack {
+            TextField(what, text: binding)
+                .frame(width: 200)
+                .onExitCommand {
+                    field.backedOutCount += 1
+                    if clearsText {
+                        field.text = ""
+                    } else {
+                        field.isRenaming = false
+                    }
+                }
+            panel(runner: runner, ledger: ledger, takesTheCancelKeys: true)
+        }
+        let window: NSWindow = windowShowing(view)
+        guard let contentView = window.contentView, let textField = findTextField(in: contentView) else {
+            XCTFail("\(what): no field")
+            close(window)
+            return
+        }
+        XCTAssertTrue(window.makeFirstResponder(textField), "\(what): the field took focus")
+        _ = runUntil(timeout: 0.3) { false }
+        XCTAssertTrue(window.firstResponder is NSText, "\(what): the field is being edited")
+        press(.escape, in: window)
+        _ = runUntil(timeout: 0.7) { false }
+        XCTAssertEqual(ledger.cancelCount, 0, "\(what): Escape in the field stopped the running task")
+        XCTAssertTrue(runner.isRunning && !runner.wasCancelled, "\(what): the task keeps running")
+        XCTAssertEqual(field.backedOutCount, 1, "\(what): the field's own Escape ran")
+        if clearsText {
+            XCTAssertEqual(field.text, "", "\(what): Escape cleared the field")
+        } else {
+            XCTAssertFalse(field.isRenaming, "\(what): Escape backed out of the rename")
+        }
+        // Command-Period in the field is not the panel's either.
+        if !clearsText {
+            press(.commandPeriod, in: window)
+            _ = runUntil(timeout: 0.5) { false }
+            XCTAssertEqual(ledger.cancelCount, 0, "\(what): Command-Period in the field stopped the running task")
+        }
+        close(window)
+    }
+
+    func testEscapeInTheFilterFieldClearsItAndTheTaskKeepsRunning() {
+        checkEscapeIsTheField(clearsText: true, what: "Filter")
+    }
+
+    func testEscapeInTheRenameFieldBacksOutAndTheTaskKeepsRunning() {
+        checkEscapeIsTheField(clearsText: false, what: "Rename")
+    }
+
+    /// With focus on the panel itself (its hosting view the first
+    /// responder), Escape stops the task.
+    func testEscapeWithFocusOnThePanelStopsTheTask() {
+        let runner: ScriptRunner = runningRunner()
+        let ledger: CancelLedger = CancelLedger()
+        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true))
+        if let contentView = window.contentView {
+            _ = window.makeFirstResponder(contentView)
+        }
+        XCTAssertFalse(window.firstResponder is NSText)
+        press(.escape, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Escape with focus on the panel did not stop the task")
+        close(window)
+    }
+
+    /// A held key repeats faster than the panel redraws, and a plan share's
+    /// cancel never sets `wasCancelled`: Cancel still acts once per run.
+    func testAHeldKeyCancelsOnceEvenWhenTheRunnerIsNotMarkedCancelled() {
+        let runner: ScriptRunner = runningRunner()
+        let ledger: CancelLedger = CancelLedger()
+        let view = TaskProgressView(
+            runner: runner,
+            title: "Sharing",
+            onCancel: {
+                ledger.cancelCount += 1
+            }
+        )
+        .frame(width: 700, height: 400)
+        let window: NSWindow = windowShowing(view)
+        press(.escape, in: window)
+        press(.escape, in: window, isARepeat: true)
+        press(.escape, in: window, isARepeat: true)
+        press(.escape, in: window)
+        _ = runUntil(timeout: 0.7) { false }
+        press(.escape, in: window)
+        press(.commandPeriod, in: window)
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(ledger.cancelCount, 1, "Cancel ran more than once for one run")
+        XCTAssertFalse(runner.wasCancelled, "the stand-in never marks the runner")
+        close(window)
+    }
+
+    /// A new run of the same runner can be cancelled again.
+    func testANewRunCanBeCancelledAgain() {
+        let once: CancelOncePerRun = CancelOncePerRun()
+        let first: Date = Date(timeIntervalSince1970: 100)
+        let second: Date = Date(timeIntervalSince1970: 200)
+        XCTAssertTrue(once.pressOnce(forRunStartedAt: first))
+        XCTAssertFalse(once.pressOnce(forRunStartedAt: first))
+        XCTAssertTrue(once.pressOnce(forRunStartedAt: second))
     }
 
     /// The section window gives the panel the keys only while no site

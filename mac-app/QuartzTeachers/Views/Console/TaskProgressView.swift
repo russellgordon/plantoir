@@ -99,6 +99,9 @@ struct TaskProgressView: View {
     /// the body, which spins the main thread forever.
     @State var refreshTracker: RefreshTracker = RefreshTracker()
 
+    /// Makes Cancel act once per run, however it is pressed (#988 review).
+    @State var cancelOnce: CancelOncePerRun = CancelOncePerRun()
+
     // MARK: - Computed properties
 
     /// Drives the question alert without writing state during a body.
@@ -177,6 +180,21 @@ struct TaskProgressView: View {
 
     // MARK: - Functions
 
+    /// Cancel, clicked or pressed from the keyboard: once per run. A plan
+    /// share's cancel never sets `wasCancelled`, so without this the button
+    /// stayed live, and a held Escape repeating within one frame ran Cancel
+    /// three times (#988 review).
+    func pressCancel() {
+        if !cancelOnce.pressOnce(forRunStartedAt: runner.startedAt) {
+            return
+        }
+        if let onCancel {
+            onCancel()
+        } else {
+            runner.cancelByUser()
+        }
+    }
+
     /// Records each refresh; a long gap means the interface was stalled.
     /// Also reports window geometry, because a blank window with a
     /// RESPONSIVE app means the content is being laid out somewhere
@@ -247,21 +265,20 @@ struct TaskProgressView: View {
 
                             Spacer()
 
-                            if canCancel && !runner.wasCancelled {
+                            if canCancel && !runner.wasCancelled
+                                && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt) {
                                 Button("Cancel") {
-                                    if let onCancel {
-                                        onCancel()
-                                    } else {
-                                        runner.cancelByUser()
-                                    }
+                                    pressCancel()
                                 }
                                 .buttonStyle(.bordered)
-                                // Escape, and Command-Period with it (#988).
-                                // A key equivalent, not `.onExitCommand`,
-                                // which fires only while something in the
-                                // panel holds the keys, and with Keyboard
-                                // Navigation off nothing here does (#973).
-                                .keyboardShortcut(takesTheCancelKeys ? KeyboardShortcut.cancelAction : nil)
+                                // Escape and Command-Period press it while
+                                // nothing else in the window has a use for
+                                // them (#988): see `CancelKeyCatcher`.
+                                .background(
+                                    CancelKeyCatcher(isEnabled: takesTheCancelKeys) {
+                                        pressCancel()
+                                    }
+                                )
                                 .accessibilityIdentifier("taskCancelButton")
                             }
                         }

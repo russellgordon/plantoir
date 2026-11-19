@@ -62,7 +62,7 @@ While a preview runs, the {{control:previewButton}} button and menu item are nam
 While Plantoir is still making the website, before it shows, {{control:cancel}} in the window stops the preview too.
 
 {{mac}}
-The Escape key and Command-Period press {{control:cancel}} as well, until the website shows.
+The Escape key and Command-Period press {{control:cancel}} as well, until the website shows. While you are typing in a box, they belong to the box.
 {{/mac}}
 
 Deploying the section also stops its preview.

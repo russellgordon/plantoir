@@ -1666,39 +1666,59 @@ a unit test can read a frame from.
 
 ## Escape and Command-Period stop a running preview or deploy (#988)
 
-The progress panel's Cancel (`TaskProgressView`, `taskCancelButton`) carries
-`.keyboardShortcut(.cancelAction)`, so Escape and Command-Period press it while
-a preview builds, a deploy runs, or the plan share's console works. Until #988
-it carried no key, and the HIG review (#975, finding D6) found both keys did
-nothing with Keyboard Navigation on or off; with it off, the button could not
-be reached from the keyboard at all. Keyboards
+The progress panel's Cancel (`TaskProgressView`, `taskCancelButton`) answers
+Escape and Command-Period while a preview builds, a deploy runs, or the plan
+share's console works, unless something else in the window has a use for the
+key. Until #988 it carried no key, and the HIG review (#975, finding D6) found
+both keys did nothing with Keyboard Navigation on or off; with it off, the
+button could not be reached from the keyboard at all. Keyboards
 (https://developer.apple.com/design/human-interface-guidelines/keyboards):
 "Esc: Cancel the current action or process"; "Command-Period: Cancel an
 operation." Progress indicators: "When it's feasible, let people halt
 processing." The key does exactly what clicking does: no question first, as
-the click has none.
+the click has none (whether stopping a deploy should ask is Russell's
+question, parked on #988).
+
+**The keys follow focus.** "The current action" is the one the teacher is in.
+Typing in the Filter field, Escape clears it; renaming a course, Escape backs
+out of the rename (`SidebarView`'s `.onExitCommand`). Neither may stop the
+deploy running beside it. So the key is caught by `CancelKeyCatcher`, a view
+behind the Cancel button that is offered the key as a key equivalent and
+DECLINES it whenever the window's first responder is text being edited
+(`NSText`: every text field, search field and text view edits through one), a
+popover or other child window is showing, or a sheet is attached. Declined,
+the key goes on to the focused control as usual. Focus on the panel, or on
+nothing (Keyboard Navigation off, the macOS default), and it presses Cancel.
+
+**Rejected:** `.keyboardShortcut(.cancelAction)` on the button, the first
+#988 shape. A SwiftUI shortcut is a key equivalent the window offers before the
+focused field sees the key, so Escape typed in a text field stopped the deploy
+and the field never saw it (measured by the #988 review: the field's
+`.onExitCommand` ran 0 times). Also rejected: `.onExitCommand`, which fires
+only while something in the panel holds the keys, and with Keyboard
+Navigation off nothing does (#973); and a list of fields that keep Escape,
+which goes stale with the next field.
 
 **Only while the panel is in front.** In the section window the preview's site
 is drawn OVER the panel once it serves (`websiteLayers`), and the runner is
-still running then. A key on the hidden Cancel would make Escape on a web page
-(closing a page's own pop-up, leaving full-screen video) stop the preview. So
-`TaskProgressView.takesTheCancelKeys` is false while `previewURL` is set, by
-`SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing:)`; the
-Section menu's Stop Preview and the toolbar button stop a showing preview, as
-before. Other tabs (Coverage, Problems) do not hold the panel at all (#793), so
-neither key reaches it there.
+still running then. So `TaskProgressView.takesTheCancelKeys` is false while
+`previewURL` is set (`SectionDetailView.progressPanelTakesTheCancelKeys`), and
+Escape on a web page never stops the preview; the Section menu's Stop Preview
+and the toolbar button do. Other tabs (Coverage, Problems) do not hold the
+panel at all (#793). No menu item or shortcut was added: those are #990's.
 
-**A key equivalent, not `.onExitCommand`**, for the reason #973 measured:
-`.onExitCommand` fires only while something inside the view holds the keys,
-and with Keyboard Navigation off nothing in the panel does. No menu item or
-shortcut was added: those are #990's.
+**Once per run** (`CancelOncePerRun`, keyed by the runner's `startedAt`): a
+held key repeating faster than the panel redraws ran Cancel three times, and
+a plan share's cancel (`stopByUser`) never sets `wasCancelled`, so its button
+stayed live. Now any press after the first in a run does nothing, and the
+button goes.
 
 `ProgressCancelKeysTests` presses each key on the panel drawn in an off-screen
-window and counts the Cancel closure: once per key, not again on a second
-press, and never while `takesTheCancelKeys` is false. Measured failing without
-the `.keyboardShortcut` line. **For Windows (stage 3):** the progress panel's
-Cancel takes Escape while the panel is in front, and not while the preview's
-site covers it.
+window and counts the Cancel closure: once per run, never while
+`takesTheCancelKeys` is false, never with a focused field beside it (whose own
+Escape runs instead), and once from a held, repeating key. **For Windows
+(stage 3):** the progress panel's Cancel takes Escape while the panel is in
+front and no text box or popover has focus, and acts once per run.
 
 ## Question sheets and alerts after the HIG review (#987)
 

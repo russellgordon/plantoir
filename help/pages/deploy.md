@@ -33,7 +33,7 @@ To deploy a section is to send its website to where students read it. A deploy c
 alt: The section's window during a deploy, with a line that says what is happening now.
 
 {{mac}}
-The Escape key and Command-Period press {{control:cancel}} as well.
+The Escape key and Command-Period press {{control:cancel}} as well. While you are typing in a box, they belong to the box.
 {{/mac}}
 
 5. Read the result when the window says the deploy is done.
