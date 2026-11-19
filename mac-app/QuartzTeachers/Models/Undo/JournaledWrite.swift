@@ -44,6 +44,37 @@ nonisolated struct UndoStepDraft: Sendable {
     let recomputes: [UndoOp]
 }
 
+/// A step given as its ops, for the kinds U2 defines: everything about the
+/// step but its number, and the content its ops need from the list.
+nonisolated struct UndoOpsDraft: Sendable {
+
+    // MARK: - Stored properties
+
+    let action: UndoAction
+
+    let madeBy: String
+
+    /// The working folder's root (the folder holding `courses/`), or nil
+    /// for a step none of whose ops names a path.
+    let workingFolderURL: URL?
+
+    let workingFolderPath: String?
+
+    let course: String?
+
+    let section: Int?
+
+    let actionClass: String?
+
+    let holds: String?
+
+    let ops: [UndoOp]
+
+    /// Every blob the ops name that holds content (a tree's listing and
+    /// files, a whole file's bytes), stored before the begin.
+    let blobs: [Data]
+}
+
 /// How the door went.
 nonisolated enum JournaledWriteOutcome: Equatable, Sendable {
 
@@ -296,6 +327,105 @@ nonisolated enum JournaledWrite {
     static func dropTheRedoBranch(below seq: Int, _ writer: UndoJournalWriter) {
         for record in writer.fold.stepsOnTheList where record.phase == .undone && record.step.seq < seq {
             try? writer.append(UndoEventLine(seq: record.step.seq, event: .dropped, reason: "newStep"))
+        }
+    }
+
+    // MARK: - A step given as ops (U2's kinds)
+
+    /// Records a step given as its ops (any kind this version defines),
+    /// then makes it: the begin is on the disk first, with every blob the
+    /// ops need; then the ops are planned FORWARD from what is on the disk,
+    /// exactly as a Redo plans them, so a step is made by the same check
+    /// and the same staged swap that later undoes and redoes it; then
+    /// `applied`. Refused (and closed `failed`) when anything is not as the
+    /// step expects. The kinds U1 writes keep `perform`, which works their
+    /// ops out from the files' before and after.
+    ///
+    /// U2 adds the door; the actions that will use it (a rollover's marker
+    /// moves, New Course's tree, a preference) are wired by U3 and U4, and
+    /// how a shadow step of these kinds is recorded beside an action's own
+    /// writes is settled there. Here a list that cannot be written refuses
+    /// the step before anything changes, in either mode.
+    static func perform(
+        ops draft: UndoOpsDraft,
+        in journal: UndoJournal,
+        mode: UndoMode,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) -> JournaledWriteOutcome {
+        var hasContentOp: Bool = false
+        for op in draft.ops where op.knownKind != .recompute {
+            hasContentOp = true
+        }
+        if !hasContentOp {
+            return .changedNothing
+        }
+        let seq: Int
+        do {
+            seq = try beginOps(draft, in: journal, mode: mode)
+        } catch {
+            return .couldNotRecordTheStep
+        }
+        if UndoKillPoints.stopsHere(.afterBegin) {
+            return .stoppedByATest
+        }
+        let root: URL = draft.workingFolderURL ?? URL(fileURLWithPath: "/", isDirectory: true)
+        let plan: UndoPlan = UndoCheck.plan(draft.ops, direction: .forward, root: root, journal: journal, places: places)
+        guard case .ready(let targets, let recomputes) = plan else {
+            finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
+            if case .refused(let refusal) = plan {
+                return .refused(refusal)
+            }
+            return .refused(.notReadable)
+        }
+        switch UndoSwap.swap(targets, label: "\(seq)-apply", places: places) {
+        case .refused(let refusal):
+            finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
+            return .refused(refusal)
+        case .stoppedByATest:
+            return .stoppedByATest
+        case .swapped:
+            break
+        }
+        if mode == .live {
+            UndoMaintainers.rederive(recomputes, root: root)
+        }
+        if UndoKillPoints.stopsHere(.beforeApplied) {
+            return .stoppedByATest
+        }
+        finish(seq: seq, with: .applied, phase: nil, reason: nil, in: journal, mode: mode)
+        return .applied(seq: seq)
+    }
+
+    /// Phase one for a step given as ops: the same as `begin`, with the
+    /// draft's own blobs stored and no working folder when none is needed.
+    static func beginOps(_ draft: UndoOpsDraft, in journal: UndoJournal, mode: UndoMode) throws -> Int {
+        var folder: UndoWorkingFolder? = nil
+        if let url = draft.workingFolderURL {
+            let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: url)
+            folder = UndoWorkingFolder(id: folderID, pathAtTheTime: draft.workingFolderPath ?? url.path)
+        }
+        let wait: Double = mode == .live ? UndoSwitch.lockWaitSeconds : UndoSwitch.shadowLockWaitSeconds
+        return try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
+            UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root)
+            for blob in draft.blobs {
+                try writer.writeBlob(blob)
+            }
+            let seq: Int = writer.fold.highestSeq + 1
+            let step: UndoStep = UndoStep(
+                seq: seq,
+                madeAt: UndoMoment.text(journal.now()),
+                action: draft.action,
+                madeBy: draft.madeBy,
+                workingFolder: folder,
+                course: draft.course,
+                section: draft.section,
+                actionClass: draft.actionClass,
+                holds: draft.holds,
+                ops: draft.ops
+            )
+            try writer.append(UndoEventLine(seq: seq, event: .begin, step: step, process: journal.process))
+            try writer.sync()
+            return seq
         }
     }
 

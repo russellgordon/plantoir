@@ -376,6 +376,176 @@ def op_state(op, current):
     return "neither"
 
 
+# --------------------------------------------------------------------------
+# The kinds U2 defines (file-formats.json -> undoJournal.opKinds): the
+# reference for undo.checkCases and undo.listingCases. Content only.
+# --------------------------------------------------------------------------
+
+def listing_text(tree):
+    """A folder's listing (opKinds.createTree): one line per item inside,
+    `folder <path>` or `file <sha256> <path>`, in the order of the paths'
+    UTF-8 bytes, each ending in a line feed. tree: {"folders": [...],
+    "files": {path: text}}."""
+    entries = []
+    for folder in tree.get("folders", []):
+        entries.append((folder.encode("utf-8"), "folder " + folder + "\n"))
+    for path, text in tree.get("files", {}).items():
+        entries.append((path.encode("utf-8"), "file " + sha(text) + " " + path + "\n"))
+    entries.sort()
+    return "".join(line for _, line in entries)
+
+
+def listing_sha(tree):
+    return sha(listing_text(tree))
+
+
+def occurrences(needle, haystack):
+    found = []
+    if not needle or len(needle) > len(haystack):
+        return found
+    for start in range(len(haystack) - len(needle) + 1):
+        if haystack[start:start + len(needle)] == needle:
+            found.append(start)
+    return found
+
+
+def hunk_place(window, other, data):
+    """A window is found when it occurs exactly once and every occurrence
+    of the other window lies inside that one (opKinds.replaceText)."""
+    mine = occurrences(window, data)
+    if len(mine) != 1:
+        return None
+    start, end = mine[0], mine[0] + len(window)
+    for other_start in occurrences(other, data):
+        if other_start < start or other_start + len(other) > end:
+            return None
+    return start
+
+
+def replace_text_state(op, data):
+    if data is None:
+        return "neither"
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return "neither"
+    before = (op["contextBefore"] + op["before"] + op["contextAfter"]).encode("utf-8")
+    after = (op["contextBefore"] + op["after"] + op["contextAfter"]).encode("utf-8")
+    if hunk_place(before, after, data) is not None:
+        return "before"
+    if hunk_place(after, before, data) is not None:
+        return "after"
+    return "neither"
+
+
+ABSENT_MEMBER = object()
+
+
+def json_equal(first, second):
+    """Compared as JSON: true is never 1, numbers by value, strings code
+    point for code point, objects by members, arrays in order."""
+    if isinstance(first, bool) or isinstance(second, bool):
+        return isinstance(first, bool) and isinstance(second, bool) and first == second
+    if first is None or second is None:
+        return first is None and second is None
+    if isinstance(first, (int, float)) and isinstance(second, (int, float)):
+        return float(first) == float(second)
+    if isinstance(first, str) and isinstance(second, str):
+        return first == second
+    if isinstance(first, list) and isinstance(second, list):
+        return len(first) == len(second) and all(json_equal(a, b) for a, b in zip(first, second))
+    if isinstance(first, dict) and isinstance(second, dict):
+        return first.keys() == second.keys() and all(json_equal(first[k], second[k]) for k in first)
+    return False
+
+
+def edit_json_state(op, data):
+    if data is None:
+        return "neither"
+    try:
+        top = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return "neither"
+    if not isinstance(top, dict):
+        return "neither"
+    current = top
+    for part in op["keyPath"]:
+        if not isinstance(current, dict):
+            return "neither"
+        if part not in current:
+            current = ABSENT_MEMBER
+            break
+        current = current[part]
+
+    def matches(side):
+        if side not in op:
+            return current is ABSENT_MEMBER
+        return current is not ABSENT_MEMBER and json_equal(current, op[side])
+
+    if matches("before"):
+        return "before"
+    if matches("after"):
+        return "after"
+    return "neither"
+
+
+def tree_reading(item):
+    """An item spec of the cases: absent, a file, or a folder (listing)."""
+    if item is None or item.get("absent"):
+        return ("absent",)
+    if "tree" in item:
+        return ("tree", listing_sha(item["tree"]))
+    if item.get("folder"):
+        return ("tree", listing_sha({}))
+    return ("file", sha(item["text"]) if "text" in item else None)
+
+
+def move_state(op, at_from, at_to):
+    """opKinds.move, judged as a PAIR (#897 piece B, seam 1)."""
+    def side(item):
+        reading = tree_reading(item)
+        if reading[0] == "absent":
+            return "free"
+        if "sha" in op:
+            return "holds" if reading == ("file", op["sha"]) else "else"
+        return "holds" if reading == ("tree", op["listingSha"]) else "else"
+    source, destination = side(at_from), side(at_to)
+    if source == "free" and destination == "holds":
+        return "after"
+    if source == "holds" and destination == "free":
+        return "before"
+    return "neither"
+
+
+def tree_state(op, item):
+    reading = tree_reading(item)
+    if reading[0] == "file":
+        return "neither"
+    present = reading[0] == "tree"
+    if present and reading[1] != op["listingSha"]:
+        return "neither"
+    if op["kind"] == "createTree":
+        return "after" if present else "before"
+    return "before" if present else "after"
+
+
+def external_state(op, current):
+    if current.get("unreadable"):
+        return "neither"
+    absent = current.get("absent", False)
+
+    def matches(side):
+        if side not in op:
+            return absent
+        return not absent and json_equal(current["preference"], op[side])
+
+    if matches("before"):
+        return "before"
+    if matches("after"):
+        return "after"
+    return "neither"
+
+
 def plan(ops, backward, pages_by_path, content_missing=False):
     """UndoCheck.plan: ('ready', {path: new text or None}), ('changedSince',
     first, others), or ('contentMissing', path) when a whole-file op needs a

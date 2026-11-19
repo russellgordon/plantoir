@@ -211,27 +211,85 @@ class LineModelTests(unittest.TestCase):
         self.assertEqual(result, ("ready", {path: text + "Written since.\n"}))
 
 
+def safe_path(path):
+    if not isinstance(path, str) or not path:
+        return False
+    parts = path.split("/")
+    if path.startswith("/") or "\\" in path or "\0" in path or any(part in ("", ".", "..") for part in parts):
+        return False
+    return not (len(path) >= 2 and path[1] == ":" and path[0].isalpha())
+
+
+def is_blob_name(name):
+    return isinstance(name, str) and re.fullmatch(r"[0-9a-f]{64}", name) is not None
+
+
+def overlap(first, second):
+    return first == second or first.startswith(second + "/") or second.startswith(first + "/")
+
+
 def readable_op(op):
     """UndoOp.shapeIsKnown, as the contract's opKinds and unknown say."""
     kind = op.get("kind")
-    path = op.get("path")
-    if kind not in ("writeFile", "editLine", "recompute") or not isinstance(path, str):
+    if kind not in KINDS_KNOWN:
         return False
-    parts = path.split("/")
-    if path.startswith("/") or "\\" in path or any(part in ("", ".", "..") for part in parts):
-        return False
-    for key in ("before", "after", "key", "afterKey"):
-        if key in op and op[key] is not None and not isinstance(op[key], str):
+    for key in ("blobs",):
+        if key in op and not (isinstance(op[key], list) and all(is_blob_name(name) for name in op[key])):
             return False
+    for key in ("beforeSha", "afterSha", "sha", "listingSha"):
+        if key in op and op[key] is not None and not is_blob_name(op[key]):
+            return False
+    if kind == "move":
+        if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
+            return False
+        if overlap(op["from"], op["to"]):
+            return False
+        return ("sha" in op) != ("listingSha" in op)
+    if kind == "external":
+        target = op.get("target")
+        if "path" in op or not isinstance(target, str) or ":" not in target:
+            return False
+        family, name = target.split(":", 1)
+        if family not in EXTERNAL_TARGETS_KNOWN or not name:
+            return False
+        return "before" in op or "after" in op
+    path = op.get("path")
+    if not safe_path(path):
+        return False
+    if kind in ("editLine", "replaceText", "writeFile", "recompute"):
+        for key in ("before", "after", "key", "afterKey", "contextBefore", "contextAfter"):
+            if key in op and op[key] is not None and not isinstance(op[key], str):
+                return False
     if kind == "editLine":
         return isinstance(op.get("key"), str) and (op.get("before") is not None or op.get("after") is not None)
     if kind == "recompute":
         # A maintainer a reader does not know is a re-derivation it cannot
         # run (opKinds.recompute).
         return op.get("maintainer") in MAINTAINERS_KNOWN
+    if kind == "replaceText":
+        parts = [op.get(key) for key in ("before", "after", "contextBefore", "contextAfter")]
+        if any(not isinstance(part, str) for part in parts):
+            return False
+        return parts[2] + parts[0] + parts[3] != parts[2] + parts[1] + parts[3]
+    if kind == "editJSON":
+        key_path = op.get("keyPath")
+        if "element" in op or not isinstance(key_path, list) or not key_path or not all(isinstance(k, str) for k in key_path):
+            return False
+        if "before" not in op and "after" not in op:
+            return False
+        if "before" in op and "after" in op and traces.json_equal(op["before"], op["after"]):
+            return False
+        return True
+    if kind in ("createTree", "removeTree"):
+        if kind == "removeTree" and "heldBy" in op:
+            return False
+        return is_blob_name(op.get("listingSha")) and op["listingSha"] in op.get("blobs", [])
     return True
 
 
+KINDS_KNOWN = ("writeFile", "editLine", "recompute", "replaceText", "editJSON", "move",
+               "createTree", "removeTree", "external")
+EXTERNAL_TARGETS_KNOWN = ("preference",)
 MAINTAINERS_KNOWN = ("sectionFrontPage",)
 HOLDS_KNOWN = ("section", "course")
 
@@ -271,33 +329,91 @@ class ContractCaseTests(unittest.TestCase):
                 return None, False
         return None, not current.get("folder")
 
+    CHECK_KEYS = {"name", "op", "current", "undo", "redo", "why"}
+
+    def item_bytes(self, current):
+        """The bytes at a place a case describes: None for absent, False for
+        a folder or a tree."""
+        if current.get("absent"):
+            return None
+        if "text" in current:
+            return current["text"].encode("utf-8")
+        if "bytesHex" in current:
+            return bytes.fromhex(current["bytesHex"])
+        return False
+
+    def prepared(self, given):
+        """The op as the replay decodes it: texts turned into their hashes,
+        a listing into its hash and blobs (checkCasesHow)."""
+        op = {key: value for key, value in given.items()}
+        if op.get("kind") == "writeFile":
+            op["beforeSha"] = None if op.get("beforeText") is None else traces.sha(op["beforeText"])
+            op["afterSha"] = None if op.get("afterText") is None else traces.sha(op["afterText"])
+        if "contentText" in op:
+            op["sha"] = traces.sha(op.pop("contentText"))
+        if "listing" in op:
+            tree = op.pop("listing")
+            op["listingSha"] = traces.listing_sha(tree)
+            if op["kind"] in ("createTree", "removeTree"):
+                op["blobs"] = [op["listingSha"]] + [traces.sha(text) for text in tree["files"].values()]
+        for key in [key for key, value in op.items() if value is None and key in ("beforeSha", "afterSha")]:
+            del op[key]
+        return op
+
     def test_check_cases(self):
         cases = shared_undo()["checkCases"]
-        self.assertGreaterEqual(len(cases), 20)
+        self.assertGreaterEqual(len(cases), 90)
         for case in cases:
             with self.subTest(case=case["name"]):
-                op = dict(case["op"])
+                self.assertEqual(set(case) - self.CHECK_KEYS, set(), "a key the replay does not check")
+                op = self.prepared(case["op"])
                 if not readable_op(op):
                     self.assertEqual(case["undo"], "notReadable")
                     self.assertEqual(case["redo"], "notReadable")
                     continue
-                if op["kind"] == "writeFile":
-                    op["beforeSha"] = None if op["beforeText"] is None else traces.sha(op["beforeText"])
-                    op["afterSha"] = None if op["afterText"] is None else traces.sha(op["afterText"])
-                text, is_absent_or_text = self.current_text(case["current"])
-                if op["kind"] == "recompute":
+                current = case["current"]
+                kind = op["kind"]
+                if kind == "recompute":
                     # No check (opKinds.recompute): re-derived, never compared.
                     state = "after"
-                elif text is None and not is_absent_or_text:
-                    state = "neither"
-                elif text is None and op["kind"] == "writeFile":
-                    state = traces.op_state(op, None)
+                elif kind == "move":
+                    state = traces.move_state(op, current["atFrom"], current["atTo"])
+                elif kind in ("createTree", "removeTree"):
+                    state = traces.tree_state(op, current)
+                elif kind == "external":
+                    state = traces.external_state(op, current)
+                elif kind == "replaceText":
+                    data = self.item_bytes(current)
+                    state = traces.replace_text_state(op, data if data else None)
+                elif kind == "editJSON":
+                    data = self.item_bytes(current)
+                    state = traces.edit_json_state(op, data if data else None)
                 else:
-                    state = traces.op_state(op, text)
+                    if "before" in case["op"] and case["op"]["before"] is None:
+                        op["before"] = None
+                    if "after" in case["op"] and case["op"]["after"] is None:
+                        op["after"] = None
+                    op.setdefault("beforeSha", None)
+                    op.setdefault("afterSha", None)
+                    text, is_absent_or_text = self.current_text(current)
+                    if text is None and not is_absent_or_text:
+                        state = "neither"
+                    elif text is None and kind == "writeFile":
+                        state = traces.op_state(op, None)
+                    else:
+                        state = traces.op_state(op, text)
                 undo = {"after": "canUndo", "before": "alreadyBack", "neither": "changedSince"}[state]
                 redo = {"before": "canRedo", "after": "alreadyRedone", "neither": "changedSince"}[state]
                 self.assertEqual(undo, case["undo"])
                 self.assertEqual(redo, case["redo"])
+
+    def test_listing_cases(self):
+        cases = shared_undo()["listingCases"]
+        self.assertGreaterEqual(len(cases), 3)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                self.assertEqual(traces.listing_text(case["tree"]), case["listing"])
+                self.assertEqual(traces.listing_sha(case["tree"]), case["listingSha"])
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
@@ -436,7 +552,7 @@ class ContractCaseTests(unittest.TestCase):
                         model.pages[p1] = after
                         model.finish(seq)
                     elif call == "foreignStep":
-                        seq = model.begin([{"kind": "move", "from": "a", "to": "b"}], readable=False)
+                        seq = model.begin([{"kind": "aKindNobodyKnows", "from": "a", "to": "b"}], readable=False)
                         model.find(seq)["phase"] = "done"
                     elif call == "begin:held":
                         begin_held()

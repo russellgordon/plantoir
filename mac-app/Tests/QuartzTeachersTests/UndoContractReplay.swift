@@ -55,6 +55,38 @@ nonisolated enum UndoContractReplay {
         return nil
     }
 
+    // MARK: - The front page's maintainer
+
+    /// Every re-derivation the replay's runner was asked for, as
+    /// "<path>#<section>", in order.
+    nonisolated(unsafe) static var rederived: [String] = []
+
+    static let rederivedLock: NSLock = NSLock()
+
+    /// Registers a runner for `sectionFrontPage` that records each call and
+    /// writes nothing, so the cases prove WHEN a re-derivation runs; the
+    /// app's own front-page rule is tested on its own
+    /// (`UndoOpKindsTests.testTheFrontPageIsRederivedByTheAppsOwnRule`).
+    /// Without a runner, a step holding a `recompute` is not available
+    /// (`UndoMaintainers`).
+    static func registerTheFrontPageMaintainer() {
+        UndoMaintainers.register("sectionFrontPage") { op, _ in
+            rederivedLock.lock()
+            rederived.append((op.path ?? "") + "#" + String(op.section ?? 0))
+            rederivedLock.unlock()
+        }
+    }
+
+    static func takeTheRederived() -> [String] {
+        rederivedLock.lock()
+        defer {
+            rederivedLock.unlock()
+        }
+        let taken: [String] = rederived
+        rederived = []
+        return taken
+    }
+
     // MARK: - A scratch working folder
 
     /// A fresh folder with a working folder (`wf`) and a list (`undo`).
@@ -205,6 +237,7 @@ nonisolated enum UndoContractReplay {
     /// Replays every trace. Answers how many traces and calls were run, and
     /// what disagreed with the contract.
     static func replayTraces(under parent: URL) throws -> (traces: Int, calls: Int, failures: [String]) {
+        registerTheFrontPageMaintainer()
         let document: [String: Any] = try contract("undo-traces.json")
         let fixture: [[String: Any]] = document["fixture"] as? [[String: Any]] ?? []
         let traces: [[String: Any]] = document["traces"] as? [[String: Any]] ?? []
@@ -366,8 +399,59 @@ nonisolated enum UndoContractReplay {
     // MARK: - undo.checkCases
 
     /// Every key a check case may carry: anything else is a case the replay
-    /// would silently not check (the contract review's MINOR 9).
-    static let checkKeys: Set<String> = ["name", "op", "current", "undo", "redo"]
+    /// would silently not check (the contract review's MINOR 9). `why` is a
+    /// reason for a person and is never compared.
+    static let checkKeys: Set<String> = ["name", "op", "current", "undo", "redo", "why"]
+
+    /// Puts what a case's `current` (or one side of a move's) describes at
+    /// a place: text, raw bytes, an empty folder, a tree, or nothing.
+    static func place(_ current: [String: Any], at url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let text = string(current["text"]) {
+            try Data(text.utf8).write(to: url)
+        } else if let hex = string(current["bytesHex"]) {
+            try bytes(fromHex: hex).write(to: url)
+        } else if current["folder"] as? Bool == true {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        } else if let tree = current["tree"] as? [String: Any] {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            for folder in tree["folders"] as? [String] ?? [] {
+                try FileManager.default.createDirectory(at: url.appendingPathComponent(folder), withIntermediateDirectories: true)
+            }
+            for (path, text) in tree["files"] as? [String: String] ?? [:] {
+                let fileURL: URL = url.appendingPathComponent(path)
+                try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data(text.utf8).write(to: fileURL)
+            }
+        }
+    }
+
+    /// A case's `listing` (or `tree`) as the listing this version makes.
+    static func listing(from tree: [String: Any]) -> UndoTreeListing {
+        var files: [UndoTreeListing.File] = []
+        for (path, text) in tree["files"] as? [String: String] ?? [:] {
+            files.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: Data(text.utf8))))
+        }
+        return UndoTreeListing(folders: tree["folders"] as? [String] ?? [], files: files)
+    }
+
+    /// An external place holding one value, for a case.
+    struct CasePlaces: UndoExternalPlaces {
+
+        // MARK: - Stored properties
+
+        let reading: UndoExternalReading
+
+        // MARK: - Functions
+
+        func read(_ target: String) -> UndoExternalReading {
+            return reading
+        }
+
+        func write(_ target: String, _ value: UndoJSON?) -> Bool {
+            return false
+        }
+    }
 
     static func runCheckCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
         let cases: [[String: Any]] = try undoBlock()["checkCases"] as? [[String: Any]] ?? []
@@ -380,20 +464,35 @@ nonisolated enum UndoContractReplay {
             let place: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "check-\(number)")
             let current: [String: Any] = testCase["current"] as? [String: Any] ?? [:]
             var given: [String: Any] = testCase["op"] as? [String: Any] ?? [:]
+            let kind: String = string(given["kind"]) ?? ""
             let relativePath: String = string(given["path"]) ?? "page.md"
             let url: URL = place.root.appendingPathComponent(UndoOp.isSafeRelativePath(relativePath) ? relativePath : "page.md")
-            if let text = string(current["text"]) {
-                try Data(text.utf8).write(to: url)
-            } else if let hex = string(current["bytesHex"]) {
-                try bytes(fromHex: hex).write(to: url)
-            } else if current["folder"] as? Bool == true {
-                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            if kind == "move" {
+                if let from = string(given["from"]), UndoOp.isSafeRelativePath(from), let side = current["atFrom"] as? [String: Any] {
+                    try self.place(side, at: place.root.appendingPathComponent(from))
+                }
+                if let to = string(given["to"]), UndoOp.isSafeRelativePath(to), to != string(given["from"]),
+                   let side = current["atTo"] as? [String: Any] {
+                    if FileManager.default.fileExists(atPath: place.root.appendingPathComponent(to).path) == false {
+                        try self.place(side, at: place.root.appendingPathComponent(to))
+                    }
+                }
+            } else if kind != "external" {
+                try self.place(current, at: url)
+            }
+            var places: CasePlaces = CasePlaces(reading: .notSet)
+            if current["unreadable"] as? Bool == true {
+                places = CasePlaces(reading: .cannotTell)
+            } else if current.keys.contains("preference") {
+                let data: Data = try JSONSerialization.data(withJSONObject: ["v": current["preference"] ?? NSNull()])
+                let wrapped: [String: UndoJSON] = try JSONDecoder().decode([String: UndoJSON].self, from: data)
+                places = CasePlaces(reading: .value(wrapped["v"] ?? .null))
             }
 
             // The op is DECODED from the case's JSON, so the lenient reader
             // is what is tested: a kind it does not know, a path that climbs
             // out, a number where text belongs.
-            if string(given["kind"]) == "writeFile" {
+            if kind == "writeFile" {
                 var names: [String] = []
                 if let text = string(given["beforeText"]) {
                     given["beforeSha"] = UndoHash.sha256(of: Data(text.utf8))
@@ -407,15 +506,39 @@ nonisolated enum UndoContractReplay {
                 given["beforeText"] = nil
                 given["afterText"] = nil
             }
+            if let text = string(given["contentText"]) {
+                given["sha"] = UndoHash.sha256(of: Data(text.utf8))
+                given["contentText"] = nil
+            }
+            if let tree = given["listing"] as? [String: Any] {
+                let made: UndoTreeListing = listing(from: tree)
+                given["listingSha"] = made.sha
+                if kind == "createTree" || kind == "removeTree" {
+                    var names: [String] = [made.sha]
+                    for file in made.files where !names.contains(file.sha) {
+                        names.append(file.sha)
+                    }
+                    given["blobs"] = names
+                }
+                given["listing"] = nil
+            }
+            // A JSON null is a value for editJSON and external (a member or
+            // a preference holding null); for every other kind it is absent.
+            let keepsNull: Bool = kind == "editJSON" || kind == "external"
             var clean: [String: Any] = [:]
-            for (key, value) in given where !(value is NSNull) {
+            for (key, value) in given where keepsNull || !(value is NSNull) {
                 clean[key] = value
             }
             let op: UndoOp = try JSONDecoder().decode(UndoOp.self, from: JSONSerialization.data(withJSONObject: clean))
             var undo: String = "notReadable"
             var redo: String = "notReadable"
             if op.isReadable {
-                let state: UndoOpState = UndoCheck.state(of: op, in: UndoItem.read(at: url))
+                let state: UndoOpState
+                if op.isWhole {
+                    state = UndoCheck.wholeState(of: op, root: place.root, places: places)
+                } else {
+                    state = UndoCheck.state(of: op, in: UndoItem.read(at: url))
+                }
                 undo = UndoCheck.verdict(for: state, direction: .backward).rawValue
                 redo = UndoCheck.verdict(for: state, direction: .forward).rawValue
             }
@@ -424,6 +547,28 @@ nonisolated enum UndoContractReplay {
             }
             if redo != string(testCase["redo"]) {
                 failures.append("checkCases '\(name)': redo is \(redo), not \(string(testCase["redo"]) ?? "?")")
+            }
+        }
+        return (cases: cases.count, failures: failures)
+    }
+
+    // MARK: - undo.listingCases
+
+    static func runListingCases() throws -> (cases: Int, failures: [String]) {
+        let cases: [[String: Any]] = try undoBlock()["listingCases"] as? [[String: Any]] ?? []
+        var failures: [String] = []
+        for testCase in cases {
+            let name: String = string(testCase["name"]) ?? "?"
+            failures += unknownKeys(in: testCase, allowed: ["name", "tree", "listing", "listingSha", "why"], list: "listingCases", name: name)
+            let made: UndoTreeListing = listing(from: testCase["tree"] as? [String: Any] ?? [:])
+            if made.text != string(testCase["listing"]) {
+                failures.append("listingCases '\(name)': the listing is \(made.text.debugDescription)")
+            }
+            if made.sha != string(testCase["listingSha"]) {
+                failures.append("listingCases '\(name)': the listing's hash is \(made.sha)")
+            }
+            if UndoTreeListing.parse(made.data)?.text != made.text {
+                failures.append("listingCases '\(name)': the listing does not read back as itself")
             }
         }
         return (cases: cases.count, failures: failures)
@@ -483,6 +628,7 @@ nonisolated enum UndoContractReplay {
     }
 
     static func runStackCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
+        registerTheFrontPageMaintainer()
         let cases: [[String: Any]] = try undoBlock()["stackCases"] as? [[String: Any]] ?? []
         let traces: [String: Any] = try contract("undo-traces.json")
         var pagePath: String = ""
@@ -706,7 +852,7 @@ nonisolated enum UndoContractReplay {
                     }
                     foreignBlob = sha
                     let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: root)
-                    let begin: String = "{\"v\":1,\"seq\":\(next),\"event\":\"begin\",\"at\":\"\(UndoMoment.text(Date()))\",\"step\":{\"seq\":\(next),\"madeAt\":\"\(UndoMoment.text(Date()))\",\"workingFolder\":{\"id\":\"\(folderID)\",\"pathAtTheTime\":\"\(root.path)\"},\"ops\":[{\"kind\":\"move\",\"from\":\"a.md\",\"to\":\"b.md\",\"blobs\":[\"\(sha)\"]}]}}"
+                    let begin: String = "{\"v\":1,\"seq\":\(next),\"event\":\"begin\",\"at\":\"\(UndoMoment.text(Date()))\",\"step\":{\"seq\":\(next),\"madeAt\":\"\(UndoMoment.text(Date()))\",\"workingFolder\":{\"id\":\"\(folderID)\",\"pathAtTheTime\":\"\(root.path)\"},\"ops\":[{\"kind\":\"aKindNobodyKnows\",\"from\":\"a.md\",\"to\":\"b.md\",\"blobs\":[\"\(sha)\"]}]}}"
                     try appendRaw(begin, to: journal())
                     try appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\"}", to: journal())
                 } else if value.hasPrefix("cleared:") {
@@ -924,6 +1070,7 @@ nonisolated enum UndoContractReplay {
     ]
 
     static func runRecoveryCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
+        registerTheFrontPageMaintainer()
         let cases: [[String: Any]] = try undoBlock()["recoveryCases"] as? [[String: Any]] ?? []
         var failures: [String] = []
         var number: Int = 0
@@ -1194,6 +1341,7 @@ nonisolated enum UndoContractReplay {
     ]
 
     static func runStepCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
+        registerTheFrontPageMaintainer()
         let cases: [[String: Any]] = try undoBlock()["stepCases"] as? [[String: Any]] ?? []
         var failures: [String] = []
         var number: Int = 0

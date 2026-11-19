@@ -48419,7 +48419,7 @@
       {
         "name": "an op of a kind this version does not know: never guessed at, never a reason to clear",
         "op": {
-          "kind": "replaceText",
+          "kind": "aKindNobodyKnows",
           "path": "page.md",
           "before": "a",
           "after": "b"
@@ -48506,9 +48506,1256 @@
         },
         "undo": "canUndo",
         "redo": "alreadyRedone"
+      },
+      {
+        "name": "replaceText: the hunk as the step left it",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Intro.\nLine one: new.\nEnd.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "replaceText: the hunk as it was before",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Intro.\nLine one: old.\nEnd.\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "replaceText: the rest of the page edited since, the hunk untouched",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Intro, rewritten.\nLine one: new.\nA paragraph added since.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "replaceText: the hunk itself changed since",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Intro.\nLine one: newer.\nEnd.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: the hunk there twice: never a guess at which",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Line one: new.\nLine one: new.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: the old and the new text both there, in different places",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Line one: old.\nLine one: new.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: a new text that begins with the old one, as left",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "2026",
+          "after": "2026-27",
+          "contextBefore": "Year: ",
+          "contextAfter": ""
+        },
+        "current": {
+          "text": "Year: 2026-27\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "The before window (Year: 2026) lies inside the one place the after window is found, so the page is as the step left it."
+      },
+      {
+        "name": "replaceText: a new text that begins with the old one, put back",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "2026",
+          "after": "2026-27",
+          "contextBefore": "Year: ",
+          "contextAfter": ""
+        },
+        "current": {
+          "text": "Year: 2026\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "replaceText: carriage returns taken out since: byte for byte, the hunk is not the one left",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\r\n"
+        },
+        "current": {
+          "text": "Line one: new.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: the page is gone",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: a folder where the page was",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "folder": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: the page is no longer UTF-8",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "bytesHex": "4c696e65206f6e653a206e65772e0aff0a"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText with no text either side given: not readable",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "text": "a\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "replaceText whose old and new text are the same: not readable",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "same",
+          "after": "same",
+          "contextBefore": "",
+          "contextAfter": ""
+        },
+        "current": {
+          "text": "same\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "editJSON: the member as the step left it",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2026-2027\"\n}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: the member as it was before",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "editJSON: another member changed since, this one untouched",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"course_name\": \"Test (renamed)\", \"school_year\": \"2026-2027\", \"added\": [1, 2]}"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: the member itself changed since",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"school_year\": \"2027-2028\"}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: the member taken out since",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"course_name\": \"Test\"}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: a member the step added, still there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"course_name\": \"Test\", \"school_year\": \"2026-2027\"}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: a member the step added, taken out since: already back",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"course_name\": \"Test\"}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "editJSON: a member set to null is not a member taken out",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "footer"
+          ],
+          "before": "Old footer",
+          "after": null
+        },
+        "current": {
+          "text": "{\"footer\": null}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "JSON's null in the op's after is a member holding null; a member that is not there would be an op with no after."
+      },
+      {
+        "name": "editJSON: a member holding null where the step took it out",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "footer"
+          ],
+          "before": "Old footer"
+        },
+        "current": {
+          "text": "{\"footer\": null}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: numbers compared by value",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "section_count"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"section_count\": 2.0}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: true is not the number 1",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "flag"
+          ],
+          "before": 0,
+          "after": true
+        },
+        "current": {
+          "text": "{\"flag\": 1}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: an object compared by its members, whatever their order",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "deploy"
+          ],
+          "before": null,
+          "after": {
+            "site": "abc",
+            "team": "x"
+          }
+        },
+        "current": {
+          "text": "{\"deploy\": {\"team\": \"x\", \"site\": \"abc\"}}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: a member found through objects inside objects",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "sections",
+            "2",
+            "label"
+          ],
+          "before": "Period 2",
+          "after": "Period 3"
+        },
+        "current": {
+          "text": "{\"sections\": {\"2\": {\"label\": \"Period 3\"}}}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: a part on the way that is not an object",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "sections",
+            "2",
+            "label"
+          ],
+          "before": "Period 2",
+          "after": "Period 3"
+        },
+        "current": {
+          "text": "{\"sections\": [\"Period 3\"]}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: the file is not one JSON object any more",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "[\"school_year\", \"2026-2027\"]\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: the file is not JSON",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "school_year: 2026-2027\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: the file is gone",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON carrying `element`, a later piece's key: not readable",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "list"
+          ],
+          "before": null,
+          "after": "b",
+          "element": 1
+        },
+        "current": {
+          "text": "{\"list\": \"b\"}\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "editJSON with no key path: not readable",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{}\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move: the place it left free, the place it went holding it: as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "move: back where it was, the other place free",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "move: a deploy wrote a new marker where it was: both left, nothing taken back, the moved copy never deleted",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"bbb-222\"}\n"
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "#897 piece B, seam 1: the pair is reversed only whole; the place it left holds something else, so neither side is touched."
+      },
+      {
+        "name": "move: the moved copy changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\", \"edited\": true}\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move: the moved copy gone and its place free",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move: the same content in both places",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move: a folder where the moved file is",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "folder": true
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move of a folder: as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/record",
+          "to": "courses/TST1O/record.previous-20261118T120000Z",
+          "listing": {
+            "folders": [],
+            "files": {
+              "20261101T080000Z-netlify.json": "{\"places\": []}\n"
+            }
+          }
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "tree": {
+              "folders": [],
+              "files": {
+                "20261101T080000Z-netlify.json": "{\"places\": []}\n"
+              }
+            }
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "move of a folder: a file added inside it since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/record",
+          "to": "courses/TST1O/record.previous-20261118T120000Z",
+          "listing": {
+            "folders": [],
+            "files": {
+              "20261101T080000Z-netlify.json": "{\"places\": []}\n"
+            }
+          }
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "tree": {
+              "folders": [],
+              "files": {
+                "20261101T080000Z-netlify.json": "{\"places\": []}\n",
+                "added.md": "x\n"
+              }
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move onto itself: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move into the place it left: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/a",
+          "to": "courses/TST1O/a/b",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move with a path: not readable",
+        "op": {
+          "kind": "move",
+          "path": "page.md",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move naming neither a file's hash nor a folder's listing: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "createTree: the folder as the step made it",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "createTree: the folder gone: already back",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "createTree: a file added inside since",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n",
+              "section1/day1.md": "Day 1\n"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "createTree: a file inside changed since",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{\"edited\": true}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "createTree: an empty folder added inside since",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1",
+              "section1/media"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "createTree: a file where the folder was",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "text": "not a folder\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "createTree without its listing among its blobs: not readable",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listingSha": "0000000000000000000000000000000000000000000000000000000000000000",
+          "blobs": []
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "removeTree: the folder still gone, as the step left it",
+        "op": {
+          "kind": "removeTree",
+          "path": "courses/OLD1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "removeTree: the folder back as it was",
+        "op": {
+          "kind": "removeTree",
+          "path": "courses/OLD1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "removeTree: something else made in its place since",
+        "op": {
+          "kind": "removeTree",
+          "path": "courses/OLD1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [],
+            "files": {
+              "course_config.json": "{}\n"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "removeTree whose content is held outside the list (heldBy, U5's): not readable",
+        "op": {
+          "kind": "removeTree",
+          "path": "courses/OLD1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          },
+          "heldBy": {
+            "zip": "backup.zip"
+          }
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "external: the preference as the step left it",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "preference": "b"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "external: the preference as it was before",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "preference": "a"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "external: the preference changed since",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "preference": "c"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "external: a preference the step set where none was, removed since: already back",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "after": true
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "external: a preference holding something JSON cannot (a date)",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "unreadable": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "external: a target this version does not know: not readable",
+        "op": {
+          "kind": "external",
+          "target": "launchAgent:ca.russellgordon.Plantoir.deploy",
+          "before": null,
+          "after": {
+            "at": "07:00"
+          }
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "external with a path: not readable",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b",
+          "path": "page.md"
+        },
+        "current": {
+          "preference": "b"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
       }
     ],
-    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent). current is what is at the op's path now: text (UTF-8), absent, a folder, or raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, notReadable (undo); canRedo, alreadyRedone, changedSince, notReadable (redo). notReadable: the op is not one this version can read (undoJournal.unknown).",
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. undo and redo are the verdicts: canUndo, alreadyBack, changedSince, notReadable (undo); canRedo, alreadyRedone, changedSince, notReadable (redo). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText).",
+    "listingCases": [
+      {
+        "name": "an empty folder: an empty listing",
+        "tree": {
+          "folders": [],
+          "files": {}
+        },
+        "listing": "",
+        "listingSha": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "folders and files together, in the order of their paths",
+        "tree": {
+          "folders": [
+            "section1",
+            "section1/media"
+          ],
+          "files": {
+            "course_config.json": "{}\n",
+            "section1/index.md": "# Home\n",
+            "section1/media/a.png": "PNG\n"
+          }
+        },
+        "listing": "file ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356 course_config.json\nfolder section1\nfile 7d48eefbcff2495cc4b0cd99ea783bbc46184d78af064c56e1a7dc7ae9dba3aa section1/index.md\nfolder section1/media\nfile e1dd52c4fded473678d49aa9270d577e5a8fb064b45824dc1dd200427ec3cb52 section1/media/a.png\n",
+        "listingSha": "deea8f61dcce2614c4b62603f2ecbf8bffc2dde8ce18d382c3f37e9f18e84653"
+      },
+      {
+        "name": "the order is the paths' UTF-8 bytes: capitals, then small letters, then letters beyond ASCII",
+        "tree": {
+          "folders": [],
+          "files": {
+            "été.md": "E\n",
+            "Zebra.md": "Z\n",
+            "apple.md": "A\n"
+          }
+        },
+        "listing": "file ec39b67830c0c34d71b0b6bf1d1c424eb7caab9222eb401fdaef044cf2145e9b Zebra.md\nfile 06f961b802bc46ee168555f066d28f4f0e9afdf3f88174c1ee6f9de004fc30a0 apple.md\nfile 20514397d70d8fb99e021a5f28fbeba3fc29814ec452ef1a3a3fcf42b08bb752 été.md\n",
+        "listingSha": "28cdfb2d9f5c1440fc57ae6c0fabe790c56cf518cee72e22d74e14d6b1d17389",
+        "why": "Z (0x5A) before a (0x61) before é (0xC3 0xA9): never a locale's order, which both platforms would answer differently."
+      },
+      {
+        "name": "a dot file inside is listed like any other",
+        "tree": {
+          "folders": [],
+          "files": {
+            ".hidden": "x\n",
+            "page.md": "p\n"
+          }
+        },
+        "listing": "file 73cb3858a687a8494ca3323053016282f3dad39d42cf62ca4e79dda2aac7d9ac .hidden\nfile fd6641673e7f3bf6e80e4bc5401fcb2821a1e117206c8e1c65cef23a58dc37ff page.md\n",
+        "listingSha": "1aae0977e35ed6e7ea0c6a6e2f77b5d4869ced59eb6b466eff5f8d14b54ad1f1"
+      }
+    ],
+    "listingCasesHow": "A folder's listing (file-formats.json -> undoJournal.opKinds.createTree): tree is the folder's content (folders, and files with their text); listing is the exact text both platforms must make from it, and listingSha its SHA-256. One line per item inside the folder, each ending in a line feed: `folder <path>` or `file <sha256 of its bytes> <path>`, path relative to the folder with forward slashes, spelled as the file system gives it; lines in the order of the paths' UTF-8 bytes; the folder itself is not listed, and an empty folder's listing is empty.",
     "stackCases": [
       {
         "name": "three steps: the newest is the head",
@@ -49250,7 +50497,7 @@
         ]
       }
     ],
-    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a readable begin and applied whose only op is a `move` (from, to, blobs naming a blob it put in content/); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to.",
+    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a begin and applied, readable as lines, whose only op is of a kind no reader knows (`aKindNobodyKnows`, with from, to and blobs naming a blob it put in content/; U1's used `move`, which U2 defines); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to.",
     "stepCases": [
       {
         "name": "two pages, the second changed by hand since: nothing written, the second named",

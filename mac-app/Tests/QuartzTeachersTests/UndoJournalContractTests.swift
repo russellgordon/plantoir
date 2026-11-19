@@ -65,7 +65,14 @@ final class UndoJournalContractTests: XCTestCase {
 
     func testCheckCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runCheckCases(under: scratchURL)
-        XCTAssertGreaterThanOrEqual(result.cases, 20)
+        XCTAssertGreaterThanOrEqual(result.cases, 90)
+        XCTAssertEqual(result.failures, [])
+    }
+
+    /// U2: a folder's listing is the same text on both platforms.
+    func testListingCases() throws {
+        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runListingCases()
+        XCTAssertGreaterThanOrEqual(result.cases, 3)
         XCTAssertEqual(result.failures, [])
     }
 

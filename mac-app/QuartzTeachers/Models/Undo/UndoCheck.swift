@@ -70,7 +70,9 @@ nonisolated enum UndoCheck {
 
     // MARK: - Functions
 
-    /// Where an op stands in a file's current content.
+    /// Where an op stands in a file's current content. A move, a tree or an
+    /// external op is judged on the disk as a whole (`wholeState`), never
+    /// here.
     static func state(of op: UndoOp, in item: UndoItem) -> UndoOpState {
         switch op.knownKind {
         case .writeFile:
@@ -105,9 +107,13 @@ nonisolated enum UndoCheck {
                 return .after
             }
             return .neither
+        case .replaceText:
+            return UndoHunk.state(of: op, in: item)
+        case .editJSON:
+            return UndoJSONMember.state(of: op, in: item)
         case .recompute:
             return .after
-        case .none:
+        case .move, .createTree, .removeTree, .external, .none:
             return .neither
         }
     }
@@ -128,20 +134,42 @@ nonisolated enum UndoCheck {
         }
     }
 
+    /// The folder a step's paths are under, or nil when it cannot be
+    /// reached. A step none of whose ops names a path (an `external` op
+    /// alone) needs no folder: it is answered with the file system's root,
+    /// which no op of it reads.
+    static func root(of step: UndoStep, resolveRoot: (UndoWorkingFolder) -> URL?) -> URL? {
+        var needsAFolder: Bool = false
+        for op in step.ops where !op.pathsNamed.isEmpty {
+            needsAFolder = true
+        }
+        if !needsAFolder {
+            return URL(fileURLWithPath: "/", isDirectory: true)
+        }
+        guard let folder = step.workingFolder else {
+            return nil
+        }
+        return resolveRoot(folder)
+    }
+
     /// Every file an undo (`.backward`) or a redo (`.forward`) of these ops
     /// would write, checked first and writing nothing: refused, naming the
     /// first page in the way and how many others, when ANY op's content is
     /// neither as the step left it nor already where it is going, or is a
-    /// line that cannot be placed. Only when no page is in the way is a
-    /// blob missing from the list reported, as `contentMissing`.
+    /// line, a hunk or a member that cannot be placed. Only when no page is
+    /// in the way is a blob missing from the list reported, as
+    /// `contentMissing`.
     ///
     /// Ops on one file are applied to that file's text in turn (in reverse
-    /// for an undo), so several lines on one page make one staged file.
+    /// for an undo), so several lines on one page make one staged file. A
+    /// move, a tree or an external op is judged on its own against what is
+    /// there now (`wholeState`), and becomes one change of its own.
     static func plan(
         _ ops: [UndoOp],
         direction: UndoDirection,
         root: URL,
-        journal: UndoJournal
+        journal: UndoJournal,
+        places: UndoExternalPlaces = UndoAppPreferences()
     ) -> UndoPlan {
         var ordered: [UndoOp] = ops
         if direction == .backward {
@@ -159,9 +187,10 @@ nonisolated enum UndoCheck {
         var inTheWay: [String] = []
         var missingContentPath: String? = nil
         var recomputes: [UndoOp] = []
+        var wholeTargets: [UndoSwapTarget] = []
 
         for op in ordered {
-            guard let kind = op.knownKind, let path = op.path else {
+            guard let kind = op.knownKind else {
                 // Never guessed at: a step this version cannot read is not
                 // undone or redone (the director's ruling 1).
                 return .refused(.notReadable)
@@ -169,6 +198,30 @@ nonisolated enum UndoCheck {
             if kind == .recompute {
                 recomputes.append(op)
                 continue
+            }
+            if op.isWhole {
+                let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: places)
+                let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
+                if verdict == .alreadyBack || verdict == .alreadyRedone {
+                    continue
+                }
+                if verdict == .changedSince {
+                    if !inTheWay.contains(op.placeName) {
+                        inTheWay.append(op.placeName)
+                    }
+                    continue
+                }
+                guard let target = UndoCheck.wholeTarget(op, direction: direction, root: root, journal: journal) else {
+                    if missingContentPath == nil {
+                        missingContentPath = op.placeName
+                    }
+                    continue
+                }
+                wholeTargets.append(target)
+                continue
+            }
+            guard let path = op.path else {
+                return .refused(.notReadable)
             }
             if original[path] == nil {
                 let item: UndoItem = UndoItem.read(at: root.appendingPathComponent(path))
@@ -189,11 +242,12 @@ nonisolated enum UndoCheck {
                 continue
             }
             guard let moved = UndoCheck.moved(op, from: current, direction: direction, journal: journal) else {
-                if kind == .editLine {
-                    // As the step left it, yet its line cannot be placed (the
-                    // front matter block it lives in is gone): the page was
-                    // changed by hand since, never content missing from the
-                    // list (ruling 13; the Fable sweep of U1, F2).
+                if kind != .writeFile {
+                    // As the step left it, yet it cannot be placed (the
+                    // front matter block a line lives in is gone, a hunk or
+                    // a member that cannot be put back exactly): the page
+                    // was changed by hand since, never content missing from
+                    // the list (ruling 13; the Fable sweep of U1, F2).
                     if !inTheWay.contains(path) {
                         inTheWay.append(path)
                     }
@@ -230,11 +284,14 @@ nonisolated enum UndoCheck {
                 replacement: after.data
             ))
         }
+        for target in wholeTargets {
+            targets.append(target)
+        }
         return .ready(targets: targets, recomputes: recomputes)
     }
 
     /// The content after moving one op one way, or nil when a blob it needs
-    /// is missing or the text cannot be read.
+    /// is missing or the text cannot be read or placed.
     static func moved(_ op: UndoOp, from item: UndoItem, direction: UndoDirection, journal: UndoJournal) -> UndoItem? {
         switch op.knownKind {
         case .writeFile:
@@ -256,8 +313,64 @@ nonisolated enum UndoCheck {
                 return nil
             }
             return .file(Data(moved.utf8))
-        case .recompute, .none:
+        case .replaceText:
+            return UndoHunk.moved(op, from: item, direction: direction)
+        case .editJSON:
+            return UndoJSONMember.moved(op, from: item, direction: direction)
+        case .recompute, .move, .createTree, .removeTree, .external, .none:
             return item
+        }
+    }
+
+    /// The one change a move, a tree or an external op makes going this
+    /// way, or nil when content it needs is missing from the list.
+    static func wholeTarget(_ op: UndoOp, direction: UndoDirection, root: URL, journal: UndoJournal) -> UndoSwapTarget? {
+        switch op.knownKind {
+        case .move:
+            guard let from = op.from, let to = op.to else {
+                return nil
+            }
+            let source: String = direction == .backward ? to : from
+            let destination: String = direction == .backward ? from : to
+            return UndoSwapTarget(
+                url: root.appendingPathComponent(destination),
+                relativePath: destination,
+                change: .moveHere(from: root.appendingPathComponent(source), fromPath: source, op: op)
+            )
+        case .createTree, .removeTree:
+            guard let path = op.path, let listingSha = op.listingSha else {
+                return nil
+            }
+            let makes: Bool = (op.knownKind == .createTree) == (direction == .forward)
+            let url: URL = root.appendingPathComponent(path)
+            if !makes {
+                return UndoSwapTarget(url: url, relativePath: path, change: .takeTree(listingSha: listingSha))
+            }
+            guard let listingData = journal.readBlob(sha: listingSha),
+                  let listing = UndoTreeListing.parse(listingData), listing.sha == listingSha else {
+                return nil
+            }
+            var contents: [String: Data] = [:]
+            for file in listing.files {
+                guard let data = journal.readBlob(sha: file.sha) else {
+                    return nil
+                }
+                contents[file.path] = data
+            }
+            return UndoSwapTarget(url: url, relativePath: path, change: .makeTree(listing, contents: contents))
+        case .external:
+            guard let target = op.target else {
+                return nil
+            }
+            let expected: UndoJSON? = direction == .backward ? op.valueAfter : op.valueBefore
+            let wanted: UndoJSON? = direction == .backward ? op.valueBefore : op.valueAfter
+            return UndoSwapTarget(
+                url: URL(fileURLWithPath: "/"),
+                relativePath: target,
+                change: .setExternal(target: target, expected: expected, value: wanted)
+            )
+        default:
+            return nil
         }
     }
 }
@@ -268,8 +381,9 @@ nonisolated enum UndoPlan: Equatable, Sendable {
     case refused(UndoRefusal)
 }
 
-/// One file to swap: what it must still hold, and what goes in its place
-/// (nil: it is removed).
+/// One change to make: a file's content swapped (what it must still hold,
+/// and what goes in its place; nil: it is removed), or one of a whole op's
+/// changes.
 nonisolated struct UndoSwapTarget: Equatable, Sendable {
 
     // MARK: - Stored properties
@@ -281,6 +395,46 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
     let expected: Data?
 
     let replacement: Data?
+
+    let change: UndoSwapChange
+
+    // MARK: - Initializer
+
+    init(url: URL, relativePath: String, expected: Data?, replacement: Data?) {
+        self.url = url
+        self.relativePath = relativePath
+        self.expected = expected
+        self.replacement = replacement
+        self.change = .file
+    }
+
+    init(url: URL, relativePath: String, change: UndoSwapChange) {
+        self.url = url
+        self.relativePath = relativePath
+        self.expected = nil
+        self.replacement = nil
+        self.change = change
+    }
+}
+
+/// The kinds of change a swap makes.
+nonisolated enum UndoSwapChange: Equatable, Sendable {
+    /// A file's content swapped: staged beside it, then renamed in.
+    case file
+    /// The item at `from` renamed onto the target, which must be free: one
+    /// rename that never replaces (a move, either way). Re-checked as a pair
+    /// first.
+    case moveHere(from: URL, fromPath: String, op: UndoOp)
+    /// A folder made with every file in it: built beside its place under a
+    /// staged name, then renamed in, never over anything.
+    case makeTree(UndoTreeListing, contents: [String: Data])
+    /// A folder whose listing must still be this taken out: renamed aside
+    /// under a staged name (its content is in the list), removed once every
+    /// change has gone in.
+    case takeTree(listingSha: String)
+    /// An external target set (nil: removed), which must still hold
+    /// `expected`.
+    case setExternal(target: String, expected: UndoJSON?, value: UndoJSON?)
 }
 
 /// How a swap went.
@@ -302,6 +456,11 @@ nonisolated enum UndoSwapResult: Equatable, Sendable {
 /// made are reversed from those originals and nothing of the step is left.
 /// A rename either happened or did not, so a process that dies part way
 /// leaves each file wholly old or wholly new, and recovery settles the rest.
+///
+/// U2's whole ops fit the same shape: a folder to make is built beside its
+/// place and renamed in; a folder to take out is renamed aside and removed
+/// at the end; a move is one rename that never replaces; an external target
+/// is set last of all, after every file has gone in, and re-read first.
 nonisolated enum UndoSwap {
 
     // MARK: - Stored properties
@@ -311,7 +470,11 @@ nonisolated enum UndoSwap {
 
     // MARK: - Functions
 
-    static func swap(_ targets: [UndoSwapTarget], label: String) -> UndoSwapResult {
+    static func swap(
+        _ targets: [UndoSwapTarget],
+        label: String,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) -> UndoSwapResult {
         var staged: [URL?] = []
         var originals: [URL?] = []
         var swapsMade: Int = 0
@@ -333,11 +496,31 @@ nonisolated enum UndoSwap {
             var index: Int = swapsMade - 1
             while index >= 0 {
                 let target: UndoSwapTarget = targets[index]
-                if let original = originals[index] {
-                    _ = UndoSwap.rename(original, onto: target.url)
-                    originals[index] = nil
-                } else {
-                    try? FileManager.default.removeItem(at: target.url)
+                switch target.change {
+                case .file:
+                    if let original = originals[index] {
+                        _ = UndoSwap.rename(original, onto: target.url)
+                        originals[index] = nil
+                    } else {
+                        try? FileManager.default.removeItem(at: target.url)
+                    }
+                case .moveHere(let from, _, _):
+                    _ = UndoSwap.renameExclusively(target.url, onto: from)
+                case .makeTree:
+                    // Back under its staged name, removed with the rest.
+                    let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
+                    if UndoSwap.renameExclusively(target.url, onto: stagedURL) {
+                        staged[index] = stagedURL
+                    }
+                case .takeTree:
+                    // Never removed by the tidy that follows: put back, or,
+                    // if even that fails, left aside under its staged name.
+                    if let original = originals[index] {
+                        _ = UndoSwap.renameExclusively(original, onto: target.url)
+                        originals[index] = nil
+                    }
+                case .setExternal(let externalTarget, let expected, _):
+                    _ = places.write(externalTarget, expected)
                 }
                 index -= 1
             }
@@ -349,7 +532,23 @@ nonisolated enum UndoSwap {
             let targetIndex: Int = stagingIndex
             stagingIndex += 1
             originals.append(nil)
-            guard let replacement = target.replacement else {
+            if case .makeTree(let listing, let contents) = target.change {
+                let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
+                try? FileManager.default.createDirectory(
+                    at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                _ = UndoSwap.removeStaged(stagedURL)
+                let failsHere: Bool = UndoKillPoints.stagingWriteFailsAt?(targetIndex) == true
+                if failsHere || !UndoTreeReading.make(listing, contents: contents, at: stagedURL) {
+                    _ = UndoSwap.removeStaged(stagedURL)
+                    staged.append(nil)
+                    tidy()
+                    return .refused(.couldNotWrite(path: target.relativePath))
+                }
+                staged.append(stagedURL)
+                continue
+            }
+            guard case .file = target.change, let replacement = target.replacement else {
                 staged.append(nil)
                 continue
             }
@@ -404,39 +603,54 @@ nonisolated enum UndoSwap {
                 tidy()
                 return .refused(.fileIsInUse(path: target.relativePath))
             }
-            let now: UndoItem = UndoItem.read(at: target.url)
-            if now.data != target.expected || (target.expected == nil && now != .absent) {
-                reverse()
-                tidy()
-                return .refused(.changedSince(firstPath: target.relativePath, others: 0))
-            }
-            if now != .absent {
-                let originalURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "orig")
-                try? FileManager.default.removeItem(at: originalURL)
-                if !UndoSwap.keep(target.url, as: originalURL) {
-                    reverse()
-                    tidy()
-                    return .refused(.fileIsInUse(path: target.relativePath))
+            var refusal: UndoRefusal? = nil
+            switch target.change {
+            case .file:
+                refusal = UndoSwap.swapAFile(target, index: index, label: label, staged: &staged, originals: &originals)
+            case .moveHere(let from, _, let op):
+                // The pair once more, just before the rename: the content at
+                // the place it leaves, nothing where it goes.
+                if UndoMoveSide.read(op, at: from) != .holdsTheContent || UndoMoveSide.read(op, at: target.url) != .free {
+                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
+                } else {
+                    try? FileManager.default.createDirectory(
+                        at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
+                    )
+                    if !UndoSwap.renameExclusively(from, onto: target.url) {
+                        refusal = .fileIsInUse(path: target.relativePath)
+                    }
                 }
-                originals[index] = originalURL
-            }
-            var wentIn: Bool = true
-            if let stagedURL = staged[index] {
-                wentIn = UndoSwap.rename(stagedURL, onto: target.url)
-                if wentIn {
+            case .makeTree:
+                if UndoTreeReading.read(at: target.url) != .absent {
+                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
+                } else if let stagedURL = staged[index], UndoSwap.renameExclusively(stagedURL, onto: target.url) {
                     staged[index] = nil
+                } else {
+                    refusal = .fileIsInUse(path: target.relativePath)
                 }
-            } else {
-                wentIn = (try? FileManager.default.removeItem(at: target.url)) != nil
+            case .takeTree(let listingSha):
+                if UndoTreeReading.read(at: target.url).listingSha != listingSha {
+                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
+                } else {
+                    let asideURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "orig")
+                    _ = UndoSwap.removeStaged(asideURL)
+                    if UndoSwap.renameExclusively(target.url, onto: asideURL) {
+                        originals[index] = asideURL
+                    } else {
+                        refusal = .fileIsInUse(path: target.relativePath)
+                    }
+                }
+            case .setExternal(let externalTarget, let expected, let value):
+                if !UndoCheck.externalMatches(places.read(externalTarget), expected) {
+                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
+                } else if !places.write(externalTarget, value) {
+                    refusal = .couldNotWrite(path: target.relativePath)
+                }
             }
-            if !wentIn {
-                if let originalURL = originals[index] {
-                    try? FileManager.default.removeItem(at: originalURL)
-                    originals[index] = nil
-                }
+            if let refusal {
                 reverse()
                 tidy()
-                return .refused(.fileIsInUse(path: target.relativePath))
+                return .refused(refusal)
             }
             swapsMade += 1
             index += 1
@@ -445,9 +659,66 @@ nonisolated enum UndoSwap {
         // 3. Every swap went in: the kept originals are no longer needed.
         tidy()
         for target in targets {
+            if case .setExternal = target.change {
+                continue
+            }
             UndoFiles.syncFolder(target.url.deletingLastPathComponent())
         }
         return .swapped
+    }
+
+    /// One file's swap: re-read, keep the original, rename the new content
+    /// in (or remove the file). The refusal, or nil when it went in.
+    private static func swapAFile(
+        _ target: UndoSwapTarget,
+        index: Int,
+        label: String,
+        staged: inout [URL?],
+        originals: inout [URL?]
+    ) -> UndoRefusal? {
+        let now: UndoItem = UndoItem.read(at: target.url)
+        if now.data != target.expected || (target.expected == nil && now != .absent) {
+            return .changedSince(firstPath: target.relativePath, others: 0)
+        }
+        if now != .absent {
+            let originalURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "orig")
+            try? FileManager.default.removeItem(at: originalURL)
+            if !UndoSwap.keep(target.url, as: originalURL) {
+                return .fileIsInUse(path: target.relativePath)
+            }
+            originals[index] = originalURL
+        }
+        var wentIn: Bool = true
+        if let stagedURL = staged[index] {
+            wentIn = UndoSwap.rename(stagedURL, onto: target.url)
+            if wentIn {
+                staged[index] = nil
+            }
+        } else {
+            wentIn = (try? FileManager.default.removeItem(at: target.url)) != nil
+        }
+        if !wentIn {
+            if let originalURL = originals[index] {
+                try? FileManager.default.removeItem(at: originalURL)
+                originals[index] = nil
+            }
+            return .fileIsInUse(path: target.relativePath)
+        }
+        return nil
+    }
+
+    /// A rename that never replaces what is at the destination
+    /// (`RENAME_EXCL`): false when anything is there, or it failed.
+    static func renameExclusively(_ from: URL, onto to: URL) -> Bool {
+        let result: Int32 = from.withUnsafeFileSystemRepresentation { fromPath in
+            return to.withUnsafeFileSystemRepresentation { toPath in
+                guard let fromPath, let toPath else {
+                    return -1
+                }
+                return renamex_np(fromPath, toPath, UInt32(RENAME_EXCL))
+            }
+        }
+        return result == 0
     }
 
     /// `.<name>.plantoir-undo-<label>-<role>` in the target's own folder:
@@ -616,19 +887,23 @@ nonisolated extension UndoJournal {
     // MARK: - Functions
 
     /// Undoes the newest step: the only one that can be (ruling 9).
+    ///
+    /// `places` are where an `external` op reads and writes (the app's own
+    /// preferences; a test passes its own). Each `recompute` op is run by its
+    /// maintainer's registered runner after the swaps (`UndoMaintainers`).
     func undoNewest(
         resolveRoot: (UndoWorkingFolder) -> URL? = UndoReach.root,
-        recompute: (UndoOp, URL) -> Void = { _, _ in }
+        places: UndoExternalPlaces = UndoAppPreferences()
     ) -> UndoOutcome {
-        return move(.backward, resolveRoot: resolveRoot, recompute: recompute)
+        return move(.backward, resolveRoot: resolveRoot, places: places)
     }
 
     /// Redoes the most recently undone step.
     func redoNewest(
         resolveRoot: (UndoWorkingFolder) -> URL? = UndoReach.root,
-        recompute: (UndoOp, URL) -> Void = { _, _ in }
+        places: UndoExternalPlaces = UndoAppPreferences()
     ) -> UndoOutcome {
-        return move(.forward, resolveRoot: resolveRoot, recompute: recompute)
+        return move(.forward, resolveRoot: resolveRoot, places: places)
     }
 
     /// What Undo or Redo would act on now: for the menu, which greys the
@@ -643,13 +918,13 @@ nonisolated extension UndoJournal {
     private func move(
         _ direction: UndoDirection,
         resolveRoot: (UndoWorkingFolder) -> URL?,
-        recompute: (UndoOp, URL) -> Void
+        places: UndoExternalPlaces
     ) -> UndoOutcome {
         // 1. Find the step, inside the lock, with recovery run first.
         let found: UndoAvailability
         do {
             found = try withLock { writer -> UndoAvailability in
-                UndoRecovery.run(writer, mode: .live, resolveRoot: resolveRoot)
+                UndoRecovery.run(writer, mode: .live, resolveRoot: resolveRoot, places: places)
                 let offer: UndoOffer = writer.fold.offer(now: now())
                 return direction == .backward ? offer.undo : offer.redo
             }
@@ -675,12 +950,17 @@ nonisolated extension UndoJournal {
             record = step
         }
         let seq: Int = record.step.seq
-        guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
+        guard let root = UndoCheck.root(of: record.step, resolveRoot: resolveRoot) else {
+            return .notAvailable
+        }
+        // Never undone or redone with its re-derivation skipped: until the
+        // app registers a maintainer's runner, its steps are not available.
+        if !UndoMaintainers.canRun(record.step.ops) {
             return .notAvailable
         }
 
         // 2. Check every op, writing nothing.
-        let plan: UndoPlan = UndoCheck.plan(record.step.ops, direction: direction, root: root, journal: self)
+        let plan: UndoPlan = UndoCheck.plan(record.step.ops, direction: direction, root: root, journal: self, places: places)
         if UndoKillPoints.stopsHere(.afterTheCheck) {
             return .stoppedByATest
         }
@@ -719,7 +999,7 @@ nonisolated extension UndoJournal {
 
         // 4. Swap, then re-derive the files kept true by a rule.
         let label: String = "\(seq)-" + (direction == .backward ? "undo" : "redo")
-        switch UndoSwap.swap(targets, label: label) {
+        switch UndoSwap.swap(targets, label: label, places: places) {
         case .refused(let refusal):
             JournaledWrite.finish(seq: seq, with: .failed, phase: phase, reason: "refused", in: self, mode: .live)
             // Caught at the swap rather than the check: the same hand edit,
@@ -730,9 +1010,7 @@ nonisolated extension UndoJournal {
         case .swapped:
             break
         }
-        for op in recomputes {
-            recompute(op, root)
-        }
+        UndoMaintainers.rederive(recomputes, root: root)
         if UndoKillPoints.stopsHere(direction == .backward ? .beforeUndone : .beforeRedone) {
             return .stoppedByATest
         }

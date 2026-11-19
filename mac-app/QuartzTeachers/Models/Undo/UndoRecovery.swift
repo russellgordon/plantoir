@@ -66,7 +66,8 @@ nonisolated enum UndoRecovery {
         _ writer: UndoJournalWriter,
         mode: UndoMode,
         trySwapsNow: Bool = true,
-        resolveRoot: (UndoWorkingFolder) -> URL?
+        resolveRoot: (UndoWorkingFolder) -> URL?,
+        places: UndoExternalPlaces = UndoAppPreferences()
     ) -> [UndoRecoveryResult] {
         var results: [UndoRecoveryResult] = []
         let now: Date = writer.journal.now()
@@ -80,7 +81,7 @@ nonisolated enum UndoRecovery {
             if !record.isReadable {
                 continue
             }
-            guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
+            guard let root = UndoCheck.root(of: record.step, resolveRoot: resolveRoot) else {
                 continue
             }
             let key: String = UndoRefusedSwaps.key(for: record, in: writer.journal)
@@ -88,7 +89,7 @@ nonisolated enum UndoRecovery {
                 continue
             }
             var swapRefused: Bool = false
-            if let result = settle(record, root: root, writer: writer, mode: mode, swapRefused: &swapRefused) {
+            if let result = settle(record, root: root, writer: writer, mode: mode, places: places, swapRefused: &swapRefused) {
                 UndoRefusedSwaps.forget(key)
                 results.append(result)
             } else if swapRefused {
@@ -137,7 +138,7 @@ nonisolated enum UndoRecovery {
     static func tidyStagedFiles(of step: UndoStep, root: URL) -> Bool {
         var urls: [URL] = []
         for op in step.ops {
-            if let path = op.path {
+            for path in op.pathsNamed {
                 urls.append(root.appendingPathComponent(path))
             }
         }
@@ -151,11 +152,27 @@ nonisolated enum UndoRecovery {
     }
 
     /// Where each file of a step stands: before, after or neither.
-    static func fileStates(of step: UndoStep, root: URL) -> [(path: String, state: UndoOpState)] {
+    ///
+    /// A move, a tree or an external op is one place of its own, named by
+    /// `placeName` and judged whole (`UndoCheck.wholeState`): a move by its
+    /// pair, never by one side.
+    static func fileStates(
+        of step: UndoStep,
+        root: URL,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) -> [(path: String, state: UndoOpState)] {
         var order: [String] = []
         var states: [String: UndoOpState] = [:]
         var items: [String: UndoItem] = [:]
         for op in step.ops {
+            if op.isWhole {
+                let place: String = op.placeName
+                if states[place] == nil {
+                    order.append(place)
+                }
+                states[place] = UndoCheck.wholeState(of: op, root: root, places: places)
+                continue
+            }
             guard let kind = op.knownKind, kind != .recompute, let path = op.path else {
                 continue
             }
@@ -204,6 +221,7 @@ nonisolated enum UndoRecovery {
         root: URL,
         writer: UndoJournalWriter,
         mode: UndoMode,
+        places: UndoExternalPlaces = UndoAppPreferences(),
         swapRefused: inout Bool
     ) -> UndoRecoveryResult? {
         let step: UndoStep = record.step
@@ -224,7 +242,7 @@ nonisolated enum UndoRecovery {
         }
         var urls: [URL] = []
         for op in step.ops {
-            if let path = op.path {
+            for path in op.pathsNamed {
                 urls.append(root.appendingPathComponent(path))
             }
         }
@@ -235,7 +253,7 @@ nonisolated enum UndoRecovery {
         // Which state the work was moving FROM, and TO.
         let startedFromBefore: Bool = phase == .begin || phase == .redoing
         let startState: UndoOpState = startedFromBefore ? .before : .after
-        let files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root)
+        let files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root, places: places)
         var atStart: Int = 0
         var atEnd: Int = 0
         var inTheWay: [String] = []
@@ -277,12 +295,12 @@ nonisolated enum UndoRecovery {
             if mode == .live && !endPaths.isEmpty {
                 var opsToPutBack: [UndoOp] = []
                 for op in step.ops {
-                    if let path = op.path, endPaths.contains(path) {
+                    if op.knownKind != .recompute && endPaths.contains(op.placeName) {
                         opsToPutBack.append(op)
                     }
                 }
                 let back: UndoDirection = startedFromBefore ? .backward : .forward
-                let plan: UndoPlan = UndoCheck.plan(opsToPutBack, direction: back, root: root, journal: writer.journal)
+                let plan: UndoPlan = UndoCheck.plan(opsToPutBack, direction: back, root: root, journal: writer.journal, places: places)
                 guard case .ready(let targets, _) = plan else {
                     // It can never be put back: closed, never left in flight.
                     var leftPartWay: [String] = Array(endPaths).sorted()
@@ -299,7 +317,7 @@ nonisolated enum UndoRecovery {
                     UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, 0, leftPartWay.count)
                     return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: .interrupted(filesInTheWay: leftPartWay.count, filesPutBack: 0))
                 }
-                if UndoSwap.swap(targets, label: label + "-recover") != UndoSwapResult.swapped {
+                if UndoSwap.swap(targets, label: label + "-recover", places: places) != UndoSwapResult.swapped {
                     // A file in use: tried again on the schedule.
                     swapRefused = true
                     return nil
@@ -328,6 +346,15 @@ nonisolated enum UndoRecovery {
         }
         if !UndoRecovery.write(events, step: step, writer) {
             return nil
+        }
+        // The files kept true by a rule are re-derived whichever way the
+        // step was settled (re-deriving is idempotent): judged by its content
+        // ops alone, a step that died after its swaps and before its
+        // re-derivation would otherwise be settled with its front page stale
+        // (`undo.laterPieces.U2`; the Fable sweep of U1, T5). Never in
+        // shadow, which writes nothing into a working folder.
+        if mode == .live {
+            UndoMaintainers.rederive(step.ops, root: root)
         }
         return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: outcome)
     }
@@ -437,7 +464,7 @@ nonisolated enum UndoPruning {
                 }
                 var paths: [String] = []
                 for op in record.step.ops {
-                    if let path = op.path, !paths.contains(path) {
+                    for path in op.pathsNamed where !paths.contains(path) {
                         paths.append(path)
                     }
                 }
