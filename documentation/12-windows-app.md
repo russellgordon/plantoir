@@ -14763,7 +14763,14 @@ found 1 HIGH and 4 MEDIUM; each has a test that failed before its fix:
   made its own). Through the handle, what is moved is provably the file
   inspected, wherever it now is. `AFileSetAsideByAnotherProcessBetweenThe
   CheckAndTheRenameIsNeverTheGoodOne` runs exactly that interleaving
-  through a seam between the check and the rename. A creator still writing
+  through a seam between the check and the rename, and a second seam
+  straight after the rename lets a third process make its own identifier
+  if the name is free. The third maker is what makes the test bite: without
+  it the compare-by-path code moved the good file aside, saw it was not the
+  file inspected and moved it back unharmed, so the test passed with the
+  fix reverted (found by the fix review). With it, that code fails (VM run
+  on 41831de19, 2026-11-19: the name held the third identifier, the good
+  one stranded aside), and the handle rename passes. A creator still writing
   holds its file with no sharing, so the open fails and nothing moves. The
   mac's equivalent (compare and rename by descriptor) is #1004, item 1.
 - **M1, a page gone with its drive.** A page whose folder is not there reads
