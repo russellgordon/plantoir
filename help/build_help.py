@@ -139,5 +139,27 @@ def main(arguments: Optional[List[str]] = None) -> int:
     return 0
 
 
+def write_output_as_utf8() -> None:
+    """Prints UTF-8 whatever the console's code page (#886).
+
+    The checks' messages carry "▸" and "…". On Windows, Python's stdout to a
+    pipe uses the ANSI code page (cp1252), so the first such message raised
+    UnicodeEncodeError and the build ended in a traceback instead of saying
+    what was wrong. PYTHONIOENCODING cannot fix it: every caller runs this
+    script with -I, which ignores PYTHON* variables. Where stdout is already
+    UTF-8 (the Mac: a UTF-8 locale, and Python 3.7+ coerces the C locale to
+    UTF-8) nothing is reconfigured, so that output is unchanged byte for byte.
+    Errors stay strict: a character that cannot be written is a failure, never
+    a silent "?".
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        encoding: str = (stream.encoding or "").lower().replace("-", "").replace("_", "")
+        if encoding != "utf8":
+            stream.reconfigure(encoding="utf-8", errors="strict")
+
+
 if __name__ == "__main__":
+    write_output_as_utf8()
     sys.exit(main())

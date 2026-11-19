@@ -118,10 +118,26 @@ public sealed partial class SidebarPane
         // Obsidian's add-ons for diagrams and graphs (#581): scanned, offered,
         // added or asked to reopen BEFORE Obsidian opens - all decided in
         // Plantoir.Core's route; this window only shows its two questions.
-        var (report, finished) = new ObsidianOpenRoute(new ObsidianWorld(ShowDialogSafelyAsync)).Press(course, reveal, answer, section);
+        var (report, finished) = ObsidianRoute().Press(course, reveal, answer, section);
         _ = Finishing(finished, null, answer);
         return report;
     }
+
+    /// <summary>
+    /// The route every open in this window takes, its questions shown over
+    /// this window (#581; since #1003 also the closing question and its
+    /// alert, so no door here closes Obsidian unasked).
+    /// </summary>
+    private ObsidianOpenRoute ObsidianRoute() => new ObsidianOpenRoute(new ObsidianWorld(ShowDialogSafelyAsync));
+
+    /// <summary>
+    /// Course Settings' How I Teach row (#360): the PAGE, through the closing
+    /// question like every other open (#1003, the mac's
+    /// <c>openHowITeachPageInObsidian</c>), without the add-ons scan or a
+    /// reference course's note, which that row never had.
+    /// </summary>
+    public void OpenHowITeachPageInObsidian(Course course, string page) =>
+        _ = Finishing(ObsidianRoute().OpenWithoutTheScanAsync(course, course.DirectoryPath, page), null, null);
 
     /// <summary>
     /// Waits for a press's route so a fault is logged rather than lost, and

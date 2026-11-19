@@ -64,7 +64,7 @@ def run_hiutil(hiutil: str, arguments: List[str], folder: Path) -> str:
         cwd=str(folder),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        universal_newlines=True,
+        encoding="utf-8",
     )
     if completed.returncode != 0:
         raise HelpError("hiutil " + " ".join(arguments) + " exited " + str(completed.returncode) + ":\n" + completed.stdout)

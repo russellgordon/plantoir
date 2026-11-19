@@ -859,8 +859,37 @@ nonisolated enum UndoHash {
         return sha256(of: data)
     }
 
+    /// The hash of a file's bytes, read a megabyte at a time, so a large
+    /// file in a folder is never held whole in memory (the hard review of
+    /// U2b, LOW b). Nil when it cannot be read.
+    static func sha256(ofFileAt url: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return nil
+        }
+        defer {
+            try? handle.close()
+        }
+        var hasher: SHA256 = SHA256()
+        while true {
+            let chunk: Data?
+            do {
+                chunk = try handle.read(upToCount: 1_048_576)
+            } catch {
+                return nil
+            }
+            guard let chunk, !chunk.isEmpty else {
+                break
+            }
+            hasher.update(data: chunk)
+        }
+        return hex(hasher.finalize())
+    }
+
     static func sha256(of data: Data) -> String {
-        let digest: SHA256.Digest = SHA256.hash(data: data)
+        return hex(SHA256.hash(data: data))
+    }
+
+    static func hex(_ digest: SHA256.Digest) -> String {
         var text: String = ""
         for byte in digest {
             let pair: String = String(byte, radix: 16)

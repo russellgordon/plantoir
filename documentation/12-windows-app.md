@@ -2565,9 +2565,11 @@ contract declines must be declined here, and every case it allows is
 declined here too (the course-wide hold). The day #868 narrows a hold to its
 section that second half fails, saying to walk the cases exactly instead.
 
-**Not red, so nothing held.** #839's Help: `help/tests/test_*.py` are not
-discovered by `PythonToolchainTests` (it finds `scripts/test_*.py` only), so
-they neither run nor fail here; wiring them in is #886's first piece.
+**Not red, so nothing held.** #839's Help: `help/tests/test_*.py` were not
+discovered by `PythonToolchainTests` when this was written (it found
+`scripts/test_*.py` only), so they neither ran nor failed here. #886's first
+piece (886a) wires them in: "Plantoir Help on Windows" at the end of this
+page.
 #902's Planning tab sentences carry `{machine}` as Windows' Planning tab
 already says them. #835's `returningToASectionMidDeploy.heldElsewhere`
 cases and `helpForASection` have no Windows reader yet (#868 owes them).
@@ -4411,7 +4413,8 @@ the same day.)
   for vaults REGISTERED in Obsidian's registry — on Windows,
   `%APPDATA%/obsidian/obsidian.json`, same JSON shape. Port the whole
   dance: quit Obsidian if running (its in-memory vault list ignores
-  registry edits), seed `support/obsidian_defaults/.obsidian` if the
+  registry edits; since #1003 only after the teacher answers "Close
+  Obsidian to open {course}?", never unasked), seed `support/obsidian_defaults/.obsidian` if the
   course has none, write the registry entry, then open the URI. Sections
   open at their `index.md` (Obsidian opens files, not folders). Enable
   the File Explorer's auto-reveal by patching the vault's
@@ -9633,10 +9636,11 @@ pages locked again" line through `ReferenceCourseUpkeep.TrailLine` when it did
 anything; a failure is logged and the teacher may still open. The note is
 shown on the sidebar's `XamlRoot` — the sidebar always exists in a window
 (there is no collapsed-sidebar state here as on the mac, where the note had to
-move to the main window). `ObsidianRouteSourceTests` holds
+move to the main window). `ObsidianRouteSourceTests` held
 `FolderActions.OpenInObsidian(` to the sidebar's two branches plus ONE named
 exception, Course Settings' How I Teach row, which opens a PAGE of a LIVE
-course. Verified by hand once (2026-10-15, a throwaway UI test, Obsidian's
+course; since #1003 both of those go through the route too, and the only
+caller is the route's world ("Windows never closes Obsidian unasked (#1003)"). Verified by hand once (2026-10-15, a throwaway UI test, Obsidian's
 vault registry backed up and restored byte for byte): a page unlocked by hand,
 the section toolbar's button, the page locked again BEFORE the note, "locked 1
 page of ICS3U again — it is kept for reference" on the trail, Obsidian opened.
@@ -13554,6 +13558,74 @@ refusal answers. And, as the mac's runner since #610, a scripted `modelReply`
 answers the FIRST request only and plain text after it — unless
 `given.modelReplyAnswers` is `everyRequest` (#720, below).
 
+## Windows never closes Obsidian unasked (#1003, the mac's #995)
+
+Written 2026-11-19 for [#1003](https://github.com/russellgordon/plantoir/issues/1003).
+The rule, the words and the reasons are the mac's: `09-mac-app.md` →
+"Plantoir never closes Obsidian unasked (#995)", and the contract key
+`obsidianNeverClosedUnasked`. This section says where Windows does it.
+
+**What was wrong.** `FolderActions.OpenInObsidian` registered a course a
+running Obsidian had never seen by quitting Obsidian, with every vault open in
+it, without a word. Every route reached it: the menus, both toolbars, the
+assistant's press, a course kept for reference after its note, and Course
+Settings' How I Teach row (the last two called it directly).
+
+**Where it is now.** `FolderActions.OpenInObsidian` never closes Obsidian: a
+course Obsidian does not know, while Obsidian runs, hands nothing over and
+answers false. Every open goes through `ObsidianOpenRoute`
+(`OpenThenReportAsync`): when `ObsidianClosingRule.MustAsk` says so (Obsidian
+running and no vault in its list is the file's folder or holds it; a list that
+cannot be read holds nothing), or when the open answers false because Obsidian
+started after the check, the route asks "Close Obsidian to open {course}?"
+(`ObsidianWorld.AskClosingAsync`: the sentence and its three facts, Close
+Obsidian and Open as the default, Cancel, Escape is Cancel). The reference
+course and the How I Teach row take `OpenWithoutTheScanAsync`, the same
+question without the add-ons scan. At the answer the route reads the situation
+again (Obsidian quit, or came to know the course: it just opens); otherwise
+`FolderActions.CloseObsidianAndRegister` runs `ObsidianClosingRule.CloseAndRegisterAsync`:
+what Obsidian's list marks open is noted (`VaultsOpen`, so a hidden Obsidian's
+courses come back), Obsidian is quit and waited for, and only once it is gone
+are the defaults seeded, auto-reveal patched, the course registered and the
+other vaults reopened; the course opens last. One trail line per answer
+("asked to close Obsidian to open a course"; the ledger entry is gone).
+
+**The add-ons offer.** Its yes reads "Close Obsidian and Add Them" when it
+closes Obsidian (`ObsidianAddOnsRequest.AddButtonTitle`: open or cannot tell).
+A course opened in Obsidian while the offer was up goes to the reopen question
+instead of a quit, because the button pressed said Add Them. The reopen
+question's button is "Close and Reopen Obsidian" (Russell's ruling 1 on #995,
+2026-11-19; the contract, both apps and `help/controls.json` changed together).
+
+**When the answer cannot finish** (Obsidian did not close, or it closed and the
+course still could not be added to its list), Windows shows "Could not open
+{course} in Obsidian", one sentence and OK (`ShowCouldNotOpenAsync`, after the
+trail line), following "Could not rename course". That is Russell's ruling 2
+on #995 (2026-11-19); the words are `obsidianNeverClosedUnasked.couldNotOpen`,
+written from Windows first. The mac owes the same alert. The second sentence,
+`notAdded`, was not his: it was written in the shape of his `didNotClose`, and
+he was asked to confirm it.
+
+**What holds it.** `ObsidianNeverClosedUnaskedTests` (every `closeCases` case,
+every word against the contract, the trail lines, the close's order through
+stand-ins, and a source scan: only `FolderActions` (its definition and the
+close), `ObsidianWorld.QuitAndWaitAsync` and the rename call
+`QuitObsidianAndWait`, and `FolderActions.OpenInObsidian` calls neither) and
+the "#1003" block of `ObsidianOpenRouteTests` (the question before any close,
+Cancel, the second look, the two failures and their alert, the backstop, the
+scanned route, How I Teach). `ObsidianRouteSourceTests` now allows one caller
+of `FolderActions.OpenInObsidian(`, the world. Checked by mutation on the
+Windows VM: with the behaviours removed (the rule always "no", the backstop,
+the second look, the order of the close, the button titles, a trail line and
+an alert sentence, a quit put back into the open), every new test went red
+except the two that guard against asking too often (`NothingIsAskedWhenNothingCloses`,
+`TheAddOnsReopenNeverAsksTheClosingQuestionAfterIt`) and the word census.
+
+**Not measured.** No dialog here was seen against a real Obsidian: the VM has
+no Obsidian, and no UI test drives these dialogs. Whether Obsidian for Windows
+writes its list in time for the reopen to find the course is #581's
+measurement, unchanged.
+
 ## The lap cap on Windows (#720, the mac's #689)
 
 One teacher action asks the model at most `shared-rules.json` →
@@ -14432,6 +14504,114 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+## Plantoir Help on Windows (#886, the mac's #839)
+
+`help/` is the one source of Plantoir Help on both platforms: the page
+format, `outline.json`, the checks and the builder (`help/build_help.py`,
+standard library only, Python 3.9 syntax), owned by the Mac's #839 and
+explained in `help/README.md`. Windows' Help is built in pieces, in the order
+the v2.0.0 run's plan review set (its "amended split", which #886 records);
+886a is the only one landed.
+
+### 886a: the Help build and its tests work on Windows, and the suite runs them
+
+**The fault, reproduced.** On Windows, Python's stdout to a pipe uses the ANSI
+code page (cp1252). The checks' messages carry "▸" and "…", so the first
+failure `build_help.py` printed raised `UnicodeEncodeError` and the build
+ended in a traceback instead of naming the fault. `help/tests/test_tokens.py`
+ran 14 tests with 2 failures under the runtime's Python 3.14.10 (both menu-path
+refusals, `encodings\cp1252.py` → `'▸'`). `PYTHONIOENCODING` and
+`PYTHONUTF8` cannot fix it, though `PythonToolchainTests` sets both: every
+caller, the tests' `helpers.run_build` included, runs the script with `-I`,
+which ignores `PYTHON*` variables.
+
+**The fix.** `build_help.py` reconfigures stdout and stderr to UTF-8
+(`errors="strict"`, so an unwritable character is a failure, never a silent
+"?") when run as a script, and only where they are not UTF-8 already; on the
+Mac they are (a UTF-8 locale, and Python 3.7+ turns on UTF-8 mode in the C
+locale), so nothing is reconfigured there. Every reader of a child's output
+in `help/` (`tests/helpers.py`, `tests/test_build_help.py`,
+`tests/test_web_search.py`, `helpbook/macbook.py`'s `hiutil`) decodes UTF-8
+explicitly (`encoding="utf-8"` in place of `universal_newlines=True`, which
+decodes with the locale's encoding: UTF-8 on the Mac, cp1252 here). Both
+halves are needed, and each was proved red alone: the old `build_help.py`
+with the new tests fails `test_tokens` 2 of 14 on the traceback, and the new
+`build_help.py` with the old `helpers.py` fails the same 2 on mojibake
+("Γû╕" for "▸"). The other three readers' changes have no red case on today's
+content (their children print ASCII: search ids, a build summary); they are
+the same fault waiting for a non-ASCII line, and a cp1252 decode can also
+RAISE on five undefined bytes (0x81, 0x8D, 0x8F, 0x90, 0x9D), which is worse
+than mojibake. Rejected: setting `PYTHONIOENCODING` in the runner (ignored
+under `-I`); dropping `-I` from the callers (it is the Mac's Xcode build
+phase's protection against a stray `PYTHONPATH`); `errors="replace"` (output
+is compared by the tests, and a "?" would pass a wrong message).
+
+**The suite.** `PythonToolchainTests.SharedHelpTestFilePasses` DISCOVERS
+`help/tests/test_*.py` and runs each as `verify.sh` does (`python3
+help/tests/test_x.py` from the repository root; the files put their own
+folder on `sys.path`, so the runtime's `._pth` needs nothing), on the
+runtime's Python, with the runtime's `node` first on PATH so the search
+tests run. `TheHelpTestsAreActuallyFound` fails a discovery that finds none;
+its floor is "above zero" rather than today's seven, because `help/` is the
+Mac's and in active work, and a floor at today's count would red this gate
+the day the Mac merges two files. `TheHelpTestsGetTheRuntimesNodeWhenOneIsFetched`
+fails a runtime without `node`, whose skips would read as passes. The same
+per-file limit applies as for `scripts/` (600 s since #916, `Limit`), and a
+stopped Help file is named by its own folder (`help/tests/...`);
+`test_build_help.py` is in `KnownSlowHelpFiles`, so a timeout there names a
+busy PC as the likely cause.
+
+**Measured** on the Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200),
+runtime Python 3.14.10 and node 22.23.4, 2026-11-14, each file run alone
+from the repository root:
+
+| File | Tests | Result | Seconds |
+|---|---|---|---|
+| `test_build_help.py` | 14 | OK, 1 skipped (`hiutil`) | 92 to 94 |
+| `test_checks.py` | 23 | OK | 12 |
+| `test_macbook.py` | 10 | OK, 10 skipped (`hiutil`) | under 1 |
+| `test_markdown.py` | 27 | OK, 2 skipped (`hiutil`) | 15 |
+| `test_tokens.py` | 14 | OK (2 failures before the fix) | 7 |
+| `test_web_search.py` | 20 | OK, 2 skipped (`hiutil`) | 15 |
+| `test_words.py` | 29 | OK | 15 |
+
+About two and a half minutes in all. Without `node` the search tests skip
+too (4 in `test_build_help.py`, 6 in `test_web_search.py`). `test_build_help.py`
+is the slow one: nine of its tests each build the real `help/` (86 pages
+written, 16 stubs on 2026-11-14), 7 to 12 seconds a build. Under the
+180-second limit of that day, one filtered run made while another agent's
+build and full suite started on this PC took it past the limit (exit 124);
+alone it took half that limit, and #916's 600 s leaves it room.
+
+**`build_help.py --check` on Windows** runs clean: exit 0, two warnings
+(`sidebarRestoreQuestionRestoreSectionButton` and
+`sidebarRestoreQuestionRestoreWholeCourseButton` in `help/controls.json`
+are used by no page) and `Help: 86 pages written, 16 stubs, 151 scenes
+awaiting capture, 2 warnings, 0 publish/deploy notes, 0 failures` on
+`origin/dev` 86ae77e53. Everything it reads is in the repository (the
+menu golden `mac-app/Tests/Goldens/menu-bar.txt`, the Swift sources, the
+contract); it needs no tool. It is not wired into the Windows gate by
+itself: `test_build_help.py`'s `test_the_real_repository_checks_green`
+already runs it on the real `help/` in the gate.
+
+### What follows 886a, and what each waits for
+
+- **886b**, after the Mac's pages branch merged (it has, by 86ae77e53):
+  `--windows` and `--release-windows` in the shared builder, on the pages'
+  `{{machine}}` token; a token with no Windows column renders a visible
+  placeholder and is counted, never failed, so a Mac merge cannot red
+  Windows' build; `{{say:}}` fills `{machine}` and the word check reads the
+  rendered Windows HTML.
+- **886c**, after #790's 790b (`GuardedSite`, its proxied environment and
+  the headless probe): the Help window, `Help.Open(pageId, from)`, Help ▸
+  Plantoir Help and F1, the bundle target and its prerequisite, the trail
+  lines.
+- **886d**, after all the Mac's pages are in and Windows' #897/#900 menu
+  items have merged: the menu table, the Windows golden and the Windows
+  columns, then the Windows runs written by Fable.
+- **886e**: Help buttons on dialogs from the outline's `opensFrom`.
+- **886f**, last before the cut: Windows' own pictures at 200%, and Help's
+  lines in the one Narrator sitting.
 
 ## The launchers refuse an overlapping build (#828, mac #729), and #835's scheduled-deploy words (#854, #868)
 
@@ -14951,6 +15131,73 @@ against a reference model of the same rules. It reads the traces with CR LF
 taken as LF, so a checkout with `core.autocrlf=true` is current (measured
 red before the fix by converting the three files to CR LF).
 
+**U2b (the mac, branch `issue/899-u2b-op-kinds`) defines the six reserved op
+kinds** (`replaceText`, `editJSON`, `move`, `createTree`, `removeTree`,
+`external`) and runs `recompute`, all in the contract: their rules in
+`undoJournal.opKinds` (and `opKinds.wholeOps`), 64 more `checkCases` rows,
+`listingCases` (a folder's listing, the one text both platforms must make
+byte for byte: lines in the order of the paths' UTF-8 BYTES, never
+`string.Compare` or a culture's order), 15 `stackCases` and 6
+`recoveryCases`. What Windows must get right that the Swift cannot show: a
+`move` is one `MoveFileEx` WITHOUT `MOVEFILE_REPLACE_EXISTING`, judged as a
+pair (never delete the destination alone); a folder taken out is renamed
+aside and deleted only once every change has gone in; `editJSON` compares
+as JSON (true is not 1) and writes back with `JsonSerializer` only if the
+result reads back as the file with that one member changed; an `external`
+`preference:` names Windows' own settings store; and until the app has a
+runner for a `recompute`'s maintainer, its step is not available. A W1
+reader written before U2b treats every one of these kinds as unreadable,
+which is still safe (a barrier); the rows say what it should answer once it
+reads them. The mac's reasons and what was rejected are in
+`documentation/09-mac-app.md` → "The kinds U2 adds, and `recompute` run".
+
+After U2b's hard review (2026-11-19) five more things bind Windows, each
+with cases: a read of the teacher's file that FAILS (access denied, an I/O
+error, a OneDrive placeholder not yet downloaded) is `cannotTell`, refused
+without clearing the list and retried by recovery, never "changed since"
+(`checkCases` with `cannotBeRead`; on Windows deny read with an ACL);
+`editJSON` changes only the member's bytes (`undo.editJSONCases`, the exact
+bytes, with a Python reference: do not re-serialise the file with
+`System.Text.Json`); places are compared without regard to case; a
+listing never holds a `.DS_Store` (and the Windows twin, `desktop.ini` and
+`Thumbs.db`, is a question for the Windows port to raise, not assumed); and
+a folder set aside by a dead process is renamed back only when its listing
+is the step's, never deleted (`undo.rule.recovery`, `recoveryCases` with
+`withATree`). The door for a step given as ops refuses before anything
+changes when the step would not read back readable, names a path outside
+the working folder (links resolved), or names a blob it was not given.
+
+Three more rules from the second and third reviews bind Windows, each in
+the contract: **who settles a front-page step** (a dead step with a
+`recompute` is settled only by a recovery that re-derives what it settles;
+a recovery inside another write's lock leaves it in flight; `rule.recovery`,
+`recoveryCases` with `recoveredBy`); **containment is checked at every
+change**, not only at the door (every place inside the working folder with
+junctions and links resolved, at plan time and immediately before each
+rename or write; a place that leads outside is `changedSince`;
+`rule.stagedThenSwapped`, `stackCases`); and **a folder set aside is the
+teacher's own** (renamed back whenever its place is free, whatever it holds,
+and in the way when it changed; left untouched and recorded when its place
+is taken; the trail event `undo found a folder set aside`, held in
+`NamedGapLedger` under #899 until Windows writes Undo lines; `recoveryCases`
+with `changeTheFolderSetAside` and `somethingInItsPlace`).
+
+Two more from the fourth review and Russell's ruling of 2026-11-19 bind
+Windows, in `rule.recovery` and `recoveryCases`: **a folder taken out is
+never deleted in place** (once every change has gone in, rename it from
+its `-orig` name to its `-gone` name with one `MoveFileEx` without
+`MOVEFILE_REPLACE_EXISTING`, then delete it; recovery deletes a `-gone`
+remnant as a staged file and never puts it back; `recoveryCases` with
+`halfDeleteTheGoneFolder`, a delete cut short at the kill point
+`whileDeletingAFolder`); and **a folder set aside whose place something
+else holds is renamed to a visible name beside it**, `<name> (kept by
+Undo)`, then `(kept by Undo 2)` and on, never over anything, with the trail
+line written just before the rename (`recoveryCases` with
+`visibleNameTaken` and `recoveryStopsAfterTheTidy`, a recovery that dies
+after it has tidied and before it writes to the list). A place that cannot
+be read (access denied) is neither free nor taken: leave the folder, say
+nothing, try again.
+
 Six things in the format are easy to get wrong and are the reason it was
 revised:
 
@@ -15206,9 +15453,11 @@ and nothing in the app calls it yet.
   check reads asking only to READ and sharing everything
   (`FileShare.ReadWrite | FileShare.Delete`), never with write or delete
   access. A page held with no read sharing, a cloud file not available
-  offline or a network error is `CannotReadNow`, and it ends as the
-  contract's `fileIsInUse` ends: refused, named, nothing on the list changed
-  (the plan review's M3). It is NEVER `changedSince`, which would clear the
+  offline or a network error is `CannotReadNow`, refused, named, nothing on
+  the list changed (the plan review's M3). Since U2b's contract (2026-11-19)
+  it ends in one of two ways: a sharing or lock violation (32, 33) as the
+  contract's `fileIsInUse` ends, every other failed read as its `cannotTell`
+  (refusal `cannotTellNow`); see "What U2b's rows met here" above. It is NEVER `changedSince`, which would clear the
   whole list under ruling 13 for a file that was merely busy. The contract
   has no case for it yet: the tests are named `Proposed_*`, and the proposed
   authored cases (with a failing staging write and the read-only bit) are a
@@ -15256,6 +15505,65 @@ after every line. The traces' writer (`settingEntry`) and the op derivation
 lock, no staged swap, no flush, one process. Each count is asserted at or
 above its value today, so a list cannot silently fall to zero.
 
+**What U2b's rows met here (2026-11-19).** With the mac's U2b in the
+contract, this reader takes its six kinds for kinds it does not know, as
+the plan has W1 do, so their rows are held on the named-gap ledger against
+#899 for W6 (`NamedGapLedger` → `UndoCheckCases`, `UndoStackCases`,
+`UndoTraces`): 60 `checkCases` (every row of a U2 kind whose verdict is not
+`notReadable` both ways), U2b's 19 `stackCases` (each needs a call or a key
+the replay does not know) and the 15 traces that hold a `move`.
+
+A held row is not skipped, and each of these is proved by a test on a real
+held row (`TheDayAHeldCheckCaseIsAnsweredAsTheContractSaysItFails`,
+`TheDayAHeldStackCasePlaysThroughItFails`, `TheDayAHeldTracePlaysThroughItFails`):
+
+- A held check case must still be read as an op this reader cannot read and
+  still be answered `notReadable` both ways. It fails as the gap closing the
+  day its op is read, or the day it is answered as the contract says, and as
+  a real failure if it is answered anything else.
+- A `current` this test cannot place yet (a move's `atFrom`/`atTo`, a
+  `tree`, a `preference`, U2's shapes, which W6 places) is judged on a
+  placeholder, and only while the op cannot be read: an unreadable op is
+  settled before anything at its path is read, and two placeholders a
+  readable op would tell apart (nothing there, a folder) must agree. So the
+  nine such rows that expect `notReadable` both ways (a move onto itself,
+  with a path, to an absolute path and so on, "createTree whose path climbs
+  out", "external with a path") are met here and are not held. An op this
+  reader CAN read with such a `current` fails, naming the shape, until the
+  test places it. (Until the review of 2026-11-19 a held case of such a
+  shape returned after checking only that its op was unreadable, which a
+  correct W6 reader of those nine still satisfies, so they could never have
+  come off the ledger.)
+- A held stack case must still stop at the call or key it is held for; a
+  held trace is asserted call by call exactly as any other and must stop at
+  its FIRST `move`, at that call's number. Either fails as the gap closing
+  the day it plays through, and as a real failure if anything else stops it.
+
+**What the held traces no longer check, for W6 to restore.** Until U2b's
+contract put a `move` in them, W1 replayed all 20 traces call by call to
+their final hashes. Held, the 15 are asserted only up to their first
+`move`, and trace-002, trace-012 and trace-020 open with one, so they check
+nothing at all here; the ledger entry's reason says so, so the coverage
+comes back when W6 replays them whole.
+
+U2b's two `cannotBeRead` rows on kinds W1 reads ("a page that is there and
+cannot be read just now (no permission)", "whole file: cannot be read just
+now") were W1's and are built: a read refused for any reason but a sharing
+or lock violation (32, 33) is now `cannotTell`, refused `cannotTellNow` with
+the list kept, in the mac's order (a page in the way, then a page that
+cannot be read, then content missing, each pinned by a test); a sharing or
+lock violation stays "in use", which `rule.recovery` names apart. The mac
+answers `cannotTell` for every failed read but a missing file or folder;
+the 32/33 split is Windows' own, because there a page held by another
+program is the everyday case and `fileIsInUse` names it. The contract rows
+make the page unreadable through `UndoCurrent.Read`'s seam (access denied),
+so they run under any token; a real deny-read ACE is
+`APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow`. It runs
+and passes over SSH on the PC (run `899u2b-win-11`): a deny ACE on READING
+a file stops the administrator's token there, unlike a deny on LISTING a
+folder, which it passes (`DenyBitesFact`). Its `DenyReadBitesFact` probe
+still skips it, saying why, on any account whose token reads past it.
+
 **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
 .NET 9, the system NTFS volume, other agents of the run sharing the CPU, so
 the spread is wide): a whole read, fold and offer of one segment, by a scratch
@@ -15292,7 +15600,8 @@ readable (4); the next number counted from readable lines only (4).
 
 **Rejected:** a typed deserialiser (the mac's first bug: it threw and the line
 was skipped); a fourth verdict word of Windows' own for a failed read (M3: the
-contract's `fileIsInUse` already says what happens); probing a page with an
+contract's `fileIsInUse` already said what happens, and since U2b its
+`cannotTell` says it for every failed read but a held file); probing a page with an
 exclusive open to find holders (M2: every page Obsidian has open would be
 refused); `File.ReadAllText` anywhere in a check (it drops a BOM and replaces
 bad bytes without a word); a culture-aware compare anywhere (it calls a

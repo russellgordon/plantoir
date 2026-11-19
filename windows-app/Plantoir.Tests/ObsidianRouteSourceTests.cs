@@ -13,8 +13,14 @@ public class ObsidianRouteSourceTests
 {
     private static string AppFolder => Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir");
 
+    /// <remarks>
+    /// Since #1003 the How I Teach row and a course kept for reference open
+    /// through the route as well (<c>OpenWithoutTheScanAsync</c>), so the
+    /// world is the one place that calls the door: no route can skip the
+    /// closing question (the mac's #995, <c>obsidianNeverClosedUnasked</c>).
+    /// </remarks>
     [Fact]
-    public void OnlyTheSidebar_OpensObsidian_ExceptTheHowITeachPage()
+    public void OnlyTheRoutesWorld_OpensObsidian()
     {
         var callers = Directory.EnumerateFiles(AppFolder, "*.cs", SearchOption.AllDirectories)
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
@@ -29,11 +35,14 @@ public class ObsidianRouteSourceTests
         Assert.Equal(0, callers.GetValueOrDefault("SidebarPane.Menus.cs"));
         Assert.Contains("new ObsidianOpenRoute(new ObsidianWorld(", File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs")));
         Assert.Equal(1, callers.GetValueOrDefault("ObsidianWorld.cs"));
-        Assert.Equal(1, callers.GetValueOrDefault("SidebarPane.Reference.cs"));
-        // The named exception: Course Settings' How I Teach row opens a PAGE of
-        // a LIVE course (a reference course has no such row), not the course.
-        Assert.Equal(1, callers.GetValueOrDefault("CourseSettingsView.xaml.cs"));
-        Assert.Equal(3, callers.Values.Sum());
+        Assert.Equal(1, callers.Values.Sum());
+        // The reference course and the How I Teach row take the route too.
+        Assert.Contains("ObsidianRoute().OpenWithoutTheScanAsync(course, revealFolder,",
+            File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Reference.cs")));
+        Assert.Contains("_window.SidebarPane.OpenHowITeachPageInObsidian(_course, page)",
+            File.ReadAllText(Path.Combine(AppFolder, "Views", "CourseSettingsView.xaml.cs")));
+        Assert.Contains("ObsidianRoute().OpenWithoutTheScanAsync(course, course.DirectoryPath, page)",
+            File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs")));
     }
 
     /// <summary>
@@ -66,7 +75,7 @@ public class ObsidianRouteSourceTests
         int locked = source.IndexOf("ReferenceLock.EnsureLocked(course)", start, StringComparison.Ordinal);
         int noted = source.IndexOf("Event.ReferenceCoursePagesLockedAgain", start, StringComparison.Ordinal);
         int note = source.IndexOf("NoteWasShown(course)", start, StringComparison.Ordinal);
-        int opened = source.IndexOf("FolderActions.OpenInObsidian(", start, StringComparison.Ordinal);
+        int opened = source.IndexOf("ObsidianRoute().OpenWithoutTheScanAsync(", start, StringComparison.Ordinal);
         Assert.True(locked > start && noted > locked && note > noted && opened > note,
             $"lock {locked}, trail {noted}, note {note}, open {opened}: the pages must be locked again before the note and before Obsidian");
     }

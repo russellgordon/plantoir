@@ -20,6 +20,11 @@ namespace Plantoir.Tests;
 /// it. A shared file could be broken from this machine and every gate on this
 /// machine would stay green.</para>
 ///
+/// <para>Since #886 it also discovers and runs Plantoir Help's
+/// <c>help/tests/test_*.py</c>, from the repository root as <c>verify.sh</c>
+/// does, with the runtime's <c>node</c> on PATH (see
+/// <see cref="SharedHelpTestFilePasses"/>).</para>
+///
 /// <para><b>Why the whole folder rather than the publishing files only.</b> The
 /// first draft of this work watched five publishing files and left the rest.
 /// Two measurements killed that: <c>build_site.py</c> is executed by a publish
@@ -112,6 +117,87 @@ public class PythonToolchainTests
             $"scripts/{fileName} failed on {Interpreter.Describe()} (exit code {result.ExitCode}).\n\n{result.Output}");
     }
 
+    // MARK: - Plantoir Help's tests (#886)
+
+    private static string HelpTestsDirectory => Path.Combine(RepoRoot, "help", "tests");
+
+    /// <summary>How a failure names Help's test folder.</summary>
+    private const string HelpTestsLabel = "help/tests";
+
+    /// <summary>
+    /// Every <c>help/tests/test_*.py</c>, discovered rather than listed (#886).
+    ///
+    /// <para><c>help/</c> is the one source of Plantoir Help on both platforms
+    /// (#839): its outline, its word check and its token checks are shared
+    /// truth, so a change made from this machine must be gated here as a
+    /// change to <c>scripts/</c> is. Until #886 nothing on Windows ran them,
+    /// and the first run found a real fault: <c>build_help.py</c> printed
+    /// "▸" to a cp1252 pipe and ended in a traceback, so <c>test_tokens.py</c>
+    /// failed 2 of 14 on the runtime's Python 3.14.10. The <c>hiutil</c> tests
+    /// skip off a Mac, by design; the rest must pass.</para>
+    /// </summary>
+    public static IEnumerable<object[]> HelpTestFiles()
+    {
+        foreach (string path in Directory.GetFiles(HelpTestsDirectory, "test_*.py").OrderBy(p => p))
+            yield return new object[] { Path.GetFileName(path) };
+    }
+
+    /// <summary>
+    /// Runs one Help test file as <c>verify.sh</c> does on the Mac:
+    /// <c>python3 help/tests/test_x.py</c> from the REPOSITORY ROOT (the files
+    /// put their own folder on <c>sys.path</c>, so the runtime's <c>._pth</c>
+    /// needs nothing more), with the runtime's <c>node</c> on PATH so the
+    /// search tests run rather than skip.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(HelpTestFiles))]
+    public void SharedHelpTestFilePasses(string fileName)
+    {
+        var result = RunHelpTest(fileName);
+        _output.WriteLine($"ran on {Interpreter.Describe()}");
+        _output.WriteLine(result.Output);
+
+        Assert.True(
+            result.ExitCode == 0,
+            $"help/tests/{fileName} failed on {Interpreter.Describe()} (exit code {result.ExitCode}).\n\n{result.Output}");
+    }
+
+    /// <summary>
+    /// The Help tests must not go quiet either: a moved folder would make the
+    /// theory above vanish and the suite green having run none of them.
+    ///
+    /// <para>The floor is "above zero" rather than today's count (seven on
+    /// 2026-11-14), unlike <see cref="TheSharedPythonTestsAreActuallyFound"/>:
+    /// <c>help/</c> is the Mac's, in active work in this release, and a floor
+    /// at today's count would turn this gate red the day the Mac folds two
+    /// test files into one, which is a change nobody here owes an answer
+    /// to.</para>
+    /// </summary>
+    [Fact]
+    public void TheHelpTestsAreActuallyFound()
+    {
+        int found = HelpTestFiles().Count();
+        Assert.True(
+            found > 0,
+            $"Expected Plantoir Help's tests in {HelpTestsDirectory}; found none. "
+            + "A suite that passes having run nothing is worse than no suite.");
+    }
+
+    /// <summary>
+    /// With a runtime fetched, its <c>node</c> must be there for the Help
+    /// tests: the search tests skip without one, and a skip here would read as
+    /// a pass.
+    /// </summary>
+    [Fact]
+    public void TheHelpTestsGetTheRuntimesNodeWhenOneIsFetched()
+    {
+        if (NativeRuntime.Folder is not { } runtime)
+            return;
+        string node = Path.Combine(runtime, "node", "node.exe");
+        Assert.True(File.Exists(node),
+            $"A runtime is fetched at {runtime}, but it has no node\\node.exe, so Help's search tests would skip. Re-run windows-app\\Vendor\\fetch-runtime.ps1.");
+    }
+
     /// <summary>
     /// #764: the shared tests run on the interpreter a TEACHER runs, the
     /// runtime's own Python, whenever a runtime is fetched (this checkout's
@@ -193,6 +279,16 @@ public class PythonToolchainTests
         Assert.True(KnownSlowFiles.Count > 0);
         foreach (string slow in KnownSlowFiles.Keys)
             Assert.True(File.Exists(Path.Combine(ScriptsDirectory, slow)), $"KnownSlowFiles names scripts/{slow}, which no longer exists.");
+
+        // Help's files (#886) are named by their own folder, and its slow file by its own table.
+        foreach (string slow in KnownSlowHelpFiles.Keys)
+        {
+            string helpMessage = TimedOutMessage(slow, Limit, 600, HelpTestsLabel);
+            Assert.Contains($"help/tests/{slow} was stopped", helpMessage);
+            Assert.Contains("a busy PC", helpMessage);
+            Assert.True(File.Exists(Path.Combine(HelpTestsDirectory, slow)), $"KnownSlowHelpFiles names help/tests/{slow}, which no longer exists.");
+        }
+        Assert.Contains("suspect a HUNG test", TimedOutMessage("test_checks.py", Limit, 600, HelpTestsLabel));
     }
 
     /// <summary>
@@ -224,16 +320,33 @@ public class PythonToolchainTests
     /// <param name="limit">How long the file may run; <see cref="Limit"/> unless a test of the limit itself says otherwise.</param>
     /// <param name="folder">The folder the file sits in; <see cref="ScriptsDirectory"/> unless a test of the limit itself says otherwise.</param>
     internal static (int ExitCode, string Output) RunPython(string fileName, TimeSpan? limit = null, string? folder = null)
+        => RunPythonFile(folder ?? ScriptsDirectory, fileName, fileName, "scripts", limit ?? Limit, withRuntimeNode: false);
+
+    /// <summary>
+    /// Runs one of Help's files (#886) from the REPOSITORY ROOT, as
+    /// <c>verify.sh</c> runs <c>python3 help/tests/test_x.py</c>, with the
+    /// runtime's <c>node</c> on PATH, under the same <see cref="Limit"/> as
+    /// <c>scripts/</c>.
+    /// </summary>
+    private static (int ExitCode, string Output) RunHelpTest(string fileName)
+        => RunPythonFile(RepoRoot, Path.Combine("help", "tests", fileName), fileName, HelpTestsLabel, Limit, withRuntimeNode: true);
+
+    /// <param name="workingDirectory">Where the interpreter runs: <c>scripts/</c> for the toolchain's files, the repository root for Help's.</param>
+    /// <param name="script">The file to run, relative to <paramref name="workingDirectory"/>.</param>
+    /// <param name="fileName">The file's own name, which <see cref="TimedOutMessage"/> looks up.</param>
+    /// <param name="folderLabel">The folder as a person names it in a failure: <c>scripts</c> or <c>help/tests</c>.</param>
+    private static (int ExitCode, string Output) RunPythonFile(
+        string workingDirectory, string script, string fileName, string folderLabel, TimeSpan allowed, bool withRuntimeNode)
     {
-        TimeSpan allowed = limit ?? Limit;
         var start = new ProcessStartInfo
         {
             FileName = Interpreter.Path,
-            // Run from `scripts/`, exactly as `verify.sh` does (`cd scripts && python3 …`).
-            // These files import their siblings by BARE NAME — `import deploy`,
-            // `import netlify_badge` — which resolves only when the interpreter's
-            // working directory is the folder they sit in.
-            WorkingDirectory = folder ?? ScriptsDirectory,
+            // Run from where `verify.sh` runs each file: `scripts/` for the
+            // toolchain's (`cd scripts && python3 …`), whose files import their
+            // siblings by BARE NAME — `import deploy`, `import netlify_badge` —
+            // which resolves only when the working directory is their folder;
+            // the repository root for Help's (`python3 help/tests/test_x.py`).
+            WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -257,7 +370,17 @@ public class PythonToolchainTests
             foreach (string argument in new[] { "-B", "-X", "utf8", "-c", RuntimeShim })
                 start.ArgumentList.Add(argument);
         }
-        start.ArgumentList.Add(fileName);
+        start.ArgumentList.Add(script);
+
+        // Help's search tests run its search.js with node, and skip without
+        // one. The runtime carries node (Quartz needs it); put it first so the
+        // tests run rather than skip. verify.sh uses whatever node is on the
+        // Mac's PATH.
+        if (withRuntimeNode && NativeRuntime.Folder is { } runtimeFolder)
+        {
+            string nodeFolder = Path.Combine(runtimeFolder, "node");
+            start.Environment["PATH"] = nodeFolder + Path.PathSeparator + (start.Environment["PATH"] ?? "");
+        }
 
         // WITHOUT THESE TWO, TWO FILES FAIL ON WINDOWS AND IT LOOKS LIKE A
         // PRODUCT BUG. `build_site.py` prints emoji ("📝 Added exclusion note
@@ -312,7 +435,7 @@ public class PythonToolchainTests
             }
             catch { /* the pipes went with the process; report the timeout alone */ }
 
-            return (124, (TimedOutMessage(fileName, allowed, ranFor) + "\n\n" + partial).Trim());
+            return (124, (TimedOutMessage(fileName, allowed, ranFor, folderLabel) + "\n\n" + partial).Trim());
         }
 
         // unittest writes its report to stderr, so the failure detail is there
@@ -369,12 +492,27 @@ public class PythonToolchainTests
         ["test_no_stored_credentials.py"] = 34,
     };
 
-    /// <summary>The sentence a stopped file fails with: its name, the limit, how long it ran, and the likely cause.</summary>
-    internal static string TimedOutMessage(string fileName, TimeSpan limit, double ranForSeconds)
+    /// <summary>
+    /// Help's files that take 30 s or more on their own (#886), kept apart
+    /// from <see cref="KnownSlowFiles"/> because they sit in
+    /// <c>help/tests/</c>, not <c>scripts/</c>. <c>test_build_help.py</c>
+    /// builds the real <c>help/</c> in nine of its tests: 92 to 94 s alone,
+    /// measured 2026-11-14 on the same PC and Python as
+    /// <see cref="KnownSlowFiles"/>.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, int> KnownSlowHelpFiles = new Dictionary<string, int>
     {
-        string message = $"scripts/{fileName} was stopped after running {ranForSeconds:F0} seconds; "
+        ["test_build_help.py"] = 93,
+    };
+
+    /// <summary>The sentence a stopped file fails with: its folder and name, the limit, how long it ran, and the likely cause.</summary>
+    /// <param name="folderLabel"><c>scripts</c> for the toolchain's files, <c>help/tests</c> for Help's.</param>
+    internal static string TimedOutMessage(string fileName, TimeSpan limit, double ranForSeconds, string folderLabel = "scripts")
+    {
+        IReadOnlyDictionary<string, int> slowFiles = folderLabel == HelpTestsLabel ? KnownSlowHelpFiles : KnownSlowFiles;
+        string message = $"{folderLabel}/{fileName} was stopped after running {ranForSeconds:F0} seconds; "
                        + $"the limit for one shared Python file is {limit.TotalSeconds:F0} seconds.";
-        if (KnownSlowFiles.TryGetValue(fileName, out int alone))
+        if (slowFiles.TryGetValue(fileName, out int alone))
             message += $" It is one of the known slow files ({alone} s alone on the development PC), so a busy PC — "
                      + "other test runs or builds at the same time — is the likely cause; run it again on a quiet machine before suspecting the file.";
         else
