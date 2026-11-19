@@ -778,6 +778,59 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
     }
 }
 
+// MARK: - Places inside the working folder
+
+/// Whether a path a step names stays inside its working folder once every
+/// link on the way is resolved: a path spelled inside that reaches outside
+/// through a link is refused by the door (the hard review of U2b, HIGH 1).
+nonisolated enum UndoPlaces {
+
+    // MARK: - Functions
+
+    static func resolved(_ path: String) -> String? {
+        guard let real = realpath(path, nil) else {
+            return nil
+        }
+        defer {
+            free(real)
+        }
+        return String(cString: real)
+    }
+
+    static func staysInside(_ root: URL, _ relativePath: String) -> Bool {
+        if !UndoOp.isSafeRelativePath(relativePath) {
+            return false
+        }
+        guard let rootReal = resolved(root.path) else {
+            return false
+        }
+        // The deepest part of the path that exists, the leaf included (a
+        // link at the leaf is followed too).
+        var existing: URL = root.appendingPathComponent(relativePath)
+        while true {
+            var information: stat = stat()
+            let found: Int32 = existing.withUnsafeFileSystemRepresentation { fileSystemPath in
+                guard let fileSystemPath else {
+                    return -1
+                }
+                return lstat(fileSystemPath, &information)
+            }
+            if found == 0 {
+                break
+            }
+            if existing.path.count <= root.path.count {
+                return true
+            }
+            existing = existing.deletingLastPathComponent()
+        }
+        guard let real = resolved(existing.path) else {
+            // A link that leads nowhere: refused rather than guessed at.
+            return false
+        }
+        return real == rootReal || real.hasPrefix(rootReal + "/")
+    }
+}
+
 // MARK: - external
 
 /// What an `external` target holds now.

@@ -359,6 +359,19 @@ nonisolated enum JournaledWrite {
         if !hasContentOp {
             return .changedNothing
         }
+        // Nothing changes until the step is one every reader can undo: it
+        // reads back readable (every shape and the wholeOps rule), every
+        // path stays inside the working folder through its links, and every
+        // blob it names is given or already held, with the right hash (the
+        // hard review of U2b, HIGH 1).
+        switch JournaledWrite.vet(draft, in: journal) {
+        case .acceptable:
+            break
+        case .refused:
+            return .refused(.notReadable)
+        case .listUnreadable:
+            return .couldNotRecordTheStep
+        }
         let seq: Int
         do {
             seq = try beginOps(draft, in: journal, mode: mode)
@@ -396,6 +409,69 @@ nonisolated enum JournaledWrite {
         }
         finish(seq: seq, with: .applied, phase: nil, reason: nil, in: journal, mode: mode)
         return .applied(seq: seq)
+    }
+
+    /// What the door found when it vetted a step before writing anything.
+    enum Vetting: Equatable {
+        case acceptable
+        case refused
+        case listUnreadable
+    }
+
+    /// The checks `perform(ops:)` makes before the begin line.
+    static func vet(_ draft: UndoOpsDraft, in journal: UndoJournal) -> Vetting {
+        // 1. Read back as a reader of this version reads it.
+        var folder: UndoWorkingFolder? = nil
+        if let url = draft.workingFolderURL {
+            folder = UndoWorkingFolder(id: "00000000-0000-0000-0000-000000000000", pathAtTheTime: url.path)
+        }
+        let step: UndoStep = UndoStep(
+            seq: 1, madeAt: UndoMoment.text(journal.now()), action: draft.action, madeBy: draft.madeBy,
+            workingFolder: folder, course: draft.course, section: draft.section,
+            actionClass: draft.actionClass, holds: draft.holds, ops: draft.ops
+        )
+        guard let encoded = try? JSONEncoder().encode(step),
+              let readBack = try? JSONDecoder().decode(UndoStep.self, from: encoded),
+              readBack.isReadable else {
+            return .refused
+        }
+        // 2. Every path inside the working folder, its links resolved.
+        for op in readBack.ops {
+            for path in op.pathsNamed {
+                guard let root = draft.workingFolderURL, UndoPlaces.staysInside(root, path) else {
+                    return .refused
+                }
+            }
+        }
+        // 3. Every blob it names, given or already held, hashing to its name.
+        var given: [String: Data] = [:]
+        for blob in draft.blobs {
+            given[UndoHash.sha256(of: blob)] = blob
+        }
+        func content(_ name: String) throws -> Data? {
+            if let data = given[name] {
+                return data
+            }
+            return try journal.blobContent(sha: name)
+        }
+        do {
+            for op in readBack.ops {
+                for name in op.namedBlobs where try content(name) == nil {
+                    return .refused
+                }
+                if op.knownKind == .createTree || op.knownKind == .removeTree, let listingSha = op.listingSha {
+                    guard let data = try content(listingSha), let listing = UndoTreeListing.parse(data) else {
+                        return .refused
+                    }
+                    for file in listing.files where !(op.blobs ?? []).contains(file.sha) {
+                        return .refused
+                    }
+                }
+            }
+        } catch {
+            return .listUnreadable
+        }
+        return .acceptable
     }
 
     /// Phase one for a step given as ops: the same as `begin`, with the
