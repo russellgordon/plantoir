@@ -177,8 +177,7 @@ struct CopyPageSheet: View {
             }
 
             if let problem {
-                Text(problem)
-                    .foregroundStyle(.orange)
+                StatusColour.blocking.sentence(problem)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("copyPageProblem")
             }

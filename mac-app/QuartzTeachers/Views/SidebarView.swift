@@ -718,8 +718,7 @@ struct SidebarView: View {
                 Label("Section \(sectionNumber)", systemImage: "doc.richtext")
                 Spacer()
                 if stoppedPublish != nil || hasProblems {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                    SectionRowWarningBadge()
                         .accessibilityIdentifier(
                             SidebarView.warningIdentifier(
                                 courseCode: courseCode,
@@ -2598,9 +2597,8 @@ struct CourseCodeField: View {
                     }
 
                 if let problem {
-                    Text(problem)
+                    StatusColour.blocking.sentence(problem)
                         .font(.caption)
-                        .foregroundStyle(Color(nsColor: .systemRed))
                         // Short enough to fit, and allowed to wrap rather
                         // than truncate if a longer one ever arrives: half a
                         // sentence with an ellipsis explains nothing.
@@ -2911,5 +2909,21 @@ private struct CourseRenameAlerts: ViewModifier {
             } message: { notice in
                 Text(notice.message)
             }
+    }
+}
+
+/// The one warning triangle on a section row: a stopped scheduled deploy,
+/// or problems in the section (#994, D38). It wears `StatusColour`'s style,
+/// which on a selected row gives way to the row's own text colour: the
+/// orange triangle measured 1.45:1 on the blue selection in Light, white
+/// there is 5.37:1 (HIG, Color: "Make sure all your app's colors work well
+/// in light, dark, and increased contrast contexts").
+struct SectionRowWarningBadge: View {
+
+    // MARK: - Computed properties
+
+    var body: some View {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .foregroundStyle(StatusColour.warning.style)
     }
 }
