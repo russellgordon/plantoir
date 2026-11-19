@@ -745,6 +745,13 @@ public static class ActivityTrail
         ObsidianReopenedForAddOns,
         /// <summary>File ▸ Settings ▸ Obsidian turned the add-ons on or off — the only way back from "Don't ask again".</summary>
         ObsidianAddOnsSettingChanged,
+        /// <summary>
+        /// "Close Obsidian to open {course}?" was answered (#1003, the mac's
+        /// #995): the course and what came of it - opened after closing
+        /// Obsidian, Cancel, nothing to close by then, Obsidian did not close,
+        /// or it closed and the course could not be added to its list.
+        /// </summary>
+        ObsidianClosingAsked,
 
         // ---- Open in Obsidian opens the page the preview shows (#681; the mac's #518) ----
         /// <summary>
@@ -938,6 +945,7 @@ public static class ActivityTrail
         Event.ObsidianAddOnsAdded => "obsidian add-ons added",
         Event.ObsidianReopenedForAddOns => "obsidian reopened for add-ons",
         Event.ObsidianAddOnsSettingChanged => "obsidian add-ons setting changed",
+        Event.ObsidianClosingAsked => "asked to close Obsidian to open a course",
         Event.PageOpenedInObsidian => "page opened in Obsidian",
         Event.SwiftGotReady => "Swift got ready on this computer",
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",

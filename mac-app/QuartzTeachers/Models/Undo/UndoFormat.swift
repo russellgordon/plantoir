@@ -347,14 +347,49 @@ nonisolated struct UndoStep: Codable, Equatable, Sendable {
             if !op.isReadable {
                 readable = false
             }
-            if op.path != nil {
+            if !op.pathsNamed.isEmpty {
                 needsAFolder = true
             }
         }
         if needsAFolder && workingFolder == nil {
             readable = false
         }
+        if !UndoStep.wholeOpsStandAlone(ops) {
+            readable = false
+        }
         isReadable = readable
+    }
+
+    /// A move's places, a tree's folder and everything in it, and an
+    /// external op's target are named by no other op of the step (U2). Such
+    /// an op is checked and changed as a whole against the disk as it is,
+    /// never against what an earlier op of the same step would leave, so a
+    /// step where two ops share a place is one this version cannot read: it
+    /// is a barrier, never undone in a guessed order.
+    static func wholeOpsStandAlone(_ ops: [UndoOp]) -> Bool {
+        var index: Int = 0
+        while index < ops.count {
+            let op: UndoOp = ops[index]
+            if op.isWhole {
+                var other: Int = 0
+                while other < ops.count {
+                    if other != index {
+                        let second: UndoOp = ops[other]
+                        if let target = op.target, second.target == target {
+                            return false
+                        }
+                        for mine in op.pathsNamed {
+                            for theirs in second.pathsNamed where UndoOp.placesOverlap(mine, theirs) {
+                                return false
+                            }
+                        }
+                    }
+                    other += 1
+                }
+            }
+            index += 1
+        }
+        return true
     }
 
     func encode(to encoder: Encoder) throws {
@@ -456,12 +491,14 @@ nonisolated struct UndoProcess: Codable, Equatable, Sendable {
 /// One thing a step changed, recorded so it can be checked and reversed.
 ///
 /// Open: `kind` is the only key every op has. An op inside a working folder
-/// has `path`; one that needs content from the journal names every blob in
-/// `blobs`, whatever its kind, so a pruner that cannot read the op still
-/// keeps what it needs. U1 writes `writeFile` and `editLine` and records
-/// `recompute`; the shapes reserved for U2 to U5 are in the contract
-/// (`undoJournal.opKinds`). An op this version cannot read makes its step
-/// unreadable; it is never guessed at.
+/// has `path` (a `move` has `from` and `to` instead); one that needs content
+/// from the journal names every blob in `blobs`, whatever its kind, so a
+/// pruner that cannot read the op still keeps what it needs. U1 wrote
+/// `writeFile` and `editLine` and recorded `recompute`; U2 defines
+/// `replaceText`, `editJSON`, `move`, `createTree`, `removeTree` and
+/// `external` (`undoJournal.opKinds`). The shapes still reserved for U5
+/// (`trash`, `storeHeld`) are kinds this version does not know. An op this
+/// version cannot read makes its step unreadable; it is never guessed at.
 nonisolated struct UndoOp: Codable, Equatable, Sendable {
 
     // MARK: - Stored properties
@@ -479,7 +516,8 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     var beforeSha: String?
     var afterSha: String?
 
-    /// `editLine`: the key, and its entry before and after.
+    /// `editLine`: the key, and its entry before and after. `replaceText`:
+    /// the hunk's text before and after.
     var key: String?
     var before: String?
     var after: String?
@@ -494,12 +532,44 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     var maintainer: String?
     var section: Int?
 
+    /// `replaceText`: the text either side of the hunk, kept as it was.
+    var contextBefore: String?
+    var contextAfter: String?
+
+    /// `editJSON`: the members to walk, from the top-level object down.
+    var keyPath: [String]?
+
+    /// `editJSON` and `external`: the value before and after, any JSON. Nil
+    /// is "no such member" (or "not set"); `.null` is JSON's null.
+    var valueBefore: UndoJSON?
+    var valueAfter: UndoJSON?
+
+    /// `move`: where the item was and where it went.
+    var from: String?
+    var to: String?
+
+    /// `move` of a file: its SHA-256. Never a blob: the file itself is
+    /// what moves.
+    var sha: String?
+
+    /// `move` of a folder, `createTree` and `removeTree`: the SHA-256 of
+    /// the folder's listing (`UndoTreeListing`).
+    var listingSha: String?
+
+    /// `external`: what outside the working folder it changed.
+    var target: String?
+
     /// False when this version cannot read the op. Never written.
     var isReadable: Bool = true
 
     /// The `recompute` maintainers this version can run. Any other makes the
     /// op unreadable (`undoJournal.opKinds.recompute`).
     static let maintainersThisVersionKnows: Set<String> = ["sectionFrontPage"]
+
+    /// The `external` targets this version can read and write, by the part
+    /// before the first colon: `preference:<name>` is one of the app's own
+    /// preferences. Any other makes the op unreadable.
+    static let externalTargetsThisVersionKnows: Set<String> = ["preference"]
 
     enum CodingKeys: String, CodingKey {
         case kind
@@ -514,6 +584,17 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         case createdTheBlock
         case maintainer
         case section
+        case contextBefore
+        case contextAfter
+        case keyPath
+        case from
+        case to
+        case sha
+        case listingSha
+        case target
+        // Read only to say the op cannot be read: a later piece's meaning.
+        case element
+        case heldBy
     }
 
     // MARK: - Initializer
@@ -538,12 +619,38 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         beforeSha = UndoLenient.string(container, .beforeSha, &readable)
         afterSha = UndoLenient.string(container, .afterSha, &readable)
         key = UndoLenient.string(container, .key, &readable)
-        before = UndoLenient.string(container, .before, &readable)
-        after = UndoLenient.string(container, .after, &readable)
+        let valuesAreJSON: Bool = kind == UndoOpKind.editJSON.rawValue || kind == UndoOpKind.external.rawValue
+        if valuesAreJSON {
+            // Any JSON, null included: a member that is there holding null
+            // is not a member that is absent.
+            valueBefore = UndoLenient.json(container, .before, &readable)
+            valueAfter = UndoLenient.json(container, .after, &readable)
+        } else {
+            before = UndoLenient.string(container, .before, &readable)
+            after = UndoLenient.string(container, .after, &readable)
+        }
         afterKey = UndoLenient.string(container, .afterKey, &readable)
         createdTheBlock = UndoLenient.value(Bool.self, container, .createdTheBlock, &readable)
         maintainer = UndoLenient.string(container, .maintainer, &readable)
         section = UndoLenient.int(container, .section, &readable)
+        contextBefore = UndoLenient.string(container, .contextBefore, &readable)
+        contextAfter = UndoLenient.string(container, .contextAfter, &readable)
+        keyPath = UndoLenient.value([String].self, container, .keyPath, &readable)
+        from = UndoLenient.string(container, .from, &readable)
+        to = UndoLenient.string(container, .to, &readable)
+        sha = UndoLenient.string(container, .sha, &readable)
+        listingSha = UndoLenient.string(container, .listingSha, &readable)
+        target = UndoLenient.string(container, .target, &readable)
+        // `element` (editJSON) and `heldBy` (removeTree) are the reserved
+        // shapes' keys for meanings a later piece settles: an op carrying
+        // either is one this version cannot undo by its own rule, so it is
+        // one it cannot read (`undoJournal.unknown.keys`).
+        if container.contains(.element) && kind == UndoOpKind.editJSON.rawValue {
+            readable = false
+        }
+        if container.contains(.heldBy) && kind == UndoOpKind.removeTree.rawValue {
+            readable = false
+        }
         isReadable = readable && UndoOp.shapeIsKnown(self)
     }
 
@@ -555,12 +662,28 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         try container.encodeIfPresent(beforeSha, forKey: .beforeSha)
         try container.encodeIfPresent(afterSha, forKey: .afterSha)
         try container.encodeIfPresent(key, forKey: .key)
-        try container.encodeIfPresent(before, forKey: .before)
-        try container.encodeIfPresent(after, forKey: .after)
+        if let valueBefore {
+            try container.encode(valueBefore, forKey: .before)
+        } else {
+            try container.encodeIfPresent(before, forKey: .before)
+        }
+        if let valueAfter {
+            try container.encode(valueAfter, forKey: .after)
+        } else {
+            try container.encodeIfPresent(after, forKey: .after)
+        }
         try container.encodeIfPresent(afterKey, forKey: .afterKey)
         try container.encodeIfPresent(createdTheBlock, forKey: .createdTheBlock)
         try container.encodeIfPresent(maintainer, forKey: .maintainer)
         try container.encodeIfPresent(section, forKey: .section)
+        try container.encodeIfPresent(contextBefore, forKey: .contextBefore)
+        try container.encodeIfPresent(contextAfter, forKey: .contextAfter)
+        try container.encodeIfPresent(keyPath, forKey: .keyPath)
+        try container.encodeIfPresent(from, forKey: .from)
+        try container.encodeIfPresent(to, forKey: .to)
+        try container.encodeIfPresent(sha, forKey: .sha)
+        try container.encodeIfPresent(listingSha, forKey: .listingSha)
+        try container.encodeIfPresent(target, forKey: .target)
     }
 
     // MARK: - Computed properties
@@ -572,7 +695,8 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return UndoOpKind(rawValue: kind)
     }
 
-    /// Every blob the op names, from `blobs` and its two hashes.
+    /// Every blob the op names, from `blobs`, its two hashes and its
+    /// listing.
     var namedBlobs: [String] {
         var names: [String] = []
         for name in blobs ?? [] {
@@ -584,7 +708,48 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         if let afterSha {
             names.append(afterSha)
         }
+        if let listingSha, !names.contains(listingSha) {
+            names.append(listingSha)
+        }
         return names
+    }
+
+    /// Every path inside the working folder the op names: its `path`, or a
+    /// move's `from` and `to`. Empty for an `external` op.
+    var pathsNamed: [String] {
+        var paths: [String] = []
+        if let path {
+            paths.append(path)
+        }
+        if let from {
+            paths.append(from)
+        }
+        if let to {
+            paths.append(to)
+        }
+        return paths
+    }
+
+    /// The name recovery and a refusal use for this op's place: its path, a
+    /// move's `from`, or an external op's target.
+    var placeName: String {
+        if let path {
+            return path
+        }
+        if let from {
+            return from
+        }
+        return target ?? kind
+    }
+
+    /// A move, a tree or an external op: checked and changed as a whole, on
+    /// its own, never folded into another op's file (`UndoStep`'s rule that
+    /// no other op of the step names its places).
+    var isWhole: Bool {
+        guard let kind = knownKind else {
+            return false
+        }
+        return kind == .move || kind == .createTree || kind == .removeTree || kind == .external
     }
 
     // MARK: - Functions
@@ -630,16 +795,110 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return op
     }
 
+    static func replaceText(
+        path: String,
+        before: String,
+        after: String,
+        contextBefore: String,
+        contextAfter: String
+    ) -> UndoOp {
+        var op: UndoOp = UndoOp(kind: UndoOpKind.replaceText.rawValue, path: path)
+        op.before = before
+        op.after = after
+        op.contextBefore = contextBefore
+        op.contextAfter = contextAfter
+        return op
+    }
+
+    static func editJSON(path: String, keyPath: [String], before: UndoJSON?, after: UndoJSON?) -> UndoOp {
+        var op: UndoOp = UndoOp(kind: UndoOpKind.editJSON.rawValue, path: path)
+        op.keyPath = keyPath
+        op.valueBefore = before
+        op.valueAfter = after
+        return op
+    }
+
+    static func moveFile(from: String, to: String, sha: String) -> UndoOp {
+        var op: UndoOp = UndoOp(kind: UndoOpKind.move.rawValue, path: nil)
+        op.from = from
+        op.to = to
+        op.sha = sha
+        return op
+    }
+
+    static func moveFolder(from: String, to: String, listingSha: String) -> UndoOp {
+        var op: UndoOp = UndoOp(kind: UndoOpKind.move.rawValue, path: nil)
+        op.from = from
+        op.to = to
+        op.listingSha = listingSha
+        return op
+    }
+
+    /// `createTree` or `removeTree`: blobs are the listing's and every
+    /// file's content, so the tree can be made again.
+    static func tree(_ kind: UndoOpKind, path: String, listing: UndoTreeListing) -> UndoOp {
+        var op: UndoOp = UndoOp(kind: kind.rawValue, path: path)
+        op.listingSha = listing.sha
+        var names: [String] = [listing.sha]
+        for file in listing.files where !names.contains(file.sha) {
+            names.append(file.sha)
+        }
+        op.blobs = names
+        return op
+    }
+
+    static func external(target: String, before: UndoJSON?, after: UndoJSON?) -> UndoOp {
+        var op: UndoOp = UndoOp(kind: UndoOpKind.external.rawValue, path: nil)
+        op.target = target
+        op.valueBefore = before
+        op.valueAfter = after
+        return op
+    }
+
     /// Whether an op read from the journal has a shape this version can act
-    /// on: a known kind, a safe path, and the fields that kind needs.
+    /// on: a known kind, safe paths, and the fields that kind needs.
     static func shapeIsKnown(_ op: UndoOp) -> Bool {
         guard let kind = UndoOpKind(rawValue: op.kind) else {
             return false
         }
-        guard let path = op.path, UndoOp.isSafeRelativePath(path) else {
+        for name in op.namedBlobs where !UndoOp.isBlobName(name) {
             return false
         }
-        for name in op.namedBlobs where !UndoOp.isBlobName(name) {
+        if let sha = op.sha, !UndoOp.isBlobName(sha) {
+            return false
+        }
+        switch kind {
+        case .move:
+            // No `path`: `from` and `to` follow path's rules, differ, and
+            // neither holds the other. Exactly one of a file's `sha` and a
+            // folder's `listingSha`.
+            guard op.path == nil, let from = op.from, let to = op.to else {
+                return false
+            }
+            if !UndoOp.isSafeRelativePath(from) || !UndoOp.isSafeRelativePath(to) {
+                return false
+            }
+            if UndoOp.placesOverlap(from, to) {
+                return false
+            }
+            return (op.sha != nil) != (op.listingSha != nil)
+        case .external:
+            guard op.path == nil, let target = op.target else {
+                return false
+            }
+            guard let colon = target.firstIndex(of: ":") else {
+                return false
+            }
+            let family: String = String(target[target.startIndex..<colon])
+            let name: String = String(target[target.index(after: colon)...])
+            if name.isEmpty || !UndoOp.externalTargetsThisVersionKnows.contains(family) {
+                return false
+            }
+            return op.valueBefore != nil || op.valueAfter != nil
+        default:
+            break
+        }
+        guard let path = op.path, UndoOp.isSafeRelativePath(path) else {
             return false
         }
         switch kind {
@@ -655,7 +914,46 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
                 return false
             }
             return UndoOp.maintainersThisVersionKnows.contains(maintainer)
+        case .replaceText:
+            // Every part present (an empty string is a part), and the two
+            // windows differ, or the hunk could never tell its states apart.
+            guard let before = op.before, let after = op.after,
+                  let contextBefore = op.contextBefore, let contextAfter = op.contextAfter else {
+                return false
+            }
+            return !UndoText.same(contextBefore + before + contextAfter, contextBefore + after + contextAfter)
+        case .editJSON:
+            guard let keyPath = op.keyPath, !keyPath.isEmpty else {
+                return false
+            }
+            if op.valueBefore == nil && op.valueAfter == nil {
+                return false
+            }
+            return op.valueBefore != op.valueAfter
+        case .createTree, .removeTree:
+            guard let listingSha = op.listingSha, let blobs = op.blobs else {
+                return false
+            }
+            return blobs.contains(listingSha)
+        case .move, .external:
+            return false
         }
+    }
+
+    /// Whether two places are the same, or one is a folder holding the
+    /// other (compared part by part, as spelled).
+    ///
+    /// Compared WITHOUT regard to case: a Mac's volume (and Windows') is
+    /// usually case-insensitive, so `a.json` and `A.json` are one place
+    /// there, and a move between them or two ops naming them is refused as
+    /// a step this version cannot read (the hard review of U2b, MEDIUM 7).
+    static func placesOverlap(_ first: String, _ second: String) -> Bool {
+        let one: String = first.lowercased()
+        let other: String = second.lowercased()
+        if one == other {
+            return true
+        }
+        return one.hasPrefix(other + "/") || other.hasPrefix(one + "/")
     }
 
     /// A path a step may name: relative, forward slashes, no `.` or `..`
@@ -693,11 +991,24 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     }
 }
 
-/// The kinds of op U1 can act on.
+/// The kinds of op this version can act on.
 nonisolated enum UndoOpKind: String, Sendable {
     case writeFile
     case editLine
     case recompute
+    /// U2: a hunk of a page's body, found by the text either side of it.
+    case replaceText
+    /// U2: one member of a JSON file, found by its key path.
+    case editJSON
+    /// U2: a file or a folder moved, reversed only as a whole pair.
+    case move
+    /// U2: a folder made, with everything in it.
+    case createTree
+    /// U2: a folder removed, with everything in it kept in the list.
+    case removeTree
+    /// U2: something outside every working folder (one of the app's
+    /// preferences in this version).
+    case external
 }
 
 /// Reading a field without throwing: absent and null are nil; a value of
@@ -727,6 +1038,19 @@ nonisolated enum UndoLenient {
             return nil
         }
         if let found = try? container.decode(type, forKey: key) {
+            return found
+        }
+        readable = false
+        return nil
+    }
+
+    /// Any JSON value, null included: absent is nil, a null is `.null`. A
+    /// value no JSON reader takes marks what holds it unreadable.
+    static func json<Key: CodingKey>(_ container: KeyedDecodingContainer<Key>, _ key: Key, _ readable: inout Bool) -> UndoJSON? {
+        if !container.contains(key) {
+            return nil
+        }
+        if let found = try? container.decode(UndoJSON.self, forKey: key) {
             return found
         }
         readable = false

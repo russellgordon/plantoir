@@ -772,7 +772,7 @@
    "windows": null
   },
   "addOnsReopen": {
-   "label": "Reopen Obsidian",
+   "label": "Close and Reopen Obsidian",
    "mac": {
     "say": "shared-rules#obsidianAddOnsForFigures.wording.reopen"
    },

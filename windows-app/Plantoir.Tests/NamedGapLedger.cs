@@ -275,6 +275,31 @@ internal static class NamedGapLedger
     internal const string LeaseLivenessCases = "shared-rules.json → workLeases.liveness.cases";
 
     /// <summary>
+    /// <c>shared-rules.json</c> → <c>undo.checkCases</c>, by case <c>name</c>:
+    /// a case whose op is of a kind this app's reader does not know yet (U2's
+    /// six kinds, Windows' W6). A held case must still be answered
+    /// <c>notReadable</c> both ways here, never guessed at, and must still
+    /// differ from the contract (<c>UndoCheckContractTests.EveryCheckCase</c>).
+    /// </summary>
+    internal const string UndoCheckCases = "shared-rules.json → undo.checkCases";
+
+    /// <summary>
+    /// <c>shared-rules.json</c> → <c>undo.stackCases</c>, by case <c>name</c>:
+    /// a case that needs a call or a key this replay does not know yet (U2's
+    /// op kinds, W6). A held case must still stop at that call or key
+    /// (<c>UndoStackContractTests.EveryStackCase</c>).
+    /// </summary>
+    internal const string UndoStackCases = "shared-rules.json → undo.stackCases";
+
+    /// <summary>
+    /// <c>undo-traces.json</c> → <c>traces</c>, by trace <c>name</c>: a trace
+    /// holding a call this replay does not know yet (U2's <c>move</c>, W6).
+    /// A held trace is still replayed and asserted call by call up to that
+    /// call, and must still stop there (<c>UndoTraceContractTests.EveryCallOfEveryTrace</c>).
+    /// </summary>
+    internal const string UndoTraces = "undo-traces.json → traces";
+
+    /// <summary>
     /// The older name each <see cref="SubjectMenuItemsUnderAnOlderName"/> entry
     /// is said under here. Every entry has exactly one, and every name here has
     /// an entry (<c>NamedGapLedgerTests</c>).
@@ -376,7 +401,8 @@ internal static class NamedGapLedger
     // The same hold, brought up to dev 39d83a0a7 (2026-11-18): stack 14's #901 piece 901a and #952.
     private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
-    private const string Reason1003 = "Plantoir never closing Obsidian without asking (the mac's #995, shared-rules.json obsidianNeverClosedUnasked) is #1003's piece of v2.0.0; until it lands Windows asks no closing question, so it has no answer to record";
+    private const string Reason899W6 = "the six op kinds the mac's U2b defines (replaceText, editJSON, move, createTree, removeTree, external) and recompute run are Windows' W6 for #899, still to come (plans/899-plan.md, W6 to W11b); until it lands this app's reader takes each for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
+    private const string Reason899W6Traces = Reason899W6 + ". COVERAGE LOST, for W6 to restore: until U2b's contract put a move in them, W1 replayed all 20 traces call by call to their final hashes; held, each of these 15 is asserted only up to its first move and must stop exactly there, and trace-002, trace-012 and trace-020 open with a move, so they check nothing at all here until W6 replays them whole";
     private const string Reason1009 = "stopping a running preview, deploy or plan share from the keyboard, with the two stop questions, their Don't ask again boxes and Settings > Deploying > Stopping (the mac's #988), is #1009's piece of v2.0.0; until it lands Windows asks no stop question and has no setting for one, so it has no change to record";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
 
@@ -514,9 +540,118 @@ internal static class NamedGapLedger
              "Cloudflare token end date learned"),
         Owed(ActivityTrailEvents, 936, V200, Reason936,
              "files for the site downloaded", "files for the site could not be downloaded"),
-        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back"),
-        Owed(ActivityTrailEvents, 1003, V200, Reason1003, "asked to close Obsidian to open a course"),
+        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back", "undo found a folder set aside"),
         Owed(ActivityTrailEvents, 1009, V200, Reason1009, "stop question setting changed"),
+        // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
+        // recompute run. This reader takes them for kinds it does not know
+        // until W6 (the Windows plan, plans/899-plan.md: W1 reads the
+        // reserved kinds as unknown and W6 builds them; "every undo key a
+        // Windows test walks starts held against #899, and each piece removes
+        // the entries it makes true"). A check case is held when its verdict
+        // is not notReadable both ways (60 of them). A case whose `current`
+        // this test cannot place yet (a move's two sides, a tree, a
+        // preference) is judged on a placeholder when its op cannot be read,
+        // since an unreadable op is settled before its path is read: the nine
+        // such rows that expect notReadable both ways are met here and are not
+        // held (the 2026-11-19 review's MEDIUM). U2b's two cannotBeRead rows
+        // on known kinds are W1's, and were built rather than held.
+        Owed(UndoCheckCases, 899, V200, Reason899W6,
+             "replaceText: the hunk as the step left it",
+             "replaceText: the hunk as it was before",
+             "replaceText: the rest of the page edited since, the hunk untouched",
+             "replaceText: the hunk itself changed since",
+             "replaceText: the hunk there twice: never a guess at which",
+             "replaceText: the old and the new text both there, in different places",
+             "replaceText: a new text that begins with the old one, as left",
+             "replaceText: a new text that begins with the old one, put back",
+             "replaceText: carriage returns taken out since: byte for byte, the hunk is not the one left",
+             "replaceText: the page is gone",
+             "replaceText: a folder where the page was",
+             "replaceText: the page is no longer UTF-8",
+             "editJSON: the member as the step left it",
+             "editJSON: the member as it was before",
+             "editJSON: another member changed since, this one untouched",
+             "editJSON: the member itself changed since",
+             "editJSON: the member taken out since",
+             "editJSON: a member the step added, still there",
+             "editJSON: a member the step added, taken out since: already back",
+             "editJSON: a member set to null is not a member taken out",
+             "editJSON: a member holding null where the step took it out",
+             "editJSON: numbers compared by value",
+             "editJSON: true is not the number 1",
+             "editJSON: an object compared by its members, whatever their order",
+             "editJSON: a member found through objects inside objects",
+             "editJSON: a part on the way that is not an object",
+             "editJSON: the file is not one JSON object any more",
+             "editJSON: the file is not JSON",
+             "editJSON: the file is gone",
+             "move: the place it left free, the place it went holding it: as the step left it",
+             "move: back where it was, the other place free",
+             "move: a deploy wrote a new marker where it was: both left, nothing taken back, the moved copy never deleted",
+             "move: the moved copy changed since",
+             "move: the moved copy gone and its place free",
+             "move: the same content in both places",
+             "move: a folder where the moved file is",
+             "move of a folder: as the step left it",
+             "move of a folder: a file added inside it since",
+             "createTree: the folder as the step made it",
+             "createTree: the folder gone: already back",
+             "createTree: a file added inside since",
+             "createTree: a file inside changed since",
+             "createTree: an empty folder added inside since",
+             "createTree: a file where the folder was",
+             "removeTree: the folder still gone, as the step left it",
+             "removeTree: the folder back as it was",
+             "removeTree: something else made in its place since",
+             "external: the preference as the step left it",
+             "external: the preference as it was before",
+             "external: the preference changed since",
+             "external: a preference the step set where none was, removed since: already back",
+             "external: a preference holding something JSON cannot (a date)",
+             "replaceText: the page cannot be read just now",
+             "editJSON: the file cannot be read just now",
+             "move: the moved copy cannot be read just now",
+             "createTree: the folder cannot be listed just now",
+             "createTree: a link inside the folder: changed since, never followed",
+             "move: a link where the moved copy is: changed since, never followed",
+             "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
+             "editJSON: a recorded value beyond 2^53: cannot tell"),
+        Owed(UndoStackCases, 899, V200, Reason899W6,
+             "U2, move: a rollover's marker moved aside is moved back by Undo",
+             "U2, move: and Redo moves it aside again",
+             "U2, move: a deploy wrote a new marker in its place: Undo takes nothing back, both markers kept, and the list is cleared (ruling 13)",
+             "U2, createTree: a folder made is taken out by Undo and made again by Redo",
+             "U2, createTree: a file added inside the folder since: Undo refuses, the folder kept whole, the list cleared",
+             "U2, removeTree: a folder removed is made again by Undo, everything in it from the list",
+             "U2, removeTree: and Redo removes it again",
+             "U2, editJSON: a settings member undone and redone",
+             "U2, editJSON: the member changed by hand since: refused, the list cleared",
+             "U2, replaceText: a hunk of a page undone and redone",
+             "U2, external: a preference set through the app, undone and redone, with no working folder",
+             "U2, external: the preference changed since: refused, the list cleared",
+             "U2: steps of every kind on one list, undone newest first (rulings 5 and 9)",
+             "U2, recompute: an Undo and a Redo each re-derive the section's front page",
+             "U2, recompute: with no runner for its maintainer, a step holding a recompute is not available, never undone with its re-derivation skipped",
+             "U2: another version's step that breaks wholeOps (a folder made inside a folder the same step makes) is a barrier: not available, never cleared",
+             "U2, createTree: an Undo whose content the list no longer holds is refused and the folder kept (the list is cleared, as for any content missing)",
+             "U2, removeTree: a Redo whose content the list no longer holds is refused, the folder kept, only the redo dropped",
+             "U2: the folder a page was moved out of, replaced since by a link to outside the working folder: Undo moves nothing out, refuses as changed since, and clears the list"),
+        Owed(UndoTraces, 899, V200, Reason899W6Traces,
+             "trace-002",
+             "trace-003",
+             "trace-004",
+             "trace-005",
+             "trace-006",
+             "trace-008",
+             "trace-010",
+             "trace-011",
+             "trace-012",
+             "trace-014",
+             "trace-015",
+             "trace-016",
+             "trace-017",
+             "trace-018",
+             "trace-020"),
         Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
         Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921, "cloudflareToken"),
         Owed(CredentialRequestsSaidDifferently, 920, V200, Reason920, "teacherSurname", "siteName", "siteNameConflict"),
@@ -701,6 +836,25 @@ internal static class NamedGapLedger
               "so unlike activityTrail.mustRecord there is no `appliesOn` here for the key to " +
               "have been hidden behind — a key missing from it really is a key withdrawn.)";
         return whyThisHappened;
+    }
+
+    /// <summary>
+    /// For a theory case held open by name: runs the case's own assertions,
+    /// and passes only while they still FAIL, and fail for the named gap (the
+    /// failure's message carries one of <paramref name="gapWords"/>). A held
+    /// case that passes is the gap closing (<see cref="ClosedMessage"/>); one
+    /// that fails for any other reason is a real failure, reported as itself.
+    /// </summary>
+    internal static void HeldCaseStillStopsAtItsGap(Entry held, Action runTheCase, params string[] gapWords)
+    {
+        Exception? stopped = null;
+        try { runTheCase(); }
+        catch (Exception failure) { stopped = failure; }
+        Assert.True(stopped is not null, ClosedMessage(held));
+        bool namesTheGap = gapWords.Any(word => stopped!.Message.Contains(word, StringComparison.Ordinal));
+        Assert.True(namesTheGap,
+            $"\"{held.Key}\" is held open (issue #{held.Issue}: {held.Reason}) for the gap it names, " +
+            $"and it failed for another reason, which is a real failure: {stopped!.Message}");
     }
 
     /// <summary>What to say when a ledgered thing has started existing on this side.</summary>

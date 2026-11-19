@@ -1396,6 +1396,12 @@
         "why": "#899, piece U1. Recovery settles a step whose process died part way from the content of what it changed, and putting files back is the one thing it writes; a teacher who finds a publish half-gone after a crash needs this line to know it was put back on purpose, and that the list was cleared when a hand edit stood in the way. Counts only. Named in U1 but FIRST WRITTEN LIVE, at U7: while the switch is off recovery never writes into a working folder, so no file is put back and this line is not written; the shadow outcome is in the journal only."
       },
       {
+        "carries": "the course and the section, the folder's place inside the working folder, and either what changed while it was aside (files added, changed, removed, counted against the step's record) or the visible name beside its place it is kept under because something else now holds that place. Written just before the rename, so a death between the rename and the list's record never loses it",
+        "event": "undo found a folder set aside",
+        "line": "ICS3U/1 · the undo list puts the folder courses/ICS3U/made back in its place; it changed while a change that stopped had set it aside (1 file added) (or: … keeps the folder courses/ICS3U/made, set aside by a change that stopped, as courses/ICS3U/made (kept by Undo), because something else now holds courses/ICS3U/made)",
+        "why": "#899, piece U2b (the director's rule after its third review). A tree op sets the teacher's folder aside under a hidden name before it is taken out. When the process dies, recovery puts the folder back in its place whenever that place is free, whatever it holds, so nothing of the teacher's stays hidden; when it changed while aside the step is recorded interrupted and this line says what changed. When something else now holds its place the folder is renamed to a visible name beside it, `<name> (kept by Undo)` (Russell's ruling of 2026-11-19), and this line names both. Never page text. First written live at U7, like 'undo rolled back'."
+      },
+      {
         "event": "outside assistant set-up opened",
         "carries": "where Set Up an Assistant… was opened from: the Settings pane, the Help menu or Revise With.",
         "line": "opened Set Up an Assistant… (from {the Settings pane | the Help menu | Revise With})",
@@ -36824,7 +36830,7 @@
       {
         "step": 6,
         "when": "the answer is notAsked",
-        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian, or wording.offerWhileObsidianIsOpen instead when Plantoir cannot tell (openStateCases). Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Since #995 (obsidianNeverClosedUnasked) Add Them is titled obsidianNeverClosedUnasked.wording.offerAddClosingObsidian whenever pressing it closes Obsidian (openStateCases: open or cannotTell), and when the course was closed as the offer was shown but is open by the time Add Them is pressed, Obsidian is not closed: step 8's reopen question asks first. Mac since #995; Windows owes both, #1003. Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
+        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian, or wording.offerWhileObsidianIsOpen instead when Plantoir cannot tell (openStateCases). Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Since #995 (obsidianNeverClosedUnasked) Add Them is titled obsidianNeverClosedUnasked.wording.offerAddClosingObsidian whenever pressing it closes Obsidian (openStateCases: open or cannotTell), and when the course was closed as the offer was shown but is open by the time Add Them is pressed, Obsidian is not closed: step 8's reopen question asks first. Mac since #995; Windows since #1003. Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
       },
       {
         "step": 7,
@@ -37799,7 +37805,7 @@
       "dontAskAgain": "Don't ask again",
       "reopenTitle": "Reopen Obsidian to show diagrams and graphs?",
       "reopenMessage": "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”.",
-      "reopen": "Reopen Obsidian",
+      "reopen": "Close and Reopen Obsidian",
       "later": "Not Now",
       "paneTitle": "Obsidian",
       "settingLabel": "Add the add-ons that draw diagrams and graphs to courses that have them",
@@ -48051,8 +48057,8 @@
       "appendOnly": "Nothing in undo/ is replaced in place. Events are appended, one per line; a blob is written under a temporary name and renamed onto a name that does not exist yet, with a rename that fails if the name exists. A reader counts only complete lines; a torn last line is ignored by readers and cut off by the next writer inside the lock (W2).",
       "unknown": "What a version cannot read it KEEPS (file-formats.json -> undoJournal.unknown): a line, a step or an op it cannot read is never skipped as if absent, its step number is never reused, nothing it might name is deleted while it is kept (file-formats.json -> undoJournal.unknown.deleting), and while it stands at or above the head Undo and Redo are simply NOT AVAILABLE (greyed, plain \"Undo\", as ruling 10 has it for an unreachable folder): never undone past, never a reason to clear the list. An older outside-assistant process kept running across an app update is the everyday case (the reviews of U1).",
       "writeAhead": "A step is written down BEFORE its change: under the lock, the next number (one more than the highest seq in ANY line, readable or not), its content blobs, and a begin line naming every op's expected state, made durable; then the change, outside the lock; then, under the lock, applied (with the redo branch dropped at that moment, so a step that is refused leaves Redo as it was). Undo (undoing, undone) and redo (redoing, redone) have the same shape. A process that dies leaves each file as it was before its step or as it was after it; recovery then settles the whole step: recoveryCases.",
-      "recovery": "Runs inside the lock before every new step, undo and redo (and, from U7, at every launch). For an unfinished event whose process is gone, judged FILE BY FILE by the content of what each op changed: every file where the work started -> failed (an undo or redo ends, the step back where it stood); every file where it was going -> completed; some of each -> what took effect is put back, rolledBack, one trail line; any file NEITHER (changed by hand since the process died) -> every file that can be verified is put back where the work started, the step is recorded `interrupted` naming the files in the way by path (never content), the whole list is CLEARED with reason `interrupted` (as ruling 13 clears for a refused step) and a trail line is written. The journal never says done or failed for a step that is half applied. While switched off (shadow) recovery never writes into a working folder: a step that partly took effect is recorded interrupted, and the list cleared. A step whose put-back cannot even be planned (content it needs is missing, measured with its blobs removed) can never be settled later either: it is closed the same way, `interrupted` (reason couldNotPutBack, naming the files left part way) and the list CLEARED. A swap refused because a file is in use (W5, the everyday case on Windows), or refused `couldNotWrite` (the disk full or the folder not taking a new file, which can change as room comes back), or a put-back whose content is there and cannot be read just now, is tried again on the same bounded schedule that costs nothing on the ordinary path: at once at an Undo or a Redo, where the teacher is waiting for it; otherwise, per process, at its first lock, then one minute after a refusal, doubling, never more than an hour apart; and once the step is past the limits, pruning closes it (below). Measured before this rule (the core review of U1's second round): retried at every lock, a refused 300-page put-back cost each of the next 50 actions 187 to 255 ms, against 7 to 11 ms for a free page (the one figure every document cites for it). Rejected: once per process (a file held for a minute would wait for the next launch). A step closed interrupted leaves nothing of the journal's in a course: its staged files (file-formats.json -> undoJournal.stagedFiles) are removed when it is closed, and, when its folder cannot be reached then, by the first recovery in each process that reaches it (the director's ruling 6 on U1's third round). A step whose working folder cannot be reached, or that this version cannot read, is left unsettled while it is on the list, and Undo is NOT AVAILABLE while it is the newest (ruling 10); once it is past the limits, pruning closes it `interrupted` (reason unsettled, naming every file it names) with NO clearing, because nothing older than it is offered any more and a clearing would take every newer step (limits). So nothing stays in flight for ever: measured before this rule, one such step stopped all pruning (121 steps on the list, none pruned; the director's ruling 4 on U1's second reviews).",
-      "stagedThenSwapped": "An undo or redo checks EVERY op first and writes nothing if any is in the way (ruling 4); otherwise writes every new content BESIDE its target (same folder, a dot-file name), and only when all are written swaps them in, one rename each, re-reading each target first; a swap that cannot go in (a file in use, W5) reverses the swaps already made and names the file. A new content that cannot be written beside its target (the disk full, a folder that will not take a new file) removes every staged file, the one it was writing included, swaps nothing, and is refused `couldNotWrite`, never `fileIsInUse` (the Fable sweep of U1, F1: the file the exclusive create had made was left beside the page for good); so is keeping the original when that fails for room or permission (on a volume without hard links it is a copy); like a file in use it changes nothing on the list (stepCases). A file of the list that is there and cannot be opened or read (a failing disk, a permission, too many open files) makes the list unreadable for that attempt: never passed over as if it were gone (only a segment pruned since it was listed is), never content missing, so nothing is cleared. An op that is as the step left it but cannot be placed (a line whose front matter block is gone) is a change since, and every page in the way is named before any content missing from the list (F2). Never a half-undone step.",
+      "recovery": "Runs inside the lock before every new step, undo and redo (and, from U7, at every launch). For an unfinished event whose process is gone, judged FILE BY FILE by the content of what each op changed: every file where the work started -> failed (an undo or redo ends, the step back where it stood); every file where it was going -> completed; some of each -> what took effect is put back, rolledBack, one trail line; any file NEITHER (changed by hand since the process died) -> every file that can be verified is put back where the work started, the step is recorded `interrupted` naming the files in the way by path (never content), the whole list is CLEARED with reason `interrupted` (as ruling 13 clears for a refused step) and a trail line is written. The journal never says done or failed for a step that is half applied. While switched off (shadow) recovery never writes into a working folder: a step that partly took effect is recorded interrupted, and the list cleared. A step whose put-back cannot even be planned (content it needs is missing, measured with its blobs removed) can never be settled later either: it is closed the same way, `interrupted` (reason couldNotPutBack, naming the files left part way) and the list CLEARED. A swap refused because a file is in use (W5, the everyday case on Windows), or refused `couldNotWrite` (the disk full or the folder not taking a new file, which can change as room comes back), or a put-back whose content is there and cannot be read just now, is tried again on the same bounded schedule that costs nothing on the ordinary path: at once at an Undo or a Redo, where the teacher is waiting for it; otherwise, per process, at its first lock, then one minute after a refusal, doubling, never more than an hour apart; and once the step is past the limits, pruning closes it (below). Measured before this rule (the core review of U1's second round): retried at every lock, a refused 300-page put-back cost each of the next 50 actions 187 to 255 ms, against 7 to 11 ms for a free page (the one figure every document cites for it). Rejected: once per process (a file held for a minute would wait for the next launch). A step closed interrupted leaves nothing of the journal's in a course: its staged files (file-formats.json -> undoJournal.stagedFiles) are removed when it is closed, and, when its folder cannot be reached then, by the first recovery in each process that reaches it (the director's ruling 6 on U1's third round). A step whose working folder cannot be reached, or that this version cannot read, is left unsettled while it is on the list, and Undo is NOT AVAILABLE while it is the newest (ruling 10); once it is past the limits, pruning closes it `interrupted` (reason unsettled, naming every file it names) with NO clearing, because nothing older than it is offered any more and a clearing would take every newer step (limits). So nothing stays in flight for ever: measured before this rule, one such step stopped all pruning (121 steps on the list, none pruned; the director's ruling 4 on U1's second reviews). A FOLDER a tree op set aside (its staged `-orig` name, U2) is the teacher's own folder and is never deleted by recovery's tidying. Whenever its place is free it is renamed back into its place, WHATEVER its listing, so nothing of the teacher's is ever left under a hidden name while its own place is free; if its listing is the one the step recorded the step is judged as the work left it, and if not the folder is in the way (a change since): the step is recorded interrupted, the list cleared as for any change since, and the trail line 'undo found a folder set aside' says the folder is back with what changed. When something else now holds its place, the folder is renamed to a VISIBLE name beside it, `<name> (kept by Undo)`, or `<name> (kept by Undo 2)`, 3 and on when that is taken too (the first name nothing holds), never merged into or over anything, the step is recorded interrupted, the list cleared, and the trail line names both (Russell's ruling of 2026-11-19: nothing of the teacher's stays hidden). Both renames never replace (RENAME_EXCL; on Windows MoveFileEx without MOVEFILE_REPLACE_EXISTING), so each happened or did not; the trail line is written just BEFORE the rename (the intent first), and a death after either rename leaves nothing to redo: the next recovery finds no hidden folder and judges the step by what its places hold. A place that cannot be read now is neither free nor taken: the folder is left as it is, nothing is said, and the step is cannot tell now, tried again on the schedule, never cleared for it. A folder a tree op TAKES OUT is deleted only once every change of the step has gone in, and never in place: it is first renamed, in one rename that never replaces, from its `-orig` name to its `-gone` name (file-formats.json -> undoJournal.stagedFiles), which this rule never puts back, and only then deleted, file by file; a death during that delete leaves a `-gone` remnant, which recovery deletes as a staged file, so a half-deleted folder never returns to the teacher's place (the fourth review of U2b, MEDIUM). Its place is read from the staged name up to the LAST `.plantoir-undo-`, so a recovery's own `-recover-orig` names the same place (the director's rule after U2b's third review, replacing 'keep a changed folder aside'). A take-out renames the folder aside FIRST and only then compares its listing with the record, putting it back as it is and refusing (changedSince) when they differ, so a file added while the folder was being read can never go aside unseen. A step that keeps a file true by a rule (a `recompute`) is settled only by a recovery that re-derives what it settles; a recovery run inside another write's lock that cannot re-derive leaves such a step in flight for one that will. A put-back that fails (the place taken in that instant) is refused as cannotTellNow and never clears the list. While such a step waits, a write through a door that cannot re-derive (U1's plain door) is refused, another change under way, on the same course, and an Undo or Redo through a path that cannot re-derive is not available, never 'under way' for ever.",
+      "stagedThenSwapped": "An undo or redo checks EVERY op first and writes nothing if any is in the way (ruling 4); otherwise writes every new content BESIDE its target (same folder, a dot-file name), and only when all are written swaps them in, one rename each, re-reading each target first; a swap that cannot go in (a file in use, W5) reverses the swaps already made and names the file. A new content that cannot be written beside its target (the disk full, a folder that will not take a new file) removes every staged file, the one it was writing included, swaps nothing, and is refused `couldNotWrite`, never `fileIsInUse` (the Fable sweep of U1, F1: the file the exclusive create had made was left beside the page for good); so is keeping the original when that fails for room or permission (on a volume without hard links it is a copy); like a file in use it changes nothing on the list (stepCases). A file of the list that is there and cannot be opened or read (a failing disk, a permission, too many open files) makes the list unreadable for that attempt: never passed over as if it were gone (only a segment pruned since it was listed is), never content missing, so nothing is cleared. An op that is as the step left it but cannot be placed (a line whose front matter block is gone) is a change since, and every page in the way is named before any content missing from the list (F2). Never a half-undone step. Every place a step names is checked to be inside its working folder, links resolved, when the step is planned and again immediately before each change: a place that now leads outside (a folder on its path replaced by a link) is a change since, and nothing is moved through it.",
       "contentNotTimes": "Whether a file has changed since is judged by the content of EXACTLY what the op changed: a front-matter entry byte for byte (carriage returns, comments and a byte-order mark kept; never Unicode-equivalence), a whole file by SHA-256. Never modification or creation times (ruling 4, W6).",
       "linear": "Strictly linear (ruling 9): Undo acts only on the newest step offered that is not undone, then the one before it; Redo only on the most recently undone. A newer step still being made, undone or redone refuses both (anotherChangeIsUnderWay), unless its process is gone and its folder cannot be reached, when both are not available. Any new step, from any process, drops the redo branch when it takes effect. One list across every course and every working folder (ruling 5), and the newest step is undone with no question wherever it was made (ruling 11): stackCases 'rulings 5 and 11'.",
       "clearing": "The whole list is CLEARED by one `cleared` line carrying its reason and, as its seq, the highest step number in the journal when it is written. A reader honours a `cleared` line WHATEVER its reason says, a reason it does not know included: it never checks the reason (stackCases 'a cleared line clears whatever its reason says'), so a later version can clear for a reason of its own; `clearReasons` are the reasons this version writes. This version clears in four cases: when Undo refuses the newest step because what it changed was changed by hand since, whether the check or the swap finds it (ruling 13: the page is named once, at the refusal); when Undo refuses the newest step because content it needs is missing from the list, which never comes back (refused once with its reason, then cleared as ruling 13 does: held question M9 on U1's second reviews, built as recommended behind one constant, UndoSwitch.undoRefusedForMissingContentClearsTheList; turned off, the newest step would be offered and refused on every try until it aged out, and nothing earlier could be undone); when recovery closes a step interrupted (recovery); and once, when the switch goes live (shadow). Every step done or undone at that point with a number up to the line's leaves the list, and so do lines a newer version wrote before it. A step another process has IN FLIGHT when the clearing is written (begun, undoing or redoing, with a number up to the line's) leaves the list too: its own applied, undone or redone, when it comes, records nothing undoable. That is one fixed rule for every clearing (the director's ruling 3 on U1's second reviews, replacing the constant held for Russell when a deploy still cleared). A REFUSED REDO clears nothing: whether what it changed was changed by hand or content it needs is missing, it is refused once with its reason, then the undone steps from it upward are `dropped` (reason redoRefused), so Redo has nothing and Undo still works for everything earlier, and the Redo is never offered and refused again (ruling 20). A refusal because a file is in use changes nothing on the list, to be tried again. WHAT IS COUNTED: what the app does to a course is a step (ruling 17: 'anything else done through the app is counted'). A DEPLOY (from the app, typed in Terminal, or a deploy set for later when it runs) and sharing or stopping sharing unit plans are NOT on the list and do NOT clear it: everything done before them can still be undone after them (rulings 17 and 18, which replaced 14 and 16). Whether SETTING or CANCELLING a deploy for later is a step is held for Russell (M10, raised by the Fable sweep of U1: the reserved `external` op names the LaunchAgent, and a rollover turns a schedule off): until he answers it is counted as not a step and clears nothing (the writer scan's ScheduledDeploy.swift entry says so), and the scan will be relabelled `waitsFor` if he rules it is one. Setting up an outside assistant is not on the list either: it changes no course and writes only outside every course (held question M8 on U1's second reviews, built as recommended; ruling 16 said so, and rulings 17 and 18 replaced it without naming it). The writer scan (UndoWriterScanTests) lists every file that writes, with which of these it is.",
@@ -48451,7 +48457,7 @@
       {
         "name": "an op of a kind this version does not know: never guessed at, never a reason to clear",
         "op": {
-          "kind": "replaceText",
+          "kind": "aKindNobodyKnows",
           "path": "page.md",
           "before": "a",
           "after": "b"
@@ -48538,9 +48544,1702 @@
         },
         "undo": "canUndo",
         "redo": "alreadyRedone"
+      },
+      {
+        "name": "replaceText: the hunk as the step left it",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Intro.\nLine one: new.\nEnd.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "replaceText: the hunk as it was before",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Intro.\nLine one: old.\nEnd.\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "replaceText: the rest of the page edited since, the hunk untouched",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Intro, rewritten.\nLine one: new.\nA paragraph added since.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "replaceText: the hunk itself changed since",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Intro.\nLine one: newer.\nEnd.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: the hunk there twice: never a guess at which",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Line one: new.\nLine one: new.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: the old and the new text both there, in different places",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Line one: old.\nLine one: new.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: a new text that begins with the old one, as left",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "2026",
+          "after": "2026-27",
+          "contextBefore": "Year: ",
+          "contextAfter": ""
+        },
+        "current": {
+          "text": "Year: 2026-27\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "The before window (Year: 2026) lies inside the one place the after window is found, so the page is as the step left it."
+      },
+      {
+        "name": "replaceText: a new text that begins with the old one, put back",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "2026",
+          "after": "2026-27",
+          "contextBefore": "Year: ",
+          "contextAfter": ""
+        },
+        "current": {
+          "text": "Year: 2026\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "replaceText: carriage returns taken out since: byte for byte, the hunk is not the one left",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\r\n"
+        },
+        "current": {
+          "text": "Line one: new.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: the page is gone",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: a folder where the page was",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "folder": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText: the page is no longer UTF-8",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "bytesHex": "4c696e65206f6e653a206e65772e0aff0a"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "replaceText with no text either side given: not readable",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "text": "a\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "replaceText whose old and new text are the same: not readable",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "same",
+          "after": "same",
+          "contextBefore": "",
+          "contextAfter": ""
+        },
+        "current": {
+          "text": "same\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "editJSON: the member as the step left it",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2026-2027\"\n}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: the member as it was before",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "editJSON: another member changed since, this one untouched",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"course_name\": \"Test (renamed)\", \"school_year\": \"2026-2027\", \"added\": [1, 2]}"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: the member itself changed since",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"school_year\": \"2027-2028\"}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: the member taken out since",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"course_name\": \"Test\"}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: a member the step added, still there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"course_name\": \"Test\", \"school_year\": \"2026-2027\"}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: a member the step added, taken out since: already back",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"course_name\": \"Test\"}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "editJSON: a member set to null is not a member taken out",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "footer"
+          ],
+          "before": "Old footer",
+          "after": null
+        },
+        "current": {
+          "text": "{\"footer\": null}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "JSON's null in the op's after is a member holding null; a member that is not there would be an op with no after."
+      },
+      {
+        "name": "editJSON: a member holding null where the step took it out",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "footer"
+          ],
+          "before": "Old footer"
+        },
+        "current": {
+          "text": "{\"footer\": null}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: numbers compared by value",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "section_count"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"section_count\": 2.0}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: true is not the number 1",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "flag"
+          ],
+          "before": 0,
+          "after": true
+        },
+        "current": {
+          "text": "{\"flag\": 1}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: an object compared by its members, whatever their order",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "deploy"
+          ],
+          "before": null,
+          "after": {
+            "site": "abc",
+            "team": "x"
+          }
+        },
+        "current": {
+          "text": "{\"deploy\": {\"team\": \"x\", \"site\": \"abc\"}}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: a member found through objects inside objects",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "sections",
+            "2",
+            "label"
+          ],
+          "before": "Period 2",
+          "after": "Period 3"
+        },
+        "current": {
+          "text": "{\"sections\": {\"2\": {\"label\": \"Period 3\"}}}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "editJSON: a part on the way that is not an object",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "sections",
+            "2",
+            "label"
+          ],
+          "before": "Period 2",
+          "after": "Period 3"
+        },
+        "current": {
+          "text": "{\"sections\": [\"Period 3\"]}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: the file is not one JSON object any more",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "[\"school_year\", \"2026-2027\"]\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: the file is not JSON",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "school_year: 2026-2027\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: the file is gone",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON carrying `element`, a later piece's key: not readable",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "list"
+          ],
+          "before": null,
+          "after": "b",
+          "element": 1
+        },
+        "current": {
+          "text": "{\"list\": \"b\"}\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "editJSON with no key path: not readable",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{}\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move: the place it left free, the place it went holding it: as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "move: back where it was, the other place free",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "move: a deploy wrote a new marker where it was: both left, nothing taken back, the moved copy never deleted",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"bbb-222\"}\n"
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "#897 piece B, seam 1: the pair is reversed only whole; the place it left holds something else, so neither side is touched."
+      },
+      {
+        "name": "move: the moved copy changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\", \"edited\": true}\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move: the moved copy gone and its place free",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move: the same content in both places",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move: a folder where the moved file is",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "folder": true
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move of a folder: as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/record",
+          "to": "courses/TST1O/record.previous-20261118T120000Z",
+          "listing": {
+            "folders": [],
+            "files": {
+              "20261101T080000Z-netlify.json": "{\"places\": []}\n"
+            }
+          }
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "tree": {
+              "folders": [],
+              "files": {
+                "20261101T080000Z-netlify.json": "{\"places\": []}\n"
+              }
+            }
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "move of a folder: a file added inside it since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/record",
+          "to": "courses/TST1O/record.previous-20261118T120000Z",
+          "listing": {
+            "folders": [],
+            "files": {
+              "20261101T080000Z-netlify.json": "{\"places\": []}\n"
+            }
+          }
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "tree": {
+              "folders": [],
+              "files": {
+                "20261101T080000Z-netlify.json": "{\"places\": []}\n",
+                "added.md": "x\n"
+              }
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move onto itself: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move into the place it left: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/a",
+          "to": "courses/TST1O/a/b",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move with a path: not readable",
+        "op": {
+          "kind": "move",
+          "path": "page.md",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move naming neither a file's hash nor a folder's listing: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "createTree: the folder as the step made it",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "createTree: the folder gone: already back",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "createTree: a file added inside since",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n",
+              "section1/day1.md": "Day 1\n"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "createTree: a file inside changed since",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{\"edited\": true}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "createTree: an empty folder added inside since",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1",
+              "section1/media"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "createTree: a file where the folder was",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "text": "not a folder\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "createTree without its listing among its blobs: not readable",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listingSha": "0000000000000000000000000000000000000000000000000000000000000000",
+          "blobs": []
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "removeTree: the folder still gone, as the step left it",
+        "op": {
+          "kind": "removeTree",
+          "path": "courses/OLD1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "removeTree: the folder back as it was",
+        "op": {
+          "kind": "removeTree",
+          "path": "courses/OLD1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "removeTree: something else made in its place since",
+        "op": {
+          "kind": "removeTree",
+          "path": "courses/OLD1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [],
+            "files": {
+              "course_config.json": "{}\n"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "removeTree whose content is held outside the list (heldBy, U5's): not readable",
+        "op": {
+          "kind": "removeTree",
+          "path": "courses/OLD1O",
+          "listing": {
+            "folders": [
+              "section1"
+            ],
+            "files": {
+              "course_config.json": "{}\n",
+              "section1/index.md": "# Home\n"
+            }
+          },
+          "heldBy": {
+            "zip": "backup.zip"
+          }
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "external: the preference as the step left it",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "preference": "b"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "external: the preference as it was before",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "preference": "a"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "external: the preference changed since",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "preference": "c"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "external: a preference the step set where none was, removed since: already back",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "after": true
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "external: a preference holding something JSON cannot (a date)",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "unreadable": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "external: a target this version does not know: not readable",
+        "op": {
+          "kind": "external",
+          "target": "launchAgent:ca.russellgordon.Plantoir.deploy",
+          "before": null,
+          "after": {
+            "at": "07:00"
+          }
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "external with a path: not readable",
+        "op": {
+          "kind": "external",
+          "target": "preference:aPreferenceForTheCases",
+          "before": "a",
+          "after": "b",
+          "path": "page.md"
+        },
+        "current": {
+          "preference": "b"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "a page that is there and cannot be read just now (no permission): cannot tell, never changed since",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\n---\n",
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell",
+        "why": "The director's ruling on U2b's review: a read of the teacher's file that fails (EACCES, EIO, a cloud file not downloaded yet) is refused without clearing the list, to be tried again; only content that was read and differs is changed since."
+      },
+      {
+        "name": "whole file: cannot be read just now",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": "old\n",
+          "afterText": "new\n",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "new\n",
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "replaceText: the page cannot be read just now",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Line one: new.\n",
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "editJSON: the file cannot be read just now",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"school_year\": \"2026-2027\"}\n",
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "move: the moved copy cannot be read just now",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n",
+            "cannotBeRead": true
+          }
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "createTree: the folder cannot be listed just now",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          },
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "move between two names that differ only in case: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m/a.json",
+          "to": "courses/TST1O/m/A.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable",
+        "why": "On a case-insensitive volume (a Mac's by default, and Windows') the two are one place: places are compared without regard to case."
+      },
+      {
+        "name": "move to an absolute path: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m.json",
+          "to": "/tmp/m.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move from a path that climbs out: not readable",
+        "op": {
+          "kind": "move",
+          "from": "../m.json",
+          "to": "courses/TST1O/m.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "createTree whose path climbs out: not readable",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/../../NEW1O",
+          "listing": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "replaceText at an absolute path: not readable",
+        "op": {
+          "kind": "replaceText",
+          "path": "/etc/page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "",
+          "contextAfter": "\n"
+        },
+        "current": {
+          "text": "new\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "editJSON whose path climbs out: not readable",
+        "op": {
+          "kind": "editJSON",
+          "path": "courses/../../c.json",
+          "keyPath": [
+            "a"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"a\": 2}\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "createTree: a link inside the folder: changed since, never followed",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            },
+            "links": {
+              "b.md": "/etc/hosts"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move: a link where the moved copy is: changed since, never followed",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m.json",
+          "to": "courses/TST1O/m.previous.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "link": "/etc/hosts"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 9007199254740993}\n"
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell",
+        "why": "The third hard review of U2b, LOW 5: through a double 2^53 + 1 reads as 2^53, so a recorded 2^53 would match a file holding 2^53 + 1."
+      },
+      {
+        "name": "editJSON: a recorded value beyond 2^53: cannot tell",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 9007199254740992,
+          "after": 1
+        },
+        "current": {
+          "text": "{\"k\": 9007199254740993}\n"
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
       }
     ],
-    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent). current is what is at the op's path now: text (UTF-8), absent, a folder, or raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, notReadable (undo); canRedo, alreadyRedone, changedSince, notReadable (redo). notReadable: the op is not one this version can read (undoJournal.unknown).",
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. Places, and the places two ops name, are compared without regard to case.",
+    "listingCases": [
+      {
+        "name": "an empty folder: an empty listing",
+        "tree": {
+          "folders": [],
+          "files": {}
+        },
+        "listing": "",
+        "listingSha": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "folders and files together, in the order of their paths",
+        "tree": {
+          "folders": [
+            "section1",
+            "section1/media"
+          ],
+          "files": {
+            "course_config.json": "{}\n",
+            "section1/index.md": "# Home\n",
+            "section1/media/a.png": "PNG\n"
+          }
+        },
+        "listing": "file ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356 course_config.json\nfolder section1\nfile 7d48eefbcff2495cc4b0cd99ea783bbc46184d78af064c56e1a7dc7ae9dba3aa section1/index.md\nfolder section1/media\nfile e1dd52c4fded473678d49aa9270d577e5a8fb064b45824dc1dd200427ec3cb52 section1/media/a.png\n",
+        "listingSha": "deea8f61dcce2614c4b62603f2ecbf8bffc2dde8ce18d382c3f37e9f18e84653"
+      },
+      {
+        "name": "the order is the paths' UTF-8 bytes: capitals, then small letters, then letters beyond ASCII",
+        "tree": {
+          "folders": [],
+          "files": {
+            "été.md": "E\n",
+            "Zebra.md": "Z\n",
+            "apple.md": "A\n"
+          }
+        },
+        "listing": "file ec39b67830c0c34d71b0b6bf1d1c424eb7caab9222eb401fdaef044cf2145e9b Zebra.md\nfile 06f961b802bc46ee168555f066d28f4f0e9afdf3f88174c1ee6f9de004fc30a0 apple.md\nfile 20514397d70d8fb99e021a5f28fbeba3fc29814ec452ef1a3a3fcf42b08bb752 été.md\n",
+        "listingSha": "28cdfb2d9f5c1440fc57ae6c0fabe790c56cf518cee72e22d74e14d6b1d17389",
+        "why": "Z (0x5A) before a (0x61) before é (0xC3 0xA9): never a locale's order, which both platforms would answer differently."
+      },
+      {
+        "name": "a dot file inside is listed like any other",
+        "tree": {
+          "folders": [],
+          "files": {
+            ".hidden": "x\n",
+            "page.md": "p\n"
+          }
+        },
+        "listing": "file 73cb3858a687a8494ca3323053016282f3dad39d42cf62ca4e79dda2aac7d9ac .hidden\nfile fd6641673e7f3bf6e80e4bc5401fcb2821a1e117206c8e1c65cef23a58dc37ff page.md\n",
+        "listingSha": "1aae0977e35ed6e7ea0c6a6e2f77b5d4869ced59eb6b466eff5f8d14b54ad1f1"
+      },
+      {
+        "name": "the Finder's .DS_Store is never listed, at any depth",
+        "tree": {
+          "folders": [
+            "sub"
+          ],
+          "files": {
+            ".DS_Store": "Bud1 finder\n",
+            "sub/.DS_Store": "Bud1\n",
+            "a.md": "A\n"
+          }
+        },
+        "listing": "file 06f961b802bc46ee168555f066d28f4f0e9afdf3f88174c1ee6f9de004fc30a0 a.md\nfolder sub\n",
+        "listingSha": "06a2abe5e7f29eee718a2e6bfd0e80acf9dc26b2def756a6c6c21664d433b267",
+        "why": "A folder the teacher opened in the Finder gains a .DS_Store; listing it would make every folder looked at in the Finder one Undo could not take back."
+      }
+    ],
+    "listingCasesHow": "A folder's listing (file-formats.json -> undoJournal.opKinds.createTree): tree is the folder's content (folders, and files with their text); listing is the exact text both platforms must make from it, and listingSha its SHA-256. One line per item inside the folder, each ending in a line feed: `folder <path>` or `file <sha256 of its bytes> <path>`, path relative to the folder with forward slashes, spelled as the file system gives it; lines in the order of the paths' UTF-8 bytes; the folder itself is not listed, and an empty folder's listing is empty. A file named .DS_Store (the Finder's record of a window), at any depth, is never listed, and is removed with the folder when the folder is taken out.",
+    "editJSONCases": [
+      {
+        "name": "only the member's value changes: spacing, 1.50, an escaped slash and a key written twice elsewhere stay",
+        "file": "{\n    \"zeta\": 1.50,\n    \"alpha\": \"a\\/b \\u00e9\",\n    \"dup\": 1,\n    \"dup\": 2,\n    \"school_year\": \"2026-2027\"\n}\n",
+        "op": {
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027",
+          "kind": "editJSON",
+          "path": "course_config.json"
+        },
+        "direction": "undo",
+        "result": "{\n    \"zeta\": 1.50,\n    \"alpha\": \"a\\/b \\u00e9\",\n    \"dup\": 1,\n    \"dup\": 2,\n    \"school_year\": \"2025-2026\"\n}\n"
+      },
+      {
+        "name": "a member added goes after the last one, spaced as that one is",
+        "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
+        "op": {
+          "keyPath": [
+            "c"
+          ],
+          "after": "x",
+          "kind": "editJSON",
+          "path": "course_config.json"
+        },
+        "direction": "redo",
+        "result": "{\n  \"a\" : 1,\n  \"b\" : 0.10,\n  \"c\" : \"x\"\n}\n"
+      },
+      {
+        "name": "the first member taken out takes the comma after it",
+        "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
+        "op": {
+          "keyPath": [
+            "a"
+          ],
+          "after": 1,
+          "kind": "editJSON",
+          "path": "course_config.json"
+        },
+        "direction": "undo",
+        "result": "{\n  \"b\" : 0.10\n}\n"
+      },
+      {
+        "name": "the last member taken out takes the comma before it",
+        "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
+        "op": {
+          "keyPath": [
+            "b"
+          ],
+          "after": 0.1,
+          "kind": "editJSON",
+          "path": "course_config.json"
+        },
+        "direction": "undo",
+        "result": "{\n  \"a\" : 1\n}\n"
+      },
+      {
+        "name": "a member added to an empty object, its value spelled compactly with keys sorted",
+        "file": "{}",
+        "op": {
+          "keyPath": [
+            "k"
+          ],
+          "after": {
+            "z": true,
+            "a": null
+          },
+          "kind": "editJSON",
+          "path": "course_config.json"
+        },
+        "direction": "redo",
+        "result": "{\"k\": {\"a\":null,\"z\":true}}"
+      },
+      {
+        "name": "a member inside objects inside objects",
+        "file": "{\"s\": {\"2\": {\"label\": \"P2\"}}}",
+        "op": {
+          "keyPath": [
+            "s",
+            "2",
+            "label"
+          ],
+          "before": "P1",
+          "after": "P2",
+          "kind": "editJSON",
+          "path": "course_config.json"
+        },
+        "direction": "undo",
+        "result": "{\"s\": {\"2\": {\"label\": \"P1\"}}}"
+      },
+      {
+        "name": "the key written twice on the path: refused, never a guess",
+        "file": "{\"school_year\": \"2026-2027\", \"school_year\": \"2026-2027\"}\n",
+        "op": {
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027",
+          "kind": "editJSON",
+          "path": "course_config.json"
+        },
+        "direction": "undo",
+        "result": null
+      },
+      {
+        "name": "a whole number beyond 2^53 is refused, never written through a double",
+        "file": "{\"k\": 1}",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 12345678901234567890,
+          "after": 1
+        },
+        "direction": "undo",
+        "result": null
+      }
+    ],
+    "editJSONCasesHow": "An editJSON move on the bytes of a file (file-formats.json -> undoJournal.opKinds.editJSON): file is the file's text, op the op (its before and after any JSON, a missing one meaning no such member), direction undo (towards before) or redo (towards after), and result the file's exact text afterwards, or null when the move is refused (as changed since). Both platforms must produce these bytes exactly: only the member's own bytes change, and a new value is spelled compactly with keys sorted.",
     "stackCases": [
       {
         "name": "three steps: the newest is the head",
@@ -49280,9 +50979,308 @@
         "onTheList": [
           1
         ]
+      },
+      {
+        "name": "U2, move: a rollover's marker moved aside is moved back by Undo",
+        "calls": [
+          "moveTheMarker",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "markers": "movedBack"
+      },
+      {
+        "name": "U2, move: and Redo moves it aside again",
+        "calls": [
+          "moveTheMarker",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "markers": "moved"
+      },
+      {
+        "name": "U2, move: a deploy wrote a new marker in its place: Undo takes nothing back, both markers kept, and the list is cleared (ruling 13)",
+        "calls": [
+          "step",
+          "moveTheMarker",
+          "deployANewMarker",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 2,
+        "markers": "bothKept"
+      },
+      {
+        "name": "U2, createTree: a folder made is taken out by Undo and made again by Redo",
+        "calls": [
+          "makeAFolder",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "folderKept": true
+      },
+      {
+        "name": "U2, createTree: a file added inside the folder since: Undo refuses, the folder kept whole, the list cleared",
+        "calls": [
+          "makeAFolder",
+          "addAFileToTheFolder",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 1,
+        "folderKept": true
+      },
+      {
+        "name": "U2, removeTree: a folder removed is made again by Undo, everything in it from the list",
+        "calls": [
+          "makeAFolder",
+          "removeTheFolder",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ],
+        "folderKept": true
+      },
+      {
+        "name": "U2, removeTree: and Redo removes it again",
+        "calls": [
+          "makeAFolder",
+          "removeTheFolder",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ],
+        "folderKept": false
+      },
+      {
+        "name": "U2, editJSON: a settings member undone and redone",
+        "calls": [
+          "editTheSettings",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "U2, editJSON: the member changed by hand since: refused, the list cleared",
+        "calls": [
+          "editTheSettings",
+          "editTheSettingsByHand",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 1
+      },
+      {
+        "name": "U2, replaceText: a hunk of a page undone and redone",
+        "calls": [
+          "editAHunk",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "U2, external: a preference set through the app, undone and redone, with no working folder",
+        "calls": [
+          "setAPreference",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "U2, external: the preference changed since: refused, the list cleared",
+        "calls": [
+          "setAPreference",
+          "changeThePreferenceByHand",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 1
+      },
+      {
+        "name": "U2: steps of every kind on one list, undone newest first (rulings 5 and 9)",
+        "calls": [
+          "step",
+          "moveTheMarker",
+          "makeAFolder",
+          "editTheSettings",
+          "editAHunk",
+          "setAPreference",
+          "undo",
+          "undo",
+          "undo",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "markers": "movedBack",
+        "folderKept": false
+      },
+      {
+        "name": "U2, recompute: an Undo and a Redo each re-derive the section's front page",
+        "calls": [
+          "stepFromAnotherVersion:theFrontPageMaintainer",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "rederived": 2
+      },
+      {
+        "name": "U2, recompute: with no runner for its maintainer, a step holding a recompute is not available, never undone with its re-derivation skipped",
+        "calls": [
+          "stepFromAnotherVersion:theFrontPageMaintainer",
+          "forgetTheMaintainer",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "rederived": 0
+      },
+      {
+        "name": "U2: another version's step that breaks wholeOps (a folder made inside a folder the same step makes) is a barrier: not available, never cleared",
+        "calls": [
+          "step",
+          "stepFromAnotherVersion:twoWholeOpsOnOnePlace",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "U2, createTree: an Undo whose content the list no longer holds is refused and the folder kept (the list is cleared, as for any content missing)",
+        "calls": [
+          "makeAFolder",
+          "removeContent",
+          "undo"
+        ],
+        "expectLast": "contentMissing",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "contentMissing",
+        "clearedSeq": 1,
+        "folderKept": true
+      },
+      {
+        "name": "U2, removeTree: a Redo whose content the list no longer holds is refused, the folder kept, only the redo dropped",
+        "calls": [
+          "makeAFolder",
+          "removeTheFolder",
+          "undo",
+          "removeContent",
+          "redo"
+        ],
+        "expectLast": "contentMissing",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "folderKept": true
+      },
+      {
+        "name": "U2: the folder a page was moved out of, replaced since by a link to outside the working folder: Undo moves nothing out, refuses as changed since, and clears the list",
+        "calls": [
+          "moveThePageAside",
+          "linkItsOldFolderOutside",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 1,
+        "nothingMovedOutside": true
       }
     ],
-    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a readable begin and applied whose only op is a `move` (from, to, blobs naming a blob it put in content/); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to.",
+    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a begin and applied, readable as lines, whose only op is of a kind no reader knows (`aKindNobodyKnows`, with from, to and blobs naming a blob it put in content/; U1's used `move`, which U2 defines); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to. U2's calls (contracts/undo-traces.json's folder A, each a step through the door that plans it forward as a Redo would, JournaledWrite.perform(ops:)): `moveTheMarker` moves courses/TST1O/.netlify_sites/section1.json (made first, holding {\"site_id\": \"aaa-111\"}, when neither place holds it) to section1.previous.json beside it, one `move`; `deployANewMarker` writes a new marker ({\"site_id\": \"bbb-222\"}) in the place the move emptied, as a deploy after a rollover onto a new website does, and nothing to the list; `makeAFolder` makes courses/TST1O/extra (a.md, sub/b.md) as one `createTree`; `addAFileToTheFolder` adds a file inside it by hand; `removeTheFolder` removes it, one `removeTree`; `editTheSettings` sets courses/TST1O/settings.json's school_year (made first holding 2025-2026) to 2026-2027, or back, one `editJSON`; `editTheSettingsByHand` sets it to 2030-2031 by hand; `editAHunk` turns `Line one: old.` in courses/TST1O/notes.md into `new`, or back, one `replaceText`; `setAPreference` sets the preference undoCasesPreference to b (or back to a), one `external`, in a step with no working folder; `changeThePreferenceByHand` sets it to z; `forgetTheMaintainer` takes away the runner of the sectionFrontPage maintainer (UndoMaintainers), which every case otherwise has. markers is what the two marker places hold after the last call (moved: only the moved copy; movedBack: only the original place; bothKept: the new marker in the original place and the moved copy beside it); folderKept whether the made folder is there; rederived how many times the front page's maintainer ran. No case leaves a staged file anywhere in the working folder. `stepFromAnotherVersion:twoWholeOpsOnOnePlace` adds two createTree ops, one inside the other, which breaks opKinds.wholeOps. `moveThePageAside` moves courses/TST1O/old/a.md (made first) to courses/TST1O/a.md, one `move`; `linkItsOldFolderOutside` replaces courses/TST1O/old by a link to a folder beside the working folder; nothingMovedOutside says nothing reached that folder.",
     "stepCases": [
       {
         "name": "two pages, the second changed by hand since: nothing written, the second named",
@@ -49536,9 +51534,299 @@
         "files": "asLeft",
         "phase": "begun",
         "afterAnOrdinaryStep": "begun"
+      },
+      {
+        "name": "U2: a step with a marker move and the front page dies after every swap, before its re-derivation: completed, and recovery re-derives the front page",
+        "work": "step",
+        "withAMove": true,
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "markers": "moved",
+        "rederived": 1,
+        "why": "rule.recovery judges a step by its content ops alone, so without the re-derivation on settle the front page would be left stale (laterPieces.U2; the Fable sweep of U1, T5)."
+      },
+      {
+        "name": "U2: the same step dies with its pages swapped and its marker not yet moved: the pages put back, rolled back, and the front page re-derived",
+        "work": "step",
+        "withAMove": true,
+        "stopAt": "beforeSwap:2",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "markers": "movedBack",
+        "rederived": 1
+      },
+      {
+        "name": "U2: the same step dies before anything is swapped: failed, nothing to put back, and the front page re-derived all the same (re-deriving is idempotent)",
+        "work": "step",
+        "withAMove": true,
+        "stopAt": "beforeSwap:0",
+        "files": "before",
+        "phase": "failed",
+        "head": null,
+        "markers": "movedBack",
+        "rederived": 1
+      },
+      {
+        "name": "U2: its undo dies after its swaps, before its re-derivation: completed, and re-derived",
+        "work": "undo",
+        "withAMove": true,
+        "stopAt": "beforeUndone",
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "markers": "movedBack",
+        "rederived": 1
+      },
+      {
+        "name": "U2: its undo dies with the marker moved back and the pages not yet: the marker moved aside again, the undo ends where it began",
+        "work": "undo",
+        "withAMove": true,
+        "stopAt": "beforeSwap:2",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "markers": "moved",
+        "rederived": 1,
+        "why": "An undo swaps second, then first, then the move: stopped before the move, the two pages are back and the marker is not; some of each, so what took effect (the two pages) is put back and the undo is rolled back, the step done as before."
+      },
+      {
+        "name": "U2: a deploy wrote a new marker after the step died with its marker moved: the pair is in the way, the pages are put back, both markers kept, the step interrupted and the list cleared",
+        "work": "step",
+        "withAMove": true,
+        "stopAt": "beforeApplied",
+        "deployBeforeRecovery": true,
+        "files": "before",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "courses/TST1O/.netlify_sites/section1.json"
+        ],
+        "markers": "bothKept",
+        "rederived": 1
+      },
+      {
+        "name": "U2: a step that removes a folder dies with the folder set aside and its marker not yet moved: the folder put back from where it was set aside (its listing the step's), the pages put back, rolled back",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "folderKept": true,
+        "markers": "movedBack",
+        "why": "The step swaps first, second, then takes the folder aside, then moves the marker. Recovery finds the folder under its hidden staged name with exactly the listing the step recorded and its place free, so it renames it back (undo.rule.recovery): the folder is before, the pages after, so the pages are put back."
+      },
+      {
+        "name": "U2: the same step dies after every change, before applied: completed, the folder gone, nothing staged left",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "folderKept": false,
+        "markers": "moved"
+      },
+      {
+        "name": "U2: its undo dies with the pages and the marker back and the folder not yet made: the folder made beside its place is removed, and the undo rolled back",
+        "work": "undo",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "folderKept": false,
+        "markers": "moved"
+      },
+      {
+        "name": "U2: a step that sets a preference dies with its pages swapped and the preference not yet set: rolled back, the preference as it was",
+        "work": "step",
+        "withAPreference": true,
+        "stopAt": "beforeSwap:2",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "preference": "a"
+      },
+      {
+        "name": "U2: the same step dies after the preference is set, before applied: completed",
+        "work": "step",
+        "withAPreference": true,
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "preference": "b"
+      },
+      {
+        "name": "U2: a step with the front page that died before applied is settled by the next write through the door for ops, and its front page re-derived",
+        "work": "step",
+        "withAMove": true,
+        "stopAt": "beforeApplied",
+        "recoveredBy": "theNextWrite",
+        "files": "after",
+        "phase": "done",
+        "markers": "moved",
+        "rederived": 1,
+        "why": "The second hard review of U2b, MEDIUM 1: recovery run inside another write's lock dropped what it settled, so the front page was never re-derived. The door for ops recovers and re-derives before it begins."
+      },
+      {
+        "name": "U2: the same step meets a write through U1's door first: the write is refused (another change is under way) and the step left in flight for a recovery that re-derives, never settled with its front page stale",
+        "work": "step",
+        "withAMove": true,
+        "stopAt": "beforeApplied",
+        "recoveredBy": "anOrdinaryWrite",
+        "nextWrite": "anotherChangeIsUnderWay",
+        "files": "after",
+        "phase": "begun",
+        "markers": "moved",
+        "rederived": 0
+      },
+      {
+        "name": "U2: a step that removes a folder dies with the folder set aside, and a file is saved into it while it is aside: the folder is put back in its place, changed, and is in the way: the pages are put back, the step is interrupted naming the folder, and the list cleared",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "changeTheFolderSetAside": true,
+        "files": "before",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "courses/TST1O/extra"
+        ],
+        "folderKept": true,
+        "keptAside": false,
+        "markers": "movedBack",
+        "why": "The second hard review of U2b, MEDIUM 3: a folder whose listing differs from the step's record is in the way, never settled as gone; and (the director's rule after the third review) it goes back in its place whenever that place is free, so nothing of the teacher's is left hidden; the trail line 'undo found a folder set aside' says what changed."
+      },
+      {
+        "name": "U2: the same, with something else made in the folder's place since: the folder set aside is kept under a visible name beside it, the step interrupted naming the folder, and the list cleared",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "changeTheFolderSetAside": true,
+        "somethingInItsPlace": true,
+        "files": "before",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "courses/TST1O/extra"
+        ],
+        "keptAside": false,
+        "keptVisibleAs": "courses/TST1O/extra (kept by Undo)",
+        "folderLines": 1,
+        "markers": "movedBack",
+        "why": "Russell's ruling of 2026-11-19 (replacing 'both left as they are'): nothing of the teacher's stays hidden; the folder is renamed, never merged or overwritten, to '<name> (kept by Undo)' beside the folder that now holds its place, and the trail line names both."
+      },
+      {
+        "name": "U2: the same, with that visible name taken too: the folder is kept as '(kept by Undo 2)', the taken name untouched",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "changeTheFolderSetAside": true,
+        "somethingInItsPlace": true,
+        "visibleNameTaken": true,
+        "files": "before",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "courses/TST1O/extra"
+        ],
+        "keptAside": false,
+        "keptVisibleAs": "courses/TST1O/extra (kept by Undo 2)",
+        "folderLines": 1,
+        "markers": "movedBack"
+      },
+      {
+        "name": "U2: the same, with the recovery dying after the folder is kept under its visible name and before it writes to the list: the next recovery finds nothing hidden and settles the step as interrupted, the folder still kept, one trail line",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "changeTheFolderSetAside": true,
+        "somethingInItsPlace": true,
+        "recoveryStopsAfterTheTidy": true,
+        "files": "before",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "courses/TST1O/extra"
+        ],
+        "keptAside": false,
+        "keptVisibleAs": "courses/TST1O/extra (kept by Undo)",
+        "folderLines": 1,
+        "markers": "movedBack",
+        "why": "Both renames never replace, so either happened or did not; the trail line is written just before the rename (the intent first, the fourth review of U2b, LOW 4), and a death after it leaves nothing to redo."
+      },
+      {
+        "name": "U2: a step that removes a folder dies with the folder changed while aside and the recovery dying after putting it back, before it writes to the list: the next recovery finds the folder in its place, in the way, and settles the step as interrupted, one trail line",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "changeTheFolderSetAside": true,
+        "recoveryStopsAfterTheTidy": true,
+        "files": "before",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "courses/TST1O/extra"
+        ],
+        "folderKept": true,
+        "keptAside": false,
+        "folderLines": 1,
+        "markers": "movedBack"
+      },
+      {
+        "name": "U2: a step that removes a folder dies part way through deleting it, every change in: the folder was renamed to its -gone name first, so recovery finishes the delete and the step is completed, never a half-emptied folder put back",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "whileDeletingAFolder",
+        "halfDeleteTheGoneFolder": true,
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "folderKept": false,
+        "folderLines": 0,
+        "markers": "moved",
+        "why": "The fourth review of U2b, MEDIUM: a recursive delete is not atomic. Before the fix the -orig folder was deleted in place, and a death part way left a half-deleted folder that recovery put back in the teacher's place and judged neither: the list cleared, no Undo and no Redo, and a half-emptied folder where the teacher had asked for none."
+      },
+      {
+        "name": "U2: its redo dies the same way, part way through deleting the folder again: recovery finishes the delete and the redo is completed",
+        "work": "redo",
+        "withATree": true,
+        "stopAt": "whileDeletingAFolder",
+        "halfDeleteTheGoneFolder": true,
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "folderKept": false,
+        "folderLines": 0,
+        "markers": "moved"
+      },
+      {
+        "name": "U2: a write through U1's door on the very file a dead front-page step left part way is refused, never written over it",
+        "work": "step",
+        "withAMove": true,
+        "stopAt": "beforeApplied",
+        "recoveredBy": "anOrdinaryWrite",
+        "ordinaryWriteOn": "first",
+        "nextWrite": "anotherChangeIsUnderWay",
+        "files": "after",
+        "phase": "begun",
+        "markers": "moved",
+        "rederived": 0,
+        "why": "The third hard review of U2b, LOW 1: the plain door's recovery cannot re-derive, so it leaves the step in flight; a write landing over it would be settled later as a hand edit and clear the list."
       }
     ],
-    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one).",
+    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared. withATree: the step also removes courses/TST1O/extra (a.md, sub/b.md: one removeTree, its content in the list) and moves the marker, so it swaps first, second, the folder aside, then the move (an undo: second, first, the move back, then the folder made); folderKept whether the folder is there after recovery. withAPreference: the step also sets the preference undoCasesPreference from a to b (one external op, its place after the pages); preference is its value after recovery. recoveredBy: who recovers: recovery (the default: the app's recovery, which re-derives what it settles), theNextWrite (the next step through the door for ops, which recovers and re-derives first), or anOrdinaryWrite (a step through U1's door, whose recovery inside its lock leaves a step that keeps a file true by a rule in flight, for a recovery that will re-derive it). changeTheFolderSetAside: before recovery a file is saved into the folder the stopped work set aside (under its hidden staged name); keptAside whether a folder is still kept aside after recovery. somethingInItsPlace: before recovery a different folder is made at the place of the folder set aside. visibleNameTaken: before recovery a folder is made at the visible name `courses/TST1O/extra (kept by Undo)` too. keptVisibleAs: the path of the visible name the folder set aside is kept under after recovery (it holds a.md). recoveryStopsAfterTheTidy: the first recovery stops at the kill point afterRecoveryTidied, once it has tidied and before it writes to the list (it must not have recorded the step interrupted), and a second recovery then runs. folderLines: how many 'undo found a folder set aside' trail lines the recoveries wrote. stopAt whileDeletingAFolder: the work stops after a folder it took out has been renamed to its `-gone` name and before its delete ends; halfDeleteTheGoneFolder then removes a.md from that `-gone` folder, as a delete that died part way leaves it. ordinaryWriteOn: first makes that write set the first page's title (the very file the stopped work left), otherwise a third page's; nextWrite is what that write comes to (anotherChangeIsUnderWay: refused, nothing changed).",
     "deployedCases": [
       {
         "name": "never deployed: no fragment, no offer",
@@ -49938,7 +52226,7 @@
       }
     ],
     "deployedCasesHow": "Each case is one move (an Undo or a Redo) of one section, asked of rule.deployed. moves: every page the move changes, by its op path inside the working folder, with whether students can see it in the course before and after the move (the build's own hide rule, worked out by the caller). changesMoreThanVisibility: the move also changes what some page says. record: every file in the section's published-pages folder, by name, with the places it lists (null: the file could not be read). destinations: the destination types the section deploys to NOW (netlify, cloudflare, folder), its primary and any additional. siteMarkers: those of them that have a site marker (file-formats.json -> firstDeployMarkers; absent: none). answer: offerToDeploy, noOffer or cannotTell.",
-    "traces": "contracts/undo-traces.json, generated by scripts/make_undo_traces.py (seeded, deterministic, with its own scripts/test_make_undo_traces.py) and replayed by both suites through each app's own journal and door. U1's traces are publish and hide only, set at the line with JournaledWrite.settingEntry's rule (which drops a leading byte-order mark, as today's publish does); U3 grows them to about 120 through the real action code.",
+    "traces": "contracts/undo-traces.json, generated by scripts/make_undo_traces.py (seeded, deterministic, with its own scripts/test_make_undo_traces.py) and replayed by both suites through each app's own journal and door. U1's traces are publish and hide only, set at the line with JournaledWrite.settingEntry's rule (which drops a leading byte-order mark, as today's publish does); U3 grows them to about 120 through the real action code. Since U2 they also move pages aside (a `move` call: one `move` op, judged as a pair, made through the door that plans a step forward), 31 moves among 690 calls, so linear undo and redo, refusals and the closing runs cross a second kind.",
     "knownLimits": {
       "note": "What the list does NOT do, named so nobody takes it for a bug or re-measures it (the director's ruling 6 on U1's second reviews).",
       "clockFarForward": "A clock set more than 60 days forward (the 30 days kept and the grace of 30), and then put right, loses the list: the step written while it is forward is trusted at that moment, so every older step is pruned and its content deleted in the same hold. Measured (U1 harness, core review): steps 1 to 5, step 6 with the clock a year ahead, the clock put right: one step offered. Up to 60 days forward and back loses nothing (stackCases 'a clock set forward' and 'and come back when the clock is put right').",
@@ -49947,12 +52235,14 @@
       "lockHolderStopped": "A process that holds the lock and is stopped (not killed) makes each live wait that runs out leave one waiting thread and one open descriptor until the holder goes; bounded by the waits made (measured: 50 waits, 51 threads). Shadow waits try once after the first runs out.",
       "putBackOverOneHandEdit": "A step that died with every file swapped in but before applied, with one page then changed by hand, is put back on every other page (measured: 299 of 300) and closed interrupted, as rule.recovery says: the journal never calls half a step done. For the UI review, not a change of rule.",
       "shadowProcessAfterTheFlip": "A process still running a build with the switch off after the switch goes live (an outside-assistant session that outlives an update: on the mac that server is the app binary; or a build with the switch off run beside a live one on a developer's Mac) goes on writing shadow steps into the same list, and a live reader cannot tell them from live ones. Measured (the Fable sweep of U1, a standalone probe): after goLive and one live step, a shadow-mode step was recorded as step 3 and was the head the live app offered, and Undo took it back past a newer change the shadow process never recorded; a LIVE two-page step killed after its first swap, when the first process to take the lock was in shadow, was recorded interrupted (partlyTookEffect) and cleared, with one page published and the other not, both staged files left, and no trail line. Reaches a teacher only if a build with the switch off is released beside a live one; under ruling 2 none is. No v1 line changes for it: U7 settles it (laterPieces.U7).",
-      "stagedFilesOfAFolderAway": "A step closed interrupted while its working folder could not be reached has its staged files removed by the first recovery that reaches the folder again, for as long as the journal still holds the step's lines (until its segment goes, normally some 60 days). A folder away for longer keeps them: hidden dot files beside its pages, which Obsidian and the website builder pass over."
+      "stagedFilesOfAFolderAway": "A step closed interrupted while its working folder could not be reached has its staged files removed by the first recovery that reaches the folder again, for as long as the journal still holds the step's lines (until its segment goes, normally some 60 days). A folder away for longer keeps them: hidden dot files beside its pages, which Obsidian and the website builder pass over.",
+      "jsonFileRewritten": "Withdrawn by the hard review of U2b (LOW a): an editJSON no longer rewrites the file; it changes only its member's bytes (file-formats.json -> undoJournal.opKinds.editJSON, undo.editJSONCases) and refuses a file where that cannot be done safely, a key written twice on the path among them. Kept as a key so a reader of an older contract finds it answered. Left as they are for the merge with the journal off (the director's ruling after the third review, to be recorded on #899): the member an editJSON sets has its number spelled by the app (2.0 is written 2), and a new object value's non-ASCII keys are sorted as Foundation sorts them, which the contract does not pin. A whole number beyond 2^53 is never compared or written through a double: cannotTell, or refused.",
+      "linkBetweenTheCheckAndTheChange": "A place is checked inside the working folder (links resolved) immediately before each change, and the change is a separate system call: a folder on the path replaced by a link to outside in the instant between the two calls is not caught. Measured as a window of one system call by the third hard review of U2b (probe C); closing it needs the change made relative to an open handle of the folder (openat/renameat on the mac, a handle opened without following reparse points on Windows), which is U7's or later. The check runs at plan time, before staging, before each swap, before a re-derivation and in the tidying."
     }
   },
   "obsidianNeverClosedUnasked": {
-    "note": "#995 (HIG stage 2, finding D21 of #975), v2.0.0, mac first; Windows meets it under #1003 (v2.0.0), and until then its tests do not read this key. Obsidian keeps its list of vaults in memory and writes it back whole when it quits, so a course it has never seen can be added only while it is closed. Until #995 the mac app quit a running Obsidian for that without asking, with every course open in it. Russell's ruling Q13 on #975 (2026-11-18): Plantoir never closes Obsidian without asking, and the button that goes ahead says plainly that Obsidian will be closed. documentation/09-mac-app.md -> \"Plantoir never closes Obsidian unasked (#995)\".",
-    "rule": "Every route that hands Obsidian a file (Open in Obsidian from any menu, button or the assistant, a Coverage tab code, Course Settings' How I Teach row) asks wording.title BEFORE closing Obsidian whenever closeCases says ask; Cancel opens nothing and closes nothing, and wording.closeAndOpen closes Obsidian, adds the course, opens again each course Obsidian had on screen, then opens what was asked for. What opens again is every vault Obsidian's list (obsidian.json) marks open, read before the quit: the add-ons' reopen's own rule (obsidianAddOnsForFigures.sequence step 8). Three more rules (#995 reviews): (1) at the answer closeCases is read again, and if it no longer says ask (Obsidian has quit, or now knows the course) the file is simply opened and nothing is closed; (2) if Obsidian is still running after the quit and the wait, nothing is written into its list and nothing is handed to it (it does not know the course, so a link would only show its own error), and trail.didNotClose is written; if it closed but the file still cannot be handed over (the list could not be written), trail.notAdded is written; neither shows anything on screen yet, because the route has no report for a course that could not be opened in Obsidian (#995's morning question); (3) if Obsidian starts between the press's check and the hand-over, nothing is handed over and the question is asked instead of the press doing nothing. Every answer writes one trail line (activityTrail.mustRecord: asked to close Obsidian to open a course). The add-ons offer (obsidianAddOnsForFigures) titles its yes wording.offerAddClosingObsidian instead of offerAdd whenever that yes closes Obsidian (the course is open in it, or Plantoir cannot tell: openStateCases open or cannotTell). When the course was closed while the offer was shown and is open by the time Add Them is pressed, Obsidian is not closed: the reopen question (obsidianAddOnsForFigures.wording.reopenTitle) asks first. The rename's question (Close Obsidian and Rename) already met the ruling.",
+    "note": "#995 (HIG stage 2, finding D21 of #975), v2.0.0, mac first; Windows since #1003 (v2.0.0, ObsidianNeverClosedUnaskedTests there too). couldNotOpen is Windows first (#1003, Russell's ruling 2 on #995, 2026-11-19); the mac owes it. Obsidian keeps its list of vaults in memory and writes it back whole when it quits, so a course it has never seen can be added only while it is closed. Until #995 the mac app quit a running Obsidian for that without asking, with every course open in it. Russell's ruling Q13 on #975 (2026-11-18): Plantoir never closes Obsidian without asking, and the button that goes ahead says plainly that Obsidian will be closed. documentation/09-mac-app.md -> \"Plantoir never closes Obsidian unasked (#995)\".",
+    "rule": "Every route that hands Obsidian a file (Open in Obsidian from any menu, button or the assistant, a Coverage tab code, Course Settings' How I Teach row) asks wording.title BEFORE closing Obsidian whenever closeCases says ask; Cancel opens nothing and closes nothing, and wording.closeAndOpen closes Obsidian, adds the course, opens again everything Obsidian had open, then opens what was asked for. What opens again is every vault Obsidian's list (obsidian.json) marks open, read before the quit: the add-ons' reopen's own rule (obsidianAddOnsForFigures.sequence step 8). Three more rules (#995 reviews): (1) at the answer closeCases is read again, and if it no longer says ask (Obsidian has quit, or now knows the course) the file is simply opened and nothing is closed; (2) if Obsidian is still running after the quit and the wait, nothing is written into its list and nothing is handed to it (it does not know the course, so a link would only show its own error), and trail.didNotClose is written; if it closed but the file still cannot be handed over (the list could not be written), trail.notAdded is written; since Russell's ruling 2 on #995 (2026-11-19) each of the two also shows couldNotOpen's alert (Windows since #1003; on the mac, until it follows, neither shows anything on screen); (3) if Obsidian starts between the press's check and the hand-over, nothing is handed over and the question is asked instead of the press doing nothing. Every answer writes one trail line (activityTrail.mustRecord: asked to close Obsidian to open a course). The add-ons offer (obsidianAddOnsForFigures) titles its yes wording.offerAddClosingObsidian instead of offerAdd whenever that yes closes Obsidian (the course is open in it, or Plantoir cannot tell: openStateCases open or cannotTell). When the course was closed while the offer was shown and is open by the time Add Them is pressed, Obsidian is not closed: the reopen question (obsidianAddOnsForFigures.wording.reopenTitle) asks first. The rename's question (Close Obsidian and Rename) already met the ruling.",
     "closeCases": {
       "note": "Whether handing Obsidian the file means asking first: Obsidian is running and no vault in its list (obsidian.json) is the file's folder or holds it. `registryVaults` null means there is no list at all; a list that cannot be read counts as holding nothing, the safe direction.",
       "cases": [
@@ -50031,6 +52321,13 @@
       "cancel": "Cancel",
       "offerAddClosingObsidian": "Close Obsidian and Add Them"
     },
+    "couldNotOpen": {
+      "note": "Russell's ruling 2 on #995 (2026-11-19): when Close Obsidian and Open cannot finish, an alert titled title, one sentence and ok, following the existing \"Could not rename\" alert. didNotClose is his suggested sentence, for trail.didNotClose; notAdded is the sentence for trail.notAdded, written under #1003 in didNotClose's shape and put to him to confirm. Shown after the trail line is written. Windows since #1003; the mac owes it (#995's follow-up).",
+      "title": "Could not open {course} in Obsidian",
+      "didNotClose": "Obsidian did not close, so {course} could not be added to its list. Close Obsidian yourself, then open the course again.",
+      "notAdded": "Obsidian closed, but {course} could not be added to its list. Close Obsidian yourself, then open the course again.",
+      "ok": "OK"
+    },
     "trail": {
       "note": "One line per answer, under the event \"asked to close Obsidian to open a course\". {course} is the course's code.",
       "opened": "{course} · closed Obsidian to add the course to its list, and opened it",
@@ -50041,6 +52338,7 @@
     },
     "knownLimits": [
       "Opens again names everything Obsidian's list marks open, read before the quit. A mark Obsidian left behind on a vault it had closed (FolderActions' own measurement) reopens that vault too: the over-report is the safe direction, as in the add-ons' reopen. A vault is not always a course (a parent folder opened as one), hence everything, not each course.",
+      "When Obsidian's list cannot be read before the quit, nothing is marked open, so only the course opens again (as the add-ons' reopen, obsidianAddOnsForFigures.wording.closingRule); opensAgainValue then says more than happens.",
       "A course with diagrams and graphs, never seen by a running Obsidian, and never asked about the add-ons, meets two questions in a row: the add-ons offer, then this one. Folding them was rejected: Not Now also opens Obsidian, so the offer would have to carry the closing in all three answers."
     ],
     "rejected": [
