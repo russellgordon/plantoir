@@ -43,6 +43,15 @@ struct ObsidianAddOnsRequest: Identifiable {
         return openState != .closed
     }
 
+    /// The offer's yes: "Close Obsidian and Add Them" whenever that yes
+    /// closes Obsidian, "Add Them" otherwise (#995, D21).
+    var addButtonTitle: String {
+        if courseIsOpen {
+            return ObsidianClosingWording.offerAddClosingObsidian
+        }
+        return ObsidianFigureAddOnsWording.offerAdd
+    }
+
     var id: String {
         return course.code + "|" + folder.path
     }
@@ -164,6 +173,13 @@ struct ObsidianOpening {
         await FolderActions.quitObsidianAndWait()
     }
 
+    /// The answer "Close Obsidian and Open" (#995): closes Obsidian, adds the
+    /// course to its list and opens again what it had on screen. Called only
+    /// from that answer, never on a press.
+    var closeAndRegister: @MainActor (_ vault: URL) async -> Void = { vault in
+        await FolderActions.closeObsidianAndRegister(vaultURL: vault)
+    }
+
     /// Opens these vaults again, in order.
     var reopen: @MainActor (_ vaultPaths: [String]) -> Void = { vaultPaths in
         FolderActions.reopenVaults(vaultPaths)
@@ -235,7 +251,7 @@ extension WorkspaceModel {
     ///
     /// Returns whether Obsidian was opened now; `false` means a question is
     /// waiting (`lockedPagesNoteRequest`, `obsidianAddOnsOfferRequest`,
-    /// `obsidianReopenRequest`) or the scan is still running — a second
+    /// `obsidianReopenRequest`, `obsidianClosingRequest`) or the scan is still running — a second
     /// click then does nothing (plan review N7). `lockAgain` is replaced
     /// only by a test, whose temporary course must stay deletable.
     @discardableResult
@@ -280,7 +296,7 @@ extension WorkspaceModel {
         if pressed.scanStarted, let work = obsidianAddOnsWork {
             await work.value
         }
-        if lockedPagesNoteRequest != nil || obsidianAddOnsOfferRequest != nil || obsidianReopenRequest != nil {
+        if lockedPagesNoteRequest != nil || obsidianAddOnsOfferRequest != nil || obsidianReopenRequest != nil || obsidianClosingRequest != nil {
             return .waitingForAnAnswer
         }
         return .opened(answer)
@@ -347,7 +363,8 @@ extension WorkspaceModel {
                 return OpenInObsidianPressed(opened: false, wentAhead: true, scanStarted: false, answer: answer)
             }
             openObsidian(folder, page: page, course: course)
-            return OpenInObsidianPressed(opened: true, wentAhead: true, scanStarted: false, answer: answer)
+            // Not opened when the closing question is waiting instead (#995).
+            return OpenInObsidianPressed(opened: obsidianClosingRequest == nil, wentAhead: true, scanStarted: false, answer: answer)
         }
         let settings: AppSettings = obsidianOpening.settings ?? AppSettings.shared
         if !ObsidianFigureAddOnsOffer.scans(
@@ -358,7 +375,8 @@ extension WorkspaceModel {
         ) {
             noteThePress()
             openObsidian(folder, page: page, course: course)
-            return OpenInObsidianPressed(opened: true, wentAhead: true, scanStarted: false, answer: answer)
+            // Not opened when the closing question is waiting instead (#995).
+            return OpenInObsidianPressed(opened: obsidianClosingRequest == nil, wentAhead: true, scanStarted: false, answer: answer)
         }
         let coursePath: String = course.directoryURL.path
         if ObsidianFigureAddOnsThisRun.beingOpened.contains(coursePath) {
@@ -391,10 +409,18 @@ extension WorkspaceModel {
         switch answered {
         case .addThem:
             settings.obsidianFigureAddOns = .yes
-            // Asked again NOW: the teacher may have opened the course in
-            // Obsidian while the question was up (fixes review N2).
-            if request.courseIsOpen || courseIsOpenInObsidian(request.course.directoryURL.path) {
+            // The offer was shown with "Close Obsidian and Add Them": that
+            // answer closes Obsidian.
+            if request.courseIsOpen {
                 await reopenObsidianWithAddOns(request)
+                return
+            }
+            // Asked again NOW: the teacher may have opened the course in
+            // Obsidian while the question was up (fixes review N2). The
+            // button they pressed said "Add Them", not that Obsidian would
+            // close, so the reopen question asks first (#995).
+            if courseIsOpenInObsidian(request.course.directoryURL.path) {
+                obsidianReopenRequest = request
                 return
             }
             await addObsidianAddOns(toCourse: request.course, request.needed, trigger: .openInObsidian)
@@ -404,6 +430,25 @@ extension WorkspaceModel {
             settings.obsidianFigureAddOns = .no
         }
         openObsidian(request.folder, page: request.page, course: request.course)
+    }
+
+    /// "Close Obsidian to open {course}?" was answered (#995). Close Obsidian
+    /// and Open closes it, adds the course to its list and opens what was
+    /// asked for; Cancel opens nothing and closes nothing.
+    func answerObsidianClosing(_ request: ObsidianClosingRequest, closeObsidian: Bool) async {
+        obsidianClosingRequest = nil
+        if !closeObsidian {
+            return
+        }
+        await obsidianOpening.closeAndRegister(request.course.directoryURL)
+        handToObsidian(request.folder, page: request.page, course: request.course)
+    }
+
+    /// Course Settings' How I Teach row (#329): the page, through the same
+    /// question as every other open (#995), but without the add-ons scan or
+    /// the reference course's note, which that row never had.
+    func openHowITeachPageInObsidian(_ page: URL, course: Course) {
+        openObsidian(course.directoryURL, page: page, course: course)
     }
 
     /// The reopen question was answered (#495): Reopen closes Obsidian, adds
@@ -458,10 +503,31 @@ extension WorkspaceModel {
 
     // MARK: - Private helpers
 
+    /// Every open in the route comes here (#995, D21): when handing Obsidian
+    /// the file means closing a running Obsidian first — a course it has
+    /// never seen — nothing is opened or closed, and the question
+    /// "Close Obsidian to open {course}?" waits instead
+    /// (`obsidianClosingRequest`). Plantoir never closes Obsidian unasked.
+    private func openObsidian(_ folder: URL, page: URL?, course: Course) {
+        var target: URL = FolderActions.obsidianTarget(forFolder: folder, vaultURL: course.directoryURL)
+        if let page {
+            target = FolderActions.pageTarget(page, vaultURL: course.directoryURL)
+        }
+        if ObsidianClosingRule.mustAsk(
+            targetPath: target.path,
+            obsidianRunning: obsidianOpening.isRunning(),
+            registryData: obsidianOpening.registryData()
+        ) {
+            obsidianClosingRequest = ObsidianClosingRequest(course: course, folder: folder, page: page)
+            return
+        }
+        handToObsidian(folder, page: page, course: course)
+    }
+
     /// The one place Open in Obsidian hands Obsidian something: the page the
     /// section's preview was showing when there is one (#518), the folder
     /// (its front page, or the course) otherwise.
-    private func openObsidian(_ folder: URL, page: URL?, course: Course) {
+    private func handToObsidian(_ folder: URL, page: URL?, course: Course) {
         if let page {
             obsidianOpening.openPage(page, course.directoryURL)
             return

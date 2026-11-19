@@ -8289,7 +8289,10 @@ which needs a window on screen for the rename feature's sake and is left as it
 is there, read MPM2D as closed while it was loaded). A registry that cannot
 be read while Obsidian runs counts as open too: Obsidian rewrites it in place,
 so a read can land mid-write. Add Them checks again when it is answered, in
-case the course was opened while the question was up. A hidden, minimised,
+case the course was opened while the question was up; since #995 that case
+asks the reopen question rather than closing Obsidian at once, because the
+button pressed said "Add Them", not that Obsidian would close ("Plantoir never
+closes Obsidian unasked (#995)", below). A hidden, minimised,
 full-screen or other-Space Obsidian holds the list in memory all the same. The
 rule over-reports (a stale mark), which is the safe direction: the pass waits
 and Open in Obsidian asks to reopen. The vaults reopened afterwards are every
@@ -8821,6 +8824,66 @@ of the Option alternate, Alt read at the click, WebView2's `SourceChanged` and
 `ContentLoading` in place of KVO and didCommit, and the page kept in its own
 file — `12-windows-app.md` → "Preview at Last Viewed on Windows (#514, the
 mac's #504)".
+
+## Plantoir never closes Obsidian unasked (#995)
+
+Finding D21 of the HIG review (#975); Russell's ruling Q13 (2026-11-18): never
+quit Obsidian without asking, and the button that goes ahead says plainly that
+Obsidian will be closed. HIG, Alerts: an alert can "warn them when their
+action might destroy data, and give them an opportunity to confirm … another
+important action they initiated"; "Aim for a one- or two-word title that
+describes the result of selecting the button"; "Always use 'Cancel' to title a
+button that cancels the alert's action."
+
+**What was wrong.** Obsidian's `open?path=` link reaches only vaults in its
+list (`obsidian.json`), and a running Obsidian holds that list in memory and
+writes it back whole when it quits. So `FolderActions.open`, on a course
+Obsidian had never seen, quit a running Obsidian (`application.terminate()`,
+every vault with it), wrote the list and reopened what had a window on
+screen, with no question at all. It was reached from every route: the
+toolbar, both menus, a row's menu, the assistant, a Coverage tab code, and
+Course Settings' How I Teach row, which called FolderActions directly.
+
+**What it does now.** `FolderActions.open` never closes Obsidian: registered,
+it opens the link; not registered with Obsidian not running, it writes the
+list and opens (the link starts Obsidian, which reads the list fresh);
+not registered with Obsidian running, it does nothing. The route asks first:
+`WorkspaceModel.openObsidian`, which every open in `OpenInObsidianRoute.swift`
+goes through, checks `ObsidianClosingRule.mustAsk` (Obsidian running and no
+vault in the list holds the file; an unreadable list holds nothing, so it
+asks) and sets `obsidianClosingRequest`, which `MainWindowView`'s
+`ObsidianClosingAlert` shows: "Close Obsidian to open {course}?", a sentence,
+then Closes / Opens again / Kept as lines (#834's shape), and the buttons
+Cancel and "Close Obsidian and Open" (the rename's "Close Obsidian and Rename"
+shape). Cancel opens and closes nothing. The go-ahead calls
+`ObsidianOpening.closeAndRegister` (`FolderActions.closeObsidianAndRegister`:
+note what is on screen, quit, seed defaults, register, reopen), then hands
+Obsidian the file. How I Teach goes through `openHowITeachPageInObsidian`,
+the same question without the add-ons scan or the reference note it never had.
+
+**The add-ons offer** titles its yes "Close Obsidian and Add Them" whenever
+that yes closes Obsidian (`ObsidianAddOnsRequest.addButtonTitle`: open or
+cannot tell), and "Add Them" otherwise. When the course was closed as the
+offer was shown and is open by the time Add Them is pressed, the reopen
+question asks rather than closing straight away (it used to close at once).
+
+**The rename** already asked, with "Close Obsidian and Rename"; unchanged.
+
+**Words and cases:** `contracts/shared-rules.json` → `obsidianNeverClosedUnasked`
+(`closeCases`, `wording`, `knownLimits`, `rejected`). Tests:
+`ObsidianNeverClosedUnaskedTests`, and `ObsidianFigureAddOnsTests.testAddThemChecksAgainWhenAnswered`
+(changed on purpose: it asserted the old unasked close). Windows is brought to
+match in stage 3 of #975; its tests do not read the new key yet.
+
+**Rejected:** opening the course without registering it (Obsidian shows its
+own "vault not found"); registering under a running Obsidian (the addition is
+lost when it quits); folding the question into the add-ons offer (Not Now
+opens Obsidian too, so all three answers would have to carry the closing).
+
+**Left as it was, for Russell:** the reopen question's "Reopen Obsidian"
+button (#995's morning question). No trail line is written for the question:
+a new `activityTrail.mustRecord` event needs Windows to declare it or a
+ledger entry owned by an open `windows` issue, and none exists yet.
 
 ## Open in Obsidian opens the page the preview shows (#518)
 
@@ -18070,9 +18133,11 @@ the course has a page — found by listing, so the teacher's own spelling counts
 a page that appears between the look and the write is the teacher's and is
 what opens) and nothing else: #209 rejected a starter text because an assistant
 reads the page as the teacher's own approach. It opens in Obsidian through
-`FolderActions.openPageInObsidian`, which shares the register/quit/reopen body
-with `openInObsidian` but targets the PAGE — `obsidianTarget` is for folders
-and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
+`WorkspaceModel.openHowITeachPageInObsidian` (since #995; until then
+`FolderActions.openPageInObsidian` directly), so a course a running Obsidian
+has never seen is added only after the teacher answers "Close Obsidian to open
+{course}?" ("Plantoir never closes Obsidian unasked (#995)"). It targets the
+PAGE — `obsidianTarget` is for folders and would open the vault. Disabled, as the toolbar's Open in Obsidian is, when
 Obsidian is not installed. Whether a page is there is read on every drawing and
 redrawn when the window becomes key (#152's `marksWalkGeneration`). Trail:
 "How I Teach page started" (or could not be, and why); opening writes nothing.

@@ -70,13 +70,24 @@ enum FolderActions {
 
     /// Opens a file (or a vault) in Obsidian, registering the vault first
     /// when Obsidian has never seen it — the body both doors share.
+    ///
+    /// **Never closes Obsidian (#995, D21).** Until #995 a course Obsidian
+    /// had never seen was registered by quitting a running Obsidian here,
+    /// with every vault it had open, and nobody was asked. Now that case
+    /// does nothing at all: the route (`WorkspaceModel.openObsidian`) asks
+    /// first, and on the answer "Close Obsidian and Open" calls
+    /// `closeObsidianAndRegister` below, after which the course IS
+    /// registered and this opens it straight away. The guard here is the
+    /// backstop for the one moment the route cannot see: Obsidian started
+    /// between its check and this call.
     private static func open(target: URL, vaultURL: URL) {
         guard let obsidianLink = FolderActions.obsidianURL(forFolder: target) else {
             return
         }
         let registryData: Data? = try? Data(contentsOf: FolderActions.obsidianRegistryFileURL)
+        let running: Bool = FolderActions.obsidianIsRunning
         if FolderActions.folderIsInRegisteredVault(target.path, registryData: registryData) {
-            if !FolderActions.obsidianIsRunning {
+            if !running {
                 // While Obsidian is closed its saved layout can be improved:
                 // auto-reveal makes the folder highlight when the page opens.
                 FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
@@ -84,15 +95,28 @@ enum FolderActions {
             NSWorkspace.shared.open(obsidianLink)
             return
         }
-        Task { @MainActor in
-            let wereOpen: [String] = FolderActions.openVaultPathsNow
-            await FolderActions.quitObsidianAndWait()
-            FolderActions.seedObsidianDefaultsIfMissing(inVault: vaultURL)
-            FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
-            FolderActions.registerVault(at: vaultURL)
-            FolderActions.reopenVaults(wereOpen)
-            NSWorkspace.shared.open(obsidianLink)
+        if running {
+            return
         }
+        // Obsidian is not running, so its list can be written without
+        // closing anything: it reads the list fresh when the link starts it.
+        FolderActions.seedObsidianDefaultsIfMissing(inVault: vaultURL)
+        FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
+        FolderActions.registerVault(at: vaultURL)
+        NSWorkspace.shared.open(obsidianLink)
+    }
+
+    /// The answer "Close Obsidian and Open" (#995): closes Obsidian, adds
+    /// the course to its list while it is closed, and opens again every
+    /// vault it had on screen. The caller then opens the course itself,
+    /// which is registered by then. Called ONLY from that answer.
+    static func closeObsidianAndRegister(vaultURL: URL) async {
+        let wereOpen: [String] = FolderActions.openVaultPathsNow
+        await FolderActions.quitObsidianAndWait()
+        FolderActions.seedObsidianDefaultsIfMissing(inVault: vaultURL)
+        FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
+        FolderActions.registerVault(at: vaultURL)
+        FolderActions.reopenVaults(wereOpen)
     }
 
     /// Whether Obsidian is running right now.

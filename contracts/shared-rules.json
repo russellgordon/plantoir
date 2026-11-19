@@ -49893,5 +49893,95 @@
       "shadowProcessAfterTheFlip": "A process still running a build with the switch off after the switch goes live (an outside-assistant session that outlives an update: on the mac that server is the app binary; or a build with the switch off run beside a live one on a developer's Mac) goes on writing shadow steps into the same list, and a live reader cannot tell them from live ones. Measured (the Fable sweep of U1, a standalone probe): after goLive and one live step, a shadow-mode step was recorded as step 3 and was the head the live app offered, and Undo took it back past a newer change the shadow process never recorded; a LIVE two-page step killed after its first swap, when the first process to take the lock was in shadow, was recorded interrupted (partlyTookEffect) and cleared, with one page published and the other not, both staged files left, and no trail line. Reaches a teacher only if a build with the switch off is released beside a live one; under ruling 2 none is. No v1 line changes for it: U7 settles it (laterPieces.U7).",
       "stagedFilesOfAFolderAway": "A step closed interrupted while its working folder could not be reached has its staged files removed by the first recovery that reaches the folder again, for as long as the journal still holds the step's lines (until its segment goes, normally some 60 days). A folder away for longer keeps them: hidden dot files beside its pages, which Obsidian and the website builder pass over."
     }
+  },
+  "obsidianNeverClosedUnasked": {
+    "note": "#995 (HIG stage 2, finding D21 of #975), v2.0.0, mac first. Obsidian keeps its list of vaults in memory and writes it back whole when it quits, so a course it has never seen can be added only while it is closed. Until #995 the mac app quit a running Obsidian for that without asking, with every course open in it. Russell's ruling Q13 on #975 (2026-11-18): Plantoir never closes Obsidian without asking, and the button that goes ahead says plainly that Obsidian will be closed. documentation/09-mac-app.md -> \"Plantoir never closes Obsidian unasked (#995)\".",
+    "rule": "Every route that hands Obsidian a file (Open in Obsidian from any menu, button or the assistant, a Coverage tab code, Course Settings' How I Teach row) asks wording.title BEFORE closing Obsidian whenever closeCases says ask; Cancel opens nothing and closes nothing, and wording.closeAndOpen closes Obsidian, adds the course, opens again each course Obsidian had on screen, then opens what was asked for. The add-ons offer (obsidianAddOnsForFigures) titles its yes wording.offerAddClosingObsidian instead of offerAdd whenever that yes closes Obsidian (the course is open in it, or Plantoir cannot tell: openStateCases open or cannotTell). When the course was closed while the offer was shown and is open by the time Add Them is pressed, Obsidian is not closed: the reopen question (obsidianAddOnsForFigures.wording.reopenTitle) asks first. The rename's question (Close Obsidian and Rename) already met the ruling.",
+    "closeCases": {
+      "note": "Whether handing Obsidian the file means asking first: Obsidian is running and no vault in its list (obsidian.json) is the file's folder or holds it. `registryVaults` null means there is no list at all; a list that cannot be read counts as holding nothing, the safe direction.",
+      "cases": [
+        {
+          "name": "Obsidian not running, course not in its list",
+          "running": false,
+          "registryVaults": [
+            "/w/ICS3U"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian not running, no list at all",
+          "running": false,
+          "registryVaults": null,
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, course in its list",
+          "running": true,
+          "registryVaults": [
+            "/w/MPM2D"
+          ],
+          "target": "/w/MPM2D/Section 1/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, a larger vault holds the course",
+          "running": true,
+          "registryVaults": [
+            "/w"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": false
+        },
+        {
+          "name": "Obsidian running, course not in its list",
+          "running": true,
+          "registryVaults": [
+            "/w/ICS3U"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        },
+        {
+          "name": "Obsidian running, a course whose name starts the same is not this one",
+          "running": true,
+          "registryVaults": [
+            "/w/MPM2"
+          ],
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        },
+        {
+          "name": "Obsidian running, no list at all",
+          "running": true,
+          "registryVaults": null,
+          "target": "/w/MPM2D/index.md",
+          "ask": true
+        }
+      ]
+    },
+    "wording": {
+      "title": "Close Obsidian to open {course}?",
+      "message": "Obsidian has not opened {course} before. It can add a course to its list only while it is closed, so Plantoir closes Obsidian, adds {course}, and opens it again.",
+      "factsRule": "After message, a blank line, then three facts each on a line of its own as Label: value, in this order: closesLabel with closesValue, opensAgainLabel with opensAgainValue, keptLabel with keptValue (#834's shape, as obsidianAddOnsForFigures.wording.closingRule).",
+      "closesLabel": "Closes",
+      "closesValue": "Obsidian, with every course open in it",
+      "opensAgainLabel": "Opens again",
+      "opensAgainValue": "{course}, and each course Obsidian had on screen",
+      "keptLabel": "Kept",
+      "keptValue": "Everything you have written",
+      "closeAndOpen": "Close Obsidian and Open",
+      "cancel": "Cancel",
+      "offerAddClosingObsidian": "Close Obsidian and Add Them"
+    },
+    "knownLimits": [
+      "Opens again names each course Obsidian had on screen: a course open in a hidden Obsidian (no window on screen) is not counted (FolderActions.openVaultPathsNow, the rename's own rule) and stays closed until the teacher opens it.",
+      "A course with diagrams and graphs, never seen by a running Obsidian, and never asked about the add-ons, meets two questions in a row: the add-ons offer, then this one. Folding them was rejected: Not Now also opens Obsidian, so the offer would have to carry the closing in all three answers."
+    ],
+    "rejected": [
+      "Opening the course without adding it to the list: Obsidian's open link finds only vaults it knows, so it would show its own error.",
+      "Adding the course to the list while Obsidian runs: Obsidian writes its in-memory list back on quit and the addition is lost (FolderActions.openInObsidian's measurement)."
+    ]
   }
 }
