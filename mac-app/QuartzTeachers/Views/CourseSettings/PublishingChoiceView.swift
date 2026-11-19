@@ -433,6 +433,8 @@ private struct NetlifyNote: View {
         HStack(alignment: .firstTextBaseline) {
             Image(systemName: "info.circle")
                 .foregroundStyle(.secondary)
+                // Decorative: the sentence beside it says it all (#993, D20).
+                .accessibilityHidden(true)
             Text(PublishingDestinations.netlifyNote)
                 .font(.caption)
                 .foregroundStyle(.secondary)

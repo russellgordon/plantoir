@@ -40,6 +40,8 @@ struct UnsavedSettingsNoticeView: View {
             HStack(alignment: .firstTextBaseline) {
                 Image(systemName: "info.circle")
                     .foregroundStyle(.secondary)
+                    // Decorative: the sentence beside it says it all (#993, D20).
+                    .accessibilityHidden(true)
                 Text(sentence)
                     .font(.callout)
                 Spacer()

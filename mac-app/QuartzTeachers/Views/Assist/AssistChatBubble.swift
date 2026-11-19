@@ -294,6 +294,12 @@ struct AssistTypingIndicator: View {
     /// separate pieces of state.
     @State private var isBreathing: Bool = false
 
+    /// The system's Reduce Motion setting (#993). With it on, the dots stand
+    /// still: Apple's Accessibility guidance asks an app to reduce
+    /// "automatic and repetitive animations", and this one repeats for as
+    /// long as the assistant works.
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion: Bool
+
     /// A single-line message bubble's body: one line of callout text plus
     /// the 7-point padding above and below it.
     private let bubbleHeight: CGFloat = 29
@@ -314,8 +320,10 @@ struct AssistTypingIndicator: View {
                         .opacity(isBreathing ? 0.95 : 0.35)
                         // Each dot lags the one before it, so the three read
                         // as a wave rather than as a single blink.
+                        // No animation at all under Reduce Motion, so
+                        // turning it on mid-wait stops the repeating one.
                         .animation(
-                            .easeInOut(duration: 0.6)
+                            reducesMotion ? nil : Animation.easeInOut(duration: 0.6)
                                 .repeatForever(autoreverses: true)
                                 .delay(Double(index) * 0.18),
                             value: isBreathing
@@ -334,12 +342,23 @@ struct AssistTypingIndicator: View {
             Spacer(minLength: 48)
         }
         .onAppear {
-            isBreathing = true
+            isBreathing = AssistTypingIndicator.breathes(whenReduceMotionIsOn: reducesMotion)
+        }
+        .onChange(of: reducesMotion) {
+            isBreathing = AssistTypingIndicator.breathes(whenReduceMotionIsOn: reducesMotion)
         }
         // Read out as one thing rather than as three dots.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("The assistant is working")
         .accessibilityIdentifier("assistTypingIndicator")
+    }
+
+    // MARK: - Functions
+
+    /// Whether the dots breathe: never while Reduce Motion is on, when they
+    /// stand still and dim, which still reads as "on its way" (#993).
+    static func breathes(whenReduceMotionIsOn reducesMotion: Bool) -> Bool {
+        return !reducesMotion
     }
 }
 

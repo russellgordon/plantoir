@@ -569,9 +569,11 @@ public sealed partial class MainWindow : Window
                             Content = message,
                             PrimaryButtonText = QuitConfirmation.QuitAnyway,
                             CloseButtonText = QuitConfirmation.KeepWorking,
-                            DefaultButton = ContentDialogButton.None,
                             XamlRoot = Content.XamlRoot,
                         };
+                        // quittingWhileWorkIsUnderWay.buttons: default null, escape keepWorking (#987).
+                        // No default, and the focus starts on Cancel, so Enter never quits (#979).
+                        DialogButtons.AskWithNoDefault(dialog);
                         AutomationProperties.SetAutomationId(dialog, "quitQuestionDialog");
                         quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
                     }
@@ -1566,11 +1568,12 @@ public sealed partial class MainWindow : Window
             Content = new ScrollViewer { Content = body, MaxHeight = 440 },
             PrimaryButtonText = CloudSyncWording.UseAnywayButton,
             CloseButtonText = CloudSyncWording.ChooseDifferentFolderButton,
-            // Neither button is the default: this is the one moment the choice
-            // is free, and a Return pressed out of habit must not decide it.
-            DefaultButton = ContentDialogButton.None,
             XamlRoot = Content.XamlRoot,
         };
+        // Neither button is the default: this is the one moment the choice
+        // is free, and a Return pressed out of habit must not decide it. The
+        // focus starts on Choose a Different Folder, so Enter is that (#979).
+        DialogButtons.AskWithNoDefault(dialog);
         AutomationProperties.SetAutomationId(dialog, "syncedFolderChoice");
         ContentDialogResult answer;
         try { answer = await dialog.ShowAsync(); }

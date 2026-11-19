@@ -51,8 +51,10 @@ public static class StartOfYearDialog
             Title = StartOfYearWording.Fill(StartOfYearWording.SheetTitle, ("course", course.Code), ("section", section.ToString())),
             PrimaryButtonText = StartOfYearWording.GoButton,
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
         };
+        // Russell's ruling Q-B on #975 (the mac's D39): getting ready can lose
+        // work, so no button is the default; the focus starts on Cancel (#979).
+        DialogButtons.AskWithNoDefault(dialog);
         AutomationProperties.SetAutomationId(dialog, "startOfYearDialog");
         StartOfYearSheetView.Build(dialog, sheet);
         var choice = await show(dialog);
@@ -143,8 +145,17 @@ public static class StartOfYearDialog
             Content = new ScrollViewer { Content = text, MaxHeight = 480 },
             PrimaryButtonText = StartOfYearWording.UndoButton,
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
+            // The mac's undo sheet: Undo is the default while it would put a
+            // page back (.defaultButton(isEnabled: !putBack.isEmpty)), and
+            // greyed otherwise; a Cancel is never the default (#979).
+            DefaultButton = ContentDialogButton.Primary,
         };
+        // And Undo cannot be pressed when nothing would go back, as on the mac
+        // (its isEnabled; the #979 review): pressing it then changed nothing
+        // and only ended the undo. EnablePrimary first, since the helper keeps
+        // the button's style as it finds it.
+        DialogButtons.EnablePrimary(dialog, wouldPutBack.Count > 0);
+        if (wouldPutBack.Count == 0) DialogButtons.AskWithNoDefault(dialog);
         AutomationProperties.SetAutomationId(dialog, "startOfYearUndoDialog");
         if (await show(dialog) != ContentDialogResult.Primary || folderMovedMeanwhile()) return null;
 

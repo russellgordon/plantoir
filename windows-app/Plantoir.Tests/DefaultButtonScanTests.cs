@@ -56,17 +56,21 @@ public class DefaultButtonScanTests
     }
 
     /// <summary>
-    /// The wizard's Create Course never takes Enter: nothing in the wizard
-    /// makes Primary its default, and its enablement goes through
-    /// <c>NeverTakesEnter</c>. (Its closing button after the work is over is
-    /// the one exception, and is enabled through the ordinary kind.)
+    /// The wizard's Create Course takes Enter only once the form is complete
+    /// and no code list is drawn (#979, the mac's D32 and the #987 review;
+    /// until #979 it never took Enter): nothing in the wizard makes Primary
+    /// its default by hand, and its enablement goes through the ordinary kind
+    /// only when <c>QuestionKeys.CreateCourseIsTheDefault</c> says so, through
+    /// <c>NotTheDefaultYet</c> (no default, no accent) otherwise. (Its closing button after the work
+    /// is over is enabled through the ordinary kind.)
     /// </summary>
     [Fact]
-    public void CreateCourse_NeverTakesEnter()
+    public void CreateCourse_TakesEnterOnlyOnceTheFormIsComplete()
     {
         string wizard = File.ReadAllText(Path.Combine(AppFolder, "Views", "NewCourseDialog.cs"));
         Assert.DoesNotContain("DefaultButton = ContentDialogButton.Primary", wizard);
-        Assert.Contains("PrimaryKind.NeverTakesEnter", wizard);
+        Assert.Contains("QuestionKeys.CreateCourseIsTheDefault(formIsComplete, _codeBox.IsSuggestionListOpen)", wizard);
+        Assert.Contains("PrimaryKind.NotTheDefaultYet", wizard);
     }
 
     /// <summary>Class Dates reads, then remembers: the main button is enabled by whether dates were read.</summary>

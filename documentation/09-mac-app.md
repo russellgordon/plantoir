@@ -2101,9 +2101,16 @@ Reopen Obsidian, the scheduled deploy's removal question in
 `ScheduledDeployRemovalWording` with no default, and Remove… beside a
 downloaded assistant asking first (`AssistModelRemovalWording`), each read
 from the contract by `QuitConfirmationTests`, `TodaysClassContractTests`,
-`ObsidianFigureAddOnsTests` and `RemovalQuestionsContractTests`. Still owed
-under #979: the dates card's titles, and the ContentDialog's fixed button
-order (its Close button always trails).
+`ObsidianFigureAddOnsTests` and `RemovalQuestionsContractTests`. The dates
+card's titles followed with the #987 merge. #979 then brought the rest of
+the Windows questions into line (no Cancel is the default; a question with no
+default opens with the focus on Cancel, since WinUI otherwise focuses the
+go-ahead and Enter pressed it, measured; the wizard's Create Course default
+and its Escape while making): [12 → "The question dialogs' keys
+(#979)"](12-windows-app.md#the-question-dialogs-keys-979-the-macs-973-and-987).
+Two differences are parked with Russell there: the ContentDialog's fixed
+button order (its Close button always trails), and Enter on a question with
+no default pressing the focused Cancel rather than nothing.
 
 ## A section's Coverage tab (#793)
 
@@ -20410,3 +20417,105 @@ page until then, with the anchor on the trail either way.
 How a set-up runs, what it records, what was measured and what was rejected
 are in `documentation/10-local-ai-assistant.md` → "Setting up an outside
 assistant (#855)".
+
+## Names VoiceOver reads, and state in more than colour (#993)
+
+Part of the Mac HIG review (#975, findings D16 to D20, D40, D41). Apple's
+VoiceOver page asks an app to "provide alternative labels for all key
+interface elements" and to "exclude purely decorative images from
+VoiceOver"; its Accessibility page asks it to "convey information with more
+than color alone" and, under Reduce Motion, to reduce "automatic and
+repetitive animations".
+
+- **Whose words a name is.** A control with a visible title, a printed
+  label beside it (`LabeledContent`, a Course Settings row, "Section
+  number:"), or a placeholder standing in for one ("Filter", "Where these
+  came from") is named with exactly those words, passed where it is drawn.
+  `AccessibilityNames` (`Views/Helpers/`) holds only the names of controls
+  that show no words at all, so the wording can be read in one place. Each
+  is a plain one- to three-word label in **sentence case**, the case of the
+  app's printed field labels ("Course name", "Folder name"): the HIG's
+  Writing page asks for one capitalisation style per kind of element, and
+  Apple's accessibility programming guide asks that a label begin with a
+  capitalised word, not end with a period, and not name the control's kind
+  ("button"), which VoiceOver says itself. The first version mixed title
+  case ("Choose Emoji", "Later Classes") with sentence case; the review
+  caught it.
+- **Why names were wrong rather than missing.** An icon-only button with no
+  label is named by SwiftUI from its symbol: the send button read "Arrow Up
+  Circle", the emoji button "face.smiling", the unsaved-settings icon
+  "Info". A segmented `Picker("")` with hidden labels gave its radio group
+  no name although each segment had one, so `DetailTabs` takes a `name`:
+  the window's own title ("EXC2O-S1" on a section, "EXC2O" on a course),
+  words already on the screen. The first version invented "Section View"
+  and "Course View", which appear nowhere a sighted teacher can see; a bar
+  with no title of its own is named after the page whose views it
+  switches.
+- **A name said once.** A `Stepper` with a title already carries that title
+  as its name even with `.labelsHidden()`; giving it an
+  `.accessibilityLabel` of the same words as well made VoiceOver read
+  "Section number, Section number" (Add a Section, the first review). Only
+  the number field beside it is labelled.
+- **Placeholders are not names.** A `TextField("Filter", …)` shows its title
+  as placeholder text, which assistive apps read as a placeholder, not as
+  the field's name (measured: such a field reads with no description); the
+  sidebar's filter field, the Class Dates sheet's "Where these came from"
+  field and Publish Pages' Find a Page field are labelled with those same
+  words. Other placeholder-only fields remain (the assistant's composer,
+  Class Dates' Google Sheet link, the sidebar's course-code rename field,
+  Course Settings' folder path, the list editor's New name, the console's
+  answer fields), not yet checked live; they are for the next pass.
+- **Decorative icons are hidden.** An `info.circle` (or the token notice's
+  triangle) beside a sentence that says everything is `accessibilityHidden`,
+  so VoiceOver reads the sentence alone.
+- **State in words, and in more than colour.** The multi-destination deploy
+  checklist names each destination's state ("Waiting", "Deploying",
+  "Done", "Failed", `DeployDestinationChecklist.stateName`) and reads as
+  one element per destination. Copy a Page's problem line is #994's
+  `StatusColour.blocking.sentence`, the stop symbol inside the sentence,
+  VoiceOver hearing the words alone; the branch's own symbol for it was
+  dropped at the merge. Plan Share's three status lines that say a share
+  may not be what the teacher expects (the last share did not finish, Stop
+  Sharing not confirmed, the new password not in use yet) are
+  `StatusColour.warning.sentence`: the caution's orange and triangle. They
+  were done here rather than left for #992, because #992's design changes
+  the sheet and leaves the bar's lines as they are.
+- **The restoring-folder spinner** is its own view,
+  `RestoringFolderPlaceholder` (`MainWindowView.swift`), named "Opening
+  folder"; a bare `ProgressView` gave VoiceOver nothing to say.
+- **Reduce Motion.** The assistant's breathing dots stand still and dim
+  while Reduce Motion is on (`AssistTypingIndicator.breathes`), and turning
+  it on mid-wait removes the repeating animation rather than leaving it
+  running.
+- **Not done here, and why.** The About window's credit links are inline
+  Markdown links in a `Text`, which SwiftUI reports to accessibility as
+  disabled links (D46). Russell ruled on 2026-11-19 that they become
+  separate link views, the design shown to him before it is built:
+  `vm-tools/reference/993-about-window-design.md`.
+- **Tests read what the app exposes.** `AccessibilityTreeTests` hosts the
+  real views (the tab bar, the emoji field, Add a Section, the Class Dates
+  sheet, the Publish Pages picker, the spinner, a stopping sentence) in an
+  off-screen window with a title of its own, and reads that window through
+  the accessibility API an assistive app uses (`AXUIElement`, on the test
+  host's own process, so no permission is asked): each element's role,
+  identifier, description and title (`AccessibilityTree`, in the test
+  target). A control with no name, or one name said twice, fails there,
+  which reading the source cannot show: SwiftUI joins a control's own title
+  and a label of the same words into one description ("Section number,
+  Section number"), and with the stepper's extra label put back
+  `testAddASectionNamesTheNumberOnce` fails. `testTheReaderCatchesADoubled
+  AndAMissingName` proves the reader sees both faults, so a reader that
+  found nothing cannot pass the rest. AppKit's own `NSAccessibility` methods
+  on the hosting view are no substitute: measured on 2026-11-19, a SwiftUI
+  hosting view answers them with one childless group until a client asks
+  through the API. `AccessibilityNamesTests` still reads the view source
+  for controls deep inside views that need a whole window to draw (the
+  wizard, Course Settings, the send button, the sidebar's filter field),
+  looking for the naming modifier on the line above the control's
+  identifier; those check that a name is given, not what VoiceOver hears.
+  The first review's outside reader of an isolated debug build
+  (`vm-tools/reference/993-review-1/ax993tools`) is the same idea from
+  outside the process.
+
+**For Windows:** each name here has a WinUI counterpart in
+`AutomationProperties.Name`; stage 3 of #975 mirrors this piece.

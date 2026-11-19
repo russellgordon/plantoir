@@ -72,7 +72,12 @@ public class QuitConfirmationTests
         Assert.Equal(buttons["titles"]!["keepWorking"]!.ToString(), QuitConfirmation.KeepWorking);
         Assert.Equal(buttons["titles"]!["quitAnyway"]!.ToString(), QuitConfirmation.QuitAnyway);
         string window = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "MainWindow.xaml.cs"));
-        Assert.Contains("CloseButtonText = QuitConfirmation.KeepWorking,\n                            DefaultButton = ContentDialogButton.None,",
+        // No default, and the focus starts on Cancel so Enter never quits (#979, measured:
+        // with no default WinUI focused Quit Anyway and Enter pressed it).
+        Assert.Contains("CloseButtonText = QuitConfirmation.KeepWorking,\n                            XamlRoot = Content.XamlRoot,\n                        };\n" +
+                        "                        // quittingWhileWorkIsUnderWay.buttons: default null, escape keepWorking (#987).\n" +
+                        "                        // No default, and the focus starts on Cancel, so Enter never quits (#979).\n" +
+                        "                        DialogButtons.AskWithNoDefault(dialog);",
                         window.Replace("\r\n", "\n"));
         var both = new QuitConfirmation.UnderWay(1, 0, 1, 0);
         Assert.Equal("a deploy", QuitConfirmation.WhatIsUnderWay(both));

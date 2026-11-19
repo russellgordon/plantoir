@@ -27,6 +27,8 @@ struct ColourSchemePickerView: View {
                     Text(scheme.name).tag(scheme.id)
                 }
             }
+            // The visible title, said explicitly (#993, D40).
+            .accessibilityLabel(Text("Colour scheme"))
 
             if let scheme = ColourSchemeCatalog.scheme(withID: selectedSchemeID) {
                 SampleBox {

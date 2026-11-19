@@ -9553,8 +9553,10 @@ while disabled the main button is not the default (`DefaultButton` None — only
 if it WAS Primary, so a dialog whose default is Close or Secondary keeps it)
 and carries no accent style; when it can be pressed it is the default again.
 Three kinds: `TakesEnterWhenEnabled` (every ordinary dialog),
-`NeverTakesEnter` (the wizard, below — the accent style explicitly, never the
-default) and `NotTheDefault` (All Backups' Delete…, destructive beside a Done
+`NotTheDefaultYet` (the wizard's Create Course while it is not the default,
+below: no default and no accent; until the #979 review this was
+`NeverTakesEnter`, which wore the accent without taking Enter, so the button
+looked like the default and was not) and `NotTheDefault` (All Backups' Delete…, destructive beside a Done
 that keeps Enter: only enablement changes). `DefaultButtonScanTests` holds
 every `IsPrimaryButtonEnabled` write under `Plantoir/` to `DialogButtons.cs`
 — object initialisers and bare writes inside a `ContentDialog` subclass
@@ -9562,13 +9564,15 @@ included, which is how All Backups' initialiser was found — so a new dialog
 cannot grey its main button by hand. The 21 sites the plan listed, plus 2B's
 section-verb dialog, all go through it.
 
-**The wizard's Create Course NEVER takes Enter** — measured on the mac
-(2026-10-08): as the default, an Enter typed in the Course code field created
-a course named by the code with the rest of the form unread. `DefaultButton`
-is None from the start; the button wears the accent while it can be pressed;
-the cursor starts in Course code (`Opened` focuses it; the suggestion list
-opens only on typing). After the work, its Close is the ordinary kind and
-takes Enter — there is nothing left to type.
+**The wizard's Create Course took no Enter until #979** — measured on the mac
+(2026-10-08): as the default from the start, an Enter typed in the Course
+code field created a course named by the code with the rest of the form
+unread. `DefaultButton` is None from the start; the button wears the accent
+only while it is the default (the #979 review, as #987 did on the mac); the cursor starts in Course code (`Opened` focuses
+it; the suggestion list opens only on typing). **Since #979 it is the default
+once the form is complete and no code list is drawn**, as the mac's has been
+since #987 ("The question dialogs' keys (#979)", below). After the work, its
+Close is the ordinary kind and takes Enter — there is nothing left to type.
 
 **Class Dates reads, THEN remembers.** "Read the Dates" (Secondary) and
 "Remember These Dates" (Primary), the mac's words. Remember is live only once
@@ -9763,6 +9767,139 @@ and the empty pane's "New Course…" came with 2A.
   repair's own titles, `SiteHealthRepair.ButtonTitle`, were left as they are —
   #491 named the dismissing button, and the mac's repair titles are the same
   words, left as they were by its sweep.
+
+## The question dialogs' keys (#979, the mac's #973 and #987)
+
+The Windows half of the mac's "Return does nothing on risky questions" (#973)
+and "Question sheets and alerts after the HIG review" (#987), in
+[09](09-mac-app.md#question-sheets-and-alerts-after-the-hig-review-987).
+Every question dialog the app shows (43 with two or more buttons) was listed
+with its buttons, default, Escape and what closing it means, beside the mac's
+for the same question; the ones that changed are named below. Apple's HIG was read on the day (Alerts, revised 2024-02-02; Buttons,
+2025-12-16), and Microsoft's Dialog controls page (2026-07-15) for what
+WinUI itself does.
+
+**Measured first, on the Windows VM** (Windows 11 ARM64 in Parallels, the
+x64 app under emulation; `QuestionDialogKeysUiTests` at 0b1711f90, before any
+change): **the quit question opened with the focus on Quit Anyway**, so
+Enter quit the app with a deploy under way. #987 had taken its default away
+(`DefaultButton` None) and nobody had pressed Enter on it. The reason is in
+WinUI's own `ContentDialog::SetInitialFocusElement`: the first focus goes to
+the first focusable control in the content, else the default button, else
+the first focusable button in the row, which is Primary, the go-ahead; and
+a focused button takes Enter and Space. So every question with no default
+and nothing focusable in it (the quit question, Remove the scheduled
+deploy, Remove a downloaded assistant, the synced folder) opened on its
+go-ahead. The same run: Escape while a course was being made closed the
+wizard and stopped the making; Enter on a complete form made nothing.
+
+**The rule** (`DialogButtons.AskWithNoDefault`): a question where a teacher
+could lose work has no default button, and when it opens the focus moves to
+its Close button, the cancelling one, which Escape already presses
+(`ContentDialog::ExecuteCloseAction` is a click of that button, so
+`CloseButtonClick` runs for Escape too). Enter and Space then press the
+visible, focused Cancel; Escape is Cancel; nothing is hidden and no key is
+caught. Asked this way: the quit question, the synced folder, Remove (course
+or section), Delete a backup, an archive, or the backups ticked, Remove the
+scheduled deploy, Remove a downloaded assistant (D22), the assistant's
+put-back (D1), a Course Settings list entry's Remove, and Get Ready's
+go-ahead (D39, Russell's ruling Q-B). Of these, the six deletes and removals,
+the put-back and Get Ready had **Cancel as the default** until #979, which
+the HIG's Alerts page advises against ("Note that you don't want to make a
+Cancel button the default button"). Get Ready's undo makes Undo the default
+while it would put a page back, as the mac's sheet does
+(`.defaultButton(isEnabled: !putBack.isEmpty)`), and asks with no default
+when nothing would go back. The questions where going ahead loses nothing
+keep the go-ahead as the default (Add on the guidance question, Show on
+today's class, Add Them and Reopen for Obsidian, Download, Restore, Close
+Obsidian and Rename, Open in Obsidian, Rename, Save Report…), as the mac's
+do.
+
+**Closing without an answer is Cancel.** A ContentDialog closes by its
+buttons, by Escape (the Close button's click) or by `Hide()` from code, and
+every question's caller reads anything but `Primary` (or `Secondary` where
+there is one) as not going ahead, so the mac's #973 rule holds here by
+construction. Two closings by code are deliberate and unchanged: the guidance
+question taken down by the quit question is put back unanswered (above,
+"The question"), and a console question whose run ended is closed with
+nothing sent.
+
+**The New Course wizard.** Create Course is the default once the form is
+complete and no code list is drawn (`QuestionKeys.CreateCourseIsTheDefault`,
+the mac's `createCourseIsTheDefault`; the mac's `formIsComplete` is
+everything Create accepts, a name, and a working folder). The list's being
+drawn or put away is followed through
+`AutoSuggestBox.IsSuggestionListOpenProperty`. **Escape does nothing while
+the course is being made** (Russell, 2026-11-18, on the mac's #987 review);
+a click on the visible Cancel still stops it, and once the course is made
+Escape closes the wizard. No key is caught for it. The first build withheld
+Escape on the template's `LayoutRoot` (`PreviewKeyDown`); the #979 review
+called that a hidden key catcher, and it went. **The route now** (the
+review's): while the course is being made, Cancel is the **Secondary**
+button (`BeginProgress` empties `CloseButtonText` and sets
+`SecondaryButtonText`, so it sits where Cancel sat; `SecondaryButtonClick`
+stops the run with `StopByUser`), and `Closing` refuses a close whose
+`Result` is `None` while `QuestionKeys.WizardEscapeIsCancel` says no: the
+Windows form of the mac's `.interactiveDismissDisabled(creator.isCreating)`.
+A click on Cancel is an answer (`Secondary`), so it closes; Escape is a close
+with no answer, so it is refused. **Measured on the Windows VM before relying
+on it** (8e099e291): with no Close button, Escape still closes a ContentDialog
+with result `None` (WinUI's `ExecuteCloseAction` hides the dialog whether or
+not there is a Close button), and the refusal holds it while the course is
+made; a click on the Secondary Cancel stops the work and closes the wizard,
+and 45 s later no front page was written; once the course is made, Escape
+closes the wizard again. Rejected: disabling Cancel (a click must still stop
+the work, and Escape would still close the dialog, leaving the course being
+made with no window).
+
+**The go-ahead never holds the first focus** (the #979 review's LOW on
+`AskWithNoDefault`): the helper first moved the focus to Cancel in `Opened`,
+which WinUI raises after it has already focused the go-ahead, so an Enter
+queued in between could have pressed it. Now, until the dialog is open, the
+Primary button's style is one based on its own with `IsTabStop` false, so
+WinUI's own first focus (the first focusable button in the row) is Close
+itself; `Opened` puts the button's own style back, so Tab reaches it as
+before, and focuses Close again. No timed wait. The helper is called after
+anything that sets the Primary style (`EnablePrimary`), since it keeps the
+style it finds.
+
+**The important update offer** (#453: Install and Reopen alone, no Close
+button) **lost its Escape catcher** in the same review: a `PreviewKeyDown`
+on the dialog that called `Hide()`. Since WinUI closes a ContentDialog with
+no answer on Escape anyway (measured above), Escape still answers "not now"
+with nothing caught: `UpdateOfferUiTests`, through the Debug feed seam.
+
+**Undo Getting Ready is greyed when nothing would go back**, as the mac's
+`.defaultButton(isEnabled: !putBack.isEmpty)`; pressing it then changed
+nothing and only ended the undo.
+
+**Tests.** `QuestionDialogScanTests` (unit): no Cancel is the default; no
+`ContentDialogButton.None` outside the helper, except the two dialogs that
+open with the cursor in a field of their own (the wizard, Class Dates'
+typed route); the questions asked with no default counted per file; the
+wizard's two rules; since the review, that the wizard holds Escape back by
+refusing the close and catches no key, that the update offer catches no
+key, that Undo is greyed when nothing would go back, and that the scan sees
+dialogs built with a target-typed `new() { }` (it saw only
+`new ContentDialog { }`, and so missed UpdatePrompts' `Plain`).
+`QuestionDialogKeysUiTests` (real keys): the quit
+question opens on Cancel and Enter and Escape both keep working; Remove
+opens on Cancel, Tab can still reach Remove, and neither key removes; an
+Enter typed straight behind Delete never removes (a race by nature: a pass
+on the old code would prove nothing); Enter with the code list drawn makes
+nothing and on a complete form makes the course; Escape while the course is
+made does nothing, Cancel is the Secondary button then, and Escape closes
+the wizard afterwards; a click on Cancel while it is made stops it and
+closes the wizard. Three of the first four failed before the change; all six,
+and `UpdateOfferUiTests`, pass at 8e099e291 on the VM.
+
+**Ruled by Russell** (#979, 2026-11-19): WinUI puts Close, the cancelling
+button, on the right and the go-ahead on the left, always (Microsoft: "The
+'do it' action button(s) should appear as the leftmost buttons. The safe,
+nondestructive action should appear as the rightmost button"), where the
+mac's rows lead with Cancel and trail with the action: Windows keeps its own
+order. And on a question with no default the focus starts on Cancel, so
+Enter or Space cancels here, where on the mac Return does nothing: kept.
 
 ## Diagrams and graphs (#485 E1, v1.7.0): the runtime carries the engines (#503)
 

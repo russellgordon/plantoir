@@ -26,10 +26,7 @@ struct MainWindowView: View {
                 // A restored window whose folder claim has not resolved
                 // yet — a beat of quiet, never the picker it is about to
                 // replace.
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier("restoringFolderPlaceholder")
+                RestoringFolderPlaceholder()
             } else if workspace.isShowingPicker {
                 WorkspacePickerView()
             } else {
@@ -567,5 +564,20 @@ private struct ObsidianClosingAlert: ViewModifier {
                 }
             }
         )
+    }
+}
+
+/// The spinner a restored window shows while its folder claim resolves.
+/// Named (#993, D18): a bare spinner gave VoiceOver nothing to say.
+struct RestoringFolderPlaceholder: View {
+
+    // MARK: - Body
+
+    var body: some View {
+        ProgressView()
+            .controlSize(.small)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityLabel(Text(AccessibilityNames.openingFolder))
+            .accessibilityIdentifier("restoringFolderPlaceholder")
     }
 }

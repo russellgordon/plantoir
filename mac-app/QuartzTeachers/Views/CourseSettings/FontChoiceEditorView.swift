@@ -71,6 +71,8 @@ struct FontChoiceEditorView: View {
                     Text(option.label).tag(option.tag)
                 }
             }
+            // The visible title, said explicitly (#993, D40).
+            .accessibilityLabel(Text("Header & body fonts"))
 
             // Live previews rendered in the actual fonts (bundled with
             // the app); an unavailable font falls back to the system font.
@@ -89,6 +91,7 @@ struct FontChoiceEditorView: View {
                     Text(fontName).tag(fontName)
                 }
             }
+            .accessibilityLabel(Text("Code font"))
 
             SampleBox {
                 Text("for number in range(10):  # code samples use this font")

@@ -60,6 +60,9 @@ struct CourseSettingsView: View {
                 Section {
                     TextField("Course name", text: $configuration.courseName)
                         .borderedTextField()
+                        // The visible title, said explicitly: in the grouped
+                        // form VoiceOver read only the value (#993, D40).
+                        .accessibilityLabel(Text("Course name"))
                         .accessibilityIdentifier("courseNameField")
 
                     if configuration.isClub {
@@ -81,6 +84,7 @@ struct CourseSettingsView: View {
                     }
 
                     Toggle("Show page read-time estimates to students", isOn: $configuration.showReadingTime)
+                        .accessibilityLabel(Text("Show page read-time estimates to students"))
                         .accessibilityIdentifier("readingTimeToggle")
 
                     // The map is drawn from this site's own links to the
@@ -88,9 +92,11 @@ struct CourseSettingsView: View {
                     // it — so the second switch is off and unavailable
                     // whenever the first one is off.
                     Toggle("Include the curriculum coverage map", isOn: $configuration.includesCurriculumCoverage)
+                        .accessibilityLabel(Text("Include the curriculum coverage map"))
                         .accessibilityIdentifier("coverageToggle")
                     Toggle("Explain the map on the page", isOn: $configuration.includesCoverageNotes)
                         .disabled(!configuration.includesCurriculumCoverage)
+                        .accessibilityLabel(Text("Explain the map on the page"))
                         .accessibilityIdentifier("coverageNotesToggle")
 
                     Picker("Sidebar folders expand when clicking", selection: $configuration.expandOnFolderClick) {
@@ -350,6 +356,8 @@ struct CourseSettingsView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
+                        // Decorative: the sentence beside it says it all (#993, D20).
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(saveNotice.sentences, id: \.self) { sentence in
                             Text(sentence)
