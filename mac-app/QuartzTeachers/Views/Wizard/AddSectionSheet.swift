@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// A small dialog for adding one section to an existing course: a number
-/// field with a stepper, validated as you type in the same orange every
-/// other warning wears, so a section that already exists is called out
+/// field with a stepper, validated as you type in the stopping red every
+/// problem that holds an action back wears (#994), so a section that
+/// already exists is called out
 /// before the Add button will do anything.
 struct AddSectionSheet: View {
 
@@ -36,6 +37,20 @@ struct AddSectionSheet: View {
             return addProblem
         }
         return SectionAdder.entryProblem(entry, existing: existingSections, courseCode: course.displayCode)
+    }
+
+    /// What kind of problem the line under the field is (#994): a press of
+    /// Add that failed, or a number that cannot be added, stops the teacher
+    /// (red); a remark about a number that can be added is a caution
+    /// (orange); nil when there is nothing to say.
+    var entryProblemKind: StatusColour? {
+        if entryProblem == nil {
+            return nil
+        }
+        if addProblem != nil || !canAdd {
+            return .blocking
+        }
+        return .warning
     }
 
     var canAdd: Bool {
@@ -98,9 +113,8 @@ struct AddSectionSheet: View {
 
             // The warning keeps a reserved line so the sheet does not jump
             // as it appears and disappears.
-            Text(entryProblem ?? " ")
+            StatusColour.sentence(entryProblem ?? " ", wornAs: entryProblemKind)
                 .font(.caption)
-                .foregroundStyle(.orange)
                 .frame(minHeight: 26, alignment: .topLeading)
                 .accessibilityIdentifier("addSectionWarning")
 

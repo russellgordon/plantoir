@@ -452,9 +452,8 @@ struct StringListEditorView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let sentence = renameFailure ?? problem {
-                Text(sentence)
+                StatusColour.blocking.sentence(sentence)
                     .font(.callout)
-                    .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("renameProblem")
             }

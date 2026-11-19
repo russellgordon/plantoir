@@ -1033,18 +1033,15 @@ struct NewCourseWizardView: View {
                 Spacer()
 
                 if let validationProblem {
-                    Text(validationProblem)
-                        .foregroundStyle(.red)
+                    StatusColour.blocking.sentence(validationProblem)
                         .font(.callout)
                 }
                 if let problem = creator.preparationProblem {
-                    Text(problem)
-                        .foregroundStyle(.red)
+                    StatusColour.blocking.sentence(problem)
                         .font(.callout)
                 }
                 if let problem = creator.finishingProblem {
-                    Text(problem)
-                        .foregroundStyle(.red)
+                    StatusColour.blocking.sentence(problem)
                         .font(.callout)
                         .accessibilityIdentifier("referenceCourseNotMade")
                 }
@@ -1174,14 +1171,13 @@ struct NewCourseWizardView: View {
                         }
                     }
                     if let problem = courseCodeProblem {
-                        // The same orange every other inline warning
-                        // wears — a duplicate code is the usual reason a
+                        // The stopping red every problem that holds the
+                        // form back wears (#994) — a duplicate code is the usual reason a
                         // filled-in form still won't submit, so it must
                         // never be a mystery.
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Text(problem)
+                            StatusColour.blocking.sentence(problem)
                                 .font(.caption)
-                                .foregroundStyle(.orange)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("courseCodeWarning")
                             // Beside the shelf rule's refusal, and only
@@ -1310,10 +1306,9 @@ struct NewCourseWizardView: View {
                                 .borderedTextField()
                         }
                         if let problem = sectionNumbersProblem {
-                            // The same orange every other warning wears.
-                            Text(problem)
+                            // It holds the form back, so the stopping red (#994).
+                            StatusColour.blocking.sentence(problem)
                                 .font(.caption)
-                                .foregroundStyle(.orange)
                                 .accessibilityIdentifier("sectionNumbersWarning")
                         } else {
                             ExampleCaption("e.g. 1,3 — comma-separated")
@@ -1472,9 +1467,8 @@ struct NewCourseWizardView: View {
                         courseCode: courseCode.trimmingCharacters(in: .whitespaces).uppercased(),
                         showsGrade: showsGradeInTitle
                     ) {
-                        Text(warning)
+                        StatusColour.warning.sentence(warning)
                             .font(.caption)
-                            .foregroundStyle(.orange)
                             .accessibilityIdentifier("wizardGradeInTitleWarning")
                     } else {
                         ExampleCaption(WizardWording.panelWords(isClub: isClubCourse).gradeCaption)
@@ -1521,9 +1515,8 @@ struct NewCourseWizardView: View {
                     if let problem = NewCourseWizardView.clubClassFolderProblem(
                         classFolderName, perSectionFolders: perSectionFolders
                     ) {
-                        Text(problem)
+                        StatusColour.blocking.sentence(problem)
                             .font(.caption)
-                            .foregroundStyle(.red)
                             .accessibilityIdentifier("clubClassFolderProblem")
                     }
                     LabeledContent(WizardWording.clubFrontPageHeadingLabel) {
@@ -1539,9 +1532,8 @@ struct NewCourseWizardView: View {
                             .accessibilityIdentifier("unitWordField")
                     }
                     if let problem = ClassPageTerm.problem(with: unitWord) {
-                        Text(problem)
+                        StatusColour.blocking.sentence(problem)
                             .font(.caption)
-                            .foregroundStyle(.red)
                             .accessibilityIdentifier("unitWordProblem")
                     } else {
                         ExampleCaption(WizardWording.clubPageWordCaption(word: ClassPageTerm.cleaned(unitWord)))
@@ -1563,9 +1555,8 @@ struct NewCourseWizardView: View {
                         .accessibilityIdentifier("unitWordField")
                 }
                 if let problem = ClassPageTerm.problem(with: unitWord) {
-                    Text(problem)
+                    StatusColour.blocking.sentence(problem)
                         .font(.caption)
-                        .foregroundStyle(.red)
                         .accessibilityIdentifier("unitWordProblem")
                 } else {
                     ExampleCaption("Class pages will be named “\(ClassPageTerm.cleaned(unitWord)) 1, Day 1”. Some teachers say Module or Thread.")

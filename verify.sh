@@ -1233,6 +1233,13 @@ else
   cat /tmp/verify_config_race_test.log
 fi
 
+if (cd scripts && python3 test_build_reads_settings_once.py) >/tmp/verify_settings_once_test.log 2>&1; then
+  pass "one build reads course_config.json once, so a Save mid-build cannot mix settings (scripts/test_build_reads_settings_once.py)"
+else
+  fail "one build reads course_config.json once, so a Save mid-build cannot mix settings (scripts/test_build_reads_settings_once.py)"
+  cat /tmp/verify_settings_once_test.log
+fi
+
 # A preview build must never reach a published site, and the FOLDER
 # destination is the one that can: it publishes host-side and never enters the
 # container, so deploy.py's own refusal never runs. Structural rather than

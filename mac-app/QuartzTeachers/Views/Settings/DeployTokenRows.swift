@@ -45,8 +45,8 @@ struct DeployTokenRows: View {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Text(panel.statusLine())
-                    .foregroundStyle(statusNeedsAttention ? Color.orange : Color.primary)
+                StatusColour.sentence(panel.statusLine(), wornAs: statusNeedsAttention ? .warning : nil)
+                    .foregroundStyle(statusNeedsAttention ? AnyShapeStyle(StatusColour.warning.style) : AnyShapeStyle(Color.primary))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("\(panel.destination.rawValue)TokenStatus")
             }

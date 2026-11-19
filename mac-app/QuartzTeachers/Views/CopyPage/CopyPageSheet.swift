@@ -177,19 +177,9 @@ struct CopyPageSheet: View {
             }
 
             if let problem {
-                // A warning symbol before the sentence, so the line is told
-                // apart from the sheet's other text by more than its orange
-                // (#993, D19), as the sidebar's warning badge is.
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                        .accessibilityLabel(Text(AccessibilityNames.warning))
-                    Text(problem)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("copyPageProblem")
+                StatusColour.blocking.sentence(problem)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("copyPageProblem")
             }
 
             buttons
