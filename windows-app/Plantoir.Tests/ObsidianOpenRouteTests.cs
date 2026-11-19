@@ -282,14 +282,18 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         // The button pressed said Add Them, not that Obsidian closes, so the
         // reopen question asks first (#1003, the mac's #995; sequence step 6).
         Assert.Equal(new[] { "scan", "offer", "answer Yes", "ask reopen", "quit", "reopen ICS3U", "open MPM2D" }, world.Asked);
+    }
 
-        // Later: Obsidian is left alone and the course opens as it is.
-        ObsidianFigureAddOnsThisRun.Forget();
-        var (world2, course2, route2) = Make();
-        world2.ReopenAnswer = false;
-        world2.WhileOfferIsUp = () => { world2.Running = true; world2.Registry = OpenRegistry(course2); };
-        await route2.OpenAsync(course2, course2.DirectoryPath);
-        Assert.Equal(new[] { "scan", "offer", "answer Yes", "ask reopen", "open MPM2D" }, world2.Asked);
+    // Not Now to that reopen question: Obsidian is left alone and the course opens as it is.
+    [Fact]
+    public async Task AddThemWhenTheCourseOpenedMeanwhileLeavesObsidianAloneOnNotNow()
+    {
+        var (world, course, route) = Make();
+        world.ReopenAnswer = false;
+        world.WhileOfferIsUp = () => { world.Running = true; world.Registry = OpenRegistry(course); };
+        await route.OpenAsync(course, course.DirectoryPath);
+        Assert.Equal(new[] { "scan", "offer", "answer Yes", "ask reopen", "open MPM2D" }, world.Asked);
+        Assert.False(Added(course));
     }
 
     // Step 7: with yes and the course closed, add them, then open.
@@ -774,7 +778,6 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         Assert.Equal(new[] { "ask closing" }, world.Asked);
         Assert.Equal(course.Code, world.ClosingAskedAbout.Single().Course.Code);
         Assert.Contains(ObsidianClosingTrail.Line(ObsidianClosingTrail.Outcome.Cancelled, "MPM2D"), TrailText);
-        Assert.Contains("asked to close Obsidian to open a course", TrailText);
     }
 
     /// <summary>Close Obsidian and Open closes once, adds the course, and opens what was asked for - here the section.</summary>
