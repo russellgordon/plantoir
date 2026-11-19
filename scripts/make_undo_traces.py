@@ -503,7 +503,11 @@ def tree_reading(item):
     if item is None or item.get("absent"):
         return ("absent",)
     if "tree" in item:
+        if item["tree"].get("links"):
+            return ("other",)
         return ("tree", listing_sha(item["tree"]))
+    if "link" in item:
+        return ("other",)
     if "treeSha" in item:
         return ("tree", item["treeSha"])
     if item.get("folder"):
@@ -530,7 +534,7 @@ def move_state(op, at_from, at_to):
 
 def tree_state(op, item):
     reading = tree_reading(item)
-    if reading[0] == "file":
+    if reading[0] in ("file", "other"):
         return "neither"
     present = reading[0] == "tree"
     if present and reading[1] != op["listingSha"]:
@@ -581,6 +585,10 @@ def plan(ops, backward, pages_by_path, content_missing=False):
                 continue
             if state != wanted_from:
                 continue
+            if content_missing and kind in ("createTree", "removeTree"):
+                # A tree is never made or taken out unless the list holds
+                # everything needed to make it (the hard review of U2b, HIGH 2).
+                return ("contentMissing", place)
             whole_changes.update(whole_moved(op, backward, pages_by_path))
             continue
         path = op["path"]

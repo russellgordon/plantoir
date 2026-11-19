@@ -225,6 +225,8 @@ def is_blob_name(name):
 
 
 def overlap(first, second):
+    """Without regard to case: one place on a case-insensitive volume."""
+    first, second = first.lower(), second.lower()
     return first == second or first.startswith(second + "/") or second.startswith(first + "/")
 
 
@@ -303,6 +305,20 @@ def readable_step(step):
     for op in step["ops"]:
         if not readable_op(op):
             return False
+    # opKinds.wholeOps: no other op shares a whole op's places.
+    whole = ("move", "createTree", "removeTree", "external")
+    for index, op in enumerate(step["ops"]):
+        if op["kind"] not in whole:
+            continue
+        mine = [op[key] for key in ("path", "from", "to") if key in op]
+        for other_index, other in enumerate(step["ops"]):
+            if other_index == index:
+                continue
+            if op.get("target") is not None and other.get("target") == op.get("target"):
+                return False
+            theirs = [other[key] for key in ("path", "from", "to") if key in other]
+            if any(overlap(a, b) for a in mine for b in theirs):
+                return False
     return True
 
 
@@ -633,6 +649,10 @@ class ContractCaseTests(unittest.TestCase):
                                              ("outsideAssistant", "A client: with colons", "session-7"))
                         elif variant == "aKeyOnAKnownOp":
                             ops[0]["onlyWhen"] = "aConditionNobodyKnows"
+                        elif variant == "twoWholeOpsOnOnePlace":
+                            listing = traces.listing_sha({})
+                            ops.append({"kind": "createTree", "path": "courses/TST1O/made", "listingSha": listing, "blobs": [listing]})
+                            ops.append({"kind": "createTree", "path": "courses/TST1O/made/inner", "listingSha": listing, "blobs": [listing]})
                         else:
                             self.fail("unknown variant " + variant)
                         seq = model.begin(ops, readable=readable_step(step))

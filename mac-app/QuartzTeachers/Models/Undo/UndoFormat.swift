@@ -942,11 +942,18 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
 
     /// Whether two places are the same, or one is a folder holding the
     /// other (compared part by part, as spelled).
+    ///
+    /// Compared WITHOUT regard to case: a Mac's volume (and Windows') is
+    /// usually case-insensitive, so `a.json` and `A.json` are one place
+    /// there, and a move between them or two ops naming them is refused as
+    /// a step this version cannot read (the hard review of U2b, MEDIUM 7).
     static func placesOverlap(_ first: String, _ second: String) -> Bool {
-        if first == second {
+        let one: String = first.lowercased()
+        let other: String = second.lowercased()
+        if one == other {
             return true
         }
-        return first.hasPrefix(second + "/") || second.hasPrefix(first + "/")
+        return one.hasPrefix(other + "/") || other.hasPrefix(one + "/")
     }
 
     /// A path a step may name: relative, forward slashes, no `.` or `..`

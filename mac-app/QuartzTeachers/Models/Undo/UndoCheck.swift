@@ -523,7 +523,8 @@ nonisolated enum UndoSwapResult: Equatable, Sendable {
 /// U2's whole ops fit the same shape: a folder to make is built beside its
 /// place and renamed in; a folder to take out is renamed aside and removed
 /// at the end; a move is one rename that never replaces; an external target
-/// is set last of all, after every file has gone in, and re-read first.
+/// goes in with them, after every file's content and in the step's order,
+/// re-read just before it is set.
 nonisolated enum UndoSwap {
 
     // MARK: - Stored properties

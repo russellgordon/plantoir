@@ -19471,7 +19471,7 @@ off.
 - **`external`**: something outside every working folder, `<family>:<name>`;
   this version knows `preference:<name>`, the app's own preferences store (`PlantoirDefaults.shared`, which follows `--state-dir`)
   (`UndoAppPreferences`), and a step of external ops alone needs no working
-  folder. It is set last, after every file has gone in, and re-read first.
+  folder. Like a move and a tree it goes in after every file's content has been swapped in, in the order of the step's ops, re-read just before it is set, and is set back if a later change cannot go in.
   The LaunchAgent of a scheduled deploy (ruling 23) and Obsidian's vault
   list are families a later piece defines; until then an op naming one
   cannot be read here.

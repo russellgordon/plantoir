@@ -432,6 +432,8 @@ nonisolated enum UndoContractReplay {
             try bytes(fromHex: hex).write(to: url)
         } else if current["folder"] as? Bool == true {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        } else if let target = string(current["link"]) {
+            try FileManager.default.createSymbolicLink(atPath: url.path, withDestinationPath: target)
         } else if let tree = current["tree"] as? [String: Any] {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             for folder in tree["folders"] as? [String] ?? [] {
@@ -441,6 +443,9 @@ nonisolated enum UndoContractReplay {
                 let fileURL: URL = url.appendingPathComponent(path)
                 try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try Data(text.utf8).write(to: fileURL)
+            }
+            for (path, target) in tree["links"] as? [String: String] ?? [:] {
+                try FileManager.default.createSymbolicLink(atPath: url.appendingPathComponent(path).path, withDestinationPath: target)
             }
         }
         if current["cannotBeRead"] as? Bool == true {
@@ -796,6 +801,13 @@ nonisolated enum UndoContractReplay {
                     step["madeBy"] = "outsideAssistant:A client: with colons:session-7"
                     step["class"] = "Z"
                     step["action"] = ["key": "aKeyNobodyKnows", "arguments": [String: String]()]
+                } else if variant == "twoWholeOpsOnOnePlace" {
+                    // Breaks opKinds.wholeOps: a folder made inside another
+                    // folder the same step makes.
+                    let empty: UndoTreeListing = UndoTreeListing(folders: [], files: [])
+                    for path in ["courses/TST1O/made", "courses/TST1O/made/inner"] {
+                        opObjects.append(["kind": "createTree", "path": path, "listingSha": empty.sha, "blobs": [empty.sha]])
+                    }
                 } else if variant == "aKeyOnAKnownOp" {
                     if !opObjects.isEmpty {
                         opObjects[0]["onlyWhen"] = "aConditionNobodyKnows"

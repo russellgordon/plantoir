@@ -49831,9 +49831,168 @@
         },
         "undo": "cannotTell",
         "redo": "cannotTell"
+      },
+      {
+        "name": "move between two names that differ only in case: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m/a.json",
+          "to": "courses/TST1O/m/A.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable",
+        "why": "On a case-insensitive volume (a Mac's by default, and Windows') the two are one place: places are compared without regard to case."
+      },
+      {
+        "name": "move to an absolute path: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m.json",
+          "to": "/tmp/m.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "move from a path that climbs out: not readable",
+        "op": {
+          "kind": "move",
+          "from": "../m.json",
+          "to": "courses/TST1O/m.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "createTree whose path climbs out: not readable",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/../../NEW1O",
+          "listing": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "replaceText at an absolute path: not readable",
+        "op": {
+          "kind": "replaceText",
+          "path": "/etc/page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "",
+          "contextAfter": "\n"
+        },
+        "current": {
+          "text": "new\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "editJSON whose path climbs out: not readable",
+        "op": {
+          "kind": "editJSON",
+          "path": "courses/../../c.json",
+          "keyPath": [
+            "a"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"a\": 2}\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "createTree: a link inside the folder: changed since, never followed",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            },
+            "links": {
+              "b.md": "/etc/hosts"
+            }
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move: a link where the moved copy is: changed since, never followed",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m.json",
+          "to": "courses/TST1O/m.previous.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "link": "/etc/hosts"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
       }
     ],
-    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText).",
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. Places, and the places two ops name, are compared without regard to case.",
     "listingCases": [
       {
         "name": "an empty folder: an empty listing",
@@ -50880,9 +51039,56 @@
           1
         ],
         "rederived": 0
+      },
+      {
+        "name": "U2: another version's step that breaks wholeOps (a folder made inside a folder the same step makes) is a barrier: not available, never cleared",
+        "calls": [
+          "step",
+          "stepFromAnotherVersion:twoWholeOpsOnOnePlace",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "U2, createTree: an Undo whose content the list no longer holds is refused and the folder kept (the list is cleared, as for any content missing)",
+        "calls": [
+          "makeAFolder",
+          "removeContent",
+          "undo"
+        ],
+        "expectLast": "contentMissing",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "contentMissing",
+        "clearedSeq": 1,
+        "folderKept": true
+      },
+      {
+        "name": "U2, removeTree: a Redo whose content the list no longer holds is refused, the folder kept, only the redo dropped",
+        "calls": [
+          "makeAFolder",
+          "removeTheFolder",
+          "undo",
+          "removeContent",
+          "redo"
+        ],
+        "expectLast": "contentMissing",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "folderKept": true
       }
     ],
-    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a begin and applied, readable as lines, whose only op is of a kind no reader knows (`aKindNobodyKnows`, with from, to and blobs naming a blob it put in content/; U1's used `move`, which U2 defines); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to. U2's calls (contracts/undo-traces.json's folder A, each a step through the door that plans it forward as a Redo would, JournaledWrite.perform(ops:)): `moveTheMarker` moves courses/TST1O/.netlify_sites/section1.json (made first, holding {\"site_id\": \"aaa-111\"}, when neither place holds it) to section1.previous.json beside it, one `move`; `deployANewMarker` writes a new marker ({\"site_id\": \"bbb-222\"}) in the place the move emptied, as a deploy after a rollover onto a new website does, and nothing to the list; `makeAFolder` makes courses/TST1O/extra (a.md, sub/b.md) as one `createTree`; `addAFileToTheFolder` adds a file inside it by hand; `removeTheFolder` removes it, one `removeTree`; `editTheSettings` sets courses/TST1O/settings.json's school_year (made first holding 2025-2026) to 2026-2027, or back, one `editJSON`; `editTheSettingsByHand` sets it to 2030-2031 by hand; `editAHunk` turns `Line one: old.` in courses/TST1O/notes.md into `new`, or back, one `replaceText`; `setAPreference` sets the preference undoCasesPreference to b (or back to a), one `external`, in a step with no working folder; `changeThePreferenceByHand` sets it to z; `forgetTheMaintainer` takes away the runner of the sectionFrontPage maintainer (UndoMaintainers), which every case otherwise has. markers is what the two marker places hold after the last call (moved: only the moved copy; movedBack: only the original place; bothKept: the new marker in the original place and the moved copy beside it); folderKept whether the made folder is there; rederived how many times the front page's maintainer ran. No case leaves a staged file anywhere in the working folder.",
+    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a begin and applied, readable as lines, whose only op is of a kind no reader knows (`aKindNobodyKnows`, with from, to and blobs naming a blob it put in content/; U1's used `move`, which U2 defines); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to. U2's calls (contracts/undo-traces.json's folder A, each a step through the door that plans it forward as a Redo would, JournaledWrite.perform(ops:)): `moveTheMarker` moves courses/TST1O/.netlify_sites/section1.json (made first, holding {\"site_id\": \"aaa-111\"}, when neither place holds it) to section1.previous.json beside it, one `move`; `deployANewMarker` writes a new marker ({\"site_id\": \"bbb-222\"}) in the place the move emptied, as a deploy after a rollover onto a new website does, and nothing to the list; `makeAFolder` makes courses/TST1O/extra (a.md, sub/b.md) as one `createTree`; `addAFileToTheFolder` adds a file inside it by hand; `removeTheFolder` removes it, one `removeTree`; `editTheSettings` sets courses/TST1O/settings.json's school_year (made first holding 2025-2026) to 2026-2027, or back, one `editJSON`; `editTheSettingsByHand` sets it to 2030-2031 by hand; `editAHunk` turns `Line one: old.` in courses/TST1O/notes.md into `new`, or back, one `replaceText`; `setAPreference` sets the preference undoCasesPreference to b (or back to a), one `external`, in a step with no working folder; `changeThePreferenceByHand` sets it to z; `forgetTheMaintainer` takes away the runner of the sectionFrontPage maintainer (UndoMaintainers), which every case otherwise has. markers is what the two marker places hold after the last call (moved: only the moved copy; movedBack: only the original place; bothKept: the new marker in the original place and the moved copy beside it); folderKept whether the made folder is there; rederived how many times the front page's maintainer ran. No case leaves a staged file anywhere in the working folder. `stepFromAnotherVersion:twoWholeOpsOnOnePlace` adds two createTree ops, one inside the other, which breaks opKinds.wholeOps.",
     "stepCases": [
       {
         "name": "two pages, the second changed by hand since: nothing written, the second named",
