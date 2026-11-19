@@ -386,11 +386,11 @@ nonisolated enum JournaledWrite {
         case .swapped:
             break
         }
-        if mode == .live {
-            UndoMaintainers.rederive(recomputes, root: root)
-        }
         if UndoKillPoints.stopsHere(.beforeApplied) {
             return .stoppedByATest
+        }
+        if mode == .live {
+            UndoMaintainers.rederive(recomputes, root: root)
         }
         finish(seq: seq, with: .applied, phase: nil, reason: nil, in: journal, mode: mode)
         return .applied(seq: seq)

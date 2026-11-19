@@ -1010,10 +1010,13 @@ nonisolated extension UndoJournal {
         case .swapped:
             break
         }
-        UndoMaintainers.rederive(recomputes, root: root)
         if UndoKillPoints.stopsHere(direction == .backward ? .beforeUndone : .beforeRedone) {
             return .stoppedByATest
         }
+        // After the swaps: a process that dies between them and this leaves
+        // the front page stale, and recovery re-derives it when it settles
+        // the step (`undo.laterPieces.U2`, recoveryCases).
+        UndoMaintainers.rederive(recomputes, root: root)
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
         return direction == .backward ? .undone(seq: seq) : .redone(seq: seq)
     }

@@ -13787,6 +13787,26 @@ against a reference model of the same rules. It reads the traces with CR LF
 taken as LF, so a checkout with `core.autocrlf=true` is current (measured
 red before the fix by converting the three files to CR LF).
 
+**U2b (the mac, branch `issue/899-u2b-op-kinds`) defines the six reserved op
+kinds** (`replaceText`, `editJSON`, `move`, `createTree`, `removeTree`,
+`external`) and runs `recompute`, all in the contract: their rules in
+`undoJournal.opKinds` (and `opKinds.wholeOps`), 64 more `checkCases` rows,
+`listingCases` (a folder's listing, the one text both platforms must make
+byte for byte: lines in the order of the paths' UTF-8 BYTES, never
+`string.Compare` or a culture's order), 15 `stackCases` and 6
+`recoveryCases`. What Windows must get right that the Swift cannot show: a
+`move` is one `MoveFileEx` WITHOUT `MOVEFILE_REPLACE_EXISTING`, judged as a
+pair (never delete the destination alone); a folder taken out is renamed
+aside and deleted only once every change has gone in; `editJSON` compares
+as JSON (true is not 1) and writes back with `JsonSerializer` only if the
+result reads back as the file with that one member changed; an `external`
+`preference:` names Windows' own settings store; and until the app has a
+runner for a `recompute`'s maintainer, its step is not available. A W1
+reader written before U2b treats every one of these kinds as unreadable,
+which is still safe (a barrier); the rows say what it should answer once it
+reads them. The mac's reasons and what was rejected are in
+`documentation/09-mac-app.md` → "The kinds U2 adds, and `recompute` run".
+
 Six things in the format are easy to get wrong and are the reason it was
 revised:
 

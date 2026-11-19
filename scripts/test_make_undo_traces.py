@@ -417,7 +417,86 @@ class ContractCaseTests(unittest.TestCase):
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "interrupted"}
+                  "blobKept", "interrupted", "markers", "folderKept", "rederived"}
+
+    MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
+    MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
+    OLD_MARKER = "{\"site_id\": \"aaa-111\"}\n"
+    NEW_MARKER = "{\"site_id\": \"bbb-222\"}\n"
+    EXTRA = "courses/TST1O/extra"
+    EXTRA_TREE = {"folders": ["sub"], "files": {"a.md": "A\n", "sub/b.md": "B\n"}}
+    SETTINGS = "courses/TST1O/settings.json"
+    NOTES = "courses/TST1O/notes.md"
+    PREFERENCE = "preference:undoCasesPreference"
+
+    def kind_call(self, call, model):
+        """U2's calls (stackCasesHow), on the model's pages. Answers what
+        `last` becomes, or None."""
+        pages = model.pages
+        if call == "moveTheMarker":
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            content = pages.get(self.MARKER_FROM) or ""
+            return model.ops_step([{"kind": "move", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(content)}])
+        if call == "deployANewMarker":
+            pages[self.MARKER_FROM] = self.NEW_MARKER
+            return None
+        if call == "makeAFolder":
+            listing = traces.listing_sha(self.EXTRA_TREE)
+            return model.ops_step([{"kind": "createTree", "path": self.EXTRA, "listingSha": listing, "blobs": [listing]}])
+        if call == "addAFileToTheFolder":
+            tree = {"folders": self.EXTRA_TREE["folders"], "files": dict(self.EXTRA_TREE["files"], **{"c.md": "C\n"})}
+            pages[self.EXTRA] = ("tree", traces.listing_sha(tree))
+            return None
+        if call == "removeTheFolder":
+            listing = pages[self.EXTRA][1]
+            return model.ops_step([{"kind": "removeTree", "path": self.EXTRA, "listingSha": listing, "blobs": [listing]}])
+        if call == "editTheSettings":
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            current = json.loads(pages[self.SETTINGS]).get("school_year")
+            after = "2025-2026" if current == "2026-2027" else "2026-2027"
+            op = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "after": after}
+            if current is not None:
+                op["before"] = current
+            return model.ops_step([op])
+        if call == "editTheSettingsByHand":
+            pages[self.SETTINGS] = "{\"course_name\": \"Test\", \"school_year\": \"2030-2031\"}\n"
+            return None
+        if call == "editAHunk":
+            if pages.get(self.NOTES) is None:
+                pages[self.NOTES] = "Intro.\nLine one: old.\nEnd.\n"
+            is_new = "Line one: new." in pages[self.NOTES]
+            return model.ops_step([{"kind": "replaceText", "path": self.NOTES, "before": "new" if is_new else "old",
+                                    "after": "old" if is_new else "new", "contextBefore": "Line one: ", "contextAfter": ".\n"}])
+        if call == "setAPreference":
+            op = {"kind": "external", "target": self.PREFERENCE, "after": "b"}
+            if self.PREFERENCE in pages:
+                op["before"] = pages[self.PREFERENCE]
+                if pages[self.PREFERENCE] == "b":
+                    op["after"] = "a"
+            return model.ops_step([op])
+        if call == "changeThePreferenceByHand":
+            pages[self.PREFERENCE] = "z"
+            return None
+        if call == "forgetTheMaintainer":
+            model.maintainer_registered = False
+            return None
+        self.fail("unknown call " + call)
+
+    def markers(self, model):
+        source, destination = model.pages.get(self.MARKER_FROM), model.pages.get(self.MARKER_TO)
+        if source is None and destination == self.OLD_MARKER:
+            return "moved"
+        if source == self.OLD_MARKER and destination is None:
+            return "movedBack"
+        if source == self.NEW_MARKER and destination == self.OLD_MARKER:
+            return "bothKept"
+        return (source, destination)
+
+    KIND_CALLS = ("moveTheMarker", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
+                  "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
+                  "changeThePreferenceByHand", "forgetTheMaintainer")
 
     def test_stack_cases(self):
         folder_b = "@B/"
@@ -547,13 +626,16 @@ class ContractCaseTests(unittest.TestCase):
                             ops[0]["onlyWhen"] = "aConditionNobodyKnows"
                         else:
                             self.fail("unknown variant " + variant)
-                        content_ops = [op for op in ops if op["kind"] != "recompute"]
-                        seq = model.begin(content_ops, readable=readable_step(step))
+                        seq = model.begin(ops, readable=readable_step(step))
                         model.pages[p1] = after
                         model.finish(seq)
                     elif call == "foreignStep":
                         seq = model.begin([{"kind": "aKindNobodyKnows", "from": "a", "to": "b"}], readable=False)
                         model.find(seq)["phase"] = "done"
+                    elif call in self.KIND_CALLS:
+                        answered = self.kind_call(call, model)
+                        if answered is not None:
+                            last = answered
                     elif call == "begin:held":
                         begin_held()
                     elif call == "finish:held":
@@ -585,6 +667,12 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(lines_written_by_the_deploy, case["linesWritten"])
                 if "interrupted" in case:
                     self.assertEqual([step["seq"] for step in model.steps if step["phase"] == "interrupted"], case["interrupted"])
+                if "markers" in case:
+                    self.assertEqual(self.markers(model), case["markers"])
+                if "folderKept" in case:
+                    self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
+                if "rederived" in case:
+                    self.assertEqual(model.rederived, case["rederived"])
 
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;

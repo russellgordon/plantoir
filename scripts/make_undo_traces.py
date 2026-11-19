@@ -359,6 +359,10 @@ def setting_entry(key, line, text):
 
 def op_state(op, current):
     """UndoCheck.state: 'before', 'after' or 'neither'. current is text or None."""
+    if op["kind"] == "replaceText":
+        return replace_text_state(op, None if current is None else current.encode("utf-8"))
+    if op["kind"] == "editJSON":
+        return edit_json_state(op, None if current is None else current.encode("utf-8"))
     if op["kind"] == "writeFile":
         current_sha = None if current is None else sha(current)
         if current_sha == op["beforeSha"]:
@@ -495,6 +499,8 @@ def tree_reading(item):
         return ("absent",)
     if "tree" in item:
         return ("tree", listing_sha(item["tree"]))
+    if "treeSha" in item:
+        return ("tree", item["treeSha"])
     if item.get("folder"):
         return ("tree", listing_sha({}))
     return ("file", sha(item["text"]) if "text" in item else None)
@@ -554,13 +560,29 @@ def plan(ops, backward, pages_by_path, content_missing=False):
     original = {}
     working = {}
     in_the_way = []
+    whole_changes = {}
+    wanted_from = "after" if backward else "before"
     for op in ordered:
+        kind = op["kind"]
+        if kind == "recompute":
+            continue
+        if kind in WHOLE_KINDS:
+            # Judged whole against what is there (opKinds.wholeOps).
+            state = whole_state(op, pages_by_path)
+            place = op.get("path") or op.get("from") or op.get("target")
+            if state == "neither":
+                if place not in in_the_way:
+                    in_the_way.append(place)
+                continue
+            if state != wanted_from:
+                continue
+            whole_changes.update(whole_moved(op, backward, pages_by_path))
+            continue
         path = op["path"]
         if path not in original:
             original[path] = pages_by_path.get(path)
             working[path] = original[path]
         state = op_state(op, working[path])
-        wanted_from = "after" if backward else "before"
         if state == "neither":
             if path not in in_the_way:
                 in_the_way.append(path)
@@ -572,6 +594,20 @@ def plan(ops, backward, pages_by_path, content_missing=False):
             if content_missing and target is not None:
                 return ("contentMissing", path)
             working[path] = target
+        elif kind == "replaceText":
+            moved = hunk_moved(op, backward, working[path])
+            if moved is None:
+                if path not in in_the_way:
+                    in_the_way.append(path)
+                continue
+            working[path] = moved
+        elif kind == "editJSON":
+            moved = json_moved(op, backward, working[path])
+            if moved is None:
+                if path not in in_the_way:
+                    in_the_way.append(path)
+                continue
+            working[path] = moved
         else:
             source = op["after"] if backward else op["before"]
             target = op["before"] if backward else op["after"]
@@ -582,7 +618,77 @@ def plan(ops, backward, pages_by_path, content_missing=False):
     for path in original:
         if original[path] != working[path]:
             changes[path] = working[path]
+    changes.update(whole_changes)
     return ("ready", changes)
+
+
+WHOLE_KINDS = ("move", "createTree", "removeTree", "external")
+
+
+def page_item(value):
+    """A model page as an item spec: text, a tree (("tree", listing sha)),
+    a preference value, or absent (None)."""
+    if value is None:
+        return {"absent": True}
+    if isinstance(value, tuple) and value[0] == "tree":
+        return {"treeSha": value[1]}
+    return {"text": value}
+
+
+def whole_state(op, pages):
+    kind = op["kind"]
+    if kind == "move":
+        return move_state(op, page_item(pages.get(op["from"])), page_item(pages.get(op["to"])))
+    if kind in ("createTree", "removeTree"):
+        return tree_state(op, page_item(pages.get(op["path"])))
+    target = op["target"]
+    if target in pages:
+        return external_state(op, {"preference": pages[target]})
+    return external_state(op, {"absent": True})
+
+
+def whole_moved(op, backward, pages):
+    kind = op["kind"]
+    if kind == "move":
+        source, destination = (op["to"], op["from"]) if backward else (op["from"], op["to"])
+        return {destination: pages.get(source), source: None}
+    if kind in ("createTree", "removeTree"):
+        makes = (kind == "createTree") != backward
+        return {op["path"]: ("tree", op["listingSha"]) if makes else None}
+    wanted = "before" if backward else "after"
+    return {op["target"]: op[wanted] if wanted in op else None}
+
+
+def hunk_moved(op, backward, text):
+    if text is None:
+        return None
+    data = text.encode("utf-8")
+    before = (op["contextBefore"] + op["before"] + op["contextAfter"]).encode("utf-8")
+    after = (op["contextBefore"] + op["after"] + op["contextAfter"]).encode("utf-8")
+    source, target = (after, before) if backward else (before, after)
+    start = hunk_place(source, target, data)
+    if start is None:
+        return None
+    return (data[:start] + target + data[start + len(source):]).decode("utf-8")
+
+
+def json_moved(op, backward, text):
+    """The member set (or taken out); the model writes sorted JSON, since
+    only what it holds is compared, never its bytes."""
+    if text is None:
+        return None
+    top = json.loads(text)
+    wanted = "before" if backward else "after"
+    current = top
+    for part in op["keyPath"][:-1]:
+        if not isinstance(current.get(part), dict):
+            return None
+        current = current[part]
+    if wanted in op:
+        current[op["keyPath"][-1]] = op[wanted]
+    else:
+        current.pop(op["keyPath"][-1], None)
+    return json.dumps(top, sort_keys=True, indent=2) + "\n"
 
 
 # --------------------------------------------------------------------------
@@ -611,6 +717,8 @@ class Model:
         self.newest_written = None
         self.unreachable = set()   # working folders that cannot be reached
         self.content_removed = False   # the list's content/ was taken away
+        self.maintainer_registered = True   # UndoMaintainers has a runner
+        self.rederived = 0   # how many times a recompute's runner ran
 
     # -- the fold -----------------------------------------------------
 
@@ -737,6 +845,21 @@ class Model:
         self.write_line()
         return self.highest
 
+    def ops_step(self, ops):
+        """JournaledWrite.perform(ops:): written down, then planned forward
+        from the pages as a Redo is, then made."""
+        seq = self.begin(ops)
+        result = plan(ops, False, self.pages)
+        if result[0] != "ready":
+            self.finish(seq, phase="failed")
+            return result
+        self.write(result[1])
+        self.finish(seq)
+        return ("applied", seq)
+
+    def holds_a_recompute(self, step):
+        return any(op["kind"] == "recompute" for op in step["ops"])
+
     def step(self, edits, days_ago=0, pages_key=None):
         """edits: [(path, key, line)] -> ('applied', seq) or ('changedNothing',)."""
         ops = []
@@ -827,6 +950,8 @@ class Model:
             return ("notAvailable",)
         if self.folder_of(undo) in self.unreachable:
             return ("notAvailable",)
+        if self.holds_a_recompute(undo) and not self.maintainer_registered:
+            return ("notAvailable",)
         result = plan(undo["ops"], True, self.pages, self.content_removed)
         if result[0] == "contentMissing" and not UNDO_REFUSED_FOR_MISSING_CONTENT_CLEARS:
             return result
@@ -837,6 +962,8 @@ class Model:
             return result
         if not dry:
             self.write(result[1])
+            if self.holds_a_recompute(undo):
+                self.rederived += 1
             undo["phase"] = "undone"
             self.write_line()
             self.prune()
@@ -852,6 +979,8 @@ class Model:
             return ("notAvailable",)
         if self.folder_of(candidate) in self.unreachable:
             return ("notAvailable",)
+        if self.holds_a_recompute(candidate) and not self.maintainer_registered:
+            return ("notAvailable",)
         result = plan(candidate["ops"], False, self.pages, self.content_removed)
         if result[0] in ("changedSince", "contentMissing"):
             if not dry:
@@ -863,6 +992,8 @@ class Model:
             return result
         if not dry:
             self.write(result[1])
+            if self.holds_a_recompute(candidate):
+                self.rederived += 1
             candidate["phase"] = "done"
             self.write_line()
             self.prune()

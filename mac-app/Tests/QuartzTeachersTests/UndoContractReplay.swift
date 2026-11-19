@@ -603,7 +603,7 @@ nonisolated enum UndoContractReplay {
     static let stackKeys: Set<String> = [
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-        "blobKept", "interrupted",
+        "blobKept", "interrupted", "markers", "folderKept", "rederived",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -670,6 +670,9 @@ nonisolated enum UndoContractReplay {
             let held: HeldStep = HeldStep()
             var foreignBlob: String? = nil
             let folderOfB: String = rootB.path
+            let places: UndoMemoryPlaces = UndoMemoryPlaces()
+            registerTheFrontPageMaintainer()
+            _ = takeTheRederived()
 
             func journal(daysAgo: Int = 0) -> UndoJournal {
                 let moment: Date = Date().addingTimeInterval((clockDays - Double(daysAgo)) * 86_400)
@@ -790,9 +793,13 @@ nonisolated enum UndoContractReplay {
                 } else if value.hasPrefix("clock:") {
                     clockDays = Double(value.dropFirst("clock:".count).replacingOccurrences(of: "+", with: "")) ?? 0
                 } else if value == "undo" {
-                    last = outcomeWord(journal().undoNewest(resolveRoot: resolve))
+                    last = outcomeWord(journal().undoNewest(resolveRoot: resolve, places: places))
                 } else if value == "redo" {
-                    last = outcomeWord(journal().redoNewest(resolveRoot: resolve))
+                    last = outcomeWord(journal().redoNewest(resolveRoot: resolve, places: places))
+                } else if UndoContractKinds.calls.contains(value) {
+                    if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
+                        last = answered
+                    }
                 } else if value == "editTheLineByHand" {
                     try handEdit("sameLine", at: pagePath, in: root)
                 } else if value == "undoWhileAStepBegins" {
@@ -969,10 +976,25 @@ nonisolated enum UndoContractReplay {
                     failures.append("stackCases '\(name)': the newer version's blob kept is \(present)")
                 }
             }
+            if let wanted = string(testCase["markers"]), UndoContractKinds.markers(in: root) != wanted {
+                failures.append("stackCases '\(name)': the markers are \(UndoContractKinds.markers(in: root)), not \(wanted)")
+            }
+            if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
+                failures.append("stackCases '\(name)': the folder is there: \(!kept)")
+            }
+            let rederived: Int = takeTheRederived().count
+            if let wanted = int(testCase["rederived"]), rederived != wanted {
+                failures.append("stackCases '\(name)': the front page was re-derived \(rederived) times, not \(wanted)")
+            }
+            let leftovers: [String] = UndoContractKinds.stagedLeftovers(in: root)
+            if !leftovers.isEmpty {
+                failures.append("stackCases '\(name)': staged files left behind: \(leftovers)")
+            }
             if fold.ignoredEvents != 0 {
                 failures.append("stackCases '\(name)': \(fold.ignoredEvents) ignored events")
             }
         }
+        registerTheFrontPageMaintainer()
         return (cases: cases.count, failures: failures)
     }
 
@@ -1066,7 +1088,7 @@ nonisolated enum UndoContractReplay {
         "name", "work", "stopAt", "mode", "processAlive", "files", "phase", "head", "undo",
         "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery", "wholeFile",
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
-        "afterAnOrdinaryStep",
+        "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
     ]
 
     static func runRecoveryCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
@@ -1132,10 +1154,44 @@ nonisolated enum UndoContractReplay {
             }
             let stepDraft: UndoStepDraft = draft(changes: stepChanges, root: root, action: "publishPages")
             var afterHashes: [String?] = []
+            // U2: the same two pages, plus a rollover's marker moved aside
+            // and the section's front page kept by its rule, as one step
+            // through the door that plans its ops forward.
+            let withAMove: Bool = testCase["withAMove"] as? Bool == true
+            func makeTheStep() -> JournaledWriteOutcome {
+                if !withAMove {
+                    return JournaledWrite.perform(stepDraft, in: dying, mode: mode)
+                }
+                var ops: [UndoOp] = []
+                var blobs: [Data] = []
+                for change in stepChanges {
+                    for op in JournaledWrite.ops(for: change) {
+                        ops.append(op)
+                        if op.knownKind == .writeFile {
+                            if let before = change.before {
+                                blobs.append(before)
+                            }
+                            if let after = change.after {
+                                blobs.append(after)
+                            }
+                        }
+                    }
+                }
+                ops.append(UndoOp.moveFile(
+                    from: UndoContractKinds.markerFrom, to: UndoContractKinds.markerTo,
+                    sha: UndoHash.sha256(of: Data(UndoContractKinds.oldMarker.utf8))
+                ))
+                ops.append(UndoOp.recompute(path: "courses/TST1O/Section 1/index.md", maintainer: "sectionFrontPage", section: 1))
+                let opsDraft: UndoOpsDraft = UndoContractKinds.draft(ops: ops, blobs: blobs, root: root, action: "rollOver")
+                return JournaledWrite.perform(ops: opsDraft, in: dying, mode: mode)
+            }
+            if withAMove {
+                try write(UndoContractKinds.oldMarker, to: UndoContractKinds.markerFrom, in: root)
+            }
 
             if work == "step" {
                 UndoKillPoints.hook = { point in point == stopAt }
-                let outcome: JournaledWriteOutcome = JournaledWrite.perform(stepDraft, in: dying, mode: mode)
+                let outcome: JournaledWriteOutcome = makeTheStep()
                 UndoKillPoints.hook = nil
                 if outcome != .stoppedByATest {
                     failures.append("recoveryCases '\(name)': the step was not stopped (\(outcome))")
@@ -1144,7 +1200,7 @@ nonisolated enum UndoContractReplay {
                     afterHashes.append(UndoHash.sha256(ofOptional: change.after))
                 }
             } else {
-                _ = JournaledWrite.perform(stepDraft, in: dying, mode: .live)
+                _ = makeTheStep()
                 afterHashes = [hash(of: first, in: root), hash(of: second, in: root)]
                 if work == "redo" {
                     _ = dying.undoNewest(resolveRoot: { _ in root })
@@ -1167,6 +1223,12 @@ nonisolated enum UndoContractReplay {
             if testCase["contentRemovedBeforeRecovery"] as? Bool == true {
                 try FileManager.default.removeItem(at: dying.contentFolderURL)
             }
+            if testCase["deployBeforeRecovery"] as? Bool == true {
+                // A deploy wrote a new marker in the place the move emptied.
+                try? FileManager.default.removeItem(at: root.appendingPathComponent(UndoContractKinds.markerFrom))
+                try write(UndoContractKinds.newMarker, to: UndoContractKinds.markerFrom, in: root)
+            }
+            _ = takeTheRederived()
 
             // Another process, which sees the first as gone, runs recovery.
             let survivor: UndoJournal = UndoJournal(
@@ -1180,6 +1242,13 @@ nonisolated enum UndoContractReplay {
                 UndoRecovery.run(writer, mode: mode, resolveRoot: resolveRoot)
             }
             UndoKillPoints.fileInUseAtSwap = nil
+            let rederivedByRecovery: Int = takeTheRederived().count
+            if let wanted = int(testCase["rederived"]), rederivedByRecovery != wanted {
+                failures.append("recoveryCases '\(name)': recovery re-derived the front page \(rederivedByRecovery) times, not \(wanted)")
+            }
+            if let wanted = string(testCase["markers"]), UndoContractKinds.markers(in: root) != wanted {
+                failures.append("recoveryCases '\(name)': the markers are \(UndoContractKinds.markers(in: root)), not \(wanted)")
+            }
             if let heldChange {
                 try (heldChange.after ?? Data()).write(to: root.appendingPathComponent(heldChange.relativePath))
                 JournaledWrite.finish(seq: heldSeq, with: .applied, phase: nil, reason: nil, in: UndoJournal(folderURL: place.journalFolder), mode: .live)

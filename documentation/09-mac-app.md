@@ -19186,8 +19186,9 @@ U1 builds `writeFile` (a whole file, by SHA-256, with both copies as blobs)
 and `editLine` (one top-level front-matter key's entry: its line and the
 lines its value runs on to, carriage returns kept), and records
 `recompute` (a file kept true by a rule, such as the section's front page,
-re-derived after the other ops; run by U2). The rest of plan 3.1 arrives
-with U2 and U5. `JournaledWrite.ops(for:)` chooses `editLine` for a change
+re-derived after the other ops; run since U2). U2 defines the six kinds
+that were reserved (below, "The kinds U2 adds"); `trash` and `storeHeld`
+arrive with U5. `JournaledWrite.ops(for:)` chooses `editLine` for a change
 only when applying its ops to the before text gives the after text byte for
 byte AND undoing them gives the before text back; otherwise the change is
 one `writeFile`. So a page the line model cannot describe exactly falls back
@@ -19207,6 +19208,106 @@ drops a leading one from a file. So the traces carry each fixture page's
 exact bytes as `utf8Hex`, the check cases give such a page as `bytesHex`,
 and the shadow record of a publish takes each page's `before` from the
 disk's own bytes rather than from the text the action read.
+
+### The kinds U2 adds, and `recompute` run (U2b)
+
+U2b (branch `issue/899-u2b-op-kinds`, on U2a) turns the six reserved shapes
+into kinds every reader of this version acts on, each with its rule in
+`file-formats.json` → `undoJournal.opKinds` and its rows in
+`undo.checkCases` (94 rows now, 64 of them U2's), and adds `undo.listingCases`
+(4) for the one piece of text both platforms must make byte for byte. The
+code is `Models/Undo/UndoOpKinds.swift` (the content and the checks),
+`UndoCheck.swift` (the plan and the swap) and `JournaledWrite.perform(ops:)`
+(the door for a step given as ops). Nothing a teacher sees changes: no
+action writes these kinds yet (U3 and U4 wire them), and the switch stays
+off.
+
+- **`replaceText`**: a hunk of a page, held in the op itself. It is found
+  by its WINDOW (the text either side plus the hunk), compared as UTF-8
+  bytes; a window counts only when it occurs exactly once and every
+  occurrence of the other window lies inside it, so a page holding the hunk
+  twice, or holding the old text in one place and the new in another, is a
+  change since rather than a guess. Rejected: the reserved shape's long text
+  in blobs. A change too long for a hunk is a `writeFile`, and a hunk read
+  from a blob would make the check depend on content the list may have lost.
+- **`editJSON`**: one member, by key path, of a JSON file whose top level is
+  an object; before and after are any JSON, compared as JSON (true is never
+  1, 1 equals 1.0, strings code point for code point, objects in any order).
+  A member holding null is not a member that is absent: the op leaves out
+  `before` or `after` for "not there", and `null` means null. The file is
+  written back in the app's own form (`CourseConfiguration`'s options:
+  pretty-printed, keys sorted, slashes unescaped, the final line feed kept)
+  with every other member as `JSONSerialization` read it, and the result is
+  read back and compared with the file with that one member changed: a
+  write that would alter anything else is refused as a change since. The
+  reserved `element` (an array element) is left to the piece that needs it:
+  an op carrying it cannot be read here, so an older reader can never undo
+  it by the member rule.
+- **`move`**: a file (by its SHA-256) or a folder (by its listing) moved,
+  judged as a PAIR (#897 piece B, seam 1, the piece B review's I1): the
+  place it left free and the place it went holding it is undoable; the
+  original back and the other free is redoable; anything else is a change
+  since, and an undo then leaves BOTH places as they are and never deletes
+  the destination alone. The case that motivated it: a rollover onto a new
+  website moves `.netlify_sites/section<N>.json` aside, a deploy writes a new
+  marker in the emptied place, and an Undo that judged the halves apart
+  deleted the kept copy, losing last year's site id (`stackCases` 'a deploy
+  wrote a new marker in its place'). The move itself is ONE rename that
+  never replaces (`renamex_np` with `RENAME_EXCL`), the pair re-read just
+  before it. Rejected: a move as a `writeFile` pair (a copy written and the
+  original deleted), which loses the file's mode (a Cloudflare marker is
+  0600, #961) and is two changes where the rename is one.
+- **`createTree` and `removeTree`**: a folder made or removed, everything in
+  it held in the list (the LISTING, `folder <path>` and `file <sha> <path>`
+  lines in the order of the paths' UTF-8 bytes, and every file's bytes, as
+  blobs). A folder matches only when its listing hashes to the recorded one:
+  a file added, changed or removed, or an empty folder added, is a change
+  since. A folder to take out is renamed aside under a staged name and
+  removed only once every change of the step has gone in, so a later swap
+  that is refused puts it back whole (`UndoOpKindsTests`); a folder to make
+  is built beside its place and renamed in, never over anything. `heldBy`
+  (content held in a backup zip) is U5's.
+- **`external`**: something outside every working folder, `<family>:<name>`;
+  this version knows `preference:<name>`, the app's own `UserDefaults`
+  (`UndoAppPreferences`), and a step of external ops alone needs no working
+  folder. It is set last, after every file has gone in, and re-read first.
+  The LaunchAgent of a scheduled deploy (ruling 23) and Obsidian's vault
+  list are families a later piece defines; until then an op naming one
+  cannot be read here.
+- **Whole ops stand alone.** A move, a tree and an external op are judged
+  against the disk as it is, never against what an earlier op of the same
+  step would leave, so no other op of a step may share their places; a step
+  that does is one this version cannot read (a barrier). U3 meets this
+  first: a rollover that moves the published-pages record's fragments into
+  a `…previous-<stamp>/` folder it creates records the moves without a
+  `createTree` for that folder (the folder is left, empty, by an undo), or
+  records the folder's move whole.
+
+**`recompute` is run** (`UndoMaintainers`). Undo, Redo and the door run each
+`recompute` op's maintainer after the swaps, and recovery re-derives a
+step's `recompute` files whenever it settles the step, whichever way
+(re-deriving is idempotent): judged by its content ops alone, a step that
+died after its swaps and before its re-derivation would otherwise be
+settled with its front page stale (the Fable sweep of U1, T5;
+`recoveryCases` with `withAMove`). The re-derivation runs after the last
+kill point, so a death between the swaps and it is a case the suite holds.
+The one maintainer, `sectionFrontPage`, is `UndoSectionFrontPage.rederive`:
+`SectionIndexPointer.repointIndex`, the rule a publish, a re-date and the
+start of the year already use. It is on the main actor and the list is
+moved off it, so the maintainer is a REGISTERED runner rather than a call:
+**until a runner is registered for a maintainer, a step holding its
+`recompute` is not available** (greyed, as a step this version cannot read
+is), never undone with its re-derivation skipped. U7 registers the app's
+runner with the switch and settles how it reaches the main actor from the
+list's thread; the suite registers a recording runner, and
+`UndoOpKindsTests.testTheFrontPageIsRederivedByTheAppsOwnRule` runs the
+app's own. Rejected: making `repointIndex` and everything it reads
+(`Course`, `CourseConfiguration`, `AssistSectionGraph`) nonisolated in U2,
+a change across the app for a list that is still off.
+
+**Measured** (a standalone build of `Models/Undo/` with the replay, Apple
+M4 Pro, swiftc -O): every check, listing, stack (61), step, recovery (26)
+and deployed case and all 20 traces, 0 failures, before the suite ran them.
 
 ### All or nothing, staged then swapped (ruling 4, W5)
 
