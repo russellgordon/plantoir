@@ -4411,7 +4411,8 @@ the same day.)
   for vaults REGISTERED in Obsidian's registry — on Windows,
   `%APPDATA%/obsidian/obsidian.json`, same JSON shape. Port the whole
   dance: quit Obsidian if running (its in-memory vault list ignores
-  registry edits), seed `support/obsidian_defaults/.obsidian` if the
+  registry edits; since #1003 only after the teacher answers "Close
+  Obsidian to open {course}?", never unasked), seed `support/obsidian_defaults/.obsidian` if the
   course has none, write the registry entry, then open the URI. Sections
   open at their `index.md` (Obsidian opens files, not folders). Enable
   the File Explorer's auto-reveal by patching the vault's
@@ -9629,10 +9630,11 @@ pages locked again" line through `ReferenceCourseUpkeep.TrailLine` when it did
 anything; a failure is logged and the teacher may still open. The note is
 shown on the sidebar's `XamlRoot` — the sidebar always exists in a window
 (there is no collapsed-sidebar state here as on the mac, where the note had to
-move to the main window). `ObsidianRouteSourceTests` holds
+move to the main window). `ObsidianRouteSourceTests` held
 `FolderActions.OpenInObsidian(` to the sidebar's two branches plus ONE named
 exception, Course Settings' How I Teach row, which opens a PAGE of a LIVE
-course. Verified by hand once (2026-10-15, a throwaway UI test, Obsidian's
+course; since #1003 both of those go through the route too, and the only
+caller is the route's world ("Windows never closes Obsidian unasked (#1003)"). Verified by hand once (2026-10-15, a throwaway UI test, Obsidian's
 vault registry backed up and restored byte for byte): a page unlocked by hand,
 the section toolbar's button, the page locked again BEFORE the note, "locked 1
 page of ICS3U again — it is kept for reference" on the trail, Obsidian opened.
@@ -13219,6 +13221,74 @@ async-local the static `Sentence()` reads, which also fills `{machine}` with
 refusal answers. And, as the mac's runner since #610, a scripted `modelReply`
 answers the FIRST request only and plain text after it — unless
 `given.modelReplyAnswers` is `everyRequest` (#720, below).
+
+## Windows never closes Obsidian unasked (#1003, the mac's #995)
+
+Written 2026-11-19 for [#1003](https://github.com/russellgordon/plantoir/issues/1003).
+The rule, the words and the reasons are the mac's: `09-mac-app.md` →
+"Plantoir never closes Obsidian unasked (#995)", and the contract key
+`obsidianNeverClosedUnasked`. This section says where Windows does it.
+
+**What was wrong.** `FolderActions.OpenInObsidian` registered a course a
+running Obsidian had never seen by quitting Obsidian, with every vault open in
+it, without a word. Every route reached it: the menus, both toolbars, the
+assistant's press, a course kept for reference after its note, and Course
+Settings' How I Teach row (the last two called it directly).
+
+**Where it is now.** `FolderActions.OpenInObsidian` never closes Obsidian: a
+course Obsidian does not know, while Obsidian runs, hands nothing over and
+answers false. Every open goes through `ObsidianOpenRoute`
+(`OpenThenReportAsync`): when `ObsidianClosingRule.MustAsk` says so (Obsidian
+running and no vault in its list is the file's folder or holds it; a list that
+cannot be read holds nothing), or when the open answers false because Obsidian
+started after the check, the route asks "Close Obsidian to open {course}?"
+(`ObsidianWorld.AskClosingAsync`: the sentence and its three facts, Close
+Obsidian and Open as the default, Cancel, Escape is Cancel). The reference
+course and the How I Teach row take `OpenWithoutTheScanAsync`, the same
+question without the add-ons scan. At the answer the route reads the situation
+again (Obsidian quit, or came to know the course: it just opens); otherwise
+`FolderActions.CloseObsidianAndRegister` runs `ObsidianClosingRule.CloseAndRegisterAsync`:
+what Obsidian's list marks open is noted (`VaultsOpen`, so a hidden Obsidian's
+courses come back), Obsidian is quit and waited for, and only once it is gone
+are the defaults seeded, auto-reveal patched, the course registered and the
+other vaults reopened; the course opens last. One trail line per answer
+("asked to close Obsidian to open a course"; the ledger entry is gone).
+
+**The add-ons offer.** Its yes reads "Close Obsidian and Add Them" when it
+closes Obsidian (`ObsidianAddOnsRequest.AddButtonTitle`: open or cannot tell).
+A course opened in Obsidian while the offer was up goes to the reopen question
+instead of a quit, because the button pressed said Add Them. The reopen
+question's button is "Close and Reopen Obsidian" (Russell's ruling 1 on #995,
+2026-11-19; the contract, both apps and `help/controls.json` changed together).
+
+**When the answer cannot finish** (Obsidian did not close, or it closed and the
+course still could not be added to its list), Windows shows "Could not open
+{course} in Obsidian", one sentence and OK (`ShowCouldNotOpenAsync`, after the
+trail line), following "Could not rename course". That is Russell's ruling 2
+on #995 (2026-11-19); the words are `obsidianNeverClosedUnasked.couldNotOpen`,
+written from Windows first. The mac owes the same alert. The second sentence,
+`notAdded`, was not his: it was written in the shape of his `didNotClose`, and
+he was asked to confirm it.
+
+**What holds it.** `ObsidianNeverClosedUnaskedTests` (every `closeCases` case,
+every word against the contract, the trail lines, the close's order through
+stand-ins, and a source scan: only `FolderActions` (its definition and the
+close), `ObsidianWorld.QuitAndWaitAsync` and the rename call
+`QuitObsidianAndWait`, and `FolderActions.OpenInObsidian` calls neither) and
+the "#1003" block of `ObsidianOpenRouteTests` (the question before any close,
+Cancel, the second look, the two failures and their alert, the backstop, the
+scanned route, How I Teach). `ObsidianRouteSourceTests` now allows one caller
+of `FolderActions.OpenInObsidian(`, the world. Checked by mutation on the
+Windows VM: with the behaviours removed (the rule always "no", the backstop,
+the second look, the order of the close, the button titles, a trail line and
+an alert sentence, a quit put back into the open), every new test went red
+except the two that guard against asking too often (`NothingIsAskedWhenNothingCloses`,
+`TheAddOnsReopenNeverAsksTheClosingQuestionAfterIt`) and the word census.
+
+**Not measured.** No dialog here was seen against a real Obsidian: the VM has
+no Obsidian, and no UI test drives these dialogs. Whether Obsidian for Windows
+writes its list in time for the reopen to find the course is #581's
+measurement, unchanged.
 
 ## The lap cap on Windows (#720, the mac's #689)
 
