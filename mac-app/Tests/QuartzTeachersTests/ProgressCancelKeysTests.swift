@@ -17,6 +17,11 @@ import XCTest
 /// Measured failing before #988: the panel's Cancel carried no key, so both
 /// keys reached nothing and `cancelCount` stayed 0.
 ///
+/// Since the second #988 review the keys reach Cancel as AppKit's
+/// `cancelOperation(_:)` action, through the window's responder chain
+/// (`CancelOperationResponder`, not a view), and a deploy asks "Stop the
+/// deploy?" before it stops (Russell's ruling, 2026-11-19).
+///
 /// The keys belong to the panel only while it is the thing in front. Once a
 /// preview's site covers the panel (`takesTheCancelKeys` false), Escape is the
 /// web page's, and must not stop the preview underneath it. And they follow
@@ -121,11 +126,12 @@ final class ProgressCancelKeysTests: XCTestCase {
     }
 
     /// The panel as the section window draws it for a running task.
-    func panel(runner: ScriptRunner, ledger: CancelLedger, takesTheCancelKeys: Bool) -> some View {
+    func panel(runner: ScriptRunner, ledger: CancelLedger, takesTheCancelKeys: Bool, asksBeforeStopping: Bool = false) -> some View {
         return TaskProgressView(
             runner: runner,
             title: "Previewing EXC2O Section 1",
             takesTheCancelKeys: takesTheCancelKeys,
+            asksBeforeStopping: asksBeforeStopping,
             onCancel: {
                 ledger.cancelCount += 1
                 runner.wasCancelled = true
@@ -317,5 +323,200 @@ final class ProgressCancelKeysTests: XCTestCase {
     func testTheSectionWindowGivesTheKeysOnlyWhileNoSiteIsShowing() {
         XCTAssertTrue(SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing: false))
         XCTAssertFalse(SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing: true))
+    }
+
+    // MARK: - The responder chain, not a view (#988 second review)
+
+    /// The keys arrive through a responder in the window's chain, and that
+    /// responder leaves the chain, joined up as it was, when the panel goes.
+    func testTheKeysComeFromTheResponderChainAndLeaveWithThePanel() {
+        let runner: ScriptRunner = runningRunner()
+        let ledger: CancelLedger = CancelLedger()
+        let shows: PanelShows = PanelShows()
+        let view = VStack {
+            if shows.panel {
+                panel(runner: runner, ledger: ledger, takesTheCancelKeys: true)
+            } else {
+                Color.clear.frame(width: 700, height: 400)
+            }
+        }
+        let window: NSWindow = windowShowing(view)
+        XCTAssertTrue(ProgressCancelKeysTests.chainHoldsAResponder(window), "the panel put its responder into the window's chain")
+        var current: NSResponder? = window.nextResponder
+        while let responder = current {
+            XCTAssertFalse(responder is CancelOperationResponder && responder is NSView, "the responder is not a view")
+            current = responder.nextResponder
+        }
+        shows.panel = false
+        XCTAssertTrue(runUntil(timeout: 2) { !ProgressCancelKeysTests.chainHoldsAResponder(window) }, "the responder left the chain with the panel")
+        press(.escape, in: window)
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(ledger.cancelCount, 0, "with the panel gone, Escape stops nothing")
+        close(window)
+    }
+
+    /// Whether the panel is drawn, for the test above.
+    @Observable
+    final class PanelShows {
+
+        // MARK: - Stored properties
+
+        var panel: Bool = true
+    }
+
+    static func chainHoldsAResponder(_ window: NSWindow) -> Bool {
+        var current: NSResponder? = window.nextResponder
+        while let responder = current {
+            if responder is CancelOperationResponder {
+                return true
+            }
+            current = responder.nextResponder
+        }
+        return false
+    }
+
+    /// The responder takes itself out of the chain and leaves the rest
+    /// joined up as it was.
+    func testUninstallLeavesTheChainAsItWas() {
+        let window: NSWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 10, height: 10), styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        let after: NSResponder = NSResponder()
+        window.nextResponder = after
+        let responder: CancelOperationResponder = CancelOperationResponder()
+        responder.install(in: window)
+        responder.install(in: window)
+        XCTAssertTrue(window.nextResponder === responder)
+        XCTAssertTrue(responder.nextResponder === after, "installed twice, it is in the chain once")
+        responder.uninstall()
+        XCTAssertTrue(window.nextResponder === after)
+        XCTAssertFalse(CancelOperationResponder.chain(of: window, contains: responder))
+    }
+
+    // MARK: - A deploy asks first (Russell, 2026-11-19)
+
+    /// The alert attached to the window, once it shows.
+    func stopQuestion(in window: NSWindow) -> NSWindow? {
+        _ = runUntil(timeout: 3) { window.attachedSheet != nil }
+        return window.attachedSheet
+    }
+
+    func buttons(in sheet: NSWindow) -> [String: NSButton] {
+        var found: [String: NSButton] = [:]
+        var queue: [NSView] = []
+        if let contentView = sheet.contentView {
+            queue.append(contentView)
+        }
+        while !queue.isEmpty {
+            let view: NSView = queue.removeFirst()
+            if let button = view as? NSButton, !button.title.isEmpty {
+                found[button.title] = button
+            }
+            for child in view.subviews {
+                queue.append(child)
+            }
+        }
+        return found
+    }
+
+    /// Escape on a running deploy asks "Stop the deploy?" and stops nothing.
+    /// Continue Deploy holds Escape (and so Command-Period), Stop Deploy holds
+    /// no key at all, so neither a second Escape nor a Return stops the
+    /// deploy unread. Continue Deploy leaves it running; Stop Deploy stops it,
+    /// once.
+    func checkADeployAsksFirst(_ key: Key) {
+        let runner: ScriptRunner = runningRunner()
+        let ledger: CancelLedger = CancelLedger()
+        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true, asksBeforeStopping: true))
+        press(key, in: window)
+        guard let sheet = stopQuestion(in: window) else {
+            XCTFail("\(key) on a running deploy did not ask first")
+            close(window)
+            return
+        }
+        XCTAssertEqual(ledger.cancelCount, 0, "\(key) stopped the deploy without asking")
+        let shown: [String: NSButton] = buttons(in: sheet)
+        guard let continueButton = shown[DeployStopWording.continueButton], let stopButton = shown[DeployStopWording.stopButton] else {
+            XCTFail("the question's buttons: \(Array(shown.keys))")
+            close(window)
+            return
+        }
+        XCTAssertEqual(continueButton.keyEquivalent, "\u{1b}", "Continue Deploy holds Escape")
+        XCTAssertEqual(stopButton.keyEquivalent, "", "Stop Deploy is not the default and holds no key")
+        XCTAssertGreaterThan(continueButton.frame.size.width, 0)
+        // Continue Deploy: the question goes and the deploy runs on.
+        continueButton.performClick(nil)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "Continue Deploy closed the question")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(ledger.cancelCount, 0, "Continue Deploy stopped the deploy")
+        // Asked again, Stop Deploy stops it.
+        press(key, in: window)
+        guard let again = stopQuestion(in: window), let stopAgain = buttons(in: again)[DeployStopWording.stopButton] else {
+            XCTFail("\(key) did not ask again after Continue Deploy")
+            close(window)
+            return
+        }
+        stopAgain.performClick(nil)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Stop Deploy stopped the deploy")
+        _ = runUntil(timeout: 0.7) { false }
+        press(key, in: window)
+        _ = runUntil(timeout: 0.7) { false }
+        XCTAssertNil(window.attachedSheet, "once stopped, the key asks nothing more")
+        XCTAssertEqual(ledger.cancelCount, 1)
+        close(window)
+    }
+
+    func testEscapeOnADeployAsksFirst() {
+        checkADeployAsksFirst(.escape)
+    }
+
+    func testCommandPeriodOnADeployAsksFirst() {
+        checkADeployAsksFirst(.commandPeriod)
+    }
+
+    /// The question's words, as ruled.
+    func testTheQuestionSaysWhatWasRuled() {
+        XCTAssertEqual(DeployStopWording.title, "Stop the deploy?")
+        XCTAssertEqual(DeployStopWording.stopButton, "Stop Deploy")
+        XCTAssertEqual(DeployStopWording.continueButton, "Continue Deploy")
+        XCTAssertTrue(DeployStopWording.message.contains("partly updated"))
+    }
+
+    /// A deploy that ends while its question is open has nothing to stop:
+    /// the question goes, and nothing is stopped.
+    func testTheQuestionGoesWhenTheDeployEnds() {
+        let runner: ScriptRunner = runningRunner()
+        let ledger: CancelLedger = CancelLedger()
+        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true, asksBeforeStopping: true))
+        press(.escape, in: window)
+        XCTAssertNotNil(stopQuestion(in: window), "Escape asked first")
+        runner.isRunning = false
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "the question went when the deploy ended")
+        XCTAssertEqual(ledger.cancelCount, 0)
+        close(window)
+    }
+
+    /// A preview stops at once, with no question (the ruling's other half).
+    func testAPreviewStopsWithNoQuestion() {
+        let runner: ScriptRunner = runningRunner()
+        let ledger: CancelLedger = CancelLedger()
+        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true))
+        press(.escape, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 })
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertNil(window.attachedSheet, "a preview asks nothing")
+        close(window)
+    }
+
+    /// The section window's deploy panel asks; its preview panel does not.
+    func testTheSectionWindowAsksOnlyForTheDeploy() throws {
+        let source: String = try String(contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Section/SectionDetailView.swift"), encoding: .utf8)
+        var asking: Int = 0
+        for chain in SheetConventionScanTests.chains(of: "TaskProgressView(", in: source, file: "SectionDetailView.swift") {
+            if chain.arguments.contains("asksBeforeStopping: true") {
+                asking += 1
+                XCTAssertTrue(chain.arguments.contains("cancelDeploy()"), "the panel that asks is the deploy's")
+            }
+        }
+        XCTAssertEqual(asking, 1, "exactly the deploy's panel asks first")
     }
 }

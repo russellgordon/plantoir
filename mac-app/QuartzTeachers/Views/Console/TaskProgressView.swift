@@ -47,6 +47,12 @@ struct TaskProgressView: View {
     /// everywhere else the panel is in front whenever it shows.
     let takesTheCancelKeys: Bool
 
+    /// True for a section's deploy: stopping it asks "Stop the deploy?"
+    /// first, by click or by key (Russell's ruling on #988, 2026-11-19),
+    /// because a deploy stopped part way can leave the website partly
+    /// updated. A preview or a plan share stops at once.
+    let asksBeforeStopping: Bool
+
     /// TESTS ONLY: told the height the folder publish's render note was
     /// actually drawn at, so a test can say whether it kept every line
     /// (#213). Nothing else can: the accessibility tree does not reach a
@@ -70,6 +76,7 @@ struct TaskProgressView: View {
         showingDetailsForTesting: Bool = false,
         canCancel: Bool = true,
         takesTheCancelKeys: Bool = true,
+        asksBeforeStopping: Bool = false,
         hidesSiteLink: Bool = false,
         allLegs: [MultiDestinationDeployRunner.Leg]? = nil,
         onCancel: (() -> Void)? = nil,
@@ -80,6 +87,7 @@ struct TaskProgressView: View {
         self.title = title
         self.canCancel = canCancel
         self.takesTheCancelKeys = takesTheCancelKeys
+        self.asksBeforeStopping = asksBeforeStopping
         self.hidesSiteLink = hidesSiteLink
         self.allLegs = allLegs
         self.onCancel = onCancel
@@ -102,7 +110,34 @@ struct TaskProgressView: View {
     /// Makes Cancel act once per run, however it is pressed (#988 review).
     @State var cancelOnce: CancelOncePerRun = CancelOncePerRun()
 
+    /// Hears Escape and Command-Period from the window's responder chain
+    /// and presses Cancel (#988): `CancelOperationResponder`. Not a view.
+    @State var cancelResponder: CancelOperationResponder = CancelOperationResponder()
+
+    /// Showing "Stop the deploy?" (`asksBeforeStopping`).
+    @State var isAskingToStop: Bool = false
+
     // MARK: - Computed properties
+
+    /// Whether the task is still under way, as the header reads it.
+    var runIsUnderWay: Bool {
+        return runner.isRunning || runner.isBetweenPhases
+    }
+
+    /// Whether the Cancel button is showing.
+    var cancelIsShowing: Bool {
+        if !canCancel || runner.wasCancelled {
+            return false
+        }
+        return !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt)
+    }
+
+    /// Whether Escape and Command-Period press Cancel now: while it shows,
+    /// the run is under way, nothing covers the panel, and no question
+    /// about stopping is already open.
+    var cancelKeysAreLive: Bool {
+        return takesTheCancelKeys && cancelIsShowing && runIsUnderWay && !isAskingToStop
+    }
 
     /// Drives the question alert without writing state during a body.
     ///
@@ -185,6 +220,22 @@ struct TaskProgressView: View {
     /// stayed live, and a held Escape repeating within one frame ran Cancel
     /// three times (#988 review).
     func pressCancel() {
+        if asksBeforeStopping {
+            if runIsUnderWay && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt) {
+                isAskingToStop = true
+            }
+            return
+        }
+        stopTheTask()
+    }
+
+    /// Stops the task: what Cancel does for a preview, and what Stop Deploy
+    /// does in "Stop the deploy?". Once per run, and never for a run that
+    /// has already ended while the question was open.
+    func stopTheTask() {
+        if !runIsUnderWay {
+            return
+        }
         if !cancelOnce.pressOnce(forRunStartedAt: runner.startedAt) {
             return
         }
@@ -192,6 +243,16 @@ struct TaskProgressView: View {
             onCancel()
         } else {
             runner.cancelByUser()
+        }
+    }
+
+    /// Tells the responder what the keys do now. Called whenever what it
+    /// depends on changes, because the responder lives outside SwiftUI's
+    /// updates.
+    func updateTheCancelKeys() {
+        cancelResponder.isEnabled = cancelKeysAreLive
+        cancelResponder.pressCancel = {
+            pressCancel()
         }
     }
 
@@ -265,21 +326,37 @@ struct TaskProgressView: View {
 
                             Spacer()
 
-                            if canCancel && !runner.wasCancelled
-                                && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt) {
+                            if cancelIsShowing {
+                                // Escape and Command-Period press it from
+                                // the responder chain while nothing else in
+                                // the window has a use for them (#988): see
+                                // `CancelOperationResponder`.
                                 Button("Cancel") {
                                     pressCancel()
                                 }
                                 .buttonStyle(.bordered)
-                                // Escape and Command-Period press it while
-                                // nothing else in the window has a use for
-                                // them (#988): see `CancelKeyCatcher`.
-                                .background(
-                                    CancelKeyCatcher(isEnabled: takesTheCancelKeys) {
-                                        pressCancel()
-                                    }
-                                )
                                 .accessibilityIdentifier("taskCancelButton")
+                                // Stopping a deploy asks first (Russell's ruling on #988,
+                                // 2026-11-19). Alerts: "Always place the default button on the
+                                // trailing side"; "If you want to encourage people to read an alert
+                                // and not just automatically press Return to dismiss it, avoid making
+                                // any button the default button." In a SwiftUI alert only the
+                                // destructive role leaves the go-ahead with no Return
+                                // (`AlertKeysTests`), so Stop Deploy is destructive and Continue
+                                // Deploy holds Escape and Command-Period, which therefore never stop
+                                // a deploy without the question being read.
+                                .alert(DeployStopWording.title, isPresented: $isAskingToStop) {
+                                    Button(DeployStopWording.continueButton, role: .cancel) {
+                                    }
+                                    .keyboardShortcut(.cancelAction)
+                                    .accessibilityIdentifier("continueDeployButton")
+                                    Button(DeployStopWording.stopButton, role: .destructive) {
+                                        stopTheTask()
+                                    }
+                                    .accessibilityIdentifier("stopDeployButton")
+                                } message: {
+                                    Text(DeployStopWording.message)
+                                }
                             }
                         }
                     } else if let exitCode = runner.lastExitCode {
@@ -500,6 +577,33 @@ struct TaskProgressView: View {
                     runner.send(line: "n")
                 }
             )
+        }
+        // The keys reach Cancel through the window's responder chain, not
+        // through a view (#988 review): the responder joins the chain once
+        // this panel is in a window, and leaves it when the panel goes.
+        .background(WindowAccessor { (window: NSWindow) in
+            cancelResponder.install(in: window)
+            updateTheCancelKeys()
+        })
+        .onAppear {
+            cancelResponder.reinstall()
+            updateTheCancelKeys()
+        }
+        .onDisappear {
+            cancelResponder.uninstall()
+        }
+        .onChange(of: cancelKeysAreLive) {
+            updateTheCancelKeys()
+        }
+        .onChange(of: ObjectIdentifier(runner)) {
+            updateTheCancelKeys()
+        }
+        .onChange(of: runIsUnderWay) {
+            // A deploy that ends while its question is open has nothing
+            // left to stop: the question goes.
+            if !runIsUnderWay {
+                isAskingToStop = false
+            }
         }
         .onChange(of: runner.isAwaitingInput) {
             // Start from the answer the task would have used anyway, so

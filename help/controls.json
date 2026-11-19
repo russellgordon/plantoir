@@ -260,6 +260,20 @@
    },
    "windows": null
   },
+  "stopDeploy": {
+   "label": "Stop Deploy",
+   "mac": {
+    "wording": "DeployStopWording.stopButton"
+   },
+   "windows": null
+  },
+  "continueDeploy": {
+   "label": "Continue Deploy",
+   "mac": {
+    "wording": "DeployStopWording.continueButton"
+   },
+   "windows": null
+  },
   "addClassWayNextInThisUnit": {
    "label": "As the next class in the unit under way",
    "mac": {
