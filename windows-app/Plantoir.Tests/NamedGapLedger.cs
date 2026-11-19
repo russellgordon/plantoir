@@ -403,6 +403,7 @@ internal static class NamedGapLedger
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
     private const string Reason1003 = "Plantoir never closing Obsidian without asking (the mac's #995, shared-rules.json obsidianNeverClosedUnasked) is #1003's piece of v2.0.0; until it lands Windows asks no closing question, so it has no answer to record";
     private const string Reason899W6 = "the six op kinds the mac's U2b defines (replaceText, editJSON, move, createTree, removeTree, external) and recompute run are Windows' W6 for #899, still to come (plans/899-plan.md, W6 to W11b); until it lands this app's reader takes each for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
+    private const string Reason899W6Traces = Reason899W6 + ". COVERAGE LOST, for W6 to restore: until U2b's contract put a move in them, W1 replayed all 20 traces call by call to their final hashes; held, each of these 15 is asserted only up to its first move and must stop exactly there, and trace-002, trace-012 and trace-020 open with a move, so they check nothing at all here until W6 replays them whole";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
 
     /// <summary>
@@ -546,10 +547,13 @@ internal static class NamedGapLedger
         // reserved kinds as unknown and W6 builds them; "every undo key a
         // Windows test walks starts held against #899, and each piece removes
         // the entries it makes true"). A check case is held when its verdict
-        // is not notReadable both ways, or when its `current` is one of U2's
-        // shapes this test cannot place yet (a move's two sides, a tree, a
-        // preference). U2b's two cannotBeRead rows on known kinds are W1's,
-        // and were built rather than held.
+        // is not notReadable both ways (60 of them). A case whose `current`
+        // this test cannot place yet (a move's two sides, a tree, a
+        // preference) is judged on a placeholder when its op cannot be read,
+        // since an unreadable op is settled before its path is read: the nine
+        // such rows that expect notReadable both ways are met here and are not
+        // held (the 2026-11-19 review's MEDIUM). U2b's two cannotBeRead rows
+        // on known kinds are W1's, and were built rather than held.
         Owed(UndoCheckCases, 899, V200, Reason899W6,
              "replaceText: the hunk as the step left it",
              "replaceText: the hunk as it was before",
@@ -589,10 +593,6 @@ internal static class NamedGapLedger
              "move: a folder where the moved file is",
              "move of a folder: as the step left it",
              "move of a folder: a file added inside it since",
-             "move onto itself: not readable",
-             "move into the place it left: not readable",
-             "move with a path: not readable",
-             "move naming neither a file's hash nor a folder's listing: not readable",
              "createTree: the folder as the step made it",
              "createTree: the folder gone: already back",
              "createTree: a file added inside since",
@@ -607,15 +607,10 @@ internal static class NamedGapLedger
              "external: the preference changed since",
              "external: a preference the step set where none was, removed since: already back",
              "external: a preference holding something JSON cannot (a date)",
-             "external with a path: not readable",
              "replaceText: the page cannot be read just now",
              "editJSON: the file cannot be read just now",
              "move: the moved copy cannot be read just now",
              "createTree: the folder cannot be listed just now",
-             "move between two names that differ only in case: not readable",
-             "move to an absolute path: not readable",
-             "move from a path that climbs out: not readable",
-             "createTree whose path climbs out: not readable",
              "createTree: a link inside the folder: changed since, never followed",
              "move: a link where the moved copy is: changed since, never followed",
              "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
@@ -640,7 +635,7 @@ internal static class NamedGapLedger
              "U2, createTree: an Undo whose content the list no longer holds is refused and the folder kept (the list is cleared, as for any content missing)",
              "U2, removeTree: a Redo whose content the list no longer holds is refused, the folder kept, only the redo dropped",
              "U2: the folder a page was moved out of, replaced since by a link to outside the working folder: Undo moves nothing out, refuses as changed since, and clears the list"),
-        Owed(UndoTraces, 899, V200, Reason899W6,
+        Owed(UndoTraces, 899, V200, Reason899W6Traces,
              "trace-002",
              "trace-003",
              "trace-004",

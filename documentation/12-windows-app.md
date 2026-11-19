@@ -15192,25 +15192,58 @@ above its value today, so a list cannot silently fall to zero.
 contract, this reader takes its six kinds for kinds it does not know, as
 the plan has W1 do, so their rows are held on the named-gap ledger against
 #899 for W6 (`NamedGapLedger` → `UndoCheckCases`, `UndoStackCases`,
-`UndoTraces`): 69 `checkCases` (every row of a U2 kind whose verdict is not
-`notReadable` both ways, or whose `current` is a shape this test cannot
-place yet: a move's `atFrom`/`atTo`, a `tree`, a `preference`), U2b's 19
-`stackCases` (each needs a call or a key the replay does not know) and the
-15 traces that hold a `move`. A held row is not skipped: a held check case
-must still be answered `notReadable` both ways, its op must still be one
-this reader cannot read, and it fails the day it is answered as the
-contract says; a held stack case or trace must still stop at the call or
-key it is held for (a held trace is asserted call by call up to its first
-`move`), and fails the day it plays through. U2b's two `cannotBeRead` rows
-on kinds W1 reads ("a page that is there and cannot be read just now (no
-permission)", "whole file: cannot be read just now") were W1's and are
-built: a read refused for any reason but a sharing or lock violation (32,
-33) is now `cannotTell`, refused `cannotTellNow` with the list kept, in the
-mac's order (a page in the way, then a page that cannot be read, then
-content missing); a sharing or lock violation stays "in use", which
-`rule.recovery` names apart. The test makes such a page unreadable through
-`UndoCurrent.Read`'s seam (access denied), since an ACL that denies reading
-is not reliable over SSH with an administrator's token.
+`UndoTraces`): 60 `checkCases` (every row of a U2 kind whose verdict is not
+`notReadable` both ways), U2b's 19 `stackCases` (each needs a call or a key
+the replay does not know) and the 15 traces that hold a `move`.
+
+A held row is not skipped, and each of these is proved by a test on a real
+held row (`TheDayAHeldCheckCaseIsAnsweredAsTheContractSaysItFails`,
+`TheDayAHeldStackCasePlaysThroughItFails`, `TheDayAHeldTracePlaysThroughItFails`):
+
+- A held check case must still be read as an op this reader cannot read and
+  still be answered `notReadable` both ways. It fails as the gap closing the
+  day its op is read, or the day it is answered as the contract says, and as
+  a real failure if it is answered anything else.
+- A `current` this test cannot place yet (a move's `atFrom`/`atTo`, a
+  `tree`, a `preference`, U2's shapes, which W6 places) is judged on a
+  placeholder, and only while the op cannot be read: an unreadable op is
+  settled before anything at its path is read, and two placeholders a
+  readable op would tell apart (nothing there, a folder) must agree. So the
+  nine such rows that expect `notReadable` both ways (a move onto itself,
+  with a path, to an absolute path and so on, "createTree whose path climbs
+  out", "external with a path") are met here and are not held. An op this
+  reader CAN read with such a `current` fails, naming the shape, until the
+  test places it. (Until the review of 2026-11-19 a held case of such a
+  shape returned after checking only that its op was unreadable, which a
+  correct W6 reader of those nine still satisfies, so they could never have
+  come off the ledger.)
+- A held stack case must still stop at the call or key it is held for; a
+  held trace is asserted call by call exactly as any other and must stop at
+  its FIRST `move`, at that call's number. Either fails as the gap closing
+  the day it plays through, and as a real failure if anything else stops it.
+
+**What the held traces no longer check, for W6 to restore.** Until U2b's
+contract put a `move` in them, W1 replayed all 20 traces call by call to
+their final hashes. Held, the 15 are asserted only up to their first
+`move`, and trace-002, trace-012 and trace-020 open with one, so they check
+nothing at all here; the ledger entry's reason says so, so the coverage
+comes back when W6 replays them whole.
+
+U2b's two `cannotBeRead` rows on kinds W1 reads ("a page that is there and
+cannot be read just now (no permission)", "whole file: cannot be read just
+now") were W1's and are built: a read refused for any reason but a sharing
+or lock violation (32, 33) is now `cannotTell`, refused `cannotTellNow` with
+the list kept, in the mac's order (a page in the way, then a page that
+cannot be read, then content missing, each pinned by a test); a sharing or
+lock violation stays "in use", which `rule.recovery` names apart. The mac
+answers `cannotTell` for every failed read but a missing file or folder;
+the 32/33 split is Windows' own, because there a page held by another
+program is the everyday case and `fileIsInUse` names it. The contract rows
+make the page unreadable through `UndoCurrent.Read`'s seam (access denied),
+so they run under any token; a real deny-read ACE is
+`APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow`, skipped,
+saying why, where the account's token reads past it (an administrator's
+over SSH), the convention of `DenyBitesFact`.
 
 **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
 .NET 9, the system NTFS volume, other agents of the run sharing the CPU, so

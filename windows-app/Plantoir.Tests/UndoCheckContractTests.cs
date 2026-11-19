@@ -1,3 +1,5 @@
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -94,9 +96,11 @@ public sealed class UndoCheckContractTests : IDisposable
     /// (on the mac and in Python, the permissions taken away) is the open
     /// refused with access denied, as <c>FileStream</c> throws it
     /// (<see cref="UnauthorizedAccessException"/>, 0x80070005), through
-    /// <see cref="UndoCurrent.Read"/>'s seam: an ACL that denies reading is not
-    /// used because this suite also runs over SSH with an administrator's token,
-    /// where such tests are skipped (the W5 review's note).
+    /// <see cref="UndoCurrent.Read"/>'s seam, so every case runs under any
+    /// token. A real ACL that denies reading is
+    /// <see cref="APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow"/>,
+    /// skipped where an administrator's token over SSH reads past it (the W5
+    /// review's note).
     /// </summary>
     private static UndoCurrent ReadAsTheCaseHasIt(JsonElement checkCase, string path)
     {
@@ -122,21 +126,29 @@ public sealed class UndoCheckContractTests : IDisposable
     /// </summary>
     [Theory]
     [MemberData(nameof(Cases))]
-    public void EveryCheckCase(string name)
+    public void EveryCheckCase(string name) =>
+        JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, JudgeOnTheDisk);
+
+    /// <summary>
+    /// One case, judged by <paramref name="judge"/> on the op
+    /// <paramref name="readOp"/> reads, and held or not as
+    /// <paramref name="entries"/> say. <see cref="EveryCheckCase"/> passes this
+    /// app's reader and the disk; <c>TheDayAHeldCheckCaseIsAnsweredAsTheContractSaysItFails</c>
+    /// passes W6's answers, to prove that a held case does not outlive its gap.
+    /// </summary>
+    internal static void JudgeAsTheLedgerSays(string name, IEnumerable<NamedGapLedger.Entry> entries,
+                                              Func<JsonElement, UndoOp> readOp,
+                                              Func<string, JsonElement, UndoOp, (string Undo, string Redo)> judge)
     {
         JsonElement checkCase = CaseNamed(name);
-        UndoOp op = OpOf(checkCase);
-        NamedGapLedger.Entry? held = NamedGapLedger.Holding(NamedGapLedger.UndoCheckCases, name);
+        UndoOp op = readOp(checkCase);
+        NamedGapLedger.Entry? held = NamedGapLedger.Holding(NamedGapLedger.UndoCheckCases, name, entries);
         if (held is not null)
         {
             // The op of a held case must still be one this reader does not know.
             Assert.False(op.Readable, NamedGapLedger.ClosedMessage(held));
-            if (!CanBePlacedHere(checkCase)) return;   // U2's shapes of `current`: placed by W6
         }
-        UndoCurrent current = ReadAsTheCaseHasIt(checkCase, Place(checkCase));
-        UndoOpState state = UndoCheck.StateOf(op, current);
-        string undo = UndoContract.Spelled(UndoCheck.UndoVerdictOf(state));
-        string redo = UndoContract.Spelled(UndoCheck.RedoVerdictOf(state));
+        (string undo, string redo) = judge(name, checkCase, op);
         string expectedUndo = checkCase.GetProperty("undo").GetString()!;
         string expectedRedo = checkCase.GetProperty("redo").GetString()!;
         if (held is not null)
@@ -149,6 +161,70 @@ public sealed class UndoCheckContractTests : IDisposable
         }
         Assert.Equal(expectedUndo, undo);
         Assert.Equal(expectedRedo, redo);
+    }
+
+    /// <summary>
+    /// The case's undo and redo verdicts, its <c>current</c> on the disk and
+    /// read back. A <c>current</c> this test cannot place yet (a move's
+    /// <c>atFrom</c>/<c>atTo</c>, a <c>tree</c>, a <c>preference</c>: U2's
+    /// shapes, which W6 places) is judged on a placeholder, and only for an op
+    /// this reader cannot read: such an op is settled before anything at its
+    /// path is read (<see cref="UndoCheck.StateOf"/>), which two placeholders
+    /// that a readable op would tell apart (nothing there, a folder) must
+    /// agree on. An op it CAN read with such a <c>current</c> fails here,
+    /// naming the shape, until this test places it (the 2026-11-19 review's
+    /// MEDIUM: a held case is never passed over for its shape).
+    /// </summary>
+    private (string Undo, string Redo) JudgeOnTheDisk(string name, JsonElement checkCase, UndoOp op)
+    {
+        if (CanBePlacedHere(checkCase))
+        {
+            UndoOpState state = UndoCheck.StateOf(op, ReadAsTheCaseHasIt(checkCase, Place(checkCase)));
+            return (UndoContract.Spelled(UndoCheck.UndoVerdictOf(state)), UndoContract.Spelled(UndoCheck.RedoVerdictOf(state)));
+        }
+        Assert.False(op.Readable,
+            $"\"{name}\" has a current of a shape this test does not place yet ({ShapesOf(checkCase)}), and its op is now " +
+            "one this reader reads: place that shape in Place before the case can be judged");
+        UndoOpState onNothing = UndoCheck.StateOf(op, new UndoCurrent.Absent());
+        UndoOpState onAFolder = UndoCheck.StateOf(op, new UndoCurrent.Folder());
+        Assert.Equal(onNothing, onAFolder);
+        return (UndoContract.Spelled(UndoCheck.UndoVerdictOf(onNothing)), UndoContract.Spelled(UndoCheck.RedoVerdictOf(onNothing)));
+    }
+
+    private static string ShapesOf(JsonElement checkCase)
+    {
+        var shapes = new List<string>();
+        foreach (JsonProperty shape in checkCase.GetProperty("current").EnumerateObject()) shapes.Add(shape.Name);
+        return string.Join(", ", shapes);
+    }
+
+    /// <summary>
+    /// Proves a held check case does not outlive its gap, on real held rows:
+    /// one whose <c>current</c> this test places and one whose <c>current</c>
+    /// it cannot place yet. Given W6's answers (the op read, the contract's
+    /// verdicts), each fails as the gap closing; given the contract's verdicts
+    /// with the op still unread, each fails the same way; answered anything
+    /// but <c>notReadable</c> while held, each fails as a real failure.
+    /// </summary>
+    [Theory]
+    [InlineData("replaceText: the hunk as the step left it")]
+    [InlineData("move: back where it was, the other place free")]
+    public void TheDayAHeldCheckCaseIsAnsweredAsTheContractSaysItFails(string name)
+    {
+        Assert.NotNull(NamedGapLedger.Holding(NamedGapLedger.UndoCheckCases, name));
+        (string, string) TheContractsAnswer(string _, JsonElement checkCase, UndoOp __) =>
+            (checkCase.GetProperty("undo").GetString()!, checkCase.GetProperty("redo").GetString()!);
+        UndoOp ReadAsW6Will(JsonElement checkCase) => OpOf(checkCase) with { Readable = true };
+
+        // As it stands today: held, and passing because it still fails for its gap.
+        JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, JudgeOnTheDisk);
+
+        var opRead = Assert.ThrowsAny<Exception>(() => JudgeAsTheLedgerSays(name, NamedGapLedger.All, ReadAsW6Will, TheContractsAnswer));
+        Assert.Contains("now EXISTS on this side", opRead.Message);
+        var answered = Assert.ThrowsAny<Exception>(() => JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, TheContractsAnswer));
+        Assert.Contains("now EXISTS on this side", answered.Message);
+        var guessed = Assert.ThrowsAny<Exception>(() => JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, (_, _, _) => ("fileIsInUse", "fileIsInUse")));
+        Assert.Contains("never guessed at", guessed.Message);
     }
 
     /// <summary>
@@ -275,6 +351,67 @@ public sealed class UndoCheckContractTests : IDisposable
     }
 
     /// <summary>
+    /// The mac's order, its second step: a page that cannot be read now is
+    /// named before content the list no longer holds, whichever op comes
+    /// first (the 2026-11-19 review's low). A step refused for content missing
+    /// clears the list; one refused cannotTellNow keeps it, so the order
+    /// decides whether a busy page costs the teacher the whole list.
+    /// </summary>
+    [Fact]
+    public void APageThatCannotBeReadNowIsNamedBeforeMissingContent()
+    {
+        UndoOp line = ThePublishLineOp() with { Path = "a.md" };
+        UndoOp whole = new() { Kind = UndoOp.WriteFile, Readable = true, Path = "b.md", BeforeSha = new string('a', 64), AfterSha = UndoCheck.Sha("new\n"u8.ToArray()) };
+        UndoCurrent Read(string relative) => relative == "a.md" ? new UndoCurrent.CannotReadNow(5) : new UndoCurrent.Bytes("new\n"u8.ToArray());
+
+        foreach (UndoOp[] ops in new[] { new[] { line, whole }, new[] { whole, line } })
+        {
+            var plan = UndoCheck.Plan(ops, backward: true, Read, _ => null);
+            Assert.Equal("a.md", Assert.IsType<UndoCheck.PlanResult.CannotTellNow>(plan).Path);
+        }
+        // and with the page readable again, the missing content is what refuses it.
+        var readable = UndoCheck.Plan([line, whole], backward: true,
+            relative => relative == "a.md" ? UndoCurrent.Read(ThePageAsTheStepLeftIt()) : new UndoCurrent.Bytes("new\n"u8.ToArray()),
+            _ => null);
+        Assert.Equal("b.md", Assert.IsType<UndoCheck.PlanResult.ContentMissing>(readable).Path);
+    }
+
+    /// <summary>
+    /// The <c>cannotBeRead</c> rows through a real deny ACE on the page, not
+    /// the seam: reading denied to this account reaches the mapping as
+    /// access denied (5), <c>cannotTell</c> both ways, and the step is refused
+    /// <c>cannotTellNow</c> naming the page. Skipped, saying why, where this
+    /// account's token reads past a deny ACE (an administrator's over SSH);
+    /// <see cref="EveryCheckCase"/> covers the rows through the seam there.
+    /// </summary>
+    [DenyReadBitesFact]
+    public void APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow()
+    {
+        string path = ThePageAsTheStepLeftIt();
+        UndoOp op = ThePublishLineOp();
+        var file = new FileInfo(path);
+        var rights = file.GetAccessControl();
+        var deny = new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!, FileSystemRights.ReadData, AccessControlType.Deny);
+        rights.AddAccessRule(deny);
+        file.SetAccessControl(rights);
+        try
+        {
+            UndoCurrent current = UndoCurrent.Read(path);
+            Assert.Equal(5, Assert.IsType<UndoCurrent.CannotReadNow>(current).ErrorCode);
+            Assert.Equal("cannotTell", UndoContract.Spelled(UndoCheck.UndoVerdictOf(UndoCheck.StateOf(op, current))));
+            Assert.Equal("cannotTell", UndoContract.Spelled(UndoCheck.RedoVerdictOf(UndoCheck.StateOf(op, current))));
+            var plan = UndoCheck.Plan([op], backward: true, _ => UndoCurrent.Read(path), _ => null);
+            Assert.Equal(op.Path, Assert.IsType<UndoCheck.PlanResult.CannotTellNow>(plan).Path);
+        }
+        finally
+        {
+            rights.RemoveAccessRule(deny);
+            file.SetAccessControl(rights);
+        }
+        Assert.Equal(UndoOpState.After, UndoCheck.StateOf(op, UndoCurrent.Read(path)));   // and readable again once allowed
+    }
+
+    /// <summary>
     /// PROPOSED. A page changed by hand settles the question whatever else is
     /// busy: one page in the way is "changed since" (the list is cleared, ruling
     /// 13) even when another page of the same step cannot be read now.
@@ -343,5 +480,54 @@ public sealed class UndoCheckContractTests : IDisposable
             relative => relative == "a.md" ? new UndoCurrent.Absent() : new UndoCurrent.Bytes(Encoding.UTF8.GetBytes(changed)),
             _ => null, folderIsReachable: () => false);
         Assert.IsType<UndoCheck.PlanResult.ChangedSince>(handEdit);
+    }
+}
+
+/// <summary>
+/// A fact that needs a deny ACE to stop this account READING a file:
+/// SKIPPED, saying why, when it does not (an administrator's token, as over
+/// SSH, may read past it), so the totals line counts it as not run rather
+/// than failed, the convention of <see cref="DenyBitesFactAttribute"/>. The
+/// probe makes a temporary file, denies itself reading it, tries, and
+/// removes both.
+/// </summary>
+public sealed class DenyReadBitesFactAttribute : FactAttribute
+{
+    private static readonly Lazy<bool> DenyBites = new(Probe);
+
+    public DenyReadBitesFactAttribute()
+    {
+        if (!DenyBites.Value)
+            Skip = "A deny ACE does not stop this account reading a file (an administrator's token, as over SSH), so "
+                 + "'a page whose reading is denied cannot tell' cannot be tried on the disk here; "
+                 + "EveryCheckCase covers the contract's cannotBeRead rows through UndoCurrent.Read's seam.";
+    }
+
+    private static bool Probe()
+    {
+        string folder = Directory.CreateTempSubdirectory("deny-read-probe-").FullName;
+        string path = Path.Combine(folder, "probe.md");
+        File.WriteAllText(path, "probe");
+        var file = new FileInfo(path);
+        var rights = file.GetAccessControl();
+        var deny = new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!, FileSystemRights.ReadData, AccessControlType.Deny);
+        try
+        {
+            rights.AddAccessRule(deny);
+            file.SetAccessControl(rights);
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                return false;
+            }
+            catch (UnauthorizedAccessException) { return true; }
+            catch (IOException) { return true; }
+        }
+        catch { return false; }
+        finally
+        {
+            try { rights.RemoveAccessRule(deny); file.SetAccessControl(rights); } catch { }
+            try { Directory.Delete(folder, recursive: true); } catch { }
+        }
     }
 }

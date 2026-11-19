@@ -46,14 +46,41 @@ public sealed class UndoStackContractTests
     /// </summary>
     [Theory]
     [MemberData(nameof(Cases))]
-    public void EveryStackCase(string name)
+    public void EveryStackCase(string name) => RunAsTheLedgerSays(name, NamedGapLedger.All, () => WalkTheCase(name));
+
+    /// <summary>
+    /// One case, walked by <paramref name="walk"/>, held or not as
+    /// <paramref name="entries"/> say. <see cref="EveryStackCase"/> passes the
+    /// real walk; <see cref="TheDayAHeldStackCasePlaysThroughItFails"/> passes
+    /// W6's, to prove that a held case does not outlive its gap.
+    /// </summary>
+    private static void RunAsTheLedgerSays(string name, IEnumerable<NamedGapLedger.Entry> entries, Action walk)
     {
-        if (NamedGapLedger.Holding(NamedGapLedger.UndoStackCases, name) is { } held)
+        if (NamedGapLedger.Holding(NamedGapLedger.UndoStackCases, name, entries) is { } held)
         {
-            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => WalkTheCase(name), "this replay does not know", "this replay does not check");
+            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, walk, "this replay does not know", "this replay does not check");
             return;
         }
-        WalkTheCase(name);
+        walk();
+    }
+
+    /// <summary>
+    /// Proves, on a real held row, that a held stack case does not outlive its
+    /// gap: as it stands it stops at the call it is held for; walked through
+    /// to the end (as W6's replay will) it fails as the gap closing; stopped
+    /// by anything else it fails as a real failure.
+    /// </summary>
+    [Fact]
+    public void TheDayAHeldStackCasePlaysThroughItFails()
+    {
+        const string name = "U2, move: a rollover's marker moved aside is moved back by Undo";
+        Assert.NotNull(NamedGapLedger.Holding(NamedGapLedger.UndoStackCases, name));
+
+        RunAsTheLedgerSays(name, NamedGapLedger.All, () => WalkTheCase(name));
+        var playedThrough = Assert.ThrowsAny<Exception>(() => RunAsTheLedgerSays(name, NamedGapLedger.All, () => { }));
+        Assert.Contains("now EXISTS on this side", playedThrough.Message);
+        var otherReason = Assert.ThrowsAny<Exception>(() => RunAsTheLedgerSays(name, NamedGapLedger.All, () => Assert.Fail("head 3, expected 2")));
+        Assert.Contains("failed for another reason", otherReason.Message);
     }
 
     private static void WalkTheCase(string name)
