@@ -239,7 +239,7 @@ nonisolated final class UndoJournal: @unchecked Sendable {
             return
         }
         try handle.seek(toOffset: size - 1)
-        let lastByte: Data = handle.readData(ofLength: 1)
+        let lastByte: Data = try UndoFileReads.read(handle, upToCount: 1)
         if lastByte.first == 0x0A {
             return
         }
@@ -248,7 +248,7 @@ nonisolated final class UndoJournal: @unchecked Sendable {
         while chunkEnd > 0 {
             let chunkStart: UInt64 = chunkEnd > 65_536 ? chunkEnd - 65_536 : 0
             try handle.seek(toOffset: chunkStart)
-            let chunk: Data = handle.readData(ofLength: Int(chunkEnd - chunkStart))
+            let chunk: Data = try UndoFileReads.read(handle, upToCount: Int(chunkEnd - chunkStart))
             var index: Int = chunk.count - 1
             var found: Bool = false
             while index >= 0 {
@@ -382,8 +382,16 @@ nonisolated enum UndoFoldCache {
                 entry.fold.segmentsSeen.insert(number)
                 continue
             }
-            try? handle.seek(toOffset: UInt64(from))
-            let data: Data = handle.readData(ofLength: Int(size) - from)
+            let data: Data
+            do {
+                try handle.seek(toOffset: UInt64(from))
+                data = try UndoFileReads.read(handle, upToCount: Int(size) - from)
+            } catch {
+                // Unreadable for this attempt: nothing of this read is kept,
+                // so the next read starts again from the fold remembered.
+                try? handle.close()
+                throw UndoJournalError.couldNotRead
+            }
             try? handle.close()
             var lineIndex: Int = entry.lineCounts[number] ?? 0
             var newEnd: Int = from
@@ -403,7 +411,7 @@ nonisolated enum UndoFoldCache {
             }
             entry.ends[number] = newEnd
             entry.lineCounts[number] = lineIndex
-            entry.tails[number] = tail(of: url, endingAt: newEnd)
+            entry.tails[number] = try tail(of: url, endingAt: newEnd)
             entry.fileNumbers[number] = fileNumber(of: url)
             entry.fold.segmentsSeen.insert(number)
         }
@@ -443,7 +451,9 @@ nonisolated enum UndoFoldCache {
             if let remembered = entry.fileNumbers[number], remembered != fileNumber(of: url) {
                 return false
             }
-            if tail(of: url, endingAt: end) != (entry.tails[number] ?? Data()) {
+            // A tail that cannot be read is not trusted: the list is read
+            // whole, which then says whether it can be read at all.
+            guard let tailNow = try? tail(of: url, endingAt: end), tailNow == (entry.tails[number] ?? Data()) else {
                 return false
             }
         }
@@ -468,8 +478,9 @@ nonisolated enum UndoFoldCache {
         return UInt64(information.st_ino)
     }
 
-    /// The last bytes before a position in a file.
-    static func tail(of url: URL, endingAt end: Int) -> Data {
+    /// The last bytes before a position in a file. Throws when they cannot
+    /// be read (`UndoFileReads`).
+    static func tail(of url: URL, endingAt end: Int) throws -> Data {
         if end <= 0 {
             return Data()
         }
@@ -480,8 +491,12 @@ nonisolated enum UndoFoldCache {
             try? handle.close()
         }
         let start: Int = max(0, end - tailBytes)
-        try? handle.seek(toOffset: UInt64(start))
-        return handle.readData(ofLength: end - start)
+        do {
+            try handle.seek(toOffset: UInt64(start))
+        } catch {
+            throw UndoJournalError.couldNotRead
+        }
+        return try UndoFileReads.read(handle, upToCount: end - start)
     }
 
     /// How many complete lines of a segment this process has read: where

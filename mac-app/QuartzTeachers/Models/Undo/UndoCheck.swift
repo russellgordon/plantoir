@@ -131,7 +131,9 @@ nonisolated enum UndoCheck {
     /// Every file an undo (`.backward`) or a redo (`.forward`) of these ops
     /// would write, checked first and writing nothing: refused, naming the
     /// first page in the way and how many others, when ANY op's content is
-    /// neither as the step left it nor already where it is going.
+    /// neither as the step left it nor already where it is going, or is a
+    /// line that cannot be placed. Only when no page is in the way is a
+    /// blob missing from the list reported, as `contentMissing`.
     ///
     /// Ops on one file are applied to that file's text in turn (in reverse
     /// for an undo), so several lines on one page make one staged file.
@@ -155,6 +157,7 @@ nonisolated enum UndoCheck {
         var original: [String: UndoItem] = [:]
         var working: [String: UndoItem] = [:]
         var inTheWay: [String] = []
+        var missingContentPath: String? = nil
         var recomputes: [UndoOp] = []
 
         for op in ordered {
@@ -186,13 +189,31 @@ nonisolated enum UndoCheck {
                 continue
             }
             guard let moved = UndoCheck.moved(op, from: current, direction: direction, journal: journal) else {
-                return .refused(.contentMissing(path: path))
+                if kind == .editLine {
+                    // As the step left it, yet its line cannot be placed (the
+                    // front matter block it lives in is gone): the page was
+                    // changed by hand since, never content missing from the
+                    // list (ruling 13; the Fable sweep of U1, F2).
+                    if !inTheWay.contains(path) {
+                        inTheWay.append(path)
+                    }
+                    continue
+                }
+                // A blob the list no longer holds. The check goes on, so
+                // every page in the way is reported first.
+                if missingContentPath == nil {
+                    missingContentPath = path
+                }
+                continue
             }
             working[path] = moved
         }
 
         if let first = inTheWay.first {
             return .refused(.changedSince(firstPath: first, others: inTheWay.count - 1))
+        }
+        if let missingContentPath {
+            return .refused(.contentMissing(path: missingContentPath))
         }
 
         var targets: [UndoSwapTarget] = []
@@ -323,7 +344,10 @@ nonisolated enum UndoSwap {
         }
 
         // 1. Stage every new content beside its target.
+        var stagingIndex: Int = 0
         for target in targets {
+            let targetIndex: Int = stagingIndex
+            stagingIndex += 1
             originals.append(nil)
             guard let replacement = target.replacement else {
                 staged.append(nil)
@@ -346,12 +370,25 @@ nonisolated enum UndoSwap {
                     at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
                 )
                 try? FileManager.default.removeItem(at: stagedURL)
+                if UndoKillPoints.stagingWriteFailsAt?(targetIndex) == true {
+                    // As a full disk does: the exclusive create makes the
+                    // file, then writing into it fails.
+                    try UndoFiles.writeDurably(Data(), to: stagedURL, mode: mode)
+                    throw UndoJournalError.couldNotStoreContent(ENOSPC)
+                }
                 try UndoFiles.writeDurably(replacement, to: stagedURL, mode: mode)
                 staged.append(stagedURL)
             } catch {
+                // The exclusive create may have made the file before the
+                // write failed (the Fable sweep of U1, F1): it is this
+                // swap's own, so it goes with every other staged file.
+                // Staging writes a NEW file, which no other program can be
+                // holding, so this is never `fileIsInUse`: the disk is full
+                // or the folder will not take a new file.
+                _ = UndoSwap.removeStaged(stagedURL)
                 staged.append(nil)
                 tidy()
-                return .refused(.fileIsInUse(path: target.relativePath))
+                return .refused(.couldNotWrite(path: target.relativePath))
             }
         }
 
