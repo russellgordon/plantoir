@@ -125,10 +125,9 @@ public sealed class FolderIdentityFileTests : IDisposable
         // The W1 review's H1. Process 1 looks and finds the file damaged;
         // process 2 sets it aside and makes a good one, G; process 1 then
         // asks to set aside what it looked at. G is a different file, so it
-        // stays where it is. Before the fix SetAside compared the file with
-        // itself, moved G aside, and a third process (the seam) made H at the
-        // name, so the put-back failed and every step recorded under G could
-        // never reach the folder again.
+        // stays where it is (the seam, which would make a third file, never
+        // runs). Before the first fix SetAside compared the file with itself
+        // and moved G aside.
         Directory.CreateDirectory(Path.GetDirectoryName(IdPath)!);
         File.WriteAllText(IdPath, "not an identifier\n");
         FolderIdentityFile.Answer look = File_().Read();
@@ -140,7 +139,7 @@ public sealed class FolderIdentityFileTests : IDisposable
 
         string other = Guid.NewGuid().ToString("D");
         var late = new FolderIdentityFile(IdPath, new UndoTestClock(DateTimeOffset.UtcNow + TimeSpan.FromHours(1)),
-            afterMoveAside: () => File.WriteAllText(IdPath, other + "\n"));
+            betweenCheckAndRename: () => File.WriteAllText(IdPath, other + "\n"));
         late.SetAside(look.Inspected);
 
         Assert.Equal(good + "\n", File.ReadAllText(IdPath));
@@ -170,5 +169,35 @@ public sealed class FolderIdentityFileTests : IDisposable
         File.WriteAllText(IdPath, "x");
         // A new file under the same name (NTFS gives it a new index).
         Assert.NotEqual(first, FolderIdentityFile.FileIdentity(IdPath));
+    }
+
+    [Fact]
+    public void AFileSetAsideByAnotherProcessBetweenTheCheckAndTheRenameIsNeverTheGoodOne()
+    {
+        // The W1 review's second round. This process finds the file damaged,
+        // and finds it is still the file inspected; THEN (the seam) another
+        // process sets that same damaged file aside and makes a good one, G.
+        // What this process renames must be the file it inspected, wherever it
+        // now is, never G: the rename goes through the handle it compared.
+        Directory.CreateDirectory(Path.GetDirectoryName(IdPath)!);
+        File.WriteAllText(IdPath, "not an identifier\n");
+        FolderIdentityFile.Answer look = File_().Read();
+        Assert.Equal(FolderIdentityFile.Outcome.Unreadable, look.Outcome);
+
+        string good = Guid.NewGuid().ToString("D");
+        string theirs = IdPath + ".unreadable-" + Guid.NewGuid().ToString("D");
+        var racing = new FolderIdentityFile(IdPath, new UndoTestClock(DateTimeOffset.UtcNow + TimeSpan.FromHours(1)),
+            betweenCheckAndRename: () =>
+            {
+                File.Move(IdPath, theirs);
+                File.WriteAllText(IdPath, good + "\n");
+            });
+        racing.SetAside(look.Inspected);
+
+        Assert.Equal(good + "\n", File.ReadAllText(IdPath));
+        string[] aside = Directory.GetFiles(Path.GetDirectoryName(IdPath)!, "folder-id.unreadable-*");
+        Assert.Single(aside);
+        Assert.Equal("not an identifier\n", File.ReadAllText(aside[0]));
+        Assert.Equal(good, File_().ReadOrMake());
     }
 }

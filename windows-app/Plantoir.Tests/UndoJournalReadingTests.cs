@@ -266,4 +266,26 @@ public sealed class UndoJournalReadingTests : IDisposable
         using var me = System.Diagnostics.Process.GetCurrentProcess();
         Assert.False(UndoJournalChecks.RecoveryMaySettle(new UndoProcess("h", Environment.ProcessId, me.ProcessName, null)));
     }
+
+    /// <summary>
+    /// "Not there" and "could not tell" are different (the U2a read rule, the
+    /// W1 review's second round): a file where the list's folder or its
+    /// content folder should be is an error, never an empty list.
+    /// </summary>
+    [Fact]
+    public void AFolderOfTheListThatCannotBeListedIsNeverAnEmptyList()
+    {
+        string notAFolder = Path.Combine(_folder, "undo-is-a-file");
+        File.WriteAllText(notAFolder, "x");
+        Assert.False(Journal(notAFolder).Read().IsFresh);
+
+        Write(1, Begin(1) + "\n" + Applied(1) + "\n");
+        File.WriteAllText(Path.Combine(_folder, "content"), "x");
+        Assert.Throws<UndoListUnreadableException>(() => Journal().BlobsOnDisk());
+
+        // A folder that is simply not there is no segments and no blobs.
+        UndoJournal nowhere = Journal(Path.Combine(_folder, "not-there-either"));
+        Assert.True(nowhere.Read().IsFresh);
+        Assert.Empty(nowhere.BlobsOnDisk());
+    }
 }

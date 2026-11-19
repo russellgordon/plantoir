@@ -45,18 +45,18 @@ internal sealed class FolderIdentityFile
 
     private readonly TimeProvider _clock;
     private readonly Func<string, string, bool>? _hardLink;
-    private readonly Action? _afterMoveAside;
+    private readonly Action? _betweenCheckAndRename;
 
     /// <param name="path">The identifier file's full path.</param>
     /// <param name="clock">The clock "less than ten seconds ago" is judged by.</param>
     /// <param name="hardLink">A seam: link the first path's file onto the second name; false when the volume has no hard links. The real call by default.</param>
-    /// <param name="afterMoveAside">A seam for tests: runs just after a file is moved aside, where another process could make a new one at the name.</param>
-    internal FolderIdentityFile(string path, TimeProvider clock, Func<string, string, bool>? hardLink = null, Action? afterMoveAside = null)
+    /// <param name="betweenCheckAndRename">A seam for tests: runs after the file is found to be the one inspected and before it is renamed aside, where another process could set it aside and make a new one.</param>
+    internal FolderIdentityFile(string path, TimeProvider clock, Func<string, string, bool>? hardLink = null, Action? betweenCheckAndRename = null)
     {
         FilePath = path;
         _clock = clock;
         _hardLink = hardLink;
-        _afterMoveAside = afterMoveAside;
+        _betweenCheckAndRename = betweenCheckAndRename;
     }
 
     internal string FilePath { get; }
@@ -216,8 +216,8 @@ internal sealed class FolderIdentityFile
         try
         {
             if (FileIdentity(FilePath) != inspected) return null;   // another process replaced it: look again
+            _betweenCheckAndRename?.Invoke();
             File.Move(FilePath, aside, overwrite: false);
-            _afterMoveAside?.Invoke();
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }

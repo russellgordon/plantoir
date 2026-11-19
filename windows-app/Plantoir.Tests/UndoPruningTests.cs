@@ -131,23 +131,40 @@ public sealed class UndoPruningTests
     }
 
     /// <summary>
-    /// The W1 review's M4. A step whose madeAt is not the journal's spelling
-    /// (an offset instead of Z) is unreadable. It takes its begin line's `at`
-    /// as its time, else the clock, never the oldest moment there is: so it
-    /// stands as a barrier (Undo not available) and is not pruned for age.
+    /// The W1 review's M4, settled as the Mac reads it (second round). A
+    /// madeAt with an offset is a moment, read as the Mac's UndoMoment reads
+    /// any ISO 8601 moment; one that is not a moment makes the step unreadable
+    /// and gives it no time of its own: it carries the previous step's time,
+    /// or none, and a step with no time never ages out (nor does anything
+    /// after it take the clock as its time).
     /// </summary>
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AStepWhoseMadeAtCannotBeReadTakesItsBeginTimeAndStandsAsABarrier(bool beginHasAnAt)
+    [Fact]
+    public void AMadeAtWithAnOffsetIsAMomentAsOnTheMac()
     {
-        string at = beginHasAnAt ? $",\"at\":\"{Moment(2)}\"" : "";
-        string begin = $"{{\"v\":1,\"seq\":1,\"event\":\"begin\"{at},\"process\":{{\"pid\":1}}," +
+        Assert.Equal(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero), UndoMoment.Parse("2026-11-12T12:00:00+00:00"));
+        Assert.Equal(new DateTimeOffset(2026, 11, 12, 12, 0, 0, TimeSpan.Zero), UndoMoment.Parse("2026-11-12T07:00:00-05:00"));
+        Assert.Equal(new DateTimeOffset(2026, 11, 12, 12, 0, 0, 500, TimeSpan.Zero), UndoMoment.Parse("2026-11-12T13:00:00.5+01:00"));
+        Assert.Null(UndoMoment.Parse("2026-11-12T12:00:00"));   // a local time is not a moment
+        string begin = $"{{\"v\":1,\"seq\":1,\"event\":\"begin\",\"process\":{{\"pid\":1}}," +
                        $"\"step\":{{\"seq\":1,\"madeAt\":\"2026-11-12T12:00:00+00:00\",\"ops\":[]}}}}";
         UndoFolded folded = Fold((1, begin), (1, Event(1, "applied", 2)));
-        UndoOffered offered = UndoLimits.Offer(folded, Now, _ => false, _ => true);
-        Assert.Equal(UndoAnswerKind.NotAvailable, offered.Undo.Kind);
-        Assert.Empty(UndoPruning.Decide(Fresh(folded), Now, _ => false));
-        Assert.Equal(beginHasAnAt ? Now - TimeSpan.FromDays(2) : Now, UndoLimits.StepTimes(folded, Now)[1]);
+        Assert.True(folded.Steps[1].Readable);
+        Assert.Equal(1, UndoLimits.Offer(folded, Now, _ => false, _ => true).Undo.Seq);
+    }
+
+    [Fact]
+    public void AStepWhoseMadeAtIsNotAMomentHasNoTimeOfItsOwn()
+    {
+        string Garbled(long seq) => $"{{\"v\":1,\"seq\":{seq},\"event\":\"begin\",\"process\":{{\"pid\":1}}," +
+                                    $"\"step\":{{\"seq\":{seq},\"madeAt\":\"not a moment\",\"ops\":[]}}}}";
+
+        // First on the list: no time at all, so it never ages out; it stands as a barrier and is not pruned.
+        UndoFolded alone = Fold((1, Garbled(1)), (1, Event(1, "applied", 2)));
+        Assert.Equal(UndoAnswerKind.NotAvailable, UndoLimits.Offer(alone, Now, _ => false, _ => true).Undo.Kind);
+        Assert.Empty(UndoPruning.Decide(Fresh(alone), Now, _ => false));
+
+        // And it lends the clock to nothing after it: a step 61 days old behind it ages out as its own time says.
+        UndoFolded behind = Fold((1, Garbled(1)), (1, Event(1, "applied", 61)), (1, Begin(2, 61)), (1, Event(2, "applied", 61)));
+        Assert.Equal(UndoAnswerKind.Nothing, UndoLimits.Offer(behind, Now, _ => false, _ => true).Undo.Kind);
     }
 }
