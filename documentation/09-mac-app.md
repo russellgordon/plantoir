@@ -20084,8 +20084,13 @@ repetitive animations".
   the number field beside it is labelled.
 - **Placeholders are not names.** A `TextField("Filter", …)` shows its title
   as placeholder text, which assistive apps read as a placeholder, not as
-  the field's name; the sidebar's filter field and the Class Dates sheet's
-  "Where these came from" field are labelled with those same words.
+  the field's name (measured: such a field reads with no description); the
+  sidebar's filter field, the Class Dates sheet's "Where these came from"
+  field and Publish Pages' Find a Page field are labelled with those same
+  words. Other placeholder-only fields remain (the assistant's composer,
+  Class Dates' Google Sheet link, the sidebar's course-code rename field,
+  Course Settings' folder path, the list editor's New name, the console's
+  answer fields); they are listed on #993 for the next pass.
 - **Decorative icons are hidden.** An `info.circle` (or the token notice's
   triangle) beside a sentence that says everything is `accessibilityHidden`,
   so VoiceOver reads the sentence alone.
@@ -20115,21 +20120,28 @@ repetitive animations".
   `vm-tools/reference/993-about-window-design.md`.
 - **Tests read what the app exposes.** `AccessibilityTreeTests` hosts the
   real views (the tab bar, the emoji field, Add a Section, the Class Dates
-  sheet, the page picker sheet, the spinner, a status sentence) in an
-  off-screen window and reads the tree AppKit hands an assistive app,
-  through `NSAccessibilityProtocol` from the hosting view down
-  (`AccessibilityTree`, in the test target): each element's role, label,
-  title and identifier. A name that is missing, or a control that says its
-  name twice, fails there, which reading the source cannot show (the
-  doubled stepper passed every source check). `AccessibilityNamesTests`
-  still reads the view source for controls deep inside views that need a
-  whole window to draw (the sidebar's filter field, the wizard, Course
-  Settings, the send button), looking for the naming modifier on the line
-  above the control's identifier; those are checks that a name is given,
-  not of what VoiceOver hears. The first review's outside reader of an
-  isolated debug build (`AXUIElement`, `vm-tools/reference/993-review-1/
-  ax993tools`) is the same idea from outside the process; inside the test
-  host no permission is needed.
+  sheet, the Publish Pages picker, the spinner, a stopping sentence) in an
+  off-screen window with a title of its own, and reads that window through
+  the accessibility API an assistive app uses (`AXUIElement`, on the test
+  host's own process, so no permission is asked): each element's role,
+  identifier, description and title (`AccessibilityTree`, in the test
+  target). A control with no name, or one name said twice, fails there,
+  which reading the source cannot show: SwiftUI joins a control's own title
+  and a label of the same words into one description ("Section number,
+  Section number"), and with the stepper's extra label put back
+  `testAddASectionNamesTheNumberOnce` fails. `testTheReaderCatchesADoubled
+  AndAMissingName` proves the reader sees both faults, so a reader that
+  found nothing cannot pass the rest. AppKit's own `NSAccessibility` methods
+  on the hosting view are no substitute: measured on 2026-11-19, a SwiftUI
+  hosting view answers them with one childless group until a client asks
+  through the API. `AccessibilityNamesTests` still reads the view source
+  for controls deep inside views that need a whole window to draw (the
+  wizard, Course Settings, the send button, the sidebar's filter field),
+  looking for the naming modifier on the line above the control's
+  identifier; those check that a name is given, not what VoiceOver hears.
+  The first review's outside reader of an isolated debug build
+  (`vm-tools/reference/993-review-1/ax993tools`) is the same idea from
+  outside the process.
 
 **For Windows:** each name here has a WinUI counterpart in
 `AutomationProperties.Name`; stage 3 of #975 mirrors this piece.
