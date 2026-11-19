@@ -13194,9 +13194,27 @@ what is imported).
   upgrade over 1.9.3, a section 1.9.3 already built keeps its old mirror,
   which has no module copies (run C below fails there, `ERR_DLOPEN_FAILED`);
   in that folder the copy beside `node.exe`, on the PATH the launchers set,
-  is the one found (run D). So neither place alone covers every teacher: the
-  module copies cover any Node however started and an older System32 copy,
-  the `node.exe` copy covers mirrors made before this change.
+  is the one found (run D). So neither place alone covered every teacher:
+  the module copies cover any Node however started and an older System32
+  copy, the `node.exe` copy covered mirrors made before this change.
+- **An upgraded mirror gains the module copies (#1006).** Since #1006 every
+  build on Windows brings each file in `windowsNodeVcRuntime` → `files` into
+  an EXISTING mirror at each `besideModules` folder under
+  `quartz\node_modules`, as a hardlink to the runtime's copy (a copy if the
+  link is refused), replacing a different file of that name and touching
+  nothing else (`build_site.py` → `ensure_node_dependencies`, in the ALWAYS
+  path; `toolchain_paths.bring_module_libraries_into_mirror`). So a section
+  1.9.3 built has the copies beside its modules from its first build under
+  the new app, and an older `vcruntime140.dll` in System32 no longer comes
+  before them there. It is a few stats per build, not a remade mirror
+  (remaking it would walk the whole `node_modules` tree, tens of thousands of
+  files, on every build), and it does nothing off Windows, where
+  `node_modules` is a symlink to the image's own and no copies exist. It
+  never stops a build: a runtime without the copies, a mirror without a
+  module's folder, or an unreadable contract leaves the mirror as it is.
+  Pinned by `scripts/test_mirror_module_libraries.py` (a mirror laid out as
+  1.9.3 left it gains both copies through the build's own dependency step).
+  The `node.exe` copy stays beside them.
 - `THIRD_PARTY_LICENSES.md` has the licence row (Microsoft's redistributable
   code terms; the file is on the list an application may carry).
 - `NativeModuleImportsTests`: every `.node` file in a fetched runtime, and
@@ -13264,9 +13282,10 @@ A shows Node does not look beside `node.exe` for a module's libraries;
 C and E show what the mirror changes. On the PC, `fetch-runtime.ps1` at this
 branch repaired the runtime fetched by the first version in place (manifest
 `nodeVcRuntimeLayout` `beside-node-and-modules`, all three copies the
-contract's SHA-256); whether `publish.ps1 -WithoutAssistantEngine`
-(unsigned, nothing uploaded) carried all three into the published `runtime`
-was still running when this was written. Not
+contract's SHA-256), and `publish.ps1 -WithoutAssistantEngine` (unsigned,
+nothing uploaded) carried all three into the published `runtime`, each with
+the contract's hash (PC run `965-finish`, which also ran the unit suite:
+4,370 passed, exactly the six known failures, 2 skipped). Not
 proven: an end-to-end rehearsal PASSED, which needs a signed candidate build
 (Edge holds an unsigned branch build at "isn't commonly downloaded"); and a
 PC whose System32 has an OLDER `vcruntime140.dll` than 14.51, where the copy
