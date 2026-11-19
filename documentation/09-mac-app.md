@@ -9166,9 +9166,15 @@ own "vault not found"); registering under a running Obsidian (the addition is
 lost when it quits); folding the question into the add-ons offer (Not Now
 opens Obsidian too, so all three answers would have to carry the closing).
 
-**Left as it was, for Russell:** the reopen question's "Reopen Obsidian"
-button (#995's morning question). The trail event "asked to close Obsidian to
-open a course" is held open on Windows in `NamedGapLedger.cs`, owned by #1003.
+**Ruled since (Russell, 2026-11-19, on #995):** the reopen question's button
+is "Close and Reopen Obsidian" (`obsidianAddOnsForFigures.wording.reopen`,
+changed on both apps under #1003), and an answer that cannot finish shows an
+alert, "Could not open {course} in Obsidian", one sentence and OK
+(`obsidianNeverClosedUnasked.couldNotOpen`). Windows shows that alert since
+#1003; **the mac does not yet**, and still writes only the trail line. Windows
+records the trail event since #1003 (its `NamedGapLedger.cs` entry is gone):
+`documentation/12-windows-app.md` → "Windows never closes Obsidian unasked
+(#1003)".
 
 ## Open in Obsidian opens the page the preview shows (#518)
 

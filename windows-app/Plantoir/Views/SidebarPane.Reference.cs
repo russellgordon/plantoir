@@ -253,9 +253,10 @@ public sealed partial class SidebarPane
             if (chosen != ContentDialogResult.Primary) return;
             RememberNoteShown(course);
         }
-        await FolderActions.OpenInObsidian(revealFolder, course.DirectoryPath,
-            BundledToolchain.SupportPath("obsidian_defaults/.obsidian"), (answer as PreviewedPageSource.Page)?.File);
-        report?.TrySetResult(new OpenInObsidianPress.Opened(answer));
+        // Through the closing question (#1003, the mac's #995): a course a
+        // running Obsidian has never seen is added only once the teacher
+        // agrees to close it. The route says what the press came to.
+        await ObsidianRoute().OpenWithoutTheScanAsync(course, revealFolder, (answer as PreviewedPageSource.Page)?.File, answer, report);
     }
 
     // ---- Picking a school year -------------------------------------------------

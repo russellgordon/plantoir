@@ -880,9 +880,11 @@ public sealed partial class CourseSettingsView : UserControl
             howITeachProblem.Text = problem ?? "";
             howITeachProblem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             howITeachButton.Content = HowITeachSettingsRow.ButtonFor(_course.DirectoryPath);
+            // Through the window's route and its closing question (#1003): a
+            // course Obsidian has never seen is added only once the teacher
+            // agrees to close Obsidian.
             if (page is not null)
-                _ = FolderActions.OpenInObsidian(_course.DirectoryPath, _course.DirectoryPath,
-                    BundledToolchain.SupportPath("obsidian_defaults/.obsidian"), page);
+                _window.SidebarPane.OpenHowITeachPageInObsidian(_course, page);
         };
         howITeachRow.Children.RemoveAt(1);
         howITeachRow.Children.Add(howITeachButton);
