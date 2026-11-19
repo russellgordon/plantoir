@@ -13869,8 +13869,15 @@ It owes, in this order (the contract review's recommendation):
    reasons (`ERROR_DISK_FULL`, `ERROR_ACCESS_DENIED` on a read-only
    folder), and a `FileStream` opened with `FileMode.CreateNew` leaves its
    file behind exactly as the mac's exclusive create did: delete it in the
-   catch. A failure at the swap itself (keeping the original, or the
-   rename onto the target) stays `fileIsInUse`, as on the mac.
+   catch. Keeping the original is `couldNotWrite` too when it fails for
+   room or permission (on the mac a volume without hard links copies it);
+   any other failure at the swap (keeping the original, or the rename
+   onto the target) stays `fileIsInUse`. A `couldNotWrite` swap during
+   recovery is retried on the same schedule as a file in use. A file of
+   the list that exists and cannot be opened or read throws: only a file
+   that is GONE (`FileNotFoundException`, a segment pruned since it was
+   listed) is passed over, and a blob that cannot be read is never
+   `contentMissing` (which clears the list).
    Every read of the list must throw rather than crash, and a throw is an
    unreadable list for that attempt (shadow goes ahead, live refuses
    before anything changes; the mac's F4).

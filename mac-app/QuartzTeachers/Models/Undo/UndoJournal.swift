@@ -228,13 +228,15 @@ nonisolated final class UndoJournal: @unchecked Sendable {
             return
         }
         let url: URL = segmentURL(number: last)
-        guard let handle = try? FileHandle(forUpdating: url) else {
+        // Gone since it was listed (pruned): nothing to cut. Any other
+        // failure to open it is an unreadable list (the review of U2a).
+        guard let handle = try UndoFileReads.openFile(url, forUpdating: true) else {
             return
         }
         defer {
             try? handle.close()
         }
-        let size: UInt64 = try handle.seekToEnd()
+        let size: UInt64 = try UndoFileReads.size(of: handle)
         if size == 0 {
             return
         }
@@ -279,7 +281,18 @@ nonisolated final class UndoJournal: @unchecked Sendable {
     /// A blob's bytes, or nil when it is missing or does not hash to its own
     /// name.
     func readBlob(sha: String) -> Data? {
-        guard let data = try? Data(contentsOf: blobURL(sha: sha)) else {
+        guard let found = try? blobContent(sha: sha) else {
+            return nil
+        }
+        return found
+    }
+
+    /// A blob's bytes, nil when it is missing or does not hash to its own
+    /// name, and a throw (`couldNotRead`) when it is there and cannot be
+    /// read: content missing can never come back, so it clears the list,
+    /// and a read error can, so it must not (the review of U2a).
+    func blobContent(sha: String) throws -> Data? {
+        guard let data = try UndoFileReads.readWhole(blobURL(sha: sha)) else {
             return nil
         }
         if UndoHash.sha256(of: data) != sha {
@@ -373,10 +386,19 @@ nonisolated enum UndoFoldCache {
         for number in numbers {
             let from: Int = entry.ends[number] ?? 0
             let url: URL = journal.segmentURL(number: number)
-            guard let handle = try? FileHandle(forReadingFrom: url) else {
+            // Only a segment that is gone (pruned by another process since
+            // it was listed) is passed over; one that cannot be opened or
+            // measured is an unreadable list (the review of U2a, MEDIUM).
+            guard let handle = try UndoFileReads.openFile(url) else {
                 continue
             }
-            let size: UInt64 = (try? handle.seekToEnd()) ?? 0
+            let size: UInt64
+            do {
+                size = try UndoFileReads.size(of: handle)
+            } catch {
+                try? handle.close()
+                throw error
+            }
             if Int(size) <= from {
                 try? handle.close()
                 entry.fold.segmentsSeen.insert(number)
@@ -484,7 +506,9 @@ nonisolated enum UndoFoldCache {
         if end <= 0 {
             return Data()
         }
-        guard let handle = try? FileHandle(forReadingFrom: url) else {
+        // Gone: no bytes, which never matches what was remembered, so the
+        // fold is read whole again. Any other failure throws.
+        guard let handle = try UndoFileReads.openFile(url) else {
             return Data()
         }
         defer {
@@ -743,6 +767,69 @@ nonisolated enum UndoFileReads {
 
     // MARK: - Functions
 
+    /// A file of the list opened for reading (or for updating), or nil
+    /// ONLY when it is gone: a segment pruned by another process, a blob
+    /// never stored. Every other failure (a failing disk, a permission, too
+    /// many open files) throws `couldNotRead`, because a file passed over
+    /// as if it were gone makes a list that reads as valid and is not (the
+    /// review of U2a: a fold missing its newest segment reuses step numbers
+    /// and lets Undo act on an older step past a newer one).
+    static func openFile(_ url: URL, forUpdating: Bool = false) throws -> FileHandle? {
+        if UndoKillPoints.openFails?(url) == true {
+            throw UndoJournalError.couldNotRead
+        }
+        var failure: Int32 = 0
+        let descriptor: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                failure = ENOENT
+                return -1
+            }
+            // Opening for updating is a writer (the torn-line cut truncates), and
+            // the writer scan counts it on this line.
+            let opened: Int32 = forUpdating ? open(path, O_RDWR | O_CLOEXEC) : open(path, O_RDONLY | O_CLOEXEC)
+            if opened < 0 {
+                failure = errno
+            }
+            return opened
+        }
+        if descriptor < 0 {
+            if failure == ENOENT || failure == ENOTDIR {
+                return nil
+            }
+            throw UndoJournalError.couldNotRead
+        }
+        return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    }
+
+    /// Where the end of an open file is, as a throw when it cannot be found.
+    static func size(of handle: FileHandle) throws -> UInt64 {
+        do {
+            return try handle.seekToEnd()
+        } catch {
+            throw UndoJournalError.couldNotRead
+        }
+    }
+
+    /// The whole of a small file of the list (a blob, an identifier file),
+    /// or nil when it is gone. Throws when it is there and cannot be read.
+    static func readWhole(_ url: URL) throws -> Data? {
+        guard let handle = try openFile(url) else {
+            return nil
+        }
+        defer {
+            try? handle.close()
+        }
+        var data: Data = Data()
+        while true {
+            let chunk: Data = try read(handle, upToCount: 1_048_576)
+            if chunk.isEmpty {
+                break
+            }
+            data.append(chunk)
+        }
+        return data
+    }
+
     /// Up to `count` bytes from where the handle stands; empty at the end.
     static func read(_ handle: FileHandle, upToCount count: Int) throws -> Data {
         if UndoKillPoints.readOfTheListFails?() == true {
@@ -875,7 +962,10 @@ nonisolated enum UndoIdentifierFile {
     // MARK: - Functions
 
     static func readOrCreate(at url: URL) throws -> String {
-        if let existing = read(at: url) {
+        // A file that is there and cannot be read (not one that holds no
+        // identifier) is never set aside: a new identifier would put every
+        // step under the old one out of reach for good (the review of U2a).
+        if let existing = try readStrictly(at: url) {
             return existing
         }
         let folder: URL = url.deletingLastPathComponent()
@@ -931,7 +1021,16 @@ nonisolated enum UndoIdentifierFile {
     /// The identifier, lower case, or nil when the file is missing or does
     /// not hold one.
     static func read(at url: URL) -> String? {
-        guard let data = try? Data(contentsOf: url) else {
+        guard let found = try? readStrictly(at: url) else {
+            return nil
+        }
+        return found
+    }
+
+    /// The identifier, lower case, or nil when the file is missing or does
+    /// not hold one; a throw when it is there and cannot be read.
+    static func readStrictly(at url: URL) throws -> String? {
+        guard let data = try UndoFileReads.readWhole(url) else {
             return nil
         }
         var text: String = String(decoding: data, as: UTF8.self)

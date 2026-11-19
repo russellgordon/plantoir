@@ -828,7 +828,7 @@ nonisolated enum UndoKillPoints {
 
     /// Answers true to make opening this file of the list (a segment, a
     /// blob, or a working folder's identifier file) fail as a failing disk,
-    /// a permission or too many open files does (`UndoFileReads.open`):
+    /// a permission or too many open files does (`UndoFileReads.openFile`):
     /// never as a file that is gone. Set only by tests.
     nonisolated(unsafe) static var openFails: ((URL) -> Bool)?
 
