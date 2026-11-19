@@ -188,10 +188,11 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
     }
 
-    /// And when something now holds its place, both are left as they are,
-    /// the folder aside and whole, never deleted; the tidying counts that as
-    /// done, so it is not looked at again at every lock.
-    func testAFolderSetAsideIsLeftWhenItsPlaceIsTaken() throws {
+    /// Russell's ruling of 2026-11-19: when something now holds its place,
+    /// the folder set aside is renamed to a visible name beside it, whole,
+    /// never merged or overwritten, and the trail is told before the
+    /// rename. FAILED on 5c55a7d7d, which left it hidden for good.
+    func testAFolderSetAsideIsKeptUnderAVisibleNameWhenItsPlaceIsTaken() throws {
         let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
         let folder: URL = root.appendingPathComponent("made", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -199,11 +200,117 @@ final class UndoOpKindsTests: XCTestCase {
         let aside: URL = UndoSwap.besideURL(for: folder, label: "5-undo", role: "orig")
         XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("other\n".utf8).write(to: folder.appendingPathComponent("other.md"))
+
+        var found: [UndoAsideFolder] = []
+        var asideWhenTold: Bool = false
+        XCTAssertTrue(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder], onAside: { told in
+            found.append(told)
+            asideWhenTold = FileManager.default.fileExists(atPath: aside.path)
+        }))
+
+        let kept: URL = root.appendingPathComponent("made (kept by Undo)")
+        XCTAssertEqual(try Data(contentsOf: kept.appendingPathComponent("a.md")), Data("kept\n".utf8))
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("other.md")), Data("other\n".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
+        XCTAssertEqual(found.count, 1)
+        XCTAssertEqual(found.first?.keptAs?.lastPathComponent, "made (kept by Undo)")
+        XCTAssertTrue(asideWhenTold, "the trail is told before the rename")
+        XCTAssertEqual(UndoContractKinds.stagedLeftovers(in: root), [])
+    }
+
+    /// And when that visible name is taken too, the next number is used,
+    /// never the taken one.
+    func testAVisibleNameThatIsTakenIsNeverUsed() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let folder: URL = root.appendingPathComponent("made", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("kept\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        let aside: URL = UndoSwap.besideURL(for: folder, label: "5-undo", role: "orig")
+        XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let taken: URL = root.appendingPathComponent("made (kept by Undo)")
+        try FileManager.default.createDirectory(at: taken, withIntermediateDirectories: true)
+        try Data("earlier\n".utf8).write(to: taken.appendingPathComponent("e.md"))
 
         XCTAssertTrue(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder]))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: aside.appendingPathComponent("a.md").path))
 
-        XCTAssertEqual(try Data(contentsOf: aside.appendingPathComponent("a.md")), Data("kept\n".utf8))
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("made (kept by Undo 2)/a.md")), Data("kept\n".utf8))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: taken.path), ["e.md"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
+    }
+
+    /// The fourth review of U2b, LOW 3: a place that cannot be read now is
+    /// not "something else holds it". The folder is left as it is, nothing
+    /// is said, and a later try looks again. FAILED on 5c55a7d7d, which
+    /// said something else held the place.
+    func testAFolderWhosePlaceCannotBeReadIsLeftForALaterTry() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let parent: URL = root.appendingPathComponent("unit", isDirectory: true)
+        let folder: URL = parent.appendingPathComponent("made", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("kept\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        let aside: URL = UndoSwap.besideURL(for: folder, label: "5-undo", role: "orig")
+        XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
+        // Something unreadable now holds its place: a folder that cannot be listed.
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: folder.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        }
+        guard UndoTreeReading.read(at: folder) == .cannotRead else {
+            throw XCTSkip("this account can read a folder with no permissions")
+        }
+
+        var found: [UndoAsideFolder] = []
+        XCTAssertFalse(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder], onAside: { told in found.append(told) }))
+
+        XCTAssertEqual(found, [], "nothing untrue is said")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: aside.appendingPathComponent("a.md").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: parent.appendingPathComponent("made (kept by Undo)").path))
+    }
+
+    /// The fourth review of U2b, MEDIUM: a folder a swap took out is renamed
+    /// to its `-gone` name before it is deleted, so a delete cut short is
+    /// finished by recovery's tidying, never put back half empty. FAILED on
+    /// 5c55a7d7d, which deleted the `-orig` folder in place.
+    func testAFolderWhoseDeleteIsCutShortIsFinishedNeverPutBack() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let folder: URL = root.appendingPathComponent("made", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("sub"), withIntermediateDirectories: true)
+        try Data("A\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        try Data("B\n".utf8).write(to: folder.appendingPathComponent("sub/b.md"))
+        guard case .tree(let listing, _) = UndoTreeReading.read(at: folder) else {
+            return XCTFail("the folder could not be listed")
+        }
+        let targets: [UndoSwapTarget] = [
+            UndoSwapTarget(url: folder, relativePath: "made", change: .takeTree(listingSha: listing.sha)),
+        ]
+        var named: [String] = []
+        UndoKillPoints.hook = { point in
+            if point == .whileDeletingAFolder {
+                // As a recursive delete that died part way would leave it.
+                if let names = try? FileManager.default.contentsOfDirectory(atPath: root.path) {
+                    named = names
+                    for name in names where name.hasSuffix("-gone") {
+                        try? FileManager.default.removeItem(at: root.appendingPathComponent(name).appendingPathComponent("a.md"))
+                    }
+                }
+                return true
+            }
+            return false
+        }
+        defer {
+            UndoKillPoints.hook = nil
+        }
+        XCTAssertEqual(UndoSwap.swap(targets, label: "9-apply"), .stoppedByATest)
+        UndoKillPoints.hook = nil
+        XCTAssertEqual(named, [".made.plantoir-undo-9-apply-gone"])
+
+        XCTAssertTrue(UndoSwap.tidyLeftovers(label: "9-apply", beside: [folder], asideListings: [folder.standardizedFileURL.path: listing.sha]))
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path), "never put back half deleted")
+        XCTAssertEqual(UndoContractKinds.stagedLeftovers(in: root), [])
     }
 
     /// The director's rule after U2b's third review (probe D), replacing
@@ -251,6 +358,71 @@ final class UndoOpKindsTests: XCTestCase {
         let names: [String] = try FileManager.default.contentsOfDirectory(atPath: root.path)
         XCTAssertEqual(names, ["made"], "put back in its own place, under its own name")
         XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("a.md")), Data("kept\n".utf8))
+    }
+
+    /// The fourth review of U2b, LOW 6: nothing is STAGED through a link
+    /// that leaves the working folder, even when the plan was made before
+    /// the link. Stopped just before the first swap, the swap would have
+    /// left its staged file outside. FAILS with the staging check taken out
+    /// (it answers stoppedByATest, a staged file in the outside folder).
+    func testNothingIsStagedThroughALinkThatLeavesTheWorkingFolder() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let outside: URL = scratchURL.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try Data("old\n".utf8).write(to: outside.appendingPathComponent("page.md"))
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("linked"), withDestinationURL: outside)
+        let targets: [UndoSwapTarget] = [
+            UndoSwapTarget(url: root.appendingPathComponent("linked/page.md"), relativePath: "linked/page.md", expected: Data("old\n".utf8), replacement: Data("new\n".utf8)),
+        ]
+        UndoKillPoints.hook = { point in point == .beforeSwap(0) }
+        defer {
+            UndoKillPoints.hook = nil
+        }
+
+        XCTAssertEqual(UndoSwap.swap(targets, label: "7-apply", root: root), .refused(.changedSince(firstPath: "linked/page.md", others: 0)))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), ["page.md"])
+    }
+
+    /// LOW 6: recovery's tidying never removes a staged-looking file through
+    /// a link that leaves the working folder. FAILS with the tidy's check
+    /// taken out (the outside file is deleted).
+    func testTheTidyingNeverReachesThroughALinkOutside() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let outside: URL = scratchURL.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let outsideFile: URL = outside.appendingPathComponent(".page.md.plantoir-undo-7-apply-new")
+        try Data("not the list's\n".utf8).write(to: outsideFile)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("linked"), withDestinationURL: outside)
+
+        _ = UndoSwap.tidyLeftovers(label: "7-apply", beside: [root.appendingPathComponent("linked/page.md")], root: root)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outsideFile.path))
+    }
+
+    /// LOW 6: a re-derivation never runs a maintainer on a place through a
+    /// link that leaves the working folder. FAILS with the re-derivation's
+    /// check taken out (the runner is called).
+    func testARederivationNeverRunsThroughALinkOutside() async throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let outside: URL = scratchURL.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("linked"), withDestinationURL: outside)
+        let calls: UndoRunnerCalls = UndoRunnerCalls()
+        UndoMaintainers.register("containmentTestMaintainer") { op, _ in
+            calls.note(op.path ?? "")
+        }
+        defer {
+            UndoMaintainers.forget("containmentTestMaintainer")
+        }
+        let inside: UndoOp = UndoOp.recompute(path: "index.md", maintainer: "containmentTestMaintainer", section: 1)
+        let throughTheLink: UndoOp = UndoOp.recompute(path: "linked/index.md", maintainer: "containmentTestMaintainer", section: 1)
+
+        await UndoMaintainers.rederive([throughTheLink, inside], root: root)
+
+        XCTAssertEqual(calls.paths, ["index.md"])
     }
 
     /// The director's ruling on U2b's review: a page that cannot be read
@@ -388,6 +560,34 @@ final class UndoMainThreadFlag: @unchecked Sendable {
     func record(_ onMain: Bool) {
         guardLock.lock()
         seen = onMain
+        guardLock.unlock()
+    }
+}
+
+/// What a test runner was called with, from whichever actor it runs on.
+final class UndoRunnerCalls: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    private let guardLock: NSLock = NSLock()
+
+    private var notedPaths: [String] = []
+
+    // MARK: - Computed properties
+
+    var paths: [String] {
+        guardLock.lock()
+        defer {
+            guardLock.unlock()
+        }
+        return notedPaths
+    }
+
+    // MARK: - Functions
+
+    func note(_ path: String) {
+        guardLock.lock()
+        notedPaths.append(path)
         guardLock.unlock()
     }
 }

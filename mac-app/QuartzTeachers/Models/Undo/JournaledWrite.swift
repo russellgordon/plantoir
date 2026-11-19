@@ -1059,6 +1059,12 @@ nonisolated enum UndoKillPoint: Equatable, Sendable {
     case beforeUndone
     case afterRedoing
     case beforeRedone
+    /// A swap that took a folder out has renamed it to its `-gone` name
+    /// and has not finished deleting it.
+    case whileDeletingAFolder
+    /// Recovery has tidied what a dead process left (a folder put back or
+    /// kept under a visible name) and has written nothing to the list yet.
+    case afterRecoveryTidied
 }
 
 nonisolated enum UndoKillPoints {
@@ -1127,11 +1133,12 @@ nonisolated enum UndoTrailHook {
     /// back and how many were in the way. The list was cleared.
     nonisolated(unsafe) static var interruptedLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ putBack: Int, _ inTheWay: Int) -> Void)?
 
-    /// Recovery found a teacher's folder set aside by a dead process: put
-    /// back in its place though it changed while aside (with what changed),
-    /// or left aside because something else now holds its place (both
-    /// named). The course and section, its place, its hidden name.
-    nonisolated(unsafe) static var foundAFolderSetAsideLine: ((_ course: String, _ section: Int?, _ place: String, _ hiddenName: String, _ putBack: Bool, _ changes: String) -> Void)?
+    /// Recovery found a teacher's folder set aside by a dead process and is
+    /// about to put it back in its place though it changed while aside
+    /// (with what changed; `keptAs` nil), or to keep it under the visible
+    /// name `keptAs` beside its place because something else now holds
+    /// that place. The course and section, its place, its hidden name.
+    nonisolated(unsafe) static var foundAFolderSetAsideLine: ((_ course: String, _ section: Int?, _ place: String, _ hiddenName: String, _ keptAs: String?, _ changes: String) -> Void)?
 
     // MARK: - Functions
 

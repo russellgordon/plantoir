@@ -1175,6 +1175,7 @@ nonisolated enum UndoContractReplay {
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
         "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace", "nextWrite", "ordinaryWriteOn",
+        "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1349,12 +1350,36 @@ nonisolated enum UndoContractReplay {
             if testCase["somethingInItsPlace"] as? Bool == true {
                 try write("someone else's\n", to: UndoContractKinds.extraFolder + "/other.md", in: root)
             }
+            if testCase["halfDeleteTheGoneFolder"] as? Bool == true {
+                // As a delete that died part way leaves the folder it renamed
+                // to its `-gone` name: one of its files already gone.
+                let parentFolder: URL = root.appendingPathComponent(UndoContractKinds.extraFolder).deletingLastPathComponent()
+                var halfDeleted: Bool = false
+                for name in (try? FileManager.default.contentsOfDirectory(atPath: parentFolder.path)) ?? [] where name.hasSuffix("-gone") {
+                    try FileManager.default.removeItem(at: parentFolder.appendingPathComponent(name).appendingPathComponent("a.md"))
+                    halfDeleted = true
+                }
+                if !halfDeleted {
+                    failures.append("recoveryCases '\(name)': no folder under its -gone name to half delete")
+                }
+            }
+            if testCase["visibleNameTaken"] as? Bool == true {
+                try write("earlier\n", to: UndoContractKinds.extraFolder + " (kept by Undo)/earlier.md", in: root)
+            }
             if testCase["deployBeforeRecovery"] as? Bool == true {
                 // A deploy wrote a new marker in the place the move emptied.
                 try? FileManager.default.removeItem(at: root.appendingPathComponent(UndoContractKinds.markerFrom))
                 try write(UndoContractKinds.newMarker, to: UndoContractKinds.markerFrom, in: root)
             }
             _ = takeTheRederived()
+            var folderLines: Int = 0
+            let trailHookBefore = UndoTrailHook.foundAFolderSetAsideLine
+            UndoTrailHook.foundAFolderSetAsideLine = { _, _, _, _, _, _ in
+                folderLines += 1
+            }
+            defer {
+                UndoTrailHook.foundAFolderSetAsideLine = trailHookBefore
+            }
 
             // Another process, which sees the first as gone, runs recovery.
             let survivor: UndoJournal = UndoJournal(
@@ -1391,6 +1416,17 @@ nonisolated enum UndoContractReplay {
             } else if mode == .live {
                 // As the app recovers: under the lock, then the re-derivation
                 // of what it settled, awaited outside it.
+                if testCase["recoveryStopsAfterTheTidy"] as? Bool == true {
+                    // A recovery that dies once it has tidied, before it
+                    // writes to the list; then the next one.
+                    UndoKillPoints.hook = { point in point == .afterRecoveryTidied }
+                    await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in reachable ? root : nil }, places: places)
+                    UndoKillPoints.hook = nil
+                    let stands: String = (try survivor.read()).records[workSeq]?.phase.rawValue ?? "missing"
+                    if stands == UndoStepPhase.interrupted.rawValue {
+                        failures.append("recoveryCases '\(name)': the stopped recovery wrote to the list (\(stands))")
+                    }
+                }
                 await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in reachable ? root : nil }, places: places)
             } else {
                 try survivor.withLock { writer in
@@ -1410,6 +1446,15 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = string(testCase["preference"]), places.read(UndoContractKinds.preference) != .value(.string(wanted)) {
                 failures.append("recoveryCases '\(name)': the preference is \(places.read(UndoContractKinds.preference)), not \(wanted)")
+            }
+            if let wanted = string(testCase["keptVisibleAs"]) {
+                let keptFile: URL = root.appendingPathComponent(wanted).appendingPathComponent("a.md")
+                if !FileManager.default.fileExists(atPath: keptFile.path) {
+                    failures.append("recoveryCases '\(name)': the folder is not kept as \(wanted)")
+                }
+            }
+            if let wanted = int(testCase["folderLines"]), folderLines != wanted {
+                failures.append("recoveryCases '\(name)': \(folderLines) 'undo found a folder set aside' lines, not \(wanted)")
             }
             let leftovers: [String] = UndoContractKinds.stagedLeftovers(in: root)
             if let wanted = testCase["keptAside"] as? Bool {
@@ -1519,6 +1564,8 @@ nonisolated enum UndoContractReplay {
             return .beforeUndone
         case "afterRedoing":
             return .afterRedoing
+        case "whileDeletingAFolder":
+            return .whileDeletingAFolder
         default:
             return .beforeRedone
         }

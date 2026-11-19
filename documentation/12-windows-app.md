@@ -14514,6 +14514,22 @@ is taken; the trail event `undo found a folder set aside`, held in
 `NamedGapLedger` under #899 until Windows writes Undo lines; `recoveryCases`
 with `changeTheFolderSetAside` and `somethingInItsPlace`).
 
+Two more from the fourth review and Russell's ruling of 2026-11-19 bind
+Windows, in `rule.recovery` and `recoveryCases`: **a folder taken out is
+never deleted in place** (once every change has gone in, rename it from
+its `-orig` name to its `-gone` name with one `MoveFileEx` without
+`MOVEFILE_REPLACE_EXISTING`, then delete it; recovery deletes a `-gone`
+remnant as a staged file and never puts it back; `recoveryCases` with
+`halfDeleteTheGoneFolder`, a delete cut short at the kill point
+`whileDeletingAFolder`); and **a folder set aside whose place something
+else holds is renamed to a visible name beside it**, `<name> (kept by
+Undo)`, then `(kept by Undo 2)` and on, never over anything, with the trail
+line written just before the rename (`recoveryCases` with
+`visibleNameTaken` and `recoveryStopsAfterTheTidy`, a recovery that dies
+after it has tidied and before it writes to the list). A place that cannot
+be read (access denied) is neither free nor taken: leave the folder, say
+nothing, try again.
+
 Six things in the format are easy to get wrong and are the reason it was
 revised:
 

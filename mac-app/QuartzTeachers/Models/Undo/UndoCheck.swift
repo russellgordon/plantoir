@@ -560,17 +560,32 @@ nonisolated enum UndoSwap {
         var originals: [URL?] = []
         var swapsMade: Int = 0
 
-        func tidy() {
+        /// True when a test stopped it while a folder taken out was being
+        /// removed, as a process that died there would stop.
+        @discardableResult
+        func tidy() -> Bool {
             for url in staged {
                 if let url {
                     _ = UndoSwap.removeStaged(url)
                 }
             }
             for url in originals {
-                if let url {
-                    _ = UndoSwap.removeStaged(url)
+                guard let url else {
+                    continue
                 }
+                if UndoSwap.isAFolderSetAside(url) {
+                    // A folder taken out is renamed to a name recovery never
+                    // puts back BEFORE it is deleted, so a delete cut short
+                    // is finished, never mistaken for the teacher's folder
+                    // (the fourth review of U2b, MEDIUM).
+                    if UndoSwap.removeAFolderTakenOut(url) {
+                        return true
+                    }
+                    continue
+                }
+                _ = UndoSwap.removeStaged(url)
             }
+            return false
         }
 
         func reverse() {
@@ -775,7 +790,9 @@ nonisolated enum UndoSwap {
         }
 
         // 3. Every swap went in: the kept originals are no longer needed.
-        tidy()
+        if tidy() {
+            return .stoppedByATest
+        }
         for target in targets {
             if case .setExternal = target.change {
                 continue
@@ -883,6 +900,39 @@ nonisolated enum UndoSwap {
         return place.isEmpty ? nil : place
     }
 
+    /// The staged name a folder taken out is renamed to before it is
+    /// deleted: its `-orig` role becomes `-gone`, which `isAFolderSetAside`
+    /// never matches, so recovery finishes the delete of whatever is left
+    /// under it as it does any staged file.
+    static func goneURL(for asideURL: URL) -> URL {
+        let name: String = asideURL.lastPathComponent
+        let stem: String = name.hasSuffix("-orig") ? String(name.dropLast("-orig".count)) : name
+        return asideURL.deletingLastPathComponent().appendingPathComponent(stem + "-gone")
+    }
+
+    /// Deletes a folder a swap took out, once every change has gone in: one
+    /// rename to its `-gone` name (atomic: the folder is wholly the teacher's
+    /// set-aside folder or wholly a leftover to finish deleting), then the
+    /// recursive delete, which is not atomic. If the rename fails the folder
+    /// is left whole under its `-orig` name, never deleted in place. True
+    /// only when a test stopped it between the rename and the end of the
+    /// delete (`UndoKillPoint.whileDeletingAFolder`).
+    static func removeAFolderTakenOut(_ asideURL: URL) -> Bool {
+        let goneURL: URL = UndoSwap.goneURL(for: asideURL)
+        if FileManager.default.fileExists(atPath: goneURL.path) {
+            // An earlier delete under this label cut short: finished first.
+            try? FileManager.default.removeItem(at: goneURL)
+        }
+        if !UndoSwap.renameExclusively(asideURL, onto: goneURL) {
+            return false
+        }
+        if UndoKillPoints.stopsHere(.whileDeletingAFolder) {
+            return true
+        }
+        _ = UndoSwap.removeStaged(goneURL)
+        return false
+    }
+
     /// Whether a staged item is a folder kept aside as an original (`-orig`):
     /// a folder a tree op took out, which holds the teacher's files.
     static func isAFolderSetAside(_ url: URL) -> Bool {
@@ -981,19 +1031,68 @@ nonisolated enum UndoSwap {
         return (try? FileManager.default.removeItem(at: url)) != nil
     }
 
+    /// The visible name a folder set aside is kept under when something
+    /// else holds its place: `<name> (kept by Undo)`, then `(kept by Undo
+    /// 2)`, `(kept by Undo 3)` and on, the first that nothing holds.
+    static func visibleName(for place: String, number: Int) -> String {
+        if number <= 1 {
+            return place + " (kept by Undo)"
+        }
+        return place + " (kept by Undo \(number))"
+    }
+
+    /// Renames a folder set aside to the first visible name beside its
+    /// place that nothing holds, never over anything. True when it went.
+    static func keepUnderAVisibleName(
+        _ stagedURL: URL,
+        place: URL,
+        hiddenName: String,
+        matched: Bool,
+        onAside: ((UndoAsideFolder) -> Void)?
+    ) -> Bool {
+        var number: Int = 1
+        while number <= 1000 {
+            let keptURL: URL = place.deletingLastPathComponent().appendingPathComponent(
+                UndoSwap.visibleName(for: place.lastPathComponent, number: number)
+            )
+            number += 1
+            if UndoTreeReading.read(at: keptURL) != .absent {
+                continue
+            }
+            onAside?(UndoAsideFolder(place: place, hiddenName: hiddenName, foundAt: stagedURL, keptAs: keptURL, matched: matched))
+            if UndoSwap.renameExclusively(stagedURL, onto: keptURL) {
+                return true
+            }
+            if UndoTreeReading.read(at: keptURL) == .absent {
+                // Not taken in that instant: the rename itself failed.
+                return false
+            }
+        }
+        return false
+    }
+
     /// Removes what a swap for this label left beside these files. True
     /// when nothing of it is left (a file another program holds, or one
     /// made immutable, stays until a later try).
     ///
-    /// A FOLDER set aside (`-orig`, a tree taken out) is never deleted here:
-    /// it is put back only when `asideListings` names its place with the
-    /// listing the step recorded and the folder still has exactly that
-    /// listing, and its place is free; otherwise it is left aside, hidden
-    /// under its dot name, whole (the hard review of U2b, MEDIUM 3: a
-    /// changed folder never lands in the teacher's place, and a working
-    /// name is never exposed). Its place is read from the name itself, up
-    /// to the LAST marker, so a recovery's own `-recover-orig` is read as
-    /// the same place.
+    /// A FOLDER set aside (`-orig`, a tree taken out) is the teacher's own
+    /// and is never deleted here. Whenever its place is free it is renamed
+    /// back into it, whatever its listing; whether its listing is the one
+    /// `asideListings` records for that place decides what recovery makes
+    /// of the step, not where the folder goes (the director's rule after
+    /// U2b's third review). When something else holds its place it is
+    /// renamed to a visible name beside it, `<name> (kept by Undo)`, or
+    /// `(kept by Undo 2)` and on when that is taken too, so nothing of the
+    /// teacher's stays hidden and nothing is merged or overwritten
+    /// (Russell's ruling of 2026-11-19). Both renames never replace, so
+    /// either happened or did not, and a death after one leaves nothing to
+    /// redo. `onAside` is told BEFORE the rename (the intent first: a death
+    /// between the rename and the trail line would lose it, the fourth
+    /// review's LOW 4). When its place cannot be read now, it is left as it
+    /// is for a later try and nothing is said (LOW 3). Its place is read
+    /// from the name itself, up to the LAST marker, so a recovery's own
+    /// `-recover-orig` is read as the same place. A `-gone` folder is a
+    /// delete cut short (`removeAFolderTakenOut`) and is finished here.
     @discardableResult
     static func tidyLeftovers(
         label: String,
@@ -1037,26 +1136,23 @@ nonisolated enum UndoSwap {
                         allGone = false
                         continue
                     }
-                    // It is the teacher's own folder: put back in its place
-                    // whenever that place is free, WHATEVER its listing, so
-                    // nothing of the teacher's is ever left under a hidden
-                    // name while its own place is free (the director's rule
-                    // after U2b's third review, replacing "keep a changed one
-                    // aside"). Whether it matches the step's record decides
-                    // what recovery then makes of the step, not where the
-                    // folder goes. When something else holds its place, both
-                    // are left as they are, and that is deliberate: it is not
-                    // a leftover to look for again.
                     let originalURL: URL = folder.appendingPathComponent(original)
                     let recorded: String? = asideListings[originalURL.standardizedFileURL.path]
                     let matched: Bool = recorded != nil && UndoTreeReading.read(at: stagedURL).listingSha == recorded
-                    if UndoTreeReading.read(at: originalURL) != .absent {
-                        onAside?(UndoAsideFolder(place: originalURL, hiddenName: name, putBack: false, matched: matched))
+                    let inItsPlace: UndoTreeReading = UndoTreeReading.read(at: originalURL)
+                    if inItsPlace == .cannotRead {
+                        // Not known to be free or taken: a later try looks again.
+                        allGone = false
                         continue
                     }
-                    if UndoSwap.renameExclusively(stagedURL, onto: originalURL) {
-                        onAside?(UndoAsideFolder(place: originalURL, hiddenName: name, putBack: true, matched: matched))
-                    } else {
+                    if inItsPlace == .absent {
+                        onAside?(UndoAsideFolder(place: originalURL, hiddenName: name, foundAt: stagedURL, keptAs: nil, matched: matched))
+                        if !UndoSwap.renameExclusively(stagedURL, onto: originalURL) {
+                            allGone = false
+                        }
+                        continue
+                    }
+                    if !UndoSwap.keepUnderAVisibleName(stagedURL, place: originalURL, hiddenName: name, matched: matched, onAside: onAside) {
                         allGone = false
                     }
                     continue
@@ -1070,7 +1166,8 @@ nonisolated enum UndoSwap {
     }
 }
 
-/// A teacher's folder recovery found set aside by a dead process.
+/// A teacher's folder recovery found set aside by a dead process, as it is
+/// about to be put back or kept under a visible name.
 nonisolated struct UndoAsideFolder: Equatable, Sendable {
 
     // MARK: - Stored properties
@@ -1081,12 +1178,24 @@ nonisolated struct UndoAsideFolder: Equatable, Sendable {
     /// The hidden name it was found under.
     let hiddenName: String
 
-    /// True when it was put back in its place; false when something else
-    /// holds that place, and it was left aside.
-    let putBack: Bool
+    /// Where it is as it is reported: under its hidden name, since the
+    /// report comes before the rename.
+    let foundAt: URL
+
+    /// Nil when it is being put back in its place; otherwise the visible
+    /// name beside it that it is being kept under, because something else
+    /// holds its place.
+    let keptAs: URL?
 
     /// Whether its listing was the one the step recorded.
     let matched: Bool
+
+    // MARK: - Computed properties
+
+    /// True when it is being put back in its place.
+    var putBack: Bool {
+        return keptAs == nil
+    }
 }
 
 /// How an undo or a redo went.

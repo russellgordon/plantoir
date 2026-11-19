@@ -73,10 +73,10 @@ nonisolated enum UndoTrail {
                 UndoTrail.couldNotRecordLine(action: action, course: course, section: section, mode: mode, why: why)
             )
         }
-        UndoTrailHook.foundAFolderSetAsideLine = { course, section, place, hiddenName, putBack, changes in
+        UndoTrailHook.foundAFolderSetAsideLine = { course, section, place, hiddenName, keptAs, changes in
             ActivityTrail.note(
                 .undoFoundAFolderSetAside,
-                UndoTrail.foundAFolderSetAsideLine(course: course, section: section, place: place, hiddenName: hiddenName, putBack: putBack, changes: changes)
+                UndoTrail.foundAFolderSetAsideLine(course: course, section: section, place: place, hiddenName: hiddenName, keptAs: keptAs, changes: changes)
             )
         }
         UndoTrailHook.rolledBackLine = { course, section, phase, files in
@@ -115,20 +115,21 @@ nonisolated enum UndoTrail {
             + ", found \(counted) changed by hand since, and cleared the list"
     }
 
-    /// `ICS3U/1 · the undo list put the folder courses/ICS3U/made back in
+    /// `ICS3U/1 · the undo list puts the folder courses/ICS3U/made back in
     /// its place; it changed while a change that stopped had set it aside
-    /// (1 file added)`, or `… left the folder courses/ICS3U/made aside,
-    /// hidden as .made.plantoir-undo-3-redo-orig, because something else now
-    /// holds courses/ICS3U/made`.
-    static func foundAFolderSetAsideLine(course: String, section: Int?, place: String, hiddenName: String, putBack: Bool, changes: String) -> String {
+    /// (1 file added)`, or `… keeps the folder courses/ICS3U/made, set
+    /// aside by a change that stopped, as courses/ICS3U/made (kept by Undo),
+    /// because something else now holds courses/ICS3U/made`. Written just
+    /// before the rename, so it says what is being done.
+    static func foundAFolderSetAsideLine(course: String, section: Int?, place: String, hiddenName: String, keptAs: String?, changes: String) -> String {
         var line: String = course
         if let section {
             line += "/\(section)"
         }
-        if putBack {
-            return line + " · the undo list put the folder \(place) back in its place; it changed while a change that stopped had set it aside (\(changes))"
+        if let keptAs {
+            return line + " · the undo list keeps the folder \(place), set aside by a change that stopped, as \(keptAs), because something else now holds \(place)"
         }
-        return line + " · the undo list left the folder \(place) aside, hidden as \(hiddenName), because something else now holds \(place)"
+        return line + " · the undo list puts the folder \(place) back in its place; it changed while a change that stopped had set it aside (\(changes))"
     }
 
     /// `ICS3U/1 · the undo list put back 2 files left part way by a change

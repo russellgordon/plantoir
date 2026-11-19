@@ -19565,9 +19565,28 @@ off.
   it; if it changed while aside, it is in the way, the step is recorded
   interrupted and the list cleared, and the trail line "undo found a folder
   set aside" says what changed. When something else now holds its place,
-  both are left as they are, the step is recorded interrupted, the line
-  names both, and the step is not looked at again for it; what becomes of
-  the hidden folder then is parked for Russell (U7).
+  the folder is renamed to a visible name beside it, `<name> (kept by
+  Undo)` (or `(kept by Undo 2)` and on, the first name nothing holds), the
+  step is recorded interrupted, the list cleared, and the line names both
+  (Russell's ruling of 2026-11-19: nothing of the teacher's stays hidden,
+  nothing is merged or overwritten; before it, both were left as they were
+  and the folder stayed hidden for good). Both renames never replace
+  (`RENAME_EXCL`), and the trail line is written just before the rename,
+  so a death between the rename and the list's record loses nothing (the
+  fourth review of U2b, LOW 4; `recoveryCases` with
+  `recoveryStopsAfterTheTidy`). A place that cannot be read now is neither
+  free nor taken: the folder is left as it is, nothing is said, and the
+  step is cannot tell now, tried again (LOW 3: it used to say something
+  else held the place). A folder a step TAKES OUT is never deleted in
+  place: once every change has gone in it is renamed from its `-orig` name
+  to its `-gone` name, which recovery never puts back, and only then
+  deleted (`UndoSwap.removeAFolderTakenOut`). A recursive delete is not
+  atomic, and before this a death part way left a half-deleted `-orig`
+  folder that recovery put back in the teacher's place and judged
+  "neither", clearing the list (the fourth review's MEDIUM); now recovery
+  finishes deleting a `-gone` remnant as a staged file and the step is
+  completed (`recoveryCases` with `halfDeleteTheGoneFolder`, kill point
+  `whileDeletingAFolder`).
   `heldBy` (content held in a backup zip) is U5's.
 - **`external`**: something outside every working folder, `<family>:<name>`;
   this version knows `preference:<name>`, the app's own preferences store (`PlantoirDefaults.shared`, which follows `--state-dir`)
@@ -19626,7 +19645,21 @@ left: a process that dies after the closing line and before its awaited
 re-derivation leaves the front page stale until the next re-derivation of
 that section (any publish, re-date or Undo there); U7 closes it by
 re-deriving every `recompute` file of the steps on the list at launch,
-which costs nothing when nothing is stale. Rejected: a synchronous runner
+which costs nothing when nothing is stale.
+
+**Conditions U7 must meet before the switch (left by U2b's reviews):**
+
+- **Register the app's front-page runner at launch, before any recovery.**
+  No app code calls `UndoMaintainers.registerTheAppsFrontPage()` today;
+  only the tests do. While none is registered, a step a dead process left
+  holding a `recompute` is never settled, so the plain doors refuse
+  ("another change is under way") on that course for as long as the step
+  waits, which, with no runner, is for ever (the fourth review of U2b,
+  LOW 5). U2b deliberately does not register one: the switch is off and
+  nothing is recorded live. U7 registers it with the switch and proves a
+  dead front-page step is settled at the first launch.
+
+Rejected: a synchronous runner
 hopped to the main actor with a blocking wait (GCD, and a deadlock when the
 list is driven from the main actor); making the front-page rule and
 everything it reads (`Course`, `CourseConfiguration`, `AssistSectionGraph`)

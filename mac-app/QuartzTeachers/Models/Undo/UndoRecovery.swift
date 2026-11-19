@@ -193,25 +193,37 @@ nonisolated enum UndoRecovery {
         return allGone
     }
 
-    /// The trail line for a teacher's folder found set aside: put back
-    /// changed (what changed, counted against the step's record when the
-    /// list still holds it), or left aside because something else holds its
-    /// place (both named). A folder put back as recorded needs no line.
+    /// The trail line for a teacher's folder found set aside, written
+    /// before it is renamed (the intent first): being put back changed
+    /// (what changed, counted against the step's record when the list
+    /// still holds it), or kept under a visible name beside its place
+    /// because something else holds that place (both named). A folder put
+    /// back as recorded needs no line.
     static func noteAnAsideFolder(_ found: UndoAsideFolder, of step: UndoStep, root: URL, journal: UndoJournal?) {
         if found.putBack && found.matched {
             return
         }
-        var place: String = found.place.lastPathComponent
-        let rootPath: String = root.standardizedFileURL.path + "/"
-        let full: String = found.place.standardizedFileURL.path
-        if full.hasPrefix(rootPath) {
-            place = String(full.dropFirst(rootPath.count))
+        let place: String = UndoRecovery.insideTheFolder(found.place, root: root)
+        var keptAs: String? = nil
+        if let keptURL = found.keptAs {
+            keptAs = UndoRecovery.insideTheFolder(keptURL, root: root)
         }
         var changes: String = ""
         if found.putBack {
-            changes = UndoRecovery.whatChanged(at: found.place, against: step, place: place, journal: journal)
+            changes = UndoRecovery.whatChanged(at: found.foundAt, against: step, place: place, journal: journal)
         }
-        UndoTrailHook.foundAFolderSetAsideLine?(step.course ?? "", step.section, place, found.hiddenName, found.putBack, changes)
+        UndoTrailHook.foundAFolderSetAsideLine?(step.course ?? "", step.section, place, found.hiddenName, keptAs, changes)
+    }
+
+    /// A place's path inside the working folder, or its last name when it
+    /// is not inside it.
+    static func insideTheFolder(_ url: URL, root: URL) -> String {
+        let rootPath: String = root.standardizedFileURL.path + "/"
+        let full: String = url.standardizedFileURL.path
+        if full.hasPrefix(rootPath) {
+            return String(full.dropFirst(rootPath.count))
+        }
+        return url.lastPathComponent
     }
 
     /// "1 file added, 2 changed" against the step's recorded listing, or
@@ -422,24 +434,32 @@ nonisolated enum UndoRecovery {
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) },
                 root: root
             )
+            if UndoKillPoints.stopsHere(.afterRecoveryTidied) {
+                return nil
+            }
         }
 
         // Which state the work was moving FROM, and TO.
         let startedFromBefore: Bool = phase == .begin || phase == .redoing
         let startState: UndoOpState = startedFromBefore ? .before : .after
         var files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root, places: places)
-        // A teacher's folder still set aside after the tidying (it was
-        // changed while it was aside) is IN THE WAY: never settled as if the
-        // folder were gone, and named on the trail with where it is kept
-        // (the second hard review of U2b, MEDIUM 3).
+        // A teacher's folder still set aside after the tidying (its place
+        // could not be read, or a rename failed) is IN THE WAY: never
+        // settled as if the folder were gone (the second hard review of
+        // U2b, MEDIUM 3), and a place that cannot be read stays "cannot
+        // tell now", tried again, never a change since (the fourth review,
+        // LOW 3).
         let keptAside: [String: String] = UndoRecovery.foldersKeptAside(of: step, root: root)
         if !keptAside.isEmpty {
             var judged: [(path: String, state: UndoOpState)] = []
             for file in files {
-                judged.append((path: file.path, state: keptAside[file.path] != nil ? .neither : file.state))
+                if keptAside[file.path] != nil && file.state != .cannotTell {
+                    judged.append((path: file.path, state: .neither))
+                } else {
+                    judged.append(file)
+                }
             }
             files = judged
-            _ = keptAside
         }
         // A file that could not be read now is never judged changed by hand:
         // the step is left as it is and tried again on the schedule, as for
