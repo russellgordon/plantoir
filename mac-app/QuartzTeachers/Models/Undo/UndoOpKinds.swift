@@ -536,6 +536,16 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
     case notATree
     case tree(UndoTreeListing, contents: [String: Data])
 
+    // MARK: - Computed properties
+
+    /// The listing's hash, when there is a folder that can be listed.
+    var listingSha: String? {
+        if case .tree(let listing, _) = self {
+            return listing.sha
+        }
+        return nil
+    }
+
     // MARK: - Functions
 
     static func read(at url: URL) -> UndoTreeReading {
@@ -604,14 +614,6 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
             }
         }
         return true
-    }
-
-    /// The listing's hash, when there is a folder that can be listed.
-    var listingSha: String? {
-        if case .tree(let listing, _) = self {
-            return listing.sha
-        }
-        return nil
     }
 
     /// Makes the folder a listing describes at a NEW place, with every
