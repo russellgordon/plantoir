@@ -20342,7 +20342,9 @@ repetitive animations".
   hear no link and the rotor's Links would be empty). The Windows About
   panel (`AboutDialog.cs`) follows: `HyperlinkButton`s of their own in
   place of inline `Hyperlink`s, the same words and rows; its source is
-  pinned by `AboutDialogLinksSourceTests`, and the sentence holds the word
+  pinned by `AboutDialogLinksSourceTests`, what UI Automation gives a
+  screen reader and where Tab goes by `AboutDialogLinksUiTests`
+  (`12-windows-app.md` → "The About panel's links"), and the sentence holds the word
   "Quartz" through a constant so the label scan's one exception (the bare
   credit name) still covers it.
 - **Tests read what the app exposes.** `AccessibilityTreeTests` hosts the

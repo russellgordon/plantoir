@@ -13421,6 +13421,43 @@ refusal answers. And, as the mac's runner since #610, a scripted `modelReply`
 answers the FIRST request only and plain text after it — unless
 `given.modelReplyAnswers` is `everyRequest` (#720, below).
 
+## The About panel's links (#993, the mac's D46)
+
+Written 2026-11-19 for [#993](https://github.com/russellgordon/plantoir/issues/993).
+The design, the ruling (option A of `vm-tools/reference/993-about-window-design.md`)
+and the reasons are the mac's: `09-mac-app.md` → "The About window's links
+(D46, #993's second piece)". This section says where Windows does it.
+
+**What was wrong.** `AboutDialog.cs` built "Quartz", "sponsoring him on
+GitHub", "Phosphor Icons" and "Russell Gordon" as inline `Hyperlink`s inside
+a `TextBlock`'s sentences. An inline link is a text range, not an element of
+its own with a name a screen reader lists and the words a keyboard user Tabs
+to.
+
+**Where it is now.** All six links are `HyperlinkButton`s of their own, made
+by one helper, `Link(uri, words, automationId)`, which gives each an
+AutomationId (`aboutWebsiteLink`, `aboutEmailLink`, `aboutQuartzLink`,
+`aboutSponsorLink`, `aboutIconCreditLink`, `aboutDesignCreditLink`). The
+sponsor sentence is one plain `TextBlock`, whole, with "Quartz" and "Sponsor
+Jacky Zhao on GitHub" on one line beneath it inside the callout; the credits
+are label-and-value rows (Icon, Phosphor Icons (MIT); Design, Russell Gordon;
+Made with, Claude) in the shape of the Website and Email rows. No key
+catcher, no invisible control: each key reaches a visible link. "Quartz"
+stays a constant, `QuartzName`, so the label scan's one exception (the bare
+credit name, `CourseSettingsSaveTests`) still covers it.
+
+**What pins it.** `AboutDialogLinksSourceTests` (unit, plain facts) pins the
+source: no inline `Hyperlink` and no `Inlines.Add`, six `Link(` calls each
+with its own words and AutomationId and no seventh, the credits as rows, the
+sentence whole. `AboutDialogLinksUiTests` (`[UiFact]`, opt-in) opens Help ▸
+About Plantoir through the menu bar and reads the dialog as UI Automation
+gives it to a screen reader: exactly six elements of control type Hyperlink,
+each with its own words, enabled, keyboard-focusable and on screen, then
+presses Tab from the dialog's first stop until every one of the six has held
+the focus. Measured on the Windows VM (Parallels, Windows 11 Pro ARM64, the
+app win-x64 under emulation), 2026-11-19: 1 of 1 passed, 17 s. Nothing is
+pressed, so no browser or mail program opens.
+
 ## Windows never closes Obsidian unasked (#1003, the mac's #995)
 
 Written 2026-11-19 for [#1003](https://github.com/russellgordon/plantoir/issues/1003).
