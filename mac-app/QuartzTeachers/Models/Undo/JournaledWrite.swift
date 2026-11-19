@@ -374,7 +374,7 @@ nonisolated enum JournaledWrite {
         }
         let seq: Int
         do {
-            seq = try beginOps(draft, in: journal, mode: mode)
+            seq = try beginOps(draft, in: journal, mode: mode, places: places)
         } catch {
             return .couldNotRecordTheStep
         }
@@ -476,7 +476,12 @@ nonisolated enum JournaledWrite {
 
     /// Phase one for a step given as ops: the same as `begin`, with the
     /// draft's own blobs stored and no working folder when none is needed.
-    static func beginOps(_ draft: UndoOpsDraft, in journal: UndoJournal, mode: UndoMode) throws -> Int {
+    static func beginOps(
+        _ draft: UndoOpsDraft,
+        in journal: UndoJournal,
+        mode: UndoMode,
+        places: UndoExternalPlaces = UndoAppPreferences()
+    ) throws -> Int {
         var folder: UndoWorkingFolder? = nil
         if let url = draft.workingFolderURL {
             let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: url)
@@ -484,7 +489,7 @@ nonisolated enum JournaledWrite {
         }
         let wait: Double = mode == .live ? UndoSwitch.lockWaitSeconds : UndoSwitch.shadowLockWaitSeconds
         return try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
-            UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root)
+            UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root, places: places)
             for blob in draft.blobs {
                 try writer.writeBlob(blob)
             }

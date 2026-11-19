@@ -852,7 +852,18 @@ nonisolated protocol UndoExternalPlaces: Sendable {
 
 /// The app's own preferences (`PlantoirDefaults.shared`, the one store, which follows `--state-dir`), named
 /// `preference:<key>`.
-nonisolated struct UndoAppPreferences: UndoExternalPlaces {
+nonisolated struct UndoAppPreferences: UndoExternalPlaces, @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    /// The store it reads and writes: the app's one store, or a test's own.
+    let store: UserDefaults
+
+    // MARK: - Initializer
+
+    init(store: UserDefaults = PlantoirDefaults.shared) {
+        self.store = store
+    }
 
     // MARK: - Functions
 
@@ -869,7 +880,7 @@ nonisolated struct UndoAppPreferences: UndoExternalPlaces {
         guard let key = UndoAppPreferences.preferenceKey(target) else {
             return .cannotTell
         }
-        guard let stored = PlantoirDefaults.shared.object(forKey: key) else {
+        guard let stored = store.object(forKey: key) else {
             return .notSet
         }
         guard let value = UndoJSON.from(foundation: stored) else {
@@ -883,14 +894,14 @@ nonisolated struct UndoAppPreferences: UndoExternalPlaces {
             return false
         }
         guard let value else {
-            PlantoirDefaults.shared.removeObject(forKey: key)
+            store.removeObject(forKey: key)
             return true
         }
         if !PropertyListSerialization.propertyList(value.foundation(), isValidFor: .binary) {
             // A JSON null, or an object holding one: no preference holds it.
             return false
         }
-        PlantoirDefaults.shared.set(value.foundation(), forKey: key)
+        store.set(value.foundation(), forKey: key)
         return true
     }
 }

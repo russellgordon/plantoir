@@ -68,21 +68,28 @@ final class UndoOpKindsTests: XCTestCase {
     /// One of the app's preferences, set and taken back through the list,
     /// in a step with no working folder.
     func testAPreferenceIsUndoneAndRedoneThroughTheList() throws {
-        let key: String = "undoOpKindsTests-\(UUID().uuidString)"
+        // A store of the test's own, never the app's (the hard review of
+        // U2b, MEDIUM 6: under the unit suite PlantoirDefaults.shared is the
+        // real preferences of ca.russellgordon.Plantoir).
+        let suiteName: String = "UndoOpKindsTests-\(UUID().uuidString)"
+        let store: UserDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer {
-            PlantoirDefaults.shared.removeObject(forKey: key)
+            store.removePersistentDomain(forName: suiteName)
         }
-        PlantoirDefaults.shared.set("before", forKey: key)
+        let places: UndoAppPreferences = UndoAppPreferences(store: store)
+        let key: String = "aPreference"
+        store.set("before", forKey: key)
         let journal: UndoJournal = UndoJournal(folderURL: scratchURL.appendingPathComponent("undo", isDirectory: true))
         let op: UndoOp = UndoOp.external(target: "preference:" + key, before: .string("before"), after: .string("after"))
         let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [op], blobs: [], root: nil, action: "setPreference")
 
-        XCTAssertEqual(JournaledWrite.perform(ops: draft, in: journal, mode: .live), .applied(seq: 1))
-        XCTAssertEqual(PlantoirDefaults.shared.string(forKey: key), "after")
-        XCTAssertEqual(journal.undoNewest(), .undone(seq: 1))
-        XCTAssertEqual(PlantoirDefaults.shared.string(forKey: key), "before")
-        XCTAssertEqual(journal.redoNewest(), .redone(seq: 1))
-        XCTAssertEqual(PlantoirDefaults.shared.string(forKey: key), "after")
+        XCTAssertEqual(JournaledWrite.perform(ops: draft, in: journal, mode: .live, places: places), .applied(seq: 1))
+        XCTAssertEqual(store.string(forKey: key), "after")
+        XCTAssertEqual(journal.undoNewest(places: places), .undone(seq: 1))
+        XCTAssertEqual(store.string(forKey: key), "before")
+        XCTAssertEqual(journal.redoNewest(places: places), .redone(seq: 1))
+        XCTAssertEqual(store.string(forKey: key), "after")
+        XCTAssertNil(PlantoirDefaults.shared.object(forKey: key), "the app's own store is never touched")
     }
 
     /// A move is one rename that never replaces: with something already at
