@@ -1526,7 +1526,7 @@
         "question": "Remove {assistant}?",
         "message": "Its {size} download is deleted from this {machine}. To use it again, download it again here.",
         "removeButton": "Remove",
-        "fill": "{assistant} is the assistant's name in a sentence (the small assistant, the larger assistant); {size} is its download's size as the platform writes a file size; {machine} is specialNames.platformWording.machine (Mac, PC)."
+        "fill": "{assistant} is the assistant's name in a sentence (the small assistant, the larger assistant); {size} is its download's size as the platform writes a file size; the computer's name in message is specialNames.platformWording.machine's placeholder (Mac, PC)."
       },
       "why": "The refusal is about ANY open assistant, not about whether that window happens to use that rung: working out which file is genuinely mapped means tracking state neither app keeps, and getting it wrong deletes weights out from under a running engine. Removing the CHOSEN one is allowed on purpose - it is not a broken state, it is the state every machine is in before its first download, and refusing would trap a teacher who wants their disk space back behind a choice they did not want to change."
     },
