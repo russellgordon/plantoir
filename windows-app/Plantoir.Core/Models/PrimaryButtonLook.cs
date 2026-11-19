@@ -7,10 +7,12 @@ public enum PrimaryKind
     TakesEnterWhenEnabled,
 
     /// <summary>
-    /// Wears the accent while it can be pressed but NEVER takes Enter — the
-    /// new-course wizard's Create Course. Measured on the mac (2026-10-08): as
-    /// the default, an Enter typed in the Course code field created a course
-    /// named by the code with the rest of the form unread.
+    /// Wears the accent while it can be pressed but takes no Enter — the
+    /// new-course wizard's Create Course until its form is complete, and
+    /// while its code list is drawn (<see cref="QuestionKeys.CreateCourseIsTheDefault"/>,
+    /// #979; it never took Enter before). Measured on the mac (2026-10-08):
+    /// as the default from the start, an Enter typed in the Course code field
+    /// created a course named by the code with the rest of the form unread.
     /// </summary>
     NeverTakesEnter,
 

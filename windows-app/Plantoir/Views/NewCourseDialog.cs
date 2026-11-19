@@ -115,6 +115,7 @@ public sealed class NewCourseDialog : ContentDialog
     private readonly CourseNameCatalog _nameCatalog;
     private readonly TextBlock _gradeWarningSlot;
     private bool _started;
+    private bool _escapeWatched;
 
     // Starting Content (rows 92–94, 130): the ready-made pages and their
     // toggles, plus the terminology switch for the factory structure.
@@ -252,17 +253,42 @@ public sealed class NewCourseDialog : ContentDialog
         // thread — so a string that must FAIL when it drifts has to live there.
         PrimaryButtonText = WizardWording.Panel(isClub: false).CreateButton;
         CloseButtonText = "Cancel";
-        // Create Course NEVER takes Enter (#491 item 2; measured on the mac,
-        // 2026-10-08): as the default, an Enter typed in the code field created
-        // a course named by the code with the rest of the form unread. It wears
-        // the accent while it can be pressed (RefreshCreateEnabled), and a long
-        // form is finished with a click.
+        // Create Course is the default only once the form is complete, and
+        // never while the course-code list is drawn (#979, the mac's D32 and
+        // the #987 review; QuestionKeys.CreateCourseIsTheDefault). Until then
+        // it takes no Enter: as the default from the start, an Enter typed in
+        // the code field created a course named by the code with the rest of
+        // the form unread (#491 item 2, measured on the mac 2026-10-08). It
+        // wears the accent while it can be pressed (RefreshCreateEnabled).
         DefaultButton = ContentDialogButton.None;
         PrimaryButtonClick += OnPrimaryButton;
         // The cursor starts in Course code, as on the mac and as Copy a Page
         // opens; the suggestion list stays closed until something is typed.
-        Opened += (_, _) => _codeBox.Focus(FocusState.Programmatic);
+        Opened += (_, _) =>
+        {
+            _codeBox.Focus(FocusState.Programmatic);
+            // Escape does nothing while the course is being made (Russell,
+            // 2026-11-18, on the mac's #987 review); a click on the visible
+            // Cancel still stops it. WinUI's Escape is a press of the Close
+            // button (ContentDialog_Partial.cpp, ExecuteCloseAction), so the
+            // Close button's own click cannot tell the two apart: the key is
+            // withheld from the dialog while QuestionKeys.WizardEscapeIsCancel
+            // says no, and reaches it as before the rest of the time.
+            if (DialogButtons.TemplatePart(this, "LayoutRoot") is { } layoutRoot && !_escapeWatched)
+            {
+                _escapeWatched = true;
+                layoutRoot.PreviewKeyDown += (_, args) =>
+                {
+                    // The code list's own Escape is the code field's (PickerEscape), further in.
+                    if (args.Key == Windows.System.VirtualKey.Escape
+                        && !QuestionKeys.WizardEscapeIsCancel(suggestionsAreShown: false, isCreating: _creator.IsCreating))
+                        args.Handled = true;
+                };
+            }
+        };
         CloseButtonClick += OnCloseButton;
+        // The list being drawn or put away changes whether Create Course takes Enter.
+        _codeBox.RegisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, (_, _) => RefreshCreateEnabled());
 
         _validationText = new TextBlock
         {
@@ -378,9 +404,14 @@ public sealed class NewCourseDialog : ContentDialog
         bool codeOk = _codeBox.Text.Trim().Length > 0 && CourseCodeProblem() is null;
         bool sectionsOk = SectionNumbersProblem(_sectionsBox.Text) is null;
         bool publishingOk = _publishingChoice?.Problem is null;   // a bad folder blocks Create (row 102)
-        DialogButtons.EnablePrimary(this,
-            codeOk && sectionsOk && publishingOk && UnitWordIsUsable && (!IsClub || ClubClassFolderProblem() is null),
-            PrimaryKind.NeverTakesEnter);
+        bool canCreate = codeOk && sectionsOk && publishingOk && UnitWordIsUsable && (!IsClub || ClubClassFolderProblem() is null);
+        // The mac's formIsComplete: everything Create accepts, AND a name
+        // typed (here the name may be filled in from the code), AND a folder.
+        bool formIsComplete = canCreate && _nameBox.Text.Trim().Length > 0 && _window.Workspace.WorkspacePath is not null;
+        DialogButtons.EnablePrimary(this, canCreate,
+            QuestionKeys.CreateCourseIsTheDefault(formIsComplete, _codeBox.IsSuggestionListOpen)
+                ? PrimaryKind.TakesEnterWhenEnabled
+                : PrimaryKind.NeverTakesEnter);
     }
 
     /// <summary>
@@ -474,7 +505,7 @@ public sealed class NewCourseDialog : ContentDialog
         nameRow.Children.Add(FormBuilders.ExampleCaption("e.g. Introduction to Computer Science"));
         nameRow.Children.Add(_suggestionsRow);
         form.Children.Add(nameRow);
-        _nameBox.TextChanged += (_, _) => { RefreshGradeWarning(); RefreshFontSample(); };
+        _nameBox.TextChanged += (_, _) => { RefreshGradeWarning(); RefreshFontSample(); RefreshCreateEnabled(); };
 
         form.Children.Add(_shortRow);
 
