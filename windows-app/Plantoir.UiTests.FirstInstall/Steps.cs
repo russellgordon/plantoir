@@ -328,7 +328,7 @@ internal static class Steps_
                              + $"{Program.Watch.FailedLooks} looks so far could not read the desktop and are not counted); "
                              + $"smartscreen.exe running before the launch: {(smartScreenBefore ? "yes" : "no")}, during it: {(smartScreenDuring ? "yes" : "no")}");
                 if (!enough)
-                    throw Stopped.Driver($"the watcher made only {looksDuringLaunch} real looks in the {seconds:0.0} s the installer's launch call ran (at least {required} required), so a question Windows asked then could have gone unseen");
+                    throw Stopped.Driver($"the watcher made only {looksDuringLaunch} real looks in the {seconds:0.0} s the installer's launch call ran (at least {required} required), so a question Windows asked then could have gone unseen", "coverage");
                 if (launchError is not null)
                     throw Stopped.Product($"Windows would not start the installer: {launchError.GetType().Name}: {launchError.Message} [screenshot {Program.Shot("no-launch")}]");
             }

@@ -31,9 +31,13 @@ internal sealed class WindowWatch
     private readonly List<AutomationElement> _baselineUnreadable = new();
     private readonly UnreadableWindows<AutomationElement> _unreadableWindows;
     private readonly List<string> _pending = new();
+    private readonly LookRecord _record;
+    private readonly object _recordLock = new();
     private int _looks;
     private int _failedLooks;
     private int _unreadable;
+    private TimeSpan _largestGapSeen;
+    private string _largestGapStage = "Starting";
 
     private static readonly string[] DialogButtonIds = { "PrimaryButton", "SecondaryButton", "CloseButton" };
 
@@ -41,8 +45,12 @@ internal sealed class WindowWatch
     {
         _automation = automation;
         _unreadableWindows = new UnreadableWindows<AutomationElement>(SameElement);
+        var readAt = DateTime.UtcNow;
+        _record = new LookRecord(readAt);
         var (windows, unreadable, read) = Desktop();
-        if (!read) throw Stopped.Driver("the desktop could not be read when the driver started, so no baseline of its windows exists");
+        if (!read) throw Stopped.Driver("the desktop could not be read when the driver started, so no baseline of its windows exists", "coverage");
+        // The baseline is the run's first successful look.
+        _record.Succeeded(readAt);
         foreach (var window in windows)
         {
             _baseline.Add(window.Handle);
@@ -77,6 +85,9 @@ internal sealed class WindowWatch
 
     public string BaselineDescription => string.Join("; ", _baselineNames);
 
+    /// <summary>Set only by the failed-looks self-test: every reading of the desktop from then on fails.</summary>
+    public DateTime? FailReadsFrom { get; set; }
+
     /// <summary>The stage whose allow-list applies. Set by each step as it starts.</summary>
     public Stage Stage { get; set; } = Stage.Starting;
 
@@ -90,8 +101,40 @@ internal sealed class WindowWatch
     /// </summary>
     public int Looks => Volatile.Read(ref _looks);
 
-    /// <summary>Looks whose reading of the desktop failed, for the log.</summary>
+    /// <summary>Looks whose reading of the desktop failed; recorded, and reported to the Mac in result.txt.</summary>
     public int FailedLooks => Volatile.Read(ref _failedLooks);
+
+    /// <summary>
+    /// The largest stretch of the run so far with no successful look, and the
+    /// stage it ended in (result.txt: largest-look-gap-ms; the Mac refuses a
+    /// PASSED over <see cref="WindowRules.MaxLookGap"/>).
+    /// </summary>
+    public (TimeSpan Gap, string Stage) LargestGap(DateTime now)
+    {
+        lock (_recordLock)
+        {
+            var gap = _record.LargestGap(now);
+            return gap > _largestGapSeen ? (gap, Stage.ToString()) : (_largestGapSeen, _largestGapStage);
+        }
+    }
+
+    /// <summary>The largest stretch with no successful look between two moments (the final watch's).</summary>
+    public TimeSpan LargestGap(DateTime from, DateTime to)
+    {
+        lock (_recordLock) return _record.LargestGap(from, to);
+    }
+
+    /// <summary>How long ago the last successful look read the desktop.</summary>
+    public TimeSpan LastLookAge(DateTime now)
+    {
+        lock (_recordLock) return _record.LastGood is { } last ? now - last : TimeSpan.MaxValue;
+    }
+
+    /// <summary>Whether a decision may be made now: the last look succeeded and is recent (<see cref="LookRecord.FreshAt"/>).</summary>
+    public bool Fresh(DateTime now)
+    {
+        lock (_recordLock) return _record.FreshAt(now);
+    }
 
     /// <summary>Different top-level windows that could not be read in this run, each recorded in the log and judged.</summary>
     public int Unreadable => _unreadableWindows.Seen;
@@ -110,7 +153,15 @@ internal sealed class WindowWatch
         var found = new List<SeenWindow>();
         var unreadable = new List<(AutomationElement, string)>();
         AutomationElement[] children;
-        try { children = _automation.GetDesktop().FindAllChildren(); }
+        try
+        {
+            // The failed-looks self-test (--self-test-fail-looks-after): from
+            // this moment on every reading of the desktop fails, as a real
+            // failure of UI Automation would, through the same path.
+            if (FailReadsFrom is { } from && DateTime.UtcNow >= from)
+                throw new InvalidOperationException("self-test failed-looks: this reading of the desktop is made to fail");
+            children = _automation.GetDesktop().FindAllChildren();
+        }
         catch (Exception error)
         {
             NoteUnreadable("desktop|" + error.GetType().Name, $"note: the desktop could not be read at this look ({error.GetType().Name}: {error.Message}); not counted as a look");
@@ -196,11 +247,11 @@ internal sealed class WindowWatch
                 case UnreadableChange.TooLong:
                     throw Stopped.Product($"a window UI Automation could not read stayed up at {Stage} for {change.SeenFor.TotalSeconds:0} s "
                                           + $"(unreadable window {change.Number}, {change.Sightings} looks; {change.Error}): a window of a higher integrity level, such as an elevation prompt, "
-                                          + $"is the usual cause [screenshot {Program.Shot("unreadable-window")}]", "unreadable-window");
+                                          + $"is the usual cause [screenshot {Program.Shot("unreadable-window")}]", "unreadable-window").Seen(DateTime.UtcNow - change.SeenFor);
                 case UnreadableChange.PresentTooLong:
                     throw Stopped.Product($"at least one window UI Automation could not read was on screen at every look for {change.SeenFor.TotalSeconds:0} s at {Stage} "
                                           + $"({change.Sightings} looks; {change.Error}), whichever windows they were: a window of a higher integrity level, such as an elevation prompt, "
-                                          + $"is the usual cause [screenshot {Program.Shot("unreadable-window")}]", "unreadable-window");
+                                          + $"is the usual cause [screenshot {Program.Shot("unreadable-window")}]", "unreadable-window").Seen(DateTime.UtcNow - change.SeenFor);
             }
         }
         if (_unreadableWindows.Pending) _pending.Add("an unreadable window (inside its 20 s)");
@@ -223,10 +274,14 @@ internal sealed class WindowWatch
     /// </summary>
     public void Check(Action<SeenWindow, string>? answer)
     {
+        var readAt = DateTime.UtcNow;
         var (windows, unreadable, read) = Desktop();
         if (!read)
         {
+            // Recorded, not just skipped (the fifth review): the record's gap
+            // runs on through it, and no decision can rest on this look.
             Interlocked.Increment(ref _failedLooks);
+            lock (_recordLock) _record.FailedLook();
             return;
         }
         _pending.Clear();
@@ -256,10 +311,10 @@ internal sealed class WindowWatch
                     continue;
                 case Verdict.Blocked:
                     throw Stopped.Product($"Windows put up {judgement.Kind}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("windows-notice")}]",
-                                          "blocked", window.Process);
+                                          "blocked", window.Process).Seen(firstSeen);
                 case Verdict.Unexpected:
                     throw Stopped.Product($"an unexpected window appeared at {Stage}: {window}{(judgement.Kind.Length > 0 ? " (" + judgement.Kind + ")" : "")}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]",
-                                          UnexpectedCause(facts), window.Process);
+                                          UnexpectedCause(facts), window.Process).Seen(firstSeen);
             }
             if (judgement.Kind == "plantoir content") contentWindows.Add(window.Element);
             if (_allowedSeen.Add($"{Stage}|{window.Handle}"))
@@ -274,7 +329,18 @@ internal sealed class WindowWatch
         // a dialog in it is judged exactly as one in the main window.
         foreach (var content in contentWindows) CheckDialogs(content);
         // Counted only now: a look that ended the run, or could not read the
-        // desktop, is not a look the run can lean on.
+        // desktop, is not a look the run can lean on. It is dated from when it
+        // read the desktop, not from when its judging finished.
+        lock (_recordLock)
+        {
+            var gapBefore = readAt - (_record.LastGood ?? readAt);
+            if (gapBefore > _largestGapSeen)
+            {
+                _largestGapSeen = gapBefore;
+                _largestGapStage = Stage.ToString();
+            }
+            _record.Succeeded(readAt);
+        }
         Interlocked.Increment(ref _looks);
     }
 
@@ -308,10 +374,11 @@ internal sealed class WindowWatch
     /// (<see cref="WindowRules.FinalWatchLength"/>): a deliberate observation
     /// window, not a wait for a condition.
     /// </summary>
-    public int Observe(TimeSpan period, Action<SeenWindow, string>? answer = null)
+    public (int Looks, TimeSpan LargestGap) Observe(TimeSpan period, Action<SeenWindow, string>? answer = null)
     {
         int before = Looks;
-        var until = DateTime.UtcNow + period;
+        var began = DateTime.UtcNow;
+        var until = began + period;
         while (DateTime.UtcNow < until)
         {
             Check(answer);
@@ -320,7 +387,14 @@ internal sealed class WindowWatch
         Check(answer);
         int looks = Looks - before;
         Settle($"the {period.TotalSeconds:0} s watch", answer);
-        return looks;
+        // Spread, not only counted (the fifth review): from the watch's start
+        // to its decision, no stretch longer than MaxLookGap without a
+        // successful look, the tail after the last one included.
+        var gap = LargestGap(began, DateTime.UtcNow);
+        if (gap > WindowRules.MaxLookGap)
+            throw Stopped.Driver($"the {period.TotalSeconds:0} s watch went {gap.TotalSeconds:0.0} s without a successful look of the desktop "
+                                 + $"(at most {WindowRules.MaxLookGap.TotalSeconds:0} s allowed; {FailedLooks} looks in the run could not read it), so it did not really watch", "coverage");
+        return (looks, gap);
     }
 
     /// <summary>
@@ -329,7 +403,10 @@ internal sealed class WindowWatch
     /// last look. Until then it goes on looking, a look a second, so each such
     /// window becomes readable and is judged, goes, or outlasts its grace and
     /// ends the run; at <see cref="WindowRules.SettleLimit"/> the run ends too,
-    /// not PASSED. Returns at once when nothing is pending.
+    /// not PASSED. Returns at once when nothing is pending AND the last look
+    /// read the desktop within <see cref="WindowRules.MaxLookAge"/> (the fifth
+    /// review); otherwise it looks again first. No successful look in the whole
+    /// settle time is a DRIVER PROBLEM, cause coverage.
     /// </summary>
     public void Settle(string what, Action<SeenWindow, string>? answer = null)
     {
@@ -337,12 +414,15 @@ internal sealed class WindowWatch
         bool noted = false;
         while (true)
         {
-            var decision = WindowRules.Settle(_pending.Count, DateTime.UtcNow - started);
+            var decision = WindowRules.Settle(_pending.Count, DateTime.UtcNow - started, Fresh(DateTime.UtcNow));
             if (decision == Settling.Done) break;
+            if (decision == Settling.NoRecentLook)
+                throw Stopped.Driver($"{what} could not finish: in {WindowRules.SettleLimit.TotalSeconds:0} s more no look read the desktop "
+                                     + $"({FailedLooks} looks in the run could not; the last successful one was {LastLookAge(DateTime.UtcNow).TotalSeconds:0} s ago), so nothing could be decided about it", "coverage");
             if (decision == Settling.OutOfTime)
                 throw Stopped.Product($"{what} could not finish: after {WindowRules.SettleLimit.TotalSeconds:0} s more, windows were still in a grace state ({string.Join("; ", _pending)}) [screenshot {Program.Shot("unsettled")}]",
                                       "unsettled");
-            if (!noted)
+            if (!noted && _pending.Count > 0)
             {
                 noted = true;
                 SettlingAfter = what;
@@ -371,7 +451,10 @@ internal sealed class WindowWatch
         try { popups = window.FindAllDescendants(cf => cf.ByClassName("Popup").And(cf.ByControlType(ControlType.Window))); }
         catch (Exception error)
         {
-            NoteUnreadable("dialogs|" + error.GetType().Name, $"note: the dialogs inside Plantoir's window could not be read at this look ({error.GetType().Name}: {error.Message})");
+            NoteUnreadable("dialogs|" + error.GetType().Name, $"note: the dialogs inside Plantoir's window could not be read at this look ({error.GetType().Name}: {error.Message}); pending until they can");
+            // Pending like any unreadable window (the fifth review): a step
+            // cannot finish on a look that could not see Plantoir's dialogs.
+            _pending.Add("the dialogs inside Plantoir's window could not be read");
             return;
         }
         foreach (var popup in popups)
@@ -395,7 +478,9 @@ internal sealed class WindowWatch
             catch (Exception error)
             {
                 _unreadable++;
-                NoteUnreadable("dialog|" + error.GetType().Name, $"note: a popup inside Plantoir's window could not be read ({error.GetType().Name}: {error.Message})");
+                NoteUnreadable("dialog|" + error.GetType().Name, $"note: a popup inside Plantoir's window could not be read ({error.GetType().Name}: {error.Message}); pending until it can be, or is gone");
+                // Pending, not skipped (the fifth review): it could be a dialog.
+                _pending.Add("a popup inside Plantoir's window that could not be read");
                 continue;
             }
             if (!isDialog) continue;

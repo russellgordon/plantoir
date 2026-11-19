@@ -27,16 +27,24 @@ namespace Plantoir.FirstInstall;
 ///   PlantoirFirstInstall.exe --self-test-final-watch --out C:\rehearsal --report …
 ///                            the final watch alone, for win-rehearsal.py's
 ///                            final-watch self-test; never says PASSED
+///                            [--self-test-fail-looks-after N]  every look from
+///                            N s into the watch on fails (the failed-looks self-test)
 ///
 /// PASSED is written only after the last step succeeded AND the desktop was
 /// then watched for <see cref="WindowRules.FinalWatchLength"/> with nothing
-/// unexpected (step 7). One driver runs at a time: a second one started while
-/// the first is alive does nothing and writes nothing.
+/// unexpected (step 7), AND every decision rested on a successful look made
+/// within <see cref="WindowRules.MaxLookAge"/>, with no gap over
+/// <see cref="WindowRules.MaxLookGap"/> in the final watch (the fifth review).
+/// One driver runs at a time: a second one started while the first is alive
+/// does nothing and writes nothing.
 ///
-/// Writes steps.log (a line per event), result.txt (the outcome, last: a
-/// "status:" line the Mac decides by, then the "DRIVER RESULT:" line) and
-/// shots\NN-label.png into --out, and PUTs each to --report as it is written,
-/// so the Mac has the evidence even if the machine stops answering.
+/// Writes steps.log (a line per event), result.txt (fixed fields the Mac
+/// decides by: status, cause, the look record's counts and gaps, times; then
+/// the "DRIVER RESULT:" line), small value files (driver-started-PID.txt,
+/// step-N.txt, final-watch-began.txt) and shots\NN-label.png into --out, and
+/// PUTs each to --report as it is written, so the Mac has the evidence even if
+/// the machine stops answering. result.txt is written straight after the last
+/// look; notes, shots and uploads come after it.
 /// Exit code: 0 passed, 2 product stopped, 1 driver problem, 3 the final-watch
 /// self-test ended with nothing seen, 4 another driver was already running.
 /// </summary>
@@ -51,6 +59,24 @@ internal static class Program
     private static string _stepName = "starting";
     private static UIA3Automation _automation = null!;
     private static WindowWatch _watch = null!;
+    private static DateTime? _finalWatchBegan;
+    private static TimeSpan? _failLooksAfter;
+    private static TimeSpan? _finalWatchGap;
+    private static int _finalWatchLooks;
+
+    private static long UnixMs(DateTime utc) => new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeMilliseconds();
+
+    /// <summary>Writes a small file of values into --out and sends it to the Mac (a step's start, the final watch's start, a driver's start).</summary>
+    private static void Mark(string name, string text)
+    {
+        try
+        {
+            string path = Path.Combine(_out, name);
+            File.WriteAllText(path, text + Environment.NewLine);
+            Send(path, name);
+        }
+        catch (Exception error) { Console.WriteLine($"(could not write {name}: {error.Message})"); }
+    }
 
     public static int Main(string[] args)
     {
@@ -61,6 +87,7 @@ internal static class Program
             if (args[i] == "--url") url = args[i + 1];
             if (args[i] == "--out") _out = args[i + 1];
             if (args[i] == "--report") _report = args[i + 1];
+            if (args[i] == "--self-test-fail-looks-after") _failLooksAfter = TimeSpan.FromSeconds(int.Parse(args[i + 1]));
         }
         // One driver at a time in the session (the Mac retries a refused
         // launch; the review of 2026-11-18 asked that a late first attempt can
@@ -72,6 +99,9 @@ internal static class Program
             return 4;
         }
         Directory.CreateDirectory(Path.Combine(_out, "shots"));
+        // A file per driver that starts, named by its process id, which the Mac
+        // counts (exec-refused self-test): a value no other driver can erase.
+        Mark($"driver-started-{Environment.ProcessId}.txt", $"pid {Environment.ProcessId}, started {UnixMs(DateTime.UtcNow)} ms");
         try
         {
             _automation = new UIA3Automation();
@@ -99,7 +129,7 @@ internal static class Program
         }
         catch (Stopped stop)
         {
-            return Finish(stop.Outcome, stop.Message, stop.Cause, stop.WindowProcess);
+            return Finish(stop.Outcome, stop.Message, stop.Cause, stop.WindowProcess, stop.WindowFirstSeen);
         }
         catch (Exception error)
         {
@@ -140,14 +170,23 @@ internal static class Program
     {
         Step($"watch the desktop for {WindowRules.FinalWatchLength.TotalSeconds:0} s after the last step");
         _watch.Stage = Stage.FinalWatch;
+        _finalWatchBegan = DateTime.UtcNow;
+        // The Mac knows the watch began from this file, a value, not the log line.
+        Mark("final-watch-began.txt", UnixMs(_finalWatchBegan.Value).ToString());
+        if (_failLooksAfter is { } after)
+        {
+            _watch.FailReadsFrom = _finalWatchBegan.Value + after;
+            Note($"SELF-TEST: every look from {after.TotalSeconds:0} s into the final watch on is made to fail; the run must not end clean");
+        }
         Note($"FINAL WATCH BEGINS: {WindowRules.FinalWatchLength.TotalSeconds:0} s");
-        int looks = _watch.Observe(WindowRules.FinalWatchLength);
+        var (looks, gap) = _watch.Observe(WindowRules.FinalWatchLength);
+        _finalWatchGap = gap;
         bool enough = WindowRules.LookedEnough(looks, WindowRules.FinalWatchLength, out int required);
-        Note($"FINAL WATCH ENDED: nothing unexpected; {looks} real looks (at least {required} required), {_watch.FailedLooks} looks in the whole run could not read the desktop, "
-             + $"{_watch.Unreadable} different top-level windows could not be read at some look (each recorded above), {_watch.UnreadablePopups} popups inside Plantoir's window could not be read");
         if (!enough)
-            throw Stopped.Driver($"the final watch made only {looks} real looks in {WindowRules.FinalWatchLength.TotalSeconds:0} s (at least {required} required), so it did not really watch");
-        Shot("final-watch");
+            throw Stopped.Driver($"the final watch made only {looks} real looks in {WindowRules.FinalWatchLength.TotalSeconds:0} s (at least {required} required), so it did not really watch", "coverage");
+        // No note, shot or upload here: the next thing is Finish, which looks
+        // once more and writes the result before any slow work (the fifth review).
+        _finalWatchLooks = looks;
         return looks;
     }
 
@@ -162,6 +201,7 @@ internal static class Program
     {
         _stepNumber++;
         _stepName = name;
+        Mark($"step-{_stepNumber}.txt", UnixMs(DateTime.UtcNow).ToString());
         Note($"STEP {_stepNumber}: {name}");
         Shot("step" + _stepNumber);
     }
@@ -211,9 +251,32 @@ internal static class Program
         catch { /* the Mac collects the folder at the end too */ }
     }
 
-    private static int Finish(Outcome outcome, string reason, string cause = "", string process = "")
+    private static int Finish(Outcome outcome, string reason, string cause = "", string process = "", DateTime? windowFirstSeen = null)
     {
-        string shot = Shot("result");
+        // PASSED is written only on a look made now (the fifth review): after
+        // the final watch's last look there used to come a note, a shot and
+        // uploads (30 s time-outs each) before the result. So: look once more,
+        // settle (which insists on a successful look within MaxLookAge), and
+        // write the result at once; every slow thing comes after.
+        if (outcome == Outcome.Passed)
+        {
+            try
+            {
+                _watch.Check(null);
+                _watch.Settle("the decision to write PASSED");
+            }
+            catch (Stopped stop)
+            {
+                return Finish(stop.Outcome, stop.Message, stop.Cause, stop.WindowProcess, stop.WindowFirstSeen);
+            }
+            catch (Exception error)
+            {
+                return Finish(Outcome.DriverProblem, "the look before writing PASSED failed: " + error.GetType().Name + ": " + error.Message);
+            }
+            if (!_watch.Fresh(DateTime.UtcNow))
+                return Finish(Outcome.DriverProblem, "no successful look of the desktop was recent enough to write PASSED on", "coverage");
+        }
+        var decided = DateTime.UtcNow;
         string word = outcome switch
         {
             Outcome.Passed => "PASSED",
@@ -234,18 +297,48 @@ internal static class Program
             Outcome.SelfTestOnly => "self-test-watch-clean",
             _ => "driver-problem",
         };
-        string line = $"DRIVER RESULT (the driver's own; the Mac's final outcome is the last line of its report): {word}{where}: {reason} [screenshot {shot}]";
-        Note(line);
-        // Fixed fields the Mac's self-tests decide by, never the sentence.
+        string line = $"DRIVER RESULT (the driver's own; the Mac's final outcome is the last line of its report): {word}{where}: {reason}";
+        // Fixed fields the Mac decides by, never the sentence. The look
+        // record's values let the Mac refuse a PASSED with a stretch nobody
+        // looked through (largest-look-gap-ms) or one written on an old look
+        // (last-look-age-ms). Times are milliseconds since 1970, UTC, by the
+        // driver's clock; the Mac compares them only with each other.
+        static string Ms(TimeSpan span) => span == TimeSpan.MaxValue ? "none" : ((long)span.TotalMilliseconds).ToString();
         var fields = new StringBuilder();
-        fields.Append("status: " + status + Environment.NewLine);
-        fields.Append("stage: " + (_watch?.Stage.ToString() ?? "Starting") + Environment.NewLine);
-        fields.Append("cause: " + (cause.Length > 0 ? cause : "none") + Environment.NewLine);
-        fields.Append("window-process: " + (process.Length > 0 ? process : "none") + Environment.NewLine);
-        fields.Append("settling-after: " + (_watch?.SettlingAfter ?? "none") + Environment.NewLine);
+        void Field(string name, string value) => fields.Append(name + ": " + value + Environment.NewLine);
+        Field("status", status);
+        Field("stage", _watch?.Stage.ToString() ?? "Starting");
+        Field("cause", cause.Length > 0 ? cause : "none");
+        Field("window-process", process.Length > 0 ? process : "none");
+        Field("settling-after", _watch?.SettlingAfter ?? "none");
+        Field("decided-unix-ms", UnixMs(decided).ToString());
+        Field("final-watch-began-unix-ms", _finalWatchBegan is { } began ? UnixMs(began).ToString() : "none");
+        Field("window-first-seen-unix-ms", windowFirstSeen is { } seen ? UnixMs(seen).ToString() : "none");
+        if (_watch is not null)
+        {
+            var (gap, gapStage) = _watch.LargestGap(decided);
+            Field("looks", _watch.Looks.ToString());
+            Field("failed-looks", _watch.FailedLooks.ToString());
+            Field("largest-look-gap-ms", Ms(gap));
+            Field("largest-look-gap-stage", gapStage);
+            Field("last-look-age-ms", Ms(_watch.LastLookAge(decided)));
+            Field("final-watch-looks", _finalWatchBegan is null ? "none" : _finalWatchLooks.ToString());
+            Field("final-watch-largest-look-gap-ms", _finalWatchGap is { } watchGap ? Ms(watchGap) : "none");
+            Field("unreadable-windows", _watch.Unreadable.ToString());
+            Field("unreadable-popups", _watch.UnreadablePopups.ToString());
+        }
+        else
+        {
+            foreach (string name in new[] { "looks", "failed-looks", "largest-look-gap-ms", "largest-look-gap-stage", "last-look-age-ms",
+                                            "final-watch-looks", "final-watch-largest-look-gap-ms", "unreadable-windows", "unreadable-popups" })
+                Field(name, "none");
+        }
         string path = Path.Combine(_out, "result.txt");
         File.WriteAllText(path, fields + line + Environment.NewLine);
         Send(path, "result.txt");
+        // Now the slow work, which no longer stands between the look and the result.
+        Note(line);
+        Note($"the result's screenshot: {Shot("result")}; looks {(_watch?.Looks.ToString() ?? "none")}, failed looks {(_watch?.FailedLooks.ToString() ?? "none")}");
         return outcome switch { Outcome.Passed => 0, Outcome.ProductStopped => 2, Outcome.SelfTestOnly => 3, _ => 1 };
     }
 }
@@ -260,6 +353,14 @@ internal sealed class Stopped : Exception
     public string Cause { get; }
     /// <summary>The process of the window the run stopped on, or empty.</summary>
     public string WindowProcess { get; }
+    /// <summary>When the watcher first saw the window the run stopped on (UTC), or null.</summary>
+    public DateTime? WindowFirstSeen { get; private set; }
+    /// <summary>Records when the window this stop names was first seen.</summary>
+    public Stopped Seen(DateTime firstSeen)
+    {
+        WindowFirstSeen = firstSeen;
+        return this;
+    }
     public Stopped(Outcome outcome, string message, string cause = "", string windowProcess = "") : base(message)
     {
         Outcome = outcome;
@@ -268,5 +369,6 @@ internal sealed class Stopped : Exception
     }
 
     public static Stopped Product(string message, string cause = "", string windowProcess = "") => new(Outcome.ProductStopped, message, cause, windowProcess);
-    public static Stopped Driver(string message) => new(Outcome.DriverProblem, message);
+    /// <summary>A DRIVER PROBLEM; cause "coverage" when nobody was looking (the fifth review).</summary>
+    public static Stopped Driver(string message, string cause = "") => new(Outcome.DriverProblem, message, cause);
 }

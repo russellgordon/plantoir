@@ -59,6 +59,12 @@ internal enum Settling
     KeepLooking,
     /// <summary>Windows were still in a grace state after <see cref="WindowRules.SettleLimit"/>: the run ends, not PASSED.</summary>
     OutOfTime,
+    /// <summary>
+    /// No successful look within <see cref="WindowRules.MaxLookAge"/> could be
+    /// made in <see cref="WindowRules.SettleLimit"/>: nobody was looking, so the
+    /// run ends as a DRIVER PROBLEM (cause "coverage"), never PASSED.
+    /// </summary>
+    NoRecentLook,
 }
 
 internal readonly record struct Judgement(Verdict Verdict, string Kind)
@@ -415,14 +421,51 @@ internal static class WindowRules
     /// <paramref name="pending"/> is how many are, at the last look; <paramref name="waited"/>
     /// how long it has gone on looking past its own end.
     /// </summary>
-    public static Settling Settle(int pending, TimeSpan waited) =>
-        pending == 0 ? Settling.Done : waited >= SettleLimit ? Settling.OutOfTime : Settling.KeepLooking;
+    /// <remarks>
+    /// <paramref name="freshLook"/> is whether the last look read the desktop
+    /// AND was made within <see cref="MaxLookAge"/> (the fifth review: a look
+    /// that cannot read the desktop keeps the previous look's pending set, so
+    /// a watch whose last looks all failed decided on a stale, empty set and
+    /// PASSED was written for a desktop nobody looked at). Without one, nothing
+    /// is finished, whatever the pending count says.
+    /// </remarks>
+    public static Settling Settle(int pending, TimeSpan waited, bool freshLook)
+    {
+        if (freshLook && pending == 0) return Settling.Done;
+        if (waited < SettleLimit) return Settling.KeepLooking;
+        // Without a fresh look the pending count is an old look's, so running
+        // out of time then says nobody was looking, not that a window stayed.
+        return freshLook ? Settling.OutOfTime : Settling.NoRecentLook;
+    }
+
+    /// <summary>
+    /// How recent the last successful look must be when a step or a watch is
+    /// declared finished, or PASSED is written (the fifth review). Looks are a
+    /// second apart and one takes about 0.3 s under emulation (a launch call
+    /// of 22 s saw 17 looks, rehearsal 2026-11-18-184324), so 5 s is several
+    /// looks' worth: a decision older than that is a decision about a desktop
+    /// nobody has looked at lately.
+    /// </summary>
+    public static readonly TimeSpan MaxLookAge = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// The largest gap allowed between successful looks: inside the final
+    /// watch the driver enforces it itself (DRIVER PROBLEM, cause "coverage"),
+    /// and over the whole run it is recorded in result.txt
+    /// (largest-look-gap-ms), and the Mac refuses a PASSED whose record is
+    /// over it. Ten seconds: a window that comes and goes faster than that
+    /// between two looks is not something a teacher could have read either,
+    /// and slow work on the step's own thread (a screenshot, reading a
+    /// browser's words) stays well inside it.
+    /// </summary>
+    public static readonly TimeSpan MaxLookGap = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Whether the watcher looked enough during a stretch of time: at least
     /// one real look, and one for every three seconds (the installer's launch
     /// call, Steps.cs; the final watch, Program.cs). False means the stretch
-    /// was not really watched and the run is a DRIVER PROBLEM.
+    /// was not really watched and the run is a DRIVER PROBLEM. A count alone
+    /// says nothing about spread: <see cref="LookRecord.LargestGap"/> does.
     /// </summary>
     public static bool LookedEnough(int realLooks, TimeSpan stretch, out int required)
     {
@@ -599,4 +642,82 @@ internal sealed class UnreadableWindows<T>
         }
         return events;
     }
+}
+
+/// <summary>
+/// The record of every look the watcher made: when each successful one read
+/// the desktop, and how many failed (the fifth review: a look that could not
+/// read the desktop returned early and was simply not counted, so a stretch of
+/// failed looks was invisible). It answers the two questions every decision
+/// needs, with no UI Automation in it so the tests can drive it: was the last
+/// look successful and recent (<see cref="FreshAt"/>), and what was the
+/// largest stretch with no successful look (<see cref="LargestGap"/>), over
+/// the whole run or over one watch. A gap is measured from the record's start,
+/// between successful looks, and on to the moment asked about, so a tail of
+/// failed looks is a gap too.
+/// </summary>
+internal sealed class LookRecord
+{
+    private readonly DateTime _start;
+    private readonly List<DateTime> _good = new();
+    private bool _lastFailed;
+
+    public LookRecord(DateTime start) => _start = start;
+
+    /// <summary>Successful looks so far.</summary>
+    public int Good => _good.Count;
+
+    /// <summary>Looks that could not read the desktop.</summary>
+    public int Failed { get; private set; }
+
+    /// <summary>When the last successful look read the desktop, or null.</summary>
+    public DateTime? LastGood => _good.Count == 0 ? null : _good[^1];
+
+    /// <summary>A look that read the desktop at <paramref name="readAt"/>.</summary>
+    public void Succeeded(DateTime readAt)
+    {
+        // Looks are made on one thread, in order; a clock step backwards is
+        // recorded as a look at the last time rather than reordering the list.
+        if (_good.Count > 0 && readAt < _good[^1]) readAt = _good[^1];
+        _good.Add(readAt);
+        _lastFailed = false;
+    }
+
+    /// <summary>A look that could not read the desktop.</summary>
+    public void FailedLook()
+    {
+        Failed++;
+        _lastFailed = true;
+    }
+
+    /// <summary>
+    /// Whether a decision may be made at <paramref name="now"/>: the last look
+    /// was successful, and made within <see cref="WindowRules.MaxLookAge"/>.
+    /// </summary>
+    public bool FreshAt(DateTime now) =>
+        !_lastFailed && LastGood is { } last && now - last <= WindowRules.MaxLookAge;
+
+    /// <summary>
+    /// The largest stretch between <paramref name="from"/> and
+    /// <paramref name="to"/> with no successful look in it: from
+    /// <paramref name="from"/> to the first look after it, between looks, and
+    /// from the last look to <paramref name="to"/>.
+    /// </summary>
+    public TimeSpan LargestGap(DateTime from, DateTime to)
+    {
+        DateTime previous = from;
+        TimeSpan largest = TimeSpan.Zero;
+        foreach (var look in _good)
+        {
+            if (look <= from) continue;
+            if (look > to) break;
+            if (look - previous > largest) largest = look - previous;
+            previous = look;
+        }
+        if (to - previous > largest) largest = to - previous;
+        return largest;
+    }
+
+    /// <summary>The largest gap from the record's start (the driver's first look) to <paramref name="now"/>.</summary>
+    public TimeSpan LargestGap(DateTime now) => LargestGap(_start, now);
 }

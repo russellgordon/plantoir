@@ -534,10 +534,10 @@ public class WindowRulesTests
     [Fact]
     public void AWatchMayNotFinishWhileAWindowIsInAGraceState()
     {
-        Assert.Equal(Settling.Done, WindowRules.Settle(0, TimeSpan.Zero));
-        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(1, TimeSpan.Zero));
-        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(2, WindowRules.SettleLimit - TimeSpan.FromSeconds(1)));
-        Assert.Equal(Settling.OutOfTime, WindowRules.Settle(1, WindowRules.SettleLimit));
+        Assert.Equal(Settling.Done, WindowRules.Settle(0, TimeSpan.Zero, true));
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(1, TimeSpan.Zero, true));
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(2, WindowRules.SettleLimit - TimeSpan.FromSeconds(1), true));
+        Assert.Equal(Settling.OutOfTime, WindowRules.Settle(1, WindowRules.SettleLimit, true));
         Assert.Equal(TimeSpan.FromSeconds(60), WindowRules.SettleLimit);
     }
 
@@ -547,7 +547,7 @@ public class WindowRulesTests
         var tracker = Tracker();
         tracker.Look(Listing(new Unreadable("late")), NoneReadable, Start);
         Assert.True(tracker.Pending);
-        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(tracker.Pending ? 1 : 0, TimeSpan.Zero));
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(tracker.Pending ? 1 : 0, TimeSpan.Zero, true));
         tracker.Look(Listing(), NoneReadable, Start + TimeSpan.FromSeconds(3));
         Assert.False(tracker.Pending);
     }
@@ -561,5 +561,93 @@ public class WindowRulesTests
         var making = Window("", "", "Plantoir");
         Assert.Equal(Verdict.Settling, VerdictOf(Stage.FinalWatch, making, 5));
         Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.FinalWatch, making, WindowRules.SettlingLimit.TotalSeconds));
+    }
+
+    // ---- Proof of looking: every decision rests on a recent successful look (the fifth review) ----
+
+    private static LookRecord Record() => new(Start);
+
+    private static void LooksEverySecond(LookRecord record, int fromSecond, int toSecond)
+    {
+        for (int second = fromSecond; second <= toSecond; second++) record.Succeeded(Start + TimeSpan.FromSeconds(second));
+    }
+
+    [Fact]
+    public void AWatchWhoseLastLooksAllFailedCannotFinishEvenWithNothingPending()
+    {
+        // Looks every second for 20 s, then 40 s of failed reads: the pending
+        // set the last good look left is empty, and that must not be enough.
+        var record = Record();
+        LooksEverySecond(record, 0, 20);
+        for (int second = 21; second <= 60; second++) record.FailedLook();
+        var decisionAt = Start + TimeSpan.FromSeconds(60);
+        Assert.False(record.FreshAt(decisionAt));
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(0, TimeSpan.Zero, record.FreshAt(decisionAt)));
+        // Still no successful look when the settle time is up: nobody looked, a DRIVER PROBLEM.
+        Assert.Equal(Settling.NoRecentLook, WindowRules.Settle(0, WindowRules.SettleLimit, record.FreshAt(decisionAt + WindowRules.SettleLimit)));
+        Assert.Equal(40, record.Failed);
+        Assert.Equal(TimeSpan.FromSeconds(40), record.LargestGap(Start, decisionAt));
+        Assert.True(record.LargestGap(Start, decisionAt) > WindowRules.MaxLookGap);
+    }
+
+    [Fact]
+    public void OneLongGapInTheMiddleOfAWatchIsFoundThoughTheCountIsEnough()
+    {
+        // 50 good looks in 60 s pass the count (20 required), but none from 20 s to 35 s.
+        var record = Record();
+        LooksEverySecond(record, 0, 20);
+        LooksEverySecond(record, 35, 64);
+        var end = Start + TimeSpan.FromSeconds(64);
+        Assert.True(WindowRules.LookedEnough(record.Good, TimeSpan.FromSeconds(60), out _));
+        Assert.Equal(TimeSpan.FromSeconds(15), record.LargestGap(Start, end));
+        Assert.True(record.LargestGap(Start, end) > WindowRules.MaxLookGap);
+        // Asked about the watch after the gap only, it is clean.
+        Assert.Equal(TimeSpan.FromSeconds(1), record.LargestGap(Start + TimeSpan.FromSeconds(35), end));
+    }
+
+    [Fact]
+    public void AFailedLookImmediatelyBeforeTheDecisionMeansLookAgain()
+    {
+        var record = Record();
+        LooksEverySecond(record, 0, 30);
+        var now = Start + TimeSpan.FromSeconds(30.5);
+        Assert.True(record.FreshAt(now));
+        record.FailedLook();
+        Assert.False(record.FreshAt(now));
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(0, TimeSpan.Zero, record.FreshAt(now)));
+        // The next successful look makes it fresh again.
+        record.Succeeded(Start + TimeSpan.FromSeconds(31.5));
+        Assert.True(record.FreshAt(Start + TimeSpan.FromSeconds(32)));
+        Assert.Equal(Settling.Done, WindowRules.Settle(0, TimeSpan.Zero, record.FreshAt(Start + TimeSpan.FromSeconds(32))));
+    }
+
+    [Fact]
+    public void ALookOlderThanTheBoundIsNotFresh()
+    {
+        var record = Record();
+        record.Succeeded(Start);
+        Assert.True(record.FreshAt(Start + WindowRules.MaxLookAge));
+        Assert.False(record.FreshAt(Start + WindowRules.MaxLookAge + TimeSpan.FromMilliseconds(1)));
+        Assert.False(Record().FreshAt(Start));   // no look at all
+        Assert.Equal(TimeSpan.FromSeconds(5), WindowRules.MaxLookAge);
+        Assert.Equal(TimeSpan.FromSeconds(10), WindowRules.MaxLookGap);
+    }
+
+    [Fact]
+    public void TheGapRunsOnToTheMomentAskedAbout()
+    {
+        var record = Record();
+        LooksEverySecond(record, 0, 10);
+        Assert.Equal(TimeSpan.FromSeconds(30), record.LargestGap(Start + TimeSpan.FromSeconds(40)));
+        // From a start with no look after it at all.
+        Assert.Equal(TimeSpan.FromSeconds(20), record.LargestGap(Start + TimeSpan.FromSeconds(20), Start + TimeSpan.FromSeconds(40)));
+    }
+
+    [Fact]
+    public void AStaleEmptySetWithAFreshLookIsTheOnlyWayToFinish()
+    {
+        Assert.Equal(Settling.Done, WindowRules.Settle(0, TimeSpan.FromSeconds(3), true));
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(0, TimeSpan.FromSeconds(3), false));
+        Assert.Equal(Settling.NoRecentLook, WindowRules.Settle(2, WindowRules.SettleLimit, false));   // a stale pending set says nothing
     }
 }
