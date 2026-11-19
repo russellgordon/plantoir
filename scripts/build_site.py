@@ -8125,9 +8125,8 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
     tmp = None
     try:
         tmp = _a_private_temporary_beside(path, ".course_config.")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.write("\n")
+        with open(tmp, "wb") as f:
+            f.write(_settings_file_bytes(data))
         _replace_with_the_mode_of(tmp, path)
         print("✅ Updated course_config.json with discovered items.")
         return True
@@ -8184,9 +8183,102 @@ def _dropping_excluded_items(cfg: dict) -> dict:
     return corrected
 
 
+def _settings_file_bytes(data: dict) -> bytes:
+    """The settings as preflight's write-back writes them: two-space indent,
+    non-ASCII kept, one closing newline. The build's reading takes these bytes
+    when preflight changed the settings, so the copies inside the site are
+    exactly what was written (#999).
+
+    Line ends are the platform's, as the text-mode write this replaced gave
+    (CRLF on Windows), so a file preflight writes is byte for byte what it
+    was before #999. JSON's own escaping means no line end occurs inside a
+    value, so only the breaks between lines change."""
+    text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    return text.replace("\n", os.linesep).encode("utf-8")
+
+
+class BuildSettings:
+    """
+    The one reading of `course_config.json` a build makes (#999).
+
+    A build used to open the file five or more times: to load it, in
+    preflight (again on a retry), to ask whether the course is kept for
+    reference, to copy it into the Quartz folder the site's components
+    import, and to copy it to the output root. A Save landing between two of
+    those gave one build a site of mixed settings: a sidebar from the new
+    file and pages from the old, say. Now the file is read once, at the start,
+    and every later step asks this object.
+
+    `file_bytes` and `config` always describe the same settings: `config` is
+    `file_bytes` parsed, except after preflight's write-back or its
+    reconciled fallback, where `file_bytes` is `config` serialized the way
+    the write-back writes it.
+
+    Preflight's compare-and-swap is the one place the file can be read again:
+    when the file changed while preflight scanned (a rename, which writes at
+    once) and preflight has something to write, it reads the newer file and
+    redoes its discovery rather than erase the rename. That newer reading then
+    becomes this build's one reading for every step after preflight; before
+    preflight only the section check and the How I Teach note had looked.
+    """
+
+    def __init__(self, config: dict, file_bytes: bytes):
+        self.config = config
+        self.file_bytes = file_bytes
+
+    @classmethod
+    def read_from(cls, config_path: Path) -> "BuildSettings":
+        """Read the file once. A file that is not JSON raises, as the build's
+        load always has."""
+        with open(config_path, "rb") as handle:
+            file_bytes = handle.read()
+        config = json.loads(file_bytes.decode("utf-8"))
+        return cls(config, file_bytes)
+
+    @classmethod
+    def from_config(cls, config: dict) -> "BuildSettings":
+        return cls(config, _settings_file_bytes(config))
+
+    def text(self) -> str:
+        """The reading as text, a byte-order mark swallowed the way
+        `reference_course` reads the file."""
+        return self.file_bytes.decode("utf-8-sig")
+
+    def is_frozen(self) -> bool:
+        """Kept for reference, or cannot tell: the build never rewrites a
+        frozen course's files. Asked of this reading, not the file."""
+        settings_text = self.text()
+        if reference_course.is_reference_in(settings_text):
+            return True
+        return reference_course.cannot_tell_from(settings_text)
+
+
 def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path,
                                    _attempt: int = 0) -> dict:
-    """Discover new items and append them to course_config.json. Return updated config dict.
+    """Preflight, for a caller that wants only the settings it ends with.
+    See `preflight_the_build_settings`, which the build itself calls."""
+    settings = _preflight(course_dir, section_dir, config_path, None, _attempt)
+    if settings is None:
+        return {}
+    return settings.config
+
+
+def preflight_the_build_settings(course_dir: Path, section_dir: Path, config_path: Path,
+                                 settings: BuildSettings) -> BuildSettings:
+    """Preflight that starts from the build's own reading rather than opening
+    the file again, and returns the reading every later step uses (#999).
+    A preflight that cannot run hands back the reading it was given."""
+    after = _preflight(course_dir, section_dir, config_path, settings.file_bytes, 0)
+    if after is None:
+        return settings
+    return after
+
+
+def _preflight(course_dir: Path, section_dir: Path, config_path: Path,
+               config_bytes_given, _attempt: int):
+    """Discover new items and append them to course_config.json. Return the
+    BuildSettings it ends with, or None when the settings could not be read.
+    Also: any newly discovered folders are added to the expandable list.
     Also: any newly discovered folders are added to the expandable list.
 
     It NEVER changes `hidden` (issue #265, 2026-09-24). It used to take a
@@ -8223,13 +8315,19 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     # what the config says). It is not add-only — an excluded name is dropped
     # from the copy lists — but that is a function of the same two inputs, so
     # redoing it against newer contents still cannot lose anything.
+    #
+    # The build hands over the bytes it read at its start (#999), so the
+    # first attempt does not open the file again; a retry reads it afresh.
     try:
-        with open(config_path, "rb") as f:
-            config_bytes_when_read = f.read()
+        if config_bytes_given is not None and _attempt == 0:
+            config_bytes_when_read = config_bytes_given
+        else:
+            with open(config_path, "rb") as f:
+                config_bytes_when_read = f.read()
         cfg = json.loads(config_bytes_when_read.decode("utf-8"))
     except Exception as e:
         print(f"❌ Could not read course_config.json for preflight: {e}")
-        return {}
+        return None
 
     # Read current lists (copy so we can mutate safely)
     shared_folders = list(cfg.get("shared_folders", []))
@@ -8379,30 +8477,47 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
                 try:
                     latest = json.loads(config_bytes_now.decode("utf-8"))
                 except Exception:
-                    return cfg
+                    return BuildSettings.from_config(cfg)
                 # Returning the raw file would hand the build a configuration
                 # whose EXCLUSIONS have not been reconciled — and nothing
                 # downstream of preflight consults `excluded_items`, so a folder
                 # the teacher excluded would be published on this build. The
                 # file is still left alone; only what this build is given is
                 # corrected.
-                return _dropping_excluded_items(latest)
+                return BuildSettings.from_config(_dropping_excluded_items(latest))
             print("ℹ️ course_config.json changed while preflight was looking "
                   "(a rename, most likely) — reading it again.")
-            return preflight_update_course_config(
-                course_dir, section_dir, config_path, _attempt + 1
+            return _preflight(
+                course_dir, section_dir, config_path, None, _attempt + 1
             )
         _atomic_write_json_with_backup(config_path, cfg)
-    else:
-        print("ℹ️ No new items discovered; course_config.json unchanged.")
+        # What was written, so the build's copies match the file it left
+        # (and, if the write failed, still match the settings it builds with).
+        return BuildSettings.from_config(cfg)
 
-    return cfg
+    print("ℹ️ No new items discovered; course_config.json unchanged.")
+    return BuildSettings(cfg, config_bytes_when_read)
 # =============================================================================
 
 # === NEW: Fix Netlify static import for course_config.json ====================
-def _copy_course_config_into_quartz(course_dir: Path, output_dir: Path):
+def _write_the_build_settings(destination: Path, settings: BuildSettings):
+    """Put the build's one reading at `destination` (#999), never a fresh copy
+    of the file: a Save since the build started must not reach this site.
+    Left alone when it already holds those bytes."""
+    try:
+        if destination.read_bytes() == settings.file_bytes:
+            return
+    except OSError:
+        pass
+    destination.write_bytes(settings.file_bytes)
+
+
+def _copy_course_config_into_quartz(course_dir: Path, output_dir: Path,
+                                    settings: BuildSettings | None = None):
     """
-    Copy <course_dir>/course_config.json into <output_dir>/quartz/course_config.json.
+    Put the build's settings at <output_dir>/quartz/course_config.json, where
+    the site's components import them. With `settings`, the build's one
+    reading (#999); without, a copy of <course_dir>/course_config.json.
     If missing at the course root, write a minimal default to prevent build errors.
     """
     src = course_dir / "course_config.json"
@@ -8410,7 +8525,10 @@ def _copy_course_config_into_quartz(course_dir: Path, output_dir: Path):
     quartz_dir.mkdir(parents=True, exist_ok=True)
     dst = quartz_dir / "course_config.json"
 
-    if src.exists():
+    if settings is not None:
+        _write_the_build_settings(dst, settings)
+        print(f"✅ Copied course_config.json → {dst.relative_to(output_dir)}")
+    elif src.exists():
         shutil.copy2(src, dst)
         print(f"✅ Copied course_config.json → {dst.relative_to(output_dir)}")
     else:
@@ -10604,8 +10722,11 @@ def build_section_site(
 
     section_dir = course_dir / section_name
 
-    with open(config_file, "r", encoding="utf-8") as f:
-        config = json.load(f)
+    # The build's ONE reading of the settings (#999). Every later step asks
+    # `build_settings` (or `config`, which is its parsed form), never the
+    # file: a Save landing mid-build must not give one site two settings.
+    build_settings = BuildSettings.read_from(config_file)
+    config = build_settings.config
 
     # Validate the requested section number against timetable sections
     allowed_sections = get_allowed_section_numbers(config)
@@ -10629,7 +10750,8 @@ def build_section_site(
             how_i_teach_dropped_places.append(how_i_teach.place_in_the_course(str(name), section_name))
 
     print("\n🔎 Preflight: discovering new shared and per-section items...")
-    config = preflight_update_course_config(course_dir, section_dir, config_file) or config
+    build_settings = preflight_the_build_settings(course_dir, section_dir, config_file, build_settings)
+    config = build_settings.config
     # ========================================================================
 
     # What this course calls a unit, before anything asks what a class page is.
@@ -10751,7 +10873,7 @@ def build_section_site(
         base_scss = output_dir / "quartz" / "styles" / "base.scss"
 
     # ALWAYS: Fix Netlify static import target
-    _copy_course_config_into_quartz(course_dir, output_dir)
+    _copy_course_config_into_quartz(course_dir, output_dir, build_settings)
     _patch_quartz_imports_to_local_config(output_dir / "quartz")
 
     # Apply teacher preference to ContentMeta on each build
@@ -10810,7 +10932,7 @@ def build_section_site(
     # A course kept for reference is last year's, frozen on purpose: the build
     # puts right its site copy (the date pass, #275/#276; the front page's
     # title, #584) but never rewrites its files.
-    frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
+    frozen_course = build_settings.is_frozen()
     copy_the_section_front_page(course_dir, section_dir, content_root, config, section_number,
                                 show_marker, course_code, frozen_course)
 
@@ -11090,7 +11212,7 @@ def build_section_site(
     # ===========================================================================
 
     # Copy course config into output root (back-compat)
-    shutil.copy2(config_file, output_dir / "course_config.json")
+    _write_the_build_settings(output_dir / "course_config.json", build_settings)
     print("✅ Copied course_config.json to output directory (root copy)")
 
     # Update Quartz layout & footer
