@@ -60,7 +60,7 @@ internal static class UndoLimits
     /// the steps before it. Taken over every step in seq order, as the
     /// reference model does.
     /// </summary>
-    internal static Dictionary<long, DateTimeOffset> StepTimes(UndoFolded folded)
+    internal static Dictionary<long, DateTimeOffset> StepTimes(UndoFolded folded, DateTimeOffset now)
     {
         var times = new Dictionary<long, DateTimeOffset>();
         DateTimeOffset? running = null;
@@ -91,7 +91,7 @@ internal static class UndoLimits
     internal static UndoOffered Offer(UndoFolded folded, DateTimeOffset now,
                                       Func<UndoProcess?, bool> isAlive, Func<UndoStep, bool> canReach)
     {
-        Dictionary<long, DateTimeOffset> times = StepTimes(folded);
+        Dictionary<long, DateTimeOffset> times = StepTimes(folded, now);
         DateTimeOffset judged = JudgedAt(now, times.Values);
         var listed = folded.OnTheList.ToList();
 

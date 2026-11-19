@@ -31,11 +31,14 @@ internal static class UndoPruning
     /// step still in flight in that run is closed there rather than stopping
     /// the run; a running one stops it.
     /// </summary>
-    internal static IReadOnlyList<UndoPruneAction> Decide(UndoFolded folded, DateTimeOffset now, Func<UndoProcess?, bool> isAlive)
+    internal static IReadOnlyList<UndoPruneAction> Decide(UndoReading reading, DateTimeOffset now, Func<UndoProcess?, bool> isAlive) =>
+        Decide(reading.Folded, now, isAlive);
+
+    private static IReadOnlyList<UndoPruneAction> Decide(UndoFolded folded, DateTimeOffset now, Func<UndoProcess?, bool> isAlive)
     {
         var actions = new List<UndoPruneAction>();
         bool trustTheClock = folded.NewestWritten is not { } newest || newest - now <= UndoLimits.ClockTolerance;
-        Dictionary<long, DateTimeOffset> times = UndoLimits.StepTimes(folded);
+        Dictionary<long, DateTimeOffset> times = UndoLimits.StepTimes(folded, now);
         var listed = folded.OnTheList.ToList();
         int remaining = listed.Count;
         foreach (UndoFoldedStep step in listed)
@@ -77,8 +80,11 @@ internal static class UndoPruning
     /// <para>A blob goes when no step on the list names it and nothing this
     /// version cannot read, in a segment still kept, holds its name.</para>
     /// </summary>
-    internal static UndoDeletion Deletable(UndoFolded folded, IReadOnlyCollection<int> segmentsOnDisk,
-                                           IReadOnlyCollection<string> blobsOnDisk, DateTimeOffset now)
+    internal static UndoDeletion Deletable(UndoReading reading, IReadOnlyCollection<string> blobsOnDisk, DateTimeOffset now) =>
+        Deletable(reading.Folded, reading.SegmentsOnDisk, blobsOnDisk, now);
+
+    private static UndoDeletion Deletable(UndoFolded folded, IReadOnlyCollection<int> segmentsOnDisk,
+                                          IReadOnlyCollection<string> blobsOnDisk, DateTimeOffset now)
     {
         var ordered = segmentsOnDisk.OrderBy(number => number).ToList();
         bool trustTheClock = folded.NewestWritten is not { } newest || newest - now <= UndoLimits.ClockTolerance;

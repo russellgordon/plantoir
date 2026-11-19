@@ -12,6 +12,9 @@ internal sealed class UndoFoldedStep
     internal required UndoStep Step { get; init; }
     internal UndoStepState State { get; set; } = UndoStepState.Begun;
 
+    /// <summary>The <c>at</c> of its begin line, when that is the journal's spelling of a moment.</summary>
+    internal DateTimeOffset? BeganAt { get; init; }
+
     /// <summary>The process that started the work now in flight (begin, undoing or redoing).</summary>
     internal UndoProcess? Process { get; set; }
 
@@ -186,7 +189,7 @@ internal static class UndoFold
                     line.Step is { } second ? second.Blobs : []);
                 return;
             }
-            var step = new UndoFoldedStep { Step = line.Step!, Process = line.Process };
+            var step = new UndoFoldedStep { Step = line.Step!, Process = line.Process, BeganAt = line.At };
             step.Segments.Add(line.Segment);
             folded.Steps[seq] = step;
             if (!step.Readable)

@@ -44,15 +44,18 @@ internal sealed class FolderIdentityFile
 
     private readonly TimeProvider _clock;
     private readonly Func<string, string, bool>? _hardLink;
+    private readonly Action? _afterMoveAside;
 
     /// <param name="path">The identifier file's full path.</param>
     /// <param name="clock">The clock "less than ten seconds ago" is judged by.</param>
     /// <param name="hardLink">A seam: link the first path's file onto the second name; false when the volume has no hard links. The real call by default.</param>
-    internal FolderIdentityFile(string path, TimeProvider clock, Func<string, string, bool>? hardLink = null)
+    /// <param name="afterMoveAside">A seam for tests: runs just after a file is moved aside, where another process could make a new one at the name.</param>
+    internal FolderIdentityFile(string path, TimeProvider clock, Func<string, string, bool>? hardLink = null, Action? afterMoveAside = null)
     {
         FilePath = path;
         _clock = clock;
         _hardLink = hardLink;
+        _afterMoveAside = afterMoveAside;
     }
 
     internal string FilePath { get; }
@@ -60,7 +63,9 @@ internal sealed class FolderIdentityFile
     /// <summary>What a read of the file comes to.</summary>
     internal enum Outcome { Identifier, Absent, NotYet, Unreadable }
 
-    internal readonly record struct Answer(Outcome Outcome, string? Identifier = null);
+    /// <param name="Inspected">The volume serial and file index of the file this read looked at, taken
+    /// from the same handle the bytes were read through; null when nothing was opened.</param>
+    internal readonly record struct Answer(Outcome Outcome, string? Identifier = null, (ulong Volume, ulong Index)? Inspected = null);
 
     /// <summary>The identifier a text holds, in lower case, or null when it holds none.</summary>
     internal static string? IdentifierIn(string text)
@@ -120,7 +125,7 @@ internal sealed class FolderIdentityFile
                 case Outcome.NotYet:
                     return null;
                 case Outcome.Unreadable:
-                    if (SetAside() is { } putBack) return putBack;
+                    if (SetAside(answer.Inspected) is { } putBack) return putBack;
                     break;
             }
             if (MakeExclusively() is { } made) return made;
@@ -186,7 +191,7 @@ internal sealed class FolderIdentityFile
     /// hold one and was put back (or the name now holds one); otherwise null,
     /// and the caller makes a new one.
     /// </summary>
-    internal string? SetAside()
+    internal string? SetAside((ulong Volume, ulong Index)? inspectedByTheRead)
     {
         (ulong Volume, ulong Index)? inspected = FileIdentity(FilePath);
         if (inspected is null) return null;
@@ -195,6 +200,7 @@ internal sealed class FolderIdentityFile
         {
             if (FileIdentity(FilePath) != inspected) return null;   // another process replaced it: look again
             File.Move(FilePath, aside, overwrite: false);
+            _afterMoveAside?.Invoke();
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }

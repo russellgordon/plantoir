@@ -161,4 +161,109 @@ public sealed class UndoJournalReadingTests : IDisposable
         Assert.True(UndoJournalChecks.ProcessIsAlive(new UndoProcess("h", Environment.ProcessId, me.ProcessName, null)));
         Assert.False(UndoJournalChecks.ProcessIsAlive(new UndoProcess("h", Environment.ProcessId, "a-name-that-is-not-mine", null)));
     }
+
+    // ---- The mac's U2a read rule, and the W1 review's M2 and M3 ----------
+
+    private UndoJournal JournalOpening(Func<string, Stream> open) =>
+        new(_folder, _clock, _ => true, _ => true, isLive: false, readRetry: TimeSpan.Zero, open: open);
+
+    private static Stream Disk(string path) =>
+        new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
+    /// <summary>
+    /// A segment pruned between the listing and the read is passed over, but
+    /// never the NEWEST: a newest segment that is gone is a reading that is
+    /// not fresh, never a shorter list (the mac's U2a read rule).
+    /// </summary>
+    [Fact]
+    public void ANewestSegmentThatIsGoneIsNeverPassedOver()
+    {
+        Write(1, Begin(1) + "\n" + Applied(1) + "\n");
+        Write(2, Begin(2) + "\n" + Applied(2) + "\n");
+        UndoReading olderGone = JournalOpening(path =>
+            path.EndsWith("journal-000001.jsonl", StringComparison.Ordinal) ? throw new FileNotFoundException("pruned") : Disk(path)).Read();
+        Assert.True(olderGone.IsFresh);
+        Assert.Equal(2, olderGone.Folded.Highest);
+
+        UndoReading newestGone = JournalOpening(path =>
+            path.EndsWith("journal-000002.jsonl", StringComparison.Ordinal) ? throw new FileNotFoundException("gone") : Disk(path)).Read();
+        Assert.False(newestGone.IsFresh);
+    }
+
+    /// <summary>A segment that is there and cannot be read (not a sharing violation) is a reading that is not fresh, never an empty list.</summary>
+    [Fact]
+    public void ASegmentThatCannotBeReadIsNeverAnEmptyList()
+    {
+        Write(1, Begin(1) + "\n" + Applied(1) + "\n");
+        foreach (Exception failure in new Exception[] { new IOException("the disk failed", unchecked((int)0x80070017)), new UnauthorizedAccessException("denied") })
+        {
+            UndoReading reading = JournalOpening(_ => throw failure).Read();
+            Assert.False(reading.IsFresh);
+            Assert.Equal(UndoAnswerKind.NotAvailable, JournalOpening(_ => throw failure).Offer(reading).Undo.Kind);
+        }
+    }
+
+    /// <summary>A blob that is there and cannot be read is never content missing (which clears the list): the read throws.</summary>
+    [Fact]
+    public void ABlobThatIsThereAndCannotBeReadIsNeverMissing()
+    {
+        byte[] bytes = "content\n"u8.ToArray();
+        string name = UndoCheck.Sha(bytes);
+        string path = Path.Combine(_folder, "content", name[..2], name);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllBytes(path, bytes);
+        Assert.Throws<UndoListUnreadableException>(() =>
+            JournalOpening(_ => throw new IOException("the disk failed", unchecked((int)0x80070017))).Blob(name));
+        Assert.Null(JournalOpening(_ => throw new FileNotFoundException("gone")).Blob(name));   // gone is missing
+    }
+
+    /// <summary>
+    /// The W1 review's M2. A reading that is not fresh holds the last state
+    /// read beside the segments and blobs on the disk NOW; deciding from that
+    /// mix deleted content the list needs. Pruning and deletion decide nothing
+    /// from it, and Undo and Redo are not available.
+    /// </summary>
+    [Fact]
+    public void AReadingThatIsNotFreshPrunesAndDeletesNothing()
+    {
+        Write(1, Begin(1) + "\n" + Applied(1) + "\n");
+        string blob = UndoCheck.Sha("x\n"u8.ToArray());
+        string blobPath = Path.Combine(_folder, "content", blob[..2], blob);
+        Directory.CreateDirectory(Path.GetDirectoryName(blobPath)!);
+        File.WriteAllBytes(blobPath, "x\n"u8.ToArray());
+        Write(2, $"{{\"v\":1,\"seq\":2,\"event\":\"begin\",\"at\":\"{At}\",\"step\":{{\"seq\":2,\"madeAt\":\"{At}\",\"ops\":[{{\"kind\":\"writeFile\",\"path\":\"a.md\",\"afterSha\":\"{blob}\",\"blobs\":[\"{blob}\"]}}]}}}}\n" + Applied(2) + "\n");
+
+        UndoJournal journal = new(_folder, _clock, _ => true, _ => true, isLive: false, readRetry: TimeSpan.Zero);   // a first read, held: its last state is empty
+        string segment = Path.Combine(_folder, "journal-000002.jsonl");
+        using (new FileStream(segment, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            UndoReading held = journal.Read();
+            Assert.False(held.IsFresh);
+            Assert.Empty(journal.Deletable(held).Blobs);
+            Assert.Empty(journal.Deletable(held).Segments);
+            Assert.Empty(journal.Pruning(held));
+            UndoOffered offered = journal.Offer(held);
+            Assert.Equal(UndoAnswerKind.NotAvailable, offered.Undo.Kind);
+            Assert.Equal(UndoAnswerKind.NotAvailable, offered.Redo.Kind);
+        }
+        UndoReading fresh = journal.Read();
+        Assert.True(fresh.IsFresh);
+        Assert.Empty(journal.Deletable(fresh).Blobs);   // named by step 2, on the list
+    }
+
+    /// <summary>
+    /// The W1 review's M3. A step whose process this version cannot identify
+    /// is gone for pruning (nothing in flight for ever) but never settled by
+    /// recovery (W3), which writes pages: a live process of another version
+    /// may still be swapping files outside the lock.
+    /// </summary>
+    [Fact]
+    public void RecoveryNeverSettlesAStepWhoseProcessItCannotIdentify()
+    {
+        Assert.False(UndoJournalChecks.ProcessIsAlive(null));
+        Assert.False(UndoJournalChecks.RecoveryMaySettle(null));
+        Assert.True(UndoJournalChecks.RecoveryMaySettle(new UndoProcess("h", int.MaxValue - 7, "nothing-runs-by-this-name", null)));
+        using var me = System.Diagnostics.Process.GetCurrentProcess();
+        Assert.False(UndoJournalChecks.RecoveryMaySettle(new UndoProcess("h", Environment.ProcessId, me.ProcessName, null)));
+    }
 }

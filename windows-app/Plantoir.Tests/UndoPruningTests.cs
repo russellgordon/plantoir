@@ -21,6 +21,10 @@ public sealed class UndoPruningTests
     private static string Event(long seq, string name, double daysAgo = 0) =>
         $"{{\"v\":1,\"seq\":{seq},\"event\":\"{name}\",\"at\":\"{Moment(daysAgo)}\"}}";
 
+    /// <summary>A fresh reading of a fold and the segments on the disk with it.</summary>
+    private static UndoReading Fresh(UndoFolded folded, params int[] segmentsOnDisk) =>
+        new() { Folded = folded, IsFresh = true, SegmentsOnDisk = segmentsOnDisk };
+
     private static UndoFolded Fold(params (int Segment, string Line)[] lines) =>
         UndoFold.Fold(lines.Select((line, place) => UndoFormat.Parse(line.Line, line.Segment, place)));
 
@@ -29,7 +33,7 @@ public sealed class UndoPruningTests
     {
         var lines = new List<(int, string)>();
         for (long seq = 1; seq <= 53; seq++) { lines.Add((1, Begin(seq))); lines.Add((1, Event(seq, "applied"))); }
-        var actions = UndoPruning.Decide(Fold([.. lines]), Now, _ => false);
+        var actions = UndoPruning.Decide(Fresh(Fold([.. lines])), Now, _ => false);
         Assert.Equal([1L, 2, 3], actions.Select(action => action.Seq));
         Assert.All(actions, action => Assert.Equal("tooMany", Assert.IsType<UndoPruneAction.Pruned>(action).Reason));
     }
@@ -39,9 +43,9 @@ public sealed class UndoPruningTests
     {
         // Step 2 was written 3 days "in the future" of this clock: the clock is behind.
         UndoFolded folded = Fold((1, Begin(1, 70)), (1, Event(1, "applied", 70)), (1, Begin(2, -3)), (1, Event(2, "applied", -3)));
-        Assert.Empty(UndoPruning.Decide(folded, Now, _ => false));
+        Assert.Empty(UndoPruning.Decide(Fresh(folded), Now, _ => false));
         UndoFolded trusted = Fold((1, Begin(1, 70)), (1, Event(1, "applied", 70)), (1, Begin(2)), (1, Event(2, "applied")));
-        Assert.Equal("tooOld", Assert.IsType<UndoPruneAction.Pruned>(Assert.Single(UndoPruning.Decide(trusted, Now, _ => false))).Reason);
+        Assert.Equal("tooOld", Assert.IsType<UndoPruneAction.Pruned>(Assert.Single(UndoPruning.Decide(Fresh(trusted), Now, _ => false))).Reason);
     }
 
     [Fact]
@@ -50,8 +54,8 @@ public sealed class UndoPruningTests
         var lines = new List<(int, string)> { (1, Begin(1, 70, pid: 77)) };
         for (long seq = 2; seq <= 3; seq++) { lines.Add((1, Begin(seq))); lines.Add((1, Event(seq, "applied"))); }
         UndoFolded folded = Fold([.. lines]);
-        Assert.Empty(UndoPruning.Decide(folded, Now, process => process?.Pid == 77));
-        var closed = Assert.IsType<UndoPruneAction.ClosedUnsettled>(Assert.Single(UndoPruning.Decide(folded, Now, _ => false)));
+        Assert.Empty(UndoPruning.Decide(Fresh(folded), Now, process => process?.Pid == 77));
+        var closed = Assert.IsType<UndoPruneAction.ClosedUnsettled>(Assert.Single(UndoPruning.Decide(Fresh(folded), Now, _ => false)));
         Assert.Equal(1, closed.Seq);
         Assert.Equal(UndoPhase.Begin, closed.Phase);
     }
@@ -63,18 +67,18 @@ public sealed class UndoPruningTests
             (1, Begin(1)), (1, Event(1, "applied")), (1, Event(1, "pruned")),
             (2, Begin(2)), (2, Event(2, "applied")),
             (3, Begin(3)), (3, Event(3, "applied")));
-        Assert.Equal([1], UndoPruning.Deletable(folded, [1, 2, 3], [], Now).Segments);
+        Assert.Equal([1], UndoPruning.Deletable(Fresh(folded, 1, 2, 3), [], Now).Segments);
 
         // Step 2 still on the list holds its segment, and so every newer one.
         UndoFolded holding = Fold((1, Begin(1)), (1, Event(1, "applied")), (2, Begin(2)), (2, Event(2, "applied")), (3, Begin(3)), (3, Event(3, "applied")));
-        Assert.Empty(UndoPruning.Deletable(holding, [1, 2, 3], [], Now).Segments);
+        Assert.Empty(UndoPruning.Deletable(Fresh(holding, 1, 2, 3), [], Now).Segments);
     }
 
     [Fact]
     public void TheNewestSegmentIsNeverDeleted()
     {
         UndoFolded folded = Fold((1, Begin(1)), (1, Event(1, "applied")), (1, Event(1, "pruned")));
-        Assert.Empty(UndoPruning.Deletable(folded, [1], [], Now).Segments);
+        Assert.Empty(UndoPruning.Deletable(Fresh(folded, 1), [], Now).Segments);
     }
 
     [Fact]
@@ -82,11 +86,11 @@ public sealed class UndoPruningTests
     {
         string foreign = $"{{\"v\":2,\"seq\":2,\"event\":\"x\",\"at\":\"{Moment(59)}\"}}";
         UndoFolded young = Fold((1, Begin(1, 59)), (1, Event(1, "applied", 59)), (1, Event(1, "pruned", 59)), (1, foreign), (2, Begin(3)), (2, Event(3, "applied")));
-        Assert.Empty(UndoPruning.Deletable(young, [1, 2], [], Now).Segments);
+        Assert.Empty(UndoPruning.Deletable(Fresh(young, 1, 2), [], Now).Segments);
 
         string old = $"{{\"v\":2,\"seq\":2,\"event\":\"x\",\"at\":\"{Moment(61)}\"}}";
         UndoFolded aged = Fold((1, Begin(1, 61)), (1, Event(1, "applied", 61)), (1, Event(1, "pruned", 61)), (1, old), (2, Begin(3)), (2, Event(3, "applied")));
-        Assert.Equal([1], UndoPruning.Deletable(aged, [1, 2], [], Now).Segments);
+        Assert.Equal([1], UndoPruning.Deletable(Fresh(aged, 1, 2), [], Now).Segments);
     }
 
     [Fact]
@@ -94,11 +98,11 @@ public sealed class UndoPruningTests
     {
         // Segment 1 holds only an unreadable line with no time at all.
         UndoFolded judgedOld = Fold((1, "garbage"), (2, Begin(1, 61)), (2, Event(1, "applied", 61)), (2, Event(1, "pruned", 61)), (3, Begin(2)), (3, Event(2, "applied")));
-        Assert.Equal([1, 2], UndoPruning.Deletable(judgedOld, [1, 2, 3], [], Now).Segments);
+        Assert.Equal([1, 2], UndoPruning.Deletable(Fresh(judgedOld, 1, 2, 3), [], Now).Segments);
 
         // Kept while no later segment has a time (before the third round's rule it kept itself and all later ones for good).
         UndoFolded noTimeAnywhere = Fold((1, "garbage"), (2, "{\"v\":1,\"seq\":1,\"event\":\"note\"}"));
-        Assert.Empty(UndoPruning.Deletable(noTimeAnywhere, [1, 2], [], Now).Segments);
+        Assert.Empty(UndoPruning.Deletable(Fresh(noTimeAnywhere, 1, 2), [], Now).Segments);
     }
 
     [Fact]
@@ -111,10 +115,10 @@ public sealed class UndoPruningTests
                       $"\"workingFolder\":{{\"id\":\"x\",\"pathAtTheTime\":\"p\"}},\"ops\":[{{\"kind\":\"writeFile\",\"path\":\"a.md\",\"afterSha\":\"{kept}\",\"blobs\":[\"{kept}\"]}}]}}}}";
         string foreign = $"{{\"v\":2,\"seq\":2,\"event\":\"x\",\"blob\":\"{byUnreadable}\"}}";
         UndoFolded folded = Fold((1, step), (1, Event(1, "applied")), (1, foreign));
-        Assert.Equal([loose], UndoPruning.Deletable(folded, [1], [kept, byUnreadable, loose], Now).Blobs);
+        Assert.Equal([loose], UndoPruning.Deletable(Fresh(folded, 1), [kept, byUnreadable, loose], Now).Blobs);
 
         UndoFolded pruned = Fold((1, step), (1, Event(1, "applied")), (1, Event(1, "pruned")));
-        Assert.Equal([kept], UndoPruning.Deletable(pruned, [1], [kept], Now).Blobs);
+        Assert.Equal([kept], UndoPruning.Deletable(Fresh(pruned, 1), [kept], Now).Blobs);
     }
 
     [Theory]
@@ -124,5 +128,26 @@ public sealed class UndoPruningTests
     {
         DateTimeOffset judged = UndoLimits.JudgedAt(Now, [Now + TimeSpan.FromDays(daysAhead)]);
         Assert.Equal(trusted ? Now + TimeSpan.FromDays(daysAhead) : Now, judged);
+    }
+
+    /// <summary>
+    /// The W1 review's M4. A step whose madeAt is not the journal's spelling
+    /// (an offset instead of Z) is unreadable. It takes its begin line's `at`
+    /// as its time, else the clock, never the oldest moment there is: so it
+    /// stands as a barrier (Undo not available) and is not pruned for age.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AStepWhoseMadeAtCannotBeReadTakesItsBeginTimeAndStandsAsABarrier(bool beginHasAnAt)
+    {
+        string at = beginHasAnAt ? $",\"at\":\"{Moment(2)}\"" : "";
+        string begin = $"{{\"v\":1,\"seq\":1,\"event\":\"begin\"{at},\"process\":{{\"pid\":1}}," +
+                       $"\"step\":{{\"seq\":1,\"madeAt\":\"2026-11-12T12:00:00+00:00\",\"ops\":[]}}}}";
+        UndoFolded folded = Fold((1, begin), (1, Event(1, "applied", 2)));
+        UndoOffered offered = UndoLimits.Offer(folded, Now, _ => false, _ => true);
+        Assert.Equal(UndoAnswerKind.NotAvailable, offered.Undo.Kind);
+        Assert.Empty(UndoPruning.Decide(Fresh(folded), Now, _ => false));
+        Assert.Equal(beginHasAnAt ? Now - TimeSpan.FromDays(2) : Now, UndoLimits.StepTimes(folded, Now)[1]);
     }
 }

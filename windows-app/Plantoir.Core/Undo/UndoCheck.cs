@@ -190,6 +190,13 @@ internal static class UndoCheck
 
         /// <summary>An op this version cannot read: never acted on.</summary>
         internal sealed record NotReadable : PlanResult;
+
+        /// <summary>
+        /// Every page in the way is simply not there, and the working folder
+        /// cannot be reached now: a drive or share that went away, not a change
+        /// by hand. Greyed (ruling 10), nothing cleared, to be tried again.
+        /// </summary>
+        internal sealed record FolderCannotBeReached(string Path) : PlanResult;
     }
 
     /// <summary>
@@ -208,8 +215,10 @@ internal static class UndoCheck
     /// </summary>
     /// <param name="read">What is at an op's path now (relative path in, current out).</param>
     /// <param name="blob">A blob's bytes by name, or null when the store does not have it (or its bytes do not hash to its name).</param>
+    /// <param name="folderIsReachable">Asked again when every page in the way is absent (the W1 review's M1); null: not asked.</param>
     internal static PlanResult Plan(IReadOnlyList<UndoOp> ops, bool backward,
-                                    Func<string, UndoCurrent> read, Func<string, byte[]?> blob)
+                                    Func<string, UndoCurrent> read, Func<string, byte[]?> blob,
+                                    Func<bool>? folderIsReachable = null)
     {
         foreach (UndoOp op in ops)
         {

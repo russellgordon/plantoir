@@ -97,13 +97,64 @@ public sealed class FolderIdentityFileTests : IDisposable
     [Fact]
     public void AFileThatHoldsAnIdentifierOnceAsideIsPutBack()
     {
-        // Another process wrote an identifier between the look and the move:
-        // simulated by asking SetAside of a file that holds one.
-        string id = Guid.NewGuid().ToString("D");
+        // The look found an empty file old enough to be damaged; the creator
+        // that made it (no hard links, an exclusive create and one write) then
+        // wrote its identifier into the SAME file before the move. It is still
+        // the file inspected, so it is moved, found to hold an identifier, and
+        // put back.
         Directory.CreateDirectory(Path.GetDirectoryName(IdPath)!);
-        File.WriteAllText(IdPath, id + "\n");
-        Assert.Equal(id, File_().SetAside());
+        File.WriteAllBytes(IdPath, []);
+        var clock = new UndoTestClock(File.GetLastWriteTimeUtc(IdPath) + TimeSpan.FromMinutes(5));
+        FolderIdentityFile.Answer look = File_(clock).Read();
+        Assert.Equal(FolderIdentityFile.Outcome.Unreadable, look.Outcome);
+        Assert.NotNull(look.Inspected);
+
+        string id = Guid.NewGuid().ToString("D");
+        using (var sameFile = new FileStream(IdPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+            sameFile.Write(Encoding.ASCII.GetBytes(id + "\n"));
+        Assert.Equal(look.Inspected, FolderIdentityFile.FileIdentity(IdPath));
+
+        Assert.Equal(id, File_(clock).SetAside(look.Inspected));
         Assert.Equal(id + "\n", File.ReadAllText(IdPath));
+        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(IdPath)!, "folder-id.unreadable-*"));
+    }
+
+    [Fact]
+    public void AGoodFileThatReplacedTheOneInspectedIsNeverMovedAside()
+    {
+        // The W1 review's H1. Process 1 looks and finds the file damaged;
+        // process 2 sets it aside and makes a good one, G; process 1 then
+        // asks to set aside what it looked at. G is a different file, so it
+        // stays where it is. Before the fix SetAside compared the file with
+        // itself, moved G aside, and a third process (the seam) made H at the
+        // name, so the put-back failed and every step recorded under G could
+        // never reach the folder again.
+        Directory.CreateDirectory(Path.GetDirectoryName(IdPath)!);
+        File.WriteAllText(IdPath, "not an identifier\n");
+        FolderIdentityFile.Answer look = File_().Read();
+        Assert.Equal(FolderIdentityFile.Outcome.Unreadable, look.Outcome);
+
+        File.Move(IdPath, IdPath + ".unreadable-" + Guid.NewGuid().ToString("D"));
+        string good = Guid.NewGuid().ToString("D");
+        File.WriteAllText(IdPath, good + "\n");
+
+        string other = Guid.NewGuid().ToString("D");
+        var late = new FolderIdentityFile(IdPath, new UndoTestClock(DateTimeOffset.UtcNow + TimeSpan.FromHours(1)),
+            afterMoveAside: () => File.WriteAllText(IdPath, other + "\n"));
+        late.SetAside(look.Inspected);
+
+        Assert.Equal(good + "\n", File.ReadAllText(IdPath));
+        Assert.Single(Directory.GetFiles(Path.GetDirectoryName(IdPath)!, "folder-id.unreadable-*"));   // process 2's, only
+        Assert.Equal(good, File_().ReadOrMake());
+    }
+
+    [Fact]
+    public void ALookThatOpenedNothingSetsNothingAside()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(IdPath)!);
+        File.WriteAllText(IdPath, "not an identifier\n");
+        Assert.Null(File_().SetAside(null));
+        Assert.Equal("not an identifier\n", File.ReadAllText(IdPath));
         Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(IdPath)!, "folder-id.unreadable-*"));
     }
 

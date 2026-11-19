@@ -222,4 +222,30 @@ public sealed class UndoCheckContractTests : IDisposable
             _ => null);
         Assert.Equal("a.md", Assert.IsType<UndoCheck.PlanResult.ChangedSince>(plan).First);
     }
+
+    /// <summary>
+    /// The W1 review's M1. A page that is simply not there while its working
+    /// folder cannot be reached (a drive or share that went away between the
+    /// reach check and the plan) is not a change by hand: the plan says the
+    /// folder cannot be reached (greyed, nothing cleared). While the folder can
+    /// be reached, a page that is gone is changed since, as before.
+    /// </summary>
+    [Fact]
+    public void APageThatIsGoneWhileItsFolderCannotBeReachedIsNotAChangeSince()
+    {
+        UndoOp op = ThePublishLineOp() with { Path = "a.md" };
+        var gone = UndoCheck.Plan([op], backward: true, _ => new UndoCurrent.Absent(), _ => null, folderIsReachable: () => false);
+        Assert.Equal("a.md", Assert.IsType<UndoCheck.PlanResult.FolderCannotBeReached>(gone).Path);
+
+        var reachable = UndoCheck.Plan([op], backward: true, _ => new UndoCurrent.Absent(), _ => null, folderIsReachable: () => true);
+        Assert.Equal("a.md", Assert.IsType<UndoCheck.PlanResult.ChangedSince>(reachable).First);
+
+        // A page that IS there and was changed by hand settles it, reach or not.
+        UndoOp second = ThePublishLineOp() with { Path = "b.md" };
+        string changed = "---\ntitle: Unit 1, Day 1\npublish: true # by hand\n---\n";
+        var handEdit = UndoCheck.Plan([op, second], backward: true,
+            relative => relative == "a.md" ? new UndoCurrent.Absent() : new UndoCurrent.Bytes(Encoding.UTF8.GetBytes(changed)),
+            _ => null, folderIsReachable: () => false);
+        Assert.IsType<UndoCheck.PlanResult.ChangedSince>(handEdit);
+    }
 }

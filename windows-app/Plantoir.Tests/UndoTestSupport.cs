@@ -281,8 +281,9 @@ internal sealed class UndoScribe : IDisposable
     /// <summary>What pruning and deletion decide, carried out.</summary>
     internal void Prune()
     {
-        UndoFolded folded = Fold();
-        foreach (UndoPruneAction action in Journal.Pruning(folded))
+        UndoReading reading = Journal.Read();
+        Assert.True(reading.IsFresh, "the scribe's own journal is never held");
+        foreach (UndoPruneAction action in Journal.Pruning(reading))
         {
             switch (action)
             {
@@ -299,7 +300,9 @@ internal sealed class UndoScribe : IDisposable
                     break;
             }
         }
-        UndoDeletion deletion = UndoPruning.Deletable(Fold(), Journal.Segments().Select(s => s.Number).ToList(), Journal.BlobsOnDisk(), Clock.GetUtcNow());
+        UndoReading after = Journal.Read();
+        Assert.True(after.IsFresh, "the scribe's own journal is never held");
+        UndoDeletion deletion = Journal.Deletable(after);
         foreach (string blob in deletion.Blobs) File.Delete(BlobPath(blob));
     }
 

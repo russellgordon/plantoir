@@ -4,6 +4,14 @@ using Plantoir.Core.Assist;
 
 namespace Plantoir.Core.Undo;
 
+/// <summary>
+/// A file of the list that is there and cannot be opened or read (a failing
+/// disk, a permission, too many open files): the list is unreadable for this
+/// attempt (<c>undo.rule.stagedThenSwapped</c>, the mac's U2a). Never passed
+/// over as if the file were gone, never content missing.
+/// </summary>
+internal sealed class UndoListUnreadableException(string message, Exception? inner = null) : IOException(message, inner);
+
 /// <summary>What one read of the journal came to.</summary>
 internal sealed record UndoReading
 {
@@ -47,6 +55,7 @@ internal sealed class UndoJournal
     private static readonly Regex SegmentName = new(@"^journal-(\d{6})\.jsonl$", RegexOptions.CultureInvariant);
 
     private readonly TimeSpan _readRetry;
+    private readonly Func<string, Stream>? _open;
     private UndoFolded _lastRead = new();
 
     /// <param name="directory">The list's own folder (<c>undo\</c>).</param>
@@ -55,9 +64,12 @@ internal sealed class UndoJournal
     /// <param name="canReach">Whether a step's working folder can be reached (ruling 10; U7 widens it to the recent folders).</param>
     /// <param name="isLive">The switch (<c>undoJournalIsLive</c>): off until W11a. Read here so nothing reads a static for it.</param>
     /// <param name="readRetry">How long a sharing violation on a segment is retried (two seconds in the app).</param>
+    /// <param name="open">A seam for tests: opens a file of the list to read (a disk or permission failure); the real open by default.</param>
     internal UndoJournal(string directory, TimeProvider clock, Func<UndoProcess?, bool> isAlive,
-                         Func<UndoStep, bool> canReach, bool isLive, TimeSpan? readRetry = null)
+                         Func<UndoStep, bool> canReach, bool isLive, TimeSpan? readRetry = null,
+                         Func<string, Stream>? open = null)
     {
+        _open = open;
         Folder = directory;
         Clock = clock;
         IsAlive = isAlive;
@@ -116,8 +128,14 @@ internal sealed class UndoJournal
     /// <summary>The list as offered now, by this journal's own clock, liveness and reach.</summary>
     internal UndoOffered Offer(UndoFolded folded) => UndoLimits.Offer(folded, Now, IsAlive, CanReach);
 
-    /// <summary>What pruning would write now (a decision only).</summary>
-    internal IReadOnlyList<UndoPruneAction> Pruning(UndoFolded folded) => UndoPruning.Decide(folded, Now, IsAlive);
+    /// <summary>The list as offered now, from one reading.</summary>
+    internal UndoOffered Offer(UndoReading reading) => Offer(reading.Folded);
+
+    /// <summary>What pruning would write now (a decision only), from one reading.</summary>
+    internal IReadOnlyList<UndoPruneAction> Pruning(UndoReading reading) => UndoPruning.Decide(reading, Now, IsAlive);
+
+    /// <summary>What may be deleted now (a decision only), from one reading and the blobs on the disk now.</summary>
+    internal UndoDeletion Deletable(UndoReading reading) => UndoPruning.Deletable(reading, BlobsOnDisk(), Now);
 
     /// <summary>The blob names in <c>content\</c>, for the deletion decision.</summary>
     internal IReadOnlyList<string> BlobsOnDisk()
@@ -152,7 +170,9 @@ internal sealed class UndoJournal
         {
             try
             {
-                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using Stream stream = _open is null
+                    ? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)
+                    : _open(path);
                 using var memory = new MemoryStream();
                 stream.CopyTo(memory);
                 return memory.ToArray();
@@ -180,6 +200,8 @@ internal static class UndoJournalChecks
     /// read is judged gone, so content-based recovery can settle it and it is
     /// never left in flight for ever.
     /// </summary>
+    internal static bool RecoveryMaySettle(UndoProcess? process) => !ProcessIsAlive(process);
+
     internal static bool ProcessIsAlive(UndoProcess? process) =>
         process is not null && process.Pid is > 0 and <= int.MaxValue
         && WorkLease.OwnerIsAlive((int)process.Pid, process.Name, process.Started, "undo");
