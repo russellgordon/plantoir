@@ -135,8 +135,11 @@ final class ProgressCancelKeysTests: XCTestCase {
         let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true))
         press(key, in: window)
         XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount > 0 }, "\(what) did not stop the running task")
-        // Pressed again once the task is stopping, nothing more runs: the
-        // Cancel button has gone, and its key with it.
+        // Pressed again once the task is stopping and the panel has redrawn,
+        // nothing more runs: the Cancel button has gone, and its key with it.
+        // (Pressed before the redraw, the key still reaches the button, as a
+        // second click would; measured on the main Mac, 2026-11-19.)
+        _ = runUntil(timeout: 0.7) { false }
         press(key, in: window)
         _ = runUntil(timeout: 0.5) { false }
         XCTAssertEqual(ledger.cancelCount, 1, "\(what): Cancel ran once, not again on a second press")
