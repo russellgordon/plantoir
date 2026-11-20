@@ -85,7 +85,7 @@ The automated PowerShell script executes:
 1. `dotnet publish` for `Plantoir.csproj` and `Plantoir.Mcp.csproj` (win-x64 self-contained).
 2. Copies `plantoir-mcp.exe` and `llama-server.exe` into the publish directory.
 3. Signs all 5 internal binaries using Azure Trusted Signing with RFC 3161 timestamp.
-4. Compiles `installer.iss` with Inno Setup to produce `dist/PlantoirSetup.exe` (`PrivilegesRequired=lowest`, installs to `%LOCALAPPDATA%\Programs\Plantoir`).
+4. Compiles `installer.iss` with Inno Setup to produce `dist/PlantoirSetup.exe` (`PrivilegesRequired=lowest`, installs to `%LOCALAPPDATA%\Programs\Plantoir`). Since #1010 the installer opens on a Licence Agreement page (`installer-licence.txt`; documentation 12, "The Licence Agreement page in the installer"), shown on a first install by hand and never under Plantoir's own `/VERYSILENT` update.
 5. Signs `dist/PlantoirSetup.exe` with Azure Trusted Signing + timestamp.
 6. Emits SHA-256 hash for release notes.
 

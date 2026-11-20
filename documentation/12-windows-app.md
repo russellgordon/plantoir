@@ -13372,6 +13372,173 @@ Fetching `VC_redist.x64.exe` and unpacking it was rejected at first (a
 second unpacker for a file Python's zip already carried) and became the
 source in #1010, on Russell's ruling; see "Where the file comes from" above.
 
+## The Licence Agreement page in the installer (#1010)
+
+Written 2026-11-19 for
+[#1010](https://github.com/russellgordon/plantoir/issues/1010) (piece
+1010b), from Russell's four rulings of 2026-11-19 evening on the issue. The
+Visual Studio Community 2026 licence, which is where the right to
+redistribute `vcruntime140.dll` comes from (above), asks a distributor to
+"require distributors and external end users to agree to terms that protect
+the Distributable Code at least as much as these license terms". The
+installer is where a teacher meets Plantoir first, so that is where the
+terms are agreed to.
+
+**What a teacher sees, on a first install by hand.** Inno Setup's own
+License Agreement page, first in the wizard (the welcome page is off, so it
+comes before Select Destination Location), titled **Licence Agreement**:
+"Please read the following important information before continuing.", then
+"Please read the following Licence Agreement. You must accept the terms of
+this agreement before continuing with the installation.", a scrolling box
+with the text, and two choices, **I accept the agreement** and **I do not
+accept the agreement**. Neither is chosen when the page opens and Next is
+disabled until "I accept the agreement" is chosen; choosing "I do not
+accept" disables it again. One page and one choice more than before; the
+pages after it are unchanged.
+
+**What the box says** (`windows-app/installer-licence.txt`, UTF-8, one line
+per paragraph so Inno wraps it to the box): "Plantoir", the copyright line
+"Copyright 2026 Russell Gordon" (the year and name About shows), "Plantoir's
+own code is released under the MIT License:" and the MIT text; "Software by
+other people", naming `THIRD_PARTY_LICENSES.txt` in the folder Plantoir is
+installed in and the notice on GitHub; and "Microsoft Visual C++ runtime",
+the terms for `vcruntime140.dll` as drafted in the design and ruled (use it
+only as part of Plantoir; do not copy it out, change it, or reverse engineer,
+decompile or disassemble it, except where the law allows; "as is"). That
+paragraph says "The MIT License above does not apply to it.", and the MIT
+paragraph opens by scoping it to Plantoir's own code, so the MIT grant's
+"without restriction" and the limits on Microsoft's file do not contradict
+each other (ruling 2). No machinery words (rule 1): "website builder".
+
+**One MIT text in three places.** The repository now has a root `LICENSE`
+(the standard MIT text, "Copyright 2026 Russell Gordon"; ruling 3); README's
+"License" section points at it; and the page carries the same words.
+`InstallerLicencePageTests.ThePageCarriesTheLicenceFileWordForWord`
+compares them paragraph by paragraph, with line breaks joined, because
+`LICENSE` is wrapped at 80 columns, as licence files usually are, and the
+page's text is not.
+
+**How it is built** (`windows-app/installer.iss`):
+
+- `LicenseFile=installer-licence.txt` in `[Setup]`. Inno shows the page only
+  when the wizard is visible: its `ShouldSkipPage` skips `wpLicense` when the
+  install mode is not normal, that is under `/SILENT` and `/VERYSILENT`
+  (Inno's own source, `Setup.WizardForm.pas`; its help: under `/SILENT` "the
+  wizard and the background window are not displayed"). So Plantoir's own
+  update, which runs the installer `/VERYSILENT /PLANTOIRUPDATE=1`, never
+  shows it: a teacher accepts once, at the first install.
+- `InitializeWizard` sets `WizardForm.LicenseNotAcceptedRadio.Checked :=
+  False` (and the accept radio too, for symmetry). Inno opens the page with
+  "I do not accept the agreement" checked; Microsoft's Windows desktop UX
+  guide, "First Experience", read 2026-11-19, says settings "with legal
+  implications, such as end user licensing agreements (EULAs)" are opt-in
+  and "can't have default selections". Inno enables Next on this page only
+  while `LicenseAcceptedRadio.Checked` (`UpdateCurPageButtonState`) and in
+  the accept radio's own click handler, so with neither checked Next is
+  disabled until the teacher chooses.
+- `[Messages]` sets all five messages the page shows (Default.isl's
+  "License Agreement" wizard page section: `WizardLicense`, `LicenseLabel`,
+  `LicenseLabel3`, `LicenseAccepted`, `LicenseNotAccepted`). Two say
+  "License" in Default.isl (the title and the sentence above the box) and
+  are spelled "Licence" here (ruling 4); the other three are Default.isl's
+  own words, set too so the whole page is written in one place and an Inno
+  upgrade cannot change it unseen. The message keys keep Inno's spelling;
+  they are names, not words a teacher reads.
+- `[Files]` copies the repository's `THIRD_PARTY_LICENSES.md` into `{app}`
+  as `THIRD_PARTY_LICENSES.txt`, so the notice travels with the files it
+  describes and a double-click opens it in Notepad. (The page cannot hold the
+  notice's tables readably.) The portable zip that `publish.ps1` also makes
+  does not carry it: it is the folder as published, and nothing about it
+  changed here.
+
+**Tests.** `windows-app/Plantoir.Tests/InstallerLicencePageTests.cs` (nine
+facts, source text with comments taken out): the `LicenseFile` setting and
+no `InfoBeforeFile`; `InitializeWizard` clears the refusal and nothing
+checks the acceptance or enables Next, and no `ShouldSkipPage` exists; all
+five messages are set, to these words, and none says "License"; `LICENSE` is
+MIT in Russell's name and README points at it; the page carries `LICENSE`
+word for word and scoped; the Microsoft paragraph's limits and the sentence
+that MIT does not apply; the `[Files]` line; no machinery words; strict
+UTF-8. The first-install rehearsal's driver
+(`Plantoir.UiTests.FirstInstall/Steps.cs`, `AnswerLicencePage`) knows the
+page by its heading (`WindowRules.IsLicencePage`, either spelling, so a
+lost override does not strand it), records what the page opened with,
+chooses "I accept the agreement" by its UI Automation name with a click
+(`BM_CLICK`, so Inno's own click handler enables Next), and lets the
+ordinary button loop press Next. **Inno's choices are not radio buttons to
+UI Automation:** `TNewRadioButton` (like `TNewButton`) is reported as a
+`Pane`, with no selection pattern and no state (measured on the VM,
+Inno 6.7.3), so the driver finds a choice by its name and that class (or
+the RadioButton type, should a later Inno give it) and reads whether it is
+checked from the Win32 button itself (`BM_GETCHECK`). A driver that looked
+only for RadioButton controls would have stopped on every run. It stops PRODUCT STOPPED, never a silent
+pass, if the page is there and that choice cannot be found, if the page
+opened with either choice made, or if Next is still disabled 30 s after the
+choice (`WindowRules.LicenceNextLimit`). An installer without the page
+(1.9.3 and before) is walked as before. `WindowRulesTests` holds the
+heading, the names (the refusal is never taken for the acceptance) and the
+limit.
+
+**Measured on the Windows VM, 2026-11-19** (Parallels, Windows 11 Pro
+ARM64, the x64 installer under emulation; snapshot 02, the development
+machine, with Inno Setup 6.7.3 installed by `winget` for this proof and not
+kept). An unsigned installer from the branch (`publish.ps1
+-WithoutAssistantEngine`, commit bf736b7f1, 252.8 MB, about 21 minutes, 630
+s of it Inno's compression), run by hand-equivalent through UI Automation:
+
+- The wizard opened on "Licence Agreement" with both choices unchecked
+  (`BM_GETCHECK`), Next disabled, and the focus in the text box, not on a
+  choice. A click on "I accept the agreement" checked it and enabled Next at
+  once; "I do not accept the agreement" disabled Next again. The two
+  pictures are in the private tools repository's
+  `runs/1010b-captures/` (`1010b-licence-page-as-it-opens.png`,
+  `1010b-licence-page-after-accepting.png`), for Russell to see before this
+  merges.
+- The first install's pages: Licence Agreement > Select Destination
+  Location > Select Additional Tasks > Ready to Install > Installing >
+  Completing; exit 0. `THIRD_PARTY_LICENSES.txt` in the installed folder,
+  the same bytes as the repository's `THIRD_PARTY_LICENSES.md`.
+- Plantoir's update command line over it (`/VERYSILENT /SUPPRESSMSGBOXES
+  /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1`, with `/LOG`): exit 0,
+  "Installation process succeeded." in setup's log, and no visible window
+  of setup or its child in 268 looks at the desktop (every 200 ms, by
+  `EnumWindows` and UI Automation) over the 62 s it ran.
+- Not measured: a clean machine (the first-install rehearsal needs a
+  signed build), and the driver's own run over the page; the driver's
+  calls are the ones the measurement above used.
+
+**Rejected** (the design, `vm-tools/reference/1010-installer-licence-page-design.md`
+in the private tools repository):
+
+- **Option B, an Information page read and passed with Next**
+  (`InfoBeforeFile`). Nothing new for the rehearsal and no choice to make,
+  but there is no act of agreeing, only reading, which is weaker for the
+  Community terms' "require ... end users to agree", and Microsoft's First
+  Experience page describes setup as requiring the user to "accept" a EULA.
+- **Option C, no page: the notice installed and a Licences link in About.**
+  Closest to the Mac and to Apple's HIG, "Onboarding" ("Avoid displaying
+  licensing details within your onboarding flow"), but it is not what
+  Russell ruled ("the Windows installer gains a licence page") and asks no
+  end user to agree to anything.
+- **Inno's own default of "I do not accept" checked.** Microsoft's guidance
+  above; a legal choice has no default.
+- **Keeping Inno's "License" wording** (the design's recommendation, every
+  Windows installer a teacher has seen says it). Russell ruled "Licence", the
+  spelling the rest of Plantoir uses.
+- **An RTF licence file.** Not needed: plain text stays readable in the
+  modern wizard style, light or dark, with no colours to check.
+
+**The Mac owes nothing, and no `mac` issue is opened.** The Mac ships a
+drag-and-drop disk image with no licence screen, and it carries nothing of
+Microsoft's, so there is no third party's terms for its users to agree to.
+It inherits the root `LICENSE` (its Info.plist already says "MIT License").
+
+**The indemnity.** The Community terms also ask the distributor to
+"indemnify, defend, and hold harmless Microsoft" against claims about the
+program; that is Russell's own undertaking as the licence holder, recorded
+on #1010 to be confirmed with him before the v2.0.0 Windows release, and
+nothing in the installer or the app carries it.
+
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 
 Written 2026-10-28 for [#681](https://github.com/russellgordon/plantoir/issues/681).

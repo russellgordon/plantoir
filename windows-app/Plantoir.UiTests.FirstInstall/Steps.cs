@@ -18,10 +18,13 @@ internal static class Steps_
 {
     [DllImport("user32.dll")] private static extern IntPtr PostMessage(IntPtr window, uint message, IntPtr w, IntPtr l);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr w, string l);
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")] private static extern IntPtr SendMessageNoText(IntPtr window, uint message, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr window);
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr window, int command);
 
     private const uint BM_CLICK = 0x00F5;
+    private const uint BM_GETCHECK = 0x00F0;
+    private const int BST_CHECKED = 1;
     private const uint WM_SETTEXT = 0x000C;
 
     private static readonly string Downloads =
@@ -416,8 +419,8 @@ internal static class Steps_
                          + $" [screenshot {Program.Shot("licence-page")}]");
             if (acceptChosen || refuseChosen)
                 throw Stopped.Product($"the installer's \"{page}\" page opened with a choice already made; neither may be chosen when it opens");
-            if (accept.Patterns.SelectionItem.TryGetPattern(out var selection)) selection.Select();
-            else PostMessage(accept.Properties.NativeWindowHandle.ValueOrDefault, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+            // A click, as a teacher's: Inno's own click handler is what enables Next.
+            PostMessage(accept.Properties.NativeWindowHandle.ValueOrDefault, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
             chosenAt = DateTime.UtcNow;
             Program.Note($"installer: chose \"{WindowRules.LicenceAcceptName}\" on \"{page}\"");
             return;
@@ -429,20 +432,37 @@ internal static class Steps_
                                   + $"[screenshot {Program.Shot("licence-next-disabled")}]");
     }
 
+    /// <summary>
+    /// A choice on the page, by its name. Inno draws its choices as
+    /// TNewRadioButton, which UI Automation reports as a Pane with no
+    /// selection pattern (measured on the VM, 2026-11-19, Inno 6.7.3), so the
+    /// class is matched as well as the RadioButton control type.
+    /// </summary>
     private static AutomationElement? LicenceChoice(AutomationElement wizard, string choice)
     {
         try
         {
-            foreach (var radio in wizard.FindAllDescendants(cf => cf.ByControlType(ControlType.RadioButton)))
-                if (WindowRules.IsChoiceNamed(radio.Properties.Name.ValueOrDefault ?? "", choice) && !radio.IsOffscreen) return radio;
+            foreach (var control in wizard.FindAllDescendants())
+            {
+                bool isChoice = control.Properties.ClassName.ValueOrDefault == "TNewRadioButton"
+                                || control.Properties.ControlType.ValueOrDefault == ControlType.RadioButton;
+                if (isChoice && WindowRules.IsChoiceNamed(control.Properties.Name.ValueOrDefault ?? "", choice) && !control.IsOffscreen)
+                    return control;
+            }
         }
         catch { }
         return null;
     }
 
+    /// <summary>Whether a choice is checked, asked of the Win32 button itself (BM_GETCHECK): Inno's radios offer UI Automation no state.</summary>
     private static bool IsChosen(AutomationElement radio)
     {
-        try { return radio.Patterns.SelectionItem.TryGetPattern(out var selection) && selection.IsSelected.ValueOrDefault; }
+        try
+        {
+            if (radio.Patterns.SelectionItem.TryGetPattern(out var selection)) return selection.IsSelected.ValueOrDefault;
+            IntPtr handle = radio.Properties.NativeWindowHandle.ValueOrDefault;
+            return handle != IntPtr.Zero && SendMessageNoText(handle, BM_GETCHECK, IntPtr.Zero, IntPtr.Zero).ToInt64() == BST_CHECKED;
+        }
         catch { return false; }
     }
 
