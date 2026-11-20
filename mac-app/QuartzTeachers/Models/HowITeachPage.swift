@@ -214,7 +214,7 @@ enum HowITeachPage {
         let step: JournaledStep = JournaledStep(
             course: course, section: nil, maker: UndoStepMaker.sheet("startHowITeachPage"), holds: "course"
         )
-        step.write(Data(newPageSettings.utf8), to: pageURL)
+        step.writeNew(Data(newPageSettings.utf8), to: pageURL)
         do {
             try step.make()
         } catch {

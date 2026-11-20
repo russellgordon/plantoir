@@ -489,13 +489,13 @@ final class UndoActionStepsTests: XCTestCase {
 
     /// A list that cannot be written changes nothing about a daily action
     /// in shadow: the same pages and the same answer as with one that can.
-    func testAListThatCannotBeWrittenChangesNothingAboutMakeRoom() async throws {
+    func testAListThatCannotBeWrittenChangesNothingAboutAnAction() async throws {
         let well: AssistFixture.Made = try section(surface: .local)
         let wellList: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("undo-well-\(UUID().uuidString)", isDirectory: true)
         listFolders.append(wellList)
         UndoJournalLocation.folderOverride = wellList
-        let saidWell: AssistToolOutcome = await AssistFixture.run("make_room_for_classes", with: ["unit": 1, "atDay": 2], on: well.runner)
+        let saidWell: AssistToolOutcome = await AssistFixture.run("add_classes", with: ["unit": 2, "howMany": 2], on: well.runner)
 
         let broken: AssistFixture.Made = try section(surface: .local)
         let brokenList: URL = FileManager.default.temporaryDirectory
@@ -503,7 +503,7 @@ final class UndoActionStepsTests: XCTestCase {
         listFolders.append(brokenList)
         try Data("a file, not a folder".utf8).write(to: brokenList)
         UndoJournalLocation.folderOverride = brokenList.appendingPathComponent("undo", isDirectory: true)
-        let saidBroken: AssistToolOutcome = await AssistFixture.run("make_room_for_classes", with: ["unit": 1, "atDay": 2], on: broken.runner)
+        let saidBroken: AssistToolOutcome = await AssistFixture.run("add_classes", with: ["unit": 2, "howMany": 2], on: broken.runner)
 
         XCTAssertEqual(saidBroken.summary, saidWell.summary)
         XCTAssertEqual(saidBroken.detail, saidWell.detail)

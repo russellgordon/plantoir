@@ -4449,15 +4449,28 @@ EVERY path that writes files without adding an entry, each pinned in
   whose every write failed says "changed nothing" (ruling L5);
 - **a partial undo**;
 - **a publish or hide that wrote pages and then stopped part way** (#412),
-  the page list and the whole unit: `AssistPublishPlanner.apply` throws
+  the page list and the whole unit: `AssistPublishPlanner.apply` threw
   `StoppedAfterWriting` only when at least one file was written, keeping the
   error's own words;
 - **Re-date Classes… that stopped part way** (ruling M3):
-  `SectionReDatePlanner.apply` writes page by page and now throws its own
-  `StoppedAfterWriting` with the pages written. The teacher is told
+  `SectionReDatePlanner.apply` wrote page by page and threw its own
+  `StoppedAfterWriting` with the pages written. The teacher was told
   `publishStoppedPartWay` ("Only part of the section's class dates was
   changed…") with the pages already re-dated listed — never "Nothing was
   changed", which it said until then although pages were written.
+
+**Since #899's U3 neither of those two can happen**: a publish, a whole unit
+and a re-date are each ONE step through the undo journal's door, staged and
+swapped in together or not at all (documentation 09, "U3: every daily page
+action through the door"). A page that cannot be written now writes
+nothing, so the menu's line says "changed nothing". A re-date says "Nothing
+was changed: …" with the file in the way. A publish still says
+`publishStoppedPartWay`, which is frozen wording and over-claims on this
+path. `SectionVerbsEndingTests`' three tests for these paths now pin this
+(`testAPublishThatCannotWriteEveryPageWritesNone`,
+`testAWholeUnitThatCannotWriteEveryPageWritesNone`,
+`testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`).
+`StoppedAfterWriting` is kept and no longer thrown.
 
 A first write that fails is still "changed nothing", and "Nothing was
 changed". Until #531 the depth alone decided, so each of these was written as

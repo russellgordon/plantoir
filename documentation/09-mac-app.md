@@ -20670,7 +20670,15 @@ cannot go in reverses the swaps already made. The error is Foundation's
 
 - `AssistPublishPlanner.StoppedAfterWriting` and
   `SectionReDatePlanner.StoppedAfterWriting` are no longer thrown, so
-  `writesWithNoNewUndoEntry` no longer counts those paths.
+  `writesWithNoNewUndoEntry` no longer counts those paths. The Section
+  menu's trail line for such a failure now says "changed nothing", which is
+  true. A re-date now says "Nothing was changed: …", naming the file in the
+  way, where it used to list the pages already re-dated.
+  `SectionVerbsEndingTests` pins all three paths
+  (`testAPublishThatCannotWriteEveryPageWritesNone`,
+  `testAWholeUnitThatCannotWriteEveryPageWritesNone`,
+  `testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`); they replace
+  the three tests that pinned the part-way writes.
 - Make Room's per-file "could not finish" counts for a failed write
   (`linksNotUpdated`, `notReDated`) can no longer happen. A rename whose new
   name is taken, and a new page whose name appeared meanwhile, are still

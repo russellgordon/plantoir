@@ -116,6 +116,10 @@ nonisolated final class JournaledStep {
     /// written over, even by `writePlainly` (a page that appeared since).
     private var absentWhenPlanned: Set<String> = []
 
+    /// Each file planned with `writeNew`: recorded as absent before, so the
+    /// door refuses rather than replaces one that is there.
+    private var mustBeNew: Set<String> = []
+
     /// Files kept true by a rule, re-derived after the step
     /// (`undoJournal.opKinds.recompute`).
     private(set) var recomputeURLs: [(url: URL, maintainer: String, section: Int?)] = []
@@ -217,6 +221,15 @@ nonisolated final class JournaledStep {
     /// Plans the file at `url` to hold these bytes.
     func write(_ data: Data, to url: URL) {
         plan(data, at: url)
+    }
+
+    /// Plans a NEW file at `url`: one that must not be there when the step
+    /// is made (`.withoutOverwriting`). A file that is there by then, even
+    /// one that appeared after this was planned, refuses the step
+    /// (`changedSince`), so it is never written over.
+    func writeNew(_ data: Data, to url: URL) {
+        plan(data, at: url)
+        mustBeNew.insert(JournaledStep.key(of: url))
     }
 
     /// Plans the file at `url` to be removed.
@@ -394,6 +407,10 @@ nonisolated final class JournaledStep {
                 return nil
             }
             let before: Data?
+            if mustBeNew.contains(key) {
+                result.append(UndoFileChange(relativePath: relative, before: nil, after: after))
+                continue
+            }
             switch UndoItem.read(at: url) {
             case .absent:
                 before = nil
@@ -420,7 +437,8 @@ nonisolated final class JournaledStep {
                 try FileManager.default.createDirectory(
                     at: url.deletingLastPathComponent(), withIntermediateDirectories: true
                 )
-                if absentWhenPlanned.contains(key) && FileManager.default.fileExists(atPath: url.path) {
+                let mustNotBeThere: Bool = absentWhenPlanned.contains(key) || mustBeNew.contains(key)
+                if mustNotBeThere && FileManager.default.fileExists(atPath: url.path) {
                     throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: url.path])
                 }
                 try after.write(to: url, options: .atomic)

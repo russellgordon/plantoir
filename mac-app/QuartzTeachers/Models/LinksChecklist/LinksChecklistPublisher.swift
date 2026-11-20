@@ -504,12 +504,10 @@ enum LinksChecklistPublisher {
             }
             rememberTheAnswer(offer: offer, leftUnticked: Set(outcome.leftUntickedPlaces),
                               course: course, sectionNumber: sectionNumber, into: step)
-            step.whilePlanning {
-                keepTheLaterClassesItPublished(
-                    outcome.publishedPlaces, course: course, sectionNumber: sectionNumber,
-                    today: CalendarDay.today(), into: step
-                )
-            }
+            keepTheLaterClassesItPublished(
+                outcome.publishedPlaces, course: course, sectionNumber: sectionNumber,
+                today: CalendarDay.today(), into: step
+            )
             try step.make()
         } catch {
             return .refused(AssistToolRefusal.unreadablePage(offer.course).message)
@@ -549,9 +547,18 @@ enum LinksChecklistPublisher {
         for place in places {
             published.insert(place)
         }
+        // Read as the step will leave the pages: the classes this press
+        // publishes are not on the disk yet when it is one step (#899, U3).
+        var flagged: [ClassesDatedLater.Flagged] = []
+        if let step {
+            flagged = step.whilePlanning {
+                return ClassesDatedLater.flagged(forSection: sectionNumber, in: course, today: today)
+            }
+        } else {
+            flagged = ClassesDatedLater.flagged(forSection: sectionNumber, in: course, today: today)
+        }
         var kept: [ClassesDatedLater.Flagged] = []
-        for page in ClassesDatedLater.flagged(forSection: sectionNumber, in: course, today: today)
-        where published.contains(page.place) {
+        for page in flagged where published.contains(page.place) {
             kept.append(page)
         }
         ClassesDatedLater.keep(kept, forSection: sectionNumber, in: course, into: step)

@@ -8506,7 +8506,11 @@ pinned:
   left alone (since #564 a file an earlier press already put back no longer
   counts), so `undo_last_change` notes the change exactly when it answers
   `undidPartly`: files both put back and left alone.
-- **A publish or hide that wrote and then stopped part way**, both the page
+- **A publish or hide that wrote and then stopped part way** (on the mac
+  this path, and the re-date's below, cannot happen since #899's U3, where
+  each is ONE step staged and swapped in whole; Windows' W7 brings the same,
+  and `SectionVerbsEndingTests`' mac tests now pin "changed nothing" and
+  nothing written: documentation 09, "U3"). Both the page
   list (`AssistWorkspace.Apply`) and the whole unit (`ApplyWholeUnit`). The
   recording is abandoned on the throw, so the top entry does not move. Each
   tracks whether a file has been written yet (`wrote`, and the whole unit's
@@ -16268,6 +16272,27 @@ as unreadable at that level (JSON does not say which is meant); a
 characters; FAT and exFAT file indexes across a re-open were NOT measured (no
 such volume on this PC), which matters only to W2's reading on.
 
+**U3 (the mac, `issue/899-u3-daily-page-actions`) puts every daily page
+action through the door, one step each**, recorded in shadow: documentation
+09 → "U3: every daily page action through the door". What Windows inherits:
+
+- `contracts/undo-action-steps.json`, each action's step as the mac's real
+  code made it (20 steps: key, maker, the files' whole text before and
+  after, the op kinds);
+- `undo-traces.json` → `actionTraces`, 120 traces made from those steps by
+  `scripts/make_undo_traces.py` beside the unchanged 20 `traces`.
+  `UndoTraceContractTests` reads `traces` only, so nothing on Windows reads
+  the new key yet (W7's);
+- one sentence in `undo.rule.recovery`: in shadow, recovery removes the
+  staged files of a step it closes interrupted when every op of the step
+  changes a file in place, because since U3 a shadow step is staged like a
+  live one.
+
+What Windows owes (W7): each daily action planned whole and made through
+its door as ONE step (a whole unit, the links checklist with its records,
+Publish Class for a Date with its kept record, the window's Duplicate with
+its room), the step keys of the 09 table, and the action traces replayed.
+
 ### The pieces still owed for #899 on Windows, and what each waits for
 
 The plan (`plans/899-plan.md` of the v2.0.0 Windows run) as amended by its
@@ -16283,7 +16308,7 @@ recording and the trail event `undo could not record a step` move to W7.
 | W4 | doc 12's step 7 and the scaffolding: where the list lives (following `--state-dir`), `madeBy` from `AssistWorkspace.Surface` (L1), the writer scan | W2a merged; no longer after W3 |
 | W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
 | W6 | the reserved op kinds and running `recompute` | the mac's U2 |
-| W7 | every daily page action through the door, publish and hide recorded (M1), `undo could not record a step` | the mac's U3, and #900 and #927 where they rewrite a writer |
+| W7 | every daily page action through the door, publish and hide recorded (M1), `undo could not record a step`; replay `undo-traces.json` → `actionTraces` (120, from `undo-action-steps.json`: an `action` call is a step given as each file's before and after, its ops worked out by the door's rule, and the trace pins the op kinds), and the one sentence U3 added to `rule.recovery` (shadow recovery removes the staged files of a closed step whose every op changes a file in place) | the mac's U3 (U3a landed the daily actions; U3b the rollover), and #900 and #927 where they rewrite a writer |
 | W8 | settings (`editJSON`, never `writeFile`, on `course_config.json`), renames, New Course, reference courses; rollover and restore | the mac's U4; #897 B; #909 and #873 |
 | W9 | Delete Backup and Delete Archive to the Recycle Bin | the mac's U5 and Windows' 785a (#912) |
 | W10 | the offer to deploy after an Undo or Redo | the mac's U6, and W5 |

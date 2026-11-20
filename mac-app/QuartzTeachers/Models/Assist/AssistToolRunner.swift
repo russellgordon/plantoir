@@ -4775,7 +4775,7 @@ final class AssistToolRunner {
             course: request.located.course, section: request.located.sectionNumber,
             maker: undoMaker("duplicateAsTheNextClass")
         )
-        copyStep.write(Data(request.copyText.utf8), to: target)
+        copyStep.writeNew(Data(request.copyText.utf8), to: target)
         do {
             try copyStep.make()
         } catch JournaledStepError.refused(.changedSince, _) {
