@@ -115,6 +115,7 @@ public class FixWithButtonsUiTests
             Assert.Equal(FixWithAssistant.NotEnabledHelp, Wait(app, "fixWithClaudeButton").HelpText);
             Assert.Equal(FixWithAssistant.NotEnabledHelp, Wait(app, "fixWithCodexButton").HelpText);
             Assert.True(Showing(app, "fixWithClaudeButton"), "greyed, never hidden, when nothing is ticked");
+            MeasureTheTooltipOnADisabledButton(app);
 
             // Tick both again and press each door.
             app.Find("problemTick-pageSettingsUnreadable|Unit 1/Lesson 1", "the first tick").AsCheckBox().Toggle();
@@ -152,6 +153,48 @@ public class FixWithButtonsUiTests
     }
 
     // ---- Helpers ------------------------------------------------------------------
+
+    /// <summary>
+    /// #990's second review asked whether WinUI shows a tooltip on a DISABLED
+    /// control. Measured only when <c>PLANTOIR_MEASURE_TOOLTIPS</c> names a file:
+    /// the pointer rests on the dimmed Fix with Claude… (its tooltip is
+    /// <see cref="FixWithAssistant.NotEnabledHelp"/>) and, as the control, on
+    /// an ENABLED control that carries a tooltip (the first problem row, whose
+    /// tooltip is its help), and what UI Automation finds on screen after each
+    /// rest is written to the file. A measurement, not a check: the result is
+    /// written up in documentation 12, and nothing here asserts it.
+    /// </summary>
+    private static void MeasureTheTooltipOnADisabledButton(DrivenApp app)
+    {
+        string? into = Environment.GetEnvironmentVariable("PLANTOIR_MEASURE_TOOLTIPS");
+        if (string.IsNullOrEmpty(into)) return;
+        var lines = new List<string>();
+        void Rest(AutomationElement element, string describedAs)
+        {
+            Mouse.MoveTo(DrivenApp.MiddleOf(app.Window));
+            Thread.Sleep(800);
+            Mouse.MoveTo(DrivenApp.MiddleOf(element));
+            var seen = new List<string>();
+            var clock = Stopwatch.StartNew();
+            while (clock.ElapsedMilliseconds < 4000)
+            {
+                Thread.Sleep(250);
+                var tips = new List<AutomationElement>();
+                tips.AddRange(app.Desktop.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip)));
+                tips.AddRange(app.Window.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip)));
+                foreach (var tip in tips)
+                {
+                    string said = $"{clock.ElapsedMilliseconds} ms: \"{tip.Name}\"";
+                    if (!seen.Exists(line => line.EndsWith($"\"{tip.Name}\"", StringComparison.Ordinal))) seen.Add(said);
+                }
+            }
+            lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.HelpText}\"): " + (seen.Count == 0 ? "no tooltip seen in 4 s" : string.Join("; ", seen)));
+        }
+        Rest(Wait(app, "fixWithClaudeButton"), "Fix with Claude…, dimmed");
+        Rest(app.Find("problemRow-pageSettingsUnreadable|Unit 1/Lesson 1", "the first row"), "the first problem row, enabled");
+        File.WriteAllLines(into, lines);
+        Mouse.MoveTo(DrivenApp.MiddleOf(app.Window));
+    }
 
     private static void OpenTheProblemsTab(DrivenApp app)
     {

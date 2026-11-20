@@ -350,7 +350,13 @@ internal sealed class SectionProblemsView : UserControl
         {
             button.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
             button.IsEnabled = state.CanPress(assistant);
-            AutomationProperties.SetHelpText(button, FixWithAssistant.HelpFor(assistant, installed, state));
+            // The reason twice (#990's second review): HelpText for Narrator,
+            // and the tooltip the mac's help tag is. Whether WinUI shows a
+            // tooltip on a DISABLED button was measured (documentation 12,
+            // "Revise With: dimmed in the menu bar, hidden in a row's menu").
+            string help = FixWithAssistant.HelpFor(assistant, installed, state);
+            AutomationProperties.SetHelpText(button, help);
+            ToolTipService.SetToolTip(button, help.Length > 0 ? help : null);
         }
     }
 
