@@ -131,8 +131,8 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// stays false until <c>Run</c> is called again for the deploy, and
     /// <c>TaskProgressView</c> — which only ever checks <c>IsRunning</c> —
     /// reads that gap as "finished" and flashes the outcome badge for the
-    /// span the 100ms poll in <see cref="WaitUntilFinished"/> takes to
-    /// notice. Mirrors the mac's `ScriptRunner.isBetweenPhases` (row 318b).
+    /// span before the caller's wait on <see cref="WaitUntilFinished"/>
+    /// resumes (a post to the window's thread since #1016). Mirrors the mac's `ScriptRunner.isBetweenPhases` (row 318b).
     /// Reset to false at the top of every <see cref="Run"/>, the same as
     /// <see cref="WasCancelled"/> and <see cref="WasStoppedByUser"/>.
     /// </summary>
@@ -676,17 +676,26 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// The trail line distinguishes a failure from a stop the teacher asked
-    /// for and from backing out at a question — all three exit non-zero, and
-    /// only one is a fault (see shared-rules.json → activityTrail.mustRecord).
+    /// The outcome the trail line and the run's record carry. It distinguishes
+    /// a failure from a stop the teacher asked for and from backing out at a
+    /// question (shared-rules.json → activityTrail.mustRecord, "task
+    /// finished"), and a stop is told as a stop whatever the launcher exited
+    /// with: Escape or Cancel on a preview sends Control-C, preview.ps1 ends
+    /// its serve and exits 0, and checking the exit code first recorded a stop
+    /// as "succeeded" (#1009's fifth review). The mac's order
+    /// (<c>ScriptRunner.outcomeDescription</c>): stopped, closed for a deploy,
+    /// backed out, then the exit code.
     /// </summary>
+    public static string FinishedOutcome(int exitCode, bool wasStoppedByUser, bool wasCancelled, bool wasClosedForADeploy) =>
+        wasStoppedByUser ? "stopped by the teacher"
+        : wasClosedForADeploy ? "closed for a deploy"
+        : wasCancelled ? "backed out at a question"
+        : exitCode == 0 ? "succeeded"
+        : $"failed (exit code {exitCode})";
+
     private void NoteTaskFinished(int exitCode)
     {
-        string outcome = exitCode == 0 ? "succeeded"
-            : WasStoppedByUser ? "stopped by the teacher"
-            : WasCancelled ? "backed out at a question"
-            : WasClosedForADeploy ? "closed for a deploy"
-            : $"failed (exit code {exitCode})";
+        string outcome = FinishedOutcome(exitCode, WasStoppedByUser, WasCancelled, WasClosedForADeploy);
         string duration = "";
         if (StartedAt is { } startedAt)
         {

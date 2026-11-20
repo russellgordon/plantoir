@@ -652,6 +652,46 @@ public sealed class StopQuestionsContractTests : IDisposable
         Assert.Equal(0, LinesIn(deploysLog));
     }
 
+    /// <summary>
+    /// A stopped task is recorded as stopped whatever the launcher exited with
+    /// (#1009's fifth review; <c>activityTrail.mustRecord</c> "task finished":
+    /// the outcome tells a stop from a failure and from backing out). Escape
+    /// or Cancel on a preview sends Control-C and preview.ps1 exits 0; the
+    /// trail said "succeeded". The mac's order (<c>outcomeDescription</c>):
+    /// stopped, closed for a deploy, backed out, then the exit code.
+    /// </summary>
+    [Fact]
+    public void AStopIsRecordedAsAStop_WhateverTheLauncherExitedWith()
+    {
+        foreach (int exitCode in new[] { 0, 1, -1 })
+        {
+            Assert.Equal("stopped by the teacher", ScriptRunner.FinishedOutcome(exitCode, wasStoppedByUser: true, wasCancelled: false, wasClosedForADeploy: false));
+            Assert.Equal("stopped by the teacher", ScriptRunner.FinishedOutcome(exitCode, wasStoppedByUser: true, wasCancelled: true, wasClosedForADeploy: false));
+            Assert.Equal("closed for a deploy", ScriptRunner.FinishedOutcome(exitCode, wasStoppedByUser: false, wasCancelled: false, wasClosedForADeploy: true));
+            Assert.Equal("backed out at a question", ScriptRunner.FinishedOutcome(exitCode, wasStoppedByUser: false, wasCancelled: true, wasClosedForADeploy: false));
+        }
+        Assert.Equal("succeeded", ScriptRunner.FinishedOutcome(0, wasStoppedByUser: false, wasCancelled: false, wasClosedForADeploy: false));
+        Assert.Equal("failed (exit code 2)", ScriptRunner.FinishedOutcome(2, wasStoppedByUser: false, wasCancelled: false, wasClosedForADeploy: false));
+
+        // The runner's own trail line: a run the teacher cancelled that then ends with exit 0.
+        string trail = Path.Combine(_folder, "activity.txt");
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            var runner = new ScriptRunner();
+            runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "Building your website…\r\n");
+            runner.CancelByUser();
+            runner.FinishRunNumber(runner.CurrentRunNumber, 0);
+            string written = File.ReadAllText(trail);
+            Assert.Contains("— stopped by the teacher", written);
+            Assert.DoesNotContain("— succeeded", written);
+        }
+        finally
+        {
+            ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+        }
+    }
+
     /// <summary>One thread, one queue: what the window's thread is to RunAsync and to a runner's posted endings.</summary>
     private sealed class SingleThreadContext : SynchronizationContext, IDisposable
     {
