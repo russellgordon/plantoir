@@ -295,8 +295,9 @@ public sealed partial class TaskProgressView : UserControl
         // IsBetweenPhases: this runner has already finished the build half
         // of a build-then-deploy leg (IsRunning is false) but the deploy
         // half is about to start on it — rendering the outcome branch here
-        // would flash "Done"/a failure for the gap the caller's polling
-        // wait takes to notice the deploy is still queued up on it. See
+        // would flash "Done"/a failure for the gap before the caller's wait
+        // resumes (a turn of the window's thread since #1016) and starts the
+        // deploy queued up on it. See
         // ScriptRunner.IsBetweenPhases (row 318b). And while the whole
         // deploy run can still be stopped (#1009's third review): in the gap
         // between two destinations the shown runner is the leg that just

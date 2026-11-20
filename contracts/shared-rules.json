@@ -52762,7 +52762,7 @@
     ],
     "howToRunACase": "Start with the two settings as settingsBefore and a model of the question being asked for `question` (null: a preview). Play each step in order: pressCancel (the task's Cancel, by click, by the accessibility interface or by its key; taskRunning says whether the task can still be stopped), tickDontAskAgain (tick the open question's box), chooseStop (the question's stopButton), chooseCancel (its cancelButton), taskEnded (the task ends while the question is open), settingsTurnOn / settingsTurnOff (the question's row in Settings ▸ Deploying ▸ Stopping). After each step, stopsAfterStep says whether that step stops the task now, and asksAfterStep whether the question is open. At the end the two settings are settingsAfter, and the trail lines written are exactly `trail`, in order.",
     "aStoppedDeploy": {
-      "rule": "What a deploy that was stopped ends as, once Stop Deploy (or Cancel and its key with the question off) has stopped it (#1009's third review). A destination the stop kept the run from reaching did not get the site, so it is counted as not deployed, exactly as the destination the stop landed in is: a stopped run is never every destination deployed, writes no published stamp (the section keeps its “— Edited”), and the assistant is told the sentence for the destinations that did not get the site. A stop that lands once the last destination has finished stops nothing: there is no destination left to keep from the site, and the run ends as every destination deployed. The sentence is the one each app already says when a stop lands inside a destination: on the mac a stop between two destinations cannot land (its Cancel is not shown there), so the case that decided it is the stop during the second of two, where the mac says deployPartiallySucceeded naming the second.",
+      "rule": "What a deploy that was stopped ends as, once Stop Deploy (or Cancel and its key with the question off) has stopped it (#1009's third review). A destination the stop kept the run from reaching did not get the site, so it is counted as not deployed, exactly as the destination the stop landed in is: a stopped run is never every destination deployed, writes no published stamp (the section keeps its “— Edited”), and the assistant is told the sentence for the destinations that did not get the site. A stop that lands once the last destination has finished stops nothing: there is no destination left to keep from the site, and the run ends as every destination deployed. The sentence is the one each app already says when a stop lands inside a destination: on the mac a stop between two destinations cannot land (its Cancel is not shown there), so the case that decided it is the stop during the second of two, where the mac says deployPartiallySucceeded naming the second. One sentence the mac says did change with this rule: stopped during the second of three, its deployPartiallySucceeded named only the second as not deployed, and now names the second and the third, since the third never got the site either (#1009's fourth review).",
       "howToRunACase": "Make a deploy run with one leg per entry of `legs`, each to a destination of that `type`, in order: deployed (finished, and it went out), stoppedDuring (finished, not deployed: the stop landed in it), notReached (never started). `stopped` is the run's own mark that the teacher stopped it. Then the run's outcome is every destination deployed exactly when `everyDestinationDeployed` (the published stamp's own rule), the destinations not deployed are the 1-based `notDeployedTo`, in order, and the sentence the assistant is told is the assist wording named by `told` (deployed, deployDidNotFinish, deployedToMultipleDestinations, deployPartiallySucceeded with the not-deployed destinations' names joined, deployToMultipleDestinationsDidNotFinish) for that course and section.",
       "cases": [
         {
@@ -52795,6 +52795,14 @@
           "stopped": true,
           "everyDestinationDeployed": false,
           "notDeployedTo": [2],
+          "told": "deployPartiallySucceeded"
+        },
+        {
+          "name": "stopped during the second of three",
+          "legs": [{ "type": "netlify", "state": "deployed" }, { "type": "cloudflare_pages", "state": "stoppedDuring" }, { "type": "local_folder", "state": "notReached" }],
+          "stopped": true,
+          "everyDestinationDeployed": false,
+          "notDeployedTo": [2, 3],
           "told": "deployPartiallySucceeded"
         },
         {

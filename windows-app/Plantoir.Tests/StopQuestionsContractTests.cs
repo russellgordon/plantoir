@@ -445,7 +445,8 @@ public sealed class StopQuestionsContractTests : IDisposable
             first.PropertyChanged += (_, firstChanged) =>
             {
                 // Destination 1 has just ended, on the window's thread: RunAsync
-                // has not yet seen it (its poll is queued behind this), so this
+                // has not yet seen it (its wait resumes in a post queued behind
+                // this, #1016), so this
                 // is the gap between two destinations.
                 if (firstChanged.PropertyName != nameof(ScriptRunner.IsRunning) || first.IsRunning || first.LastExitCode is null) return;
                 if (underWayInTheGap is not null) return;
@@ -482,6 +483,52 @@ public sealed class StopQuestionsContractTests : IDisposable
             Plantoir.Core.Assist.AssistWording.DeployPartiallySucceeded("GAPTWO", "1",
                 MultiDestinationDeployRunner.JoinedWithAnd(new[] { destinations[1].Path, destinations[2].Path })),
             MultiDestinationDeployRunner.Result("GAPTWO", "1", destinations.Length, outcome).Message);
+    }
+
+    /// <summary>
+    /// A cancel that lands once a leg is announced and before its Run
+    /// (#1009's fourth review): <c>CanStillBeStopped</c> counts that leg, so
+    /// the cancel marks the run, and the leg must then never start. Before
+    /// the change the leg started anyway, and a second Stop was refused
+    /// because the run already read as cancelled. Played for the first leg
+    /// of a run that builds first (its build's Run) and for the second leg
+    /// of three (its deploy's Run).
+    /// </summary>
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    public async Task ACancelOnceALegIsAnnouncedKeepsThatLegFromStarting(int cancelledAtLeg, bool buildsFirst)
+    {
+        var course = StandInCourse("ANNOUNCE", out string deploysLog);
+        var destinations = new[]
+        {
+            new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-one")),
+            new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-two")),
+            new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-three")),
+        };
+        using var context = new SingleThreadContext();
+        var run = new MultiDestinationDeployRunner(context);
+        bool? stoppableAsAnnounced = null;
+        run.PropertyChanged += (_, changed) =>
+        {
+            if (changed.PropertyName != nameof(MultiDestinationDeployRunner.CurrentLegIndex) || run.CurrentLegIndex != cancelledAtLeg) return;
+            if (stoppableAsAnnounced is not null) return;
+            // The leg is announced, and the section shows its runner; its Run has not begun.
+            stoppableAsAnnounced = run.CanStillBeStopped;
+            run.Cancel();
+        };
+        await RunOn(context, () => run.RunAsync(course, 1, destinations, "", _folder,
+                                                buildReason: buildsFirst ? BuildFreshness.ReasonPages : null));
+
+        Assert.True(stoppableAsAnnounced == true, $"the announced leg did not read as a deploy to stop ({stoppableAsAnnounced})");
+        Assert.True(run.WasCancelled);
+        Assert.False(run.IsRunning);
+        Assert.True(run.Legs[cancelledAtLeg].Runner.StartedAt is null, $"leg {cancelledAtLeg + 1} started after the cancel that landed as it was announced");
+        Assert.Equal(cancelledAtLeg, LinesIn(deploysLog));
+        for (int later = cancelledAtLeg + 1; later < destinations.Length; later++)
+            Assert.Null(run.Legs[later].Runner.StartedAt);
+        Assert.False(run.CurrentOutcome.AllSucceeded, "a deploy stopped before a leg started reads as every destination deployed");
+        Assert.False(File.Exists(SectionPublishState.StampPath(course.DirectoryPath, 1)), "a stopped deploy stamped the section as published");
     }
 
     /// <summary>

@@ -186,7 +186,8 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     /// <summary>
     /// Cancels whichever leg is currently running. The remaining,
     /// not-yet-started legs are simply never reached — <see cref="RunAsync"/>'s
-    /// own loop checks <see cref="WasCancelled"/> after every wait and stops.
+    /// own loop checks <see cref="WasCancelled"/> after every wait, and
+    /// immediately before every Run, and stops.
     /// A cancel once nothing is left to stop (the last leg has ended, and
     /// RunAsync has not yet seen it) marks nothing (#1009's third review):
     /// everything went out, and the run must not end "Cancelled".
@@ -209,8 +210,10 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     /// deploy run it belongs to is still running and not cancelled. The
     /// second half is the gap between two destinations: the first leg's
     /// runner has stopped, and <see cref="RunAsync"/> has not yet moved to the
-    /// next leg (up to one poll of <see cref="ScriptRunner.WaitUntilFinished"/>),
-    /// so the shown runner alone reads as ended while the deploy goes on.
+    /// next leg (RunAsync's wait on <see cref="ScriptRunner.WaitUntilFinished"/>
+    /// resumes on the window's thread after the runner's own ending has been
+    /// announced, #1016), so the shown runner alone reads as ended while the
+    /// deploy goes on.
     /// <paramref name="deployRun"/> is null for a task that is not a deploy
     /// to two or more destinations.
     /// </summary>
@@ -239,7 +242,8 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     /// runner, a moment before the leg's Run), or a later leg is still to
     /// start (the gap between two destinations). Once the last leg has ended
     /// nothing is left (#1009's third review), though <see cref="IsRunning"/>
-    /// stays true until RunAsync notices, up to one poll later.
+    /// stays true until RunAsync's wait resumes, a turn of the window's
+    /// thread later (#1016).
     /// </summary>
     public bool CanStillBeStopped =>
         IsRunning && !WasCancelled
@@ -375,6 +379,11 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                 if (buildsFirst)
                 {
                     runner.Milestones = BuildAndDeployMilestones(destination.Type);
+                    // Immediately before each Run (#1009's fourth review): a
+                    // cancel that lands once the leg is announced and before
+                    // it starts (CanStillBeStopped counts that leg) marks only
+                    // the run, so this is what keeps the leg from starting.
+                    if (WasCancelled) break;
                     // A DEPLOY's build leg: --for-deploy, so another program's
                     // launcher reads it as a deploy (#828, mac #729).
                     runner.Run("preview.ps1",
@@ -429,6 +438,8 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                 }
 
                 var arguments = DeployCommand.Arguments(course.Code, sectionNumber, destination, cloudflareAccountID);
+                // The same check before the deploy's Run (#1009's fourth review).
+                if (WasCancelled) break;
                 runner.Run(DeployCommand.ScriptName, arguments, workingDirectory, keepTranscript: buildsFirst);
                 if (runner.LaunchProblem is not null)
                 {

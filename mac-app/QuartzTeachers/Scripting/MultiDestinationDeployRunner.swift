@@ -96,10 +96,14 @@ class MultiDestinationDeployRunner {
     /// added with Windows' #1009): it did not get the site, so a stopped
     /// run is never every destination deployed and writes no stamp. Every
     /// stop the mac's window can make lands inside a leg (its Cancel answers
-    /// only while the shown leg is running or between its phases), so no sentence the mac says today changes: a
-    /// stop in the first leg of two now also lists the second as not
-    /// deployed, and that list is said only when another leg went out.
-    /// It keeps the rule the same on both sides.
+    /// only while the shown leg is running or between its phases), and the
+    /// rule changes one sentence the mac says: with three destinations
+    /// stopped during the second, `deployPartiallySucceeded` named only the
+    /// second as not deployed and now names the second and the third
+    /// (the contract case "stopped during the second of three", #1009's
+    /// fourth review). A stop in the first leg of two also lists the second
+    /// now, which is never said, since no leg went out. It keeps the rule
+    /// the same on both sides.
     var outcome: Outcome {
         var failed: [CourseConfiguration.DeployDestination] = []
         var succeeded: [CourseConfiguration.DeployDestination] = []
