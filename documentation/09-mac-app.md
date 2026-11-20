@@ -1816,10 +1816,12 @@ key and Command-Period." They are the grouped form's switches, as the
 Obsidian and Assistant panes draw theirs (Toggles: "Within a grouped form,
 consider using a mini switch"; "In general, don't replace a checkbox with a
 switch"). Each change, from the box or the pane, writes one
-`stop question setting changed` line. Windows owes it with the questions
-([#1009](https://github.com/russellgordon/plantoir/issues/1009)) and holds it
-in `NamedGapLedger` until then; never `appliesOn`, which is for a permanent
-difference (`contracts/README.md` → "Named gaps"). Rejected: one setting for both (above), and
+`stop question setting changed` line. Windows records it too since
+[#1009](https://github.com/russellgordon/plantoir/issues/1009), which also
+moved the questions' words into `shared-rules.json` → `stopQuestions` (the mac
+owes a test pinning its Swift constants there; documentation 12 → "Escape
+stops a running preview or deploy, and the stop questions"); never
+`appliesOn`, which is for a permanent difference. Rejected: one setting for both (above), and
 Xcode's "Reset all questions" button, which says nothing about which
 question it brings back.
 
