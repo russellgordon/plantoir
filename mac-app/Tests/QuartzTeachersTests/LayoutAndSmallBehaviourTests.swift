@@ -428,68 +428,253 @@ final class LayoutAndSmallBehaviourTests: XCTestCase {
     func testThePaneCapLeavesRoomForTheWindowAroundIt() {
         let laptop: CGFloat = SettingsPaneHeight.tallest(onScreenShowing: 705)
         let scaled: CGFloat = SettingsPaneHeight.tallest(onScreenShowing: 560)
-        print("LayoutAndSmallBehaviourTests: pane cap \(laptop) pt at 705 visible, \(scaled) pt at 560 visible, \(SettingsPaneHeight.tallestOnTheMainScreen()) pt on this Mac's main screen")
+        print("LayoutAndSmallBehaviourTests: pane cap \(laptop) pt at 705 visible, \(scaled) pt at 560 visible, \(SettingsPaneHeight.tallestOnTheShortestScreen(SettingsWindowPlacement.connectedScreens())) pt on this Mac's shortest screen")
         XCTAssertEqual(laptop + SettingsPaneHeight.windowChrome + SettingsPaneHeight.screenMargin * 2, 705, accuracy: 0.5)
         XCTAssertLessThan(scaled + SettingsPaneHeight.windowChrome, 560)
         XCTAssertLessThan(laptop, 674, "the Assistant pane would run off a 1280 x 800 screen")
         XCTAssertEqual(SettingsPaneHeight.tallest(onScreenShowing: 100), SettingsPaneHeight.fewest)
     }
 
+    /// A laptop's 1280 x 800 screen with the Dock (705 pt visible) whose
+    /// visible area starts at `corner`, and a tall 2560 x 1440 display
+    /// (1415 pt visible) beside it.
+    static func laptopScreen(at corner: NSPoint) -> SettingsScreenArea {
+        return SettingsScreenArea(
+            frame: NSRect(x: corner.x, y: corner.y - 70, width: 1280, height: 800),
+            visibleFrame: NSRect(x: corner.x, y: corner.y, width: 1280, height: 705)
+        )
+    }
+
+    static func tallScreen(at corner: NSPoint) -> SettingsScreenArea {
+        return SettingsScreenArea(
+            frame: NSRect(x: corner.x, y: corner.y, width: 2560, height: 1440),
+            visibleFrame: NSRect(x: corner.x, y: corner.y, width: 2560, height: 1415)
+        )
+    }
+
+    /// A window that is never shown, at the frame the unit host pins it to
+    /// (every window sits beyond the displays there, `UnitTestHostWindows`),
+    /// so the pretend displays are laid out around wherever that is.
+    static func pinnedWindow() -> NSWindow {
+        let window: NSWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 400), styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        return window
+    }
+
     /// The cap comes from the Settings window's OWN screen (#997, D42, the
-    /// second review): Settings left on an 800 pt laptop screen while the
-    /// main window is on a tall display gets the laptop's cap, smaller
-    /// than the tall display's, not the main window's.
+    /// second and third reviews): Settings left on the laptop while the
+    /// main window is on a tall display gets the laptop's cap, smaller than
+    /// the tall display's. The displays are handed in, the tall one first
+    /// (where the menu bar is), and the placement chooses among them by
+    /// where the window is; a placement that read the key window's screen,
+    /// `NSScreen.main`, or the first display, gets another cap and fails.
     func testThePaneCapComesFromTheSettingsWindowsOwnScreen() {
         let center: NotificationCenter = NotificationCenter()
-        let laptop: NSRect = NSRect(x: 0, y: 95, width: 1280, height: 705)
-        let tall: NSRect = NSRect(x: 1280, y: 0, width: 2560, height: 1415)
-        let placement: SettingsWindowPlacement = SettingsWindowPlacement(center: center, visibleFrame: laptop)
-        let window: NSWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 400), styleMask: [.titled], backing: .buffered, defer: true)
+        let window: NSWindow = LayoutAndSmallBehaviourTests.pinnedWindow()
+        let frame: NSRect = window.frame
+        let laptop: SettingsScreenArea = LayoutAndSmallBehaviourTests.laptopScreen(at: NSPoint(x: frame.minX - 100, y: frame.minY - 100))
+        let tall: SettingsScreenArea = LayoutAndSmallBehaviourTests.tallScreen(at: NSPoint(x: laptop.frame.maxX, y: laptop.frame.minY))
+        let placement: SettingsWindowPlacement = SettingsWindowPlacement(center: center, screens: {
+            return [tall, laptop]
+        })
+        let laptopsCap: CGFloat = SettingsPaneHeight.tallest(onScreenShowing: laptop.visibleFrame.height)
+        let tallCap: CGFloat = SettingsPaneHeight.tallest(onScreenShowing: tall.visibleFrame.height)
+        XCTAssertEqual(placement.tallest, laptopsCap, accuracy: 0.5, "before it has a window, the cap is not the shortest screen's")
+
         placement.watch(window)
-        let mainWindowsCap: CGFloat = SettingsPaneHeight.tallest(onScreenShowing: tall.height)
-        print("LayoutAndSmallBehaviourTests: Settings on the laptop \(placement.tallest) pt, the tall display's cap \(mainWindowsCap) pt")
-        XCTAssertEqual(placement.tallest, SettingsPaneHeight.tallest(onScreenShowing: 705), accuracy: 0.5)
-        XCTAssertLessThan(placement.tallest, mainWindowsCap)
-        XCTAssertLessThan(placement.tallest + SettingsPaneHeight.windowChrome, laptop.height)
+        print("LayoutAndSmallBehaviourTests: Settings at \(window.frame) on the laptop \(laptop.frame): \(placement.tallest) pt, the tall display's cap \(tallCap) pt")
+        XCTAssertEqual(placement.tallest, laptopsCap, accuracy: 0.5, "the cap is not the laptop's, where the Settings window is")
+        XCTAssertLessThan(placement.tallest, tallCap)
+        XCTAssertLessThan(placement.tallest + SettingsPaneHeight.windowChrome, laptop.visibleFrame.height)
     }
 
     /// The cap is worked out again when the Settings window's screen
     /// changes, and when a screen's visible area changes (the Dock shown
-    /// or moved), each on the notification AppKit posts.
+    /// or moved), each on the notification AppKit posts; another window's
+    /// notification changes nothing. The window is across two displays
+    /// side by side and the one holding most of it decides.
     func testThePaneCapFollowsTheWindowsScreenWhenItChanges() {
         let center: NotificationCenter = NotificationCenter()
-        let laptop: NSRect = NSRect(x: 0, y: 95, width: 1280, height: 705)
-        let tall: NSRect = NSRect(x: 1280, y: 0, width: 2560, height: 1415)
-        let placement: SettingsWindowPlacement = SettingsWindowPlacement(center: center, visibleFrame: tall)
-        let window: NSWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 400), styleMask: [.titled], backing: .buffered, defer: true)
+        let window: NSWindow = LayoutAndSmallBehaviourTests.pinnedWindow()
+        let frame: NSRect = window.frame
+        // Most of the window on the tall display, to the laptop's right.
+        var laptop: SettingsScreenArea = LayoutAndSmallBehaviourTests.laptopScreen(at: NSPoint(x: frame.minX + 100 - 1280, y: frame.minY - 100))
+        var tall: SettingsScreenArea = LayoutAndSmallBehaviourTests.tallScreen(at: NSPoint(x: frame.minX + 100, y: laptop.frame.minY))
+        let placement: SettingsWindowPlacement = SettingsWindowPlacement(center: center, screens: {
+            return [tall, laptop]
+        })
         placement.watch(window)
-        XCTAssertEqual(placement.tallest, SettingsPaneHeight.tallest(onScreenShowing: 1415), accuracy: 0.5)
+        XCTAssertEqual(placement.tallest, SettingsPaneHeight.tallest(onScreenShowing: 1415), accuracy: 0.5, "the cap is not the tall display's, which holds most of the window")
 
-        placement.visibleFrameOverride = laptop
+        // The displays rearranged so most of it is on the laptop.
+        laptop = LayoutAndSmallBehaviourTests.laptopScreen(at: NSPoint(x: frame.maxX - 100 - 1280, y: frame.minY - 100))
+        tall = LayoutAndSmallBehaviourTests.tallScreen(at: NSPoint(x: frame.maxX - 100, y: laptop.frame.minY))
         center.post(name: NSWindow.didChangeScreenNotification, object: window)
         XCTAssertEqual(placement.tallest, SettingsPaneHeight.tallest(onScreenShowing: 705), accuracy: 0.5, "the cap did not follow the window to the laptop's screen")
 
-        let withTheDockHidden: NSRect = NSRect(x: 0, y: 0, width: 1280, height: 775)
-        placement.visibleFrameOverride = withTheDockHidden
+        // The Dock hidden: the laptop shows 775 pt.
+        var shown: NSRect = laptop.visibleFrame
+        shown.size.height = 775
+        laptop.visibleFrame = shown
         center.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
         XCTAssertEqual(placement.tallest, SettingsPaneHeight.tallest(onScreenShowing: 775), accuracy: 0.5, "the cap did not follow the screen's visible area")
 
-        let otherWindow: NSWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 300), styleMask: [.titled], backing: .buffered, defer: true)
-        placement.visibleFrameOverride = tall
+        let otherWindow: NSWindow = LayoutAndSmallBehaviourTests.pinnedWindow()
+        laptop = LayoutAndSmallBehaviourTests.laptopScreen(at: NSPoint(x: frame.minX + 100 - 1280, y: frame.minY - 100))
+        tall = LayoutAndSmallBehaviourTests.tallScreen(at: NSPoint(x: frame.minX + 100, y: laptop.frame.minY))
         center.post(name: NSWindow.didChangeScreenNotification, object: otherWindow)
         XCTAssertEqual(placement.tallest, SettingsPaneHeight.tallest(onScreenShowing: 775), accuracy: 0.5, "another window's move changed the Settings pane's cap")
     }
 
-    /// A window grown past its screen's bottom is moved up just far enough
-    /// to sit on the screen, and never so far its title bar leaves the top.
-    func testATallerPaneKeepsTheWindowOnItsScreen() {
-        let laptop: NSRect = NSRect(x: 0, y: 95, width: 1280, height: 705)
-        let onScreen: NSRect = NSRect(x: 100, y: 200, width: 560, height: 500)
-        XCTAssertNil(SettingsPaneHeight.originKeepingOnScreen(onScreen, visible: laptop))
-        let grownPastTheBottom: NSRect = NSRect(x: 100, y: 400 - 762, width: 560, height: 762 + 88)
-        let moved: NSPoint? = SettingsPaneHeight.originKeepingOnScreen(NSRect(x: 100, y: 0, width: 560, height: 650), visible: laptop)
-        XCTAssertEqual(moved, NSPoint(x: 100, y: 95))
-        let tooTall: NSPoint? = SettingsPaneHeight.originKeepingOnScreen(grownPastTheBottom, visible: laptop)
-        XCTAssertEqual(tooTall?.y ?? 0, laptop.maxY - grownPastTheBottom.height, accuracy: 0.5, "the title bar was pushed above the screen")
+    /// The origin rule, from the frames before and after a resize: a
+    /// growing resize that pushes the bottom past the visible area moves
+    /// the window up just far enough; a resize that did not grow it, or
+    /// grew it with its bottom still on the screen, does not.
+    func testOnlyAResizeThatGrewTheWindowPastTheBottomMovesIt() {
+        let visible: NSRect = LayoutAndSmallBehaviourTests.laptopScreen(at: NSPoint(x: 0, y: 70)).visibleFrame
+        let before: NSRect = NSRect(x: 100, y: 150, width: 560, height: 488)
+        let grown: NSRect = NSRect(x: 100, y: 150 - 112, width: 560, height: 600)
+        XCTAssertEqual(SettingsPaneHeight.originAfterResize(from: before, to: grown, visible: visible), NSPoint(x: 100, y: 70))
+
+        let grownOnScreen: NSRect = NSRect(x: 100, y: 150 - 50, width: 560, height: 538)
+        XCTAssertNil(SettingsPaneHeight.originAfterResize(from: before, to: grownOnScreen, visible: visible))
+
+        let leftLow: NSRect = NSRect(x: 100, y: -100, width: 560, height: 300)
+        let shrunk: NSRect = NSRect(x: 100, y: -50, width: 560, height: 250)
+        XCTAssertNil(SettingsPaneHeight.originAfterResize(from: leftLow, to: shrunk, visible: visible), "a resize that did not grow the window moved it")
+        let leftLowAndGrown: NSRect = NSRect(x: 100, y: -300, width: 560, height: 500)
+        XCTAssertEqual(SettingsPaneHeight.originAfterResize(from: leftLow, to: leftLowAndGrown, visible: visible), NSPoint(x: 100, y: -100), "a window left low was not put back where the person left its bottom")
+
+        let tallerThanTheScreen: NSRect = NSRect(x: 100, y: 150 - 412, width: 560, height: 900)
+        let highest: NSPoint? = SettingsPaneHeight.originAfterResize(from: before, to: tallerThanTheScreen, visible: visible)
+        XCTAssertEqual(highest?.y ?? 0, visible.maxY - 900, accuracy: 0.5, "the title bar was pushed above the screen")
+    }
+
+    /// A shown window and a placement watching it, with one pretend display
+    /// laid out around the window. In the unit host every window is pinned
+    /// beyond the displays, at an origin worked out from its size that keeps
+    /// its TOP edge where it was as it grows, as a taller pane does; so the
+    /// window is shown where it is pinned and the display is laid around it,
+    /// `bottomAboveTheVisibleArea` points below the window's bottom (a
+    /// negative number puts the window's bottom below the visible area, as
+    /// a person who left it low does). The window records each origin it is
+    /// asked to move to. The real `didResizeNotification` and
+    /// `didMoveNotification` are relayed to the placement's own center, so
+    /// the test can post focus and screen changes without telling the whole
+    /// host app that its screens changed.
+    @MainActor
+    final class ShownSettingsWindow {
+
+        // MARK: - Stored properties
+
+        let window: OriginRecordingWindow
+
+        let placement: SettingsWindowPlacement
+
+        let center: NotificationCenter = NotificationCenter()
+
+        var relays: [NSObjectProtocol] = []
+
+        let visible: NSRect
+
+        // MARK: - Initializer
+
+        init(bottomAboveTheVisibleArea: CGFloat) {
+            window = OriginRecordingWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.animationBehavior = .none
+            window.orderFrontRegardless()
+            let frame: NSRect = window.frame
+            let visibleArea: NSRect = NSRect(x: frame.minX - 200, y: frame.minY - bottomAboveTheVisibleArea, width: 1280, height: 705)
+            visible = visibleArea
+            let screen: SettingsScreenArea = SettingsScreenArea(
+                frame: NSRect(x: visibleArea.minX, y: visibleArea.minY - 70, width: 1280, height: 800),
+                visibleFrame: visibleArea
+            )
+            placement = SettingsWindowPlacement(center: center, screens: {
+                return [screen]
+            })
+            for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification] {
+                let relay: NSObjectProtocol = NotificationCenter.default.addObserver(forName: name, object: window, queue: nil) { [center] notification in
+                    center.post(name: notification.name, object: notification.object)
+                }
+                relays.append(relay)
+            }
+            placement.watch(window)
+            window.askedOrigins = []
+        }
+
+        // MARK: - Functions
+
+        /// Resized by AppKit to `height`, keeping its top edge, as a pane
+        /// change resizes the Settings window.
+        func resize(toHeight height: CGFloat) {
+            let frame: NSRect = window.frame
+            window.setFrame(NSRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height), display: false)
+        }
+
+        func close() {
+            for relay in relays {
+                NotificationCenter.default.removeObserver(relay)
+            }
+            window.close()
+        }
+    }
+
+    /// A window that keeps every origin it is asked to move to. The unit
+    /// host pins every window beyond the displays (`UnitTestHostWindows`),
+    /// so the frame cannot show a move; the asked origin can.
+    final class OriginRecordingWindow: NSWindow {
+
+        // MARK: - Stored properties
+
+        var askedOrigins: [NSPoint] = []
+
+        // MARK: - Functions
+
+        override func setFrameOrigin(_ point: NSPoint) {
+            askedOrigins.append(point)
+            super.setFrameOrigin(point)
+        }
+    }
+
+    /// A shown Settings window on a screen, grown by a taller pane so its
+    /// bottom runs past the visible area, is moved up onto it, just far
+    /// enough: its bottom to the visible bottom.
+    func testAGrowingResizeThatPushesTheBottomOffTheScreenMovesTheWindowUp() throws {
+        let shown: ShownSettingsWindow = ShownSettingsWindow(bottomAboveTheVisibleArea: 100)
+        defer {
+            shown.close()
+        }
+        XCTAssertTrue(shown.window.isVisible, "the window is not shown, so nothing about the move is tested")
+        XCTAssertEqual(shown.window.frame.minY - shown.visible.minY, 100, accuracy: 0.5)
+        shown.resize(toHeight: 700)
+        XCTAssertEqual(shown.window.frame.height, 700, accuracy: 0.5)
+        print("LayoutAndSmallBehaviourTests: grown to \(shown.window.frame) on \(shown.visible), asked to move to \(shown.window.askedOrigins)")
+        let moved: NSPoint = try XCTUnwrap(shown.window.askedOrigins.last, "a taller pane pushed the window's bottom off the screen and it was not moved")
+        XCTAssertEqual(shown.window.askedOrigins.count, 1, "the window was moved more than once for one resize")
+        XCTAssertEqual(moved.y, shown.visible.minY, accuracy: 0.5)
+        XCTAssertEqual(moved.x, shown.window.frame.minX, accuracy: 0.5)
+    }
+
+    /// A Settings window the person left low, its bottom below the visible
+    /// area, stays where they put it when it becomes key, when the screens
+    /// change, and when it is resized without growing. (The second version
+    /// moved it on every one of these, so it snapped back on every click.)
+    func testAWindowThePersonLeftLowIsLeftAlone() {
+        let shown: ShownSettingsWindow = ShownSettingsWindow(bottomAboveTheVisibleArea: -150)
+        defer {
+            shown.close()
+        }
+        XCTAssertTrue(shown.window.isVisible, "the window is not shown, so nothing about the move is tested")
+        shown.center.post(name: NSWindow.didBecomeKeyNotification, object: shown.window)
+        XCTAssertEqual(shown.window.askedOrigins, [], "a window left low was moved when it became key")
+        shown.center.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        XCTAssertEqual(shown.window.askedOrigins, [], "a window left low was moved when the screens changed")
+        shown.center.post(name: NSWindow.didChangeScreenNotification, object: shown.window)
+        XCTAssertEqual(shown.window.askedOrigins, [], "a window left low was moved when its screen changed")
+        shown.resize(toHeight: 300)
+        XCTAssertEqual(shown.window.frame.height, 300, accuracy: 0.5)
+        XCTAssertEqual(shown.window.askedOrigins, [], "a window left low was moved by a resize that did not grow it")
     }
 }

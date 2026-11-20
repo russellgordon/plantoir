@@ -4560,23 +4560,63 @@ brought to match in stage 3.
   nothing recomputed it on a move or a Dock change. Now
   `SettingsWindowPlacement` is handed the Settings window itself
   (`WindowAccessor`, the moment the pane joins it) and works the cap out
-  again from that window's screen on the notifications AppKit posts when
+  again, from the screen that holds most of that window (how AppKit's
+  `NSWindow.screen` decides), on the notifications AppKit posts when
   something it depends on has changed: `NSWindow.didChangeScreenNotification`,
   `didBecomeKeyNotification` (Settings reopened), `didResizeNotification`,
   and `NSApplication.didChangeScreenParametersNotification` (screens
-  rearranged, the Dock shown, hidden or moved); no timed delay. A taller
-  pane grows the window down from its top edge, so a window left low on
-  its screen would run past the bottom: on each of those notifications
-  `SettingsPaneHeight.originKeepingOnScreen` moves it up just far enough to
-  sit on the visible area, never so far its title bar leaves the top
-  (AppKit's own `constrainFrameRect(_:to:)` keeps only the top edge on
-  screen, so it does not cover this). `LayoutAndSmallBehaviourTests`
-  injects the screen's visible frame: the cap for a 705 pt laptop is
-  smaller than a tall display's, it follows a screen change and a Dock
-  change, another window's move does not change it, and the origin rule
-  keeps the window on screen. NOT proven: a real second display (this Mac
-  has one screen), and the move during SwiftUI's animated resize between
-  panes, which was not driven in the running window. Until #997 every pane opened
+  rearranged, the Dock shown, hidden or moved); no timed delay. Before it
+  has a window the cap is the SHORTEST screen's, the one cap never too
+  tall for wherever Settings opens (the second version read
+  `NSScreen.main`). The placement is handed the displays
+  (`SettingsScreenArea` values, `NSScreen.screens` in the app), so a test
+  gives it a laptop beside a tall display and checks the choice of screen
+  itself: the third review found the second version's test passed with
+  the screen read from the key window, because its injected visible frame
+  skipped that choice.
+
+  **When the window is moved.** A taller pane grows the window down from
+  its top edge, so a window that sat on its screen with a short pane runs
+  past the bottom (past the Dock) with a tall one. It is moved ONLY after
+  a resize that grew it and pushed its bottom past the visible area,
+  judged from the frame before and after that resize
+  (`SettingsPaneHeight.originAfterResize`; the frame before is kept on
+  every resize and every move): up just far enough to undo what the growth
+  hid, to the visible bottom, or, when the person had left the bottom
+  lower than that, back to where they left it, never so far the title bar
+  leaves the top. A focus change, a screen change, a resize that did not
+  grow it, or a person's own drag of an edge (`inLiveResize`) never moves
+  it, so a window left partly below the screen, or across two displays
+  stacked one above the other, stays where it was put. HIG, Windows:
+  people "can reposition them", and "the system remembers window size and
+  placement". The second version moved it on every one of those
+  notifications, and the third review found it snapped back on every
+  click. (AppKit's own `constrainFrameRect(_:to:)` keeps only the top edge
+  on screen, so it does not cover the bottom.) `LayoutAndSmallBehaviourTests`
+  shows a window (beyond the displays, as the unit host keeps every
+  window, with a pretend display laid around it; the window records the
+  origins it is asked to move to, since the host pins every frame) and
+  resizes it through AppKit: a growing resize past the bottom moves it
+  once, to the visible bottom; a window left low is not moved on becoming
+  key, on a screen change or on a resize that did not grow it.
+
+  NOT proven: a real second display (this Mac has one screen), and so the
+  cap changing while a person drags Settings across to a display of
+  another height (the pane would resize mid-drag; left as it is, since it
+  cannot be checked here); and `windowChrome` on macOS 15 (88 pt
+  measured on 26 only; owed). MEASURED, 2026-11-20, on the real Settings
+  window opened in the unit host through `openSettings` (macOS 26): a
+  pane change resizes the window in ONE step, one `didResizeNotification`
+  per change (Preview 247 pt to Assistant 762 pt, Assistant to Obsidian
+  255 pt), posted from SwiftUI's `NSHostingView.updateAnimatedWindowSize`
+  through `NSWindow._setFrameCommon`, with `inLiveResize` false; so the
+  window is moved once per pane change, and nothing waits for an
+  animation's end (`windowDidEndLiveResize` is for a person's drag only).
+  The same run measured the chrome again: 88 pt, the frame less
+  `contentLayoutRect`. Not measured on a window on a display, where AppKit
+  might step an animation; were it to, the rule above would move the
+  window on each step that grew it past the bottom, ending in the same
+  place. Until #997 every pane opened
   at 560 x 648: the Assistant pane was held at `.frame(height: 560)` and
   scrolled, and Preview and Obsidian were mostly empty space (the
   inventory's captures). HIG, Settings: "a settings window accommodates

@@ -137,31 +137,96 @@ enum SettingsPaneHeight {
         return room
     }
 
-    /// The tallest a pane may be on the main screen, for a Settings window
-    /// not yet in a window of its own.
-    static func tallestOnTheMainScreen() -> CGFloat {
-        guard let screen = NSScreen.main else {
-            return tallest(onScreenShowing: 800)
+    /// The tallest a pane may be on the shortest of `screens`, for a
+    /// Settings window not yet in a window of its own: until it is, its
+    /// screen is not known, and the shortest is the one cap that is never
+    /// too tall for wherever Settings opens. On one screen it is that
+    /// screen's cap. (The first version read `NSScreen.main`, the key
+    /// window's screen, which is too tall when Settings was left on a
+    /// shorter display.) Once the window is watched the cap is worked out
+    /// again for its own screen.
+    static func tallestOnTheShortestScreen(_ screens: [SettingsScreenArea]) -> CGFloat {
+        var shortest: CGFloat?
+        for screen in screens {
+            let height: CGFloat = screen.visibleFrame.height
+            if let found = shortest, found <= height {
+                continue
+            }
+            shortest = height
         }
-        return tallest(onScreenShowing: screen.visibleFrame.height)
+        return tallest(onScreenShowing: shortest ?? 800)
     }
 
-    /// Where a window of `frame` must move to stay on a screen whose
-    /// visible area is `visible`, or nil when it already does. A taller
-    /// pane grows the Settings window downward from its top edge, so a
-    /// window left low on the screen would run past the bottom (past the
-    /// Dock) with its last controls out of reach; it is moved up just far
-    /// enough, and never so far that its title bar leaves the top.
-    static func originKeepingOnScreen(_ frame: NSRect, visible: NSRect) -> NSPoint? {
-        if frame.minY >= visible.minY - 0.5 {
+    /// The screen a window of `frame` is on: the one that holds the most of
+    /// it, which is how AppKit's `NSWindow.screen` decides, or the first
+    /// (the one with the menu bar) when it is on none of them.
+    static func screen(holding frame: NSRect, among screens: [SettingsScreenArea]) -> SettingsScreenArea? {
+        var holdingTheMost: SettingsScreenArea?
+        var mostHeld: CGFloat = 0
+        for screen in screens {
+            let shared: NSRect = frame.intersection(screen.frame)
+            let held: CGFloat = shared.width * shared.height
+            if !shared.isNull && held > mostHeld {
+                mostHeld = held
+                holdingTheMost = screen
+            }
+        }
+        if let holdingTheMost {
+            return holdingTheMost
+        }
+        return screens.first
+    }
+
+    /// Where a window must move after AppKit resized it from `before` to
+    /// `after`, on a screen whose visible area is `visible`, or nil when it
+    /// stays where it is.
+    ///
+    /// Only a resize that GREW the window and pushed its bottom down past
+    /// the visible area moves it: a taller pane grows the Settings window
+    /// downward from its top edge, so a window that sat on the screen with
+    /// a short pane runs past the bottom (past the Dock) with a tall one,
+    /// its last controls out of reach. It is moved up just far enough to
+    /// undo what the growth hid: to the visible bottom, or, when the person
+    /// had left its bottom lower than that, back to where they left it, so
+    /// a taller pane never hides more than was hidden before. Never so far
+    /// its title bar leaves the top. Where the person put the window is
+    /// never, by itself, a reason to move it: the HIG's Windows page,
+    /// "people can reposition them", and "the system remembers window
+    /// size and placement".
+    static func originAfterResize(from before: NSRect, to after: NSRect, visible: NSRect) -> NSPoint? {
+        if after.height <= before.height + 0.5 {
+            return nil
+        }
+        if after.minY >= before.minY - 0.5 {
+            return nil
+        }
+        if after.minY >= visible.minY - 0.5 {
             return nil
         }
         var bottom: CGFloat = visible.minY
-        if bottom + frame.height > visible.maxY {
-            bottom = visible.maxY - frame.height
+        if before.minY < bottom {
+            bottom = before.minY
         }
-        return NSPoint(x: frame.minX, y: bottom)
+        if bottom + after.height > visible.maxY {
+            bottom = visible.maxY - after.height
+        }
+        if bottom <= after.minY + 0.5 {
+            return nil
+        }
+        return NSPoint(x: after.minX, y: bottom)
     }
+}
+
+/// One display as `SettingsWindowPlacement` reads it: its whole frame, and
+/// the part not under the menu bar or the Dock. A value, so a test can hand
+/// the placement displays this Mac does not have.
+struct SettingsScreenArea: Equatable {
+
+    // MARK: - Stored properties
+
+    var frame: NSRect
+
+    var visibleFrame: NSRect
 }
 
 /// The Settings window's own screen, followed as it changes (#997, D42).
@@ -172,13 +237,21 @@ enum SettingsPaneHeight {
 /// the main window on a tall display and Settings left on an 800 pt laptop
 /// screen the Assistant pane opened 762 pt tall where about 705 show. This
 /// is told the Settings window itself (`WindowAccessor`) and works the cap
-/// out again from that window's screen whenever AppKit says something it
-/// depends on changed: the window moved to another screen
-/// (`NSWindow.didChangeScreenNotification`), it became key again (Settings
-/// reopened), or a screen's arrangement or visible area changed
-/// (`NSApplication.didChangeScreenParametersNotification`, which is posted
-/// when the Dock is shown, hidden or moved). No timed delay: each is a
-/// notification AppKit posts when the thing has happened.
+/// out again from the screen that holds most of that window whenever AppKit
+/// says something it depends on changed: the window moved to another
+/// screen (`NSWindow.didChangeScreenNotification`), it became key again
+/// (Settings reopened), it was resized, or a screen's arrangement or
+/// visible area changed (`NSApplication.didChangeScreenParametersNotification`,
+/// posted when the Dock is shown, hidden or moved). No timed delay: each is
+/// a notification AppKit posts when the thing has happened.
+///
+/// The window is MOVED only after a resize that grew it past the visible
+/// bottom (`SettingsPaneHeight.originAfterResize`), judged from its frame
+/// before and after that resize; never on a focus change, a screen change
+/// or a resize that did not grow it, so a window the person left low, or
+/// across two displays stacked one above the other, stays where they put
+/// it. (The second version moved it on every one of those notifications,
+/// and the third review found it snapped back on every click.)
 @MainActor
 @Observable
 final class SettingsWindowPlacement {
@@ -191,8 +264,15 @@ final class SettingsWindowPlacement {
     /// The Settings window, once it has been put in one.
     @ObservationIgnored weak var window: NSWindow?
 
-    /// For tests: the visible frame to use instead of the window's screen's.
-    @ObservationIgnored var visibleFrameOverride: NSRect?
+    /// The displays, as they are now. `NSScreen.screens` in the app; a
+    /// test hands in displays of its own, so the choice of screen below it
+    /// is what the test checks.
+    @ObservationIgnored let screens: @MainActor () -> [SettingsScreenArea]
+
+    /// The window's frame as it was before the latest resize: kept on every
+    /// resize and every move, so a resize is judged against where the
+    /// window was, not against where it was first seen.
+    @ObservationIgnored var frameBeforeResize: NSRect?
 
     @ObservationIgnored let center: NotificationCenter
 
@@ -200,14 +280,11 @@ final class SettingsWindowPlacement {
 
     // MARK: - Initializer
 
-    init(center: NotificationCenter = .default, visibleFrame: NSRect? = nil) {
+    init(center: NotificationCenter = .default,
+         screens: @escaping @MainActor () -> [SettingsScreenArea] = SettingsWindowPlacement.connectedScreens) {
         self.center = center
-        self.visibleFrameOverride = visibleFrame
-        if let visibleFrame {
-            self.tallest = SettingsPaneHeight.tallest(onScreenShowing: visibleFrame.height)
-        } else {
-            self.tallest = SettingsPaneHeight.tallestOnTheMainScreen()
-        }
+        self.screens = screens
+        self.tallest = SettingsPaneHeight.tallestOnTheShortestScreen(screens())
     }
 
     isolated deinit {
@@ -218,52 +295,83 @@ final class SettingsWindowPlacement {
 
     // MARK: - Functions
 
-    /// Starts following `window`: its screen, and the screens' visible
-    /// areas. Called once, the moment the pane joins the window.
+    /// This Mac's displays, as AppKit has them now.
+    static func connectedScreens() -> [SettingsScreenArea] {
+        var areas: [SettingsScreenArea] = []
+        for screen in NSScreen.screens {
+            areas.append(SettingsScreenArea(frame: screen.frame, visibleFrame: screen.visibleFrame))
+        }
+        return areas
+    }
+
+    /// Starts following `window`: its screen, its size, and the screens'
+    /// visible areas. Called once, the moment the pane joins the window.
     func watch(_ window: NSWindow) {
         self.window = window
         for observer in observers {
             center.removeObserver(observer)
         }
         observers = []
-        let windowNames: [Notification.Name] = [
+        frameBeforeResize = window.frame
+        let capNames: [Notification.Name] = [
             NSWindow.didChangeScreenNotification,
             NSWindow.didBecomeKeyNotification,
-            NSWindow.didResizeNotification,
         ]
-        for name in windowNames {
+        for name in capNames {
             let observer: NSObjectProtocol = center.addObserver(forName: name, object: window, queue: nil) { [weak self] _ in
                 MainActor.assumeIsolated {
-                    self?.refresh()
+                    self?.refreshCap()
                 }
             }
             observers.append(observer)
         }
-        let screens: NSObjectProtocol = center.addObserver(
+        let resized: NSObjectProtocol = center.addObserver(
+            forName: NSWindow.didResizeNotification, object: window, queue: nil
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.windowWasResized()
+            }
+        }
+        observers.append(resized)
+        let moved: NSObjectProtocol = center.addObserver(
+            forName: NSWindow.didMoveNotification, object: window, queue: nil
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.frameBeforeResize = self?.window?.frame
+            }
+        }
+        observers.append(moved)
+        let screensChanged: NSObjectProtocol = center.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: nil
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.refresh()
+                self?.refreshCap()
             }
         }
-        observers.append(screens)
-        refresh()
+        observers.append(screensChanged)
+        refreshCap()
     }
 
-    /// The visible area of the screen the Settings window is on.
+    /// The visible area of the screen that holds most of the Settings
+    /// window, or of the shortest screen before there is a window.
     func visibleFrame() -> NSRect? {
-        if let visibleFrameOverride {
-            return visibleFrameOverride
+        let areas: [SettingsScreenArea] = screens()
+        guard let window else {
+            var shortest: SettingsScreenArea?
+            for area in areas {
+                if let found = shortest, found.visibleFrame.height <= area.visibleFrame.height {
+                    continue
+                }
+                shortest = area
+            }
+            return shortest?.visibleFrame
         }
-        if let screen = window?.screen {
-            return screen.visibleFrame
-        }
-        return NSScreen.main?.visibleFrame
+        return SettingsPaneHeight.screen(holding: window.frame, among: areas)?.visibleFrame
     }
 
-    /// Works the cap out again for the window's screen, and keeps the
-    /// window's bottom on that screen.
-    func refresh() {
+    /// Works the cap out again for the window's screen. Never moves the
+    /// window.
+    func refreshCap() {
         guard let visible = visibleFrame() else {
             return
         }
@@ -271,12 +379,25 @@ final class SettingsWindowPlacement {
         if cap != tallest {
             tallest = cap
         }
-        guard let window, window.isVisible else {
+    }
+
+    /// After AppKit resized the window: moves it up if the resize grew it
+    /// past the visible bottom, then works the cap out again.
+    func windowWasResized() {
+        guard let window else {
             return
         }
-        if let origin = SettingsPaneHeight.originKeepingOnScreen(window.frame, visible: visible) {
-            window.setFrameOrigin(origin)
+        let after: NSRect = window.frame
+        let before: NSRect = frameBeforeResize ?? after
+        frameBeforeResize = after
+        // A person dragging an edge is placing the window themselves.
+        if window.isVisible && !window.inLiveResize, let visible = visibleFrame() {
+            if let origin = SettingsPaneHeight.originAfterResize(from: before, to: after, visible: visible) {
+                window.setFrameOrigin(origin)
+                frameBeforeResize = window.frame
+            }
         }
+        refreshCap()
     }
 }
 
