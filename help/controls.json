@@ -260,6 +260,48 @@
    },
    "windows": null
   },
+  "stopDeploy": {
+   "label": "Stop Deploy",
+   "mac": {
+    "wording": "DeployStopWording.stopButton"
+   },
+   "windows": null
+  },
+  "stopShare": {
+   "label": "Stop Share",
+   "mac": {
+    "wording": "ShareStopWording.stopButton"
+   },
+   "windows": null
+  },
+  "stopQuestionDontAskAgain": {
+   "label": "Don't ask again",
+   "mac": {
+    "wording": "StopQuestionSettingsWording.dontAskAgain"
+   },
+   "windows": null
+  },
+  "stopQuestionSection": {
+   "label": "Stopping",
+   "mac": {
+    "wording": "StopQuestionSettingsWording.sectionHeader"
+   },
+   "windows": null
+  },
+  "asksBeforeStoppingADeploy": {
+   "label": "Ask before stopping a deploy",
+   "mac": {
+    "wording": "StopQuestionSettingsWording.asksBeforeStoppingADeploy"
+   },
+   "windows": null
+  },
+  "asksBeforeStoppingAShare": {
+   "label": "Ask before stopping a share of unit plans",
+   "mac": {
+    "wording": "StopQuestionSettingsWording.asksBeforeStoppingAShare"
+   },
+   "windows": null
+  },
   "addClassWayNextInThisUnit": {
    "label": "As the next class in the unit under way",
    "mac": {

@@ -1228,8 +1228,9 @@ applies to every dialog presented within the view it is on, so it appeared on
 this alert too (#731, found driving this piece) — ticking it silently turned
 the add-ons offer off. The offer is now presented from a view of its own
 behind the content (`ObsidianAddOnsOfferDialog.offerHost`), and
-`testOnlyTheAddOnsOfferCarriesASuppressionToggle` holds that there is one
-toggle in the app's views, there. Every answer is remembered by alert key in
+`testEachSuppressionToggleIsTheAddOnsOffersOrTheStopQuestions` holds that there is one
+toggle for it in the app's views, there (the only other is the stop
+questions' box on the progress panel's Cancel, #988). Every answer is remembered by alert key in
 `~/Library/Application Support/Plantoir/problems-acknowledged/<folder id>.json`
 (last 20 per section), so a relaunch does not raise yesterday's alert again
 (plan review, HIGH 2) — never in the record, which the build rewrites. A record
@@ -1669,6 +1670,262 @@ below the row (`CourseCodeSuggestionsOverlay.top`). Measured by the geometry
 function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests`);
 the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
 a unit test can read a frame from.
+
+## Escape and Command-Period stop a running preview, deploy or plan share (#988)
+
+The progress panel's Cancel (`TaskProgressView`, `taskCancelButton`) answers
+Escape and Command-Period while a preview builds or a deploy runs, unless
+something else has a use for the key. Until #988 it carried no key, and the
+HIG review (#975, finding D6) found both keys did nothing with Keyboard
+Navigation on or off; with it off, the button could not be reached from the
+keyboard at all. Keyboards
+(https://developer.apple.com/design/human-interface-guidelines/keyboards):
+"Esc: Cancel the current action or process"; "Command-Period: Cancel an
+operation." Progress indicators: "When it's feasible, let people halt
+processing."
+
+**The visible button carries the key, and decides each key when it
+arrives** (the fifth #988 round). Cancel is `TaskCancelButton`, a real
+`NSButton` wrapped for SwiftUI (`CancelKeyNSButton`, a regular push button,
+the bezel SwiftUI's `.bordered` draws on the Mac: 66 x 24 points for both,
+measured by `testTheCancelButtonIsTheSizeAndKindOfTheOneItReplaced`; its cell
+is the accessibility element, role button, title "Cancel"). It overrides
+`performKeyEquivalent(with:)`, which AppKit calls with the key itself before
+the focused box sees it, and takes Escape (no Command, Option, Control or
+Shift) or Command-Period only while `cancelKeysAreLive`
+(`TaskProgressView.cancelHoldsTheKeys`: Cancel shows, the run is under way,
+no preview's site covers the panel (below), no question about stopping is
+open, the panel's window is the key window, `controlActiveState == .key`, so
+a sheet, an alert or a popover in front lets go of it) AND, read at that
+moment, no box in its window is being typed in
+(`KeyWindowTextEditing.isEditingText(in:)`: the window's first responder is
+EDITABLE `NSText`, the field editor every text field and search field edits
+through, or an editable text view). Refused, the key goes on to the box as if
+there were no Cancel; a box with no use for Escape sends `cancelOperation`
+back up to the window, which offers it to Cancel again and is refused again,
+so nothing loops (`testEscapeInAFieldWithNoUseForItStopsNothing`). A click
+and an accessibility press (VoiceOver's VO-Space, Voice Control's "Click
+Cancel", Switch Control) reach `pressCancel` with nothing to inspect and
+always stop the task. The button sets no `keyEquivalent`, so there is one
+route for its keys; with Escape set there as well every pressed-key test still
+passed (sabotage S4, run `988-n4`), so that is a choice, not a fix.
+
+**Why it moved off a SwiftUI shortcut.** Round four put
+`.keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)` on a SwiftUI
+Cancel. SwiftUI applies a change to that only when it next updates the view,
+so in run `988-n2` (Keyboard Navigation on) a click in the Filter field and
+Escape already waiting together in the event queue, which is what a
+teacher's input becomes when the app is busy for longer than the gap between
+them, met a Cancel that still held the key, and Escape stopped the task.
+The next writer had `pressCancel` read `NSApp.currentEvent` and refuse a
+press that was a key while a box was being typed in. The fifth review found
+that `NSApp.currentEvent` is the last event taken off the queue, not the
+event that pressed the button: an accessibility press has no event of its
+own, so a VoiceOver press coming after a key typed in a box was taken for
+that key and the task kept running (`testAnAccessibilityPressStopsTheTaskWhileABoxHasTheFocus`,
+red with that check put back, sabotage S1). It also still took the key away
+from the box. Deciding in `performKeyEquivalent` reads the key that is
+actually arriving and the window as it is then.
+
+**Only editable text is a box** (the fifth review's low). The console's
+output is `.textSelection(.enabled)`; measured on the main Mac with
+Keyboard Navigation on and off (run `988-n4`), a click in it makes a
+read-only `NSTextView` the window's first responder, so with "is `NSText`"
+as the test, selecting a line of output silenced Escape and Command-Period for
+the running task. Nobody types there, so `isEditingText` asks for
+`isEditable` too (`testSelectingConsoleTextLeavesTheKeysWithCancel`,
+`testOnlyEditableTextIsABox`). The console's own answer field is a box, and
+keeps the keys.
+
+Russell's ruling on #988 (2026-11-19, evening): left as built. While any box
+has the focus (with Keyboard Navigation on, AppKit focuses the sidebar's
+Filter field when the window becomes key), Escape and Command-Period are
+both the box's; a click on Cancel still stops the task
+(`testAClickOnCancelStopsTheTaskWhileABoxHasTheFocus`, a real click through
+the event queue).
+
+**What SwiftUI's field does with a queued Escape is SwiftUI's.** Measured in
+run `988-n4`: with the Filter field's `.onExitCommand`, an Escape queued
+straight behind the click that focused the field runs nothing, with Cancel
+in the window or with no Cancel at all, because SwiftUI learns that its field
+has the focus only when it next updates the view. The queued-key tests
+therefore hold the box to what it does with no Cancel in the window,
+measured first in the same window, and the task to running on; the next
+Escape clears the box as usual. Passing the key on to the box from Cancel's
+action, rejected in round four because it came straight back to Cancel
+through `cancelOperation`, is not needed: the key never reaches the action.
+
+**Rejected, in order:** `CancelKeyCatcher` (round one), an invisible view
+that took the keys: the kind of hidden key-carrying control Russell rejected
+on #973. `CancelOperationResponder` (rounds two and three), an `NSResponder`
+put into the window's chain to answer `cancelOperation(_:)`: the third
+review measured that in a window whose content is a hosting CONTROLLER (the
+shape of the app's own windows) it was not in the chain and Escape did
+nothing, and that taking the window's first-responder place depended on
+Keyboard Navigation; it also needed an invisible installer view.
+`.onExitCommand`, which fires only while something in the panel holds the
+keys, and with Keyboard Navigation off nothing does (#973). A list of fields
+that keep Escape, which goes stale with the next field.
+
+**A preview stops at once; a deploy asks first** (Russell, 2026-11-19, on
+#988), by click or by key: an alert, "Stop the deploy?"
+(`DeployStopWording`), "The website may be left partly updated until you
+deploy again.", with **Stop Deploy**, a plain button and the default (Return),
+and **Cancel** (`role: .cancel`, `.keyboardShortcut(.cancelAction)`: Escape and
+Command-Period), which lets the deploy run on. Alerts: "Always use 'Cancel'
+to title a button that cancels the alert's action"; the destructive style is
+for "a destructive action people didn't deliberately choose", and stopping
+is what the teacher chose. macOS stacks the two buttons in this alert, the
+default at the top (with the box below, AppKit draws them in a row, the
+default trailing). If the deploy ends while the question is open, the
+question goes and nothing is stopped.
+
+**A plan share asks first too** (Russell's rulings on the design,
+`vm-tools/reference/988-stop-questions-design.md`, 2026-11-19): "Stop this
+share?", "The unit plans may be left partly shared until you share them
+again.", **Stop Share** (plain, default) and **Cancel** (`ShareStopWording`),
+and its Cancel holds the stop keys as the deploy's does. The title is not
+"Stop Sharing", which already names taking shared plans down in the
+Planning tab. The sentence becomes "The unit plans stay as they were before
+this share began." when #992's all-or-nothing share lands; a comment on #992
+says so. `TaskProgressView` takes `stopQuestion: StopQuestion?` (`.deploy`
+from the section window, `.share` from `PlanShareConsoleSheet`, `nil` for a
+preview).
+
+**"Don't ask again" on both questions, each its own setting** (rulings 2 and
+3). The box is `.dialogSuppressionToggle` on the panel's Cancel button itself,
+so it reaches the stop question and no other: a suppression toggle applies to
+every dialog presented within the view it is on, which is how the add-ons
+offer's box once reached the Problems alert (#731). It starts unticked each
+time the question opens and is read only by the stopping button
+(`StopQuestion.stopWasChosen`): ticked with Stop Deploy or Stop Share, that
+question is off (`AppSettings.asksBeforeStoppingADeploy` or
+`.asksBeforeStoppingAShare`, both on by default); ticked with Cancel, nothing
+is remembered, so a teacher who backed out is not surprised next time by a
+key that stops at once. Two settings, not one: the HIG's words are "the same
+alert", and one setting would let a tick on a share silently turn off the
+deploy's question (the #731 lesson again). **Once a question is off**,
+`asksBeforeStopping` is false, and Cancel, Escape and Command-Period stop that
+task at once, as a preview's do.
+
+**The way back is Plantoir ▸ Settings ▸ Deploying ▸ Stopping**
+(`StopQuestionSettingsSection`, the pane's first section): "Ask before
+stopping a deploy" and "Ask before stopping a share of unit plans", with the
+footer "When one is off, Cancel stops that task at once, and so do the Escape
+key and Command-Period." They are the grouped form's switches, as the
+Obsidian and Assistant panes draw theirs (Toggles: "Within a grouped form,
+consider using a mini switch"; "In general, don't replace a checkbox with a
+switch"). Each change, from the box or the pane, writes one
+`stop question setting changed` line. Windows owes it with the questions
+([#1009](https://github.com/russellgordon/plantoir/issues/1009)) and holds it
+in `NamedGapLedger` until then; never `appliesOn`, which is for a permanent
+difference (`contracts/README.md` → "Named gaps"). Rejected: one setting for both (above), and
+Xcode's "Reset all questions" button, which says nothing about which
+question it brings back.
+
+**Only while the panel is in front.** In the section window the preview's site
+is drawn OVER the panel once it serves (`websiteLayers`), and the runner is
+still running then. So `takesTheCancelKeys` is false while `previewURL` is set
+(`SectionDetailView.progressPanelTakesTheCancelKeys`), and Escape on a web
+page never stops the preview; the Section menu's Stop Preview and the toolbar
+button do. Other tabs (Coverage, Problems) do not hold the panel at all
+(#793). No menu item or shortcut was added: those are #990's.
+
+**Once per run** (`CancelOncePerRun`, keyed by the runner's `startedAt`): a
+held key repeating faster than the panel redraws would run Cancel more than
+once, and a plan share's cancel (`stopByUser`) never sets `wasCancelled`.
+Any stop after the first in a run does nothing, and the button goes.
+
+**Tests.** `ProgressCancelKeysTests` presses each key the way a teacher does:
+the panel in a window whose content is an `NSHostingController` (the app's
+own windows' shape, which the class also reads off the host's real window),
+inside a split view with a Filter box, appearing after the window is up,
+the window made the key window of the active app, and the key sent through
+`NSApp.sendEvent`. Escape and Command-Period stop a preview once; a held key
+stops it once; typed in the Filter box, Escape clears the box and neither key
+stops the task, a click in the box with Escape or Command-Period already
+queued behind it stops nothing and leaves the box as it is with no Cancel
+there, and once focus leaves the box Escape stops it; behind a sheet
+(one whose Cancel holds Escape, and one with no use for it) and behind an
+alert neither key stops it; with the site covering the panel neither does;
+on a deploy either key asks, Escape or Command-Period in the question is
+Cancel and the deploy runs on, Return is Stop Deploy and stops it once, and
+the question goes when the deploy ends; ticked with Stop Deploy the box turns
+the deploy's question off and leaves the share's on, ticked with Cancel it is
+not remembered and the next question opens unticked; with a question off,
+Escape and Command-Period stop that task at once; and a share still asks
+with the deploy's question off, Return choosing Stop Share. They take the front from
+the person at the Mac, so they are **opt-in**: `TEST_RUNNER_PLANTOIR_KEY_TESTS=1`
+on the `xcodebuild` line, on a Mac nobody is using; without it they skip and
+say so, and the rule and source tests run. The merge gate on the main Mac
+runs them after the suite (`vm-tools/gate-here.sh`, a `keys:` line that is
+RED on any failure), except while the person is at that Mac's keyboard,
+when the line reads `keys: SKIPPED, screen in use`. Bringing the host forward goes
+through Launch Services when macOS refuses `activate` (cooperative
+activation, no accessibility grant), which makes the accessory host a
+regular app; `tearDown` makes it an accessory again
+(`UnitTestHostWindowsTests`, #633). When the host still cannot be made the
+active app with that window key (a locked screen, #315), those tests skip and
+say so. With Keyboard Navigation on, AppKit puts the focus in the Filter
+box when the window becomes key, so the box owns Escape until the teacher
+clicks elsewhere; the tests start with focus in no box, and
+`testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst` records that case
+as it is (skipped with Keyboard Navigation off); Russell ruled on 2026-11-19
+that it stays so. Also pressed: an accessibility press (`AXPress`
+on Cancel's accessibility element, the button's cell) and a real click on
+Cancel each stop the task while the Filter box has the focus, the press
+coming straight after a key typed in the box; typed in a text view, or in a
+field with no use for Escape, neither key stops the task; after selecting
+console output, Escape does. A test that focuses the Filter box has the
+window's SwiftUI content update before the next key
+(`applyPendingViewUpdates`), because the field's own `onExitCommand` runs
+only once SwiftUI knows the field has the focus (above; a gap no teacher can
+press a key inside). Measured on the main Mac with Keyboard Navigation on
+and off (`AppleKeyboardUIMode` 3 and 0), the same results (run `988-n4`: 35
+of 35 on, 34 and the one Keyboard-Navigation-on test skipped off). Gated, in
+every suite: the button's rule (`testCancelTakesAKeyOnlyWhenNoBoxIsBeingTypedIn`),
+the keys it answers (`testTheCancelKeysAreEscapeAndCommandPeriod`), only
+editable text is a box, the button's size, kind and accessibility element
+against the SwiftUI Cancel it replaced, and a source check that nothing in
+`Views/Console` is a hidden key catcher: the one representable there is the
+visible Cancel, a titled `NSButton`, and nothing adds a responder, watches
+the event stream, hides a view or reads `NSApp.currentEvent`. Sabotaged in a
+scratch worktree (run `988-n4`): S1, the `currentEvent` check put back, turns
+the accessibility-press test red (the click test stays green, as it was
+before: a mouse-up is the current event); S2, the typing condition taken out
+of `performKeyEquivalent`, turns the text-field, text-view, no-use field and
+both queued-key tests red; S3, selectable text counted as a box, turns the
+console test and `testOnlyEditableTextIsABox` red.
+
+`StopQuestionTests` (in every suite) holds the rest without a key. The
+question's open state and its box are a small `@Observable` model,
+`StopQuestionAsking`, whose `chooseStop()` and `chooseCancel()` the alert's
+buttons call (the fourth review: before it, Cancel-remembers-nothing was
+held only by a source check). Its tests: ticked then Cancel leaves the
+setting on, writes nothing and opens unticked next time; ticked then Stop
+turns off that question only; with a question off Cancel stops at once;
+Return's key is the stopping button's. Also: both on by
+default, the tick counts only with the stop, each setting silences only its
+own question, the Settings rows turn each back on and write their line, the
+answers are remembered apart, Stopping is the pane's first section, and the
+words are the ruled ones.
+
+**For Windows (stage 3, #979):** the progress panel's Cancel takes Escape
+while the panel is in front and no text box, popover, dialog or flyout has
+focus, acts once per run, and for a deploy or a plan share asks first ("Stop
+the deploy?", "Stop this share?"), with the stopping button the default and
+Cancel on Escape, a "Don't ask again" box that counts only with the stop,
+one setting per question, and both turned back on in the Deploying part of
+Settings. The words are Mac-only (`DeployStopWording`, `ShareStopWording`,
+`StopQuestionSettingsWording`), not yet in `contracts/`; the trail event
+`stop question setting changed` is in `activityTrail.mustRecord`, held on
+Windows by `NamedGapLedger` against #1009. Two lessons from the Mac's fifth
+round travel: decide whether a key is the text box's when the key arrives,
+from the focused element as it is then, never afterwards from a "last event"
+global (a click or a UI Automation Invoke on Cancel must always stop the
+task, whatever was typed before it); and a read-only text block a teacher can
+select (the console's output) is not a text box, so selecting a line of it
+must not take the keys from Cancel.
 
 ## Red and orange: the colours of a problem, measured (#994)
 

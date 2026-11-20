@@ -23,6 +23,9 @@ import SwiftUI
 /// `DeployTokenPanel` asks `deploy.sh --token`; the app never reads the
 /// token itself. Netlify gets a section of its own above Cloudflare's
 /// (Russell, 2026-10-27).
+///
+/// **Stopping (#988).** Above them, whether stopping a running deploy or a
+/// share of unit plans asks first (`StopQuestionSettingsSection`).
 struct DeployingSettingsView: View {
 
     // MARK: - Stored properties
@@ -45,6 +48,10 @@ struct DeployingSettingsView: View {
     var body: some View {
         @Bindable var settings = AppSettings.shared
         Form {
+            // At the top (#988, ruling 4): the way back from "Don't ask
+            // again" on "Stop the deploy?" and "Stop this share?".
+            StopQuestionSettingsSection(settings: settings)
+
             Section {
                 DeployTokenRows(panel: netlifyToken)
             } header: {

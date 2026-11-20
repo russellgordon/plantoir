@@ -16,6 +16,11 @@ struct PlanShareConsoleSheet: View {
             TaskProgressView(
                 runner: planRunner.runner,
                 title: planRunner.title,
+                // Stopping a share asks "Stop this share?" first, as a deploy
+                // asks (Russell, 2026-11-19, on #988), and its Cancel holds
+                // Escape and Command-Period as the deploy's does. With the
+                // question turned off, they stop the share at once.
+                stopQuestion: .share,
                 hidesSiteLink: true,
                 onCancel: {
                     planRunner.cancel()

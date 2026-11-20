@@ -2102,6 +2102,8 @@ struct SectionDetailView: View {
                         TaskProgressView(
                             runner: deployRunner.activeRunner,
                             title: deployProgressTitle,
+                            takesTheCancelKeys: SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing: previewURL != nil),
+                            stopQuestion: .deploy,
                             hidesSiteLink: deployRunner.legs.count > 1,
                             allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
                             onCancel: {
@@ -2117,6 +2119,7 @@ struct SectionDetailView: View {
                 TaskProgressView(
                     runner: previewRunner,
                     title: previewTaskTitle,
+                    takesTheCancelKeys: SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing: previewURL != nil),
                     onCancel: {
                         cancelPreview()
                     }
@@ -2307,6 +2310,17 @@ struct SectionDetailView: View {
             return "Deploying \(sectionName) — \(currentDestinationDescription)"
         }
         return "Deploying \(sectionName)"
+    }
+
+    /// Whether Escape and Command-Period stop the task in the progress
+    /// panel (#988, the HIG review's D6): only while no preview's site is
+    /// drawn over the panel (the Website tab's layers, in
+    /// `SectionDetailCoverage`). Once the site shows, Escape is the web
+    /// page's, and stopping the preview stays with the Section menu's
+    /// Stop Preview and the toolbar button. Static so a test can read the
+    /// rule without building this view.
+    static func progressPanelTakesTheCancelKeys(previewIsShowing: Bool) -> Bool {
+        return !previewIsShowing
     }
 
     /// Whichever task is running now, or — once both have finished — the

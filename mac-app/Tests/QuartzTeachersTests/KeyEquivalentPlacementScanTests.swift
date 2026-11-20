@@ -25,8 +25,12 @@ final class KeyEquivalentPlacementScanTests: XCTestCase {
     static func characterShortcuts(in code: String, file: String) -> [String] {
         var found: [String] = []
         var lineNumber: Int = 0
-        for line in code.components(separatedBy: "\n") {
+        for codeLine in code.components(separatedBy: "\n") {
             lineNumber += 1
+            // AppKit's `performKeyEquivalent(with:)` is the method a key
+            // arrives through, not a key made by name (#988's Cancel,
+            // `CancelKeyNSButton`, which holds only Escape).
+            let line: String = codeLine.replacingOccurrences(of: "performKeyEquivalent(", with: "performKey(")
             var mentions: Bool = false
             for spelling in [".keyboardShortcut(", "KeyboardShortcut(", "KeyEquivalent("] {
                 if line.contains(spelling) {
@@ -81,6 +85,7 @@ final class KeyEquivalentPlacementScanTests: XCTestCase {
         Button("Save") { }.keyboardShortcut("s", modifiers: .command)
         Button("Go") { }.keyboardShortcut(KeyboardShortcut("g"))
         let key = KeyEquivalent("x")
+        override func performKeyEquivalent(with event: NSEvent) -> Bool {
         """)
         XCTAssertEqual(
             KeyEquivalentPlacementScanTests.characterShortcuts(in: code, file: "Example.swift"),
