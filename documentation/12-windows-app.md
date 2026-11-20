@@ -8151,7 +8151,13 @@ here where Windows has the same thing:
   control takes no pointer input, so a tooltip on it is not expected to show
   (WinUI's documented behaviour, not measured on this PC). Not built
   tonight; the Windows Help book (886b onward) must not copy that sentence
-  as it stands. A dimmed Revise
+  as it stands, and `help/pages/fix-with.md` was left as the mac wrote it
+  (help/README.md rule 7: no `{{windows}}` runs yet). Revert on the Planning
+  tab, the mac's other new help tag (`unitPlanning.tab.saveOnPlanning.rule`),
+  has no Windows counterpart until #801 builds the Planning tab; when it
+  does, `PlanningTab.RevertOnPlanning` is that item's reason, and a dimmed
+  WinUI `MenuFlyoutItem` is expected to show no tooltip either, so the
+  question of where Windows says it goes with #801. A dimmed Revise
   item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
   shows no tooltip, and the ruling Q14 rules out a grey text row.
 - **A row's context menu still HIDES a missing assistant**
