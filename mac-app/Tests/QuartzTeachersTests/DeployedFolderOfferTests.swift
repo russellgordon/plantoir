@@ -171,7 +171,7 @@ final class DeployedFolderOfferTests: XCTestCase {
         )
         XCTAssertEqual(answer?.status, 200)
 
-        shows.stop(courseCode: "ICS3U", sectionNumber: 2, workingFolderPath: workingFolder)
+        await shows.stop(courseCode: "ICS3U", sectionNumber: 2, workingFolderPath: workingFolder)
         XCTAssertTrue(shows.shows.isEmpty)
         XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: show.port), "still answering after Stop")
 
@@ -264,11 +264,190 @@ final class DeployedFolderOfferTests: XCTestCase {
         let port: Int = try XCTUnwrap(shows.shows.first).port
         let neighbour: Int = port + 1
         let neighbourWasFree: Bool = !RawHTTP.canConnect(address: "127.0.0.1", port: neighbour)
-        shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+        await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
         XCTAssertTrue(shows.shows.isEmpty)
         XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: port), "still listening after Stop")
         if neighbourWasFree {
             XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: neighbour), "a second listener was left behind")
+        }
+    }
+
+    /// #1013: Stop does not finish until nothing is listening. Under load a
+    /// listener told to cancel goes on answering until the framework has
+    /// worked through its queue, so a Stop that returned at once could
+    /// leave the address held (3 of 40 class runs failed under load). Here
+    /// the framework's delivery queue is held back while Stop runs, the
+    /// load made certain: Stop must still be waiting, and once the queue
+    /// moves again it finishes with nothing listening. Holding the queue
+    /// back is how the test reaches the race at all; it defers no work of
+    /// its own.
+    func testStopIsNotFinishedWhileTheListenerIsStillOpen() async throws {
+        let made: (section: URL, top: URL, trail: URL) = try makeASection(named: "held")
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.trail)
+        let shows: DeployedFolderShows = DeployedFolderShows.shared
+        shows.resetForTests()
+        let deliveryQueue: DispatchQueue = DeployedFolderServer.deliveryQueue
+        var queueIsHeld: Bool = false
+        defer {
+            if queueIsHeld {
+                deliveryQueue.resume()
+            }
+            shows.resetForTests()
+            ActivityTrail.store = previousTrail
+            try? FileManager.default.removeItem(at: made.top)
+        }
+        let workingFolder: String = made.top.path
+        let opened: Bool = await shows.open(
+            sectionFolder: made.section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+            from: .toolbar, defaults: TestDefaults.make(), openInBrowser: { _ in true }
+        )
+        XCTAssertTrue(opened)
+        let port: Int = try XCTUnwrap(shows.shows.first).port
+        XCTAssertTrue(RawHTTP.canConnect(address: "127.0.0.1", port: port), "not listening before Stop")
+
+        deliveryQueue.suspend()
+        queueIsHeld = true
+        var stopFinished: Bool = false
+        var listeningWhenStopFinished: Bool = false
+        let stopIsWaiting: Task<String, Never> = DeployedFolderOfferTests.whenAStopIsWaiting(shows)
+        let stopping: Task<Void, Never> = Task { @MainActor in
+            await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+            listeningWhenStopFinished = RawHTTP.canConnect(address: "127.0.0.1", port: port)
+            stopFinished = true
+        }
+        // The Stop says when it has asked the listener to cancel and is
+        // waiting for it to let go.
+        _ = await stopIsWaiting.value
+        XCTAssertTrue(shows.shows.isEmpty, "the show was not taken off the list at once")
+        let listeningWhileHeld: Bool = RawHTTP.canConnect(address: "127.0.0.1", port: port)
+        if stopFinished {
+            XCTAssertFalse(listeningWhenStopFinished, "Stop finished while the listener was still open")
+        }
+        if listeningWhileHeld {
+            XCTAssertFalse(stopFinished, "Stop finished while the listener was still open")
+        }
+        deliveryQueue.resume()
+        queueIsHeld = false
+        await stopping.value
+        XCTAssertTrue(stopFinished)
+        XCTAssertFalse(listeningWhenStopFinished, "still listening when Stop finished")
+        XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: port), "still listening after Stop")
+    }
+
+    /// #1013: Open pressed while a Stop of the same folder is still letting
+    /// the address go waits for it, so the folder comes back at its usual
+    /// address rather than moving because its own old listener held it.
+    func testOpenRightAfterStopGetsTheSameAddressBack() async throws {
+        let made: (section: URL, top: URL, trail: URL) = try makeASection(named: "again")
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.trail)
+        let shows: DeployedFolderShows = DeployedFolderShows.shared
+        shows.resetForTests()
+        let deliveryQueue: DispatchQueue = DeployedFolderServer.deliveryQueue
+        var queueIsHeld: Bool = false
+        defer {
+            if queueIsHeld {
+                deliveryQueue.resume()
+            }
+            shows.resetForTests()
+            ActivityTrail.store = previousTrail
+            try? FileManager.default.removeItem(at: made.top)
+        }
+        let defaults: UserDefaults = TestDefaults.make()
+        let workingFolder: String = made.top.path
+        let section: URL = made.section
+        let opened: Bool = await shows.open(
+            sectionFolder: section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+            from: .toolbar, defaults: defaults, openInBrowser: { _ in true }
+        )
+        XCTAssertTrue(opened)
+        let firstPort: Int = try XCTUnwrap(shows.shows.first).port
+
+        // The framework's queue is held back, so the Stop is certain to
+        // be still waiting for the old listener's word when Open is
+        // pressed (the same way as the test above; it defers no work of
+        // its own).
+        deliveryQueue.suspend()
+        queueIsHeld = true
+        let stopIsWaiting: Task<String, Never> = DeployedFolderOfferTests.whenAStopIsWaiting(shows)
+        let stopping: Task<Void, Never> = Task { @MainActor in
+            await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+        }
+        let folder: String = await stopIsWaiting.value
+        let reopening: Task<Bool, Never> = Task { @MainActor in
+            return await shows.open(
+                sectionFolder: section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+                from: .sectionMenu, defaults: defaults, openInBrowser: { _ in true }
+            )
+        }
+        // The main actor runs its work in order: one yield lets the Open
+        // run up to its first wait.
+        await Task.yield()
+        XCTAssertFalse(shows.isStartingForTests(folder), "Open started a listener while the old one was still letting go")
+        deliveryQueue.resume()
+        queueIsHeld = false
+        await stopping.value
+        let reopened: Bool = await reopening.value
+        XCTAssertTrue(reopened)
+        XCTAssertEqual(shows.shows.count, 1)
+        XCTAssertEqual(shows.shows.first?.port, firstPort, "opened again straight after Stop, it moved to another address")
+        let trail: String = DeployedFolderOfferTests.trailText(in: made.trail)
+        XCTAssertFalse(trail.contains(DeployedFolderShows.openedLine(from: .sectionMenu, alreadyOpen: false, moved: true)),
+                       "the trail says the usual address was taken")
+        await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+        XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: firstPort), "still listening after Stop")
+    }
+
+    /// #1013's review: a late "ended" from an old listener of a folder must
+    /// not stop a newer show of the same folder.
+    func testAnOldListenerEndingDoesNotStopANewerShowOfTheFolder() async throws {
+        let made: (section: URL, top: URL, trail: URL) = try makeASection(named: "late")
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.trail)
+        let shows: DeployedFolderShows = DeployedFolderShows.shared
+        shows.resetForTests()
+        defer {
+            shows.resetForTests()
+            ActivityTrail.store = previousTrail
+            try? FileManager.default.removeItem(at: made.top)
+        }
+        let defaults: UserDefaults = TestDefaults.make()
+        let workingFolder: String = made.top.path
+        let opened: Bool = await shows.open(
+            sectionFolder: made.section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+            from: .toolbar, defaults: defaults, openInBrowser: { _ in true }
+        )
+        XCTAssertTrue(opened)
+        let oldServer: DeployedFolderServer = try XCTUnwrap(shows.shows.first).server
+        await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+        let reopened: Bool = await shows.open(
+            sectionFolder: made.section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+            from: .toolbar, defaults: defaults, openInBrowser: { _ in true }
+        )
+        XCTAssertTrue(reopened)
+        let newer: DeployedFolderShows.Show = try XCTUnwrap(shows.shows.first)
+        XCTAssertFalse(newer.server === oldServer)
+        await shows.theListenerEnded(server: oldServer)
+        await shows.theFolderWentAway(server: oldServer)
+        XCTAssertEqual(shows.shows.count, 1, "the old listener's late word stopped the newer show")
+        await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+    }
+
+    /// A task that finishes, with the folder's path, when a Stop has asked
+    /// its listener to cancel and is waiting for it to let go.
+    static func whenAStopIsWaiting(_ shows: DeployedFolderShows) -> Task<String, Never> {
+        let announced: AsyncStream<String>.Continuation
+        let stream: AsyncStream<String>
+        (stream, announced) = AsyncStream<String>.makeStream()
+        shows.stopIsWaitingForTests = { folder in
+            announced.yield(folder)
+        }
+        return Task { @MainActor in
+            for await folder in stream {
+                return folder
+            }
+            return ""
         }
     }
 
@@ -298,7 +477,7 @@ final class DeployedFolderOfferTests: XCTestCase {
             XCTAssertTrue(opened)
         }
         XCTAssertEqual(shows.shows.count, 2)
-        shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+        await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
         XCTAssertTrue(shows.shows.isEmpty, "Stop left a show of the section running")
     }
 

@@ -1862,8 +1862,6 @@ public sealed partial class SectionDetailView : UserControl
         _serverWait?.Cancel();
         var cancel = new CancellationTokenSource();
         _serverWait = cancel;
-        DateTime? serverStartedAt = null;
-        bool launched = false;
         Exception? lastAttempt = null;
 
         try
@@ -1872,12 +1870,15 @@ public sealed partial class SectionDetailView : UserControl
             while (true)
             {
                 if (cancel.IsCancellationRequested) return;
+                // Watched BEFORE the state is read (#1016), so a change that
+                // lands between the reading and the wait below is not lost.
+                using var watch = _previewRunner.WatchTheStanding();
                 bool runIsOver = _previewRunner.WasStoppedByUser ||
                                  (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null);
-                string shown = _previewRunner.Transcript.DisplayText;
-                if (serverStartedAt is null && shown.Contains(PreviewReachability.ServerStartedLine, StringComparison.Ordinal))
-                    serverStartedAt = DateTime.UtcNow;
-                launched = launched || shown.Contains("Launching Quartz preview", StringComparison.Ordinal);
+                // Both lines are collected by the runner as they arrive
+                // (#1016): never searched for in the whole transcript.
+                DateTime? serverStartedAt = _previewRunner.ServerStartedAt;
+                bool launched = _previewRunner.HasAnnouncedQuartzLaunch;
                 Uri? announced = _previewRunner.PreviewAddress;
 
                 var step = PreviewReachability.NextStep(runIsOver, announced, serverStartedAt,
@@ -1911,9 +1912,19 @@ public sealed partial class SectionDetailView : UserControl
                             lastAttempt = null;
                         }
                         catch (Exception attempt) { lastAttempt = attempt; }
-                        break;
+                        // Nothing announces that the server answers (#1011
+                        // will): asked again after a second, as on the mac.
+                        await Task.Delay(1000);
+                        continue;
                 }
-                await Task.Delay(1000);
+                // Before the launch line and the address there is nothing to
+                // ask (#1016, the mac's #998 phase 1): woken by the run's next
+                // change of standing — the launch line, the server line, the
+                // address, the end or a stop — or when the quiet bound runs
+                // out, never by a clock of its own.
+                TimeSpan? bound = PreviewReachability.UntilTheQuietRunsOut(serverStartedAt, _previewRunner.LastOutputAt,
+                                                                           DateTime.UtcNow);
+                await watch.UntilItChangesAsync(bound, cancel.Token);
             }
         }
         finally

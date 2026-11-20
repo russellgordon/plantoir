@@ -21,7 +21,20 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     private ConPtyProcess? _process;
     private Thread? _readerThread;
     private Thread? _exitThread;
-    private int _finished;                 // 0 until FinishRun runs, guards against a double finish
+    // Which run is current (#1016 review): bumped by every start, and carried
+    // by each finish the reader and exit watcher post, so a finish that
+    // arrives after the next run has started (a build's late second finish
+    // landing on its deploy leg) finishes nothing.
+    private int _runNumber;
+    // The run that is started and not yet finished, 0 when none. A finish
+    // claims it in ONE step (compare and exchange to 0), so "is this still the
+    // current run" and "has nobody finished it yet" cannot be split by a
+    // start in between (second review of #1016).
+    private int _unfinishedRun;
+    // Completed by FinishRun with "succeeded" (#1016): what WaitUntilFinished
+    // hands out, so a wait ends the moment the run does instead of at its
+    // next 100 ms look. A new one for every run, made before IsRunning is set.
+    private TaskCompletionSource<bool> _runEnded = new(TaskCreationOptions.RunContinuationsAsynchronously);
     // Puts back the line breaks ConPTY draws as cursor jumps (#661). One per
     // PROCESS: what it holds back (half an escape, whether the line has text)
     // belongs to the output of the process that printed it. Initialised here
@@ -230,7 +243,13 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // and the deploy, and a stop question open across the change was taken
         // down while the deploy carried on.
         StepDetail = "";
-        if (!keepTranscript) { _announcedPreviewAddress = null; _unfinishedPreviewLine = ""; }
+        if (!keepTranscript)
+        {
+            _announcedPreviewAddress = null;
+            _unfinishedPreviewLine = "";
+            HasAnnouncedQuartzLaunch = false;
+            ServerStartedAt = null;
+        }
         // Findings follow the transcript: a build-then-publish reads as one
         // job, so its folder problems do too. The half-line left over when the
         // previous process ended is dead either way.
@@ -311,10 +330,11 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             return;
         }
 
+        _runEnded = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int thisRun = BeginRunNumber();
         IsRunning = true;
         IsBetweenPhases = false;
         StartedAt = DateTime.UtcNow;
-        _finished = 0;
         // A new process, so a new stage - even for a keepTranscript leg. Its
         // first line starts with no text of its own, whatever the previous
         // leg left unfinished in Transcript.CurrentLine (#661).
@@ -327,19 +347,20 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         NotifyRunState();
 
         var process = _process;
-        _readerThread = new Thread(() => ReadLoop(process)) { IsBackground = true };
-        _readerThread.Start();
+        var readerThread = new Thread(() => ReadLoop(process, thisRun)) { IsBackground = true };
+        _readerThread = readerThread;
+        readerThread.Start();
 
         // Watch the CHILD PROCESS handle directly. The ConPTY output pipe is
         // NOT reliably closed when the child exits — WSL leaves a background
         // process holding it open — so waiting on end-of-stream alone can hang
         // forever and the "Done" state would never appear. When the process
         // exits we close the pseudo console (unblocking the reader) and finish.
-        _exitThread = new Thread(() => ExitWatch(process)) { IsBackground = true };
+        _exitThread = new Thread(() => ExitWatch(process, readerThread, thisRun)) { IsBackground = true };
         _exitThread.Start();
     }
 
-    private void ReadLoop(ConPtyProcess process)
+    private void ReadLoop(ConPtyProcess process, int runNumber)
     {
         var decoder = Encoding.UTF8.GetDecoder();
         var buffer = new byte[8192];
@@ -354,17 +375,40 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // End of stream (the console closed on its own — the common case).
         process.WaitForExit(10_000);
         int exitCode = process.ExitCode ?? -1;
-        Post(() => FinishRun(exitCode));
+        Post(() => FinishRunNumber(runNumber, exitCode));
     }
 
-    private void ExitWatch(ConPtyProcess process)
+    private void ExitWatch(ConPtyProcess process, Thread readerThread, int runNumber)
     {
         process.WaitForExit(-1);          // block until the child actually exits
         int exitCode = process.ExitCode ?? -1;
         process.ClosePty();               // unblock the reader so it drains and ends
-        _readerThread?.Join(3000);        // let the final output flush through first
-        Post(() => FinishRun(exitCode));
+        // THIS run's reader, not the field: by now the field may hold the
+        // next run's.
+        readerThread.Join(3000);          // let the final output flush through first
+        Post(() => FinishRunNumber(runNumber, exitCode));
     }
+
+    /// <summary>Makes the next run the current one and returns its number.</summary>
+    private int BeginRunNumber()
+    {
+        int number = Interlocked.Increment(ref _runNumber);
+        Volatile.Write(ref _unfinishedRun, number);
+        return number;
+    }
+
+    /// <summary>The number of the current (or last) run; tests post stale finishes with an older one.</summary>
+    internal int CurrentRunNumber => Volatile.Read(ref _runNumber);
+
+    /// <summary>
+    /// Finishes run <paramref name="runNumber"/> if it is still the current
+    /// run, and does nothing if another has started since (#1016 review):
+    /// both the reader and the exit watcher post a finish, and the second
+    /// can arrive after a deploy leg has started on this runner. Without the
+    /// check it finished the deploy with the build's exit code, disposed the
+    /// deploy's process and let its leg report success.
+    /// </summary>
+    internal void FinishRunNumber(int runNumber, int exitCode) => FinishRun(runNumber, exitCode);
 
     /// <summary>Coalesces chunks so the interface never redraws per byte (0.15 s cadence).</summary>
     private void BufferOutput(string text)
@@ -440,6 +484,8 @@ public sealed class ScriptRunner : INotifyPropertyChanged
                                          int quietSeconds = 4)
     {
         Milestones = milestones;
+        _runEnded = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        BeginRunNumber();
         IsRunning = true;
         StartedAt = DateTime.UtcNow;
         ReceiveOutput(output);
@@ -554,40 +600,40 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// caller has already asked the process to die: see
     /// <see cref="WaitUntilFinishedOrKill"/>.
     /// </summary>
-    public async Task<bool> WaitUntilFinished()
-    {
-        while (IsRunning)
-        {
-            await Task.Delay(100);
-        }
-        return LastExitCode == 0;
-    }
+    public Task<bool> WaitUntilFinished() =>
+        IsRunning ? _runEnded.Task : Task.FromResult(LastExitCode == 0);
 
     /// <summary>
     /// Bounded wait for a process that has been TOLD to stop (StopByUser /
     /// Terminate): if it has not died by the deadline, force-finish it so a
     /// wedged teardown cannot hang its caller. Never use this to wait on
-    /// live work — the force-finish kills the run it waits on.
+    /// live work — the force-finish kills the run it waits on. Ends the
+    /// moment the run does (#1016); only the deadline is a clock.
     /// </summary>
     public async Task<bool> WaitUntilFinishedOrKill(int timeoutMs)
     {
-        var start = DateTime.UtcNow;
-        while (IsRunning && (DateTime.UtcNow - start).TotalMilliseconds < timeoutMs)
+        int waitedOn = CurrentRunNumber;
+        if (IsRunning)
         {
-            await Task.Delay(100);
+            Task<bool> ended = _runEnded.Task;
+            using var deadline = new CancellationTokenSource();
+            Task bound = Task.Delay(Math.Max(0, timeoutMs), deadline.Token);
+            await Task.WhenAny(ended, bound);
+            deadline.Cancel();
         }
         if (IsRunning)
         {
-            FinishRun(-1);
+            // Only the run this wait was for: one started since is live work.
+            FinishRunNumber(waitedOn, -1);
         }
         return LastExitCode == 0;
     }
 
-    private void FinishRun(int exitCode)
+    private void FinishRun(int runNumber, int exitCode)
     {
         // Either the reader (EOF) or the exit watcher can get here first;
-        // only the first one finishes.
-        if (Interlocked.Exchange(ref _finished, 1) != 0) return;
+        // only the first one finishes, and only while its run is current.
+        if (runNumber == 0 || Interlocked.CompareExchange(ref _unfinishedRun, 0, runNumber) != runNumber) return;
         _promptCheck?.Cancel();
         if (IsAwaitingInput) { IsAwaitingInput = false; Notify(nameof(IsAwaitingInput)); }
         FlushBufferedOutput();
@@ -621,7 +667,12 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         _process?.Dispose();
         _process = null;
         NoteTaskFinished(exitCode);
+        // Taken BEFORE the notification: a handler that starts the next run
+        // synchronously replaces _runEnded, and completing the new one would
+        // strand everyone waiting on this run (#1016 review).
+        TaskCompletionSource<bool> thisRunEnded = _runEnded;
         NotifyRunState();
+        thisRunEnded.TrySetResult(exitCode == 0);
     }
 
     /// <summary>
@@ -877,6 +928,13 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         int lastBreak = text.LastIndexOfAny(LineBreaks);
         if (lastBreak < 0)
         {
+            // The preview's own lines are read in the unfinished line too
+            // (#1016 review): "Started a Quartz server" is the last line
+            // before a quiet server, and ConPTY can hold a line's end back
+            // until the next drawing (#623, #661), so waiting for the end
+            // left ServerStartedAt null and the quiet bound never ran (#233).
+            // Read before the carry may be dropped below.
+            NoteThePreviewsOwnLines(text);
             // A carry with no line end that has outgrown any plausible line
             // cannot become an announcement unless it holds the marker.
             _unfinishedPreviewLine = text.Length > 16_000 &&
@@ -886,6 +944,10 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         }
         _unfinishedPreviewLine = text[(lastBreak + 1)..];
         ReadCompleteLinesForTheAddress(text[..lastBreak]);
+        // The same for the unfinished tail after the last line end. The
+        // ADDRESS still waits for its line to end: a half-printed port reads
+        // as the wrong port; a half-printed sentence simply does not match yet.
+        if (_unfinishedPreviewLine.Length > 0) NoteThePreviewsOwnLines(_unfinishedPreviewLine);
     }
 
     private void FlushUnfinishedPreviewLine()
@@ -899,10 +961,119 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     {
         foreach (string line in completeLines.Split(LineBreaks))
         {
+            NoteThePreviewsOwnLines(line);
             if (!line.Contains(OutputParsers.PreviewAnnouncementMarker, StringComparison.Ordinal)) continue;
             // Last announcement wins.
-            if (OutputParsers.PreviewAddress(TranscriptBuilder.StripControlSequences(line)) is { } address)
+            if (OutputParsers.PreviewAddress(TranscriptBuilder.StripControlSequences(line)) is { } address
+                && address != _announcedPreviewAddress)
+            {
                 _announcedPreviewAddress = address;
+                Notify(nameof(PreviewAddress));
+            }
+        }
+    }
+
+    // ---- The preview's own lines, collected as they arrive (#1016) -------
+
+    /// <summary>
+    /// build_site.py's line, printed before <c>quartz build --serve</c> starts.
+    /// It is the contract's progress marker of the same words
+    /// (<c>contracts/app-rules.json</c> → <c>markerOrigins.origins</c>, a
+    /// "shared-python" marker), and the app reads no contract at run time, so
+    /// <c>QuartzLaunchLineIsTheContractsMarkerAndWhatTheBuilderPrints</c> pins
+    /// this text to that key and to build_site.py's print: a change to either
+    /// fails it.
+    /// </summary>
+    public const string QuartzLaunchLine = "Launching Quartz preview";
+
+    /// <summary>
+    /// "Launching Quartz preview" has been printed in this run. Collected as
+    /// lines arrive, like the address, so the preview's wait is woken by it
+    /// instead of searching the whole transcript once a second (#1016, the
+    /// mac's <c>hasAnnouncedQuartzLaunch</c>, #998).
+    /// </summary>
+    public bool HasAnnouncedQuartzLaunch { get; private set; }
+
+    /// <summary>
+    /// When <see cref="Models.PreviewReachability.ServerStartedLine"/> first
+    /// arrived in this run; null before. The 45 s quiet bound counts from here.
+    /// </summary>
+    public DateTime? ServerStartedAt { get; private set; }
+
+    private void NoteThePreviewsOwnLines(string line)
+    {
+        if (!line.Contains("Quartz", StringComparison.Ordinal)) return;
+        string text = TranscriptBuilder.StripControlSequences(line);
+        if (!HasAnnouncedQuartzLaunch && text.Contains(QuartzLaunchLine, StringComparison.Ordinal))
+        {
+            HasAnnouncedQuartzLaunch = true;
+            Notify(nameof(HasAnnouncedQuartzLaunch));
+        }
+        if (ServerStartedAt is null && text.Contains(Plantoir.Core.Models.PreviewReachability.ServerStartedLine, StringComparison.Ordinal))
+        {
+            ServerStartedAt = DateTime.UtcNow;
+            Notify(nameof(ServerStartedAt));
+        }
+    }
+
+    // ---- Waiting on the run's standing (#1016) ---------------------------
+
+    /// <summary>
+    /// The properties a wait on the run cares about: whether it runs, how it
+    /// ended, and the preview's own announcements. NOT the transcript or
+    /// <see cref="LastOutputAt"/>, which change with every piece of output —
+    /// a wait woken by those would be the once-a-second poll again, faster.
+    /// </summary>
+    public static readonly IReadOnlySet<string> StandingProperties = new HashSet<string>(StringComparer.Ordinal)
+    {
+        nameof(IsRunning), nameof(LastExitCode), nameof(LaunchProblem), nameof(WasStoppedByUser),
+        nameof(PreviewAddress), nameof(HasAnnouncedQuartzLaunch), nameof(ServerStartedAt),
+    };
+
+    /// <summary>
+    /// Starts watching the run's standing NOW. Take it before reading the
+    /// state you decide on, then await <see cref="StandingWatch.UntilItChangesAsync"/>:
+    /// a change that lands between the reading and the await is not lost.
+    /// Dispose it when done.
+    /// </summary>
+    public StandingWatch WatchTheStanding() => new(this);
+
+    /// <summary>One wait on <see cref="StandingProperties"/>; see <see cref="WatchTheStanding"/>.</summary>
+    public sealed class StandingWatch : IDisposable
+    {
+        private readonly ScriptRunner _runner;
+        private readonly TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal StandingWatch(ScriptRunner runner)
+        {
+            _runner = runner;
+            runner.PropertyChanged += Changed;
+        }
+
+        /// <summary>Completed by the first change of standing since the watch began.</summary>
+        public Task HasChanged => _changed.Task;
+
+        /// <summary>
+        /// Waits for the first change of standing, at most <paramref name="bound"/>
+        /// (null: no bound but the change or <paramref name="cancel"/>).
+        /// True when it changed; false at the bound or on cancel.
+        /// </summary>
+        public async Task<bool> UntilItChangesAsync(TimeSpan? bound, CancellationToken cancel)
+        {
+            if (_changed.Task.IsCompleted) return true;
+            using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+            TimeSpan wait = bound is { } limit ? (limit < TimeSpan.Zero ? TimeSpan.Zero : limit) : Timeout.InfiniteTimeSpan;
+            Task clock = Task.Delay(wait, stop.Token);
+            await Task.WhenAny(_changed.Task, clock).ConfigureAwait(true);
+            stop.Cancel();   // the clock's timer goes with the wait
+            return _changed.Task.IsCompleted;
+        }
+
+        public void Dispose() => _runner.PropertyChanged -= Changed;
+
+        private void Changed(object? sender, PropertyChangedEventArgs args)
+        {
+            if (args.PropertyName is { } name && StandingProperties.Contains(name)) _changed.TrySetResult();
         }
     }
 
