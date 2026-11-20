@@ -688,6 +688,29 @@ public class WindowRulesTests
         Assert.Null(WindowRules.CheckStateMeans(4));    // BST_PUSHED alone: not a check state
     }
 
+    /// <summary>
+    /// The second #1010 review: a refusal that cannot be found was read as
+    /// "not chosen" (<c>refuse is null ? false</c>), so a page whose refusal
+    /// the driver could not see passed as opening with neither chosen. It is
+    /// CouldNotLook now, a DRIVER PROBLEM, like an unreadable state.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false, false, "NeitherChosen")]
+    [InlineData(false, false, null, "CouldNotLook")]    // the refusal not found
+    [InlineData(false, false, false, "CouldNotLook")]   // not found, whatever a caller passes for its state
+    [InlineData(true, null, false, "CouldNotLook")]     // the acceptance unreadable
+    [InlineData(true, false, null, "CouldNotLook")]     // the refusal unreadable
+    [InlineData(true, null, null, "CouldNotLook")]
+    [InlineData(true, true, false, "AChoiceMade")]
+    [InlineData(true, false, true, "AChoiceMade")]
+    [InlineData(false, true, null, "AChoiceMade")]      // "I accept" chosen is a product fault even with the refusal missing
+    [InlineData(true, true, null, "AChoiceMade")]
+    public void AChoiceThatCannotBeFoundOrReadIsNeverNotChosen(bool refuseFound, bool? acceptChosen, bool? refuseChosen, string expected)
+    {
+        // By name: the enum is internal to the driver, and a public theory cannot take it.
+        Assert.Equal(Enum.Parse<LicenceOpening>(expected), WindowRules.ReadLicenceOpening(refuseFound, acceptChosen, refuseChosen));
+    }
+
     [Theory]
     [InlineData("2.0.0", true)]
     [InlineData("2.0.0+1ba4ceaf6", true)]
@@ -735,10 +758,39 @@ public class WindowRulesTests
         Assert.Contains("private static bool? IsChosen(AutomationElement radio)", steps);
         Assert.Contains("return WindowRules.CheckStateMeans(", steps);
         Assert.Contains("catch { return null; }", steps);
-        Assert.Contains("if (acceptChosen is null || refuseChosen is null)\n                throw Stopped.Driver(", steps.Replace("\r\n", "\n"));
+        string lines = steps.Replace("\r\n", "\n");
+        Assert.Contains("bool? refuseChosen = refuse is null ? null : IsChosen(refuse);", steps);
+        Assert.DoesNotContain("refuse is null ? false", steps);
+        Assert.Contains("var opening = WindowRules.ReadLicenceOpening(refuse is not null, acceptChosen, refuseChosen);", steps);
+        Assert.Contains("if (opening == LicenceOpening.AChoiceMade)\n                throw Stopped.Product(", lines);
+        Assert.Contains("if (opening == LicenceOpening.CouldNotLook)\n                throw Stopped.Driver(", lines);
         Assert.Contains("bool? licenceRequired = WindowRules.LicencePageRequiredFor(version.ProductVersion);", steps);
         Assert.Contains("if (licenceRequired is null)\n            throw Stopped.Driver(", steps.Replace("\r\n", "\n"));
         Assert.Contains("if (licenceRequired == true && !WindowRules.LicencePageWasSeen(pagesSeen))\n            throw Stopped.Product(", steps.Replace("\r\n", "\n"));
+    }
+
+    /// <summary>
+    /// The second #1010 review asked for AnswerLicencePage to run end to end
+    /// before a signed candidate exists. --self-test-install runs step 2 alone
+    /// on an installer already on the machine; it must never be able to say
+    /// PASSED (no download, no mark of the web, steps 3 to 7 not run), and
+    /// win-rehearsal.py, which does not know its status word, reads it as a
+    /// DRIVER PROBLEM if it ever meets one.
+    /// </summary>
+    [Fact]
+    public void TheInstallSelfTestCanNeverSayPassed()
+    {
+        string program = DriverSource("Program.cs").Replace("\r\n", "\n");
+        int mode = program.IndexOf("if (installOnly is not null)", StringComparison.Ordinal);
+        int fullRun = program.IndexOf("Steps1To6(url);\n", StringComparison.Ordinal);
+        Assert.True(mode >= 0 && fullRun > mode, "the install self-test is not decided before the full run");
+        string branch = program[mode..fullRun];
+        Assert.Contains("Steps_.Install(installOnly);", branch);
+        Assert.Contains("return Finish(Outcome.SelfTestInstallOnly,", branch);
+        Assert.DoesNotContain("Outcome.Passed", branch);
+        Assert.DoesNotContain("FinalWatch()", branch);
+        Assert.Contains("Outcome.SelfTestInstallOnly => \"self-test-install-done\",", program);
+        Assert.DoesNotContain("SelfTestInstallOnly => 0", program);
     }
 
     private static string DriverSource(string file)

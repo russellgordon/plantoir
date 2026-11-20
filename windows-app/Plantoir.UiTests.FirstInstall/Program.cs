@@ -30,6 +30,15 @@ namespace Plantoir.FirstInstall;
 ///                            [--self-test-fail-looks-after N]  every look from
 ///                            N s into the watch on fails (the failed-looks self-test)
 ///
+///   PlantoirFirstInstall.exe --self-test-install &lt;PlantoirSetup.exe on this machine&gt; --out C:\rehearsal
+///                            step 2 alone (run the installer), on a file
+///                            already here, for a branch-built installer that
+///                            cannot pass a download (unsigned: Edge holds it);
+///                            the second #1010 review, to run AnswerLicencePage
+///                            end to end. Never says PASSED: no download, no
+///                            mark of the web, so SmartScreen is not exercised,
+///                            and steps 3 to 7 are not run
+///
 /// PASSED is written only after the last step succeeded AND the desktop was
 /// then watched for <see cref="WindowRules.FinalWatchLength"/> with nothing
 /// unexpected (step 7), AND every decision rested on a successful look made
@@ -46,7 +55,8 @@ namespace Plantoir.FirstInstall;
 /// the machine stops answering. result.txt is written straight after the last
 /// look; notes, shots and uploads come after it.
 /// Exit code: 0 passed, 2 product stopped, 1 driver problem, 3 the final-watch
-/// self-test ended with nothing seen, 4 another driver was already running.
+/// self-test ended with nothing seen, 4 another driver was already running,
+/// 5 the install self-test reached the installer's end.
 /// </summary>
 internal static class Program
 {
@@ -82,12 +92,14 @@ internal static class Program
     {
         string url = "https://github.com/russellgordon/plantoir/releases/latest/download/PlantoirSetup.exe";
         bool watchOnly = Array.IndexOf(args, "--self-test-final-watch") >= 0;
+        string? installOnly = null;
         for (int i = 0; i < args.Length - 1; i++)
         {
             if (args[i] == "--url") url = args[i + 1];
             if (args[i] == "--out") _out = args[i + 1];
             if (args[i] == "--report") _report = args[i + 1];
             if (args[i] == "--self-test-fail-looks-after") _failLooksAfter = TimeSpan.FromSeconds(int.Parse(args[i + 1]));
+            if (args[i] == "--self-test-install") installOnly = args[i + 1];
         }
         // One driver at a time in the session (the Mac retries a refused
         // launch; the review of 2026-11-18 asked that a late first attempt can
@@ -121,6 +133,15 @@ internal static class Program
                 Note("SELF-TEST: steps 1 to 6 are not run; only the final watch, which must catch a window planted during it");
                 int selfTestLooks = FinalWatch();
                 return Finish(Outcome.SelfTestOnly, $"the final watch saw nothing unexpected in {WindowRules.FinalWatchLength.TotalSeconds:0} s ({selfTestLooks} looks); no steps were run, so this is no rehearsal");
+            }
+            if (installOnly is not null)
+            {
+                Note($"SELF-TEST: step 2 alone, on {installOnly}, a file already on this machine; no download, so no mark of the web and no SmartScreen; steps 3 to 7 are not run");
+                if (!File.Exists(installOnly))
+                    throw Stopped.Driver($"there is no installer at {installOnly}");
+                Step("run the installer (self-test: a file already here)");
+                Steps_.Install(installOnly);
+                return Finish(Outcome.SelfTestInstallOnly, "the installer ran to its Finish page and Plantoir was installed; the download and steps 3 to 7 were not run, so this is no rehearsal");
             }
             Steps1To6(url);
             int looks = FinalWatch();
@@ -282,9 +303,10 @@ internal static class Program
             Outcome.Passed => "PASSED",
             Outcome.ProductStopped => "PRODUCT STOPPED",
             Outcome.SelfTestOnly => "SELF-TEST WATCH CLEAN",
+            Outcome.SelfTestInstallOnly => "SELF-TEST INSTALL DONE",
             _ => "DRIVER PROBLEM",
         };
-        string where = outcome is Outcome.Passed or Outcome.SelfTestOnly ? "" : $" at step {_stepNumber} ({_stepName})";
+        string where = outcome is Outcome.Passed or Outcome.SelfTestOnly or Outcome.SelfTestInstallOnly ? "" : $" at step {_stepNumber} ({_stepName})";
         // "DRIVER RESULT", not "RESULT": the Mac's report carries this line and
         // then its own final outcome, which can override it (a UAC prompt the
         // Mac saw, a final watch it did not cover), so a reader must not take
@@ -295,6 +317,7 @@ internal static class Program
             Outcome.Passed => "passed",
             Outcome.ProductStopped => "product-stopped",
             Outcome.SelfTestOnly => "self-test-watch-clean",
+            Outcome.SelfTestInstallOnly => "self-test-install-done",
             _ => "driver-problem",
         };
         string line = $"DRIVER RESULT (the driver's own; the Mac's final outcome is the last line of its report): {word}{where}: {reason}";
@@ -339,11 +362,11 @@ internal static class Program
         // Now the slow work, which no longer stands between the look and the result.
         Note(line);
         Note($"the result's screenshot: {Shot("result")}; looks {(_watch?.Looks.ToString() ?? "none")}, failed looks {(_watch?.FailedLooks.ToString() ?? "none")}");
-        return outcome switch { Outcome.Passed => 0, Outcome.ProductStopped => 2, Outcome.SelfTestOnly => 3, _ => 1 };
+        return outcome switch { Outcome.Passed => 0, Outcome.ProductStopped => 2, Outcome.SelfTestOnly => 3, Outcome.SelfTestInstallOnly => 5, _ => 1 };
     }
 }
 
-internal enum Outcome { Passed, ProductStopped, DriverProblem, SelfTestOnly }
+internal enum Outcome { Passed, ProductStopped, DriverProblem, SelfTestOnly, SelfTestInstallOnly }
 
 /// <summary>Ends the run with an outcome. Thrown from any step.</summary>
 internal sealed class Stopped : Exception

@@ -421,18 +421,21 @@ internal static class Steps_
         {
             var refuse = LicenceChoice(wizard, WindowRules.LicenceRefuseName);
             bool? acceptChosen = IsChosen(accept);
-            bool? refuseChosen = refuse is null ? false : IsChosen(refuse);
+            bool? refuseChosen = refuse is null ? null : IsChosen(refuse);
+            string refuseWords = refuse is null ? "not found" : ChoiceWords(refuseChosen);
             Program.Note($"installer: \"{page}\" opened with \"{WindowRules.LicenceAcceptName}\" {ChoiceWords(acceptChosen)} "
-                         + $"and \"{WindowRules.LicenceRefuseName}\" {(refuse is null ? "not found" : ChoiceWords(refuseChosen))}"
+                         + $"and \"{WindowRules.LicenceRefuseName}\" {refuseWords}"
                          + $" [screenshot {Program.Shot("licence-page")}]");
-            // The #1010 review: a state that cannot be read is not "not
-            // chosen"; the driver did not look, so it says so.
-            if (acceptChosen is null || refuseChosen is null)
-                throw Stopped.Driver($"the driver could not read whether the choices on the installer's \"{page}\" page were made "
-                                     + $"(\"{WindowRules.LicenceAcceptName}\" {ChoiceWords(acceptChosen)}, \"{WindowRules.LicenceRefuseName}\" {ChoiceWords(refuseChosen)}), "
-                                     + "so it could not look whether the page opened with neither chosen");
-            if (acceptChosen == true || refuseChosen == true)
+            // The #1010 reviews: a state that cannot be read, or a refusal
+            // that cannot be found, is not "not chosen"; the driver did not
+            // look, so it says so.
+            var opening = WindowRules.ReadLicenceOpening(refuse is not null, acceptChosen, refuseChosen);
+            if (opening == LicenceOpening.AChoiceMade)
                 throw Stopped.Product($"the installer's \"{page}\" page opened with a choice already made; neither may be chosen when it opens");
+            if (opening == LicenceOpening.CouldNotLook)
+                throw Stopped.Driver($"the driver could not read whether the choices on the installer's \"{page}\" page were made "
+                                     + $"(\"{WindowRules.LicenceAcceptName}\" {ChoiceWords(acceptChosen)}, \"{WindowRules.LicenceRefuseName}\" {refuseWords}), "
+                                     + "so it could not look whether the page opened with neither chosen");
             // A click, as a teacher's: Inno's own click handler is what enables Next.
             PostMessage(accept.Properties.NativeWindowHandle.ValueOrDefault, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
             chosenAt = DateTime.UtcNow;

@@ -34,6 +34,20 @@ public sealed class InstallerLicencePageTests
 
     private static string LicencePageText => File.ReadAllText(Path.Combine(WindowsApp, "installer-licence.txt"));
 
+    private static string Notice => File.ReadAllText(Path.Combine(RepoRoot, "THIRD_PARTY_LICENSES.md"));
+
+    /// <summary>The heading of the notice's section that carries the terms for Microsoft's file.</summary>
+    private const string NoticeTermsHeading = "## Terms for the Microsoft Visual C++ runtime file, which only the Windows app carries";
+
+    /// <summary>The page's paragraph of terms for vcruntime140.dll: the one after its "Microsoft Visual C++ runtime" heading.</summary>
+    private static string PageTerms()
+    {
+        var page = Paragraphs(LicencePageText);
+        int heading = page.IndexOf("Microsoft Visual C++ runtime");
+        Assert.True(heading > 0 && heading + 1 < page.Count, "the page has no \"Microsoft Visual C++ runtime\" heading with terms after it");
+        return page[heading + 1];
+    }
+
     /// <summary>The lines of one <c>[Section]</c> of the script, comments already gone, blank lines dropped.</summary>
     private static List<string> SectionLines(string script, string section)
     {
@@ -232,7 +246,9 @@ public sealed class InstallerLicencePageTests
         Assert.True(heading > 0, "the page has no \"Microsoft Visual C++ runtime\" heading");
         string terms = page[heading + 1];
         Assert.StartsWith("Plantoir includes vcruntime140.dll", terms);
-        Assert.Contains("The MIT License above does not apply to it.", terms);
+        // Read the same in the notice, where no MIT text comes above it (the second #1010 review).
+        Assert.Contains("The MIT License that covers Plantoir's own code does not apply to it.", terms);
+        Assert.DoesNotContain("above", terms, StringComparison.OrdinalIgnoreCase);
         // The drafted limits, as ruled (Russell, 2026-11-19, ruling 2).
         Assert.Contains("You may use it only as part of Plantoir.", terms);
         Assert.Contains("reverse engineer, decompile or disassemble it", terms);
@@ -277,6 +293,45 @@ public sealed class InstallerLicencePageTests
         Assert.True(made < licences && licences < unmapped, "the licences are not added to the zip after it is made");
         Assert.True(File.Exists(Path.Combine(RepoRoot, "LICENSE")));
         Assert.True(File.Exists(Path.Combine(RepoRoot, "THIRD_PARTY_LICENSES.md")));
+        // Ruling 6: the zip's notice carries the Microsoft terms. The notice
+        // the zip gets is THIRD_PARTY_LICENSES.md, copied as it is (above), so
+        // the terms must be in that file, word for word as on the page; the
+        // zip itself carries no Licence Agreement page (the second review).
+        Assert.Contains(PageTerms(), Paragraphs(Notice));
+    }
+
+    /// <summary>
+    /// The second #1010 review (MEDIUM): the end-user terms for
+    /// vcruntime140.dll were on the installer's page only, so a copy of the
+    /// file reached through the portable zip, or read later in the installed
+    /// folder, travelled without them. They are in the notice now, under a
+    /// heading that says only the Windows app carries the file (the notice
+    /// is also read on GitHub, by Mac users too), in the same words as the
+    /// page: one text, held equal here. The notice reaches {app} through the
+    /// installer's [Files] line and the zip through publish.ps1 (the tests
+    /// above), both copying the file unchanged.
+    /// </summary>
+    [Fact]
+    public void TheNoticeCarriesTheMicrosoftTermsInThePagesWords()
+    {
+        var notice = Paragraphs(Notice);
+        int heading = notice.IndexOf(NoticeTermsHeading);
+        Assert.True(heading >= 0, $"THIRD_PARTY_LICENSES.md has no \"{NoticeTermsHeading}\" section");
+        var section = new List<string>();
+        for (int i = heading + 1; i < notice.Count && !notice[i].StartsWith("## ", StringComparison.Ordinal); i++)
+            section.Add(notice[i]);
+        var terms = new List<string>();
+        foreach (string paragraph in section)
+            if (paragraph.StartsWith("Plantoir includes vcruntime140.dll", StringComparison.Ordinal)) terms.Add(paragraph);
+        Assert.Single(terms);
+        Assert.Equal(PageTerms(), terms[0]);
+        // Said where a Mac reader of the notice meets it, not only in the heading.
+        Assert.Contains(section, paragraph => paragraph.Contains("The Mac app does not carry", StringComparison.Ordinal));
+        // Nowhere else in the notice, so there is one copy of the words to keep equal.
+        int copies = 0;
+        foreach (string paragraph in notice)
+            if (paragraph.Contains("You may use it only as part of Plantoir.", StringComparison.Ordinal)) copies++;
+        Assert.Equal(1, copies);
     }
 
     /// <summary>

@@ -13405,7 +13405,10 @@ installed in and the notice on GitHub; and "Microsoft Visual C++ runtime",
 the terms for `vcruntime140.dll` as drafted in the design and ruled (use it
 only as part of Plantoir; do not copy it out, change it, or reverse engineer,
 decompile or disassemble it, except where the law allows; "as is"). That
-paragraph says "The MIT License above does not apply to it.", and the MIT
+paragraph says "The MIT License that covers Plantoir's own code does not
+apply to it." (it said "The MIT License above" until the second review of
+1010b, which put the same words in the notice too, below, where no MIT text
+comes above them), and the MIT
 paragraph opens by scoping it to Plantoir's own code, so the MIT grant's
 "without restriction" and the limits on Microsoft's file do not contradict
 each other (ruling 2). No machinery words (rule 1): "website builder".
@@ -13469,6 +13472,21 @@ page's text is not.
   as `THIRD_PARTY_LICENSES.txt`, so the notice travels with the files it
   describes and a double-click opens it in Notepad. (The page cannot hold the
   notice's tables readably.)
+- **The notice carries the Microsoft terms too** (the second review of
+  1010b, its one MEDIUM). The terms for `vcruntime140.dll` were on the
+  installer's page only, so a copy of the file in the portable zip, which
+  has no page, travelled without them, against ruling 6. The same paragraph
+  is now in `THIRD_PARTY_LICENSES.md`, in its own section, "Terms for the
+  Microsoft Visual C++ runtime file, which only the Windows app carries",
+  which opens by saying the Mac app does not carry the file: the notice is
+  one file for both platforms and is read on GitHub, which README and the
+  page link to. The Mac app and plantoir.app do not ship the notice
+  (searched 2026-11-19: nothing in `mac-app/` or `website/` names it), so
+  GitHub, `{app}` and the zip are where it is read. One text in two files,
+  held equal by
+  `InstallerLicencePageTests.TheNoticeCarriesTheMicrosoftTermsInThePagesWords`;
+  `ThePortableZipCarriesTheLicencesBesideTheApp` checks that the notice the
+  zip copies contains the page's paragraph.
 - **The portable zip carries both licences beside the app** (Russell,
   2026-11-19, ruling 6). `publish.ps1` makes `Plantoir-win-x64.zip` from the
   published folder as before, then adds the repository's `LICENSE` and
@@ -13478,7 +13496,7 @@ page's text is not.
   installer takes whole (`{#PublishDir}\*`) and would then install twice.
   The zip's name is unchanged (a frozen asset name, `RELEASING.md`).
 
-**Tests.** `windows-app/Plantoir.Tests/InstallerLicencePageTests.cs` (eleven
+**Tests.** `windows-app/Plantoir.Tests/InstallerLicencePageTests.cs` (twelve
 facts and one theory, source text with comments taken out, Pascal's
 settings matched whatever their spacing and case, so `Checked:=False` reads
 as `Checked := False`): the `LicenseFile` setting and
@@ -13490,7 +13508,8 @@ the zip after making it, under its frozen name; all
 five messages are set, to these words, and none says "License"; `LICENSE` is
 MIT in Russell's name and README points at it; the page carries `LICENSE`
 word for word and scoped; the Microsoft paragraph's limits and the sentence
-that MIT does not apply; the `[Files]` line; no machinery words; strict
+that MIT does not apply; the same paragraph, word for word, in the notice's
+Windows-only section, and in the notice the zip copies; the `[Files]` line; no machinery words; strict
 UTF-8. The first-install rehearsal's driver
 (`Plantoir.UiTests.FirstInstall/Steps.cs`, `AnswerLicencePage`) knows the
 page by its heading (`WindowRules.IsLicencePage`, either spelling, so a
@@ -13510,7 +13529,11 @@ choice (`WindowRules.LicenceNextLimit`). Since the first review of 1010b,
 two more: **a choice whose state cannot be read is not "not chosen"** (no
 window handle, a `BM_GETCHECK` answer other than checked or clear, or UI
 Automation failing: `WindowRules.CheckStateMeans` returns null and the run
-stops DRIVER PROBLEM, saying it could not look), and **an install of
+stops DRIVER PROBLEM, saying it could not look; since the second review,
+the same for a refusal ("I do not accept the agreement") that cannot be
+found, which had been read as not chosen: `WindowRules.ReadLicenceOpening`
+gives `CouldNotLook` for either, and `AChoiceMade` only for a choice read
+as made), and **an install of
 2.0.0 or later must have shown the page** (`WindowRules.LicencePageRequiredFor`
 reads the installed `Plantoir.exe`'s product version; a 2.0.0+ install whose
 pages seen hold no Licence Agreement page is PRODUCT STOPPED, and a version
@@ -13569,6 +13592,7 @@ text, neither choice chosen and Next disabled, before and after.
 | Down arrow or Space in the text | nothing changes | nothing changes |
 | Alt+D | "I do not accept" focused and chosen; Next disabled | the same |
 | Alt+A | "I accept" focused and chosen; Next enabled | the same |
+| Up arrow, from "I accept" | not reachable | the focus leaves the pair for the text; "I accept" stays chosen and Next enabled. Inno's stock page does the same (its pair has no group boundary above it), not changed here. The Tab stop sits on the refusal because a Win32 radio button cannot take the keyboard focus without being chosen, so the button Tab lands on is chosen, and Microsoft's "Radio Buttons" guidance (read 2026-11-19) says to "Select the safest (to prevent loss of data or system access) and most secure and private option": not accepting is the safe one |
 
 Three tiny installers with this page and three `InitializeWizard` bodies
 measured the choice of stop first: with both cleared, the same as "Before";

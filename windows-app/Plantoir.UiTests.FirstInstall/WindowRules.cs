@@ -67,6 +67,21 @@ internal enum Settling
     NoRecentLook,
 }
 
+/// <summary>What the driver read of the Licence Agreement page's two choices as it opened (#1010).</summary>
+internal enum LicenceOpening
+{
+    /// <summary>Both choices were found and both read clear: the page opened as ruled.</summary>
+    NeitherChosen,
+    /// <summary>A choice was read as made: PRODUCT STOPPED.</summary>
+    AChoiceMade,
+    /// <summary>
+    /// A choice could not be found or its state could not be read: the driver
+    /// did not look, so it cannot say the page opened with neither chosen
+    /// (DRIVER PROBLEM, never "not chosen").
+    /// </summary>
+    CouldNotLook,
+}
+
 internal readonly record struct Judgement(Verdict Verdict, string Kind)
 {
     public static Judgement Of(Verdict verdict, string kind = "") => new(verdict, kind);
@@ -335,6 +350,22 @@ internal static class WindowRules
         0 => false,
         _ => null,
     };
+
+    /// <summary>
+    /// What the page's two choices say about how it opened. The second
+    /// review of #1010: a refusal that cannot be found is no more "not
+    /// chosen" than a state that cannot be read, so either is <see
+    /// cref="LicenceOpening.CouldNotLook"/>; a choice read as made is <see
+    /// cref="LicenceOpening.AChoiceMade"/> even when the other could not be
+    /// read; only two choices found and both read clear is <see
+    /// cref="LicenceOpening.NeitherChosen"/>.
+    /// </summary>
+    public static LicenceOpening ReadLicenceOpening(bool refuseFound, bool? acceptChosen, bool? refuseChosen)
+    {
+        if (acceptChosen == true || (refuseFound && refuseChosen == true)) return LicenceOpening.AChoiceMade;
+        if (!refuseFound || acceptChosen is null || refuseChosen is null) return LicenceOpening.CouldNotLook;
+        return LicenceOpening.NeitherChosen;
+    }
 
     /// <summary>
     /// The first Plantoir whose installer shows the Licence Agreement page
