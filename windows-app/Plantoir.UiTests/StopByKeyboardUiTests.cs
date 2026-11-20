@@ -216,18 +216,21 @@ public class StopByKeyboardUiTests
         Assert.Null(app.OpenDialog());
 
         // ---- An Invoke on Cancel stops it, the box still focused.
+        Assert.True(PreviewRuns() && CancelShows(app), $"the preview ended by itself before the Invoke (phase \"{Phase(app)}\")");
         app.Find("taskCancelButton", "the panel's Cancel").AsButton().Invoke();
-        Assert.True(Retry.WhileFalse(() => !PreviewRuns(), Patience, TimeSpan.FromMilliseconds(250)).Result,
-                    "Invoke on Cancel did not stop the preview while a text box had the focus");
+        Assert.True(Retry.WhileFalse(() => Phase(app) == "Stopped", Patience, TimeSpan.FromMilliseconds(250)).Result,
+                    $"Invoke on Cancel did not stop the preview while a text box had the focus (phase \"{Phase(app)}\")");
         Assert.Null(app.OpenDialog());
 
         // ---- Escape anywhere else stops a preview at once, with no question.
         StartPreview();
         app.Find("previewButton", "the Preview button").Focus();
         Thread.Sleep(400);
+        Assert.True(PreviewRuns() && CancelShows(app), $"the preview ended by itself before Escape (phase \"{Phase(app)}\")");
         Press(app, VirtualKeyShort.ESCAPE);
-        Assert.True(Retry.WhileFalse(() => !PreviewRuns(), Patience, TimeSpan.FromMilliseconds(250)).Result,
-                    "Escape did not stop the running preview");
+        Assert.True(Retry.WhileFalse(() => Phase(app) == "Stopped", Patience, TimeSpan.FromMilliseconds(250)).Result,
+                    $"Escape did not stop the running preview (phase \"{Phase(app)}\", Preview button \"{app.Find("previewButton", "the Preview button").Name}\")");
+        Assert.False(PreviewRuns(), "the preview still runs after Escape");
         Assert.Null(app.OpenDialog());
     }
 }
