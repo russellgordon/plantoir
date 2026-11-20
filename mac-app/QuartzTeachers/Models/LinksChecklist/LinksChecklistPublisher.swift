@@ -508,9 +508,14 @@ enum LinksChecklistPublisher {
                 outcome.publishedPlaces, course: course, sectionNumber: sectionNumber,
                 today: CalendarDay.today(), into: step
             )
+        } catch {
+            // A page the plan needs could not be read: nothing was written.
+            return .refused(AssistToolRefusal.unreadablePage(offer.course).message)
+        }
+        do {
             try step.make()
         } catch {
-            return .refused(AssistToolRefusal.unreadablePage(offer.course).message)
+            return .refused(sentence(forRefused: error, of: step, graph: graph, offer: offer, in: course))
         }
         ActivityTrail.note(
             .pagesPublishedFromLinksChecklist, publishedLine(outcome),
@@ -531,6 +536,60 @@ enum LinksChecklistPublisher {
             )
         }
         return .published(outcome)
+    }
+
+    /// What the sheet says when the door refused the press (the first
+    /// review of U3a, LOW 7). Every refusal wrote nothing (the press is one
+    /// step, all or none), and each is said with the words already used for
+    /// it: a page changed since it was checked is
+    /// `linksChecklist.wording.pageChangedSince`, named as the sheet names a
+    /// page; a file that could not be read just now is the unreadable-page
+    /// sentence, as before; anything else (a full disk, a file in use, a
+    /// list that could not take the step while Undo is live) is the
+    /// runner's "Nothing was changed: …" with Foundation's could-not-be-saved
+    /// sentence for the file (`JournaledStepError`), as a re-date says it.
+    static func sentence(
+        forRefused error: Error, of step: JournaledStep, graph: AssistSectionGraph,
+        offer: LinksChecklistOffer, in course: Course
+    ) -> String {
+        guard case JournaledStepError.refused(let refusal, _) = error else {
+            return "Nothing was changed: \(error.localizedDescription)"
+        }
+        switch refusal {
+        case .changedSince(let firstPath, _):
+            if let name = pageName(atStepPath: firstPath, of: step, graph: graph, offer: offer, in: course) {
+                return LinksChecklistWording.pageChangedSince(name: name)
+            }
+        case .cannotTellNow:
+            return AssistToolRefusal.unreadablePage(offer.course).message
+        case .fileIsInUse, .couldNotWrite, .contentMissing, .notReadable:
+            break
+        }
+        return "Nothing was changed: \(error.localizedDescription)"
+    }
+
+    /// The page at a path the door named (inside the working folder, or the
+    /// whole path for a step that cannot be named), as the sheet names it;
+    /// nil when it is not one of the section's pages (the answered record,
+    /// the kept record).
+    static func pageName(
+        atStepPath path: String, of step: JournaledStep, graph: AssistSectionGraph,
+        offer: LinksChecklistOffer, in course: Course
+    ) -> String? {
+        var fileURL: URL = URL(fileURLWithPath: path)
+        if !path.hasPrefix("/"), let root = step.workingFolderURL {
+            fileURL = root.appendingPathComponent(path)
+        }
+        let wanted: String = UndoFolderPlaces.canonicalPath(of: fileURL)
+        let pages: [String: AssistSectionPage] = pagesByPlace(graph, in: course)
+        for (place, page) in pages where UndoFolderPlaces.canonicalPath(of: page.fileURL) == wanted {
+            let naming: LinksChecklistNaming = LinksChecklistNaming(
+                graph: graph, pagesByPlace: pages, rows: offer.rows,
+                courseDirectoryURL: course.directoryURL, courseCode: course.code
+            )
+            return naming.name(ofPlace: place)
+        }
+        return nil
     }
 
     /// A class the teacher published from this checklist is a class they

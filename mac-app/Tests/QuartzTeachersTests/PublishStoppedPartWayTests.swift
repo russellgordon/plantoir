@@ -1,11 +1,15 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// A publish or a hide (marking pages, not a deploy) that stops part way says
-/// `AssistWording.publishStoppedPartWay` — never "Nothing was changed", which
-/// the page-list path said until #412 although the pages before the failing
-/// one were already written — and, in the in-app assistant with a copy saved
-/// for the conversation, points at the banner's Restore Section button.
+/// A publish or a hide (marking pages, not a deploy) whose pages cannot all
+/// be written. Since U3 of #899 the pages are ONE step through the door,
+/// staged and swapped in together or not at all
+/// (`undo.rule.stagedThenSwapped`), so a failure writes nothing and the
+/// teacher is told "Nothing was changed: …" with the reason — never
+/// `AssistWording.publishStoppedPartWay` ("Only part of … was changed"),
+/// which #412 said while the write went page by page and which is false of
+/// a disk where nothing was written (the first review of U3a, MEDIUM 1). No
+/// pointer at a copy is added either: there is nothing to put back.
 ///
 /// The write is made to fail by taking write permission off the section's
 /// class folder after the course is laid out (restored in teardown).
@@ -52,43 +56,57 @@ final class PublishStoppedPartWayTests: XCTestCase {
         return made
     }
 
+    /// Both pages, as they were laid out.
+    func pagesAsLaidOut(in course: Course) throws -> [String] {
+        var texts: [String] = []
+        for title in ["Unit 1, Day 1", "Unit 1, Day 2"] {
+            texts.append(try String(contentsOf: AssistFixture.pageURL(of: title, in: course), encoding: .utf8))
+        }
+        return texts
+    }
+
     let prefixForPages: String = AssistWording.publishStoppedPartWay(what: "the pages you named", problem: "")
 
     // MARK: - Tests
 
-    /// MUST FAIL before #412: the page-list path said "Nothing was changed".
-    func testAPageListThatStopsPartWayIsSaidAsPartlyChangedWithTheWayBack() async throws {
+    /// A page list none of whose pages could be written is said as nothing
+    /// changed, with the reason, and with no pointer at a copy. MUST FAIL on
+    /// U3a's first round, which said `publishStoppedPartWay` with the
+    /// Restore Section pointer.
+    func testAPageListThatCannotBeWrittenIsSaidAsNothingChanged() async throws {
         let made: AssistFixture.Made = try makeLockedCourse(surface: .local)
+        let before: [String] = try pagesAsLaidOut(in: made.course)
         let outcome: AssistToolOutcome = await AssistFixture.run(
             "publish_pages", with: ["pages": ["Unit 1, Day 1", "Unit 1, Day 2"]], on: made.runner
         )
-        XCTAssertTrue(outcome.detail.hasPrefix(prefixForPages), outcome.detail)
-        XCTAssertFalse(outcome.detail.contains("Nothing was changed"), outcome.detail)
-        XCTAssertTrue(made.runner.hasConversationBackup, "The fixture's publish saves a copy first.")
-        XCTAssertTrue(
-            outcome.detail.hasSuffix(" " + AssistWording.restoreSectionPutsItBack(section: "1")),
-            "MUST FAIL without the Restore Section pointer: \(outcome.detail)"
-        )
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
+        XCTAssertFalse(outcome.detail.hasPrefix(prefixForPages), outcome.detail)
+        XCTAssertFalse(outcome.detail.contains("Restore Section"), outcome.detail)
+        XCTAssertEqual(try pagesAsLaidOut(in: made.course), before, "a page was written")
     }
 
-    /// A whole unit says the same key with the unit named.
-    func testAWholeUnitThatStopsPartWayNamesTheUnit() async throws {
+    /// A whole unit says the same, and names no unit as part changed. MUST
+    /// FAIL on U3a's first round.
+    func testAWholeUnitThatCannotBeWrittenIsSaidAsNothingChanged() async throws {
         let made: AssistFixture.Made = try makeLockedCourse(surface: .local)
+        let before: [String] = try pagesAsLaidOut(in: made.course)
         let outcome: AssistToolOutcome = await AssistFixture.run(
             "publish_pages", with: ["pages": "Unit 1"], on: made.runner
         )
-        let prefix: String = AssistWording.publishStoppedPartWay(what: "Unit 1", problem: "")
-        XCTAssertTrue(outcome.detail.hasPrefix(prefix), outcome.detail)
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
+        XCTAssertFalse(
+            outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "Unit 1", problem: "")), outcome.detail
+        )
+        XCTAssertEqual(try pagesAsLaidOut(in: made.course), before, "a page of the unit was written")
     }
 
-    /// An outside assistant has no Restore Section button to press, so it is
-    /// not pointed at one.
-    func testAnOutsideAssistantIsNotPointedAtAButtonItCannotSee() async throws {
+    /// An outside assistant hears the same, and is pointed at no button.
+    func testAnOutsideAssistantIsToldNothingChanged() async throws {
         let made: AssistFixture.Made = try makeLockedCourse(surface: .mcp)
         let outcome: AssistToolOutcome = await AssistFixture.run(
             "publish_pages", with: ["pages": ["Unit 1, Day 1", "Unit 1, Day 2"]], on: made.runner
         )
-        XCTAssertTrue(outcome.detail.hasPrefix(prefixForPages), outcome.detail)
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
         XCTAssertFalse(outcome.detail.contains("Restore Section"), outcome.detail)
     }
 

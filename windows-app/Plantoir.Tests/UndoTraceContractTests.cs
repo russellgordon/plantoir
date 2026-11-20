@@ -9,7 +9,7 @@ namespace Plantoir.Tests;
 /// replayed through the product's reader, fold, limits, pruning decisions and
 /// all-or-nothing check (#899 piece W1). The pages start from the fixture's
 /// <c>utf8Hex</c> bytes (never its <c>text</c>), each step sets its lines with
-/// the traces' writer (<see cref="UndoLineOps.SettingEntry"/>, test-only until
+/// the traces' writer (<see cref="JournaledSetting.SettingEntry"/>, test-only until
 /// W2's <c>JournaledSetting</c>), and the journal lines are the scribe's
 /// (<see cref="UndoScribe"/>). After every call the folded list must answer the
 /// trace's <c>head</c> and <c>redo</c>, every call must come to its
@@ -147,7 +147,7 @@ public sealed class UndoTraceContractTests
                         if (!pages.ContainsKey(path))
                             pages[path] = scribe.Page("A", path) is { } bytes ? UndoCheck.DecodeStrictly(bytes) : null;
                         if (pages[path] is not { } text) continue;   // the page is gone: left alone
-                        if (UndoLineOps.SettingEntry(set.GetProperty("key").GetString()!, set.GetProperty("line").GetString()!, text) is { } changed)
+                        if (JournaledSetting.SettingEntry(set.GetProperty("key").GetString()!, set.GetProperty("line").GetString()!, text) is { } changed)
                             pages[path] = changed;
                     }
                     foreach ((string path, string? text) in pages)
@@ -183,7 +183,7 @@ public sealed class UndoTraceContractTests
                         break;
                     }
                     string? text = scribe.Page("A", path) is { } bytes ? UndoCheck.DecodeStrictly(bytes) : null;
-                    string? edited = UndoLineOps.HandEdit(kind, text);
+                    string? edited = UndoTraceEdits.HandEdit(kind, text);
                     Assert.True(edited is not null, where + ": the trace's hand edit could not be made");
                     scribe.WritePage("A", path, Encoding.UTF8.GetBytes(edited!));
                     break;

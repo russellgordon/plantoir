@@ -159,7 +159,7 @@ public sealed class UndoStackContractTests
         {
             string text = UndoCheck.DecodeStrictly(_scribe.Page(folder, path)!)!;
             bool published = UndoEntries.ReadingOf("publish", text).Matches("publish: true");
-            return Encoding.UTF8.GetBytes(UndoLineOps.SettingEntry("publish", published ? "publish: false" : "publish: true", text)!);
+            return Encoding.UTF8.GetBytes(JournaledSetting.SettingEntry("publish", published ? "publish: false" : "publish: true", text)!);
         }
 
         private void OneStep(string folder, string path, double daysAgo = 0)
@@ -186,7 +186,7 @@ public sealed class UndoStackContractTests
                 case "editTheLineByHand":
                 {
                     string text = UndoCheck.DecodeStrictly(_scribe.Page("A", _p1)!)!;
-                    _scribe.WritePage("A", _p1, Encoding.UTF8.GetBytes(UndoLineOps.HandEdit("sameLine", text)!));
+                    _scribe.WritePage("A", _p1, Encoding.UTF8.GetBytes(UndoTraceEdits.HandEdit("sameLine", text)!));
                     return;
                 }
                 case "deploy":
@@ -234,8 +234,7 @@ public sealed class UndoStackContractTests
                 }
                 case "goLive":
                 {
-                    if (_scribe.Clear("wentLive") is { } seq) Clearings.Add(("wentLive", seq));
-                    _scribe.Prune();
+                    if (_scribe.GoLive() is { } seq) Clearings.Add(("wentLive", seq));
                     return;
                 }
                 case "wholeFileStep":

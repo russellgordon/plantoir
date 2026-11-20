@@ -81,10 +81,14 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
 /// offered back. A course that is not inside a working folder (no `courses`
 /// folder above it), a file outside its working folder through a link, or a
 /// target that is not a plain file (a link, a folder, a file that cannot be
-/// read) cannot be named in a step: in shadow those files are written as the
-/// action always wrote them, with one trail line; live, the step is refused
-/// before anything changes, because an unrecorded change above the head
-/// would be passed over by the next Undo.
+/// read) cannot be named in a step: in shadow those files are staged and
+/// swapped in together without the list (`writePlainly`), with one trail
+/// line; live, the step is refused before anything changes, because an
+/// unrecorded change above the head would be passed over by the next Undo.
+///
+/// Each file's `before` is what it held when it was FIRST planned, never a
+/// second read at `make()`: a file another program changed in between
+/// refuses the step instead of being written over.
 nonisolated final class JournaledStep {
 
     // MARK: - Stored properties
@@ -112,14 +116,13 @@ nonisolated final class JournaledStep {
     /// The bytes each planned file is left holding (nil: removed).
     private var plannedAfter: [String: Data?] = [:]
 
-    /// Each planned file that was not there when first planned: never
-    /// written over, even by `writePlainly` (a page that appeared since).
-    private var absentWhenPlanned: Set<String> = []
-
-    /// Each planned file's bytes when it was first planned (nil: absent or
-    /// not a readable file), so a step made without a record refuses a file
-    /// another program changed after the plan read it.
-    private var beforeWhenPlanned: [String: Data?] = [:]
+    /// What each planned file held when it was FIRST planned: the bytes the
+    /// action's plan was built from. They are the step's `before`, so a file
+    /// another program changed between planning and `make()` (an Obsidian
+    /// edit, a page that appeared at a new page's place) refuses the step
+    /// (`changedSince`) instead of being written over; a file that was not
+    /// there is never written over either, even by `writePlainly`.
+    private var plannedBefore: [String: UndoItem] = [:]
 
     /// Each file planned with `writeNew`: recorded as absent before, so the
     /// door refuses rather than replaces one that is there.
@@ -392,13 +395,20 @@ nonisolated final class JournaledStep {
     /// whole list (100 to 380 ms at a year's 2 to 6 MB, the core review of
     /// U1's second round; `UndoFoldCache`). The director's ruling 8 on U1's
     /// third round: the window is never held for that read. Called by the
-    /// runner before every tool and by the sheets before their planners.
-    /// What is left on the main actor is the lock (at most 50 ms in shadow)
-    /// and one flush (4 ms on the M4 Pro), measured in documentation 09.
+    /// runner before every tool, by Get Ready before its write, and by every
+    /// sheet that makes a step while the teacher reads it (the links
+    /// checklist, today's class and Not Today, the classes dated later, the
+    /// class dates, Course Settings for How I Teach), unawaited, so the
+    /// order of effects is unchanged. What is left on the main actor is the
+    /// lock (at most 50 ms to begin and 50 ms to finish in shadow; live up to
+    /// 2 s and 10 s, for U7 to settle) and one flush (4 ms on the M4 Pro),
+    /// measured in documentation 09. Also tidies what a shadow swap without
+    /// the list left when its process died (`UndoShadowStaging`).
     @concurrent
     static func readTheListAhead() async {
         let journal: UndoJournal = UndoJournalLocation.standardJournal()
         _ = try? journal.read()
+        UndoShadowStaging.tidyLeftovers(of: journal)
     }
 
     /// Makes the step through the door: written down first (in shadow, when
@@ -592,9 +602,19 @@ nonisolated final class JournaledStep {
             guard let url = plannedURL[key], let after = plannedAfter[key] else {
                 continue
             }
+            // The bytes the plan read, so a file another program changed
+            // after the plan read it is refused, never written over.
             var before: Data? = nil
-            if !mustBeNew.contains(key) && !absentWhenPlanned.contains(key) {
-                before = beforeWhenPlanned[key] ?? nil
+            if !mustBeNew.contains(key) {
+                switch plannedBefore[key] ?? UndoItem.read(at: url) {
+                case .absent:
+                    before = nil
+                case .file(let data):
+                    before = data
+                case .notAFile, .unreadable:
+                    let refusal: UndoRefusal = .cannotTellNow(path: url.path)
+                    throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+                }
             }
             if before == after {
                 continue
@@ -617,10 +637,10 @@ nonisolated final class JournaledStep {
                 change: .setExternal(target: target, expected: op.valueBefore, value: op.valueAfter)
             ))
         }
-        switch UndoSwap.swap(targets, label: "shadow", places: places, root: nil) {
+        switch UndoShadowStaging.swap(targets, noting: UndoJournalLocation.standardJournal(), places: places) {
         case .swapped:
             return
-        case .refused(let refusal):
+        case .refused(let refusal), .notPutBack(let refusal):
             throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
         case .stoppedByATest:
             throw JournaledStepError.stoppedByATest
@@ -638,45 +658,70 @@ nonisolated final class JournaledStep {
             guard let relative = UndoFolderPlaces.relativePath(of: url, under: root) else {
                 return nil
             }
-            let before: Data?
             if mustBeNew.contains(key) {
                 result.append(UndoFileChange(relativePath: relative, before: nil, after: after))
                 continue
             }
-            switch UndoItem.read(at: url) {
+            // As it was when planned, never re-read here (the first review
+            // of U3a, MEDIUM 2): re-reading at `make()` took in whatever
+            // another program wrote meanwhile as the step's before, and the
+            // door then wrote over it.
+            switch plannedBefore[key] ?? UndoItem.read(at: url) {
             case .absent:
-                before = nil
+                result.append(UndoFileChange(relativePath: relative, before: nil, after: after))
             case .file(let data):
-                before = data
+                result.append(UndoFileChange(relativePath: relative, before: data, after: after))
             case .notAFile, .unreadable:
                 return nil
             }
-            result.append(UndoFileChange(relativePath: relative, before: before, after: after))
         }
         return result
     }
 
-    /// The files written as the actions wrote them before U3: in shadow,
-    /// for a step that cannot be named. Each file whole and in place
-    /// (`.atomic`), its folder made first; a removal of a file that is
-    /// already gone is not a failure.
+    /// The files of a step that cannot be named, in shadow: written as the
+    /// door writes a step, all of them or none, without the list (the first
+    /// review of U3a, LOW 3: file by file, a failure part way left half an
+    /// action while the reply said "Nothing was changed"). Every new content
+    /// is staged beside its target and the files are swapped in together
+    /// (`UndoSwap`, label `shadow`, its staged names noted for a tidy after a
+    /// kill: `UndoShadowStaging`); each must still hold what it held when it
+    /// was planned, and one that was absent must still be absent. A target
+    /// that was a link, a folder or a file that could not be read when it was
+    /// planned is refused before anything is written, as a live step is: its
+    /// content cannot be checked, and writing over a link replaced the
+    /// teacher's link with a copy.
     func writePlainly() throws {
+        var targets: [UndoSwapTarget] = []
         for key in plannedOrder {
             guard let url = plannedURL[key], let after = plannedAfter[key] else {
                 continue
             }
-            if let after {
-                try FileManager.default.createDirectory(
-                    at: url.deletingLastPathComponent(), withIntermediateDirectories: true
-                )
-                let mustNotBeThere: Bool = absentWhenPlanned.contains(key) || mustBeNew.contains(key)
-                if mustNotBeThere && FileManager.default.fileExists(atPath: url.path) {
-                    throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: url.path])
-                }
-                try after.write(to: url, options: .atomic)
-            } else if FileManager.default.fileExists(atPath: url.path) {
-                try FileManager.default.removeItem(at: url)
+            let expected: Data?
+            switch mustBeNew.contains(key) ? UndoItem.absent : (plannedBefore[key] ?? UndoItem.read(at: url)) {
+            case .absent:
+                expected = nil
+            case .file(let data):
+                expected = data
+            case .notAFile, .unreadable:
+                let refusal: UndoRefusal = .cannotTellNow(path: url.path)
+                throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
             }
+            if expected == after {
+                continue
+            }
+            targets.append(UndoSwapTarget(url: url, relativePath: url.path, expected: expected, replacement: after))
+        }
+        if targets.isEmpty {
+            return
+        }
+        let journal: UndoJournal = UndoJournalLocation.standardJournal()
+        switch UndoShadowStaging.swap(targets, noting: journal) {
+        case .swapped:
+            return
+        case .refused(let refusal), .notPutBack(let refusal):
+            throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+        case .stoppedByATest:
+            throw JournaledStepError.stoppedByATest
         }
     }
 
@@ -687,11 +732,7 @@ nonisolated final class JournaledStep {
         if plannedURL[key] == nil {
             plannedOrder.append(key)
             plannedURL[key] = url
-            let found: UndoItem = UndoItem.read(at: url)
-            if case .absent = found {
-                absentWhenPlanned.insert(key)
-            }
-            beforeWhenPlanned[key] = found.data
+            plannedBefore[key] = UndoItem.read(at: url)
         }
         plannedAfter[key] = data
     }

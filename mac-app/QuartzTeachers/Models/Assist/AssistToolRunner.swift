@@ -1503,12 +1503,10 @@ final class AssistToolRunner {
                 }
             } catch {
                 // Nothing of the unit is written: its classes are one step,
-                // and the step is made only once every class is planned.
-                return AssistToolOutcome.refused(publishStoppedPartWay(
-                    what: "\(located.course.configuration.unitWord) \(unit)",
-                    problem: error.localizedDescription,
-                    sectionNumber: located.sectionNumber
-                ))
+                // and the step is made only once every class is planned. So
+                // never `publishStoppedPartWay` ("Only part of …"), which is
+                // false here (the first review of U3a, MEDIUM 1).
+                return AssistToolOutcome.refused("Nothing was changed: \(error.localizedDescription)")
             }
         }
         if changedAnything {
@@ -1519,11 +1517,9 @@ final class AssistToolRunner {
             do {
                 try unitStep.make()
             } catch {
-                return AssistToolOutcome.refused(publishStoppedPartWay(
-                    what: "\(located.course.configuration.unitWord) \(unit)",
-                    problem: error.localizedDescription,
-                    sectionNumber: located.sectionNumber
-                ))
+                // The door writes every class of the unit or none
+                // (`undo.rule.stagedThenSwapped`): a refusal wrote nothing.
+                return AssistToolOutcome.refused("Nothing was changed: \(error.localizedDescription)")
             }
             // The front page follows the newest visible class once, after
             // the whole unit, as it did after the unit's last class.
@@ -2138,17 +2134,13 @@ final class AssistToolRunner {
             change = applied.change
             leftAlone = applied.leftAlone
         } catch {
-            // Not "Nothing was changed" (said here until #412): the write is
-            // page by page, so pages before the one that failed are written —
-            // and when one was, it is a write with no undo entry (#531).
-            if error is AssistPublishPlanner.StoppedAfterWriting {
-                writesWithNoNewUndoEntry += 1
-            }
-            return AssistToolOutcome.refused(publishStoppedPartWay(
-                what: "the pages you named",
-                problem: error.localizedDescription,
-                sectionNumber: sectionNumber
-            ))
+            // "Nothing was changed", as before #412 and true again since U3
+            // of #899: the pages are ONE step through the door, written all
+            // or none (`undo.rule.stagedThenSwapped`), so a failure leaves
+            // every page as it was. #412's `publishStoppedPartWay` ("Only
+            // part of …") was true only while the write went page by page
+            // (the first review of U3a, MEDIUM 1).
+            return AssistToolOutcome.refused("Nothing was changed: \(error.localizedDescription)")
         }
         history.record(change)
 

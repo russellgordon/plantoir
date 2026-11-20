@@ -540,6 +540,13 @@ nonisolated enum UndoSwapChange: Equatable, Sendable {
 nonisolated enum UndoSwapResult: Equatable, Sendable {
     case swapped
     case refused(UndoRefusal)
+    /// Refused, and the swaps already made could not all be reversed: a
+    /// file may hold the new content while its original sits beside it
+    /// under a staged name. Never closed `failed`: the step is left IN
+    /// FLIGHT, so recovery settles it from the content once this process is
+    /// gone (`undo.rule.recovery`; the Windows W3 review's finding, matched
+    /// here). The refusal is the one that stopped the swap; no new word.
+    case notPutBack(UndoRefusal)
     /// A test stopped it at a kill point, leaving everything as it was.
     case stoppedByATest
 }
@@ -608,38 +615,73 @@ nonisolated enum UndoSwap {
             return false
         }
 
-        func reverse() {
+        /// Puts back every swap already made, newest first. False when any
+        /// could not be put back (the result was ignored until the Windows
+        /// W3 review: the step was then closed `failed` with a page left new
+        /// and its original hidden beside it, recorded nowhere).
+        func reverse() -> Bool {
+            var everyOnePutBack: Bool = true
             var index: Int = swapsMade - 1
             while index >= 0 {
                 let target: UndoSwapTarget = targets[index]
+                let failsHere: Bool = UndoKillPoints.putBackFailsAt?(index) == true
                 switch target.change {
                 case .file:
                     if let original = originals[index] {
-                        _ = UndoSwap.rename(original, onto: target.url)
-                        originals[index] = nil
-                    } else {
-                        try? FileManager.default.removeItem(at: target.url)
+                        if !failsHere && UndoSwap.rename(original, onto: target.url) {
+                            originals[index] = nil
+                        } else {
+                            everyOnePutBack = false
+                        }
+                    } else if failsHere {
+                        everyOnePutBack = false
+                    } else if UndoItem.read(at: target.url) != .absent {
+                        if (try? FileManager.default.removeItem(at: target.url)) == nil {
+                            everyOnePutBack = false
+                        }
                     }
                 case .moveHere(let from, _, _):
-                    _ = UndoSwap.renameExclusively(target.url, onto: from)
+                    if failsHere || !UndoSwap.renameExclusively(target.url, onto: from) {
+                        everyOnePutBack = false
+                    }
                 case .makeTree:
                     // Back under its staged name, removed with the rest.
                     let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
-                    if UndoSwap.renameExclusively(target.url, onto: stagedURL) {
+                    if !failsHere && UndoSwap.renameExclusively(target.url, onto: stagedURL) {
                         staged[index] = stagedURL
+                    } else {
+                        everyOnePutBack = false
                     }
                 case .takeTree:
                     // Never removed by the tidy that follows: put back, or,
                     // if even that fails, left aside under its staged name.
                     if let original = originals[index] {
-                        _ = UndoSwap.renameExclusively(original, onto: target.url)
-                        originals[index] = nil
+                        if !failsHere && UndoSwap.renameExclusively(original, onto: target.url) {
+                            originals[index] = nil
+                        } else {
+                            everyOnePutBack = false
+                        }
                     }
                 case .setExternal(let externalTarget, let expected, _):
-                    _ = places.write(externalTarget, expected)
+                    if failsHere || !places.write(externalTarget, expected) {
+                        everyOnePutBack = false
+                    }
                 }
                 index -= 1
             }
+            return everyOnePutBack
+        }
+
+        /// A refusal once swaps may have been made: reversed and tidied, or,
+        /// when the reversal could not complete, left exactly as it stands
+        /// (every kept original where recovery's tidy will find it) for
+        /// recovery to settle.
+        func refusedAfterSwapping(_ refusal: UndoRefusal) -> UndoSwapResult {
+            if !reverse() {
+                return .notPutBack(refusal)
+            }
+            tidy()
+            return .refused(refusal)
         }
 
         // 1. Stage every new content beside its target.
@@ -722,9 +764,7 @@ nonisolated enum UndoSwap {
                 return .stoppedByATest
             }
             if UndoKillPoints.fileInUseAtSwap?(index) == true {
-                reverse()
-                tidy()
-                return .refused(.fileIsInUse(path: target.relativePath))
+                return refusedAfterSwapping(.fileIsInUse(path: target.relativePath))
             }
             var refusal: UndoRefusal? = nil
             // Inside the working folder, its links resolved, at the moment of
@@ -738,7 +778,16 @@ nonisolated enum UndoSwap {
             case _ where refusal != nil:
                 break
             case .file:
-                refusal = UndoSwap.swapAFile(target, index: index, label: label, staged: &staged, originals: &originals)
+                var putBack: Bool = true
+                refusal = UndoSwap.swapAFile(
+                    target, index: index, label: label, staged: &staged, originals: &originals, putBack: &putBack
+                )
+                if let fileRefusal = refusal, !putBack {
+                    // This file's own swap could not be put back: nothing
+                    // more is reversed or tidied, recovery settles it.
+                    _ = reverse()
+                    return .notPutBack(fileRefusal)
+                }
             case .moveHere(let from, _, let op):
                 // The pair once more, just before the rename: the content at
                 // the place it leaves, nothing where it goes.
@@ -801,9 +850,7 @@ nonisolated enum UndoSwap {
                 }
             }
             if let refusal {
-                reverse()
-                tidy()
-                return .refused(refusal)
+                return refusedAfterSwapping(refusal)
             }
             swapsMade += 1
             index += 1
@@ -837,12 +884,26 @@ nonisolated enum UndoSwap {
 
     /// One file's swap: re-read, keep the original, rename the new content
     /// in (or remove the file). The refusal, or nil when it went in.
+    ///
+    /// After the rename the kept original is read back (the Windows W2b
+    /// review's finding, matched here; documentation 12, W2b). Another
+    /// program that edited the file IN PLACE between the re-read and the
+    /// rename wrote into the inode the original is a hard link to, so its
+    /// edit is there and nowhere else: the tidy would have deleted it. When
+    /// the original no longer holds what the check saw, it is put back over
+    /// the new content and the swap is refused `changedSince` (the edit is
+    /// the teacher's, kept whole); when it cannot be read back, it is put
+    /// back too and the swap is refused `cannotTellNow`. `putBack` is false
+    /// when that put-back itself failed. A volume without hard links keeps a
+    /// COPY (`keep`), which an edit after the copy never reaches: there the
+    /// race is not seen, as before.
     private static func swapAFile(
         _ target: UndoSwapTarget,
         index: Int,
         label: String,
         staged: inout [URL?],
-        originals: inout [URL?]
+        originals: inout [URL?],
+        putBack: inout Bool
     ) -> UndoRefusal? {
         let now: UndoItem = UndoItem.read(at: target.url)
         if now == .unreadable {
@@ -870,6 +931,7 @@ nonisolated enum UndoSwap {
             }
             originals[index] = originalURL
         }
+        UndoKillPoints.beforeTheRename?(index, target.url)
         var wentIn: Bool = true
         if let stagedURL = staged[index] {
             wentIn = UndoSwap.rename(stagedURL, onto: target.url)
@@ -886,7 +948,22 @@ nonisolated enum UndoSwap {
             }
             return .fileIsInUse(path: target.relativePath)
         }
-        return nil
+        guard let originalURL = originals[index] else {
+            return nil
+        }
+        let keptNow: UndoItem = UndoItem.read(at: originalURL)
+        if keptNow.data == target.expected && keptNow.data != nil {
+            return nil
+        }
+        let refusal: UndoRefusal = keptNow == .unreadable
+            ? .cannotTellNow(path: target.relativePath)
+            : .changedSince(firstPath: target.relativePath, others: 0)
+        if UndoKillPoints.putBackFailsAt?(index) != true && UndoSwap.rename(originalURL, onto: target.url) {
+            originals[index] = nil
+        } else {
+            putBack = false
+        }
+        return refusal
     }
 
     /// A rename that never replaces what is at the destination
@@ -1444,6 +1521,11 @@ nonisolated extension UndoJournal {
             // Caught at the swap rather than the check: the same hand edit,
             // so the same answer (rulings 13 and 20; the core review's M2).
             return .refused(refusal, clearedTheList: answerARefusal(refusal, of: seq, direction: direction))
+        case .notPutBack(let refusal):
+            // Left IN FLIGHT (`undoing` or `redoing` with no closing event),
+            // never `failed` and never a clearing: recovery settles it from
+            // the content once this process is gone (`undo.rule.recovery`).
+            return .refused(refusal, clearedTheList: false)
         case .stoppedByATest:
             return .stoppedByATest
         case .swapped:

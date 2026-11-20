@@ -28,7 +28,7 @@ public sealed class UndoJournalReadingTests : IDisposable
     private static string Applied(long seq) => $"{{\"v\":1,\"seq\":{seq},\"event\":\"applied\",\"at\":\"{At}\"}}";
 
     private UndoJournal Journal(string? folder = null, bool live = false) =>
-        new(folder ?? _folder, _clock, _ => true, _ => true, isLive: live, readRetry: TimeSpan.Zero);
+        new(folder ?? _folder, _clock, _ => true, _ => true, isLive: live, memory: new UndoProcessMemory(), readRetry: TimeSpan.Zero);
 
     private void Write(int segment, string text) =>
         File.WriteAllBytes(Path.Combine(_folder, $"journal-{segment:D6}.jsonl"), new UTF8Encoding(false).GetBytes(text));
@@ -127,7 +127,7 @@ public sealed class UndoJournalReadingTests : IDisposable
         Write(1, Begin(1) + "\n" + Applied(1) + "\n");
         var laterClock = new UndoTestClock(new DateTimeOffset(2027, 1, 1, 0, 0, 0, TimeSpan.Zero));
         UndoJournal first = Journal(live: true);
-        var second = new UndoJournal(other, laterClock, _ => false, _ => false, isLive: false, readRetry: TimeSpan.Zero);
+        var second = new UndoJournal(other, laterClock, _ => false, _ => false, isLive: false, memory: new UndoProcessMemory(), readRetry: TimeSpan.Zero);
         Assert.Single(first.Read().Folded.Steps);
         Assert.Empty(second.Read().Folded.Steps);
         Assert.True(first.IsLive);
@@ -165,7 +165,7 @@ public sealed class UndoJournalReadingTests : IDisposable
     // ---- The mac's U2a read rule, and the W1 review's M2 and M3 ----------
 
     private UndoJournal JournalOpening(Func<string, Stream> open) =>
-        new(_folder, _clock, _ => true, _ => true, isLive: false, readRetry: TimeSpan.Zero, open: open);
+        new(_folder, _clock, _ => true, _ => true, isLive: false, memory: new UndoProcessMemory(), readRetry: TimeSpan.Zero, open: open);
 
     private static Stream Disk(string path) =>
         new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
@@ -233,7 +233,7 @@ public sealed class UndoJournalReadingTests : IDisposable
         File.WriteAllBytes(blobPath, "x\n"u8.ToArray());
         Write(2, $"{{\"v\":1,\"seq\":2,\"event\":\"begin\",\"at\":\"{At}\",\"step\":{{\"seq\":2,\"madeAt\":\"{At}\",\"ops\":[{{\"kind\":\"writeFile\",\"path\":\"a.md\",\"afterSha\":\"{blob}\",\"blobs\":[\"{blob}\"]}}]}}}}\n" + Applied(2) + "\n");
 
-        UndoJournal journal = new(_folder, _clock, _ => true, _ => true, isLive: false, readRetry: TimeSpan.Zero);   // a first read, held: its last state is empty
+        UndoJournal journal = new(_folder, _clock, _ => true, _ => true, isLive: false, memory: new UndoProcessMemory(), readRetry: TimeSpan.Zero);   // a first read, held: its last state is empty
         string segment = Path.Combine(_folder, "journal-000002.jsonl");
         using (new FileStream(segment, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {

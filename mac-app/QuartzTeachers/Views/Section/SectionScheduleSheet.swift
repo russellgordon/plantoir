@@ -55,6 +55,12 @@ struct SectionScheduleSheet: View {
 
     @State var route: Route = .typed
 
+    /// Whether the teacher has chosen another route since the sheet opened
+    /// (#997). The dates box takes the focus when the sheet opens on it,
+    /// not when someone arrows the route picker back onto Typed: that
+    /// would pull the keyboard out of the picker mid-choice.
+    @State var hasChangedRoute: Bool = false
+
     /// The pasted column, as typed.
     @State var typed: String = ""
 
@@ -164,6 +170,12 @@ struct SectionScheduleSheet: View {
                 break
             }
         }
+        .task {
+            // Remembering the dates makes a step on the main actor: the list
+            // is read off it while the teacher fills the sheet in (#899,
+            // ruling 8 on U1's third round; the first review of U3a, LOW 6).
+            await JournaledStep.readTheListAhead()
+        }
     }
 
     // MARK: - Computed properties — the parts of the sheet
@@ -201,6 +213,7 @@ struct SectionScheduleSheet: View {
         .accessibilityIdentifier("sectionScheduleRoutePicker")
         .onChange(of: route) {
             failure = nil
+            hasChangedRoute = true
         }
     }
 
@@ -212,12 +225,17 @@ struct SectionScheduleSheet: View {
                 Text("One date per line. A heading row and blank lines are fine.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $typed)
-                    .font(.body.monospaced())
-                    .frame(minHeight: 150)
-                    .border(Color.secondary.opacity(0.3))
-                    .accessibilityLabel(Text(AccessibilityNames.classDates))
-                    .accessibilityIdentifier("sectionScheduleTypedField")
+                // Tab moves on rather than typing a tab (#997, ruling Q-C).
+                // Named (#993, D41) on the text area itself, where VoiceOver
+                // lands, rather than on the scroll view around it.
+                ClassDatesTextBox(
+                    text: $typed,
+                    accessibilityName: AccessibilityNames.classDates,
+                    identifier: "sectionScheduleTypedField",
+                    takesTheFocusWhenShown: !hasChangedRoute
+                )
+                .frame(minHeight: 150)
+                .border(Color.secondary.opacity(0.3))
             }
 
         case .file:

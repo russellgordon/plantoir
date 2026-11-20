@@ -64,7 +64,6 @@ final class AccessibilityNamesTests: XCTestCase {
             ("Views/Section/SectionVerbSheet.swift", "pagesTable", "sectionVerbSheetPickerTable"),
             ("Views/Section/SectionVerbSheetRollOver.swift", "rollOverWebsite", "sectionVerbSheetRollOverWebsite"),
             ("Views/Section/StartOfYearSheet.swift", "planTable", "startOfYearPlanTable"),
-            ("Views/Section/SectionScheduleSheet.swift", "classDates", "sectionScheduleTypedField"),
             ("Views/Wizard/AddSectionSheet.swift", "sectionNumber", "addSectionNumberField"),
         ]
         for entry in expected {
@@ -75,6 +74,10 @@ final class AccessibilityNamesTests: XCTestCase {
                 "\(entry.identifier) in \(entry.file) is not named \(entry.name)"
             )
         }
+        // The dates box is AppKit's text view since #997, named on the text
+        // view itself (`ClassDatesTextBox`); the tree test reads the name.
+        let schedule: String = try AccessibilityNamesTests.source("Views/Section/SectionScheduleSheet.swift")
+        XCTAssertNotNil(schedule.range(of: "accessibilityName: AccessibilityNames.classDates,\n                    identifier: \"sectionScheduleTypedField\""))
         let verbSheet: String = try AccessibilityNamesTests.source("Views/Section/SectionVerbSheet.swift")
         XCTAssertNotNil(verbSheet.range(of: ".flexibleTableHeight(laterClassesTableHeight)\n        .accessibilityLabel(Text(AccessibilityNames.laterClassesTable))"))
     }

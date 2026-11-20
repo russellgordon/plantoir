@@ -89,6 +89,39 @@ internal sealed class UndoFolded
     internal long NextSeq => Highest + 1;
 
     internal IEnumerable<UndoFoldedStep> OnTheList => Steps.Values.Where(step => step.IsOnTheList);
+
+    /// <summary>
+    /// A copy that shares nothing it can change: the writer of a hold folds
+    /// its own lines into a copy, so a reading another thread holds (a
+    /// not-fresh read hands out the last state read) never changes under it
+    /// (W2a's review, LOW 1). The steps' records are immutable and shared.
+    /// </summary>
+    internal UndoFolded Copy()
+    {
+        var copy = new UndoFolded
+        {
+            Highest = Highest,
+            SegmentOfTheHighest = SegmentOfTheHighest,
+            NewestWritten = NewestWritten,
+            LastClearing = LastClearing,
+            Lines = Lines,
+        };
+        foreach ((long seq, UndoFoldedStep step) in Steps)
+        {
+            var stepCopy = new UndoFoldedStep { Step = step.Step, State = step.State, Process = step.Process, MarkedByAClearing = step.MarkedByAClearing };
+            foreach (int segment in step.Segments) stepCopy.Segments.Add(segment);
+            copy.Steps[seq] = stepCopy;
+        }
+        foreach (UndoBarrier barrier in Barriers)
+            copy.Barriers.Add(new UndoBarrier { Seq = barrier.Seq, HighestBefore = barrier.HighestBefore, Place = barrier.Place, Segment = barrier.Segment, Cleared = barrier.Cleared });
+        foreach ((int number, UndoSegmentInfo info) in Segments)
+        {
+            var infoCopy = new UndoSegmentInfo { Number = info.Number, NewestAt = info.NewestAt, HoldsSomethingUnreadable = info.HoldsSomethingUnreadable, Lines = info.Lines };
+            foreach (string blob in info.BlobsKeptByUnreadables) infoCopy.BlobsKeptByUnreadables.Add(blob);
+            copy.Segments[number] = infoCopy;
+        }
+        return copy;
+    }
 }
 
 /// <summary>
