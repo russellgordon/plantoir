@@ -1,107 +1,37 @@
 import AppKit
-import Observation
 
-/// Whether text is being edited in the key window: a text field, search
-/// field or text view has the field editor (`NSText`) as the window's first
-/// responder (#988).
+/// Whether a box in a window is being typed in (#988): the window's first
+/// responder is editable text, the field editor every text field and search
+/// field edits through, or an editable text view.
 ///
-/// The progress panel's Cancel holds Escape and Command-Period
-/// (`.keyboardShortcut(.cancelAction)`). While a teacher is typing in a box,
-/// Cancel lets go of the key, so Escape is always the box's (the Filter
-/// field clears, a rename backs out), including in a text view that has no
-/// use for Escape and would otherwise pass it on to the button. Measured on
-/// the main Mac (`988-r4-sabotage-text`): through `NSApp.sendEvent` a text
-/// FIELD is offered Escape before any button, so for a field this rule is a
-/// second guard, not the only one.
+/// Read by the progress panel's Cancel (`CancelKeyNSButton`) at the moment a
+/// cancel key arrives, so while a teacher is typing in a box, Escape and
+/// Command-Period are the box's (the Filter field clears, a rename backs
+/// out), including in a text view that has no use for Escape (Russell's
+/// ruling on #988, 2026-11-19 evening).
 ///
-/// This draws nothing, takes no key and is not a view: it watches
-/// `NSWindow.firstResponder` (key-value observing) on whichever window is
-/// key, and moves to the new key window when another becomes key.
-@MainActor
-@Observable
-final class KeyWindowTextEditing {
-
-    // MARK: - Stored properties
-
-    /// The one watch the app needs: there is one key window at a time.
-    static let shared: KeyWindowTextEditing = KeyWindowTextEditing()
-
-    /// True while the key window's first responder is text being edited.
-    private(set) var isEditingText: Bool = false
-
-    /// The window being watched: the key window, when there is one.
-    @ObservationIgnored
-    private weak var watchedWindow: NSWindow?
-
-    @ObservationIgnored
-    private var firstResponderWatch: NSKeyValueObservation?
-
-    @ObservationIgnored
-    private var keyWindowWatches: [NSObjectProtocol] = []
-
-    // MARK: - Initializer
-
-    init() {
-        let center: NotificationCenter = NotificationCenter.default
-        let becameKey: NSObjectProtocol = center.addObserver(
-            forName: NSWindow.didBecomeKeyNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            let window: NSWindow? = notification.object as? NSWindow
-            MainActor.assumeIsolated {
-                self?.watch(window)
-            }
-        }
-        let resignedKey: NSObjectProtocol = center.addObserver(
-            forName: NSWindow.didResignKeyNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            MainActor.assumeIsolated {
-                self?.watch(NSApp.keyWindow)
-            }
-        }
-        keyWindowWatches = [becameKey, resignedKey]
-        watch(NSApp.keyWindow)
-    }
+/// Only EDITABLE text counts. Text a teacher can only select, such as the
+/// console's output (`TaskConsoleView`, `.textSelection(.enabled)`), is not
+/// a box anybody types in, so a click to select some of it leaves the keys
+/// with Cancel (the fifth #988 review).
+///
+/// This draws nothing, takes no key and is not a view: it reads one window
+/// when asked. (Until the fifth review it watched the key window's first
+/// responder by key-value observing, for a SwiftUI shortcut that could only
+/// be changed by redrawing; the button reads the window itself now.)
+enum KeyWindowTextEditing {
 
     // MARK: - Functions
 
-    /// Watches `window`'s first responder, and only that window's.
-    func watch(_ window: NSWindow?) {
-        if window === watchedWindow && firstResponderWatch != nil {
-            readNow()
-            return
-        }
-        firstResponderWatch?.invalidate()
-        firstResponderWatch = nil
-        watchedWindow = window
-        if let window {
-            firstResponderWatch = window.observe(\.firstResponder, options: [.new]) { [weak self] _, _ in
-                MainActor.assumeIsolated {
-                    self?.readNow()
-                }
-            }
-        }
-        readNow()
-    }
-
-    /// Reads the watched window's first responder now.
-    func readNow() {
-        let editing: Bool = KeyWindowTextEditing.isEditingText(in: watchedWindow)
-        if editing != isEditingText {
-            isEditingText = editing
-        }
-    }
-
-    /// Whether `window`'s first responder is text being edited. The field
-    /// editor every text field and search field edits through is an
-    /// `NSTextView`, and so is a text view itself: both are `NSText`.
+    /// Whether `window`'s first responder is text being edited.
+    @MainActor
     static func isEditingText(in window: NSWindow?) -> Bool {
         guard let window else {
             return false
         }
-        return window.firstResponder is NSText
+        guard let text = window.firstResponder as? NSText else {
+            return false
+        }
+        return text.isEditable
     }
 }

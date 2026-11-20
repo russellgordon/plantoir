@@ -70,7 +70,7 @@ final class StopQuestionTests: XCTestCase {
         // The Cancel button's modifiers run from its identifier to the end
         // of the `if cancelIsShowing` block: the question and its box are
         // both there, so the box is on the button and nowhere wider.
-        let afterTheCancel: String = try XCTUnwrap(code.components(separatedBy: ".accessibilityIdentifier(\"taskCancelButton\")").dropFirst().first)
+        let afterTheCancel: String = try XCTUnwrap(code.components(separatedBy: "accessibilityIdentifier: \"taskCancelButton\"").dropFirst().first)
         let buttonChain: String = try XCTUnwrap(afterTheCancel.components(separatedBy: "} else if let exitCode = runner.lastExitCode").first)
         let onTheCancel: Bool = buttonChain.contains(".alert(questionShown.title") && buttonChain.contains(".dialogSuppressionToggle(StopQuestionSettingsWording.dontAskAgain, isSuppressed: $asking.dontAskAgain)")
         XCTAssertEqual(code.components(separatedBy: ".dialogSuppressionToggle(").count - 1, 1, "one box in the panel")

@@ -132,9 +132,6 @@ struct TaskProgressView: View {
     /// it.
     @Environment(\.controlActiveState) var controlActiveState
 
-    /// Whether a box in the key window is being typed in (#988).
-    var textEditing: KeyWindowTextEditing = KeyWindowTextEditing.shared
-
     // MARK: - Computed properties
 
     /// Whether stopping this task asks first now: it has a question, and
@@ -170,16 +167,17 @@ struct TaskProgressView: View {
 
     /// Whether the visible Cancel holds Escape and Command-Period now
     /// (#988): while it shows, the run is under way, nothing covers the
-    /// panel, no question about stopping is open, the panel's window is
-    /// the key window, and nobody is typing in a box there.
+    /// panel, no question about stopping is open, and the panel's window is
+    /// the key window. Whether a box is being typed in is read by the
+    /// button itself when a key arrives (`CancelKeyNSButton`), so it is
+    /// never out of date.
     var cancelKeysAreLive: Bool {
         return TaskProgressView.cancelHoldsTheKeys(
             takesTheCancelKeys: takesTheCancelKeys,
             cancelIsShowing: cancelIsShowing,
             runIsUnderWay: runIsUnderWay,
             isAskingToStop: asking.isAsking,
-            windowIsKey: controlActiveState == .key,
-            textIsBeingEdited: textEditing.isEditingText
+            windowIsKey: controlActiveState == .key
         )
     }
 
@@ -266,44 +264,28 @@ struct TaskProgressView: View {
         cancelIsShowing: Bool,
         runIsUnderWay: Bool,
         isAskingToStop: Bool,
-        windowIsKey: Bool,
-        textIsBeingEdited: Bool
+        windowIsKey: Bool
     ) -> Bool {
         if !takesTheCancelKeys || !cancelIsShowing || !runIsUnderWay {
             return false
         }
-        if isAskingToStop || !windowIsKey || textIsBeingEdited {
+        if isAskingToStop || !windowIsKey {
             return false
         }
         return true
-    }
-
-    /// Whether a press of Cancel came from a key typed in a box, which is
-    /// the box's and stops nothing (#988). Cancel lets go of its key while
-    /// a box is being typed in (`cancelKeysAreLive`), but SwiftUI applies
-    /// that to the button only when it next updates the view. Measured on
-    /// the main Mac (run `988-n2`, Keyboard Navigation on): a click in the
-    /// Filter field and Escape already waiting together in the event queue,
-    /// which is what a teacher's input becomes when the app is busy for
-    /// longer than the gap between them, were handed out with no update
-    /// between, and Escape stopped the task. So the press reads the key
-    /// window as it is at that moment. Rejected: passing the key on to the
-    /// box, measured to come straight back to Cancel (the field editor's
-    /// `cancelOperation` reaches the window's cancel button) without end.
-    static func pressIsAKeyTypedInABox(isKeyDown: Bool, textIsBeingEdited: Bool) -> Bool {
-        return isKeyDown && textIsBeingEdited
     }
 
     /// Cancel, clicked or pressed from the keyboard: once per run. A plan
     /// share's cancel never sets `wasCancelled`, so without this the button
     /// stayed live, and a held Escape repeating within one frame ran Cancel
     /// three times (#988 review).
+    ///
+    /// Nothing here asks what pressed the button: a key typed in a box never
+    /// reaches it (`CancelKeyNSButton.performKeyEquivalent` refuses it when
+    /// it arrives), and a click or an accessibility press always stops the
+    /// task. (The fifth #988 review: reading `NSApp.currentEvent` here took
+    /// a VoiceOver press after a typed key for that key.)
     func pressCancel() {
-        let pressIsAKey: Bool = NSApp.currentEvent?.type == .keyDown
-        let textIsBeingEdited: Bool = KeyWindowTextEditing.isEditingText(in: NSApp.keyWindow)
-        if TaskProgressView.pressIsAKeyTypedInABox(isKeyDown: pressIsAKey, textIsBeingEdited: textIsBeingEdited) {
-            return
-        }
         let taskCanStillBeStopped: Bool = runIsUnderWay && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt)
         let stopsNow: Bool = asking.pressCancel(taskCanStillBeStopped: taskCanStillBeStopped)
         if stopsNow {
@@ -410,13 +392,16 @@ struct TaskProgressView: View {
                                 // The visible button holds Escape and
                                 // Command-Period itself (#988), and lets go
                                 // of them whenever something else has a use
-                                // for them: `cancelKeysAreLive`.
-                                Button("Cancel") {
-                                    pressCancel()
-                                }
-                                .buttonStyle(.bordered)
-                                .keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)
-                                .accessibilityIdentifier("taskCancelButton")
+                                // for them: `cancelKeysAreLive`, and a box
+                                // being typed in, read when the key arrives.
+                                TaskCancelButton(
+                                    title: "Cancel",
+                                    accessibilityIdentifier: "taskCancelButton",
+                                    holdsTheCancelKeys: cancelKeysAreLive,
+                                    action: {
+                                        pressCancel()
+                                    }
+                                )
                                 // Stopping a deploy or a share asks first (Russell's rulings on
                                 // #988, 2026-11-19). Stop Deploy and Stop Share are plain buttons
                                 // and the default, so Return stops the task; Alerts: "Always place
