@@ -1835,7 +1835,17 @@ questions"). The mac reads that section in `StopQuestionsContractTests`: its
 Swift constants pinned to `questions`, `wording` and `trail`, and every one
 of the `cases` played step by step through `StopQuestionAsking` and the
 Settings row's binding, `StopQuestionSettingsSection.isOn`; never
-`appliesOn`, which is for a permanent difference. Rejected: one setting for both (above), and
+`appliesOn`, which is for a permanent difference. The same test plays
+`stopQuestions.aStoppedDeploy` (#1009's third review) against
+`MultiDestinationDeployRunner.outcome` and `result`: a destination a stop
+kept the run from reaching counts as not deployed, so a stopped run is never
+`allSucceeded` and `recordWhatWentOut` writes no stamp. On Windows a stop
+could land between two destinations and the run was stamped published and
+the assistant told "deployed"; the mac's Cancel answers only while the shown leg is running or
+between its phases (`TaskProgressView`), so a stop cannot land in that gap
+and no sentence it says changed (a stop in the first of two legs now lists the
+second as not deployed too, which is said only when another leg went out).
+Rejected: one setting for both (above), and
 Xcode's "Reset all questions" button, which says nothing about which
 question it brings back.
 

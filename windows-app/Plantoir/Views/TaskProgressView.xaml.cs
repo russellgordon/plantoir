@@ -54,7 +54,7 @@ public sealed partial class TaskProgressView : UserControl
         // Re-renders once a second while a task runs, so the "still working…"
         // timer keeps moving even when the script itself is momentarily quiet.
         _tick = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _tick.Tick += (_, _) => { if (_runner is { IsUnderWay: true }) Render(); };
+        _tick.Tick += (_, _) => { if (MultiDestinationDeployRunner.ShownTaskShowsAsWorking(_runner, _multiRunner)) Render(); };
         Loaded += (_, _) =>
         {
             _leaving = false;
@@ -297,8 +297,12 @@ public sealed partial class TaskProgressView : UserControl
         // half is about to start on it — rendering the outcome branch here
         // would flash "Done"/a failure for the gap the caller's polling
         // wait takes to notice the deploy is still queued up on it. See
-        // ScriptRunner.IsBetweenPhases (row 318b).
-        if (_runner.IsUnderWay)
+        // ScriptRunner.IsBetweenPhases (row 318b). And while the whole
+        // deploy run can still be stopped (#1009's third review): in the gap
+        // between two destinations the shown runner is the leg that just
+        // ended, and drawing its outcome put a "Done" or "Something went
+        // wrong" badge beside a Cancel that still stops the deploy.
+        if (MultiDestinationDeployRunner.ShownTaskShowsAsWorking(_runner, _multiRunner))
         {
             OutcomeIcon.Visibility = Visibility.Collapsed;
             PhaseText.Text = hasMilestones ? _runner.StepDescription : "Working…";
@@ -386,7 +390,7 @@ public sealed partial class TaskProgressView : UserControl
             DestinationLinks.Visibility = Visibility.Collapsed;
         }
 
-        if (!_runner.IsUnderWay) EnsureTicking(false);
+        if (!MultiDestinationDeployRunner.ShownTaskShowsAsWorking(_runner, _multiRunner)) EnsureTicking(false);
 
         // Under way, so Cancel stays on screen, and holds its key, between a
         // leg's build and its deploy (#1009's review).

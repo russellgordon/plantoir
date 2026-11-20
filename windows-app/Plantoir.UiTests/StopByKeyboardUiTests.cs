@@ -103,18 +103,33 @@ public class StopByKeyboardUiTests
         Measured($"deploy {which} running, phase \"{Phase(app)}\"");
     }
 
-    private static void WriteCourse(string courses, out string published, bool alsoToNetlify = false)
+    private static void WriteCourse(string courses, out string published) => WriteCourse(courses, out published, out _, out _);
+
+    /// <summary>
+    /// The course every deploy test here uses. Every destination is a folder
+    /// in the test's own temp tree (#1009's third review): a host destination
+    /// would make deploy.ps1 read this machine's real credential and publish
+    /// for real, so no test in this class can reach an account on any machine.
+    /// </summary>
+    private static void WriteCourse(string courses, out string published, out string courseDirectory,
+                                    out string? secondFolder, bool alsoToASecondFolder = false)
     {
-        published = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(courses)!)!, "published");
+        string root = Path.GetDirectoryName(Path.GetDirectoryName(courses)!)!;
+        published = Path.Combine(root, "published");
         Directory.CreateDirectory(published);
+        secondFolder = alsoToASecondFolder ? Path.Combine(root, "published-second") : null;
+        if (secondFolder is not null) Directory.CreateDirectory(secondFolder);
         var toTheFolder = EndToEnd.PublishesTo(published);
+        string? second = secondFolder;
         string dir = EndToEnd.WriteCourse(courses, Code, "Stop By Keyboard", new[] { "Concepts" }, config =>
         {
             toTheFolder(config);
-            // A second destination after the folder: two legs, and a gap between them.
-            if (alsoToNetlify)
-                config["additional_deploy_targets"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "netlify" });
+            // A second folder after the first: two legs, and a gap between them.
+            if (second is not null)
+                config["additional_deploy_targets"] = new System.Text.Json.Nodes.JsonArray(
+                    new System.Text.Json.Nodes.JsonObject { ["type"] = "local_folder", ["path"] = second });
         });
+        courseDirectory = dir;
         for (int page = 1; page <= PaddingPages; page++)
             EndToEnd.WritePage(Path.Combine(dir, "Concepts", $"Padding {page:0000}.md"),
                 $"title: Padding {page:0000}\npublish: true", $"A page to make the build take a while ({page}).");
@@ -387,17 +402,21 @@ public class StopByKeyboardUiTests
 
     /// <summary>
     /// #1009's second review: a course that deploys to a folder and then to
-    /// Netlify runs two legs, and between them destination 1's runner has
-    /// stopped before the run moves on. The question opened during the build
-    /// stays up across the change of destination, and Stop Deploy then stops
-    /// the deploy, with no later leg started. Before the change the question
-    /// was taken down when destination 1 finished.
+    /// a second folder runs two legs, and between them destination 1's runner
+    /// has stopped before the run moves on. The question opened during the
+    /// build stays up across the change of destination, and Stop Deploy then
+    /// stops the deploy, with no later leg started. Before the change the
+    /// question was taken down when destination 1 finished. Its third review:
+    /// the stopped deploy writes no published stamp, and the second folder
+    /// never gets the site.
     /// </summary>
     [UiFact]
     public void TheQuestionStaysAcrossTheChangeOfDestination_AndStopDeployStartsNoLaterOne()
     {
         string published = "";
-        using var app = new DrivenApp(courses => WriteCourse(courses, out published, alsoToNetlify: true));
+        string courseDirectory = "";
+        string? secondFolder = null;
+        using var app = new DrivenApp(courses => WriteCourse(courses, out published, out courseDirectory, out secondFolder, alsoToASecondFolder: true));
         app.SelectSection(Code, 1);
         StartDeploy(app, 1);
         Assert.True(DeployStarts(app) == 0, "destination 1's deploy began before the build was seen; nothing here tests the change");
@@ -417,6 +436,10 @@ public class StopByKeyboardUiTests
         Thread.Sleep(3000);
         Assert.True(DeployStarts(app) == startsAtTheStop, $"a later leg started after Stop Deploy ({startsAtTheStop} deploys started at the stop, {DeployStarts(app)} after)");
         Assert.False(CancelShows(app), "Cancel still shows after the deploy was stopped");
+        // The stopped outcome (#1009's third review): no stamp, so the section keeps its " — Edited".
+        Assert.False(File.Exists(SectionPublishState.StampPath(courseDirectory, 1)),
+                     "the deploy stopped between two destinations stamped the section as published");
+        Assert.False(File.Exists(Path.Combine(secondFolder!, "section1", "index.html")), "the second folder got the site after Stop Deploy");
     }
 
     /// <summary>

@@ -143,6 +143,61 @@ public sealed class StopQuestionsContractTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// <c>stopQuestions.aStoppedDeploy</c> (#1009's third review): what a
+    /// stopped deploy ends as, played through the runner's own outcome (the
+    /// published stamp's rule) and the one place that words it for the
+    /// assistant and the window, <see cref="MultiDestinationDeployRunner.Result"/>.
+    /// </summary>
+    [Fact]
+    public void EveryStoppedDeployCaseHolds()
+    {
+        var cases = Contract["aStoppedDeploy"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 7, $"only {cases.Count} aStoppedDeploy cases");
+        foreach (var c in cases)
+        {
+            string name = c!["name"]!.ToString();
+            var legs = new List<MultiDestinationDeployRunner.Leg>();
+            foreach (var entry in c["legs"]!.AsArray())
+            {
+                string type = entry!["type"]!.ToString();
+                var destination = new CourseConfiguration.DeployDestination(type, type == "local_folder" ? @"C:\sites" : "");
+                var leg = new MultiDestinationDeployRunner.Leg(destination, null);
+                switch (entry["state"]!.ToString())
+                {
+                    case "deployed": leg.IsFinished = true; leg.Succeeded = true; break;
+                    case "stoppedDuring": leg.IsFinished = true; leg.Succeeded = false; break;
+                    case "notReached": break;
+                    case var other: throw new Xunit.Sdk.XunitException($"{name}: unknown leg state {other}");
+                }
+                legs.Add(leg);
+            }
+            var run = new MultiDestinationDeployRunner();
+            run.SetLegsForTests(legs, currentLegIndex: 0, running: false, cancelled: c["stopped"]!.GetValue<bool>());
+            var outcome = run.CurrentOutcome;
+
+            Assert.True(c["everyDestinationDeployed"]!.GetValue<bool>() == outcome.AllSucceeded, $"{name}: every destination deployed {outcome.AllSucceeded}");
+            var notDeployed = new List<CourseConfiguration.DeployDestination>();
+            foreach (var number in c["notDeployedTo"]!.AsArray()) notDeployed.Add(legs[number!.GetValue<int>() - 1].Destination);
+            Assert.True(notDeployed.SequenceEqual(outcome.FailedDestinations),
+                        $"{name}: not deployed to {string.Join(", ", outcome.FailedDestinations.Select(DeployCommand.DestinationDescription))}");
+
+            var names = new List<string>();
+            foreach (var destination in notDeployed) names.Add(DeployCommand.DestinationDescription(destination));
+            string expected = c["told"]!.ToString() switch
+            {
+                "deployed" => Plantoir.Core.Assist.AssistWording.Deployed("STPKY", "1"),
+                "deployDidNotFinish" => Plantoir.Core.Assist.AssistWording.DeployDidNotFinish("STPKY", "1"),
+                "deployedToMultipleDestinations" => Plantoir.Core.Assist.AssistWording.DeployedToMultipleDestinations("STPKY", "1", legs.Count),
+                "deployPartiallySucceeded" => Plantoir.Core.Assist.AssistWording.DeployPartiallySucceeded("STPKY", "1", MultiDestinationDeployRunner.JoinedWithAnd(names)),
+                "deployToMultipleDestinationsDidNotFinish" => Plantoir.Core.Assist.AssistWording.DeployToMultipleDestinationsDidNotFinish("STPKY", "1"),
+                var other => throw new Xunit.Sdk.XunitException($"{name}: unknown sentence {other}"),
+            };
+            Assert.True(expected == MultiDestinationDeployRunner.Result("STPKY", "1", legs.Count, outcome).Message,
+                        $"{name}: told \"{MultiDestinationDeployRunner.Result("STPKY", "1", legs.Count, outcome).Message}\"");
+        }
+    }
+
     [Fact]
     public void BothQuestionsAreAskedUntilTheTeacherSaysOtherwise_AndTheAnswerIsKept()
     {
@@ -277,6 +332,9 @@ public sealed class StopQuestionsContractTests : IDisposable
         Assert.Equal(3, CountOf(panel, "TakeDownTheStopQuestionIfTheTaskEnded()"));
         Assert.DoesNotContain("!runner.IsUnderWay", panel);
         Assert.Contains("RunningActionsRow.Visibility = TaskIsUnderWay ?", panel);
+        // Working or its outcome, by the same rule as Cancel's row (#1009's third review).
+        Assert.Contains("if (MultiDestinationDeployRunner.ShownTaskShowsAsWorking(_runner, _multiRunner))\n        {\n            OutcomeIcon.Visibility = Visibility.Collapsed;", panel);
+        Assert.DoesNotContain("if (_runner.IsUnderWay)", panel);
         int from = panel.IndexOf("// ---- Stopping, by click", StringComparison.Ordinal);
         Assert.True(from >= 0, "the stopping code is not where this test looks");
         Assert.DoesNotContain("IsRunning: true", panel.Substring(from));
@@ -302,10 +360,15 @@ public sealed class StopQuestionsContractTests : IDisposable
     [Fact]
     public void BetweenTwoDestinationsTheDeployIsUnderWay_AndAPressThereAsks()
     {
-        // Destination 1's runner has stopped; the run has not yet moved on.
-        var finishedLeg = new ScriptRunner();
+        // Destination 1's runner has stopped; the run has not yet moved on to destination 2.
+        var legs = new List<MultiDestinationDeployRunner.Leg>
+        {
+            new(new CourseConfiguration.DeployDestination("netlify", ""), null),
+            new(new CourseConfiguration.DeployDestination("cloudflare_pages", ""), null),
+        };
+        var finishedLeg = legs[0].Runner;
         var run = new MultiDestinationDeployRunner();
-        run.SetStateForTests(running: true, startedAt: DateTime.UtcNow);
+        run.SetLegsForTests(legs, currentLegIndex: 0, running: true, cancelled: false);
         Assert.False(finishedLeg.IsUnderWay);
         Assert.True(MultiDestinationDeployRunner.ShownTaskIsUnderWay(finishedLeg, run),
                     "the gap between two destinations read as the deploy having ended");
@@ -373,6 +436,7 @@ public sealed class StopQuestionsContractTests : IDisposable
         bool hooked = false;
         bool? underWayInTheGap = null;
         bool? askedInTheGap = null;
+        bool? drawnWorkingInTheGap = null;
         run.PropertyChanged += (_, changed) =>
         {
             if (hooked || changed.PropertyName != nameof(MultiDestinationDeployRunner.IsRunning) || !run.IsRunning) return;
@@ -386,6 +450,7 @@ public sealed class StopQuestionsContractTests : IDisposable
                 if (firstChanged.PropertyName != nameof(ScriptRunner.IsRunning) || first.IsRunning || first.LastExitCode is null) return;
                 if (underWayInTheGap is not null) return;
                 underWayInTheGap = MultiDestinationDeployRunner.ShownTaskIsUnderWay(first, run);
+                drawnWorkingInTheGap = MultiDestinationDeployRunner.ShownTaskShowsAsWorking(first, run);
                 var asking = new StopQuestionAsking(StopQuestion.Deploy, new AppSettings(), note: _ => { });
                 askedInTheGap = !asking.PressCancel(underWayInTheGap == true) && asking.IsAsking;
                 // Stop Deploy, chosen in the gap: the panel's StopTheTask → the section's CancelDeploy.
@@ -396,11 +461,107 @@ public sealed class StopQuestionsContractTests : IDisposable
 
         Assert.True(underWayInTheGap == true, "the gap between two destinations was never reached, or read as ended");
         Assert.True(askedInTheGap == true, "a press between two destinations did not ask");
+        // No outcome badge beside the Cancel that still stops it (#1009's third review).
+        Assert.True(drawnWorkingInTheGap == true, "between two destinations the panel drew destination 1's outcome beside Cancel");
         Assert.True(run.WasCancelled);
         Assert.False(run.IsRunning);
         Assert.Equal(1, LinesIn(deploysLog));
         Assert.Null(run.Legs[1].Runner.StartedAt);
         Assert.Null(run.Legs[2].Runner.StartedAt);
+
+        // The stopped outcome (#1009's third review, stopQuestions.aStoppedDeploy):
+        // destinations 2 and 3 never got the site, so the run is not every
+        // destination deployed, no published stamp is written, and the
+        // assistant hears which destinations did not get it.
+        var outcome = run.CurrentOutcome;
+        Assert.False(outcome.AllSucceeded, "a deploy stopped between two destinations reads as every destination deployed");
+        Assert.Equal(new[] { destinations[1], destinations[2] }, outcome.FailedDestinations);
+        Assert.False(File.Exists(SectionPublishState.StampPath(course.DirectoryPath, 1)),
+                     "a deploy stopped between two destinations stamped the section as published");
+        Assert.Equal(
+            Plantoir.Core.Assist.AssistWording.DeployPartiallySucceeded("GAPTWO", "1",
+                MultiDestinationDeployRunner.JoinedWithAnd(new[] { destinations[1].Path, destinations[2].Path })),
+            MultiDestinationDeployRunner.Result("GAPTWO", "1", destinations.Length, outcome).Message);
+    }
+
+    /// <summary>
+    /// A stop once the last destination has finished (#1009's third review):
+    /// nothing is left to stop, so the panel does not ask, a cancel that
+    /// arrives anyway marks nothing, and the run ends as every destination
+    /// deployed, stamped. Before the change the run read as under way until
+    /// RunAsync noticed the last leg had ended, and a cancel there ended it
+    /// "Cancelled" though everything had gone out.
+    /// </summary>
+    [Fact]
+    public async Task AStopOnceTheLastDestinationHasFinishedStopsNothing()
+    {
+        var course = StandInCourse("GAPLAST", out string deploysLog);
+        var destinations = new[]
+        {
+            new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-one")),
+            new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-two")),
+        };
+        using var context = new SingleThreadContext();
+        var run = new MultiDestinationDeployRunner(context);
+        bool hooked = false;
+        bool? underWayAfterTheLast = null;
+        run.PropertyChanged += (_, changed) =>
+        {
+            if (hooked || changed.PropertyName != nameof(MultiDestinationDeployRunner.IsRunning) || !run.IsRunning) return;
+            hooked = true;
+            var last = run.Legs[1].Runner;
+            last.PropertyChanged += (_, lastChanged) =>
+            {
+                // The last destination has just ended; RunAsync has not yet seen it.
+                if (lastChanged.PropertyName != nameof(ScriptRunner.IsRunning) || last.IsRunning || last.LastExitCode is null) return;
+                if (underWayAfterTheLast is not null) return;
+                underWayAfterTheLast = MultiDestinationDeployRunner.ShownTaskIsUnderWay(last, run);
+                run.Cancel();
+            };
+        };
+        await RunOn(context, () => run.RunAsync(course, 1, destinations, "", _folder, buildReason: null));
+
+        Assert.True(underWayAfterTheLast == false, $"after the last destination the deploy still read as under way ({underWayAfterTheLast})");
+        Assert.False(run.WasCancelled, "a cancel after the last destination marked the run cancelled");
+        Assert.Equal(2, LinesIn(deploysLog));
+        Assert.True(run.CurrentOutcome.AllSucceeded);
+        Assert.True(File.Exists(SectionPublishState.StampPath(course.DirectoryPath, 1)), "a deploy that went out everywhere was not stamped");
+    }
+
+    /// <summary>
+    /// A throw in the run's own ending (#1009's third review): a listener of
+    /// the leg's mark being cleared throws, and the run still ends, so the
+    /// panel never asks about a run that is over. Before the change the
+    /// ending's throw skipped <c>IsRunning = false</c> for good.
+    /// </summary>
+    [Fact]
+    public async Task AThrowInTheRunsEndingStillEndsTheRun()
+    {
+        var course = StandInCourse("ENDTHROW", out string deploysLog);
+        var destinations = new[] { new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-one")) };
+        using var context = new SingleThreadContext();
+        var run = new MultiDestinationDeployRunner(context);
+        bool hooked = false;
+        run.PropertyChanged += (_, changed) =>
+        {
+            if (hooked || changed.PropertyName != nameof(MultiDestinationDeployRunner.IsRunning) || !run.IsRunning) return;
+            hooked = true;
+            var leg = run.Legs[0].Runner;
+            leg.PropertyChanged += (_, legChanged) =>
+            {
+                // Between the build and the deploy: the run goes to its ending with the mark set.
+                if (legChanged.PropertyName == nameof(ScriptRunner.IsRunning) && leg.IsBetweenPhases && leg.LastExitCode is null)
+                    throw new InvalidOperationException("thrown between the build and the deploy");
+                // The ending clearing the mark: a listener that throws there.
+                if (legChanged.PropertyName == nameof(ScriptRunner.IsBetweenPhases) && !leg.IsBetweenPhases)
+                    throw new InvalidOperationException("thrown in the run's ending");
+            };
+        };
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RunOn(context, () => run.RunAsync(course, 1, destinations, "", _folder, buildReason: BuildFreshness.ReasonPages)));
+        Assert.False(run.IsRunning, "a throw in the run's ending left the run running for good");
+        Assert.False(MultiDestinationDeployRunner.ShownTaskIsUnderWay(run.Legs[0].Runner, run), "the panel would still ask about a run that has ended");
+        Assert.Equal(0, LinesIn(deploysLog));
     }
 
     [Fact]

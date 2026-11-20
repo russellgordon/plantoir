@@ -98,8 +98,13 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
 
     /// <summary>
     /// What actually happened, once every leg that ran has finished. A leg
-    /// the run never reached (stopped early by a cancel or a failed shared
-    /// build) is not counted as failed — it simply never ran.
+    /// the run never reached because the shared build failed is not counted
+    /// as failed: it simply never ran, and the build's own answer is said
+    /// instead. A leg a STOP kept the run from reaching is counted as not
+    /// deployed, as the leg the stop landed in is (#1009's third review,
+    /// <c>stopQuestions.aStoppedDeploy</c>): it did not get the site, so a
+    /// stopped run is never every destination deployed, writes no published
+    /// stamp, and is told as the destinations that did not get it.
     /// </summary>
     public Outcome CurrentOutcome
     {
@@ -109,8 +114,18 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
             var refusals = new List<FailureExplainer.SectionDeployRefusal>();
             bool anySucceeded = false;
             bool anyFailedOtherwise = false;
-            foreach (var leg in Legs.Where(leg => leg.IsFinished))
+            bool stopped = WasCancelled || WasStoppedByUser;
+            foreach (var leg in Legs)
             {
+                if (!leg.IsFinished)
+                {
+                    if (stopped)
+                    {
+                        anyFailedOtherwise = true;
+                        failed.Add(leg.Destination);
+                    }
+                    continue;
+                }
                 if (!leg.Succeeded)
                 {
                     if (leg.RefusedWhileItsSectionDeploys is { } refusal) refusals.Add(refusal);
@@ -158,13 +173,27 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         Notify(nameof(IsRunning));
     }
 
+    /// <summary>For tests only (#1009's third review): a run with these legs, as they stand, and its own marks.</summary>
+    internal void SetLegsForTests(List<Leg> legs, int currentLegIndex, bool running, bool cancelled)
+    {
+        Legs = legs;
+        CurrentLegIndex = currentLegIndex;
+        IsRunning = running;
+        WasCancelled = cancelled;
+        Notify(nameof(IsRunning));
+    }
+
     /// <summary>
     /// Cancels whichever leg is currently running. The remaining,
     /// not-yet-started legs are simply never reached — <see cref="RunAsync"/>'s
     /// own loop checks <see cref="WasCancelled"/> after every wait and stops.
+    /// A cancel once nothing is left to stop (the last leg has ended, and
+    /// RunAsync has not yet seen it) marks nothing (#1009's third review):
+    /// everything went out, and the run must not end "Cancelled".
     /// </summary>
     public void Cancel()
     {
+        if (!CanStillBeStopped) return;
         WasCancelled = true;
         // Under way, not running (#1009's review): a cancel that lands between
         // a leg's build and its deploy marks that leg's runner cancelled, so
@@ -187,9 +216,32 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     /// </summary>
     public static bool ShownTaskIsUnderWay(ScriptRunner? shown, MultiDestinationDeployRunner? deployRun)
     {
-        if (deployRun is { IsRunning: true, WasCancelled: false }) return true;
+        if (deployRun is { CanStillBeStopped: true }) return true;
         return shown is { IsUnderWay: true, WasCancelled: false };
     }
+
+    /// <summary>
+    /// Whether a task panel draws the shown task as working rather than its
+    /// outcome badge: the shown runner is under way (a cancelled run still
+    /// finishing included), or the whole deploy run can still be stopped
+    /// (#1009's third review). In the gap between two destinations the shown
+    /// runner is the leg that just ended, and its outcome drawn there put a
+    /// "Done" or "Something went wrong" badge beside a Cancel that still
+    /// stops the deploy.
+    /// </summary>
+    public static bool ShownTaskShowsAsWorking(ScriptRunner? shown, MultiDestinationDeployRunner? deployRun) =>
+        shown is { IsUnderWay: true } || ShownTaskIsUnderWay(shown, deployRun);
+
+    /// <summary>
+    /// The run is going, not cancelled, and has something left to stop: its
+    /// current leg is under way, or a later leg is still to start (the gap
+    /// between two destinations). Once the last leg has ended nothing is left
+    /// (#1009's third review), though <see cref="IsRunning"/> stays true until
+    /// RunAsync notices, up to one poll later.
+    /// </summary>
+    public bool CanStillBeStopped =>
+        IsRunning && !WasCancelled
+        && (CurrentLeg is { Runner.IsUnderWay: true } || CurrentLegIndex < Legs.Count - 1);
 
     /// <summary>
     /// Refuses up front, against EVERY configured destination, rather than
@@ -399,18 +451,34 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
             // "a run finishing" must see the new stamp already on disk, or
             // it reads the stale one and the marker stays up until the next
             // unrelated refresh.
-            RecordWhatWentOut(course, sectionNumber, publishedFingerprint);
-            // No leg is left between its build and its deploy once the run
-            // is over, however it ended (#1009's second review): an exception
-            // after the build and before the deploy's Run started would
-            // otherwise leave the mark set for good, and the panel would ask
-            // about a run that has ended.
-            foreach (var finishedLeg in Legs)
+            // Each step of the ending runs whatever the one before it threw
+            // (#1009's third review): a throw from the stamp or from a
+            // listener would otherwise skip IsRunning = false for good, and
+            // the run would read as going on for as long as the app runs.
+            try
             {
-                if (finishedLeg.Runner.IsBetweenPhases) finishedLeg.Runner.IsBetweenPhases = false;
+                RecordWhatWentOut(course, sectionNumber, publishedFingerprint);
             }
-            IsRunning = false;
-            Notify(nameof(IsRunning));
+            finally
+            {
+                try
+                {
+                    // No leg is left between its build and its deploy once the
+                    // run is over, however it ended (#1009's second review): an
+                    // exception after the build and before the deploy's Run
+                    // started would otherwise leave the mark set for good, and
+                    // the panel would ask about a run that has ended.
+                    foreach (var finishedLeg in Legs)
+                    {
+                        if (finishedLeg.Runner.IsBetweenPhases) finishedLeg.Runner.IsBetweenPhases = false;
+                    }
+                }
+                finally
+                {
+                    IsRunning = false;
+                    Notify(nameof(IsRunning));
+                }
+            }
         }
     }
 

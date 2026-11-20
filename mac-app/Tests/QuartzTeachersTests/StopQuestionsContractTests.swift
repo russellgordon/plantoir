@@ -223,4 +223,92 @@ final class StopQuestionsContractTests: XCTestCase {
         let expectedTrail: [String] = try XCTUnwrap(testCase["trail"] as? [String], name)
         XCTAssertEqual(trailLinesWritten(), expectedTrail, "\(name): the trail lines")
     }
+
+    // MARK: - Tests: what a stopped deploy ends as
+
+    /// `stopQuestions.aStoppedDeploy` (added with Windows' #1009, third
+    /// review): each case's legs built by hand on the mac's own runner, then
+    /// its `outcome` (the published stamp's rule, `recordWhatWentOut`) and the
+    /// one place that words it for the window and the assistant,
+    /// `MultiDestinationDeployRunner.result`.
+    func testEveryStoppedDeployCaseIsTheMacs() throws {
+        let section: [String: Any] = try XCTUnwrap(
+            try StopQuestionsContractTests.stopQuestions()["aStoppedDeploy"] as? [String: Any]
+        )
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 7)
+        for testCase in cases {
+            try playStoppedDeployCase(testCase)
+        }
+    }
+
+    /// One case of `aStoppedDeploy`, as `howToRunACase` says.
+    func playStoppedDeployCase(_ testCase: [String: Any]) throws {
+        let name: String = try XCTUnwrap(testCase["name"] as? String)
+        let legEntries: [[String: Any]] = try XCTUnwrap(testCase["legs"] as? [[String: Any]], name)
+        var legs: [MultiDestinationDeployRunner.Leg] = []
+        for entry in legEntries {
+            let type: String = try XCTUnwrap(entry["type"] as? String, name)
+            let path: String = type == "local_folder" ? "/sites" : ""
+            var leg: MultiDestinationDeployRunner.Leg = MultiDestinationDeployRunner.Leg(
+                destination: CourseConfiguration.DeployDestination(type: type, path: path)
+            )
+            let state: String = try XCTUnwrap(entry["state"] as? String, name)
+            switch state {
+            case "deployed":
+                leg.isFinished = true
+                leg.succeeded = true
+            case "stoppedDuring":
+                leg.isFinished = true
+                leg.succeeded = false
+            case "notReached":
+                break
+            default:
+                XCTFail("\(name): the contract names a leg state \(state), which this runner does not know")
+            }
+            legs.append(leg)
+        }
+        let run: MultiDestinationDeployRunner = MultiDestinationDeployRunner()
+        run.legs = legs
+        run.wasCancelled = try XCTUnwrap(testCase["stopped"] as? Bool, name)
+        let outcome: MultiDestinationDeployRunner.Outcome = run.outcome
+
+        let everyDeployed: Bool = try XCTUnwrap(testCase["everyDestinationDeployed"] as? Bool, name)
+        XCTAssertEqual(outcome.allSucceeded, everyDeployed, "\(name): every destination deployed")
+        let numbers: [Int] = try XCTUnwrap(testCase["notDeployedTo"] as? [Int], name)
+        var notDeployed: [CourseConfiguration.DeployDestination] = []
+        var notDeployedNames: [String] = []
+        for number in numbers {
+            let destination: CourseConfiguration.DeployDestination = legs[number - 1].destination
+            notDeployed.append(destination)
+            notDeployedNames.append(DeployCommand.destinationDescription(for: destination))
+        }
+        XCTAssertEqual(outcome.failedDestinations, notDeployed, "\(name): the destinations not deployed")
+
+        let told: String = try XCTUnwrap(testCase["told"] as? String, name)
+        var expected: String = ""
+        switch told {
+        case "deployed":
+            expected = AssistWording.deployed(course: "STPKY", section: "1")
+        case "deployDidNotFinish":
+            expected = AssistWording.deployDidNotFinish(course: "STPKY", section: "1")
+        case "deployedToMultipleDestinations":
+            expected = AssistWording.deployedToMultipleDestinations(
+                course: "STPKY", section: "1", destinationCount: legs.count
+            )
+        case "deployPartiallySucceeded":
+            expected = AssistWording.deployPartiallySucceeded(
+                course: "STPKY", section: "1",
+                failedDestinations: MultiDestinationDeployRunner.joinedWithAnd(notDeployedNames)
+            )
+        case "deployToMultipleDestinationsDidNotFinish":
+            expected = AssistWording.deployToMultipleDestinationsDidNotFinish(course: "STPKY", section: "1")
+        default:
+            XCTFail("\(name): the contract names a sentence \(told), which this runner does not know")
+        }
+        let result: AssistSiteWorkResult = MultiDestinationDeployRunner.result(
+            course: "STPKY", section: "1", destinationCount: legs.count, outcome: outcome
+        )
+        XCTAssertEqual(result.message, expected, "\(name): what the assistant is told")
+    }
 }

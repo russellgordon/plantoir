@@ -88,8 +88,18 @@ class MultiDestinationDeployRunner {
     }
 
     /// What actually happened, once every leg that ran has finished. A
-    /// leg the run never reached (stopped early by a cancel or a failed
-    /// shared build) is not counted as failed — it simply never ran.
+    /// leg the run never reached because the shared build failed is not
+    /// counted as failed — it simply never ran, and the build's own answer
+    /// is said instead. A leg a STOP kept the run from reaching is counted
+    /// as not deployed, as the leg the stop landed in is
+    /// (`contracts/shared-rules.json` → `stopQuestions.aStoppedDeploy`,
+    /// added with Windows' #1009): it did not get the site, so a stopped
+    /// run is never every destination deployed and writes no stamp. Every
+    /// stop the mac's window can make lands inside a leg (its Cancel answers
+    /// only while the shown leg is running or between its phases), so no sentence the mac says today changes: a
+    /// stop in the first leg of two now also lists the second as not
+    /// deployed, and that list is said only when another leg went out.
+    /// It keeps the rule the same on both sides.
     var outcome: Outcome {
         var failed: [CourseConfiguration.DeployDestination] = []
         var succeeded: [CourseConfiguration.DeployDestination] = []
@@ -97,7 +107,15 @@ class MultiDestinationDeployRunner {
         var anySucceeded: Bool = false
         var refusals: [FailureExplainer.SectionDeployRefusal] = []
         var anyFailedOtherwise: Bool = false
-        for leg in legs where leg.isFinished {
+        let stopped: Bool = wasCancelled || wasStoppedByUser
+        for leg in legs {
+            if !leg.isFinished {
+                if stopped {
+                    anyFailedOtherwise = true
+                    failed.append(leg.destination)
+                }
+                continue
+            }
             if !leg.succeeded {
                 if let refusal = leg.refusedWhileItsSectionDeploys {
                     refusals.append(refusal)
