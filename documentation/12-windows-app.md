@@ -15957,7 +15957,9 @@ It owes, in this order (the contract review's recommendation):
    exclusive open retried on a timer (W3; polling on the mac gave up 663 of
    1,600 begins with 8 processes at once). Readers open with
    `FileShare.ReadWrite | FileShare.Delete`, retry a sharing violation for a
-   bounded time and never call the list unreadable for it (W2).
+   bounded time and never call the list unreadable for it (W2). Built in
+   W2a with `LockFileEx`; the named mutex was rejected there for its thread
+   affinity ("What Windows has built: W2a").
 4. The checks: `checkCases`, then `stepCases` and the staged swap that
    retries a refused rename and names the file still in use (W5). Two
    rows came with the mac's U2a (the Fable sweep of U1, F1 and F2), and
@@ -16132,7 +16134,7 @@ and nothing in the app calls it yet.
   oldest end only; one holding a line this version cannot read kept until its
   own newest `at`, or the first later segment's, is past 60 days; a blob kept
   while anything on the list or anything unreadable in a kept segment names
-  it), both as PURE decisions. W2 carries them out under the lock.
+  it), both as PURE decisions. W2a carries them out under the lock (below).
 - **`UndoEntries` and `UndoCheck`**: the `editLine` entry model (the block
   found by `PageVisibilityReader.FenceIndices`, used unchanged, the plan
   review's L5; the entry rule is the reference model's `Layout`), its pure
@@ -16193,9 +16195,13 @@ door writes; every decision it acts on is the product's (`Offer`, `Plan`,
 after every line. The traces' writer (`settingEntry`) and the op derivation
 (`line_ops`) are test-only too (`UndoLineOps`), ported from
 `scripts/make_undo_traces.py`; W2 moves the writer into the product as
-`JournaledSetting`. What the scribe does NOT have is everything W2 owns: no
-lock, no staged swap, no flush, one process. Each count is asserted at or
-above its value today, so a list cannot silently fall to zero.
+`JournaledSetting`. When W1 landed the scribe had no lock, no flush and one
+process; since W2a (below) it writes every line, blob and pruning through the
+real lock, writer and `Prune`, and since W2b every step, undo and redo goes
+through the real door and staged swap, and the writer and op derivation are in
+the product (`JournaledSetting`, `UndoLineOps`; "What Windows has built: W2b"
+below). Each count is asserted at or above its value today, so a
+list cannot silently fall to zero.
 
 **What U2b's rows met here (2026-11-19).** With the mac's U2b in the
 contract, this reader takes its six kinds for kinds it does not know, as
@@ -16271,8 +16277,9 @@ fresh process:
 
 Linear in the bytes and the lines, and slower than the mac's first reads
 (50.8 ms at 1 MB, 170.9 ms at 4 MB, M4 Pro), which read on from where they
-stopped: W1 reads whole, every time. Reading on (W2a's `UndoStore`) is what
-makes the ordinary step cheap; measure the door's first step against these.
+stopped: W1 reads whole, every time. Reading on (built in W2a, `UndoJournal.Read`;
+its numbers are in "What Windows has built: W2a" below) is what makes the
+ordinary step cheap; measure the door's first step against these.
 Scanning every line for blob names, which only an unreadable line needs, was
 made lazy after the first measurement (1 MiB one-page: 281 ms to 253 ms
 median, inside the noise). The undo test classes run in about 25 s together
@@ -16379,7 +16386,385 @@ and these listings, are #1004 items 2 and the closing paragraph.
 as unreadable at that level (JSON does not say which is meant); a
 `writeFile`'s `beforeSha`/`afterSha`, when present, must be 64 lower-case hex
 characters; FAT and exFAT file indexes across a re-open were NOT measured (no
-such volume on this PC), which matters only to W2's reading on.
+such volume on this PC), which matters only to reading on: W2a reads those
+volumes, and network shares, whole every time (below).
+
+### What Windows has built: W2a, the lock and the store (#899, #949)
+
+Piece W2a (branch `issue/899-w2a-lock-store-pruning`, 2026-11-20) is the
+first half of the write side: the one lock, the append, segments, blobs,
+reading on, and pruning CARRIED OUT (W1 only decides). Nothing a teacher sees
+changed and nothing in the app calls it: the switch stays off, no trail line
+(no teacher-visible behaviour), no tool or phrasing of the built-in assistant
+moved. The plan it was built from is `vm-tools/reference/899-w2a-plan.md`.
+
+- **`UndoLock`** (`rule.oneLock`). `CreateFileW` on `undo\.lock`
+  (`OPEN_ALWAYS`, read/write/delete sharing, `FILE_FLAG_OVERLAPPED`, never
+  wrapped in a `FileStream`, so .NET never binds it to the thread pool's
+  completion port: the earlier run's P2 crash), then
+  `LockFileEx(LOCKFILE_EXCLUSIVE_LOCK)` on byte 0 WITHOUT
+  `LOCKFILE_FAIL_IMMEDIATELY`, the OVERLAPPED in unmanaged memory with its own
+  manual-reset event until the handle closes. A wait that runs out cancels
+  (`CancelIoEx`) and then waits for the request's own answer
+  (`GetOverlappedResult`); a grant that beat the cancel is let go at once, so
+  a take that said busy never leaves the lock held. The lock is the handle's,
+  not the thread's: two journals in one process exclude each other and a
+  hold may be let go on another thread. Paths past 259 characters take the
+  `\\?\` form. *Rejected:* a named mutex (thread affinity; `Local\` is per
+  session), an exclusive open retried on a timer (a poll), `FileStream.Lock`
+  (no form that waits).
+- **`UndoProcessMemory`**: what the contract says a PROCESS remembers, the
+  shadow try-once (after a shadow wait runs out, later shadow takes try once
+  with `LOCKFILE_FAIL_IMMEDIATELY` until the lock is next taken) and the
+  closings it could not write. An object the composition root will own (W4),
+  never a static (the plan review's H1); a journal given none makes its own.
+- **`UndoJournal.WithLock`** (the mac's `withLock`): the folder made, the lock
+  taken (2 s live, 50 ms in shadow, both read from the rule's sentence by
+  `UndoLockTests`), a torn last line cut (only bytes after the last LF, then
+  `FlushFileBuffers`), the journal read FRESH, pending closings written first
+  (an `applied` dropping the redo branch then), the body, and every line
+  made durable. **A reading inside the lock that is not fresh refuses the hold**
+  (`UndoJournalFailure.ListNotReadable`): nothing is written or deleted from
+  a stale fold (the W1 review's M2, carried into the write side).
+  `WriteClosingOrKeep(line, wait)` keeps a closing the lock refused; the
+  10-second wait the mac's door uses is the door's to pass (W2b).
+- **`UndoJournalWriter`**: one JSON object per line, keys sorted at every
+  level, `v` 1 and `at` (whole seconds, UTC) stamped when the caller has not,
+  UTF-8 with no BOM, an explicit LF (never `WriteLine`, which is CR LF here),
+  each line ONE `WriteFile` on an unbuffered stream. A new segment once the
+  newest is at or past 4 MiB, made with `FileMode.CreateNew`. **Every hold
+  that wrote ends with `FlushFileBuffers`**: the mac `fsync`s every hold and
+  `F_FULLFSYNC`s `begin`/`undoing`/`redoing`; Windows has one flush that
+  reaches the disk, measured at 0.90 ms median (below), so every hold gets
+  it rather than only the three (a change from the plan, which flushed only
+  those). `Sync()` is the same flush, for a door that must make a line
+  durable before it goes on inside one hold.
+- **Blobs** (`WriteBlob`, `WriteBlobs`): one already there that hashes to its
+  name is used as it is; otherwise `content\aa\.tmp-<guid>` made with
+  `CreateNew`, flushed to the disk, then `File.Move(overwrite: false)`; 80 or
+  183 means the name is there, so it is read and hashed (a torn one is
+  deleted and the write tried once more); 50 or 87 from the move falls back
+  to an exclusive create of the name (the contract's exFAT rule). A blob that
+  cannot be stored removes its temporary file and throws
+  `CouldNotStoreContent`. `WriteBlobs(contents, parallelism)` writes many at
+  once, because each blob's flush is per file: see the 233-page numbers.
+- **Reading on** (`UndoJournal.Read`, the twin of the mac's `UndoFoldCache`,
+  per journal instance). Per segment it keeps the parsed lines, the end read
+  to, the 64 bytes before that end, and the file's identity (volume serial and
+  file index from the OPEN handle, `UndoFileIdentity`). It reads on only when
+  every kept segment is still there (or gone from the oldest end only), the
+  same file, at least as long, with the same 64 bytes before the end, and no
+  segment has appeared below the newest read; anything else reads whole.
+  It **refolds from the kept lines on every read** rather than updating a
+  kept fold: a reading a caller holds never changes under it, and a deleted
+  oldest segment's barriers are forgotten by construction
+  (`undoJournal.files`). FAT, exFAT and network volumes (not NTFS or ReFS, or
+  a UNC path) are read whole every time, and so is a journal given the test
+  `open` seam. Nothing of a failed read is kept.
+- **`UndoJournal.Prune(writer)`**, inside the lock, never failing the caller:
+  W1's `Decide` on the writer's fold (fresh, plus its own lines), each
+  `pruned` or `interrupted` (`unsettled`) appended; then W1's `Deletable` on
+  that fold and the blobs on the disk: blobs, any `.tmp-` a dead writer left
+  (blobs are written under the lock, so only a dead process leaves one), then
+  segments from the oldest end, stopping at the first that will not delete,
+  and the writer refolds. The staged files a step closed `unsettled` may have
+  left are tidied in the same hold since W2b (below).
+- **`UndoJournalLocation.Folder`**: `AppDataRoot.Current\undo`, following
+  `--state-dir`; the only place Undo reads `AppDataRoot`. Nothing calls it
+  before W4.
+- **The scribe moved onto the store.** `UndoScribe` (test-only, W1) now
+  appends, stores blobs and prunes through `WithLock`, the writer and
+  `Prune`, so all the stack cases and traces W1 walks (the held ones still
+  held for W6) run through the real lock, append, segments, blobs, reading on
+  and deletion.
+
+**Tests** (each written failing first): `UndoLockTests` (8),
+`UndoStoreTests` (18), `UndoPruningCarriedOutTests` (4), every contract
+sentence they prove asserted from the JSON. Six must-fail proofs, each red
+alone and green restored, by a script on the PC
+(`vm-tools/guest/899-w2a-mustfail.json`): CR LF written; a reader without
+delete sharing; `LOCKFILE_FAIL_IMMEDIATELY`; reading on without the tail
+check; no fresh check inside the lock (deletion from a stale fold); no
+torn-line cut.
+
+**Measured** on a Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200),
+Release build, by `windows-app/Plantoir.UndoHarness` (in no solution;
+`vm-tools/guest/899-w2a-pc-run.ps1 -Mode harness`), first in
+`C:\vm-setup\...\scratch` and then in a scratch folder inside the PC's
+signed-in OneDrive (`C:\Users\lenov\OneDrive`, OneDrive.exe running, Files
+On Demand on), removed afterwards. Outside / inside OneDrive:
+
+| What | Outside OneDrive | Inside OneDrive |
+|---|---|---|
+| 2 processes × 200 holds, live (2 s) | 400 of 400, seqs distinct, highest wait 193 ms | 400 of 400, 300 ms |
+| 8 × 200, live | 1,600 of 1,600, distinct, highest wait 958 ms | 1,600 of 1,600, 1,090 ms |
+| 2 × 200, shadow (50 ms, try-once) | 200 of 400 | 17 of 400 |
+| 8 × 200, shadow | 14 of 1,600 (85 on an earlier run) | 51 of 1,600 |
+| A holder killed, the waiter granted after | median 24 ms, highest 45 (5 rounds) | median 34 ms, highest 42 |
+| One line appended / `FlushFileBuffers` | 0.39 / 0.90 ms median (p95 0.63 / 1.20) | 0.48 / 0.85 ms (0.79 / 1.13) |
+| A whole hold (lock, cut, read on, line, flush) | median 10.7 ms, p95 16.4 | 11.9 ms, 17.3 |
+| First read / read on, nothing new / read on after one step (0.5 s later) / whole read, 106 KB | 10.5 / 0.7 / 3.2 / 13.5 ms | 11.9 / 0.7 / 3.8 / 8.9 ms |
+| the same at 1 MB | 40 / 2.7 / 6.5 / 66 ms | 47 / 3.1 / 5.8 / 77 ms |
+| at 4.2 MB (2 segments) | 156 / 6.6 / 54 / 166 ms | 207 / 15 / 43 / 181 ms |
+| at 10.6 MB (3 segments, the mac's simulated year peak) | 360 / 35 / 56 / 359 ms | 419 / 29 / 64 / 383 ms |
+| A 233-page whole-file step's 466 blobs (2 KB each) in one hold, one at a time | 1,273 ms; a 2 s waiter beside it granted at 1,265 ms | 1,521 ms; granted at 1,522 ms |
+| the same, 4 at a time / 8 at a time | 409 / 387 ms | 429 / 418 ms |
+| One blob's parts, median: create and write / flush / close / no-replace move | 0.56 / 0.81 / 0.12 / 0.79 ms | 0.54 / 0.82 / 0.11 / 0.78 ms |
+
+Read from it:
+
+- **The lock queues**: no live hold was refused with 8 processes at once, in
+  OneDrive too; the mac's poll lost 663 of 1,600. A killed holder's lock goes
+  to the waiter in tens of milliseconds.
+- **Shadow under contention gets very little through**, by the contract's
+  own rule: once a process's 50 ms wait runs out it only tries once until it
+  next gets the lock, and with seven others queued it rarely does. The
+  earlier run's P1 (752 of 1,600) did not have the try-once. Nothing is lost
+  by it (shadow records nothing a teacher relies on), and contention like
+  this is far beyond a classroom's.
+- **Reading on matters from about 1 MB**: at the year's peak a read on costs
+  35 to 64 ms against 360 to 420 ms read whole. Refolding every kept line on
+  every read is about 30 ms of that at 10 MB, kept over a fold updated in
+  place for the reasons above. A read on just after another process wrote is
+  slower than half a second later (8.6 against 3.2 ms at 106 KB): the file is
+  being looked at right after it is written (Defender), measured, not fixed.
+- **A whole-file step's blobs dominate a hold**: written one at a time, 466
+  blobs held the lock 1.3 to 1.5 s, close to the 2 s a live waiter gives up
+  at; each blob's flush and move are about 0.8 ms each and do not shrink.
+  Four at a time holds it about 0.4 s. **W2b's door writes a step's blobs
+  with `WriteBlobs(contents, 4)`**; eight buys almost nothing more. The mac
+  measured 34 to 36 ms for the same step.
+- **OneDrive changes nothing W2a relies on**: in 120 s of a hold a second
+  inside it (115 holds, a blob each, every third blob deleted), the segment's
+  file index never changed, no read was ever refused for sharing (with no
+  retry at all), no delete failed, no conflict copy or other stray file
+  appeared, and the segment stayed a plain local file (`Archive` only, no
+  reparse point). The journal itself never lives there (`%LOCALAPPDATA%`).
+
+**What W2b needs from this.** The staged swap's OneDrive measurement is
+W2b's: the POSIX-semantics rename onto a page OneDrive is syncing, hard
+links (the identifier files use one), and pages that are Files On Demand
+placeholders (the OneDrive folders on this PC, `Documents` and `Pictures`,
+are reparse points: pages in them may not be on the disk at all until
+read). Blob writes are about 2.7 ms each one at a time, so a door should
+write a step's blobs together (`WriteBlobs`, 4), and the `begin` in the
+same hold. A closing refused by a busy lock is kept with
+`WriteClosingOrKeep`.
+
+### What Windows has built: W2b, the staged swap and the door (#899, #949)
+
+Piece W2b (branch `issue/899-w2b-staged-swap-door`, on W2a, 2026-11-20) is
+the half of the write side that changes pages: the staged swap, the door
+every step, undo and redo goes through, and the stack cases, traces and
+`stepCases` through that real door. Nothing a teacher sees changed and
+nothing in the app calls it: the switch stays off, no trail line, no tool or
+phrasing of the built-in assistant moved. The plan it was built from is
+`vm-tools/reference/899-w2b-plan.md`. Recovery is W3's: until it exists a
+dead process's step stays in flight exactly as the fold reads it (the
+door's hook points for it are marked in `UndoDoor`).
+
+- **`UndoSwap`** (`rule.stagedThenSwapped`). Every new content is STAGED
+  beside its target as `.<name>.plantoir-undo-<seq>-<apply|undo|redo>-new`
+  (`FileMode.CreateNew`, flushed); a staging write that fails removes the file
+  it was writing and every other, swaps nothing and refuses `couldNotWrite`
+  (U1's F1; `stepCases` `stagingFailsAt`). Then each target in the order the
+  check met it: the containment check (below); the target RE-READ with
+  delete sharing and never write access, which must still hold what the
+  check saw (a page deleted by hand just before its swap is changed since and
+  is not made again); a read-only page refused `couldNotWrite`, never forced
+  (the plan review's M4: today's publish refuses one too); the original kept
+  as `-orig` by `CreateHardLinkW` (a copy where the volume has no links, a
+  copy that fails for room or permission being `couldNotWrite`); the target's
+  attributes (Hidden, System, Archive, not indexed) and creation time copied
+  onto the staged file, because whatever the staged file carries the page
+  becomes (M4; Quartz dates a page with no `created:` by its file); then ONE
+  rename, the POSIX-semantics rename (`SetFileInformationByHandle`,
+  `FileRenameInfoEx`, `REPLACE_IF_EXISTS | POSIX_SEMANTICS`, the source opened
+  with DELETE), and `MoveFileEx(REPLACE_EXISTING | WRITE_THROUGH)` only when
+  that answers 87 or 50 (a network share, M5). A page that had no file is made
+  with a move that never replaces. A refused rename is tried six times 10 ms
+  apart (a paced retry, the director's fact 2 on #899: 0 of 2,000 lost with 10
+  tries), then `fileIsInUse` (an access-denied on a page that is not
+  read-only, or a sharing violation) and the swaps already made are reversed
+  from their originals. After the rename the kept original, a hard link and
+  so the page AS IT WAS at the rename, is read back and must be what the
+  check saw (the plan review's L4): an edit made in place between the re-read
+  and the rename shows there, and the step is reversed, which puts the edit
+  back, and refused as changed since; an original that cannot be read back is
+  `cannotTellNow`, never changed since. Once every swap is in, the originals
+  and anything staged are removed. An original whose reversal did not go in
+  is never removed: it is the page's old content under its staged name, for
+  recovery.
+- **Containment, links resolved** (`UndoPlaces`). Every place is checked to
+  be inside the working folder by the final path of an open handle
+  (`GetFinalPathNameByHandleW` on the deepest part that is there), never by
+  the spelling of the path, at the plan and again just before each re-read
+  and each rename. A folder on the path replaced by a junction to outside the
+  working folder since the check is changed since, and nothing is read, kept
+  or renamed through it.
+- **`UndoDoor`** (the mac's `JournaledWrite` and `UndoJournal.move`).
+  `Perform(UndoStepDraft)`: a step given as each file's before and after,
+  its ops worked out by the line model where it reproduces the change both
+  ways, otherwise `writeFile` (`UndoLineOps.ForAFile`, moved into the product
+  from the test with `JournaledSetting.SettingEntry`, the traces' writer).
+  `Perform(UndoOpsDraft)`: the one entry for every kind, a step given as its
+  ops, vetted first (it reads back readable, every path stays inside the
+  folder through its links, every blob is given or held) and planned forward
+  as a Redo plans it; an op of a kind this version cannot read yet (U2b's six
+  until W6) is refused `notReadable` before anything is written. Both:
+  phase one, ONE hold: the `folder-id` read or made, the blobs
+  (`WriteBlobs(contents, 4)`, W2a's measurement), the next number from the
+  fresh fold, the `begin` naming every op with this process's host, pid,
+  name and start moment (`WorkLease.StartMoment`, now internal), flushed;
+  phase two, outside the lock, the swap; phase three, `applied` (the redo
+  branch dropped then) or `failed` (phase begin, reason refused), with
+  pruning in the same hold, written by `WriteClosingOrKeep` with a 10-second
+  wait (the mac's `UndoSwitch.finishWaitSeconds`; the plan review's L6) and
+  kept by the process when the lock stays busy. `Undo()` and `Redo()`: the
+  offer inside the lock; every op checked outside it with nothing written
+  (`UndoCheck.Plan`, which now also gives the changes in the order it met
+  them, with what each held); inside again, still the one to move,
+  `undoing`/`redoing` flushed; the swap; `undone`/`redone` or `failed` with
+  its phase. `changedSince` and `contentMissing` clear the list for an Undo
+  (rulings 13 and 22) and drop the redo branch from that step up for a Redo
+  (ruling 20), whether the check or the swap found them; `fileIsInUse`,
+  `couldNotWrite` and `cannotTellNow` change nothing on the list; a folder
+  that cannot be reached is not available (ruling 10). A `recompute` is run by
+  a maintainer runner the door is given (`IUndoMaintainers`; W6 supplies the
+  app's): with none for its maintainer a step is not available, never undone
+  with its re-derivation skipped. `ClearTheListAsTheSwitchGoesLive` is the one
+  clearing at the flip. The test seams (`UndoSeams`: stop at a kill point, a
+  staging write that fails at an index, a hook before each swap) are an
+  object a caller makes, never a static.
+- **A step's blobs and its begin are one hold, and that hold never prunes**
+  (W2a's review, LOW 2). `WriteBlob` uses a blob already on the disk as it
+  is, and a blob nothing on the list names is deletable; a pruning between
+  storing (or finding) it and the begin that names it would delete it. The
+  door stores blobs only inside its begin hold and prunes only in the
+  closing hold, after the begin keeps them. `AStepsBlobsAndItsBeginAreOneHoldSoNoPruningCanTakeABlobItReuses`
+  goes red with a pruning put into the begin hold.
+- **Pruning's staged-file tidy.** When pruning closes a dead process's step
+  `interrupted` (reason `unsettled`) and the journal is live and the step's
+  folder can be reached, every `.plantoir-undo-<seq>-<apply|undo|redo>-…` file
+  beside the files it names is removed in the same hold; a folder that cannot
+  be reached keeps them for W3's first recovery that reaches it
+  (`knownLimits.stagedFilesOfAFolderAway`). Folders under a staged name are
+  U2's (W6) and are not touched.
+- **The scribe goes through the door.** `UndoScribe` now makes every step,
+  undo, redo and the clearing at the flip through `UndoDoor`; only the calls
+  that stand for ANOTHER process or version (`begin:held`, `finish:held`,
+  `begin:dead@B`, `foreign*`, `stepFromAnotherVersion:*`, `cleared:<reason>`,
+  `note`) write their lines raw, as the contract describes them. Every stack
+  case and trace W1 walks (the W6-held ones still held) runs through the
+  real door, lock, store and swap. `stepCases` (5) run in
+  `UndoStepContractTests` with the file in use at a swap a REAL holder
+  (`FileShare.ReadWrite`, no delete: the re-read succeeds, the rename is
+  refused 32) and the staging failure the seam (a real full volume needs an
+  administrator).
+- **W2a's review LOWs, fixed here**, each with a test that fails without it:
+  the writer folds into a COPY of the reading (`UndoFolded.Copy`), so a
+  not-fresh read on another thread never hands out an object a hold is
+  changing (1); the blobs-and-begin hold above (2); `AWaiterIsWokenByTheRelease`
+  waits on a real signal that the waiter's request is queued
+  (`UndoLock.Take`'s `whenQueued`), not a 300 ms delay (3);
+  `AReaderReadsOnWhileAWriterAppends` asserts a reading mid-writing and a
+  read-on (4); `UndoJournal`'s process memory is a required argument (5);
+  whether a folder reads on is judged by the file system of the volume the
+  folder is REALLY on (`GetVolumeInformationByHandleW` on a handle to it, a
+  final path through a share being "network"), not the drive letter's, so a
+  state folder reached through a link onto exFAT or a share reads whole (6;
+  its test makes a directory link on C: to `\\localhost\C$\…` and skips,
+  saying why, where the account cannot).
+
+**Tests:** `UndoSwapTests` (11), `UndoDoorTests` (11), `UndoStepContractTests`
+(6), every stack case and trace through the door; the Undo classes 546 on the
+PC (run `w2b-h1`: 545 passed, 1 skipped, the deny-listing ACE probe of W5). The whole unit suite on 8070e021c (run `w2b-full`): 4,730 tests, exactly the six known failures.
+Sixteen must-fail proofs, each red alone and green restored
+(`vm-tools/guest/899-w2b-mustfail.json`, runs `w2b-c2` and `w2b-h1`): MoveFileEx
+in place of the POSIX rename; a failed staging write leaving its file (two
+tests); attributes not copied; read-only not classified; no re-read (proved on
+a page deleted by hand: an edit in place is ALSO caught by the L4 hash, so
+the first proof of it stayed green); no L4 hash; no containment check at the
+swap; a refused swap not reversed; no unsettled tidy; and one for each LOW.
+
+**Measured** on a Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200),
+Release, by `Plantoir.UndoHarness` (`vm-tools/guest/899-w2b-pc-run.ps1 -Mode
+harness`), outside OneDrive (`C:\vm-setup\…\scratch`) and in a scratch folder
+made inside the PC's signed-in OneDrive (`C:\Users\lenov\OneDrive`, OneDrive.exe
+running, Files On Demand on) and removed after; nothing else there was
+touched (its top level was the same before and after).
+
+| What | Outside OneDrive | Inside OneDrive |
+|---|---|---|
+| A 1-page step through the door (begin, swap, applied), median of 20 | 15.9 ms | 25.9 ms |
+| Its undo | 20.7 ms | 33.8 ms |
+| A 233-page step (editLine ops, no blobs), median of 5 | 1,072 ms | 1,906 ms |
+| Its undo | 1,179 ms | 1,975 ms |
+| The swap alone, per page (233 pages) | 4.6 ms | 7.4 ms |
+| A swap onto a plain page | swapped, 43 ms (first in the folder) | swapped, 37 ms |
+| onto a page open in a program that shares delete (Obsidian's way) | swapped, 4.9 ms | swapped, 6.1 ms |
+| onto a page open in one that does not (Word's way) | `fileIsInUse` after the retries, 113 ms, page untouched | `fileIsInUse`, 105 ms, untouched |
+| onto a 4 MB page written a moment before (OneDrive uploading it) | swapped, 17 ms | swapped, 21 ms |
+| A hard link to a page | made | made |
+| Anything added beside the pages within 60 s (conflict copies, strays) | none | none |
+| A page made a cloud-only placeholder (unpinned, freed by OneDrive after 160 to 184 s: `Archive`, `Unpinned`, `RecallOnDataAccess`) | (none outside) | `cannotTellNow` in 4.5 ms: the re-read was refused 395 (`ERROR_CLOUD_FILE_ACCESS_DENIED`); the page untouched and still a placeholder, nothing staged, the list kept |
+| A hard link to such a placeholder | (none outside) | made; but a read through the link, and a read by the page's own name, were both refused 395 |
+
+**The two-process test**, a CHILD process making (or undoing) a 233-page step
+through the door, killed with `Process.Kill` at each point, every page then
+read by the parent:
+
+| Killed at | Pages old / new / torn | Staged files left | The journal says |
+|---|---|---|---|
+| after the begin | 233 / 0 / 0 | none | step 1 begun |
+| before the 117th swap | 117 / 116 / 0 | 233 (`1-apply`) | begun |
+| after the last swap, before `applied` | 0 / 233 / 0 | none | begun |
+| the moment the first page was seen changed (a race, no seam) | 230 / 3 / 0 | 234 | begun |
+| an undo, before its 117th swap | 116 / 117 / 0 | 233 (`1-undo`) | undoing |
+| an undo, the moment its first page changed | 86 / 147 / 0 | 234 | undoing |
+
+The same six inside OneDrive: the same counts, every page whole. So a death
+anywhere leaves every page wholly old or wholly new, never torn, and the
+journal names the step in flight and which way it was going; what it leaves
+is exactly what W3's recovery has to settle (put back or complete, by
+content) and tidy (the staged `-new` files and `-orig` links of that step's
+label).
+
+Read from it:
+
+- **A 233-page step costs about a second outside OneDrive and two inside**,
+  against the mac's 34 to 36 ms, and almost all of it is per-file work
+  OUTSIDE the lock (the begin hold of an editLine step is a single line): a
+  create, a flush and a close per staged file, a hard link, a re-read, an
+  attribute copy, a rename and a read-back per page. Nothing waits on the
+  lock for it; the teacher waits. Measured, not tuned: parallel staging is
+  the obvious lever if W7's actions find it slow.
+- **The POSIX-semantics rename is what makes Obsidian's open pages
+  swappable**: a holder that shares delete is swapped under in 5 to 6 ms, in
+  OneDrive too; one that does not is refused, the page untouched and named,
+  and the list left as it was.
+- **OneDrive changed no outcome** for a page that is on the disk: every case
+  came out as outside it, about 1.6 times slower, with no conflict copy and
+  nothing else beside the pages a minute later.
+- **A cloud-only placeholder is `cannotTellNow`, never changed since.** In
+  this measurement the harness ran over SSH, a logon session OneDrive's
+  client does not serve, so OneDrive would not download the page for it and
+  every read was refused 395. The swap refused at the re-read, before
+  anything was kept or renamed, with a word that keeps the list and is tried
+  again (`rule.recovery`). What a read in the TEACHER's own session does (the
+  page downloaded on the first read, then swapped as any other) is NOT
+  measured: it needs the PC's desktop session, and goes on W11b's list with
+  the two-process UI test. Either way no outcome can clear the list for a
+  page that was merely not on the disk: the re-read, and the read-back of the
+  kept original, answer `cannotTellNow` for a read that fails.
+
+**Known differences to KNOW** (not to do): the swap replaces a page's
+identity, so an explicit ACL or an alternate data stream (a `Zone.Identifier`)
+on a page is not carried over (the plan review's M4; rare for course pages,
+and APFS's rename behaves alike); an editor holding a page open and writing
+through that handle AFTER the rename writes into the old file, which the tidy
+then removes (Obsidian writes by opening the path afresh, so this is the
+L4-shaped race the hash catches only before the rename).
 
 ### The pieces still owed for #899 on Windows, and what each waits for
 
@@ -16390,9 +16775,9 @@ recording and the trail event `undo could not record a step` move to W7.
 
 | Piece | What | Waits for |
 |---|---|---|
-| W2a | `UndoLock` (`LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY` on a `CreateFileW` overlapped handle .NET never binds), `UndoStore` (segments, the LF-only append, the torn line cut inside the lock, reading on, blobs by a no-overwrite rename), pruning and deletion carried out, `UndoJournalLocation` | W1 merged |
-| W2b | `UndoSwap` (the POSIX-semantics rename, `MoveFileEx` only on 87 / not supported; the page's own attributes and creation time copied onto the staged file before its rename; the read-only bit classified; staged files removed on every failure path, F1), `UndoDoor` (step, undo, redo, refusal, clearing, dropping), `JournaledSetting`; `stepCases`, the stack cases and traces through the real door instead of the scribe | W2a merged |
-| W3 | recovery, the refused-swap schedule, `interrupted` and `unsettled` closed, staged files tidied; `recoveryCases`; the kill harness outside the gate; the ledger entry for `undo rolled back` out | W2b merged |
+| W2a | BUILT (2026-11-20, above): `UndoLock` (`LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY` on a `CreateFileW` overlapped handle .NET never binds), the store in `UndoJournal.WithLock` and `UndoJournalWriter` (segments, the LF-only append, the torn line cut inside the lock, reading on, blobs by a no-overwrite rename), pruning and deletion carried out, `UndoJournalLocation` | W1 merged |
+| W2b | BUILT (2026-11-20, above): `UndoSwap` (staged, then the POSIX-semantics rename, `MoveFileEx` only on 87/50; re-read, read-only refused, attributes and creation time kept, the kept original read back; staged files removed on every failure path, F1), `UndoPlaces` (containment by a handle's final path), `UndoDoor` (step, undo, redo, refusals, clearing, dropping; blobs and begin in one hold), `JournaledSetting`; `stepCases`, the stack cases and traces through the real door; pruning's tidy of an unsettled step's staged files | W2a merged |
+| W3 | recovery (run inside the door's begin hold and before every undo and redo: W2b marks the places), the refused-swap schedule, `interrupted` closed and its staged files tidied, the staged files of a step pruning closed `unsettled` while its folder was away; `recoveryCases`; the kill harness outside the gate; the ledger entry for `undo rolled back` out | W2b merged |
 | W4 | doc 12's step 7 and the scaffolding: where the list lives (following `--state-dir`), `madeBy` from `AssistWorkspace.Surface` (L1), the writer scan | W2a merged; no longer after W3 |
 | W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
 | W6 | the reserved op kinds and running `recompute` | the mac's U2 |
