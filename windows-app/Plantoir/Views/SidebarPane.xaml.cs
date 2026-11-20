@@ -578,7 +578,7 @@ public sealed partial class SidebarPane : UserControl
             string who = item.Maker switch
             {
                 BackupMaker.Assistant a => $"Assistant, Section {a.SectionNumber}",
-                BackupMaker.Menu m => $"Section menu, Section {m.SectionNumber}",
+                BackupMaker.Menu m => $"{SubjectMenuLayout.Title(m.InMenu)} menu, Section {m.SectionNumber}",
                 _ => "You",
             };
             string[] cells = { item.CourseCode, item.WhenDescription, who,

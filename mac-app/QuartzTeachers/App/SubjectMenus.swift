@@ -269,7 +269,7 @@ struct SectionMenu: Commands {
     /// label when the action requires more information before it can
     /// complete", Menus). The menu draws Preview with `previewItem`, titled
     /// by the setting; this is its resting title, for a menu path.
-    static func title(for item: SubjectMenuRules.Item) -> String {
+    static func title(for item: SubjectMenuRules.Item) -> String? {
         switch item {
         case .preview:
             return PreviewStartPageWording.preview
@@ -325,8 +325,21 @@ struct SectionMenu: Commands {
             return "Roll Over to a New Year…"
         case .getReadyForTheStartOfTheYear:
             return StartOfYearWording.menuItem
-        default:
-            return item.rawValue
+        case .sectionReviseWithClaude, .sectionReviseWithCodex, .sectionReviseWithCopilot,
+             .sectionReviseWithLocalAssistant:
+            // Drawn inside Revise With ▸ by `ReviseWithMenu`, which titles them.
+            return nil
+        case .openWorkingFolder, .openRecent, .newCourse, .importCoursesForReference, .restoreFromArchive,
+             .reloadCourses, .addSection, .copyAPage, .saveCourseSettings, .revertCourseSettings, .rename,
+             .setSchoolYear, .moveToGroup, .keepACopyForReference, .backUpNow, .restoreFromBackup,
+             .courseReviseWithClaude, .courseReviseWithCodex, .courseReviseWithCopilot,
+             .courseReviseWithLocalAssistant, .courseOpenInObsidian, .courseShowInFinder,
+             .courseNewTerminalAtFolder, .deleteBackup, .deleteArchive, .removeCourse,
+             .back, .forward, .reloadPage:
+            // File, Course and View items: not in Section or Classes. No
+            // `default`, so a new item does not compile until it is placed
+            // here or given its title (#990 review, LOW c).
+            return nil
         }
     }
 
@@ -387,22 +400,24 @@ struct SectionMenu: Commands {
             // has a shortcut with that key equivalent, the application's
             // shortcut wins", Services Implementation Guide), measured in
             // the running app (documentation/09 → "Mac conventions").
-            item(SectionMenu.title(for: .rebuildPreview), .rebuildPreview, enabled)
+            item("Rebuild Preview", .rebuildPreview, enabled)
                 .keyboardShortcut("y", modifiers: [.command, .shift])
         case .item(.deploy):
-            item(SectionMenu.title(for: .deploy), .deploy, enabled)
+            item("Deploy…", .deploy, enabled)
                 .keyboardShortcut("d", modifiers: [.command, .shift])
         case .item(.sectionOpenInObsidian):
             // ⇧⌘O sits on whichever Open in Obsidian is live: this one while
             // a SECTION row is selected (see CourseMenu).
-            item(SectionMenu.title(for: .sectionOpenInObsidian), .sectionOpenInObsidian, enabled)
+            item("Open in Obsidian", .sectionOpenInObsidian, enabled)
                 .keyboardShortcut(current.row == .section ? KeyboardShortcut("o", modifiers: [.command, .shift]) : nil)
         case .item(let plain):
             // No key on the rest. Undo Last Change in particular: ⌘Z
             // belongs to text editing in Edit, and a key that took back a
             // page change from inside a text field would be a surprise
             // nobody could undo.
-            item(SectionMenu.title(for: plain), plain, enabled)
+            // A layout item with no title draws its raw name, and
+            // `SubjectMenuLayoutTests` fails on it.
+            item(SectionMenu.title(for: plain) ?? plain.rawValue, plain, enabled)
         }
     }
 

@@ -116,7 +116,9 @@ final class SectionVerbs {
         let before: SectionKey? = currentLastChange()
         let changesBefore: Int = toolRunner.changeCount
         let writesBefore: Int = toolRunner.writesWithNoNewUndoEntry
+        toolRunner.menuMakingTheChange = SubjectMenuLayout.menu(containing: item) ?? .section
         let outcome: AssistToolOutcome = await toolRunner.run(call: call)
+        toolRunner.menuMakingTheChange = .section
         let changesAfter: Int = toolRunner.changeCount
         let writesAfter: Int = toolRunner.writesWithNoNewUndoEntry
         lastChange = currentLastChange()
@@ -211,10 +213,10 @@ final class SectionVerbs {
     /// holds it, from `SubjectMenuLayout` (#990: Section or Classes), and
     /// the title it is drawn with there.
     static func menuPath(of item: SubjectMenuRules.Item) -> String {
-        if SubjectMenuLayout.menu(containing: item) == nil {
+        guard SubjectMenuLayout.menu(containing: item) != nil, let title = SectionMenu.title(for: item) else {
             return item.rawValue
         }
-        return SubjectMenuLayout.path(of: item, titled: SectionMenu.title(for: item))
+        return SubjectMenuLayout.path(of: item, titled: title)
     }
 
     // MARK: - The calls, built in code

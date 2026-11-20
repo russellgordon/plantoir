@@ -1835,16 +1835,21 @@ nonisolated enum ActivityTrail {
     }
 
     /// The words for `sectionMenuBackedUpACourse` (#457): the copy the
-    /// Section menu saves before each change it makes.
-    static func sectionMenuBackedUpLine(fileName: String, bytes: Int64, seconds: Double) -> String {
+    /// Section or Classes menu saves before each change it makes, naming the
+    /// menu the item is in (#990, "name the real menu"). The event keeps its
+    /// name from before the split.
+    static func sectionMenuBackedUpLine(
+        fileName: String, bytes: Int64, seconds: Double, inMenu: SubjectMenuLayout.Menu = .section
+    ) -> String {
         let megabytes: String = String(format: "%.1f", Double(bytes) / 1_000_000)
         let took: String = String(format: "%.1f", seconds)
-        return "the Section menu backed up the course as \(fileName) (\(megabytes) MB, \(took) s)"
+        let menu: String = SubjectMenuLayout.title(of: inMenu)
+        return "the \(menu) menu backed up the course as \(fileName) (\(megabytes) MB, \(took) s)"
     }
 
-    /// The words for a Section menu backup that could not be made.
-    static func sectionMenuCouldNotBackUpLine(reason: String) -> String {
-        return "the Section menu could not back up the course: \(reason)"
+    /// The words for a menu backup that could not be made.
+    static func sectionMenuCouldNotBackUpLine(reason: String, inMenu: SubjectMenuLayout.Menu = .section) -> String {
+        return "the \(SubjectMenuLayout.title(of: inMenu)) menu could not back up the course: \(reason)"
     }
 
     /// Where a start-of-the-year act was asked from, in the trail's words.

@@ -753,7 +753,7 @@
      ],
      "pictures": [
       {
-       "shows": "The Section menu open on Add Class…",
+       "shows": "The Classes menu open on Add Class…",
        "labels": [
         "Add Class…"
        ],
@@ -811,7 +811,7 @@
       "Tick the pages in the list (columns Page, Folder, Date) and press Continue",
       "Read the plan, then press Publish (or Hide)",
       "Section > Publish Class for a Date… does a whole class at once (link publish-class-for-date)",
-      "Section > Undo Last Change takes back the last change made from the Section menu in this window (not the assistant's, not another window's)",
+      "Section > Undo Last Change takes back the last change made from the Section or Classes menu in this window (not the assistant's, not another window's)",
       "Deploy the section so students see the change"
      ],
      "pictures": [
@@ -4086,7 +4086,7 @@
      "about": "Back Up Now, the Backups group and All Backups, the backups Plantoir makes by itself, Restore from Backup, Delete Backup.",
      "steps": [
       "Select the course: Course > Back Up Now (or right-click the course)",
-      "Plantoir also saves a copy by itself before every Section menu change, Get Ready for the Start of the Year, a unit-word rename, Copy a Page into a course and Replace It…",
+      "Plantoir also saves a copy by itself before every change from the Section or Classes menu, Get Ready for the Start of the Year, a unit-word rename, Copy a Page into a course and Replace It…",
       "The Backups group in the sidebar, and All Backups: who made each, its size, what Plantoir keeps",
       "Select a backup's row, then Course > Restore from Backup…; the version you have now moves to Archived",
       "Delete Backup… deletes one for good"

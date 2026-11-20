@@ -50,7 +50,7 @@ final class SubjectMenuLayoutTests: XCTestCase {
     /// What the real menu should read, line by line, from the layout: each
     /// item's title, "Revise With" for the submenu, and "----" between
     /// groups. Preview reads back in its resting form, as the golden does.
-    static func expectedLines(of menu: SubjectMenuLayout.Menu) -> [String] {
+    static func expectedLines(of menu: SubjectMenuLayout.Menu) throws -> [String] {
         var lines: [String] = []
         var isFirstGroup: Bool = true
         for group in SubjectMenuLayout.groups(of: menu) {
@@ -61,7 +61,7 @@ final class SubjectMenuLayoutTests: XCTestCase {
             for entry in group {
                 switch entry {
                 case .item(let item):
-                    lines.append(SectionMenu.title(for: item))
+                    lines.append(try XCTUnwrap(SectionMenu.title(for: item), "\(item) is in the layout with no title"))
                 case .submenu(let submenu):
                     lines.append(SubjectMenuLayout.title(of: submenu))
                 }
@@ -187,7 +187,7 @@ final class SubjectMenuLayoutTests: XCTestCase {
             let title: String = SubjectMenuLayout.title(of: menu)
             let real: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: title), "no \(title) menu in the menu bar")
             XCTAssertEqual(
-                SubjectMenuLayoutTests.actualLines(of: real), SubjectMenuLayoutTests.expectedLines(of: menu),
+                SubjectMenuLayoutTests.actualLines(of: real), try SubjectMenuLayoutTests.expectedLines(of: menu),
                 "\(title) against subjectMenus.layout"
             )
         }
@@ -228,7 +228,7 @@ final class SubjectMenuLayoutTests: XCTestCase {
             let title: String = SubjectMenuLayout.title(of: menu)
             let real: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: title))
             let lines: [String] = SubjectMenuLayoutTests.actualLines(of: real)
-            XCTAssertEqual(lines, SubjectMenuLayoutTests.expectedLines(of: menu), "\(title) hides something")
+            XCTAssertEqual(lines, try SubjectMenuLayoutTests.expectedLines(of: menu), "\(title) hides something")
             var live: [String] = []
             var stack: [NSMenu] = [real]
             while let current = stack.popLast() {
@@ -292,6 +292,42 @@ final class SubjectMenuLayoutTests: XCTestCase {
         XCTAssertEqual(SectionVerbs.menuPath(of: .publishPages), "Section ▸ Publish Pages…")
         XCTAssertEqual(SectionVerbs.menuPath(of: .undoLastChange), "Section ▸ Undo Last Change")
         XCTAssertEqual(SectionVerbs.menuPath(of: .rebuildPreview), "Section ▸ Rebuild Preview")
+    }
+
+    /// Russell's ruling "name the real menu" (#990): the copy's trail line
+    /// names the menu the item is in, as `activityTrail.mustRecord` →
+    /// "section menu backed up a course" → `lineCases` says. MUST FAIL with
+    /// the line's menu typed as Section.
+    func testTheMenusCopyLineNamesTheRealMenu() throws {
+        let trail: [String: Any] = try SharedRulesContractTests.section("activityTrail")
+        let events: [[String: Any]] = try XCTUnwrap(trail["mustRecord"] as? [[String: Any]])
+        var cases: [[String: Any]] = []
+        for event in events where event["event"] as? String == "section menu backed up a course" {
+            cases = try XCTUnwrap(event["lineCases"] as? [[String: Any]])
+        }
+        XCTAssertEqual(cases.count, 4)
+        for testCase in cases {
+            let inMenu: SubjectMenuLayout.Menu = try XCTUnwrap(SubjectMenuLayout.Menu(rawValue: try XCTUnwrap(testCase["menu"] as? String)))
+            if let file = testCase["file"] as? String {
+                let line: String = ActivityTrail.sectionMenuBackedUpLine(fileName: file, bytes: 1_000_000, seconds: 2, inMenu: inMenu)
+                XCTAssertTrue(line.hasPrefix(try XCTUnwrap(testCase["startsWith"] as? String)), line)
+            } else {
+                let reason: String = try XCTUnwrap(testCase["reason"] as? String)
+                XCTAssertEqual(ActivityTrail.sectionMenuCouldNotBackUpLine(reason: reason, inMenu: inMenu), testCase["line"] as? String)
+            }
+        }
+        XCTAssertEqual(SubjectMenuLayout.eitherMenu, "Section or Classes")
+        XCTAssertTrue(AssistWording.nothingToUndoFromTheMenu.contains("the Section or Classes menu"))
+    }
+
+    /// The Backups list's column names the menu that made the copy.
+    func testTheBackupsColumnNamesTheRealMenu() {
+        let view: AllBackupsView = AllBackupsView()
+        let classes: BackupItem = BackupItem(
+            courseCode: "ICS3U", backedUpAt: Date(), fileURL: URL(fileURLWithPath: "/x/ICS3U_backup_2026-08-11_221530_classes-section2.zip"),
+            maker: .menu(sectionNumber: 2, inMenu: .classes)
+        )
+        XCTAssertEqual(view.madeBy(classes), "The Classes menu, Section 2")
     }
 
     /// #990's ellipsis ruling: a command that only asks for a confirmation

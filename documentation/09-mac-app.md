@@ -7918,10 +7918,30 @@ on the section row's right-click menu
 **Menu paths.** `help/menu-paths.json`, `help/outline.json`, the two menu
 sentences that named Section ▸ Class Dates… (`menuNeedsClassDatesFirst`,
 `menuRollOverDatesAreOld`) and the comments that named the five moved items
-say Classes now. A club's twins of those two sentences never say "class"
-(`ClubNounTests.testEveryMeetingKeyHasItsClassTwin`), and the menu's own
-title does, so they point at "the menu after Section in the menu bar". The
+say Classes now. A club's twins of those two sentences name "the Classes menu"
+(below). The
 three Undo sentences that name Section ▸ Undo Last Change are U7's and stay.
+
+**Name the real menu** (Russell, 2026-11-20, on #990). A sentence that says
+where a change came from names the menu the action is in, read from
+`SubjectMenuLayout`, never typed: the copy saved before a Classes item is
+`<CODE>_backup_<stamp>_classes-section<N>.zip`, listed as "before a change
+from the Classes menu to Section N" ("The Classes menu, Section N" in the
+Backups window), and its trail line reads "the Classes menu backed up the
+course as …". A Section item's copy keeps `_menu-section<N>`, the name every
+menu copy had before the split, so an older copy reads as it was written.
+`SectionVerbs.perform` tells the runner the item's menu for one call
+(`AssistToolRunner.menuMakingTheChange`). The menus' copies are pruned
+together, five between them (`course-management.json` → `backups.pruneCases`,
+`zipNames`). A sentence that covers both menus says "the Section or Classes
+menu" (`SubjectMenuLayout.eitherMenu`): `nothingToUndoFromTheMenu`,
+`sectionIsChangingFromTheMenu` and the Help pages' Undo and greyed-item
+lines. The club's two sentences name "the Classes menu" too: a club's menu
+bar says Classes as well, and `ClubNounTests` takes a menu's own title out
+before it looks for "class". A released app before #990 does not know the
+`classes-section` piece and leaves such a copy unlisted, as `zipNames` does
+with any maker it does not know. Get Ready for the Start of the Year… saves
+the teacher's own kind of copy ("made by you"), as before.
 
 ### The shape: one focused value per OWNER of the state
 

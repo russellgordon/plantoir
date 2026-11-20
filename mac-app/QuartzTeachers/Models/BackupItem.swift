@@ -17,12 +17,16 @@ enum BackupMaker: Hashable {
     /// conversation about this section.
     case assistant(sectionNumber: Int)
 
-    /// The Section menu made it, before one change it made to this section
-    /// (#457 batch B) — Publish Pages…, Hide Pages… and the rest of the
-    /// assistant's functions, run from the menu. One per change, so the menu
-    /// clears up after itself the way the assistant does: its five most
-    /// recent of a course are kept, counted apart from the assistant's.
-    case menu(sectionNumber: Int)
+    /// The Section or Classes menu made it, before one change it made to
+    /// this section (#457 batch B) — Publish Pages…, Hide Pages… and the rest
+    /// of the assistant's functions, run from the menu. One per change, so
+    /// the menus clear up after themselves the way the assistant does: their
+    /// five most recent of a course are kept, counted apart from the
+    /// assistant's. `inMenu` is the menu the item is in
+    /// (`SubjectMenuLayout`, #990, Russell's ruling "name the real menu"):
+    /// a Section copy is named `_menu-section<N>`, as every menu copy was
+    /// until #990, and a Classes copy `_classes-section<N>`.
+    case menu(sectionNumber: Int, inMenu: SubjectMenuLayout.Menu = .section)
 
     // MARK: - Computed properties
 
@@ -35,8 +39,8 @@ enum BackupMaker: Hashable {
             return ""
         case .assistant(let sectionNumber):
             return "_assistant-section\(sectionNumber)"
-        case .menu(let sectionNumber):
-            return "_menu-section\(sectionNumber)"
+        case .menu(let sectionNumber, let inMenu):
+            return "_" + BackupMaker.namePrefix(of: inMenu) + "\(sectionNumber)"
         }
     }
 
@@ -47,8 +51,8 @@ enum BackupMaker: Hashable {
             return "made by you"
         case .assistant(let sectionNumber):
             return "before an assistant chat about Section \(sectionNumber)"
-        case .menu(let sectionNumber):
-            return "before a change from the Section menu to Section \(sectionNumber)"
+        case .menu(let sectionNumber, let inMenu):
+            return "before a change from the \(SubjectMenuLayout.title(of: inMenu)) menu to Section \(sectionNumber)"
         }
     }
 
@@ -64,13 +68,28 @@ enum BackupMaker: Hashable {
                 return .assistant(sectionNumber: sectionNumber)
             }
         }
-        let menuPrefix: String = "menu-section"
-        if piece.hasPrefix(menuPrefix) {
-            if let sectionNumber = Int(piece.dropFirst(menuPrefix.count)) {
-                return .menu(sectionNumber: sectionNumber)
+        for inMenu in SubjectMenuLayout.Menu.allCases {
+            let menuPrefix: String = namePrefix(of: inMenu)
+            if piece.hasPrefix(menuPrefix) {
+                if let sectionNumber = Int(piece.dropFirst(menuPrefix.count)) {
+                    return .menu(sectionNumber: sectionNumber, inMenu: inMenu)
+                }
             }
         }
         return nil
+    }
+
+    /// The piece of the name before the section number for a menu's copy:
+    /// "menu-section" for Section (every menu copy before #990 reads as
+    /// Section's, which is what it was written with) and "classes-section"
+    /// for Classes (`course-management.json` → `zipNames`).
+    static func namePrefix(of inMenu: SubjectMenuLayout.Menu) -> String {
+        switch inMenu {
+        case .section:
+            return "menu-section"
+        case .classes:
+            return "classes-section"
+        }
     }
 }
 
@@ -145,8 +164,9 @@ struct BackupItem: Identifiable, Hashable {
             return "You made this one, so it is kept until you delete it."
         case .assistant:
             return "The assistant made this one; its five most recent are kept."
-        case .menu:
-            return "The Section menu made this one before a change; its five most recent are kept."
+        case .menu(_, let inMenu):
+            return "The \(SubjectMenuLayout.title(of: inMenu)) menu made this one before a change; "
+                + "the five most recent the Section and Classes menus made are kept."
         }
     }
 

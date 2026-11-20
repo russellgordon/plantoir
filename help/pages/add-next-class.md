@@ -98,13 +98,13 @@ Give the dates there. When you press {{control:rememberTheseDates}}, the sheet t
 
 Select the section and choose {{menu:undoLastChange}}. The new page is deleted, unless you have written in it since. A page you have changed is kept, and the sheet says so. This is the same for all three ways.
 
-This works while adding the page is still the last change made from the Section menu in this window. [Show or hide pages for a section](page:publish-pages) has the rules for Undo Last Change.
+This works while adding the page is still the last change made from the Section or Classes menu in this window. [Show or hide pages for a section](page:publish-pages) has the rules for Undo Last Change.
 
 The copy of the course that Plantoir saved first is in its list of backups. See [Back up a course and restore it](page:backups).
 
 ## If it does not work
 
-- **{{menu:addClass}} is greyed.** The course may be kept for reference. Or the section is busy. It is being deployed, a copy of the course is being saved, or another command from the Section menu is still running in this window.
+- **{{menu:addClass}} is greyed.** The course may be kept for reference. Or the section is busy. It is being deployed, a copy of the course is being saved, or another Section or Classes command is still running here.
 - **A way on the sheet is greyed.** A line under the ways says why. There are three reasons.
   - The course has no units:
     {{say:assist-wording#wording.menuAddClassGreyedNoUnits}}

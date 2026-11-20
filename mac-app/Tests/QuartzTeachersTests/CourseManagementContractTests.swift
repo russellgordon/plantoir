@@ -34,10 +34,23 @@ final class CourseManagementContractTests: XCTestCase {
                 XCTAssertNil(archive, "\(name) must NOT also read as an archive")
                 CourseManagementContractTests.assertMoment(backup?.backedUpAt, is: testCase["moment"] as? String, in: name)
                 if let expectedSection = testCase["section"] as? Int, testCase["maker"] as? String == "menu" {
+                    // #990: which menu made it rides in the name too, and the
+                    // Backups list says so (Russell: name the real menu).
+                    let menuName: String = testCase["menu"] as? String ?? "section"
+                    let inMenu: SubjectMenuLayout.Menu = try XCTUnwrap(SubjectMenuLayout.Menu(rawValue: menuName), name)
                     XCTAssertEqual(
-                        backup?.maker, .menu(sectionNumber: expectedSection),
-                        "\(name): the Section menu's own backups say so in the name (#457)"
+                        backup?.maker, .menu(sectionNumber: expectedSection, inMenu: inMenu),
+                        "\(name): the menu's own backups say so in the name (#457, #990)"
                     )
+                    if let words = testCase["description"] as? String {
+                        XCTAssertEqual(backup?.maker.description, words, name)
+                        XCTAssertEqual(backup?.keptDescription, testCase["kept"] as? String, name)
+                        let made: BackupMaker = try XCTUnwrap(backup?.maker)
+                        XCTAssertEqual(
+                            code + "_backup_2026-08-11_221530" + made.nameSuffix + ".zip", name,
+                            "the name is written as it is read"
+                        )
+                    }
                 } else if let expectedSection = testCase["section"] as? Int {
                     XCTAssertEqual(
                         backup?.maker, .assistant(sectionNumber: expectedSection),

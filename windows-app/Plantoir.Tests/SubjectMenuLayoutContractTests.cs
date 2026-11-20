@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Item = Plantoir.Core.Models.SubjectMenuRules.Item;
 
@@ -101,6 +102,53 @@ public class SubjectMenuLayoutContractTests
         Assert.Equal(SubjectMenuLayout.Menu.Classes, SubjectMenuLayout.MenuContaining(Item.ClassDates));
         Assert.Equal(SubjectMenuLayout.Menu.Section, SubjectMenuLayout.MenuContaining(Item.SectionReviseWithCodex));
         Assert.Null(SubjectMenuLayout.MenuContaining(Item.AddSection));
+    }
+
+    /// <summary>
+    /// Every item of the two menus has its words and its own AutomationId here
+    /// (#990 review, LOW c: a missing title was drawn as the item's name).
+    /// MUST FAIL with a title taken out of <see cref="SubjectMenuLayout.TitleHere"/>.
+    /// </summary>
+    [Fact]
+    public void EveryItemOfTheTwoMenusHasItsWordsAndItsOwnId()
+    {
+        var ids = new List<string>();
+        foreach (var menu in Enum.GetValues<SubjectMenuLayout.Menu>())
+            foreach (var group in SubjectMenuLayout.Groups(menu))
+                foreach (var entry in group)
+                    if (entry is SubjectMenuLayout.Entry.OfItem(var item))
+                    {
+                        Assert.False(string.IsNullOrEmpty(SubjectMenuLayout.TitleHere(item)), $"{item} is in {menu} with no words");
+                        ids.Add(SubjectMenuLayout.AutomationIdHere(menu, item));
+                    }
+        Assert.Equal(ids.Count, ids.Distinct().Count());
+        Assert.Null(SubjectMenuLayout.TitleHere(Item.Rename));
+    }
+
+    /// <summary>
+    /// Russell's ruling "name the real menu" (#990): the menu's copy's trail
+    /// line names the menu the item is in (<c>activityTrail.mustRecord</c> →
+    /// "section menu backed up a course" → <c>lineCases</c>), and the sentences
+    /// that cover both name both. MUST FAIL with the line's menu typed as Section.
+    /// </summary>
+    [Fact]
+    public void TheMenusCopyLineNamesTheRealMenu()
+    {
+        var events = ContractLoader.LoadJson("shared-rules.json")["activityTrail"]!["mustRecord"]!.AsArray();
+        var cases = events.Single(e => e!["event"]!.ToString() == "section menu backed up a course")!["lineCases"]!.AsArray();
+        Assert.Equal(4, cases.Count);
+        foreach (var c in cases)
+        {
+            var menu = AssistWorkspace.MenuNamed(c!["menu"]!.ToString());
+            Assert.Equal(c["menu"]!.ToString(), SubjectMenuLayout.ContractName(menu));
+            if (c["file"]?.ToString() is { } file)
+                Assert.StartsWith(c["startsWith"]!.ToString(), AssistWorkspace.MenuBackedUpLine(menu, file, 1.0, 2.0));
+            else
+                Assert.Equal(c["line"]!.ToString(), AssistWorkspace.MenuCouldNotBackUpLine(menu, c["reason"]!.ToString()));
+        }
+        Assert.Equal("Section or Classes", SubjectMenuLayout.EitherMenu);
+        Assert.Contains("the Section or Classes menu", AssistWording.NothingToUndoFromTheMenu);
+        Assert.Contains("the Section or Classes menu", AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1"));
     }
 
     /// <summary>Windows' menu bar order is the contract's, Classes after Section.</summary>

@@ -2908,7 +2908,7 @@ class WorkspaceModel {
             madeFor = nil
         case .assistant(let sectionNumber):
             madeFor = sectionNumber
-        case .menu(let sectionNumber):
+        case .menu(let sectionNumber, _):
             madeFor = sectionNumber
         }
         guard let sectionNumber = madeFor else {
@@ -3061,7 +3061,7 @@ class WorkspaceModel {
             madeFor = nil
         case .assistant(let number):
             madeFor = number
-        case .menu(let number):
+        case .menu(let number, _):
             madeFor = number
         }
         if madeFor != sectionNumber {

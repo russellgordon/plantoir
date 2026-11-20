@@ -133,9 +133,10 @@ internal sealed class SectionVerbDialog
     /// holds it, from <see cref="SubjectMenuLayout"/> (#990: Section or
     /// Classes), and the words it is drawn with there.
     /// </summary>
-    internal static string MenuPath(Item item) => SubjectMenuLayout.MenuContaining(item) is null
-        ? item.ToString()
-        : SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleHere(item));
+    internal static string MenuPath(Item item) =>
+        SubjectMenuLayout.MenuContaining(item) is not null && SubjectMenuLayout.TitleHere(item) is { } title
+            ? SubjectMenuLayout.Path(item, title)
+            : item.ToString();
 
     // ---- Opening it, per item ---------------------------------------------------
 
@@ -814,7 +815,8 @@ internal sealed class SectionVerbDialog
     private async Task RunPlan(JsonObject planCall)
     {
         ShowWorking(AssistWording.MenuWorking);
-        var answer = await _verbs.Perform(planCall, MenuPath(_item), _course.Code, _section, Counts());
+        var answer = await _verbs.Perform(planCall, MenuPath(_item), _course.Code, _section, Counts(),
+                                          menu: SubjectMenuLayout.MenuContaining(_item));
         if (answer.IsPlan)
         {
             // The table when the menu's server sent one (#548); the text card
@@ -839,6 +841,7 @@ internal sealed class SectionVerbDialog
         ShowWorking(AssistWording.MenuWorking);
         string savingACopy = AssistWording.MenuSavingACopy(_course.Code);
         var answer = await _verbs.Perform(call, MenuPath(_item), _course.Code, _section, Counts(),
+            menu: SubjectMenuLayout.MenuContaining(_item),
             progress: note => _dialog.DispatcherQueue?.TryEnqueue(() =>
             {
                 if (_stage == Stage.Working && _workingWords is not null)

@@ -679,8 +679,17 @@ public class ContractTests
                     }
                     else if (expectedMaker == "menu")
                     {
-                        Assert.IsType<BackupMaker.Menu>(backup!.Maker);
-                        Assert.Equal(c["section"]!.GetValue<int>(), ((BackupMaker.Menu)backup.Maker).SectionNumber);
+                        var menu = Assert.IsType<BackupMaker.Menu>(backup!.Maker);
+                        Assert.Equal(c["section"]!.GetValue<int>(), menu.SectionNumber);
+                        // #990: which menu made it rides in the name, and the Backups list says so.
+                        string menuName = c["menu"]?.ToString() ?? "section";
+                        Assert.Equal(menuName, SubjectMenuLayout.ContractName(menu.InMenu));
+                        if (c["description"]?.ToString() is { } words)
+                        {
+                            Assert.Equal(words, menu.Description);
+                            Assert.Equal(c["kept"]!.ToString(), backup.KeptDescription);
+                            Assert.Equal(name, "ICS3U_backup_2026-08-11_221530" + menu.NameSuffix + ".zip");
+                        }
                     }
                     else
                     {

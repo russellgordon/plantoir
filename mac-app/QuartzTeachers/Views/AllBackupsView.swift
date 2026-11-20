@@ -270,8 +270,8 @@ struct AllBackupsView: View {
             return "You"
         case .assistant(let sectionNumber):
             return "The assistant, Section \(sectionNumber)"
-        case .menu(let sectionNumber):
-            return "The Section menu, Section \(sectionNumber)"
+        case .menu(let sectionNumber, let inMenu):
+            return "The \(SubjectMenuLayout.title(of: inMenu)) menu, Section \(sectionNumber)"
         }
     }
 

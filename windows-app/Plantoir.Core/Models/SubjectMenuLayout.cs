@@ -117,7 +117,7 @@ public static class SubjectMenuLayout
     /// Deploy carry no ellipsis since #990: a command that only asks for a
     /// confirmation takes none.
     /// </summary>
-    public static string TitleHere(Item item) => item switch
+    public static string? TitleHere(Item item) => item switch
     {
         Item.Preview => "Preview",
         Item.RebuildPreview => "Rebuild Preview",
@@ -140,7 +140,7 @@ public static class SubjectMenuLayout
         Item.ReDateClasses => "Re-date Classes…",
         Item.MakeRoomForClasses => "Make Room for Classes…",
         Item.GetReadyForTheStartOfTheYear => StartOfYearWording.MenuItem,
-        _ => item.ToString(),
+        _ => null,   // not an item of Section or Classes: SubjectMenuLayoutContractTests fails on a layout item with none (#990 review, LOW c)
     };
 
     /// <summary>
@@ -177,6 +177,13 @@ public static class SubjectMenuLayout
         };
         return ContractName(layout) + own;
     }
+
+    /// <summary>
+    /// "Section or Classes": the two menus' titles in the layout's order, for a
+    /// sentence that covers a change from either (#990, Russell's ruling "name
+    /// the real menu").
+    /// </summary>
+    public static string EitherMenu => string.Join(" or ", Enum.GetValues<Menu>().Select(Title));
 
     /// <summary>
     /// Where an item is, the way the trail says it: "Classes ▸ Class Dates…".

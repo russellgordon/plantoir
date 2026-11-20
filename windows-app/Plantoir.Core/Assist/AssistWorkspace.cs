@@ -3307,23 +3307,47 @@ public sealed partial class AssistWorkspace
         try
         {
             made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
-                                               new BackupMaker.Menu(sectionNumber));
+                                               new BackupMaker.Menu(sectionNumber, MenuOfTheChange));
         }
         catch (Exception error)
         {
             ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
-                $"the Section menu could not back up the course: {error.Message}", course.Code, sectionNumber);
+                MenuCouldNotBackUpLine(MenuOfTheChange, error.Message), course.Code, sectionNumber);
             throw;
         }
         double megabytes = 0;
         try { megabytes = new FileInfo(made).Length / (1024.0 * 1024.0); } catch { }
         ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
-            $"the Section menu backed up the course as {Path.GetFileName(made)} " +
-            $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
-            $"{clock.Elapsed.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)",
+            MenuBackedUpLine(MenuOfTheChange, Path.GetFileName(made), megabytes, clock.Elapsed.TotalSeconds),
             course.Code, sectionNumber);
         return made;
     }
+
+    /// <summary>
+    /// On the menu's server: the menu the running item is in (#990, Russell's
+    /// ruling "name the real menu"), sent by the window in the call's
+    /// <c>_meta</c> (<see cref="MenuMetaKey"/>) and set for one call by
+    /// <c>plantoir-mcp</c>'s filter, so the copy and its trail line name
+    /// Section or Classes. Section otherwise.
+    /// </summary>
+    public SubjectMenuLayout.Menu MenuOfTheChange { get; set; } = SubjectMenuLayout.Menu.Section;
+
+    /// <summary>The key in a tools/call request's <c>_meta</c> that names the menu (its contract name).</summary>
+    public const string MenuMetaKey = "plantoirMenu";
+
+    /// <summary>The menu named by a <c>_meta</c> value, or Section.</summary>
+    public static SubjectMenuLayout.Menu MenuNamed(string? contractName) =>
+        Enum.GetValues<SubjectMenuLayout.Menu>().FirstOrDefault(menu => SubjectMenuLayout.ContractName(menu) == contractName);
+
+    /// <summary>"the Classes menu backed up the course as …" (<c>activityTrail.mustRecord</c> → <c>lineCases</c>).</summary>
+    public static string MenuBackedUpLine(SubjectMenuLayout.Menu menu, string fileName, double megabytes, double seconds) =>
+        $"the {SubjectMenuLayout.Title(menu)} menu backed up the course as {fileName} " +
+        $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
+        $"{seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)";
+
+    /// <summary>"the Classes menu could not back up the course: …".</summary>
+    public static string MenuCouldNotBackUpLine(SubjectMenuLayout.Menu menu, string reason) =>
+        $"the {SubjectMenuLayout.Title(menu)} menu could not back up the course: {reason}";
 
     /// <summary>
     /// The one door every assistant zip goes through — the conversation's first

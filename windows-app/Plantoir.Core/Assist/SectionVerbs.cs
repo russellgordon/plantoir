@@ -175,9 +175,12 @@ public sealed class SectionVerbs : IAsyncDisposable
     /// False for the hide the question at Deploy makes (#475): no preview is
     /// stopped before it or started after it (<see cref="AssistToolRunner.PreviewFollowsAChange"/>).
     /// </param>
+    /// <param name="menu">The menu the item is in (<see cref="SubjectMenuLayout.MenuContaining"/>),
+    /// sent to the server so the copy it saves names it (#990); Section when null.</param>
     public async Task<AssistToolAnswer> Perform(JsonObject call, string item, string course, int section,
                                                 string? counts = null, CancellationToken cancellation = default,
-                                                Action<string>? progress = null, bool previewFollows = true)
+                                                Action<string>? progress = null, bool previewFollows = true,
+                                                SubjectMenuLayout.Menu? menu = null)
     {
         string name = call["function"]?["name"]?.GetValue<string>() ?? "";
         bool writes = AssistToolRunner.IsWriteTool(name);
@@ -204,7 +207,10 @@ public sealed class SectionVerbs : IAsyncDisposable
                 if (server is null) return AssistToolAnswer.Same(CouldNotBeDone);
                 var runner = _runnerFor(course, section, progress is null ? server : new Relaying(server, progress));
                 runner.PreviewFollowsAChange = previewFollows;
-                (answer, _) = await runner.Run(call, cancellation);
+                if (server is IHearsTheMenu hears)
+                    hears.MenuOfTheNextCalls = SubjectMenuLayout.ContractName(menu ?? SubjectMenuLayout.Menu.Section);
+                try { (answer, _) = await runner.Run(call, cancellation); }
+                finally { if (server is IHearsTheMenu heard) heard.MenuOfTheNextCalls = null; }
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {

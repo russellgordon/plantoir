@@ -36,10 +36,21 @@ public abstract record BackupMaker
     /// <c>_assistant-section</c>: a teacher who declined the assistant must not
     /// find a copy said to be from a chat they never had.
     /// </summary>
-    public sealed record Menu(int SectionNumber) : BackupMaker
+    /// <remarks>
+    /// <paramref name="InMenu"/> is the menu the item is in (#990, Russell's
+    /// ruling "name the real menu"; <c>subjectMenus.layout</c>): a Section copy
+    /// is named <c>_menu-section&lt;N&gt;</c>, as every menu copy was before
+    /// the split, a Classes copy <c>_classes-section&lt;N&gt;</c>
+    /// (<c>course-management.json</c> → <c>zipNames</c>).
+    /// </remarks>
+    public sealed record Menu(int SectionNumber, SubjectMenuLayout.Menu InMenu = SubjectMenuLayout.Menu.Section) : BackupMaker
     {
-        public override string Description => $"before a change from the Section menu to Section {SectionNumber}";
-        public override string NameSuffix => $"_menu-section{SectionNumber}";
+        public override string Description => $"before a change from the {SubjectMenuLayout.Title(InMenu)} menu to Section {SectionNumber}";
+        public override string NameSuffix => $"_{NamePrefix(InMenu)}{SectionNumber}";
+
+        /// <summary>The piece before the section number: "menu-section" for Section, "classes-section" for Classes.</summary>
+        public static string NamePrefix(SubjectMenuLayout.Menu inMenu) =>
+            inMenu == SubjectMenuLayout.Menu.Section ? "menu-section" : "classes-section";
     }
 
     public abstract string Description { get; }
@@ -55,11 +66,12 @@ public abstract record BackupMaker
             if (int.TryParse(piece[assistantPrefix.Length..], out int sectionNumber))
                 return new Assistant(sectionNumber);
         }
-        const string menuPrefix = "menu-section";
-        if (piece.StartsWith(menuPrefix, StringComparison.Ordinal))
+        foreach (var inMenu in Enum.GetValues<SubjectMenuLayout.Menu>())
         {
-            if (int.TryParse(piece[menuPrefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out int sectionNumber))
-                return new Menu(sectionNumber);
+            string menuPrefix = Menu.NamePrefix(inMenu);
+            if (piece.StartsWith(menuPrefix, StringComparison.Ordinal)
+                && int.TryParse(piece[menuPrefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out int sectionNumber))
+                return new Menu(sectionNumber, inMenu);
         }
         return null;
     }
@@ -88,7 +100,7 @@ public sealed record BackupItem(string CourseCode, DateTime BackedUpAt, string F
     public string KeptDescription => Maker switch
     {
         BackupMaker.Assistant => "The assistant made this one; its five most recent are kept.",
-        BackupMaker.Menu => "The Section menu made this one before a change; its five most recent are kept.",
+        BackupMaker.Menu m => $"The {SubjectMenuLayout.Title(m.InMenu)} menu made this one before a change; the five most recent the Section and Classes menus made are kept.",
         _ => "You made this one, so it is kept until you delete it.",
     };
 

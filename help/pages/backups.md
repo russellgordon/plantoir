@@ -39,7 +39,7 @@ The backup is listed under {{control:sidebarBackupsGroup}} in the sidebar, and t
 
 Plantoir saves a copy of a course by itself before certain changes:
 
-- before every change made from the Section menu, such as publishing pages or re-dating classes;
+- before every change made from the Section or Classes menu, such as publishing pages or re-dating classes;
 - before it gets a section ready for the start of the year;
 - before it renames what the course calls a unit;
 - before a page is copied into the course with Copy a Page;
@@ -57,7 +57,7 @@ Select {{control:sidebarAllBackupsRow}} to see every backup in a table:
 
 - {{control:allBackupsColumnCourse}}: the course the backup is of.
 - {{control:allBackupsColumnMade}}: when it was made.
-- {{control:allBackupsColumnMadeBy}}: {{control:allBackupsMadeByYou}}, or the Section menu with the number of the section.
+- {{control:allBackupsColumnMadeBy}}: {{control:allBackupsMadeByYou}}, or the Section or Classes menu, whichever made it, with the number of the section.
 - {{control:allBackupsColumnSize}}: how much room it takes.
 
 {{picture:backups-1}}
@@ -72,7 +72,7 @@ A backup made before an assistant changed a course reads as made by the assistan
 ## What Plantoir keeps
 
 - Plantoir never deletes a backup you made.
-- Of the backups the Section menu made, Plantoir keeps the five most recent for each course.
+- Of the backups the Section and Classes menus made, Plantoir keeps the five most recent for each course, between the two menus.
 
 {{assistant}}
 Of the backups made for an assistant, Plantoir also keeps the five most recent for each course, counted apart. It never deletes one that an open conversation with an assistant could still restore from.

@@ -61,7 +61,7 @@ public class RemovalQuestionsContractTests
         Assert.Contains("MenuItem(ScheduledDeployRemovalWording.MenuItem,", sidebar);
         // The menu bar draws Section ▸ from SubjectMenuLayout since #990; the item's words are its title there.
         Assert.Contains("Item.CancelScheduledDeploy => ScheduledDeployRemovalWording.MenuItem,", Source("..", "Plantoir.Core", "Models", "SubjectMenuLayout.cs"));
-        Assert.Contains("Add(into, SubjectMenuLayout.TitleHere(item), id, item);", Source("MainWindow.Menus.cs"));
+        Assert.Contains("Add(into, LayoutTitle(item), id, item);", Source("MainWindow.Menus.cs"));
     }
 
     [Fact]

@@ -130,6 +130,18 @@ nonisolated enum SubjectMenuLayout {
         return nil
     }
 
+    /// "Section or Classes": the two menus' titles in the layout's order, for
+    /// a sentence that covers a change from either (#990, Russell's ruling
+    /// "name the real menu": "the few sentences that cover both say 'the
+    /// Section or Classes menu'").
+    static var eitherMenu: String {
+        var titles: [String] = []
+        for menu in Menu.allCases {
+            titles.append(title(of: menu))
+        }
+        return titles.joined(separator: " or ")
+    }
+
     /// Where an item is, the way a teacher would say it: "Classes ▸ Add
     /// Class…" for `.addClass` and "Add Class…". The menu's title comes from
     /// the layout, so a menu path moves when the item does.

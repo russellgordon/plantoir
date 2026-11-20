@@ -66,8 +66,8 @@ public static partial class AssistWording
     /// Undo Last Change with nothing to undo — greyed in the menu, so this is
     /// said only when the change went away between drawing the menu and the click.
     /// </summary>
-    public const string NothingToUndoFromTheMenu =
-        "Nothing has been changed from the Section menu in this window yet, so there is nothing to undo. Anything older is in Plantoir's Backups list.";
+    public static string NothingToUndoFromTheMenu =>
+        $"Nothing has been changed from the {Plantoir.Core.Models.SubjectMenuLayout.EitherMenu} menu in this window yet, so there is nothing to undo. Anything older is in Plantoir's Backups list.";
 
     /// <summary>The section changed while its copy was being saved, so the plan no longer fits.</summary>
     public static string ChangedWhileSavingACopyFromTheMenu(string course, string section) =>
@@ -137,7 +137,7 @@ public static partial class AssistWording
     /// right now: refused before anything is backed up or written.
     /// </summary>
     public static string SectionIsChangingFromTheMenu(string course, string section) =>
-        $"{course} Section {section} is being changed from the Section menu right now, so nothing was changed. Try again once that has finished.";
+        $"{course} Section {section} is being changed from the {Plantoir.Core.Models.SubjectMenuLayout.EitherMenu} menu right now, so nothing was changed. Try again once that has finished.";
 
     // ---- Why the class dates are asked for first ------------------------------
 

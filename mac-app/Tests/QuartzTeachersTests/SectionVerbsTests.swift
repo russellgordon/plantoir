@@ -621,6 +621,36 @@ final class SectionVerbsEndingTests: XCTestCase {
 
     // MARK: - Tests
 
+    /// #990 (Russell's ruling "name the real menu"): Make Room for Classes…
+    /// is in the Classes menu, so the copy saved before it is named
+    /// `_classes-section1`, listed as the Classes menu's, and its trail line
+    /// says so; a Section item's copy keeps `_menu-section1`. MUST FAIL with
+    /// `SectionVerbs.perform` not telling the runner the menu (proved by
+    /// taking the line that sets `menuMakingTheChange` out).
+    func testACopyBeforeAClassesItemIsNamedForTheClassesMenu() async throws {
+        let (made, verbs) = try makeVerbs()
+        try MenuVoiceTests.layOutAUnitWithDates(in: made.course)
+        _ = await verbs.perform(
+            SectionVerbs.makeRoom(course: "ICS3U", section: 1, unit: 1, atDay: 2, howMany: 1, planning: false),
+            item: .makeRoomForClasses, courseCode: "ICS3U", sectionNumber: 1
+        )
+        let backups: URL = made.root.appendingPathComponent("courses/_backups/ICS3U")
+        var classesCopies: [String] = []
+        for name in try FileManager.default.contentsOfDirectory(atPath: backups.path).sorted() {
+            XCTAssertFalse(name.hasSuffix("_menu-section1.zip"), "a Classes item's copy named for Section: \(name)")
+            if name.hasSuffix("_classes-section1.zip") {
+                classesCopies.append(name)
+                let item: BackupItem? = BackupItem.from(fileURL: backups.appendingPathComponent(name), courseCode: "ICS3U")
+                XCTAssertEqual(item?.maker, .menu(sectionNumber: 1, inMenu: .classes))
+                XCTAssertTrue(item?.subtitle.contains("the Classes menu") ?? false, item?.subtitle ?? "")
+            }
+        }
+        XCTAssertEqual(classesCopies.count, 1, "one Classes copy: \(classesCopies)")
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: false)
+        XCTAssertTrue(trail.contains("the Classes menu backed up the course as "), trail)
+        XCTAssertEqual(verbs.toolRunner.menuMakingTheChange, .section, "the menu is set for one call only")
+    }
+
     /// Make Room records no undo entry, on purpose. MUST FAIL on the old
     /// `perform`, which wrote "changed nothing".
     func testMakeRoomFromTheMenuIsCarriedOut() async throws {

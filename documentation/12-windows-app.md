@@ -8394,6 +8394,23 @@ has its place reserved in `layout.reservedPlaces`.
 on #990: a command that only asks for a confirmation takes none), in the
 menu bar and on the section row's right-click menu.
 
+**Name the real menu** (Russell, 2026-11-20). The copy the menu's server
+saves before a change names the menu the item is in: the window sends it in
+the tools/call request's `_meta` (`plantoirMenu`: `section` or `classes`,
+`McpClient.MenuOfTheNextCalls`, set by `SectionVerbs.Perform` from
+`SubjectMenuLayout.MenuContaining`), never as a tool argument, so no tool's
+schema changed; `plantoir-mcp`'s call filter sets
+`AssistWorkspace.MenuOfTheChange` for that one call. A Classes copy is
+`_classes-section<N>`, listed as "before a change from the Classes menu"
+("Classes menu, Section N" in All Backups), with "the Classes menu backed up
+the course as …" on the trail; a Section copy keeps `_menu-section<N>`. The
+two menus' copies are pruned together, five between them. The sentences that
+cover both menus (`NothingToUndoFromTheMenu`, `SectionIsChangingFromTheMenu`)
+say "the Section or Classes menu" (`SubjectMenuLayout.EitherMenu`). Tests:
+`SectionMenuServerTests.ACopyBeforeAClassesItemIsNamedForTheClassesMenu`,
+`ContractTests` (zipNames, with the words), and
+`SubjectMenuLayoutContractTests.TheMenusCopyLineNamesTheRealMenu`.
+
 **Tests.** `SubjectMenuLayoutContractTests` (the groups, the submenu, every
 section item in one menu once, the bar's order in `MainWindow.xaml`, menu
 paths); `RemovalQuestionsContractTests` (the words); and, through the real

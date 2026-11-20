@@ -79,6 +79,12 @@ final class AssistToolRunner {
 
     private let surface: Surface
 
+    /// On `.menu`: which menu the running item is in (#990, "name the real
+    /// menu"), set by `SectionVerbs.perform` from `SubjectMenuLayout` for the
+    /// length of one call, so the copy it saves and its trail line name
+    /// Section or Classes. Section otherwise.
+    var menuMakingTheChange: SubjectMenuLayout.Menu = .section
+
     /// Where the courses are.
     private let workspace: WorkspaceModel
 
@@ -1940,7 +1946,7 @@ final class AssistToolRunner {
         var maker: BackupMaker = .assistant(sectionNumber: sectionNumber)
         var event: ActivityTrail.Event = .assistantBackedUpACourse
         if surface == .menu {
-            maker = .menu(sectionNumber: sectionNumber)
+            maker = .menu(sectionNumber: sectionNumber, inMenu: menuMakingTheChange)
             event = .sectionMenuBackedUpACourse
         }
         do {
@@ -1955,7 +1961,8 @@ final class AssistToolRunner {
                 line = ActivityTrail.sectionMenuBackedUpLine(
                     fileName: backupURL.lastPathComponent,
                     bytes: bytes,
-                    seconds: Date().timeIntervalSince(started)
+                    seconds: Date().timeIntervalSince(started),
+                    inMenu: menuMakingTheChange
                 )
             }
             ActivityTrail.note(event, line, course: code, section: sectionNumber)
@@ -1963,7 +1970,9 @@ final class AssistToolRunner {
         } catch {
             var line: String = ActivityTrail.assistantCouldNotBackUpLine(reason: error.localizedDescription)
             if surface == .menu {
-                line = ActivityTrail.sectionMenuCouldNotBackUpLine(reason: error.localizedDescription)
+                line = ActivityTrail.sectionMenuCouldNotBackUpLine(
+                    reason: error.localizedDescription, inMenu: menuMakingTheChange
+                )
             }
             ActivityTrail.note(event, line, course: code, section: sectionNumber)
             throw error
@@ -4757,7 +4766,10 @@ final class AssistToolRunner {
         }
         ActivityTrail.note(
             .classCopyNotMade,
-            "did not copy a class from the Section menu — the copy could not be made certainly "
+            // Add Class…, as a copy, is in the Classes menu (#990): the line
+            // names the menu the layout puts it in.
+            "did not copy a class from the \(SubjectMenuLayout.title(of: SubjectMenuLayout.menu(containing: .addClass) ?? .classes)) menu — "
+            + "the copy could not be made certainly "
             + "hidden, so nothing was written",
             course: located.course.code, section: located.sectionNumber
         )

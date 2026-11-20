@@ -234,6 +234,9 @@ public sealed partial class MainWindow
         }
     }
 
+    /// <summary>An item's words in Section ▸ or Classes ▸; a layout item with none draws its name, and the contract test fails on it.</summary>
+    private static string LayoutTitle(Item item) => SubjectMenuLayout.TitleHere(item) ?? item.ToString();
+
     /// <summary>One item of Section ▸ or Classes ▸, with its key where it has one.</summary>
     private void AddLayoutItem(IList<MenuFlyoutItemBase> into, SubjectMenuLayout.Menu layout, Item item)
     {
@@ -253,13 +256,13 @@ public sealed partial class MainWindow
                 return;
             case Item.RebuildPreview:
                 // Ctrl+Shift+B, the mac's Shift+Cmd+B until #990: kept free for it by #488's key census.
-                Add(into, SubjectMenuLayout.TitleHere(item), id, item, Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
+                Add(into, LayoutTitle(item), id, item, Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
                 return;
             case Item.Deploy:
-                Add(into, SubjectMenuLayout.TitleHere(item), id, item, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
+                Add(into, LayoutTitle(item), id, item, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
                 return;
             case Item.SectionOpenInObsidian:
-                Add(into, SubjectMenuLayout.TitleHere(item), id, item);
+                Add(into, LayoutTitle(item), id, item);
                 // Its key is moved onto it by ApplyMenuEnablement while a section is selected.
                 _sectionObsidianKey = Key(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+O")!.Value.Make(this, Item.SectionOpenInObsidian);
                 return;
@@ -268,7 +271,7 @@ public sealed partial class MainWindow
                 // belongs to text editing, and a key that took back a page
                 // change from inside a text field would be a surprise nobody
                 // could undo (the mac's reason for no Cmd+Z).
-                Add(into, SubjectMenuLayout.TitleHere(item), id, item);
+                Add(into, LayoutTitle(item), id, item);
                 return;
         }
     }

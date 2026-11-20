@@ -59,6 +59,18 @@ public sealed record ModelReply(JsonObject Message, string? FinishReason = null,
 /// It used to be one string, shown to the teacher and sent to the model both,
 /// and that single fact is why this app's replies read longer than the mac's.
 /// </summary>
+/// <summary>
+/// A tool server that can be told which menu the next calls come from (#990,
+/// Russell's ruling "name the real menu"): <c>McpClient</c> sends it in each
+/// call's <c>_meta</c> (<see cref="AssistWorkspace.MenuMetaKey"/>), never as a
+/// tool argument, so no tool's schema changes.
+/// </summary>
+public interface IHearsTheMenu
+{
+    /// <summary>The menu's contract name ("section", "classes"), or null to send none.</summary>
+    string? MenuOfTheNextCalls { get; set; }
+}
+
 public interface IToolServer
 {
     Task<AssistToolAnswer> CallTool(string name, JsonObject arguments,
