@@ -1227,7 +1227,10 @@ final class AppRulesContractTests: XCTestCase {
         let courseCode: String = "ICS3U_CONTRACT_TEST"
         let greeting: String = ClaudeCodeLauncher.greeting(courseCode: courseCode, courseName: "Grade 11 Computer Science")
 
-        XCTAssertEqual(section["hiddenWhenNotInstalled"] as? Bool, true)
+        // #990 (D11): dimmed in the menu bar and on Fix with, hidden only in
+        // a row's context menu.
+        XCTAssertEqual(section["hiddenWhenNotInstalled"] as? Bool, false)
+        XCTAssertEqual(section["hiddenInContextMenusWhenNotInstalled"] as? Bool, true)
         XCTAssertEqual(section["greetingIsTheSameForEveryAgent"] as? Bool, true)
         XCTAssertEqual(section["serverName"] as? String, "plantoir")
         XCTAssertEqual(section["doorCourseVariable"] as? String, AssistMCPServer.doorCourseVariable)

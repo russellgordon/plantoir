@@ -1037,10 +1037,24 @@ contract's message in place of the plain greeting. `FixWithAssistant` (Core) is
 the mac's `FixWithAssistant.swift` function for function: `HandoverOf`,
 `Buttons`, `GreetingFor`, `TrailLine`, every word a constant pinned key by key
 (`FixWithAssistantContractTests`, which runs the 8 `buttonCases` and 10
-`greetingCases`). A button is HIDDEN when its assistant is not on this PC or
-the course is kept for reference, and GREYED when nothing ticked is handed
-over, with `fixWith.notEnabledHelp` as its help text so Narrator says why
-(proposed from Windows; the mac gives the same as an accessibility hint since #776).
+`greetingCases`). Both buttons are HIDDEN only on a course kept for
+reference. Since #990 (the mac's D11, Russell's ruling Q9) a button whose
+assistant is not on this PC is DIMMED rather than hidden, as Revise With ▸ in
+the menu bar dims it, with `FixWithAssistant.NotInstalledHelp` as its help
+text; until #990 it was hidden. A button is also GREYED when nothing ticked is
+handed over, with `fixWith.notEnabledHelp` as its help text so Narrator says
+why (proposed from Windows; the mac gives the same as an accessibility hint
+since #776). Not set up outranks nothing ticked (`FixWithAssistant.HelpFor`).
+`ButtonState` carries `ClaudeEnabled` and `CodexEnabled` beside `Enabled`
+(a row is handed over), and `buttonCases`' `claudeEnabled`/`codexEnabled` are
+run against them. **The help text is the contract's first sentence only**,
+"Not set up on this PC." (the contract's "Mac" said as
+`platformWording.machine`'s "PC"): its second sentence names Settings ▸
+Other Assistants, which Windows does not have until #903 builds the set-up, so it is held open by name (`NamedGapLedger.FixWithWordsSaidDifferently`,
+`notInstalledHelp`, #903, v2.0.0) and comes back whole, asserted by
+`FixWithAssistantContractTests.PiecesAndBoundsAreTheContracts`, the day that
+entry goes. REJECTED: saying the whole sentence now, which sends a teacher
+looking for a page that is not there.
 Whether each door exists is `OutsideAssistantPresence`, asked at launch and on
 `MainWindow.Activated` off the interface thread — never while the tab draws,
 and false until the first answer, so a tab that draws first shows its buttons
@@ -7991,7 +8005,7 @@ when they land.
 | Menu | Items (Windows key) |
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
-| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
+| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
 | Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
@@ -8007,10 +8021,12 @@ port of the mac's `SubjectMenuRules.enabledItems`, run by
 cases, 51 items, 24 situation keys; the names map both ways by camel-casing
 the enum, so "Finder" and "NewTerminalAtFolder" in two names are the mac's
 neutral words for Show in File Explorer and Open in Terminal). Items GREY,
-never hide — except Revise With ▸ Claude… and Codex…, LEFT OUT when not
-installed (`ClaudeCodeLauncher.IsAvailable`, `CodexLauncher.IsAvailable`,
-decided when the window is built: a fact about the PC, not the selection).
-Local AI Assistant… is always drawn, greyed on a course row.
+never hide, Revise With ▸ Claude… and Codex… included since #990: drawn on
+every PC and DIMMED when not installed (`SubjectMenuRules.EnabledInTheMenuBar`,
+fed by `OutsideAssistantPresence`; "Revise With: dimmed in the menu bar, hidden
+in a row's menu (#990)" below). Until #990 they were LEFT OUT when not
+installed, decided when the window was built. Local AI Assistant… is always
+drawn, greyed on a course row.
 
 **What the rule is fed** is `MainWindow.CurrentSituation()`, read from the
 owner that already decides each fact, so the menu and the button cannot
@@ -8086,9 +8102,10 @@ silent too** — F2 on a course whose Rename the rule greys (a reference
 course, a section row, a course being copied) does nothing and says nothing,
 which is what the mac's key on a disabled menu item does. Before #488 F2 opened
 the rename dialog and let it explain the refusal; do not restore that route:
-the reason is on the greyed Course ▸ Rename's own reason line, and a key that
-opens a dialog the menu says cannot be used is the disagreement the one rule
-exists to prevent.
+the reason is in the row's own context menu, under Add Section… (until #990
+it was also a grey line under Course ▸ Rename, which the mac's ruling Q14 took
+out of the menu bar), and a key that opens a dialog the menu says cannot be
+used is the disagreement the one rule exists to prevent.
 
 **Ctrl+Shift+O sits on ONE Open in Obsidian item** — Course's unless a section
 row is selected, then Section's; `ApplyMenuEnablement` moves the accelerator
@@ -8106,6 +8123,94 @@ for Copy a Page: it is the browser's inspect-element key and a teacher who has
 used one expects that; Copy a Page has no key. **Settings… lost its "Ctrl+,"
 label**: it was drawn with nothing behind it, and a comma key measured above
 does not fire. Ctrl+Shift+B was kept free for 2B's Rebuild Preview, which has it now.
+
+### Revise With: dimmed in the menu bar, hidden in a row's menu (#990)
+
+The mac's #990 (the HIG review's D11, D24, D25, D43 and Russell's rulings Q8,
+Q9, Q10 and Q14, 2026-11-18) changed four things a Windows teacher sees, and
+the Windows half (branch `issue/990-menus-windows`, 2026-11-19) brings them
+here where Windows has the same thing:
+
+- **A missing assistant is DIMMED in the menu bar** (Course ▸ and Section ▸
+  Revise With ▸ Claude…, Codex…), never left out: HIG, The menu bar, "Always
+  show the same set of menu items… If a menu bar item isn't actionable,
+  disable the action instead of hiding it from the menu"
+  (`outsideAgents.hiddenWhenNotInstalled`, false since #990). The rule is
+  `SubjectMenuRules.EnabledInTheMenuBar`: the contract's rule AND, for an item
+  that opens an outside door (`OutsideDoorOf`), that door's assistant
+  installed. Presence is `OutsideAssistantPresence`, asked at launch and on
+  activation off the interface thread; its `Changed` re-runs
+  `ApplyMenuEnablement`, and `Invoke` asks presence again at the click.
+  `ReviseWithPresenceTests` holds the rule, the two contract keys and the
+  source (no installed test around the menu bar's `Add`). The mac's dimmed
+  Fix with buttons (and Revert on Planning) also carry the reason as a help
+  tag, shown when the pointer rests on them, and the shared Help page says
+  "Hold the pointer over the button to read why". Since #990's second review
+  Windows gives a dimmed Fix with button its reason twice:
+  `AutomationProperties.HelpText` for Narrator AND `ToolTipService.ToolTip`
+  (`SectionProblemsView.ShowTheFixButtons`; no tooltip while it can be
+  pressed). **Whether WinUI SHOWS that tooltip on a disabled button is not
+  known.** Tried on this PC on 2026-11-19 (Lenovo i5-8365U, Windows 11 Pro
+  26200, the desktop session through Task Scheduler): `FixWithButtonsUiTests`
+  rested the real pointer on the dimmed Fix with Claude… (UI Automation
+  confirmed the pointer was over `fixWithClaudeButton`) and, as the control,
+  on the sidebar's enabled + button, whose XAML tooltip is "Add a course or
+  club", and polled UI Automation for 4 s for a ToolTip element in the
+  window and among the desktop's top-level windows. Neither showed one, the
+  control included, so the probe cannot see a WinUI tooltip at all and says
+  nothing about disabled ones; a screen picture was tried too and came back
+  as a 1280 x 720 crop of the scaled screen, missing both controls. The probe
+  was taken out again rather than left in a test that asserts nothing. Until
+  someone looks at the screen, no Windows Help page may say "Hold the pointer
+  over the button": the Windows Help book (886b onward) must not copy the
+  mac's sentence, and `help/pages/fix-with.md` was left as the mac wrote it
+  (help/README.md rule 7: no `{{windows}}` runs yet). Revert on the Planning
+  tab, the mac's other new help tag (`unitPlanning.tab.saveOnPlanning.rule`),
+  has no Windows counterpart until #801 builds the Planning tab; when it
+  does, `PlanningTab.RevertOnPlanning` is that item's reason, given as the
+  dimmed menu item's `ToolTipService.ToolTip` and `HelpText` as the review
+  asks, and the same tooltip question applies to a dimmed `MenuFlyoutItem`.
+  The same run also failed `FixWithButtonsUiTests` later, at the Codex door's
+  argument count (12 expected, 14 sent), after every assertion #990 touches
+  in it had passed; that test is in no gate, the count is not this piece's,
+  and whether `dev` fails the same way was not checked. A dimmed Revise
+  item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
+  shows no tooltip, and the ruling Q14 rules out a grey text row.
+- **A row's context menu still HIDES a missing assistant**
+  (`hiddenInContextMenusWhenNotInstalled`): HIG, Context menus, "Hide
+  unavailable menu items, don't dim them." Nothing changed in
+  `SidebarPane.ReviseItems`. Its grouping already matches the mac's D43 rule
+  (HIG, Menus: "provide icons for all menu items in a group, or none of
+  them"): Revise With ▸ and every item in it carry the star glyph, and the
+  four assistant functions, the one group without icons, sit between dividers.
+  The mac's other D43 change, the deployed folder's items in a group of their
+  own, has no Windows counterpart until #889 builds those items.
+- **No grey text rows in the Course or Section menu** (Q14): Course ▸
+  Rename's reason line (`courseRenameReason`) is gone. The row's context
+  menus keep their lines (the ruling named the two menus): the busy note under
+  Add Section… and the Revise hold under Revise With ▸. Windows never drew the
+  mac's other grey rows (Revert on Planning, Open in Browser's reason,
+  "Available once deploy completed", the Revise notes in the menu bar).
+- **Set Up an Assistant… only under Revise With ▸** (Q10): Windows has neither
+  item (the set-up is #903), so there was no Help-menu item to take out and
+  nothing is drawn under Revise With; #903 adds it there and only there.
+
+**Shortcuts: none changed on Windows tonight.** The mac moved Preview / Stop
+Preview from ⇧⌘P to ⌘Y (the HIG keeps ⇧⌘P for Page Setup), its Option
+alternate to ⌥⌘Y, and Copy a Page from This Course… from ⇧⌘C to ⇧⌘K (Show
+Colors), and Rebuild Preview from ⇧⌘B to ⇧⌘Y (the review fixes, 7fb03c5f6).
+Nothing in `contracts/` pins a key
+(the mac's keys are its golden's, and `subjectMenus` names items only), and
+this page's rule is only that Ctrl+Shift letters "follow the mac's ⇧⌘
+letters" where Windows has no convention of its own. Ctrl+Y is Windows' Redo
+(Microsoft Learn, Keyboard accelerators → Common keyboard accelerators), and
+this app's own Undo plan gives it Edit ▸ Redo (W11b), so Preview cannot follow
+the mac to Ctrl+Y. Ctrl+Shift+P is not a Windows reserved key (the reason the
+mac moved, Page Setup, is a macOS convention). Whether Windows moves Preview,
+Rebuild Preview, or gives Copy a Page a key (it has none: Ctrl+Shift+C is the
+browser's inspect-element key) is Russell's question, asked on #990's
+hand-back; until he rules, Preview stays Ctrl+Shift+P, Rebuild Preview
+Ctrl+Shift+B and Copy a Page keyless.
 
 ### What does NOT exist here: File with no window
 
@@ -9236,8 +9341,8 @@ and the rule's re-check passes (Preview is enabled while running), so
 `PressPreview(opposite: true)` refuses when the runner is running and the menu
 is redrawn.
 
-**No key on the second item.** The mac's is ⌥⇧⌘P; the counterpart,
-Ctrl+Alt+Shift+P, is AltGr+Shift+P on keyboards with an AltGr (Ctrl+Alt is
+**No key on the second item.** The mac's is ⌥⌘Y (⌥⇧⌘P until #990); the
+counterpart, Ctrl+Alt+Y, is AltGr+Y on keyboards with an AltGr (Ctrl+Alt is
 AltGr to Windows), a character a teacher may be typing. REJECTED for that
 reason, as Ctrl+Alt was for #488's keys.
 
@@ -13371,6 +13476,320 @@ it is kept beside the module copies because the first ruling asked for it.
 Fetching `VC_redist.x64.exe` and unpacking it was rejected at first (a
 second unpacker for a file Python's zip already carried) and became the
 source in #1010, on Russell's ruling; see "Where the file comes from" above.
+
+## The Licence Agreement page in the installer (#1010)
+
+Written 2026-11-19 for
+[#1010](https://github.com/russellgordon/plantoir/issues/1010) (piece
+1010b), from Russell's four rulings of 2026-11-19 evening on the issue. The
+Visual Studio Community 2026 licence, which is where the right to
+redistribute `vcruntime140.dll` comes from (above), asks a distributor to
+"require distributors and external end users to agree to terms that protect
+the Distributable Code at least as much as these license terms". The
+installer is where a teacher meets Plantoir first, so that is where the
+terms are agreed to.
+
+**What a teacher sees, on a first install by hand.** Inno Setup's own
+License Agreement page, first in the wizard (the welcome page is off, so it
+comes before Select Destination Location), titled **Licence Agreement**:
+"Please read the following important information before continuing.", then
+"Please read the following Licence Agreement. You must accept the terms of
+this agreement before continuing with the installation.", a scrolling box
+with the text, and two choices, **I accept the agreement** and **I do not
+accept the agreement**. Neither is chosen when the page opens and Next is
+disabled until "I accept the agreement" is chosen; choosing "I do not
+accept" disables it again. One page and one choice more than before; the
+pages after it are unchanged.
+
+**What the box says** (`windows-app/installer-licence.txt`, UTF-8, one line
+per paragraph so Inno wraps it to the box): "Plantoir", the copyright line
+"Copyright 2026 Russell Gordon" (the year and name About shows), "Plantoir's
+own code is released under the MIT License:" and the MIT text; "Software by
+other people", naming `THIRD_PARTY_LICENSES.txt` in the folder Plantoir is
+installed in and the notice on GitHub; and "Microsoft Visual C++ runtime",
+the terms for `vcruntime140.dll` as drafted in the design and ruled (use it
+only as part of Plantoir; do not copy it out, change it, or reverse engineer,
+decompile or disassemble it, except where the law allows; "as is"). That
+paragraph says "The MIT License that covers Plantoir's own code does not
+apply to it." (it said "The MIT License above" until the second review of
+1010b, which put the same words in the notice too, below, where no MIT text
+comes above them), and the MIT
+paragraph opens by scoping it to Plantoir's own code, so the MIT grant's
+"without restriction" and the limits on Microsoft's file do not contradict
+each other (ruling 2). No machinery words (rule 1): "website builder".
+
+**One MIT text in three places.** The repository now has a root `LICENSE`
+(the standard MIT text, "Copyright 2026 Russell Gordon"; ruling 3); README's
+"License" section points at it; and the page carries the same words.
+`InstallerLicencePageTests.ThePageCarriesTheLicenceFileWordForWord`
+compares them paragraph by paragraph, with line breaks joined, because
+`LICENSE` is wrapped at 80 columns, as licence files usually are, and the
+page's text is not.
+
+**How it is built** (`windows-app/installer.iss`):
+
+- `LicenseFile=installer-licence.txt` in `[Setup]`. Inno shows the page only
+  when the wizard is visible: its `ShouldSkipPage` skips `wpLicense` when the
+  install mode is not normal, that is under `/SILENT` and `/VERYSILENT`
+  (Inno's own source, `Setup.WizardForm.pas`; its help: under `/SILENT` "the
+  wizard and the background window are not displayed"). So Plantoir's own
+  update, which runs the installer `/VERYSILENT /PLANTOIRUPDATE=1`, never
+  shows it. **A teacher already on 1.x is updated to 2.0.0 silently and is
+  not asked** (Russell, 2026-11-19, ruling 5): no page and no prompt on an
+  update, then or later. A newer installer downloaded and run by hand is a
+  visible install, so it shows the page again and asks again; only the
+  update path skips it.
+- `InitializeWizard` sets `WizardForm.LicenseNotAcceptedRadio.Checked :=
+  False` (and the accept radio too, for symmetry). Inno opens the page with
+  "I do not accept the agreement" checked; Microsoft's Windows desktop UX
+  guide, "First Experience", read 2026-11-19, says settings "with legal
+  implications, such as end user licensing agreements (EULAs)" are opt-in
+  and "can't have default selections". Inno enables Next on this page only
+  while `LicenseAcceptedRadio.Checked` (`UpdateCurPageButtonState`) and in
+  the accept radio's own click handler, so with neither checked Next is
+  disabled until the teacher chooses.
+- `InitializeWizard` then sets `WizardForm.LicenseNotAcceptedRadio.TabStop
+  := True` (the first review of 1010b, its one MEDIUM). Delphi's radio
+  button sets its Tab stop to match `Checked` (Inno's form gives the stop to
+  the checked refusal; `Setup.WizardForm.dfm`, read 2026-11-19), so clearing
+  both choices took the pair out of the Tab order, and a keyboard-only
+  teacher could reach them only by Alt+A or Alt+D (measured below). The stop
+  goes on the **refusal**, not the acceptance, because Windows chooses a
+  radio button when the keyboard moves the focus onto it: with the stop on
+  "I accept the agreement", one Tab from the text accepted the agreement and
+  enabled Next (measured below). Microsoft's guidance, read 2026-11-19
+  (Windows UX guide, "Radio Buttons" and "Keyboard"): a group of radio
+  buttons "behaves like a single control" with a single Tab stop and the
+  arrow keys move within it, and "keyboard navigation shouldn't change
+  control values"; Win32 radio buttons cannot be focused by the keyboard
+  without being chosen, so the stop sits where that change is the safe one,
+  the state Inno itself opens with. The page still opens with neither
+  chosen.
+- `[Messages]` sets all five messages the page shows (Default.isl's
+  "License Agreement" wizard page section: `WizardLicense`, `LicenseLabel`,
+  `LicenseLabel3`, `LicenseAccepted`, `LicenseNotAccepted`). Two say
+  "License" in Default.isl (the title and the sentence above the box) and
+  are spelled "Licence" here (ruling 4); the other three are Default.isl's
+  own words, set too so the whole page is written in one place and an Inno
+  upgrade cannot change it unseen. The message keys keep Inno's spelling;
+  they are names, not words a teacher reads.
+- `[Files]` copies the repository's `THIRD_PARTY_LICENSES.md` into `{app}`
+  as `THIRD_PARTY_LICENSES.txt`, so the notice travels with the files it
+  describes and a double-click opens it in Notepad. (The page cannot hold the
+  notice's tables readably.)
+- **The notice carries the Microsoft terms too** (the second review of
+  1010b, its one MEDIUM). The terms for `vcruntime140.dll` were on the
+  installer's page only, so a copy of the file in the portable zip, which
+  has no page, travelled without them, against ruling 6. The same paragraph
+  is now in `THIRD_PARTY_LICENSES.md`, in its own section, "Terms for the
+  Microsoft Visual C++ runtime file, which only the Windows app carries",
+  which opens by saying the Mac app does not carry the file: the notice is
+  one file for both platforms and is read on GitHub, which README and the
+  page link to. The Mac app and plantoir.app do not ship the notice
+  (searched 2026-11-19: nothing in `mac-app/` or `website/` names it), so
+  GitHub, `{app}` and the zip are where it is read. One text in two files,
+  held equal by
+  `InstallerLicencePageTests.TheNoticeCarriesTheMicrosoftTermsInThePagesWords`;
+  `ThePortableZipCarriesTheLicencesBesideTheApp` checks that the notice the
+  zip copies contains the page's paragraph.
+- **The portable zip carries both licences beside the app** (Russell,
+  2026-11-19, ruling 6). `publish.ps1` makes `Plantoir-win-x64.zip` from the
+  published folder as before, then adds the repository's `LICENSE` and
+  `THIRD_PARTY_LICENSES.md` to its root, the notice as
+  `THIRD_PARTY_LICENSES.txt`, the name the installer gives it. They are
+  added to the zip rather than copied into the published folder, which the
+  installer takes whole (`{#PublishDir}\*`) and would then install twice.
+  The zip's name is unchanged (a frozen asset name, `RELEASING.md`).
+
+**Tests.** `windows-app/Plantoir.Tests/InstallerLicencePageTests.cs` (twelve
+facts and one theory, source text with comments taken out, Pascal's
+settings matched whatever their spacing and case, so `Checked:=False` reads
+as `Checked := False`): the `LicenseFile` setting and
+no `InfoBeforeFile`; `InitializeWizard` clears the refusal and nothing
+checks the acceptance or enables Next, and no `ShouldSkipPage` exists;
+the Tab stop is set on the refusal, after both are cleared, and never on the
+acceptance; publish.ps1 adds `LICENSE` and `THIRD_PARTY_LICENSES.txt` to
+the zip after making it, under its frozen name; all
+five messages are set, to these words, and none says "License"; `LICENSE` is
+MIT in Russell's name and README points at it; the page carries `LICENSE`
+word for word and scoped; the Microsoft paragraph's limits and the sentence
+that MIT does not apply; the same paragraph, word for word, in the notice's
+Windows-only section, and in the notice the zip copies; the `[Files]` line; no machinery words; strict
+UTF-8. The first-install rehearsal's driver
+(`Plantoir.UiTests.FirstInstall/Steps.cs`, `AnswerLicencePage`) knows the
+page by its heading (`WindowRules.IsLicencePage`, either spelling, so a
+lost override does not strand it), records what the page opened with,
+chooses "I accept the agreement" by its UI Automation name with a click
+(`BM_CLICK`, so Inno's own click handler enables Next), and lets the
+ordinary button loop press Next. **Inno's choices are not radio buttons to
+UI Automation:** `TNewRadioButton` (like `TNewButton`) is reported as a
+`Pane`, with no selection pattern and no state (measured on the VM,
+Inno 6.7.3), so the driver finds a choice by its name and that class (or
+the RadioButton type, should a later Inno give it) and reads whether it is
+checked from the Win32 button itself (`BM_GETCHECK`). A driver that looked
+only for RadioButton controls would have stopped on every run. It stops PRODUCT STOPPED, never a silent
+pass, if the page is there and that choice cannot be found, if the page
+opened with either choice made, or if Next is still disabled 30 s after the
+choice (`WindowRules.LicenceNextLimit`). Since the first review of 1010b,
+two more: **a choice whose state cannot be read is not "not chosen"** (no
+window handle, a `BM_GETCHECK` answer other than checked or clear, or UI
+Automation failing: `WindowRules.CheckStateMeans` returns null and the run
+stops DRIVER PROBLEM, saying it could not look; since the second review,
+the same for a refusal ("I do not accept the agreement") that cannot be
+found, which had been read as not chosen: `WindowRules.ReadLicenceOpening`
+gives `CouldNotLook` for either, and `AChoiceMade` only for a choice read
+as made), and **an install of
+2.0.0 or later must have shown the page** (`WindowRules.LicencePageRequiredFor`
+reads the installed `Plantoir.exe`'s product version; a 2.0.0+ install whose
+pages seen hold no Licence Agreement page is PRODUCT STOPPED, and a version
+the driver cannot read is DRIVER PROBLEM rather than a guess). An installer
+older than 2.0.0 (1.9.3 and before) has no page and is walked as before.
+`WindowRulesTests` holds the heading, the names (the refusal is never taken
+for the acceptance), the limit, the check-state reading, the version rule
+(suffixes such as `2.0.0+1ba4ceaf6` read as 2.0.0; `1.10.0` is before it)
+and, as source text, that `Steps.cs` stops on both.
+
+**Measured on the Windows VM, 2026-11-19** (Parallels, Windows 11 Pro
+ARM64, the x64 installer under emulation; snapshot 02, the development
+machine, with Inno Setup 6.7.3 installed by `winget` for this proof and not
+kept). An unsigned installer from the branch (`publish.ps1
+-WithoutAssistantEngine`, commit bf736b7f1, 252.8 MB, about 21 minutes, 630
+s of it Inno's compression), run by hand-equivalent through UI Automation:
+
+- The wizard opened on "Licence Agreement" with both choices unchecked
+  (`BM_GETCHECK`), Next disabled, and the focus in the text box, not on a
+  choice. A click on "I accept the agreement" checked it and enabled Next at
+  once; "I do not accept the agreement" disabled Next again. The two
+  pictures are in the private tools repository's
+  `runs/1010b-captures/` (`1010b-licence-page-as-it-opens.png`,
+  `1010b-licence-page-after-accepting.png`), for Russell to see before this
+  merges.
+- The first install's pages: Licence Agreement > Select Destination
+  Location > Select Additional Tasks > Ready to Install > Installing >
+  Completing; exit 0. `THIRD_PARTY_LICENSES.txt` in the installed folder,
+  the same bytes as the repository's `THIRD_PARTY_LICENSES.md`.
+- Plantoir's update command line over it (`/VERYSILENT /SUPPRESSMSGBOXES
+  /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1`, with `/LOG`): exit 0,
+  "Installation process succeeded." in setup's log, and no visible window
+  of setup or its child in 268 looks at the desktop (every 200 ms, by
+  `EnumWindows` and UI Automation) over the 62 s it ran.
+- Not measured then: a clean machine (the first-install rehearsal needs a
+  signed build), and the driver's own run over the page. The second is
+  measured now (below, "The driver over the page, end to end").
+
+**The keyboard, measured** (the first review of 1010b asked whether a
+keyboard-only teacher could reach and choose "I accept the agreement"; VM as
+above, 2026-11-19). Real keys (SendInput) to the wizard in front, the page
+opened afresh for each row, and after every key the focused control, both
+choices' `BM_GETCHECK` and Next read back (`vm-tools/guest/1010b-keyboard.ps1`
+in the private tools repository). Before: the installer built from
+1ba4ceaf6 (both choices cleared, no Tab stop). After: the installer built
+from this fix (Tab stop on the refusal). The page opens with the focus in the
+text, neither choice chosen and Next disabled, before and after.
+
+| Key, from the page as it opens | Before | After |
+|---|---|---|
+| Tab | the focus goes to Cancel, then back to the text; never to a choice (8 presses) | the focus goes to "I do not accept the agreement", which is chosen; Next stays disabled. Then Cancel, then the text |
+| Shift+Tab | Cancel, then the text; never a choice | Cancel, then "I do not accept the agreement" (chosen; Next disabled) |
+| Up arrow, from "I do not accept" | not reachable | the focus moves to "I accept the agreement", which is chosen; Next enabled |
+| Down arrow, from "I accept" | not reachable | back to "I do not accept the agreement", chosen; Next disabled |
+| Space, on "I accept" | not reachable | stays chosen; Next enabled |
+| Down arrow or Space in the text | nothing changes | nothing changes |
+| Alt+D | "I do not accept" focused and chosen; Next disabled | the same |
+| Alt+A | "I accept" focused and chosen; Next enabled | the same |
+| Up arrow, from "I accept" | not reachable | the focus leaves the pair for the text; "I accept" stays chosen and Next enabled. Inno's stock page does the same (its pair has no group boundary above it), not changed here. The Tab stop sits on the refusal because a Win32 radio button cannot take the keyboard focus without being chosen, so the button Tab lands on is chosen, and Microsoft's "Radio Buttons" guidance (read 2026-11-19) says to "Select the safest (to prevent loss of data or system access) and most secure and private option": not accepting is the safe one |
+
+Three tiny installers with this page and three `InitializeWizard` bodies
+measured the choice of stop first: with both cleared, the same as "Before";
+with the stop on "I accept the agreement", **one Tab from the text chose
+"I accept" and enabled Next**, and the up arrow then left the pair for the
+text (Windows chooses a radio button the keyboard focuses, and Inno's pair
+has no group boundary above it); with the stop on the refusal, the "After"
+column. That is why the stop is on the refusal. What a keyboard user meets
+is Inno's stock page (Tab to "I do not accept", up arrow to accept) with
+one difference: the page opens with neither chosen.
+
+Two more things measured that night. The Win32 `WS_TABSTOP` style reads
+clear on both choices before AND after the fix: Delphi moves the focus on
+Tab itself, from its own `TabStop` property, so a check of the window style
+says nothing about whether Tab reaches a control; press the key and read
+the focus. And at this fix's head (installer built from 612159ca0, 14
+minutes): the page opened as before (the two captures still show it), the
+first install by hand ran Licence Agreement > Select Destination Location >
+Select Additional Tasks > Ready to Install > Installing > Completing, exit
+0; the `/VERYSILENT` update over it showed no window of setup in 268 looks
+and its log says "Installation process succeeded."; and the zip's root
+holds `LICENSE` (1,088 bytes) and `THIRD_PARTY_LICENSES.txt` (12,847
+bytes), each the same bytes as the repository's file.
+
+**The driver over the page, end to end** (the second review of 1010b:
+`AnswerLicencePage` had never run). Neither `win-rehearsal.py` nor the
+driver could start from an installer already on the machine: the
+rehearsal restores a clean snapshot and downloads with Edge, and Edge
+holds an unsigned branch build at "isn't commonly downloaded" (#965), so a
+real rehearsal of this page waits for a signed candidate. Loosening either
+of those would weaken what PASSED means. Instead the driver has an opt-in
+mode, `PlantoirFirstInstall.exe --self-test-install <PlantoirSetup.exe>
+--out <folder>`, which runs step 2 alone (the same `Steps_.Install`, with
+the same window watch, allow-list and proof-of-looking rules) on a file
+already on the machine, and ends `SELF-TEST INSTALL DONE` (status
+`self-test-install-done`, exit 5), never PASSED; `win-rehearsal.py` does
+not know that status and would read it as DRIVER PROBLEM
+(`WindowRulesTests.TheInstallSelfTestCanNeverSayPassed`). Run on the VM's
+snapshot 02, 2026-11-19, against the installer built from 84cb5c91d
+(`vm-tools/guest/1010b-driver-install.ps1`), the driver's own lines:
+
+```text wrap
+installer page: "Licence Agreement"
+installer: "Licence Agreement" opened with "I accept the agreement" not chosen and "I do not accept the agreement" not chosen [screenshot shot-03-licence-page]
+installer: chose "I accept the agreement" on "Licence Agreement"
+installer: pressed Next on "Licence Agreement"
+installer finished; pages: Licence Agreement > Select Destination Location > Select Additional Tasks > Ready to Install > Installing > Completing the Plantoir Setup Wizard
+installed C:\Users\<account>\AppData\Local\Programs\Plantoir\Plantoir.exe, version 2.0.0
+DRIVER RESULT (...): SELF-TEST INSTALL DONE
+```
+
+84 looks, none failed, largest gap 3.8 s. Plantoir's `/VERYSILENT` update
+over that install: exit 0, no visible window of setup in 370 looks,
+"Installation process succeeded."; the installed and the zip's
+`THIRD_PARTY_LICENSES.txt` are the repository's notice byte for byte and
+hold the Microsoft terms. **Still unproven until a signed candidate
+exists:** the whole rehearsal on a clean machine (download with the mark
+of the web, SmartScreen, then steps 3 to 7), and the page on the clean
+machines 11 to 16 (a standard user, an accented name, French, hardened,
+a nearly full disk).
+
+**Rejected** (the design, `vm-tools/reference/1010-installer-licence-page-design.md`
+in the private tools repository):
+
+- **Option B, an Information page read and passed with Next**
+  (`InfoBeforeFile`). Nothing new for the rehearsal and no choice to make,
+  but there is no act of agreeing, only reading, which is weaker for the
+  Community terms' "require ... end users to agree", and Microsoft's First
+  Experience page describes setup as requiring the user to "accept" a EULA.
+- **Option C, no page: the notice installed and a Licences link in About.**
+  Closest to the Mac and to Apple's HIG, "Onboarding" ("Avoid displaying
+  licensing details within your onboarding flow"), but it is not what
+  Russell ruled ("the Windows installer gains a licence page") and asks no
+  end user to agree to anything.
+- **Inno's own default of "I do not accept" checked.** Microsoft's guidance
+  above; a legal choice has no default.
+- **Keeping Inno's "License" wording** (the design's recommendation, every
+  Windows installer a teacher has seen says it). Russell ruled "Licence", the
+  spelling the rest of Plantoir uses.
+- **An RTF licence file.** Not needed: plain text stays readable in the
+  modern wizard style, light or dark, with no colours to check.
+
+**The Mac owes nothing, and no `mac` issue is opened.** The Mac ships a
+drag-and-drop disk image with no licence screen, and it carries nothing of
+Microsoft's, so there is no third party's terms for its users to agree to.
+It inherits the root `LICENSE` (its Info.plist already says "MIT License").
+
+**The indemnity.** The Community terms also ask the distributor to
+"indemnify, defend, and hold harmless Microsoft" against claims about the
+program; that is Russell's own undertaking as the licence holder, recorded
+on #1010 to be confirmed with him before the v2.0.0 Windows release, and
+nothing in the installer or the app carries it.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 

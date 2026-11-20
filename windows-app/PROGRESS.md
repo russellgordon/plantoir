@@ -19,6 +19,27 @@ Branch `issue/1009-win-stop-by-keyboard`. Built and tested on the Windows VM (Pa
 - The console's visible Cancel holds Escape through a `KeyboardAccelerator` on the button (no key handler, no hidden control), decided as each key arrives: not while an editable text box has the focus, a dialog is up, the preview's site covers the console, or Cancel is off screen. A preview stops at once; a deploy asks "Stop the deploy?" (Stop Deploy the default, Cancel on the right) with "Don't ask again", counted only with Stop. File ▸ Settings ▸ Deploying opens with Stopping. Trail: `stop question setting changed`, off the ledger.
 - The words moved into `shared-rules.json` → `stopQuestions` (added from Windows; the mac owes a pinning test and a case runner). Windows' footer names Escape alone: Windows has no Command-Period.
 - Not built: "Stop this share?" has nothing to stop until #824. Tests: `StopQuestionsContractTests`, `StopByKeyboardUiTests` (3 real-key tests, each red under its sabotage). Details: documentation/12, "Escape stops a running preview or deploy, and the stop questions (#1009, the mac's #988)".
+- First review's fixes: the console's own Stop goes the way Cancel goes (asks, is swept, reads "Cancelled"); every stop decision reads one "under way" rule (`ScriptRunner.IsUnderWay`: running, or between a leg's build and its deploy), so the question stays across that change and a press in the gap asks; an open Settings follows the question's Don't ask again.
+
+## 2026-11-19 — a missing assistant dimmed in the menu bar and on Fix with (#990, the mac's D11 and Q14)
+
+Branch `issue/990-menus-windows`, on the mac's `issue/990-menus`. Lenovo 20QES70500 over SSH.
+
+- Fix with Claude… / Codex…: both drawn on every live course, each enabled only when its assistant is installed and a row is handed over (`buttonCases`' `claudeEnabled`/`codexEnabled`); a missing one says "Not set up on this PC." to Narrator and as its tooltip. The contract's second sentence (Settings ▸ Other Assistants) is held by name against #903, which builds that page.
+- Course ▸ and Section ▸ Revise With ▸ Claude… and Codex…: always drawn, dimmed when not installed (`SubjectMenuRules.EnabledInTheMenuBar`, re-read on `OutsideAssistantPresence.Changed` and at the click). A row's context menu still hides them.
+- Course ▸ Rename's grey reason line is gone (ruling Q14); the row's context menu keeps its notes.
+- Not on Windows, so nothing done: Set Up an Assistant… (no set-up until #903, so no Help item to remove), the deployed folder's context-menu group (#889).
+- Shortcuts unchanged; whether Windows follows the mac's ⌘Y / ⇧⌘K is a question for Russell (Ctrl+Y is Redo). Tests: `ReviseWithPresenceTests` (new), `FixWithAssistantContractTests`. Details: documentation/12, "Revise With: dimmed in the menu bar, hidden in a row's menu (#990)".
+
+## 2026-11-19 — the installer opens on a Licence Agreement page (#1010, piece 1010b)
+
+Branch `issue/1010b-installer-licence-page` (on `night2/integration-2`). Built and proven on the Windows VM (Parallels, Windows 11 Pro ARM64, the installer x64 under emulation), not on the PC.
+
+- Russell's rulings of 2026-11-19 (option A): Inno Setup's License Agreement page, first, titled "Licence Agreement", with Plantoir's MIT text (a new root `LICENSE`, carried word for word), the third-party notice and the terms for Microsoft's `vcruntime140.dll`; neither choice made when it opens, Next disabled until "I accept the agreement"; skipped by Plantoir's own `/VERYSILENT` update, so a teacher already on 1.x is updated silently and not asked (ruling 5); a newer installer run by hand asks again. The notice is installed as `{app}\THIRD_PARTY_LICENSES.txt`, and the portable zip carries it and `LICENSE` beside the app (ruling 6).
+- Keyboard (first review's MEDIUM): clearing both choices had taken them out of the Tab order; the refusal gets the pair's Tab stop back, so Tab lands on "I do not accept" (Next stays disabled) and the up arrow chooses "I accept the agreement". Measured key by key on the VM (documentation/12).
+- The first-install rehearsal's driver chooses "I accept the agreement" by name and stops PRODUCT STOPPED if it cannot, or if an install of 2.0.0 or later never showed the page; a choice whose state it cannot read is DRIVER PROBLEM, never "not chosen".
+- Second review: the terms for `vcruntime140.dll` are in `THIRD_PARTY_LICENSES.md` too (a section that says only the Windows app carries the file), so the zip's and `{app}`'s notice carry them; the same words as the page, held equal by a test. The driver reads a refusal it cannot find as DRIVER PROBLEM, and gains `--self-test-install <file>` (step 2 alone on an installer already on the machine, never PASSED) so `AnswerLicencePage` can run before a signed candidate exists.
+- Tests: `InstallerLicencePageTests` (12 facts, 1 theory), `WindowRulesTests` (9: 2 at first, 5 since the first review, 2 since the second). No `mac` issue: the Mac has no licence screen and carries nothing of Microsoft's. Details: documentation/12, "The Licence Agreement page in the installer (#1010)".
 
 ## 2026-11-19 — the About panel's links are links of their own (#993, the mac's D46)
 

@@ -103,7 +103,9 @@ final class AssistantSetUpContractTests: XCTestCase {
     func testTheItemsAndLimitsAreTheContracts() throws {
         let block: [String: Any] = try AssistantSetUpContractTests.setUpBlock()
         XCTAssertEqual(block["menuItem"] as? String, AssistantSetUpWording.menuItem)
-        XCTAssertEqual(block["helpMenuItem"] as? String, AssistantSetUpWording.helpMenuItem)
+        // #990 (Russell's ruling Q10): Revise With ▸ only, so the Help
+        // menu's copy is gone from the contract too.
+        XCTAssertNil(block["helpMenuItem"], "Set Up an Assistant… is in Revise With only")
         XCTAssertEqual(block["helpAnchor"] as? String, AssistantSetUp.helpAnchor)
         let minutes: Int = try XCTUnwrap(block["longestRunMinutes"] as? Int)
         XCTAssertEqual(Int64(minutes), SetUpRunner.longestRunMinutes)

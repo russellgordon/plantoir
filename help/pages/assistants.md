@@ -43,7 +43,7 @@ An outside assistant is a separate program, made by another company. You sign in
 
 Plantoir can open that program in your working folder, on one of your courses, with what it needs to know about the course. You then type to the assistant in its own window.
 
-- Plantoir installs an outside assistant only when you ask it to. You can also install one yourself. To have Plantoir do it, choose {{menu:helpSetUpAnAssistant}}. See [Set up an assistant's command-line tool](page:set-up-assistant).
+- Plantoir installs an outside assistant only when you ask it to. You can also install one yourself. To have Plantoir do it, choose {{menu:reviseWithSetUpAnAssistant}}. See [Set up an assistant's command-line tool](page:set-up-assistant).
 - Plantoir never signs in for you. Signing in is done in the assistant's own window, with its maker.
 - When Plantoir opens an assistant on a course, it does not check whether you are signed in, or what kind of account you have.
 - What an outside assistant reads is sent to its maker's service.
@@ -52,7 +52,7 @@ Plantoir can open that program in your working folder, on one of your courses, w
 
 Plantoir works with three, and names them as its menus do: Claude, Codex and GitHub Copilot. Each is a program that runs in a terminal window: Claude Code, Codex, and GitHub Copilot's command-line tool.
 
-Plantoir looks for each program on this {{machine}} and finds it where its installer put it. The menu items and buttons of an assistant that is not installed are hidden, not greyed. Each of the three is shown or hidden on its own. The Revise With menus are always there, and always end with an item that opens the settings for setting an assistant up.
+Plantoir looks for each program on this {{machine}} and finds it where its installer put it. An assistant that is not installed is still listed in the menu bar's Revise With menus and on a section's {{control:problemsTab}} tab, dimmed. It is left out of the menu that opens when you right-click a row, and of the {{control:courseDetailPlanningTab}} tab. The Revise With menus are always there, and always end with an item that opens the settings for setting an assistant up.
 
 ## Where each appears
 

@@ -8068,9 +8068,11 @@ ran `/mcp disable plantoir` gets sessions with no Plantoir tools, which
 
 **Where a teacher without Copilot is sent.** Russell, 2026-11-13: wherever
 Plantoir offers Copilot to a teacher who does not have it, it links Help's
-`github-education` page (#839). This door is hidden while Copilot is not
-installed, so it offers Copilot to nobody who lacks it; the first such offer
-is #855's set-up item. The anchors are recorded in
+`github-education` page (#839). Since #990 the door is drawn in the menu
+bar's Revise With on every Mac and dimmed while Copilot is not installed (a
+row's context menu still leaves it out); a dimmed item cannot be chosen, so
+it offers Copilot to nobody who lacks it. The offer is #855's set-up item,
+at the end of Revise With only since #990. The anchors are recorded in
 `outsideAgents.agents[copilot].helpAnchors`.
 
 **What #855 builds on.** `CopilotLauncher.findCopilot()` and
@@ -9687,9 +9689,10 @@ teacher there and never to share or deploy a plan itself.
 **What it is.** Settings ▸ Other Assistants lists GitHub Copilot, Claude Code
 and Codex (in that order: GitHub's plans page says every plan includes
 Copilot), each with what is true of it now and one next step. It is reached
-three ways (ruling 3): the pane's own tab, Help ▸ Set Up an Assistant…, and
-Revise With ▸ Set Up an Assistant…, last in every Revise With submenu.
-The two menu items open the pane and set up nothing themselves. **Revise With
+two ways since #990: the pane's own tab, and Revise With ▸ Set Up an
+Assistant…, last in every Revise With submenu (ruling 3 made it three, with
+Help ▸ Set Up an Assistant…, which Russell's ruling Q10 of the HIG review
+removed). The menu item opens the pane and sets up nothing itself. **Revise With
 is now always drawn** (ruling, 2026-11-13): a teacher with no assistant at all
 sees it holding the one set-up item. Until #855 a teacher with none saw no
 sign that any existed (`outsideAgents.hiddenWhenNotInstalledWhy`, rewritten).

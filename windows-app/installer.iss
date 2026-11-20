@@ -44,9 +44,35 @@ WizardStyle=modern
 CloseApplications=yes
 CloseApplicationsFilter=*Plantoir*,*plantoir-mcp*,*llama-server*
 UninstallDisplayIcon={app}\Plantoir.exe
+; The Licence Agreement page (#1010, Russell's rulings of 2026-11-19, option
+; A): Plantoir's MIT text (the same words as the repository's LICENSE), the
+; third-party notice, and the terms for Microsoft's vcruntime140.dll that the
+; Visual Studio Community licence asks end users to agree to. Inno shows it
+; first, before the folder, and lets Next work only while "I accept the
+; agreement" is chosen. It is never shown under /SILENT or /VERYSILENT (Inno
+; skips the page unless the install is a normal, visible one), so Plantoir's
+; own update passes it by: a teacher already on 1.x is updated silently and
+; never asked (Russell, 2026-11-19, ruling 5). A newer installer run by hand
+; is a visible install, so it shows the page again and asks again.
+; The page's words are in [Messages]; InitializeWizard clears its default
+; choice and gives the pair its Tab stop. documentation/12-windows-app.md,
+; "The Licence Agreement page".
+LicenseFile=installer-licence.txt
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+
+; Every message the Licence Agreement page shows, in the spelling the rest of
+; Plantoir uses (Russell, 2026-11-19, ruling 4: "Licence"). Default.isl says
+; "License" in the title and in the sentence above the text; the other three
+; are Default.isl's own words, set here too so the whole page is written in
+; one place and an Inno upgrade cannot change it unseen.
+[Messages]
+WizardLicense=Licence Agreement
+LicenseLabel=Please read the following important information before continuing.
+LicenseLabel3=Please read the following Licence Agreement. You must accept the terms of this agreement before continuing with the installation.
+LicenseAccepted=I &accept the agreement
+LicenseNotAccepted=I &do not accept the agreement
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -93,6 +119,9 @@ Type: filesandordirs; Name: "{app}\Toolchain\scripts\__pycache__"
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The third-party notice the Licence Agreement page names (#1010), beside the
+; files it describes. Renamed .txt so a double-click opens it in Notepad.
+Source: "..\THIRD_PARTY_LICENSES.md"; DestDir: "{app}"; DestName: "THIRD_PARTY_LICENSES.txt"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\Plantoir"; Filename: "{app}\Plantoir.exe"
@@ -151,6 +180,31 @@ begin
         Exec(ExpandConstant('{param:RETURNTO|}'), '--update-not-installed', '', SW_SHOW, ewNoWait, ResultCode);
     end;
   end;
+end;
+
+// The Licence Agreement page opens with neither choice made (#1010). Inno
+// checks "I do not accept the agreement" when the page is created; Microsoft's
+// guidance for a setting with legal implications, such as a licence
+// agreement, is that it "can't have default selections" (Windows desktop UX
+// guide, "First Experience"). With neither checked, Inno keeps Next disabled
+// (it enables Next only while LicenseAcceptedRadio is checked) until the
+// teacher chooses "I accept the agreement".
+//
+// The pair keeps one Tab stop, on "I do not accept the agreement" (#1010
+// review). Delphi's radio button sets its Tab stop to match Checked, so
+// clearing both took the pair out of the Tab order: measured on the Windows
+// VM, Tab went only between the text and Cancel, and Alt+A was the one way
+// in. Windows chooses a radio button when the keyboard moves the focus onto
+// it, so the stop is on the safe choice: Tab lands on "I do not accept" (Next
+// stays disabled), the up arrow moves to "I accept the agreement" and
+// chooses it, and Alt+A still chooses it directly. A Tab stop on "I accept"
+// would accept the agreement by Tab alone. Microsoft: a group of radio
+// buttons has a single Tab stop and the arrow keys move within it.
+procedure InitializeWizard;
+begin
+  WizardForm.LicenseNotAcceptedRadio.Checked := False;
+  WizardForm.LicenseAcceptedRadio.Checked := False;
+  WizardForm.LicenseNotAcceptedRadio.TabStop := True;
 end;
 
 function WantsRelaunch: Boolean;

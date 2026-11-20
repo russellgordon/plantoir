@@ -36,12 +36,12 @@ description: Open Claude, Codex or GitHub Copilot on a course from the Revise Wi
 ---
 Revise With opens an outside assistant on a course: Claude, Codex or GitHub Copilot. The assistant starts in a terminal window, already told which course you are working on. You type to it there.
 
-You sign in to the assistant yourself, with your own account. You can install it yourself, or ask Plantoir to set it up: choose {{menu:helpSetUpAnAssistant}}, and see [Set up an assistant's command-line tool](page:set-up-assistant). [About the assistants (optional)](page:assistants) says what an outside assistant is.
+You sign in to the assistant yourself, with your own account. You can install it yourself, or ask Plantoir to set it up: choose {{menu:reviseWithSetUpAnAssistant}}, and see [Set up an assistant's command-line tool](page:set-up-assistant). [About the assistants (optional)](page:assistants) says what an outside assistant is.
 
 ## Open the assistant on a course
 
 1. In the sidebar, select the course.
-2. Choose {{menu:courseReviseWithClaude}} from the menu bar. For another assistant, choose {{menu:courseReviseWithCodex}} or {{menu:courseReviseWithCopilot}} instead. Each item shows only when that program is installed on this {{machine}}.
+2. Choose {{menu:courseReviseWithClaude}} from the menu bar. For another assistant, choose {{menu:courseReviseWithCodex}} or {{menu:courseReviseWithCopilot}} instead. Each item can be chosen only when that program is installed on this {{machine}}. Otherwise it is dimmed in the menu bar, and left out of the menu that opens when you right-click a row.
 
 {{picture:revise-with-1}}
 alt: The Course menu with Revise With open and the item for Claude marked.

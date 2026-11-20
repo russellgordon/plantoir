@@ -650,4 +650,158 @@ public class WindowRulesTests
         Assert.Equal(Settling.KeepLooking, WindowRules.Settle(0, TimeSpan.FromSeconds(3), false));
         Assert.Equal(Settling.NoRecentLook, WindowRules.Settle(2, WindowRules.SettleLimit, false));   // a stale pending set says nothing
     }
+
+    // #1010: the installer's Licence Agreement page, answered by step 2.
+
+    [Fact]
+    public void TheLicencePageIsKnownByItsHeadingInEitherSpelling()
+    {
+        Assert.True(WindowRules.IsLicencePage("Licence Agreement"));
+        Assert.True(WindowRules.IsLicencePage("License Agreement"));   // Inno's own, should the override be lost
+        Assert.False(WindowRules.IsLicencePage("Select Destination Location"));
+        Assert.False(WindowRules.IsLicencePage("Information"));   // a page to read is not an agreement to accept
+        Assert.False(WindowRules.IsLicencePage(""));
+    }
+
+    [Fact]
+    public void TheAcceptChoiceIsFoundByItsNameOnly()
+    {
+        Assert.Equal("I accept the agreement", WindowRules.LicenceAcceptName);
+        Assert.True(WindowRules.IsChoiceNamed("I accept the agreement", WindowRules.LicenceAcceptName));
+        Assert.True(WindowRules.IsChoiceNamed("I &accept the agreement", WindowRules.LicenceAcceptName));
+        // The refusal is never taken for the acceptance, nor the acceptance for the refusal.
+        Assert.False(WindowRules.IsChoiceNamed("I do not accept the agreement", WindowRules.LicenceAcceptName));
+        Assert.False(WindowRules.IsChoiceNamed("I accept the agreement", WindowRules.LicenceRefuseName));
+        Assert.True(WindowRules.IsChoiceNamed("I &do not accept the agreement", WindowRules.LicenceRefuseName));
+        Assert.Equal(TimeSpan.FromSeconds(30), WindowRules.LicenceNextLimit);
+    }
+
+    // The #1010 review's two lows on the driver.
+
+    [Fact]
+    public void AChoiceWhoseStateCannotBeReadIsNotNotChosen()
+    {
+        Assert.True(WindowRules.CheckStateMeans(1));    // BST_CHECKED
+        Assert.False(WindowRules.CheckStateMeans(0));   // BST_UNCHECKED
+        Assert.Null(WindowRules.CheckStateMeans(2));    // BST_INDETERMINATE: no radio button is ever this
+        Assert.Null(WindowRules.CheckStateMeans(-1));
+        Assert.Null(WindowRules.CheckStateMeans(4));    // BST_PUSHED alone: not a check state
+    }
+
+    /// <summary>
+    /// The second #1010 review: a refusal that cannot be found was read as
+    /// "not chosen" (<c>refuse is null ? false</c>), so a page whose refusal
+    /// the driver could not see passed as opening with neither chosen. It is
+    /// CouldNotLook now, a DRIVER PROBLEM, like an unreadable state.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false, false, "NeitherChosen")]
+    [InlineData(false, false, null, "CouldNotLook")]    // the refusal not found
+    [InlineData(false, false, false, "CouldNotLook")]   // not found, whatever a caller passes for its state
+    [InlineData(true, null, false, "CouldNotLook")]     // the acceptance unreadable
+    [InlineData(true, false, null, "CouldNotLook")]     // the refusal unreadable
+    [InlineData(true, null, null, "CouldNotLook")]
+    [InlineData(true, true, false, "AChoiceMade")]
+    [InlineData(true, false, true, "AChoiceMade")]
+    [InlineData(false, true, null, "AChoiceMade")]      // "I accept" chosen is a product fault even with the refusal missing
+    [InlineData(true, true, null, "AChoiceMade")]
+    public void AChoiceThatCannotBeFoundOrReadIsNeverNotChosen(bool refuseFound, bool? acceptChosen, bool? refuseChosen, string expected)
+    {
+        // By name: the enum is internal to the driver, and a public theory cannot take it.
+        Assert.Equal(Enum.Parse<LicenceOpening>(expected), WindowRules.ReadLicenceOpening(refuseFound, acceptChosen, refuseChosen));
+    }
+
+    [Theory]
+    [InlineData("2.0.0", true)]
+    [InlineData("2.0.0+1ba4ceaf6", true)]
+    [InlineData("2.0.1", true)]
+    [InlineData("2.1", true)]
+    [InlineData("10.0.0", true)]
+    [InlineData("1.9.3", false)]
+    [InlineData("1.9.3+abc", false)]
+    [InlineData("1.10.0", false)]
+    public void TheLicencePageIsOwedFromTwoPointZero(string productVersion, bool owed)
+    {
+        Assert.Equal(owed, WindowRules.LicencePageRequiredFor(productVersion));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("two")]
+    [InlineData("v2.0.0")]
+    public void AVersionThatCannotBeReadOwesNoGuess(string? productVersion)
+    {
+        Assert.Null(WindowRules.LicencePageRequiredFor(productVersion));
+    }
+
+    [Fact]
+    public void TheLicencePageIsFoundAmongThePagesSeen()
+    {
+        Assert.True(WindowRules.LicencePageWasSeen(new[] { "Licence Agreement", "Select Destination Location", "Ready to Install" }));
+        Assert.True(WindowRules.LicencePageWasSeen(new[] { "Select Destination Location", "License Agreement" }));
+        Assert.False(WindowRules.LicencePageWasSeen(new[] { "Select Destination Location", "Select Additional Tasks", "Ready to Install", "Installing" }));
+        Assert.False(WindowRules.LicencePageWasSeen(Array.Empty<string>()));
+    }
+
+    /// <summary>
+    /// The driver's own source uses the rules above as the review asked: an
+    /// unreadable choice stops the run as a DRIVER PROBLEM, and an install of
+    /// 2.0.0 or later that never showed the page is PRODUCT STOPPED. Read as
+    /// text, because Steps.cs needs UI Automation and is not compiled here.
+    /// </summary>
+    [Fact]
+    public void TheDriverStopsOnBothAsTheReviewAsked()
+    {
+        string steps = DriverSource("Steps.cs");
+        Assert.Contains("private static bool? IsChosen(AutomationElement radio)", steps);
+        Assert.Contains("return WindowRules.CheckStateMeans(", steps);
+        Assert.Contains("catch { return null; }", steps);
+        string lines = steps.Replace("\r\n", "\n");
+        Assert.Contains("bool? refuseChosen = refuse is null ? null : IsChosen(refuse);", steps);
+        Assert.DoesNotContain("refuse is null ? false", steps);
+        Assert.Contains("var opening = WindowRules.ReadLicenceOpening(refuse is not null, acceptChosen, refuseChosen);", steps);
+        Assert.Contains("if (opening == LicenceOpening.AChoiceMade)\n                throw Stopped.Product(", lines);
+        Assert.Contains("if (opening == LicenceOpening.CouldNotLook)\n                throw Stopped.Driver(", lines);
+        Assert.Contains("bool? licenceRequired = WindowRules.LicencePageRequiredFor(version.ProductVersion);", steps);
+        Assert.Contains("if (licenceRequired is null)\n            throw Stopped.Driver(", steps.Replace("\r\n", "\n"));
+        Assert.Contains("if (licenceRequired == true && !WindowRules.LicencePageWasSeen(pagesSeen))\n            throw Stopped.Product(", steps.Replace("\r\n", "\n"));
+    }
+
+    /// <summary>
+    /// The second #1010 review asked for AnswerLicencePage to run end to end
+    /// before a signed candidate exists. --self-test-install runs step 2 alone
+    /// on an installer already on the machine; it must never be able to say
+    /// PASSED (no download, no mark of the web, steps 3 to 7 not run), and
+    /// win-rehearsal.py, which does not know its status word, reads it as a
+    /// DRIVER PROBLEM if it ever meets one.
+    /// </summary>
+    [Fact]
+    public void TheInstallSelfTestCanNeverSayPassed()
+    {
+        string program = DriverSource("Program.cs").Replace("\r\n", "\n");
+        int mode = program.IndexOf("if (installOnly is not null)", StringComparison.Ordinal);
+        int fullRun = program.IndexOf("Steps1To6(url);\n", StringComparison.Ordinal);
+        Assert.True(mode >= 0 && fullRun > mode, "the install self-test is not decided before the full run");
+        string branch = program[mode..fullRun];
+        Assert.Contains("Steps_.Install(installOnly);", branch);
+        Assert.Contains("return Finish(Outcome.SelfTestInstallOnly,", branch);
+        Assert.DoesNotContain("Outcome.Passed", branch);
+        Assert.DoesNotContain("FinalWatch()", branch);
+        Assert.Contains("Outcome.SelfTestInstallOnly => \"self-test-install-done\",", program);
+        Assert.DoesNotContain("SelfTestInstallOnly => 0", program);
+    }
+
+    private static string DriverSource(string file)
+    {
+        var folder = new DirectoryInfo(AppContext.BaseDirectory);
+        while (folder is not null)
+        {
+            string candidate = Path.Combine(folder.FullName, "Plantoir.UiTests.FirstInstall", file);
+            if (File.Exists(candidate)) return File.ReadAllText(candidate);
+            folder = folder.Parent;
+        }
+        throw new FileNotFoundException($"no Plantoir.UiTests.FirstInstall/{file} above {AppContext.BaseDirectory}");
+    }
 }

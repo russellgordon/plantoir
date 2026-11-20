@@ -269,7 +269,7 @@ final class CourseDetailStructureTests: XCTestCase {
         )
         XCTAssertTrue(commands.maySave)
         XCTAssertFalse(commands.mayRevert, "Revert is not offered out of sight")
-        XCTAssertEqual(commands.revertNote, PlanningWording.revertOnPlanning, "and says why")
+        XCTAssertEqual(commands.revertHelp, PlanningWording.revertOnPlanning, "and its help tag says why (#990 review)")
         commands.perform(.saveCourseSettings)
         // Read at once, before anything waits: "Saved ✓" fades on a clock
         // of its own (708 fix review 2, L4).
