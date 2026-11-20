@@ -127,7 +127,7 @@ nonisolated enum UndoCheck {
             return UndoJSONMember.state(of: op, in: item)
         case .recompute:
             return .after
-        case .move, .createTree, .removeTree, .external, .none:
+        case .move, .moveApart, .createTree, .removeTree, .external, .none:
             return .neither
         }
     }
@@ -180,12 +180,20 @@ nonisolated enum UndoCheck {
     /// for an undo), so several lines on one page make one staged file. A
     /// move, a tree or an external op is judged on its own against what is
     /// there now (`wholeState`), and becomes one change of its own.
+    ///
+    /// `leavesApart` is true for an Undo or a Redo (never for making a step,
+    /// nor for recovery): an op that stands apart (`UndoOp.standsApart`)
+    /// and is found changed since, or an external op that cannot be set
+    /// back now, is then LEFT where it is and named in `leftApart` instead
+    /// of refusing the step, and the rest goes ahead (Russell's ruling of
+    /// 2026-11-19 on Q3; #959; #897 piece B, seams 2 and 4).
     static func plan(
         _ ops: [UndoOp],
         direction: UndoDirection,
         root: URL,
         journal: UndoJournal,
-        places: UndoExternalPlaces = UndoAppPreferences()
+        places: UndoExternalPlaces = UndoAppPreferences(),
+        leavesApart: Bool = false
     ) -> UndoPlan {
         var ordered: [UndoOp] = ops
         if direction == .backward {
@@ -209,6 +217,7 @@ nonisolated enum UndoCheck {
         var recomputes: [UndoOp] = []
         var wholeTargets: [UndoSwapTarget] = []
         var cannotTellPath: String? = nil
+        var leftApart: [String] = []
 
         for op in ordered {
             guard let kind = op.knownKind else {
@@ -248,7 +257,16 @@ nonisolated enum UndoCheck {
                     }
                     continue
                 }
-                if verdict == .changedSince {
+                var cannotGoBack: Bool = verdict == .changedSince
+                if !cannotGoBack, op.knownKind == .external, let target = op.target {
+                    let wanted: UndoJSON? = direction == .backward ? op.valueBefore : op.valueAfter
+                    cannotGoBack = !places.canSet(target, wanted)
+                }
+                if cannotGoBack {
+                    if leavesApart && op.standsApart {
+                        leftApart.append(op.placeName)
+                        continue
+                    }
                     if !inTheWay.contains(op.placeName) {
                         inTheWay.append(op.placeName)
                     }
@@ -358,7 +376,7 @@ nonisolated enum UndoCheck {
         for target in wholeTargets {
             targets.append(target)
         }
-        return .ready(targets: targets, recomputes: recomputes)
+        return .ready(targets: targets, recomputes: recomputes, leftApart: leftApart)
     }
 
     /// The content after moving one op one way, or nil when a blob it needs
@@ -389,7 +407,7 @@ nonisolated enum UndoCheck {
             return UndoHunk.moved(op, from: item, direction: direction)
         case .editJSON:
             return UndoJSONMember.moved(op, from: item, direction: direction)
-        case .recompute, .move, .createTree, .removeTree, .external, .none:
+        case .recompute, .move, .moveApart, .createTree, .removeTree, .external, .none:
             return item
         }
     }
@@ -399,7 +417,7 @@ nonisolated enum UndoCheck {
     /// when content it needs is there and cannot be read.
     static func wholeTarget(_ op: UndoOp, direction: UndoDirection, root: URL, journal: UndoJournal) throws -> UndoSwapTarget? {
         switch op.knownKind {
-        case .move:
+        case .move, .moveApart:
             guard let from = op.from, let to = op.to else {
                 return nil
             }
@@ -453,7 +471,9 @@ nonisolated enum UndoCheck {
 
 /// What a check found.
 nonisolated enum UndoPlan: Equatable, Sendable {
-    case ready(targets: [UndoSwapTarget], recomputes: [UndoOp])
+    /// `leftApart`: the places of ops that stand apart and are left where
+    /// they are (`UndoCheck.plan`'s `leavesApart`), in the order judged.
+    case ready(targets: [UndoSwapTarget], recomputes: [UndoOp], leftApart: [String])
     case refused(UndoRefusal)
     /// Content the step needs is there and cannot be read (a failing disk):
     /// refused for this attempt, the list left as it is.
@@ -1200,8 +1220,12 @@ nonisolated struct UndoAsideFolder: Equatable, Sendable {
 
 /// How an undo or a redo went.
 nonisolated enum UndoOutcome: Equatable, Sendable {
-    case undone(seq: Int)
-    case redone(seq: Int)
+    /// `leftApart`: what stands apart from the step and was left where it
+    /// is (a rollover's marker after a deploy filled its place, a deploy set
+    /// for later whose moment has gone by), by place, for U7 to say once
+    /// (Russell's ruling of 2026-11-19 on Q3). Empty for every other step.
+    case undone(seq: Int, leftApart: [String] = [])
+    case redone(seq: Int, leftApart: [String] = [])
     case nothingToUndo
     case nothingToRedo
     /// A newer step is still being made, undone or redone
@@ -1283,7 +1307,7 @@ nonisolated extension UndoJournal {
     ) async -> UndoOutcome {
         await UndoRecovery.recoverAndRederive(self, resolveRoot: resolveRoot, places: places)
         let outcome: UndoOutcome = undoNewest(resolveRoot: resolveRoot, places: places)
-        if case .undone(let seq) = outcome {
+        if case .undone(let seq, _) = outcome {
             await UndoMaintainers.rederive(stepNumbered: seq, in: self, resolveRoot: resolveRoot)
         }
         return outcome
@@ -1297,7 +1321,7 @@ nonisolated extension UndoJournal {
     ) async -> UndoOutcome {
         await UndoRecovery.recoverAndRederive(self, resolveRoot: resolveRoot, places: places)
         let outcome: UndoOutcome = redoNewest(resolveRoot: resolveRoot, places: places)
-        if case .redone(let seq) = outcome {
+        if case .redone(let seq, _) = outcome {
             await UndoMaintainers.rederive(stepNumbered: seq, in: self, resolveRoot: resolveRoot)
         }
         return outcome
@@ -1373,11 +1397,13 @@ nonisolated extension UndoJournal {
         }
 
         // 2. Check every op, writing nothing.
-        let plan: UndoPlan = UndoCheck.plan(record.step.ops, direction: direction, root: root, journal: self, places: places)
+        let plan: UndoPlan = UndoCheck.plan(
+            record.step.ops, direction: direction, root: root, journal: self, places: places, leavesApart: true
+        )
         if UndoKillPoints.stopsHere(.afterTheCheck) {
             return .stoppedByATest
         }
-        guard case .ready(let targets, let recomputes) = plan else {
+        guard case .ready(let targets, let recomputes, let leftApart) = plan else {
             if case .refused(let refusal) = plan {
                 if refusal == .notReadable {
                     return .notAvailable
@@ -1431,7 +1457,7 @@ nonisolated extension UndoJournal {
         // (`undoNewestAndRederive`, `UndoMaintainers`).
         _ = recomputes
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
-        return direction == .backward ? .undone(seq: seq) : .redone(seq: seq)
+        return direction == .backward ? .undone(seq: seq, leftApart: leftApart) : .redone(seq: seq, leftApart: leftApart)
     }
 
     /// What a refusal that can never succeed does to the list. The page was

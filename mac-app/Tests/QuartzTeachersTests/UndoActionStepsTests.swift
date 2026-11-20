@@ -62,6 +62,11 @@ final class UndoActionStepsTests: XCTestCase {
 
         let recomputes: [(path: String, maintainer: String, section: Int?)]
 
+        /// Each file moved (U3b: a rollover's record fragments, `move`, and
+        /// its site markers, `moveApart`), in op order: where from, where
+        /// to, its bytes, and whether it stands apart from its step.
+        let moves: [(from: String, to: String, content: Data, standsApart: Bool)]
+
         let opKinds: [String]
 
         let phase: UndoStepPhase
@@ -91,8 +96,17 @@ final class UndoActionStepsTests: XCTestCase {
         var paths: [String] = []
         var kinds: [String] = []
         var recomputes: [(path: String, maintainer: String, section: Int?)] = []
+        var moves: [(from: String, to: String, content: Data, standsApart: Bool)] = []
         for op in record.step.ops {
             kinds.append(op.kind)
+            if op.knownKind == .move || op.knownKind == .moveApart {
+                let from: String = op.from ?? ""
+                moves.append((
+                    from: from, to: op.to ?? "", content: before[from] ?? Data(),
+                    standsApart: op.knownKind == .moveApart
+                ))
+                continue
+            }
             if op.knownKind == .recompute {
                 recomputes.append((path: op.path ?? "", maintainer: op.maintainer ?? "", section: op.section))
                 continue
@@ -111,7 +125,7 @@ final class UndoActionStepsTests: XCTestCase {
         }
         return Recorded(
             name: name, action: record.step.action?.key ?? "", madeBy: record.step.madeBy ?? "",
-            files: files, recomputes: recomputes, opKinds: kinds, phase: record.phase
+            files: files, recomputes: recomputes, moves: moves, opKinds: kinds, phase: record.phase
         )
     }
 
@@ -322,7 +336,40 @@ final class UndoActionStepsTests: XCTestCase {
             ).write(courseDirectory: kept.course.directoryURL, section: 1)
         })
 
+        // U3b: the rollover, ONE step, from the menu onto a new website (the
+        // re-date, the record's fragment and answered checklist, the marker)
+        // and from the window keeping its website (the re-date and the record).
+        let newWebsite: AssistFixture.Made = try rolloverSection(surface: .menu)
+        recorded.append(try await record("rollOverOntoANewWebsite", root: newWebsite.root) {
+            _ = await newWebsite.runner.run(
+                call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "new", planning: false)
+            )
+        })
+
+        let sameWebsite: AssistFixture.Made = try rolloverSection(surface: .local)
+        recorded.append(try await record("rollOverKeepingTheWebsite", root: sameWebsite.root) {
+            _ = await AssistFixture.run("re_date_classes", with: ["rollover": "yes", "website": "same"], on: sameWebsite.runner)
+        })
+
         return recorded
+    }
+
+    /// A section to roll over: dates to move, a Netlify marker, last year's
+    /// published-pages record and links checklist answered, the copy of the
+    /// course saved first (`UndoRolloverStepTests`' world).
+    func rolloverSection(surface: AssistToolRunner.Surface) throws -> AssistFixture.Made {
+        let made: AssistFixture.Made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: surface, for: self)
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        _ = RollOverFromTheMenuTests.countCopies(of: made)
+        try UndoRolloverStepTests.lastYear.write(
+            to: made.root.appendingPathComponent(UndoRolloverStepTests.markerPath), atomically: true, encoding: .utf8
+        )
+        try RollOverFromTheMenuTests.writePublishedRecord(in: made.course)
+        try "{\"offered\": [], \"leftUnticked\": []}\n".write(
+            to: LinksChecklistAnswered.fileURL(courseDirectory: made.course.directoryURL, section: 1),
+            atomically: true, encoding: .utf8
+        )
+        return made
     }
 
     // MARK: - Tests
@@ -332,7 +379,7 @@ final class UndoActionStepsTests: XCTestCase {
     /// `undo-action-steps.json` (written from here, never by hand).
     func testEveryDailyActionIsOneStepThroughTheDoor() async throws {
         let recorded: [Recorded] = try await recordEveryAction()
-        XCTAssertEqual(recorded.count, 20)
+        XCTAssertEqual(recorded.count, 22)
         let expectedMakers: [String: String] = [
             "publishPages": "menu", "hidePages": "builtInAssistant:", "publishPagesAWholeUnit": "menu",
             "publishClassForADate": "builtInAssistant:", "addNextClass": "builtInAssistant:",
@@ -343,9 +390,11 @@ final class UndoActionStepsTests: XCTestCase {
             "writeHowITeach": "outsideAssistant:", "startHowITeachPage": "sheet",
             "getReadyForTheStartOfTheYear": "builtInAssistant:", "showTodaysClassOnTheFrontPage": "sheet",
             "notTodayOnTheFrontPage": "sheet", "answerTheLinksChecklist": "sheet", "keepClassesDatedLater": "sheet",
+            "rollOverOntoANewWebsite": "menu", "rollOverKeepingTheWebsite": "builtInAssistant:",
         ]
         let expectedKeys: [String: String] = [
             "publishPagesAWholeUnit": "publishPages",
+            "rollOverOntoANewWebsite": "rollOver", "rollOverKeepingTheWebsite": "rollOver",
         ]
         for step in recorded {
             XCTAssertEqual(step.phase, .done, "\(step.name): the step was not closed applied")
@@ -549,22 +598,57 @@ final class UndoActionStepsTests: XCTestCase {
                 }
                 recomputes.append(entry)
             }
-            steps.append([
+            var entry: [String: Any] = [
                 "name": step.name,
                 "action": step.action,
                 "madeBy": UndoActionStepsTests.maker(step.madeBy),
                 "files": files,
                 "recomputes": recomputes,
                 "ops": step.opKinds,
-            ])
+            ]
+            if !step.moves.isEmpty {
+                var moves: [[String: Any]] = []
+                for moved in step.moves {
+                    moves.append([
+                        "from": UndoActionStepsTests.stampless(moved.from),
+                        "to": UndoActionStepsTests.stampless(moved.to),
+                        "content": text(moved.content),
+                        "standsApart": moved.standsApart,
+                    ])
+                }
+                entry["moves"] = moves
+            }
+            steps.append(entry)
         }
         let object: [String: Any] = [
-            "note": "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
+            "note": "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `moves` (U3b, only when there are any) every file it moved, in op order, from and to (the moment in a kept copy's name set to one fixed moment), its text, and whether it stands apart from the step (moveApart) or not (move); `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
             "steps": steps,
         ]
         var data: Data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         data.append(0x0A)
         return data
+    }
+
+    /// A path with the moment a rollover names its kept copies by
+    /// (`previous-yyyy-MM-dd_HHmmss`) set to one fixed moment, so the
+    /// document is the same on every run.
+    static func stampless(_ path: String) -> String {
+        guard let found = path.range(of: "previous-") else {
+            return path
+        }
+        let rest: Substring = path[found.upperBound...]
+        if rest.count < 17 {
+            return path
+        }
+        let stamp: Substring = rest.prefix(17)
+        var shape: String = ""
+        for character in stamp {
+            shape.append(character.isNumber ? "9" : character)
+        }
+        if shape != "9999-99-99_999999" {
+            return path
+        }
+        return String(path[path.startIndex..<found.upperBound]) + "2026-09-08_070000" + String(rest.dropFirst(17))
     }
 
     static func text(_ data: Data?) -> Any {
@@ -653,6 +737,21 @@ final class UndoActionStepsTests: XCTestCase {
                 }
                 changes.append(UndoFileChange(relativePath: path, before: before, after: after))
             }
+            var moveOps: [UndoOp] = []
+            for moved in step["moves"] as? [[String: Any]] ?? [] {
+                let from: String = moved["from"] as? String ?? ""
+                let to: String = moved["to"] as? String ?? ""
+                let content: String = moved["content"] as? String ?? ""
+                try UndoContractReplay.write(content, to: from, in: root)
+                paths.append(from)
+                paths.append(to)
+                let sha: String = UndoHash.sha256(of: Data(content.utf8))
+                if moved["standsApart"] as? Bool == true {
+                    moveOps.append(UndoOp.moveFileApart(from: from, to: to, sha: sha))
+                } else {
+                    moveOps.append(UndoOp.moveFile(from: from, to: to, sha: sha))
+                }
+            }
             var recomputes: [UndoOp] = []
             for kept in step["recomputes"] as? [[String: Any]] ?? [] {
                 recomputes.append(UndoOp.recompute(
@@ -686,7 +785,42 @@ final class UndoActionStepsTests: XCTestCase {
                         course: "ICS3U", section: 1, actionClass: "A", holds: "section",
                         changes: changes, recomputes: recomputes
                     )
-                    let outcome: JournaledWriteOutcome = JournaledWrite.perform(draft, in: journal, mode: .live)
+                    let outcome: JournaledWriteOutcome
+                    if moveOps.isEmpty {
+                        outcome = JournaledWrite.perform(draft, in: journal, mode: .live)
+                    } else {
+                        // U3b: a step with moves goes through the door that
+                        // takes every kind, as `JournaledStep` makes it.
+                        var ops: [UndoOp] = []
+                        var blobs: [Data] = []
+                        for change in changes where change.before != change.after {
+                            for op in JournaledWrite.ops(for: change) {
+                                ops.append(op)
+                                if op.knownKind == .writeFile {
+                                    if let before = change.before {
+                                        blobs.append(before)
+                                    }
+                                    if let after = change.after {
+                                        blobs.append(after)
+                                    }
+                                }
+                            }
+                        }
+                        for op in moveOps {
+                            ops.append(op)
+                        }
+                        for op in recomputes {
+                            ops.append(op)
+                        }
+                        outcome = JournaledWrite.perform(
+                            ops: UndoOpsDraft(
+                                action: draft.action, madeBy: draft.madeBy, workingFolderURL: root,
+                                workingFolderPath: root.path, course: "ICS3U", section: 1, actionClass: "A",
+                                holds: "section", ops: ops, blobs: blobs
+                            ),
+                            in: journal, mode: .live
+                        )
+                    }
                     if expect == "applied" {
                         let seq: Int = UndoContractReplay.int(call["seq"]) ?? -1
                         if outcome != .applied(seq: seq) {
@@ -711,10 +845,14 @@ final class UndoActionStepsTests: XCTestCase {
                     if word != expect {
                         failures.append("\(where_): \(kind) came to \(word), not \(expect ?? "?")")
                     }
-                    if case .undone(let seq) = outcome, seq != UndoContractReplay.int(call["seq"]) {
+                    if case .undone(let seq, _) = outcome, seq != UndoContractReplay.int(call["seq"]) {
                         failures.append("\(where_): undid \(seq)")
                     }
-                    if case .redone(let seq) = outcome, seq != UndoContractReplay.int(call["seq"]) {
+                    let leftApart: [String] = UndoContractReplay.leftApart(of: outcome)
+                    if leftApart != (call["leftApart"] as? [String] ?? []) {
+                        failures.append("\(where_): left apart \(leftApart), not \(call["leftApart"] as? [String] ?? [])")
+                    }
+                    if case .redone(let seq, _) = outcome, seq != UndoContractReplay.int(call["seq"]) {
                         failures.append("\(where_): redid \(seq)")
                     }
                     if case .refused(.changedSince(let first, let others), let cleared) = outcome {
@@ -732,6 +870,10 @@ final class UndoActionStepsTests: XCTestCase {
                     try UndoContractReplay.handEdit(call["kind"] as? String ?? "", at: call["path"] as? String ?? "", in: root)
                 case "note":
                     try UndoContractReplay.appendNote(to: journal)
+                case "deploy":
+                    // U3b: a deploy writes a new marker in the place a
+                    // rollover's marker left, and nothing to the list.
+                    try UndoContractReplay.write(call["text"] as? String ?? "", to: call["path"] as? String ?? "", in: root)
                 default:
                     failures.append("\(where_): unknown call \(kind)")
                 }

@@ -20194,9 +20194,9 @@ off.
   this version knows `preference:<name>`, the app's own preferences store (`PlantoirDefaults.shared`, which follows `--state-dir`)
   (`UndoAppPreferences`), and a step of external ops alone needs no working
   folder. Like a move and a tree it goes in after every file's content has been swapped in, in the order of the step's ops, re-read just before it is set, and is set back if a later change cannot go in.
-  The LaunchAgent of a scheduled deploy (ruling 23) and Obsidian's vault
-  list are families a later piece defines; until then an op naming one
-  cannot be read here.
+  U3b adds `scheduledDeploy:<label>`, a deploy set for later (below,
+  "U3b: the rollover as one step"); Obsidian's vault list is a family a
+  later piece defines, and until then an op naming one cannot be read here.
 - **Whole ops stand alone.** A move, a tree and an external op are judged
   against the disk as it is, never against what an earlier op of the same
   step would leave, so no other op of a step may share their places; a step
@@ -20818,53 +20818,189 @@ setting's:
 
 The rollover's ONE step is U3's (#897 piece B, seam 3). Splitting it would
 leave the rollover as two steps, which is the fault #897 B fixed in today's
-history. So the writer scan gives `Models/DeployCommand.swift` and
-`Models/LinksChecklist/PublishedPagesRecord.swift` to U3b (`waitsFor: U3b`),
-and U4 does not touch them. The deploy that `DeployCommand` starts is still
+history. Since U3b both are planned into that step (below):
+`PublishedPagesRecord.release` writes nothing any more and has left the
+writer scan, and `DeployCommand.planSiteRelease` plans the markers. The
+plain `DeployCommand.releaseSite` is kept only for Keep a Copy for
+Reference, which cuts the COPY loose from the website as it makes it; that
+is part of making the copy, U4's step, so the scan's `DeployCommand.swift`
+entry now reads `waitsFor: U4`. The deploy that `DeployCommand` starts is still
 not counted (rulings 17 and 18). Schedule Deploy and Cancel Scheduled
 Deploy remain U4's (ruling 23); only the schedule a rollover REMOVES is an
 op in the rollover's step (seam 2, an `external` op).
 
-#### U3b, the rollover: what is left, in order
+### U3b: the rollover as one step (#899, #959)
 
-U3 was split at a point where the tree builds and the scan is truthful
-(`DeployCommand`, `PublishedPagesRecord` and the scheduled deploy's removal
-still wait). U3a is everything above. The rollover's re-date already goes
-through the door, as a step keyed `rollOver`. Its record, markers and
-schedule are still written as before, so today the rollover is two steps on
-the shadow list. U3b makes it one:
+Roll Over to a New Year (Section ▸ Roll Over to a New Year…, the built-in
+window's rollover, an outside assistant's `re_date_classes` with
+`rollover`/`website`) is ONE step, key `rollOver`, made through the door
+that takes every kind (`JournaledWrite.perform(ops:)`, from
+`JournaledStep.makeAsOps`). Under one begin it holds, in this order:
 
-1. **The door takes a mixed step.** `JournaledStep` gains `move(from:to:)`
-   and an `external` op beside its files. `make()` then goes through
-   `JournaledWrite.perform(ops:)`, with the file changes as
-   `editLine`/`writeFile` ops and their blobs, so one begin holds the
-   re-dated pages, the record's fragments (one `move` each), the two removed
-   records (`writeFile`, after absent), the markers (one `move` each), and
-   the schedule.
-2. **Q3, as Russell ruled on 2026-11-19.** After a deploy has filled the
-   place a marker left, Undo takes back the rest (the dates and the record),
-   leaves both markers where they are, says once that the section stays on
-   its new website, and the step leaves the list. This needs one optional
-   op key, proposed as `"standsApart": true` on a `move`. It means that a
-   pair found "changed since" is left and reported, without refusing the
-   step or clearing the list. That is a format addition with `checkCases`
-   and `stackCases` rows, the Python model's `plan()` taught the same, and a
-   `windows` note: W1 reads an unknown key as unreadable. This fixes #959 in
-   the journal's terms.
-3. **The legacy Netlify marker lives in `.merged_output`, which is a link
-   out to Application Support.** A `move` must stay inside its working
-   folder through its links (`undo.rule.stagedThenSwapped`). So that marker
-   needs either the builds root named as a second place, or a ruling that
-   it stays outside the step, with its move done as today. The second is
-   recommended, because `deploy.py` migrates it back into the stable path
-   on the next deploy anyway.
-4. **A removed schedule.** An `external` op whose target family is
-   `scheduledDeploy` (the LaunchAgent). Its reverse registers the agent
-   again only while its time is ahead, and says so when it is not (seam 2).
-   This is a new family in `undoJournal.opKinds.external`.
-5. The rollover's action traces recorded the same way, and
-   `RollOverFromTheMenuSafetyTests` kept green. Today's history keeps its
-   one menu entry (`menuRolloverChange`) and the window's two.
+1. every page re-dated (`editLine`, or `writeFile` when the lines cannot
+   say it), planned by `SectionReDatePlanner.apply(…, into: step)`;
+2. the two answered records removed (`writeFile`, after absent:
+   `links-checklist-answered.json`, `later-classes-kept.json`) and each
+   published-pages fragment moved into `…published-pages.previous-<stamp>/`
+   (`move`), planned by `PublishedPagesRecord.release(…, into: step)`;
+3. with "new", each site marker moved aside (`moveApart`), planned by
+   `DeployCommand.planSiteRelease`;
+4. with "new", each deploy set for later in this working folder for the
+   section turned off (`external`, target `scheduledDeploy:<label>`);
+5. the front page (`recompute`, `sectionFrontPage`), repointed by the runner
+   once the step is made, as the re-date's own step does.
+
+The same step is made when the dates are already right (the record and
+the website alone: the menu's `menuRolloverWithTheDatesAlreadyRight`, the
+window's second turn). An ordinary re-date (no `rollover`) is still its own
+`reDateClasses` step.
+
+**Nothing is said, recorded or left on the trail until the step is made.**
+The website is PLANNED (`planTheWebsite` → `PlannedWebsite`) before the
+make and FINISHED after it (`finishTheWebsite`: the sentences, the trail
+line, the window's second history entry). A step that is refused changes
+nothing and the reply is the runner's "Nothing was changed: …", so every
+sentence a teacher or an assistant hears on a failed rollover is true of
+the disk. Two exceptions are deliberate, each true:
+
+- **A deploy set for later that cannot be removed** (its plist will not
+  go): the step is refused `couldNotWrite` on that target; the runner takes
+  that op out and makes the rest (`makeTheRolloverStep`), and the reply says
+  `rolloverCouldNotTurnOffTheScheduledPublish`, as before U3b. The failed
+  attempt leaves a `failed` step on the list, which is never offered. A job
+  whose files cannot be read is left out the same way.
+- **The legacy Netlify marker** (`.merged_output/section<N>/.netlify_site.json`)
+  lives in the built output, a link out of the working folder, where a step
+  cannot name a place (`undo.rule.stagedThenSwapped`). It is moved aside
+  OUTSIDE the step before the make, put back if the step is refused
+  (`PlannedSiteRelease.putTheLegacyMarkerBack`), and the step's action
+  carries `legacyMarkerSetAsideOutside: "true"`, so U7 can say an Undo
+  leaves it aside. `deploy.py` migrates a legacy marker into the stable path
+  on its next deploy anyway (`load_netlify_marker`). Rejected: naming the
+  builds root as a second place of the step (a second root in the format for
+  one file that only very old folders hold); leaving the whole website out
+  of the step. **Held for Russell** (the report's first question).
+
+**What changed in the order of effects, and why.** The window's rollover
+moved its markers and turned its schedule off AFTER the preview was
+rebuilt; now both go in with the step, BEFORE the rebuild, because the
+step cannot be split around it (the dates must be on disk for the
+rebuild). The window's reply, its `detail`, and today's two history
+entries (the re-date, then the website) are unchanged; the website's trail
+line now comes before the preview's. The menu's order is unchanged.
+
+**Today's in-memory undo answers exactly as before**: the menu's one entry
+(`menuRolloverChange`, the marker halves that left their place,
+`onlyTheHalvesMovedAway`), the window's two, the front page in the same
+place among the files. `RollOverFromTheMenuSafetyTests` and
+`RolloverWebsiteTests` pass unchanged.
+
+#### Q3 and #959: what stands apart from its step
+
+Russell ruled on 2026-11-19: after a rollover onto a new website and a
+deploy, Undo takes back the rest (the dates and the record), leaves both
+markers where they are, says once that the section stays on its new
+website, and the step leaves the list so earlier steps can still be undone.
+
+That needed an op whose being changed since does not refuse its step. The
+plan (above, before U3b) proposed a key, `"standsApart": true`, on a
+`move`. **Rejected**, because `undoJournal.unknown.keys` forbids it: a
+known kind never gains a key that changes what undoing it does, since an
+older reader would undo it by the old rule (here: refuse and CLEAR the
+list). So it is a kind of its own, `moveApart`: judged, made, undone and
+redone exactly as `move`, but an Undo or a Redo (`UndoCheck.plan(…,
+leavesApart: true)`) that finds its pair changed since LEAVES it, both
+places untouched, names its place in `UndoOutcome.undone(seq:, leftApart:)`
+(or `redone`), and goes on with the rest. A reader that does not know
+`moveApart` (Windows W1, a Mac before U3b) reads the step as a barrier:
+greyed, never undone in a guessed way. Making a step never leaves an op
+apart (`perform(ops:)` and recovery plan with `leavesApart` false): a step
+is made whole or not at all, and a dead process's step is put back whole
+or completed whole.
+
+"The step leaves the list" is built as the journal's ordinary Undo: the
+step moves to the redo side, and the step below it is the one Undo offers
+next. A Redo then takes the dates and the record forward again and leaves
+the markers apart again (the section is already on its new website).
+Today's Undo Last Change has no redo, which is where #959's "comes off the
+list" came from; the U7 menu greys Redo as for any other step only when
+there is none. With no deploy between, the marker is moved back from its
+kept copy (one rename, its 0600 mode kept, #961) and nothing is apart.
+
+The schedule stands apart too, by its family: an `external` op on
+`scheduledDeploy:` that an Undo cannot set back because the job's moment
+has gone by (`UndoExternalPlaces.canSet`, false for a moment past) is left
+off and named (#897 piece B, seam 2: never registered again for a moment
+already past). Undone while its moment is ahead, the plist and its script
+come back byte for byte and the job is loaded again (`UndoScheduledDeploys`,
+through the action's own `LaunchControlRunning`, never the real
+`launchctl` under the suite). That runner is the main actor's, so a write
+made off the main thread answers false (a change that could not be made,
+nothing changed): **U7 must make an Undo of such a step on the main actor**,
+or give the runner a nonisolated form, and must pass `UndoAppPlaces` (not
+the core's default `UndoAppPreferences`) as `places` to every Undo, Redo
+and recovery.
+
+Cases: `checkCases` (4 `moveApart` rows), `stackCases` (4 U3b rows, the
+call `rollOverOntoANewWebsite`, keys `leftApart` and `schoolYear`), both
+replayed by the Mac and the Python model (`plan(…, leaves_apart=True)`).
+
+#### If the app dies part way through a rollover
+
+The step is one door, so the five places to die are U3a's ("If the app dies
+part way" above). Its swaps go files first (the pages, the removed
+records), then the moves (fragments, markers), then the schedule. Live,
+recovery puts places 2 and 3 back to before the step (`rolledBack`): whole
+in the OLD year, marker in place, record in place, schedule registered
+again through the same places. Place 4 is completed (`done`): whole in the
+NEW year. `UndoRolloverStepTests.testARolloverKilledBetweenItsSwapsIsWholeInItsOldYearAfterRecovery`
+(killed at `beforeSwap(2)`) and `…KilledAfterItsLastSwapIsWholeInItsNewYearAfterRecovery`
+(at `beforeApplied`) prove both, and the closing line says which. The
+legacy marker outside the step is the one file a death between its move and
+the step's begin leaves aside with nothing on the list; `deploy.py` reads
+the stable marker first and migrates a legacy one only when there is none,
+so the section stays on its old website unless it had only the legacy
+marker. In SHADOW, recovery never writes the teacher's files (U3a's rule);
+a rollover step moves files, so its staged files are left for a live
+recovery, as for any step with a move.
+
+A list that cannot take the step in shadow changes nothing about the
+rollover: the step is made all or none WITHOUT a record
+(`JournaledStep.makeWithoutARecord`, the same staged swap with nothing
+written down), and the same goes for a step that cannot be named in one.
+`testInShadowAListThatCannotBeWrittenChangesNothingAboutTheRollover`.
+
+#### The rollover's action traces
+
+`UndoActionStepsTests` records two more steps from the real code:
+`rollOverOntoANewWebsite` (the menu, "new": re-date, record, checklist
+answers, marker) and `rollOverKeepingTheWebsite` (the window, "same":
+re-date and record), 22 steps in all. `undo-action-steps.json` gains
+`moves` for a step that moves files (from, to, content, `standsApart`; the
+moment in a kept copy's name set to one fixed moment so the file is the
+same on every run). `scripts/make_undo_traces.py` makes six traces of each
+(132 `actionTraces`); a trace of a step with a `moveApart` may hold a
+`deploy` call (a new marker in the emptied place, nothing on the list), and
+an undo or redo after it carries `leftApart`. The 20 seeded traces and the
+120 of U3a are unchanged byte for byte.
+
+#### For U4
+
+U4 owns Schedule Deploy… and Cancel Scheduled Deploy (ruling 23) and can
+take the family whole: `UndoScheduledDeploys` reads and writes a job by its
+label, `{plist, script}` in base64, and `UndoAppPlaces` routes it. A
+schedule SET is an `external` op from not set to the job's value; cancelled,
+the reverse. It stands apart by its family, which is right for the
+rollover; whether a schedule step U4 makes should stand apart (an Undo of
+Schedule Deploy after the job has fired) is U4's to decide, and if not, U4
+gives its ops a family or kind of their own rather than changing this one.
+A settings save goes through the same door: `JournaledStep.write` for
+`course_config.json` (the door then chooses `writeFile` for it), or, finer,
+one `editJSON` per member, which U4 adds to `JournaledStep` the way U3b
+added `move` and `setExternal` (a planned list beside the files, so the step
+is made as ops: `isMixed`); `setExternal` for a preference; `extraArguments`
+for anything U7 needs to name the step; `places` set to `UndoAppPlaces`
+whenever a step holds an external op.
 
 ### The U1 harness
 

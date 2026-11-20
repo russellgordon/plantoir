@@ -100,10 +100,12 @@ class ActionTraceTests(unittest.TestCase):
 
     def test_every_recorded_step_is_reproduced_by_its_ops_both_ways(self):
         for step in traces.read_action_steps():
-            model = traces.Model(pages={entry["path"]: entry["before"] for entry in step["files"]
-                                        if entry["before"] is not None})
+            pages = {entry["path"]: entry["before"] for entry in step["files"] if entry["before"] is not None}
+            for moved in step.get("moves", []):
+                pages[moved["from"]] = moved["content"]
+            model = traces.Model(pages=pages)
             outcome = model.files_step([(entry["path"], entry["before"], entry["after"]) for entry in step["files"]],
-                                       step.get("recomputes", []))
+                                       step.get("recomputes", []), step.get("moves", []))
             self.assertEqual(outcome[0], "applied", step["name"])
             self.assertEqual([op["kind"] for op in outcome[2]], step["ops"], step["name"] + ": the op kinds")
             undone = traces.plan(outcome[2], True, dict(model.pages))
@@ -111,6 +113,20 @@ class ActionTraceTests(unittest.TestCase):
             for entry in step["files"]:
                 self.assertEqual(undone[1].get(entry["path"], model.pages.get(entry["path"])), entry["before"],
                                  step["name"] + ": " + entry["path"] + " undone")
+
+    def test_a_rollover_after_a_deploy_is_undone_leaving_its_marker_apart(self):
+        # U3b, Russell's ruling of 2026-11-19 on Q3: some rollover trace has
+        # a deploy fill the marker's place and a later undo of the step
+        # that names the marker as left apart, not a refusal.
+        found = False
+        for trace in committed()["actionTraces"]:
+            deployed = False
+            for call in trace["calls"]:
+                if call["call"] == "deploy":
+                    deployed = True
+                if deployed and call["call"] == "undo" and call.get("leftApart"):
+                    found = True
+        self.assertTrue(found, "no action trace undoes a rollover after a deploy")
 
     def test_there_are_about_120_action_traces_and_each_starts_with_its_step(self):
         steps = traces.read_action_steps()
@@ -245,7 +261,7 @@ class LineModelTests(unittest.TestCase):
                 if ops[0]["kind"] == "writeFile":
                     continue
                 result = traces.plan(ops, True, {path: after})
-                self.assertEqual(result, ("ready", {path: text}), page_id)
+                self.assertEqual(result, ("ready", {path: text}, []), page_id)
 
     def test_a_body_edit_leaves_the_line_op_undoable(self):
         _, path, text, _ = traces.FIXTURE[0]
@@ -254,7 +270,7 @@ class LineModelTests(unittest.TestCase):
         self.assertEqual(ops[0]["kind"], "editLine")
         edited = after + "Written since.\n"
         result = traces.plan(ops, True, {path: edited})
-        self.assertEqual(result, ("ready", {path: text + "Written since.\n"}))
+        self.assertEqual(result, ("ready", {path: text + "Written since.\n"}, []))
 
 
 def safe_path(path):
@@ -287,7 +303,7 @@ def readable_op(op):
     for key in ("beforeSha", "afterSha", "sha", "listingSha"):
         if key in op and op[key] is not None and not is_blob_name(op[key]):
             return False
-    if kind == "move":
+    if kind in ("move", "moveApart"):
         if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
             return False
         if overlap(op["from"], op["to"]):
@@ -335,9 +351,9 @@ def readable_op(op):
     return True
 
 
-KINDS_KNOWN = ("writeFile", "editLine", "recompute", "replaceText", "editJSON", "move",
+KINDS_KNOWN = ("writeFile", "editLine", "recompute", "replaceText", "editJSON", "move", "moveApart",
                "createTree", "removeTree", "external")
-EXTERNAL_TARGETS_KNOWN = ("preference",)
+EXTERNAL_TARGETS_KNOWN = ("preference", "scheduledDeploy")
 MAINTAINERS_KNOWN = ("sectionFrontPage",)
 HOLDS_KNOWN = ("section", "course")
 
@@ -352,7 +368,7 @@ def readable_step(step):
         if not readable_op(op):
             return False
     # opKinds.wholeOps: no other op shares a whole op's places.
-    whole = ("move", "createTree", "removeTree", "external")
+    whole = ("move", "moveApart", "createTree", "removeTree", "external")
     for index, op in enumerate(step["ops"]):
         if op["kind"] not in whole:
             continue
@@ -447,7 +463,7 @@ class ContractCaseTests(unittest.TestCase):
                 if kind == "recompute":
                     # No check (opKinds.recompute): re-derived, never compared.
                     state = "after"
-                elif kind == "move":
+                elif kind in ("move", "moveApart"):
                     state = traces.move_state(op, current["atFrom"], current["atTo"])
                 elif kind in ("createTree", "removeTree"):
                     state = traces.tree_state(op, current)
@@ -497,7 +513,8 @@ class ContractCaseTests(unittest.TestCase):
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside"}
+                  "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
+                  "leftApart", "schoolYear"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
     MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
@@ -518,6 +535,17 @@ class ContractCaseTests(unittest.TestCase):
                 pages[self.MARKER_FROM] = self.OLD_MARKER
             content = pages.get(self.MARKER_FROM) or ""
             return model.ops_step([{"kind": "move", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(content)}])
+        if call == "rollOverOntoANewWebsite":
+            # U3b: one step of the year's setting and the marker moved aside
+            # as a `moveApart` (stackCasesHow).
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            content = pages.get(self.MARKER_FROM) or ""
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            marker = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(content)}
+            return model.ops_step([year, marker])
         if call == "deployANewMarker":
             pages[self.MARKER_FROM] = self.NEW_MARKER
             return None
@@ -583,7 +611,7 @@ class ContractCaseTests(unittest.TestCase):
             return "bothKept"
         return (source, destination)
 
-    KIND_CALLS = ("moveTheMarker", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
+    KIND_CALLS = ("moveTheMarker", "rollOverOntoANewWebsite", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
                   "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
                   "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside")
 
@@ -766,6 +794,10 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:
                     self.assertEqual(model.rederived, case["rederived"])
+                if "leftApart" in case:
+                    self.assertEqual(list(last[2]) if len(last) > 2 else [], case["leftApart"])
+                if "schoolYear" in case:
+                    self.assertEqual(json.loads(model.pages[self.SETTINGS])["school_year"], case["schoolYear"])
 
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;

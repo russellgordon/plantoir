@@ -23,7 +23,7 @@ nonisolated enum UndoContractKinds {
 
     /// Every call this file answers.
     static let calls: Set<String> = [
-        "moveTheMarker", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
+        "moveTheMarker", "rollOverOntoANewWebsite", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
         "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
         "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
     ]
@@ -60,6 +60,15 @@ nonisolated enum UndoContractKinds {
         return "\(outcome)"
     }
 
+    /// The settings file's school year, or nil.
+    static func schoolYear(in root: URL) -> String? {
+        let reading: UndoJSONMember.Reading = UndoJSONMember.reading(["school_year"], in: Data((text(at: settings, in: root) ?? "").utf8))
+        if case .value(.string(let year)) = reading {
+            return year
+        }
+        return nil
+    }
+
     static func text(at path: String, in root: URL) -> String? {
         guard let data = UndoItem.read(at: root.appendingPathComponent(path)).data else {
             return nil
@@ -77,6 +86,19 @@ nonisolated enum UndoContractKinds {
             let content: String = text(at: markerFrom, in: root) ?? ""
             let op: UndoOp = UndoOp.moveFile(from: markerFrom, to: markerTo, sha: UndoHash.sha256(of: Data(content.utf8)))
             return word(JournaledWrite.perform(ops: draft(ops: [op], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+        case "rollOverOntoANewWebsite":
+            // U3b: one step of the year's setting and the marker moved aside
+            // as a `moveApart`, which stands apart from the rest of its step.
+            if text(at: markerFrom, in: root) == nil && text(at: markerTo, in: root) == nil {
+                try UndoContractReplay.write(oldMarker, to: markerFrom, in: root)
+            }
+            if text(at: settings, in: root) == nil {
+                try UndoContractReplay.write("{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n", to: settings, in: root)
+            }
+            let content: String = text(at: markerFrom, in: root) ?? ""
+            let year: UndoOp = UndoOp.editJSON(path: settings, keyPath: ["school_year"], before: .string("2025-2026"), after: .string("2026-2027"))
+            let marker: UndoOp = UndoOp.moveFileApart(from: markerFrom, to: markerTo, sha: UndoHash.sha256(of: Data(content.utf8)))
+            return word(JournaledWrite.perform(ops: draft(ops: [year, marker], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
         case "deployANewMarker":
             // What a deploy after a rollover onto a new website does: a new
             // marker in the place the rollover emptied, nothing in the list.

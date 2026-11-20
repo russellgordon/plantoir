@@ -561,7 +561,7 @@ nonisolated enum UndoRecovery {
                     swapRefused = true
                     return nil
                 }
-                guard case .ready(let targets, _) = plan else {
+                guard case .ready(let targets, _, _) = plan else {
                     // It can never be put back: closed, never left in flight.
                     var leftPartWay: [String] = Array(endPaths).sorted()
                     for path in inTheWay where !leftPartWay.contains(path) {

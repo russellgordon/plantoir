@@ -1008,7 +1008,7 @@ nonisolated extension UndoCheck {
     /// the destination alone.
     static func wholeState(of op: UndoOp, root: URL, places: UndoExternalPlaces) -> UndoOpState {
         switch op.knownKind {
-        case .move:
+        case .move, .moveApart:
             guard let from = op.from, let to = op.to else {
                 return .neither
             }
@@ -1188,6 +1188,20 @@ nonisolated protocol UndoExternalPlaces: Sendable {
     func read(_ target: String) -> UndoExternalReading
     /// Sets the target (nil: removes it). False when it could not.
     func write(_ target: String, _ value: UndoJSON?) -> Bool
+    /// Whether the target can be set to this value at all now, judged
+    /// before anything is changed: false for a deploy set for later whose
+    /// moment has gone by, which is never registered again (#897 piece B,
+    /// seam 2). True for everything else.
+    func canSet(_ target: String, _ value: UndoJSON?) -> Bool
+}
+
+extension UndoExternalPlaces {
+
+    // MARK: - Functions
+
+    func canSet(_ target: String, _ value: UndoJSON?) -> Bool {
+        return true
+    }
 }
 
 /// The app's own preferences (`PlantoirDefaults.shared`, the one store, which follows `--state-dir`), named

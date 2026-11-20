@@ -5012,11 +5012,24 @@ final class AssistToolRunner {
         if !backedUp {
             return AssistToolRunner.menuRolloverRefusedWithoutACopy(located.course)
         }
+        // ONE step (#899 U3b): the record and the website, made together
+        // or not at all, before anything is said or recorded.
+        let step: JournaledStep = rolloverStep(for: located.course, sectionNumber: located.sectionNumber)
         var files: [AssistSavedFile] = PublishedPagesRecord.release(
-            courseDirectory: located.course.directoryURL, section: located.sectionNumber
+            courseDirectory: located.course.directoryURL, section: located.sectionNumber, into: step
         )
-        let settled: (said: String, files: [AssistSavedFile]) = settleTheWebsite(
-            arguments, course: located.course, sectionNumber: located.sectionNumber, recordsItsOwnChange: false
+        let planned: PlannedWebsite = planTheWebsite(
+            arguments, course: located.course, sectionNumber: located.sectionNumber, into: step
+        )
+        let schedule: ScheduledPublishOutcome
+        do {
+            schedule = try makeTheRolloverStep(step, planned)
+        } catch {
+            return AssistToolOutcome.refused("Nothing was changed: \(error.localizedDescription)")
+        }
+        let settled: (said: String, files: [AssistSavedFile]) = finishTheWebsite(
+            planned, course: located.course, sectionNumber: located.sectionNumber,
+            recordsItsOwnChange: false, schedule: schedule
         )
         for file in settled.files {
             files.append(file)
@@ -5066,13 +5079,31 @@ final class AssistToolRunner {
                 // last year's. An offer that looks like it worked is worse than
                 // no offer at all.
                 var said: String = already
+                // The record and the website are ONE step (#899 U3b), made
+                // before either is said or recorded.
+                let step: JournaledStep = rolloverStep(
+                    for: asked.located.course, sectionNumber: asked.located.sectionNumber
+                )
                 // The record is set aside on a rollover that moved no page,
                 // too (#379): the year still turned over.
+                var released: [AssistSavedFile] = []
                 if isARollover(arguments) {
-                    let released: [AssistSavedFile] = PublishedPagesRecord.release(
+                    released = PublishedPagesRecord.release(
                         courseDirectory: asked.located.course.directoryURL,
-                        section: asked.located.sectionNumber
+                        section: asked.located.sectionNumber, into: step
                     )
+                }
+                let planned: PlannedWebsite = planTheWebsite(
+                    arguments, course: asked.located.course,
+                    sectionNumber: asked.located.sectionNumber, into: step
+                )
+                let schedule: ScheduledPublishOutcome
+                do {
+                    schedule = try makeTheRolloverStep(step, planned)
+                } catch {
+                    return AssistToolOutcome.refused("Nothing was changed: \(error.localizedDescription)")
+                }
+                if isARollover(arguments) {
                     if !released.isEmpty {
                         history.record(AssistChange(
                             whatHappened: "set aside the record of pages published last year",
@@ -5083,11 +5114,10 @@ final class AssistToolRunner {
                         ))
                     }
                 }
-                let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
-                    arguments,
-                    course: asked.located.course,
-                    sectionNumber: asked.located.sectionNumber
-                )
+                let aboutTheWebsite: String = finishTheWebsite(
+                    planned, course: asked.located.course, sectionNumber: asked.located.sectionNumber,
+                    recordsItsOwnChange: true, schedule: schedule
+                ).said
                 // Into the SUMMARY, which is what a teacher reads. `detail` is
                 // shown only behind a "Show me" disclosure, and only when the
                 // outcome carries a `teacherDetail` — which `wrote` does not.
@@ -5117,17 +5147,47 @@ final class AssistToolRunner {
             var leftAlone: [String] = []
             var classesReDated: Int = 0
             var pagesTheyUseReDated: Int = 0
+            // A rollover is ONE step (#899 U3b; #897 piece B, seam 3): the
+            // re-dated pages, the record set aside, and from either surface
+            // the website's markers and any deploy set for later, planned
+            // into one `JournaledStep` and made together, or not at all,
+            // before anything is said or recorded. An ordinary re-date
+            // makes its own step, as U3a has it.
+            let rolling: Bool = isARollover(arguments)
+            let step: JournaledStep? = rolling
+                ? rolloverStep(for: asked.located.course, sectionNumber: asked.located.sectionNumber)
+                : nil
+            var released: [AssistSavedFile] = []
+            var planned: PlannedWebsite = PlannedWebsite()
+            var schedule: ScheduledPublishOutcome = .noneWasSet
             do {
                 let applied: (
                     change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int
                 ) = try SectionReDatePlanner.apply(
                     asked.plan, forSection: asked.located.sectionNumber, in: asked.located.course,
-                    by: undoMaker(isARollover(arguments) ? "rollOver" : "reDateClasses")
+                    by: undoMaker(rolling ? "rollOver" : "reDateClasses"),
+                    into: step
                 )
                 change = applied.change
                 leftAlone = applied.leftAlone
                 classesReDated = applied.classesReDated
                 pagesTheyUseReDated = applied.pagesTheyUseReDated
+                if let step {
+                    // A rollover sets aside the section's published-pages
+                    // record (#379, plan review finding 12): a new year's
+                    // site has published nothing yet. Whichever website
+                    // answer is given, and inside the rollover's own change,
+                    // so taking the rollover back brings it back.
+                    released = PublishedPagesRecord.release(
+                        courseDirectory: asked.located.course.directoryURL,
+                        section: asked.located.sectionNumber, into: step
+                    )
+                    planned = planTheWebsite(
+                        arguments, course: asked.located.course,
+                        sectionNumber: asked.located.sectionNumber, into: step
+                    )
+                    schedule = try makeTheRolloverStep(step, planned)
+                }
             } catch let stopped as SectionReDatePlanner.StoppedAfterWriting {
                 // Pages before the one that failed ARE re-dated, and the undo
                 // entry is abandoned (#531, ruling M3): said as part way, with
@@ -5143,16 +5203,16 @@ final class AssistToolRunner {
                     "Nothing was changed: \(error.localizedDescription)"
                 )
             }
-            // A rollover sets aside the section's published-pages record
-            // (#379, plan review finding 12): a new year's site has published
-            // nothing yet. Whichever website answer is given, and inside the
-            // rollover's own change, so taking the rollover back brings it back.
-            if isARollover(arguments) {
-                let released: [AssistSavedFile] = PublishedPagesRecord.release(
-                    courseDirectory: asked.located.course.directoryURL,
-                    section: asked.located.sectionNumber
-                )
+            if rolling {
+                // The front page follows the step, once it is made, as the
+                // re-date's own step repoints it (`SectionReDatePlanner.apply`),
+                // and today's undo holds it in the same place among the files.
                 var files: [AssistSavedFile] = change.files
+                if let repointed = SectionIndexPointer.repointIndex(
+                    forSection: asked.located.sectionNumber, in: asked.located.course
+                ) {
+                    files.append(repointed)
+                }
                 for file in released {
                     files.append(file)
                 }
@@ -5165,12 +5225,13 @@ final class AssistToolRunner {
             // From the menu, the website is settled HERE, before the preview
             // is rebuilt, and its markers join the same change (#897 piece B,
             // the plan review's amendment 10): one entry, which Undo Last
-            // Change takes back whole. The window keeps its two.
+            // Change takes back whole. The window keeps its two, its second
+            // recorded just after the first (below).
             var settledFromTheMenu: String? = nil
-            if surface == .menu && isARollover(arguments) {
-                let settled: (said: String, files: [AssistSavedFile]) = settleTheWebsite(
-                    arguments, course: asked.located.course, sectionNumber: asked.located.sectionNumber,
-                    recordsItsOwnChange: false
+            if surface == .menu && rolling {
+                let settled: (said: String, files: [AssistSavedFile]) = finishTheWebsite(
+                    planned, course: asked.located.course, sectionNumber: asked.located.sectionNumber,
+                    recordsItsOwnChange: false, schedule: schedule
                 )
                 var files: [AssistSavedFile] = change.files
                 for file in settled.files {
@@ -5184,6 +5245,16 @@ final class AssistToolRunner {
                 settledFromTheMenu = settled.said
             }
             history.record(change)
+            // The window's website, its own entry after the re-date's as
+            // before; its markers were moved with the step above, before
+            // the preview is rebuilt (the one step cannot be split around it).
+            var settledInTheWindow: String = ""
+            if surface != .menu && rolling {
+                settledInTheWindow = finishTheWebsite(
+                    planned, course: asked.located.course, sectionNumber: asked.located.sectionNumber,
+                    recordsItsOwnChange: true, schedule: schedule
+                ).said
+            }
 
             // The model's copy says "class" whatever the course calls them;
             // only the line the teacher reads takes the course's noun (#267).
@@ -5209,9 +5280,7 @@ final class AssistToolRunner {
             ))
             detail += "\n\nNothing was published or hidden, so students see no change until you "
                     + "deploy."
-            let aboutTheWebsite: String = settledFromTheMenu ?? settleTheWebsiteAfterARollover(
-                arguments, course: asked.located.course, sectionNumber: asked.located.sectionNumber
-            )
+            let aboutTheWebsite: String = settledFromTheMenu ?? settledInTheWindow
             // The website goes in the SUMMARY beside the count of what moved:
             // it is the part a teacher has to answer, and `detail` is not shown
             // to them at all for a write.
@@ -5324,10 +5393,78 @@ final class AssistToolRunner {
         return answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 
-    /// What a rollover says about the website, and what it does about it.
+    /// What settling the website PLANNED into a rollover's step (#899 U3b):
+    /// nothing is written, said or left on the trail until the step is made
+    /// (`finishTheWebsite`), so a refused step leaves no sentence that is
+    /// untrue of the disk.
+    struct PlannedWebsite {
+
+        // MARK: - Stored properties
+
+        /// What is said when nothing of the website is in the step: empty
+        /// for an ordinary re-date, the question, the website kept, or a
+        /// section that was not on one.
+        var said: String = ""
+
+        /// The trail line for that case, written once the step is made.
+        var note: (event: ActivityTrail.Event, line: String)? = nil
+
+        /// The markers planned into the step (and the legacy one moved
+        /// outside it), when the section was cut loose from a website.
+        var release: DeployCommand.PlannedSiteRelease? = nil
+
+        /// The deploys set for later planned to be removed, as targets.
+        var schedules: [String] = []
+
+        /// A deploy set for later whose files could not be read now, so it
+        /// was not removed (said as not turned off).
+        var aScheduleCouldNotBeRead: Bool = false
+    }
+
+    /// A rollover's ONE step, its deploys set for later reached through the
+    /// runner's own launchd (never the real one under the suite).
+    func rolloverStep(for course: Course, sectionNumber: Int) -> JournaledStep {
+        let step: JournaledStep = JournaledStep(course: course, section: sectionNumber, maker: undoMaker("rollOver"))
+        step.places = UndoAppPlaces(schedules: UndoScheduledDeploys(runner: launchControl))
+        return step
+    }
+
+    /// Makes a rollover's step. A deploy set for later that cannot be
+    /// removed is taken out of the step and the rest made without it, said
+    /// as not turned off (as before U3b; the failure is reported, never
+    /// swallowed). Any other refusal changes nothing: the legacy marker
+    /// moved outside the step is put back, and the error is the caller's
+    /// "Nothing was changed".
+    func makeTheRolloverStep(_ step: JournaledStep, _ planned: PlannedWebsite) throws -> ScheduledPublishOutcome {
+        var outcome: ScheduledPublishOutcome = .noneWasSet
+        if !planned.schedules.isEmpty {
+            outcome = .turnedOff
+        }
+        if planned.aScheduleCouldNotBeRead {
+            outcome = .couldNotTurnOff
+        }
+        var tries: Int = 0
+        while true {
+            tries += 1
+            do {
+                try step.make()
+                return outcome
+            } catch JournaledStepError.refused(.couldNotWrite(let path), _)
+                where path.hasPrefix(UndoOp.scheduledDeployFamily + ":") && tries <= planned.schedules.count {
+                step.forgetExternal(path)
+                outcome = .couldNotTurnOff
+            } catch {
+                planned.release?.putTheLegacyMarkerBack()
+                throw error
+            }
+        }
+    }
+
+    /// What a rollover will say about the website, and what it will do about
+    /// it, PLANNED into the step.
     ///
-    /// Returns the empty string for an ORDINARY re-date, which is three of the
-    /// four phrasings that reach this tool — a snow day, a timetable that
+    /// Says nothing for an ORDINARY re-date, which is three of the four
+    /// phrasings that reach this tool — a snow day, a timetable that
     /// shifted. Those must never be asked about websites: answering "a new
     /// website" to a mid-semester re-date abandons the address students are
     /// reading right now. Only the rollover carries `rollover`.
@@ -5340,26 +5477,17 @@ final class AssistToolRunner {
     /// the write had already happened. Answering in words works identically in
     /// both clients, and the reply always states which of the two happened, so
     /// a question nobody answers is visible rather than silent.
-    private func settleTheWebsiteAfterARollover(
-        _ arguments: [String: Any],
-        course: Course,
-        sectionNumber: Int
-    ) -> String {
-        return settleTheWebsite(arguments, course: course, sectionNumber: sectionNumber, recordsItsOwnChange: true).said
-    }
-
-    /// The same, saying what it moved. `recordsItsOwnChange` is true for the
-    /// window and an outside assistant, exactly as before #897; Section ▸ Roll
-    /// Over to a New Year… passes false and records the moved markers inside
-    /// the rollover's one change (the plan review's amendment 10), and reads
-    /// its own sentences where the window's speak as a conversation or say
-    /// "website" of a folder (amendments 12 and 13).
-    private func settleTheWebsite(
+    ///
+    /// Section ▸ Roll Over to a New Year… reads its own sentences where the
+    /// window's speak as a conversation or say "website" of a folder (the
+    /// plan review's amendments 12 and 13).
+    func planTheWebsite(
         _ arguments: [String: Any],
         course: Course,
         sectionNumber: Int,
-        recordsItsOwnChange: Bool
-    ) -> (said: String, files: [AssistSavedFile]) {
+        into step: JournaledStep
+    ) -> PlannedWebsite {
+        var planned: PlannedWebsite = PlannedWebsite()
         let answer: String = text("website", in: arguments).lowercased()
         let fromTheMenu: Bool = surface == .menu
         // Either the app's card phrasing said so, or a caller answered the
@@ -5368,7 +5496,7 @@ final class AssistToolRunner {
         // also cannot roll a section over, which is the hole this design was
         // supposed to close.
         guard isARollover(arguments) else {
-            return ("", [])
+            return planned
         }
         // From the menu: the website rule decides what a "same" is said as,
         // and a "new" that would take this website's own address is not
@@ -5381,47 +5509,72 @@ final class AssistToolRunner {
         let wouldReuseItsAddress: Bool = menuWebsite == .aNewWebsiteWouldReuseItsAddress
         if answer == "same" || (answer == "new" && wouldReuseItsAddress) {
             if fromTheMenu {
-                return (menuSaysTheWebsiteIsKept(course: course, sectionNumber: sectionNumber,
-                                                 wouldReuseItsAddress: wouldReuseItsAddress), [])
+                let kept: (said: String, line: String) = AssistToolRunner.menuSaysTheWebsiteIsKept(
+                    course: course, wouldReuseItsAddress: wouldReuseItsAddress
+                )
+                planned.said = kept.said
+                planned.note = (event: .sectionKeptItsWebsiteOnRollover, line: kept.line)
+                return planned
             }
-            ActivityTrail.note(
-                .sectionKeptItsWebsiteOnRollover,
-                "kept last year's website when rolling the section over",
-                course: course.code, section: sectionNumber
-            )
-            return (AssistWording.rolloverKeptTheSameWebsite, [])
+            planned.said = AssistWording.rolloverKeptTheSameWebsite
+            planned.note = (event: .sectionKeptItsWebsiteOnRollover, line: "kept last year's website when rolling the section over")
+            return planned
         }
         guard answer == "new" else {
             // Asked, and NOT acted on.
-            return (AssistToolRunner.askingWhichWebsite, [])
+            planned.said = AssistToolRunner.askingWhichWebsite
+            return planned
         }
 
-        let release: DeployCommand.SiteRelease = DeployCommand.releaseSite(
-            forSection: sectionNumber, in: course
+        let release: DeployCommand.PlannedSiteRelease = DeployCommand.planSiteRelease(
+            forSection: sectionNumber, in: course, into: step
         )
-        guard release.releasedAnything else {
+        guard release.release.releasedAnything else {
             // Still pinned is NOT the same as never published, and telling a
             // teacher the wrong one of those is telling them the opposite of
             // the truth about the only fact this feature turns on.
-            if release.somethingIsStillPinned {
-                return (couldNotStartANewWebsite(release, fromTheMenu: fromTheMenu), [])
+            if release.release.somethingIsStillPinned {
+                planned.said = couldNotStartANewWebsite(release.release, fromTheMenu: fromTheMenu)
+                return planned
             }
             // From the menu the line says what is true of a course that also
             // deploys to a folder, or whose website a rollover set aside
             // before (the implementation review's M1); the window's is as it was.
-            ActivityTrail.note(
-                .sectionStartedANewWebsiteOnRollover,
-                fromTheMenu
+            planned.note = (
+                event: .sectionStartedANewWebsiteOnRollover,
+                line: fromTheMenu
                     ? "rolled the section over onto a new website — it was not on a website at the moment"
-                    : "rolled the section over onto a new website — it had not been deployed anywhere yet",
-                course: course.code, section: sectionNumber
+                    : "rolled the section over onto a new website — it had not been deployed anywhere yet"
             )
-            if fromTheMenu {
-                return (AssistWording.menuRollOverNotDeployedYet, [])
-            }
-            return (AssistWording.rolloverHadNoWebsiteYet, [])
+            planned.said = fromTheMenu ? AssistWording.menuRollOverNotDeployedYet : AssistWording.rolloverHadNoWebsiteYet
+            return planned
         }
+        planned.release = release
+        planScheduledPublishesOff(course: course, sectionNumber: sectionNumber, into: step, planned: &planned)
+        return planned
+    }
 
+    /// Says, records and leaves on the trail what the website part of a
+    /// rollover's step did, once the step is MADE. `recordsItsOwnChange` is
+    /// true for the window and an outside assistant, exactly as before #897
+    /// (their second entry); Section ▸ Roll Over to a New Year… passes false
+    /// and takes the moved markers' halves into the rollover's one change
+    /// (the plan review's amendment 10).
+    func finishTheWebsite(
+        _ planned: PlannedWebsite,
+        course: Course,
+        sectionNumber: Int,
+        recordsItsOwnChange: Bool,
+        schedule: ScheduledPublishOutcome
+    ) -> (said: String, files: [AssistSavedFile]) {
+        guard let plannedRelease = planned.release else {
+            if let note = planned.note {
+                ActivityTrail.note(note.event, note.line, course: course.code, section: sectionNumber)
+            }
+            return (planned.said, [])
+        }
+        let release: DeployCommand.SiteRelease = plannedRelease.release
+        let fromTheMenu: Bool = surface == .menu
         if recordsItsOwnChange {
             history.record(
                 AssistChange(
@@ -5452,7 +5605,7 @@ final class AssistToolRunner {
         if release.somethingIsStillPinned {
             said += "\n\n" + couldNotStartANewWebsite(release, fromTheMenu: fromTheMenu)
         }
-        switch turnOffAnyScheduledPublish(course: course, sectionNumber: sectionNumber) {
+        switch schedule {
         case .noneWasSet:
             break
         case .turnedOff:
@@ -5494,33 +5647,25 @@ final class AssistToolRunner {
         return movedAway
     }
 
-    /// What the menu says, and leaves on the trail, when a rollover keeps the
-    /// section where it deploys: a folder is a folder (amendment 12, and the
-    /// implementation review's M1 and M2), a website a new one would replace
-    /// says why (W1), and anything else is the window's own sentence.
-    private func menuSaysTheWebsiteIsKept(course: Course, sectionNumber: Int, wouldReuseItsAddress: Bool) -> String {
+    /// What the menu says, and the line it leaves on the trail once the step
+    /// is made, when a rollover keeps the section where it deploys: a folder
+    /// is a folder (amendment 12, and the implementation review's M1 and
+    /// M2), a website a new one would replace says why (W1), and anything
+    /// else is the window's own sentence.
+    static func menuSaysTheWebsiteIsKept(course: Course, wouldReuseItsAddress: Bool) -> (said: String, line: String) {
         if wouldReuseItsAddress {
-            ActivityTrail.note(
-                .sectionKeptItsWebsiteOnRollover,
-                "kept the section's website when rolling it over — a new one would have had the same address",
-                course: course.code, section: sectionNumber
+            return (
+                AssistWording.menuRollOverANewWebsiteWouldReuseItsAddress,
+                "kept the section's website when rolling it over — a new one would have had the same address"
             )
-            return AssistWording.menuRollOverANewWebsiteWouldReuseItsAddress
         }
         if RollOverFromTheMenu.deploysOnlyToAFolder(course) {
-            ActivityTrail.note(
-                .sectionKeptItsWebsiteOnRollover,
-                "kept deploying the section to its folder when rolling it over",
-                course: course.code, section: sectionNumber
+            return (
+                AssistWording.rolloverDeploysToAFolderFromTheMenu,
+                "kept deploying the section to its folder when rolling it over"
             )
-            return AssistWording.rolloverDeploysToAFolderFromTheMenu
         }
-        ActivityTrail.note(
-            .sectionKeptItsWebsiteOnRollover,
-            "kept last year's website when rolling the section over",
-            course: course.code, section: sectionNumber
-        )
-        return AssistWording.rolloverKeptTheSameWebsite
+        return (AssistWording.rolloverKeptTheSameWebsite, "kept last year's website when rolling the section over")
     }
 
     /// The sentence for a marker that could not be moved: the window's, or
@@ -5533,8 +5678,10 @@ final class AssistToolRunner {
         return AssistWording.rolloverCouldNotStartANewWebsite(stillPinned: stillPinned)
     }
 
-    /// Turn off a publish that was set to happen on its own, and say whether
-    /// there was one.
+    /// Plans the publish that was set to happen on its own OFF, as one
+    /// `external` op per job in the rollover's step (#899 U3b; #897 piece B,
+    /// seam 2): undoing the rollover registers it again while its moment is
+    /// still ahead, and otherwise leaves it off and says so (`UndoOp.standsApart`).
     ///
     /// **Not politeness — the alternative is a website nobody named going
     /// live.** A section cut loose has no agreed website to publish TO, and a
@@ -5555,37 +5702,38 @@ final class AssistToolRunner {
     /// year's folder and have the OTHER folder's deploy deleted — and be told
     /// it had been turned off. That is the fault #236 exists to close, in the
     /// one place the fix first missed.
-    private func turnOffAnyScheduledPublish(
-        course: Course, sectionNumber: Int
-    ) -> ScheduledPublishOutcome {
+    ///
+    /// Each job by its OWN label, read off disk (`ScheduledDeploy.agents`),
+    /// which for a job set before #237 is not the label rebuilt from the
+    /// course. launchd is reached through the runner's `launchControl` (the
+    /// step's `places`), never the real `launchctl` under the suite: the
+    /// fixture course is ICS3U, which is a course a teacher plausibly has.
+    private func planScheduledPublishesOff(
+        course: Course, sectionNumber: Int, into step: JournaledStep, planned: inout PlannedWebsite
+    ) {
         let ours: [ScheduledDeploy.Agent] = ScheduledDeployCleanup.agentsOwnedBy(
             courseCode: course.code,
             sectionNumber: sectionNumber,
             inWorkingFolder: workspace.workspaceURL ?? course.directoryURL
         )
-        guard !ours.isEmpty else {
-            return .noneWasSet
+        for agent in ours {
+            let target: String = UndoScheduledDeploys.target(label: agent.label)
+            switch step.places.read(target) {
+            case .value(let value):
+                step.setExternal(target, from: value, to: nil)
+                planned.schedules.append(target)
+            case .notSet:
+                continue
+            case .cannotTell:
+                // Its files cannot be read now: left as it is, and said as
+                // not turned off, which is true.
+                planned.aScheduleCouldNotBeRead = true
+            }
         }
-        // `runner: launchControl` is not optional here. The default runs the
-        // real `launchctl` against the real `~/Library/LaunchAgents`, so a test
-        // driving this would boot out and delete a scheduled publish belonging
-        // to whoever is running the suite — the fixture course is ICS3U, which
-        // is a course a teacher plausibly has.
-        let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
-            courseCode: course.code,
-            sectionNumber: sectionNumber,
-            inWorkingFolder: workspace.workspaceURL ?? course.directoryURL,
-            runner: launchControl
-        )
-        // The failure is REPORTED, never swallowed: a plist left behind is
-        // loaded again at next login, so the publish really can still fire —
-        // with nobody to ask what the new website should be called, which is
-        // the whole thing turning it off exists to prevent.
-        return problem == nil ? .turnedOff : .couldNotTurnOff
     }
 
     /// What became of a publish that was set to happen on its own.
-    private enum ScheduledPublishOutcome {
+    enum ScheduledPublishOutcome {
         case noneWasSet
         case turnedOff
         case couldNotTurnOff

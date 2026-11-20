@@ -402,7 +402,7 @@ nonisolated enum JournaledWrite {
         }
         let root: URL = draft.workingFolderURL ?? URL(fileURLWithPath: "/", isDirectory: true)
         let plan: UndoPlan = UndoCheck.plan(draft.ops, direction: .forward, root: root, journal: journal, places: places)
-        guard case .ready(let targets, let recomputes) = plan else {
+        guard case .ready(let targets, let recomputes, _) = plan else {
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             if case .refused(let refusal) = plan {
                 return .refused(refusal)

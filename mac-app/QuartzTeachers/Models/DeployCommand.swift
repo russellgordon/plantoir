@@ -321,6 +321,114 @@ enum DeployCommand {
         return SiteRelease(keptFiles: keptFiles, savedFiles: savedFiles, stillPinned: stillPinned)
     }
 
+    /// What a rollover's release of the website PLANNED into its one step
+    /// (#899 U3b), and the legacy marker it moved outside the step.
+    struct PlannedSiteRelease {
+
+        // MARK: - Stored properties
+
+        /// As `releaseSite` reports it, true once the step is made.
+        let release: SiteRelease
+
+        /// The legacy Netlify marker, already moved aside OUTSIDE the step:
+        /// where it was and where it went, or nil when there was none.
+        let legacyMove: (from: URL, to: URL)?
+
+        // MARK: - Functions
+
+        /// Puts the legacy marker back where it was, for a step that was
+        /// then refused: the rollover says nothing was changed, and that
+        /// must be true of this file too. Never over anything.
+        func putTheLegacyMarkerBack() {
+            guard let legacyMove else {
+                return
+            }
+            if FileManager.default.fileExists(atPath: legacyMove.from.path) {
+                return
+            }
+            try? FileManager.default.moveItem(at: legacyMove.to, to: legacyMove.from)
+        }
+    }
+
+    /// `releaseSite`, PLANNED into the rollover's ONE step instead of
+    /// written (#899 U3b; #897 piece B, seams 1 and 3): each marker in the
+    /// course's own folders becomes one `moveApart`, judged as a pair and
+    /// standing apart from the rest of the step, so an Undo after a deploy
+    /// has filled the marker's place leaves both where they are and takes
+    /// back the rest (Russell's ruling of 2026-11-19 on Q3; #959). A marker
+    /// that cannot be read, or whose kept name is taken, is still pinned,
+    /// as before.
+    ///
+    /// **The legacy marker is moved OUTSIDE the step**, here and at once,
+    /// because it lives in the built output (`.merged_output`, a link out of
+    /// the working folder to Application Support), where a step cannot name
+    /// it (`undo.rule.stagedThenSwapped`). It is put back if the step is
+    /// then refused (`putTheLegacyMarkerBack`), and an Undo leaves it aside;
+    /// the step says so (`legacyMarkerSetAsideOutside`), and `deploy.py`
+    /// migrates a legacy marker into the stable path on its next deploy in
+    /// any case (`load_netlify_marker`).
+    static func planSiteRelease(
+        forSection sectionNumber: Int,
+        in course: Course,
+        at moment: Date = Date(),
+        into step: JournaledStep
+    ) -> PlannedSiteRelease {
+        var keptFiles: [String] = []
+        var savedFiles: [AssistSavedFile] = []
+        var stillPinned: [String] = []
+
+        for destinationType in CourseConfiguration.knownDeployTargetTypes {
+            guard let markerURL = firstDeployMarkerURL(
+                forSection: sectionNumber, in: course, destinationType: destinationType
+            ) else {
+                continue
+            }
+            guard FileManager.default.fileExists(atPath: markerURL.path) else {
+                continue
+            }
+            guard let contents = try? String(contentsOf: markerURL, encoding: .utf8) else {
+                stillPinned.append(nameForTeacher(markerURL))
+                continue
+            }
+            let keptURL: URL = markerURL.deletingLastPathComponent()
+                .appendingPathComponent(releasedMarkerName(forSection: sectionNumber, at: moment))
+            if FileManager.default.fileExists(atPath: keptURL.path)
+                || !step.move(markerURL, to: keptURL, standsApart: true) {
+                stillPinned.append(nameForTeacher(markerURL))
+                continue
+            }
+            keptFiles.append(nameForTeacher(keptURL))
+            savedFiles.append(AssistSavedFile(fileURL: markerURL, before: contents, after: nil))
+            savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
+        }
+
+        var legacyMove: (from: URL, to: URL)? = nil
+        let legacyURL: URL = legacyMarkerURL(forSection: sectionNumber, in: course)
+        if FileManager.default.fileExists(atPath: legacyURL.path) {
+            if let contents = try? String(contentsOf: legacyURL, encoding: .utf8) {
+                let keptURL: URL = legacyURL.deletingLastPathComponent()
+                    .appendingPathComponent(".netlify_site.previous-" + stamp(moment) + ".json")
+                do {
+                    try FileManager.default.moveItem(at: legacyURL, to: keptURL)
+                    legacyMove = (from: legacyURL, to: keptURL)
+                    step.extraArguments["legacyMarkerSetAsideOutside"] = "true"
+                    keptFiles.append(nameForTeacher(keptURL))
+                    savedFiles.append(AssistSavedFile(fileURL: legacyURL, before: contents, after: nil))
+                    savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
+                } catch {
+                    stillPinned.append(nameForTeacher(legacyURL))
+                }
+            } else {
+                stillPinned.append(nameForTeacher(legacyURL))
+            }
+        }
+
+        return PlannedSiteRelease(
+            release: SiteRelease(keptFiles: keptFiles, savedFiles: savedFiles, stillPinned: stillPinned),
+            legacyMove: legacyMove
+        )
+    }
+
     /// The legacy Netlify marker `releaseSite` also moves: inside the BUILT
     /// output, `.merged_output/section<N>/.netlify_site.json` (see there).
     static func legacyMarkerURL(forSection sectionNumber: Int, in course: Course) -> URL {

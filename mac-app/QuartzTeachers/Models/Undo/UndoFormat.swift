@@ -568,8 +568,13 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
 
     /// The `external` targets this version can read and write, by the part
     /// before the first colon: `preference:<name>` is one of the app's own
-    /// preferences. Any other makes the op unreadable.
-    static let externalTargetsThisVersionKnows: Set<String> = ["preference"]
+    /// preferences; `scheduledDeploy:<label>` (U3b) is a deploy set for
+    /// later, its LaunchAgent and the script it runs. Any other makes the op
+    /// unreadable.
+    static let externalTargetsThisVersionKnows: Set<String> = ["preference", UndoOp.scheduledDeployFamily]
+
+    /// The family of a deploy set for later (`scheduledDeploy:<label>`).
+    static let scheduledDeployFamily: String = "scheduledDeploy"
 
     enum CodingKeys: String, CodingKey {
         case kind
@@ -749,7 +754,25 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         guard let kind = knownKind else {
             return false
         }
-        return kind == .move || kind == .createTree || kind == .removeTree || kind == .external
+        return kind == .move || kind == .moveApart || kind == .createTree || kind == .removeTree || kind == .external
+    }
+
+    /// Whether an undo or a redo that finds this op changed since leaves it
+    /// where it is and goes on with the rest of the step, reporting it
+    /// (`moveApart`, and an `external` op on a scheduled deploy: the
+    /// rollover's markers and the schedule it removed, U3b). Making the
+    /// step never leaves one apart: a step is made whole or not at all.
+    var standsApart: Bool {
+        guard let kind = knownKind else {
+            return false
+        }
+        if kind == .moveApart {
+            return true
+        }
+        if kind == .external, let target = target {
+            return target.hasPrefix(UndoOp.scheduledDeployFamily + ":")
+        }
+        return false
     }
 
     // MARK: - Functions
@@ -826,6 +849,15 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return op
     }
 
+    /// A file moved that stands apart from its step (`moveApart`).
+    static func moveFileApart(from: String, to: String, sha: String) -> UndoOp {
+        var op: UndoOp = UndoOp(kind: UndoOpKind.moveApart.rawValue, path: nil)
+        op.from = from
+        op.to = to
+        op.sha = sha
+        return op
+    }
+
     static func moveFolder(from: String, to: String, listingSha: String) -> UndoOp {
         var op: UndoOp = UndoOp(kind: UndoOpKind.move.rawValue, path: nil)
         op.from = from
@@ -868,7 +900,7 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             return false
         }
         switch kind {
-        case .move:
+        case .move, .moveApart:
             // No `path`: `from` and `to` follow path's rules, differ, and
             // neither holds the other. Exactly one of a file's `sha` and a
             // folder's `listingSha`.
@@ -935,7 +967,7 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
                 return false
             }
             return blobs.contains(listingSha)
-        case .move, .external:
+        case .move, .moveApart, .external:
             return false
         }
     }
@@ -1002,6 +1034,14 @@ nonisolated enum UndoOpKind: String, Sendable {
     case editJSON
     /// U2: a file or a folder moved, reversed only as a whole pair.
     case move
+    /// U3b: a move judged as `move` is, which STANDS APART from the rest of
+    /// its step: when an undo or a redo finds its pair changed since (a
+    /// deploy wrote a new marker in the place a rollover emptied), it is
+    /// left where it is and reported, and the rest of the step goes ahead
+    /// (Russell's ruling of 2026-11-19 on Q3; #959). A kind of its own,
+    /// never a key on `move`: an older reader would undo a key's meaning by
+    /// the old rule (`undoJournal.unknown.keys`).
+    case moveApart
     /// U2: a folder made, with everything in it.
     case createTree
     /// U2: a folder removed, with everything in it kept in the list.
