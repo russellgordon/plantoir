@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- #899 W2a's measurements and its two-process lock test, run by hand on a
+       real PC. In NO solution, so the unit suite never builds or runs it. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Plantoir.Core\Plantoir.Core.csproj" />
+  </ItemGroup>
+
+</Project>

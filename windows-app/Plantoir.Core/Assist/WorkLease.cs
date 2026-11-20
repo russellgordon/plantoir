@@ -459,7 +459,7 @@ public static class WorkLease
     }
 
     /// <summary>A start time as the mac writes line 4: whole seconds since 1970, a dot, six digits of microseconds.</summary>
-    private static string StartMoment(DateTime started)
+    internal static string StartMoment(DateTime started)
     {
         long ticks = started.ToUniversalTime().Ticks - DateTime.UnixEpoch.Ticks;
         return $"{ticks / TimeSpan.TicksPerSecond}.{ticks % TimeSpan.TicksPerSecond / 10:D6}";
