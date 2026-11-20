@@ -14413,8 +14413,10 @@ deploy read "Something went wrong". Ruled: stopping a deploy asks first by
 every route. It now goes through `PressCancelAsync`, as Cancel does: a
 deploy asks, is swept and ends "Cancelled"; a preview stops at once; the
 button stays. *One "under way" rule.* A deploy that builds first runs both
-scripts on one runner, and between them `IsRunning` is false for up to the
-100 ms `WaitUntilFinished` takes to notice (`IsBetweenPhases`, row 318b).
+scripts on one runner, and between them `IsRunning` is false until
+`RunAsync`'s wait on `WaitUntilFinished` resumes (`IsBetweenPhases`, row
+318b): up to 100 ms when this was written, a turn of the window's thread since
+#1016 made the wait a `TaskCompletionSource` that the run's ending completes.
 The stopping code read `IsRunning` alone, so a "Stop the deploy?" open when
 the build ended was taken down while the deploy went on, and a press in the
 gap asked nothing. Now `ScriptRunner.IsUnderWay` (running, or between
@@ -14503,8 +14505,9 @@ closed).
 
 **The second review's fixes (2026-11-20).** *Between two destinations.* A
 course that deploys to two or more places runs a leg each, and when leg 1's
-runner stops, `RunAsync` moves to leg 2 only after its next poll (up to
-100 ms) and `CurrentLegIndex` changes; only then does the section show leg
+runner stops, `RunAsync` moves to leg 2 only once its wait resumes (up to
+100 ms then; since #1016, the post queued behind the runner's own ending) and
+`CurrentLegIndex` changes; only then does the section show leg
 2's runner. In that gap the panel's runner was leg 1's and not under way, so
 a "Stop the deploy?" open when destination 1 finished was taken down while
 the deploy went on, Cancel's row hid, and Escape did nothing. The panel's
@@ -14534,8 +14537,8 @@ wizard's console Stop, pressed at "Step 1 of 7", ended the work "Cancelled".
 **Tests.** `StopQuestionsContractTests`: the rule holds between two
 destinations and a press there asks (state set by hand); a real
 `RunAsync` over three stand-in destinations on a one-thread context,
-cancelled from the first leg's own ending (the gap, before the run's poll
-sees it), asks there and runs `deploy.ps1` once; an exception thrown
+cancelled from the first leg's own ending (the gap, before the run's wait
+resumes), asks there and runs `deploy.ps1` once; an exception thrown
 between a real build and the deploy's `Run` leaves no leg between phases.
 `StopByKeyboardUiTests`: the question across the change of destination, and
 the wizard's console Stop. Sabotaged in the VM, each red: the rule without
@@ -14562,7 +14565,9 @@ the mac's Cancel answers only while the shown leg runs, so it has no gap
 case of its own. A leg not reached because the shared BUILD failed is still
 not counted (the build's own answer is said). *A stop after the last leg
 stops nothing.* Once the last leg's runner has ended, `IsRunning` stays
-true until `RunAsync`'s next poll; the panel's rule read that as under way,
+true until `RunAsync`'s wait resumes (a post queued behind the leg's own
+ending since #1016's `TaskCompletionSource`, so a key or click already queued
+on the window's thread can land there); the panel's rule read that as under way,
 so a press there asked, and Stop Deploy marked the run cancelled: the badge
 read "Cancelled" over a deploy that had gone out everywhere. The run's half
 of the rule is now `CanStillBeStopped`: running, not cancelled, and its

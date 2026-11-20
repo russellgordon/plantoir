@@ -1842,9 +1842,13 @@ kept the run from reaching counts as not deployed, so a stopped run is never
 `allSucceeded` and `recordWhatWentOut` writes no stamp. On Windows a stop
 could land between two destinations and the run was stamped published and
 the assistant told "deployed"; the mac's Cancel answers only while the shown leg is running or
-between its phases (`TaskProgressView`), so a stop cannot land in that gap
-and no sentence it says changed (a stop in the first of two legs now lists the
-second as not deployed too, which is said only when another leg went out).
+between its phases (`TaskProgressView`), so a stop cannot land in that gap.
+One sentence the mac says did change: with three destinations stopped during
+the second, `deployPartiallySucceeded` named only the second as not deployed,
+and now names the second and the third, which never got the site either (the
+contract case "stopped during the second of three", #1009's fourth review). A
+stop in the first of two legs now lists the second as not deployed too, which
+is never said, since no leg went out.
 Rejected: one setting for both (above), and
 Xcode's "Reset all questions" button, which says nothing about which
 question it brings back.
