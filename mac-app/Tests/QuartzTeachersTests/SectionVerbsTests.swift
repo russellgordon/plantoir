@@ -769,18 +769,16 @@ final class SectionVerbsEndingTests: XCTestCase {
     /// so the change was carried out part way. Since U3 the pages are ONE
     /// step through the door, staged and swapped in together or not at all
     /// (`undo.rule.stagedThenSwapped`): nothing is written, the trail says
-    /// "changed nothing", and the sentence is the one the publish has always
-    /// said for a stop (`publishStoppedPartWay`, frozen; documentation 09,
-    /// U3, says it over-claims on this path). MUST FAIL on the writes before
-    /// U3, which left Notes published.
+    /// "changed nothing", and the teacher is told "Nothing was changed: …"
+    /// with the reason, which is true (the first review of U3a, MEDIUM 1:
+    /// `publishStoppedPartWay`, "Only part of …", was said here and is
+    /// false). MUST FAIL on the writes before U3, which left Notes
+    /// published, and on U3a's first round, which said only part changed.
     func testAPublishThatCannotWriteEveryPageWritesNone() async throws {
         let (made, verbs) = try makeVerbs()
         try layOutAPublishThatStopsAfterAWrite(in: made)
         let outcome: AssistToolOutcome = await publish(["section1/All Classes/Unit 1, Day 1"], with: verbs)
-        XCTAssertTrue(
-            outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "the pages you named", problem: "")),
-            outcome.detail
-        )
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
         let notes: String = try String(
             contentsOf: made.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), encoding: .utf8
         )
@@ -792,8 +790,10 @@ final class SectionVerbsEndingTests: XCTestCase {
     }
 
     /// A whole unit one of whose pages cannot be written: since U3 the unit
-    /// is one step, so nothing of it is written and the trail says "changed
-    /// nothing". MUST FAIL on the writes before U3.
+    /// is one step, so nothing of it is written, the trail says "changed
+    /// nothing" and the teacher is told "Nothing was changed: …". MUST FAIL
+    /// on the writes before U3, and on U3a's first round, which said
+    /// `publishStoppedPartWay` ("Only part of Unit 1 was changed").
     func testAWholeUnitThatCannotWriteEveryPageWritesNone() async throws {
         let (made, verbs) = try makeVerbs()
         try layOutAPublishThatStopsAfterAWrite(in: made)
@@ -804,7 +804,8 @@ final class SectionVerbsEndingTests: XCTestCase {
             SectionVerbs.call("publish_pages", ["course": "ICS3U", "section": 1, "pages": "Unit 1"]),
             item: .publishPages, courseCode: "ICS3U", sectionNumber: 1
         )
-        XCTAssertTrue(
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
+        XCTAssertFalse(
             outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "Unit 1", problem: "")), outcome.detail
         )
         XCTAssertEqual(
@@ -864,10 +865,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
         lockedFolder = folder
         let outcome: AssistToolOutcome = await publish(["section1/All Classes/Unit 1, Day 1"], with: verbs)
-        XCTAssertTrue(
-            outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "the pages you named", problem: "")),
-            outcome.detail
-        )
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
         XCTAssertTrue(
             lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "changed nothing", counts: "")),
             lastMenuLine()

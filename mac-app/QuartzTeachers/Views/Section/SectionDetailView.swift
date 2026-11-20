@@ -1975,6 +1975,13 @@ struct SectionDetailView: View {
         if frontPageQuestionMayBeAsked(), let offer = todaysClassOffer() {
             previewAlert = .todaysClass(offer)
             previewAlertIsUp = true
+            // Either answer makes a step on the main actor (the front page,
+            // or Not Today's record): the list is read off it while the
+            // question is up (#899, ruling 8 on U1's third round; the first
+            // review of U3a, LOW 6).
+            Task {
+                await JournaledStep.readTheListAhead()
+            }
             return
         }
         startPreview(at: PreviewStartPage.Request(opensAt: opensAt))

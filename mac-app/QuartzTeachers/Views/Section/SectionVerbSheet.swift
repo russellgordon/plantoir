@@ -585,6 +585,12 @@ final class SectionVerbSheetModel: Identifiable {
             nextClassDay = AssistWording.laterClassesDay(weekday: nextDay.weekdayName, date: nextDay.text)
         }
         stage = .askingAboutLaterClasses
+        // The answer keeps the ticked classes in a step made on the main
+        // actor: the list is read off it while the question is up (#899,
+        // ruling 8 on U1's third round; the first review of U3a, LOW 6).
+        Task {
+            await JournaledStep.readTheListAhead()
+        }
     }
 
     /// The classes asked about that are TICKED: kept published at their

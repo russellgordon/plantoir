@@ -385,35 +385,97 @@ final class UndoActionStepsTests: XCTestCase {
     /// Today's in-memory undo (`AssistChangeHistory`) answers exactly as it
     /// did before U3: each action through the runner gains the entries it
     /// always did (none for Make Room, Add Classes and the class dates), and
-    /// Undo Last Change puts every page it wrote back, byte for byte.
+    /// Undo Last Change puts every page it wrote back, byte for byte. The
+    /// first review of U3a (LOW 11) added re-date, Publish Class for a Date,
+    /// How I Teach, the menu's Duplicate as Next Class and Undo Getting Ready
+    /// (`StartOfYearUndoRegistry`, below).
     func testTodaysUndoAnswersExactlyAsBefore() async throws {
         let cases: [(tool: String, arguments: [String: Any], surface: AssistToolRunner.Surface, entries: Int)] = [
             ("publish_pages", ["pages": ["Unit 1, Day 2"]], .menu, 1),
             ("unpublish_pages", ["pages": ["Unit 1, Day 1"]], .local, 1),
             ("publish_pages", ["pages": ["Unit 1"]], .menu, 1),
+            ("publish_class_on", ["date": "2026-09-10"], .local, 1),
             ("add_next_class", [:], .local, 1),
             ("add_next_class", ["duplicate": "Unit 1, Day 1"], .local, 0),
             ("make_room_for_classes", ["unit": 1, "atDay": 2], .local, 0),
             ("add_classes", ["unit": 2, "howMany": 2], .mcp, 1),
             ("remember_timetable", ["dates": "2026-09-08; 2026-09-10"], .local, 0),
             ("add_curriculum_mentions", ["page": "Loops", "codes": "A1.1"], .mcp, 1),
+            ("write_how_i_teach", ["text": "I start every class with a question."], .mcp, 1),
         ]
         for testCase in cases {
             let made: AssistFixture.Made = try section(surface: testCase.surface)
-            let pagesBefore: [String: Data] = UndoActionStepsTests.pages(of: made.course)
-            let depth: Int = made.runner.changeCount
-            let said: AssistToolOutcome = await AssistFixture.run(testCase.tool, with: testCase.arguments, on: made.runner)
-            XCTAssertEqual(
-                made.runner.changeCount - depth, testCase.entries,
-                "\(testCase.tool) \(testCase.arguments): undo entries — \(said.summary)"
-            )
-            if testCase.entries == 0 {
-                continue
+            try await expectTodaysUndo(
+                on: made, "\(testCase.tool) \(testCase.arguments)", entries: testCase.entries
+            ) {
+                return await AssistFixture.run(testCase.tool, with: testCase.arguments, on: made.runner)
             }
-            let undone: AssistToolOutcome = await AssistFixture.run("undo_last_change", with: [:], on: made.runner)
-            XCTAssertEqual(made.runner.changeCount, depth, "\(testCase.tool): \(undone.summary)")
-            XCTAssertEqual(UndoActionStepsTests.pages(of: made.course), pagesBefore, "\(testCase.tool): the undo did not put every page back")
         }
+
+        let reDate: AssistFixture.Made = try AssistFixture.makeSectionNeedingReDating(for: self)
+        try await expectTodaysUndo(on: reDate, "re_date_classes", entries: 1) {
+            return await AssistFixture.run("re_date_classes", with: [:], on: reDate.runner)
+        }
+
+        let fromTheMenu: AssistFixture.Made = try section(surface: .menu)
+        try await expectTodaysUndo(on: fromTheMenu, "the menu's Duplicate as Next Class", entries: 1) {
+            return await fromTheMenu.runner.run(call: SectionVerbs.duplicateAsNextClass(
+                course: "ICS3U", section: 1, sourcePath: "section1/All Classes/Unit 1, Day 1.md", planning: false
+            ))
+        }
+
+        // Undo Getting Ready: the sheet's own registry, not the runner's.
+        StartOfYearUndoRegistry.shared.forgetAll()
+        defer {
+            StartOfYearUndoRegistry.shared.forgetAll()
+        }
+        let startOfYear: AssistFixture.Made = try startOfYearSection()
+        let pagesBefore: [String: Data] = UndoActionStepsTests.pages(of: startOfYear.course)
+        let go: StartOfYearSheetModel = StartOfYearSheetModel(
+            course: startOfYear.course, sectionNumber: 1, workspaceURL: startOfYear.root, mode: .getReady
+        )
+        go.load()
+        await go.goAhead()
+        guard case .done = go.stage else {
+            return XCTFail("getting ready was not done: \(go.stage)")
+        }
+        XCTAssertNotEqual(UndoActionStepsTests.pages(of: startOfYear.course), pagesBefore, "getting ready changed nothing")
+        let back: StartOfYearSheetModel = StartOfYearSheetModel(
+            course: startOfYear.course, sectionNumber: 1, workspaceURL: startOfYear.root, mode: .undo
+        )
+        back.load()
+        guard case .undoReady(_, _, let skipped) = back.stage else {
+            return XCTFail("no Undo Getting Ready offered: \(back.stage)")
+        }
+        XCTAssertEqual(skipped.count, 0)
+        await back.undo()
+        XCTAssertEqual(
+            UndoActionStepsTests.pages(of: startOfYear.course), pagesBefore,
+            "Undo Getting Ready did not put every page back"
+        )
+        XCTAssertNil(StartOfYearUndoRegistry.shared.entry(
+            folderPath: startOfYear.root.path, courseCode: "ICS3U", sectionNumber: 1
+        ))
+    }
+
+    /// Runs an action, counts the undo entries it gains, and, when it gains
+    /// one, runs Undo Last Change, which must put every page back byte for
+    /// byte.
+    func expectTodaysUndo(
+        on made: AssistFixture.Made, _ name: String, entries: Int,
+        _ action: () async throws -> AssistToolOutcome
+    ) async throws {
+        let pagesBefore: [String: Data] = UndoActionStepsTests.pages(of: made.course)
+        let depth: Int = made.runner.changeCount
+        let said: AssistToolOutcome = try await action()
+        XCTAssertEqual(made.runner.changeCount - depth, entries, "\(name): undo entries — \(said.summary)")
+        if entries == 0 {
+            return
+        }
+        XCTAssertNotEqual(UndoActionStepsTests.pages(of: made.course), pagesBefore, "\(name) changed nothing: \(said.summary)")
+        let undone: AssistToolOutcome = await AssistFixture.run("undo_last_change", with: [:], on: made.runner)
+        XCTAssertEqual(made.runner.changeCount, depth, "\(name): \(undone.summary)")
+        XCTAssertEqual(UndoActionStepsTests.pages(of: made.course), pagesBefore, "\(name): the undo did not put every page back")
     }
 
     /// THE worst case of documentation 09's "if the app dies": Make Room
@@ -507,11 +569,200 @@ final class UndoActionStepsTests: XCTestCase {
 
         XCTAssertEqual(saidBroken.summary, saidWell.summary)
         XCTAssertEqual(saidBroken.detail, saidWell.detail)
-        var wellPages: [String: Data] = [:]
-        for (path, data) in UndoActionStepsTests.pages(of: well.course) {
-            wellPages[path] = data
+        let wellPages: [String: Data] = UndoActionStepsTests.pages(of: well.course)
+        let brokenPages: [String: Data] = UndoActionStepsTests.pages(of: broken.course)
+        var differing: [String] = []
+        for (path, data) in wellPages where brokenPages[path] != data {
+            differing.append(path + ": " + (String(data: brokenPages[path] ?? Data(), encoding: .utf8) ?? "?")
+                             + " | " + (String(data: data, encoding: .utf8) ?? "?"))
         }
-        XCTAssertEqual(UndoActionStepsTests.pages(of: broken.course), wellPages)
+        for (path, _) in brokenPages where wellPages[path] == nil {
+            differing.append(path + ": only with the broken list")
+        }
+        differing.sort()
+        XCTAssertEqual(differing, [])
+    }
+
+    // MARK: - Tests: reading through the plan
+
+    /// The day a number of days from today, by the Mac's own clock (the
+    /// links checklist reads it).
+    static func day(fromToday days: Int) throws -> CalendarDay {
+        let moment: Date = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: days, to: Date()))
+        return CalendarDay.today(moment)
+    }
+
+    /// The section with a Concepts page both Unit 1, Day 2 and Day 3 use.
+    func sectionSharingAPage(surface: AssistToolRunner.Surface) throws -> AssistFixture.Made {
+        let made: AssistFixture.Made = try section(surface: surface)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "false", date: "2026-09-10", body: "Two, see [[Notes]].", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 3", publish: "false", date: "2026-09-14", body: "Three, see [[Notes]].", in: made.course)
+        try "---\ntitle: Notes\npublishForSection1: false\ncreatedSection1: 2026-02-01T07:00:00.000-0400\n---\n\nNotes.\n"
+            .write(to: made.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), atomically: true, encoding: .utf8)
+        return made
+    }
+
+    /// A whole unit is ONE step planned class by class: each class's plan
+    /// reads the pages as the classes before it left them in the step, so
+    /// the unit writes exactly what publishing its classes one by one wrote
+    /// before U3 (a page two classes use keeps the first one's date). MUST
+    /// FAIL with `JournaledStep.textAsPlanned` reading the disk (the first
+    /// review of U3a, LOW 4): Day 3's plan then saw Notes still hidden and
+    /// published it again with its own date.
+    func testAWholeUnitReadsWhatItsEarlierClassesPlanned() async throws {
+        let unit: AssistFixture.Made = try sectionSharingAPage(surface: .menu)
+        _ = await AssistFixture.run("publish_pages", with: ["pages": ["Unit 1"]], on: unit.runner)
+
+        let oneByOne: AssistFixture.Made = try sectionSharingAPage(surface: .menu)
+        _ = await AssistFixture.run("publish_pages", with: ["pages": ["Unit 1, Day 2"]], on: oneByOne.runner)
+        _ = await AssistFixture.run("publish_pages", with: ["pages": ["Unit 1, Day 3"]], on: oneByOne.runner)
+
+        let notes: String = try String(
+            contentsOf: unit.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), encoding: .utf8
+        )
+        XCTAssertTrue(notes.contains("publishForSection1: true"), notes)
+        XCTAssertEqual(UndoActionStepsTests.pages(of: unit.course), UndoActionStepsTests.pages(of: oneByOne.course))
+    }
+
+    /// A section whose runner reads 2026-09-08 as today: Day 2 (09-10) is
+    /// the next class, so a visible Day 3 (09-14) is one the Deploy
+    /// question asks about.
+    func sectionOnTheEighth() throws -> AssistFixture.Made {
+        let today: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-09-08"))
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(
+            hasDeployedBefore: true, clock: AssistFixture.TestClock(today), surface: .local
+        )
+        try AssistFixture.keepScheduledPublishingInside(made.root, for: self)
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-08", body: "One.", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "false", date: "2026-09-10", body: "Two.", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 3", publish: "false", date: "2026-09-14", body: "Three, see [[Notes]].", in: made.course)
+        try "---\ntitle: Notes\npublishForSection1: false\ncreatedSection1: 2026-02-01T07:00:00.000-0400\n---\n\nNotes.\n"
+            .write(to: made.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), atomically: true, encoding: .utf8)
+        return made
+    }
+
+    /// Publish Class for a Date keeps the class it publishes, when the
+    /// Deploy question would ask about it, in the publish's own step: the
+    /// question is asked of the pages AS THE STEP LEAVES THEM, where the
+    /// class is visible. MUST FAIL with `JournaledStep.textAsPlanned`
+    /// reading the disk (LOW 4), where the class is still hidden and
+    /// nothing is kept.
+    func testPublishClassForADateKeepsTheClassItPublishesInTheSameStep() async throws {
+        let made: AssistFixture.Made = try sectionOnTheEighth()
+        let list: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("undo-on-a-date-\(UUID().uuidString)", isDirectory: true)
+        listFolders.append(list)
+        UndoJournalLocation.folderOverride = list
+        let said: AssistToolOutcome = await AssistFixture.run("publish_class_on", with: ["date": "2026-09-14"], on: made.runner)
+        let kept: ClassesDatedLater.KeptRecord? = ClassesDatedLater.KeptRecord.read(
+            courseDirectory: made.course.directoryURL, section: 1
+        )
+        XCTAssertEqual(
+            kept?.kept, [ClassesDatedLater.Kept(place: "section1/All Classes/Unit 1, Day 3", date: "2026-09-14")],
+            said.summary
+        )
+        let fold: UndoFold = try UndoJournal(folderURL: list).read()
+        XCTAssertEqual(fold.records.count, 1, "not one step")
+        var paths: [String] = []
+        for op in try XCTUnwrap(fold.records[1]).step.ops {
+            if let path = op.path {
+                paths.append(path)
+            }
+        }
+        XCTAssertTrue(paths.contains("courses/ICS3U/.publish_state/section1.later-classes-kept.json"), "\(paths)")
+        XCTAssertTrue(paths.contains("courses/ICS3U/section1/All Classes/Unit 1, Day 3.md"), "\(paths)")
+    }
+
+    /// The kept record of Publish Class for a Date is written only inside a
+    /// step that goes in (LOW 10). Before U3 it was written AFTER the
+    /// publish, whatever came of it, so a publish that could not be written
+    /// still recorded the class as kept when it was already visible: the
+    /// Deploy question was then silenced for a class the teacher's request
+    /// never reached. MUST FAIL on the order before U3.
+    func testAPublishClassForADateThatIsRefusedKeepsNothing() async throws {
+        let made: AssistFixture.Made = try sectionOnTheEighth()
+        try AssistFixture.write(page: "Unit 1, Day 3", publish: "true", date: "2026-09-14", body: "Three, see [[Notes]].", in: made.course)
+        let concepts: URL = made.course.directoryURL.appendingPathComponent("Concepts")
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: concepts.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: concepts.path)
+        }
+        let depth: Int = made.runner.changeCount
+        let said: AssistToolOutcome = await AssistFixture.run("publish_class_on", with: ["date": "2026-09-14"], on: made.runner)
+        XCTAssertTrue(said.detail.hasPrefix("Nothing was changed: "), said.detail)
+        XCTAssertNil(
+            ClassesDatedLater.KeptRecord.read(courseDirectory: made.course.directoryURL, section: 1),
+            "a refused publish kept the class"
+        )
+        XCTAssertEqual(made.runner.changeCount, depth, "a refused publish gained an undo entry")
+    }
+
+    /// The links checklist keeps the later classes it publishes, read as
+    /// its step leaves the pages. MUST FAIL with `JournaledStep.textAsPlanned`
+    /// reading the disk (LOW 4).
+    func testTheLinksChecklistKeepsTheLaterClassItPublishes() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(surface: .local)
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        let next: CalendarDay = try UndoActionStepsTests.day(fromToday: 1)
+        let later: CalendarDay = try UndoActionStepsTests.day(fromToday: 10)
+        let testCase: [String: Any] = [
+            "pages": [
+                ["title": "Unit 1, Day 1", "kind": "class", "visible": true, "date": next.text, "links": ["How Marks Work"]],
+                ["title": "Unit 2, Day 5", "kind": "class", "visible": false, "date": later.text, "links": ["Class Notes"]],
+                ["title": "How Marks Work", "kind": "page", "visible": true, "date": next.text],
+                ["title": "Class Notes", "kind": "page", "visible": false, "date": "2026-02-01"],
+            ],
+        ]
+        _ = try LinksChecklistTests.layOut(testCase, made: made)
+        let offer: LinksChecklistOffer = try LinksChecklistTests.offer(from: [
+            [
+                "place": "section1/All Classes/Unit 2, Day 5", "group": "class", "ticked": false, "step": NSNull(),
+                "claimedBy": NSNull(), "date": NSNull(), "why": "classNeverDated", "firstUsedIn": NSNull(),
+            ],
+        ])
+        let result: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
+            offer: offer, ticked: ["section1/All Classes/Unit 2, Day 5"], course: made.course, sectionNumber: 1,
+            workspaceURL: made.root, shownComingWith: []
+        )
+        guard case .published = result else {
+            return XCTFail("Publish did not publish: \(result)")
+        }
+        let kept: ClassesDatedLater.KeptRecord? = ClassesDatedLater.KeptRecord.read(
+            courseDirectory: made.course.directoryURL, section: 1
+        )
+        XCTAssertEqual(kept?.kept, [ClassesDatedLater.Kept(place: "section1/All Classes/Unit 2, Day 5", date: later.text)])
+    }
+
+    /// Every sheet that makes a step on the main actor reads the list off
+    /// it first, while the teacher reads the sheet or the question (the
+    /// director's ruling 8 on U1's third round; the first review of U3a,
+    /// LOW 6): the links checklist, today's class and Not Today, the
+    /// classes dated later at Deploy, the class dates, and starting the
+    /// How I Teach page. MUST FAIL with any one of those reads taken out.
+    func testEverySheetThatMakesAStepReadsTheListAhead() throws {
+        let productFolder: URL = ActivityTrailWiringTests.productSourceFolderURL()
+        let sheets: [String] = [
+            "Views/Section/LinksChecklistSheet.swift",
+            "Views/Section/SectionDetailView.swift",
+            "Views/Section/SectionVerbSheet.swift",
+            "Views/Section/SectionScheduleSheet.swift",
+            "Views/CourseSettings/CourseSettingsView.swift",
+            "Models/Assist/AssistToolRunner.swift",
+            "Models/StartOfYear/StartOfYearPreparation.swift",
+        ]
+        var missing: [String] = []
+        for sheet in sheets {
+            let source: String = try String(contentsOf: productFolder.appendingPathComponent(sheet), encoding: .utf8)
+            var reads: Bool = false
+            for line in UndoWriterScanTests.codeLines(of: source) where line.contains("await JournaledStep.readTheListAhead()") {
+                reads = true
+            }
+            if !reads {
+                missing.append(sheet)
+            }
+        }
+        XCTAssertEqual(missing, [], "these make a step on the main actor without reading the list ahead")
     }
 
     // MARK: - Functions

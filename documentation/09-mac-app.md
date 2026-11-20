@@ -20646,10 +20646,22 @@ unit as one entry.
 - a target that is not a plain file (a link, a folder, a file that cannot
   be read).
 
-In shadow those files are written as the action always wrote them
-(`writePlainly`, `.atomic`, never over a file that was absent when it was
-planned), with one trail line. Live (U7), the step is refused before
-anything changes.
+In shadow those files are written with one trail line by
+`JournaledStep.writePlainly`, which since U3a's second round is all or none
+like the door (the first review of U3a, LOW 3: it wrote file by file, so a
+failure part way left half an action while the reply said "Nothing was
+changed"). It stages every file beside its target and swaps them in
+together (`UndoSwap`, label `shadow`), each still holding what it held when
+it was planned and a page that was absent still absent. A target that was
+a link, a folder or a file that could not be read when it was planned is
+refused before anything is written, as a live step refuses it: its content
+cannot be checked, and the old `.atomic` write over a link replaced the
+teacher's link with a regular file (measured: `Data.write(.atomic)` to a
+link leaves a regular file at the link's place and the linked file
+untouched). Chosen over making the sentence true of a part-way write,
+because every caller would then need a part-way sentence and a trail count
+of its own, and live refuses the same targets anyway. Live (U7), the step
+is refused before anything changes.
 
 **The front page is the rule's, never content.** Publish, hide, a whole
 unit, re-date and the start of the year name the section's front page as a
@@ -20668,11 +20680,27 @@ lock wait in shadow, and one `F_FULLFSYNC` (4.0 ms median on the M4 Pro,
 U1's measurement). The expensive part, a process's first whole read of the
 list (100 to 380 ms at a year's 2 to 6 MB), is taken OFF the main actor
 first, by `JournaledStep.readTheListAhead()`. The runner calls it before
-every tool, and Get Ready for the Start of the Year calls it before its
-write, so the step reads on from there (the director's ruling 8 on U1's
-third round). **For U7:** live, the lock waits up to 2 s. Before the flip,
-U7 must either move the step's `make()` off the main actor (the planners
-would become async) or show that the live wait cannot hold the window.
+every tool, Get Ready for the Start of the Year before its write, and,
+since U3a's second round (the first review, LOW 6), every sheet that makes
+a step on the main actor while the teacher reads it: the links checklist
+(`.task`), today's class and Not Today (when the question goes up), the
+classes dated later at Deploy (`SectionVerbSheetModel.ask`), the class
+dates sheet and Course Settings (for Start the How I Teach Page…), each a
+`.task` or an unawaited `Task`, so nothing waits for the read and the order
+of effects is unchanged. `UndoActionStepsTests.testEverySheetThatMakesAStepReadsTheListAhead`
+pins the list. The step reads on from there (the director's ruling 8 on
+U1's third round).
+
+**For U7, to settle before the switch (the first review of U3a, LOW 9).**
+In shadow the main actor waits at most 0.05 s for the lock to begin a step
+(`UndoSwitch.shadowLockWaitSeconds`) and 0.05 s to finish it. Live it waits
+up to 2 s to begin (`lockWaitSeconds`) and up to 10 s to finish
+(`finishWaitSeconds`), per action, so a busy list (another window, an
+outside assistant, a scheduled deploy holding the lock) could hold the
+window for 12 s. U7 must either move the step's `make()` off the main
+actor (the planners would become async) or bound the live waits on the
+main actor to what the HIG allows a window to stall, and say which, before
+`undoJournalIsLive` is turned on. Also in `undo.laterPieces.U7`.
 
 #### The actions, their keys and makers
 
@@ -20680,7 +20708,7 @@ would become async) or show that the live wait cannot hold the window.
 |---|---|---|---|
 | Publish Pages / Hide Pages | `AssistToolRunner.carryOut` → `AssistPublishPlanner.apply` | `publishPages` / `hidePages` | each page (editLine), front page as recompute |
 | A whole unit published or hidden | `wholeUnitRequested`, one `JournaledStep` for the unit, `planWrites` per class | `publishPages` / `hidePages` | every class and page of the unit, front page as recompute |
-| Publish Class for a Date | `carryOut` with `planningAlso` | `publishClassForADate` | the pages, and `section<N>.later-classes-kept.json` when the class would be asked about at Deploy (one step; on its own step when the publish changed nothing) |
+| Publish Class for a Date | `carryOut` with `planningAlso` | `publishClassForADate` | the pages, and `section<N>.later-classes-kept.json` when the class would be asked about at Deploy (one step; on its own step when the publish changed nothing; written only inside a step that goes in, see "The second round") |
 | Add Next Class, in a new unit, Add Classes | `PlaceholderClassPlanner.apply` | `addNextClass` / `addNextClassInANewUnit` / `addClasses` | each new page (writeFile, before absent) |
 | Make Room for Classes | `ClassInsertionPlanner.apply` | `makeRoomForClasses` | each rename (the new name written, the old removed), each link rewritten, each date moved, each new page |
 | Duplicate Class (the window) | `duplicateClassRequested`, `ClassInsertionPlanner.apply(into:)` | `duplicateClass` | the room made and the copy, in one step. When the copy is refused after the room is planned, the room alone is made, as before U3 |
@@ -20732,9 +20760,91 @@ cannot go in reverses the swaps already made. The error is Foundation's
   (`linksNotUpdated`, `notReDated`) can no longer happen. A rename whose new
   name is taken, and a new page whose name appeared meanwhile, are still
   carried past and named.
-- **Known, for U7's wording:** `AssistWording.publishStoppedPartWay` still
-  says "Only part of … was changed" on that path, and since U3 nothing was
-  changed. The frozen wording was not touched here.
+- A publish, a hide and a whole unit that cannot write every page now say
+  "Nothing was changed: …" with the reason, as a re-date does, and never
+  `publishStoppedPartWay` ("Only part of … was changed"), which is false of
+  a disk where nothing was written (the first review of U3a, MEDIUM 1;
+  `undo.rule.stagedThenSwapped` and ruling 4 make all-or-nothing the final
+  behaviour, not U7's to word). `AssistWording` is untouched and no
+  `assist-cases` case pins this path. `PublishStoppedPartWayTests` pins the
+  page list, the whole unit and an outside assistant; no Restore Section
+  pointer is added, since there is nothing to put back.
+
+#### The second round (the first review of U3a)
+
+- **The befores are the plan's (MEDIUM 2).** `JournaledStep.recordableChanges`
+  read each file again at `make()`, so an Obsidian edit, or a page that
+  appeared at a rename target or a new page's place, between planning and
+  making became the step's before and was written over. The bytes `plan()`
+  read when it first planned the file are now the before
+  (`plannedBefore`), so the door refuses `changedSince` and the other
+  program's file is left as it wrote it
+  (`JournaledStepTests.testAFileEditedBetweenPlanAndMakeIsRefusedAndLeftAsTheOtherProgramWroteIt`,
+  `testAPageAppearingAtANewPagesPlaceIsRefused`, and the same for a step
+  written plainly).
+- **The swap reads the kept original back (the Windows W2b review, matched
+  here).** An edit made IN PLACE by another program between the swap's
+  re-read and its rename lands in the inode the kept original links to;
+  the tidy then deleted it. After each rename the original is read back:
+  changed, it is put back over the new content and the step refused
+  `changedSince`; unreadable, put back and refused `cannotTellNow`. No
+  contract row: those are the existing refusals. On a volume without hard
+  links the original is a copy, which the race never reaches, so it is not
+  seen there (as before). `JournaledStepTests.testAnEditThatRacesTheSwapIsPutBackAndTheSwapRefused`
+  mirrors Windows' `UndoSwapTests.AnEditThatRacesTheSwapIsPutBackAndTheSwapRefused`.
+- **A reversal that cannot complete leaves the step in flight (the Windows
+  W3 review, matched here).** `UndoSwap.swap` ignored `reverse()`'s result
+  and the step was closed `failed`, so a page could be left new with its
+  original in a staged file nothing recorded. Now `reverse()` says whether
+  every swap went back; when one did not, the swap answers `notPutBack`
+  (no new refusal word: the caller says the refusal that stopped it), no
+  closing event is written, nothing is tidied, and recovery settles the
+  step from the content once the process is gone (`rule.recovery`).
+  `testAReversalThatCannotCompleteLeavesTheStepForRecovery`.
+- **A shadow swap without the list is tidied after a kill (LOW 8).** The
+  door's fallback when the list cannot take a step, and `writePlainly`, swap
+  under label `shadow` with no `begin` naming their files. Before staging,
+  `UndoShadowStaging` notes the targets in `shadow-staged/` in the list's
+  folder under this process, and removes the note when the swap ends. A
+  note whose process is gone is tidied by the next recovery and the next
+  read ahead: its `-shadow-new` and `-shadow-orig` files are removed, the
+  teacher's files left as the process left them. When the list's folder
+  cannot take the note the swap goes ahead untracked, and a leftover is
+  replaced by the next shadow swap of the same file. A swap that answered
+  `notPutBack` drops its note, since what it left may be a page's only
+  original. `testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery`.
+- **The links checklist says what is true for each refusal (LOW 7).** A
+  page the plan cannot read: the unreadable-page sentence, as before. A
+  page changed since it was checked: `linksChecklist.wording.pageChangedSince`,
+  named as the sheet names a page. A file that cannot be read just now:
+  the unreadable-page sentence. Anything else (a full disk, a file in use,
+  a list that cannot take the step once live): "Nothing was changed: …"
+  with Foundation's could-not-be-saved sentence for the file, as the
+  runner says it.
+- **Publish Class for a Date's kept record (LOW 10).** Before U3 the record
+  was written after the publish, whatever came of it: a publish refused
+  part way (a page it uses could not be written) still recorded an
+  already-visible class as kept, silencing the Deploy question for a class
+  the request never reached. Now it is written inside the publish's own
+  step, before `history.record`, so it goes in only with the pages. It is
+  not part of today's `AssistChange`, as before, so Undo Last Change leaves
+  it, as it did. `UndoActionStepsTests.testAPublishClassForADateThatIsRefusedKeepsNothing`
+  and `testPublishClassForADateKeepsTheClassItPublishesInTheSameStep`.
+- **Reading through the plan is pinned (LOW 4)** for the whole unit
+  (`testAWholeUnitReadsWhatItsEarlierClassesPlanned`: it writes what
+  publishing its classes one by one wrote), Publish Class for a Date's
+  record and the checklist's kept classes
+  (`testTheLinksChecklistKeepsTheLaterClassItPublishes`).
+- **The front page, repointed once per unit instead of once per class,
+  changes no class's plan.** Checked from the code: the repoint changes
+  only the front page's embed of a class. A publish plan follows links out
+  of the class it publishes and never reads who links in. A hide plan
+  reads who links in (`pageStillLinking`), but a class candidate stops at
+  `aClassOfItsOwn` before that, and the front page's embed names only a
+  class. So every class of a unit is planned the same with the front page
+  as it was before the unit or after any class of it.
+- **The flaky test (LOW 5).** See the flake's note in
+  `UndoActionStepsTests.testAListThatCannotBeWrittenChangesNothingAboutAnAction`.
 
 #### If the app dies part way: what is on disk
 

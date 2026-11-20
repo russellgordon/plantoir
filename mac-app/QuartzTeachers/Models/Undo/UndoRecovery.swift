@@ -118,6 +118,9 @@ nonisolated enum UndoRecovery {
         // aside (steps that move or make folders are left to a live
         // recovery), so it still writes nothing of the teacher's.
         tidyClosedSteps(writer, resolveRoot: resolveRoot, onlyStepsOfFiles: mode == .shadow)
+        // And what a shadow swap without the list left when its process
+        // died (`UndoShadowStaging`; the first review of U3a, LOW 8).
+        UndoShadowStaging.tidyLeftovers(of: writer.journal)
         return results
     }
 

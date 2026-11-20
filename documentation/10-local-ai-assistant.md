@@ -4464,13 +4464,19 @@ and a re-date are each ONE step through the undo journal's door, staged and
 swapped in together or not at all (documentation 09, "U3: every daily page
 action through the door"). A page that cannot be written now writes
 nothing, so the menu's line says "changed nothing". A re-date says "Nothing
-was changed: …" with the file in the way. A publish still says
-`publishStoppedPartWay`, which is frozen wording and over-claims on this
-path. `SectionVerbsEndingTests`' three tests for these paths now pin this
-(`testAPublishThatCannotWriteEveryPageWritesNone`,
+was changed: …" with the file in the way, and so, since U3a's second
+round, does a publish, a hide and a whole unit: `publishStoppedPartWay`
+("Only part of … was changed") was true only while the write went page by
+page, and is no longer said on the Mac on any path (the first review of
+U3a, MEDIUM 1; `AssistWording` is unchanged, the key stays for the re-date
+catch that can no longer be reached and for Windows, which still writes
+page by page). Nor is the Restore Section pointer added: there is nothing
+to put back. `SectionVerbsEndingTests`' three tests for these paths pin
+this (`testAPublishThatCannotWriteEveryPageWritesNone`,
 `testAWholeUnitThatCannotWriteEveryPageWritesNone`,
-`testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`).
-`StoppedAfterWriting` is kept and no longer thrown.
+`testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`), and
+`PublishStoppedPartWayTests` pins the page list, the whole unit and an
+outside assistant. `StoppedAfterWriting` is kept and no longer thrown.
 
 A first write that fails is still "changed nothing", and "Nothing was
 changed". Until #531 the depth alone decided, so each of these was written as

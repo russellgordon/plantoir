@@ -164,6 +164,12 @@ struct SectionScheduleSheet: View {
                 break
             }
         }
+        .task {
+            // Remembering the dates makes a step on the main actor: the list
+            // is read off it while the teacher fills the sheet in (#899,
+            // ruling 8 on U1's third round; the first review of U3a, LOW 6).
+            await JournaledStep.readTheListAhead()
+        }
     }
 
     // MARK: - Computed properties — the parts of the sheet
