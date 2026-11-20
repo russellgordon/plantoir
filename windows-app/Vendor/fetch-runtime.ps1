@@ -349,7 +349,6 @@ if (Test-Path $Manifest) {
     }
 }
 
-New-Item -ItemType Directory -Force $Runtime | Out-Null
 $Temp = Join-Path ([IO.Path]::GetTempPath()) ("plantoir-runtime-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force $Temp | Out-Null
 
@@ -534,18 +533,40 @@ function Get-MicrosoftVcRuntime([string]$Cache, [string]$Work) {
     }
     $member = Expand-CabinetFile $payload $VcRedistMember (Join-Path $Work "vc-redist-runtime")
     Assert-Sha256 $member $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+    # Written under another name, checked, then renamed (the review of
+    # 867ef7859): a run killed mid-copy never leaves a partial file under
+    # the cache's own name.
     New-Item -ItemType Directory -Force $Cache | Out-Null
-    Copy-Item -LiteralPath $member -Destination $cached -Force
+    $partial = Join-Path $Cache "vcruntime140.dll.partial"
+    Copy-Item -LiteralPath $member -Destination $partial -Force
+    Assert-Sha256 $partial $NodeVcRuntimeSha256 $NodeVcRuntimeLength
+    Move-Item -LiteralPath $partial -Destination $cached -Force
     Assert-Sha256 $cached $NodeVcRuntimeSha256 $NodeVcRuntimeLength
     Write-Host "vcruntime140.dll $NodeVcRuntimeVersion taken from Microsoft's Visual C++ Redistributable $VcRedistVersion." -ForegroundColor Green
     return $Cache
 }
 
+# Microsoft's vcruntime140.dll is obtained and checked HERE, before anything
+# is made in runtime\ (the review of 867ef7859). On a fresh fetch a refused
+# bundle (the versioned address gone and the permalink serving a newer one)
+# then stops the run with runtime\ untouched, instead of after the ~600 MB
+# base phase, where it left a runtime with no manifest that a re-run cannot
+# repair in place (see the header: node would be moved inside the old node
+# folder, and git clone refuses a non-empty quartz\). Placing it is
+# unchanged: Install-NodeVcRuntime, below, in both paths.
+try {
+    $vcRuntimeSource = Get-MicrosoftVcRuntime $VcRuntimeCache $Temp
+}
+catch {
+    Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
+    throw
+}
+New-Item -ItemType Directory -Force $Runtime | Out-Null
+
 # The place-the-file-only path (#965), in a try/finally of its own like the
 # main run's below, so a refusal part-way still removes $Temp (#1006).
 if ($vcRuntimeOnly) {
     try {
-        $vcRuntimeSource = Get-MicrosoftVcRuntime $VcRuntimeCache $Temp
         Install-NodeVcRuntime $vcRuntimeSource $nodeDir $Runtime
         $fields = Get-BaseFields
         foreach ($key in $VendorPins.Keys) { $fields[$key] = $VendorPins[$key] }
@@ -751,7 +772,6 @@ try {
     # first manifest written, right after the base phases): from here until
     # the end, a failure leaves a runtime the build refuses and a re-run
     # finishes by fetching runtime\vendor alone.
-    $vcRuntimeSource = Get-MicrosoftVcRuntime $VcRuntimeCache $Temp
     Install-NodeVcRuntime $vcRuntimeSource $nodeDir $Runtime
     Write-RuntimeManifest (Get-BaseFields)
     if (Test-Path $VendorOut) { Remove-Item $VendorOut -Recurse -Force }

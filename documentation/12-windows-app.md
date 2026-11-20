@@ -13343,8 +13343,13 @@ page does not name). The contract half is `windowsNodeVcRuntime` →
   `expand.exe`, the approach `swift_windows_fetch.py` already uses for the
   Swift installer. The file is checked by SHA-256 and size, kept in
   `windows-app\Vendor\vc-runtime` (outside `runtime\`, which the installer
-  packs whole; not committed), and checked again at each place. A cached
-  file that is not the pin is deleted and fetched again.
+  packs whole; not committed; written under a temporary name, checked, then
+  renamed), and checked again at each place. A cached file that is not the
+  pin is deleted and fetched again. The file is obtained BEFORE anything is
+  made in `runtime\`, ahead of the base phase: a refused bundle on a fresh
+  fetch then leaves `runtime\` untouched, where after the ~600 MB base phase
+  it would leave a runtime with no manifest that a re-run cannot repair in
+  place (the independent review of 867ef7859).
 - **Measured 2026-11-19** on the development PC: about 2 s for the download,
   the checks and both `expand` steps; the same at Medium integrity (a
   scheduled task in the desktop session, not elevated) as from SSH (High).

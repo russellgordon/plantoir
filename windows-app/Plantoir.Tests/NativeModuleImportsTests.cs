@@ -135,20 +135,38 @@ public sealed class NativeModuleImportsTests
         Assert.StartsWith("https://download.visualstudio.microsoft.com/", bundle["url"]!.ToString(), StringComparison.Ordinal);
         Assert.StartsWith("https://aka.ms/", bundle["permalink"]!.ToString(), StringComparison.Ordinal);
 
+        // The file is obtained and checked ONCE, before anything is made in
+        // runtime\ (the review of 867ef7859): a refused bundle on a fresh
+        // fetch must not leave a half-made runtime with no manifest, which a
+        // re-run cannot repair in place (the header's trap: node moved inside
+        // the old node folder, git clone refusing a non-empty quartz\).
         int placements = 0;
+        int fetchLine = -1;
         int fetches = 0;
-        foreach (string line in recipe.Split('\n'))
+        int runtimeMade = -1;
+        int baseBegins = -1;
+        string[] lines = recipe.Replace("\r\n", "\n").Split('\n');
+        for (int index = 0; index < lines.Length; index++)
         {
-            string trimmed = line.Trim();
+            string trimmed = lines[index].Trim();
             if (trimmed.StartsWith("Install-NodeVcRuntime ", StringComparison.Ordinal))
             {
                 placements += 1;
                 Assert.Equal("Install-NodeVcRuntime $vcRuntimeSource $nodeDir $Runtime", trimmed);
             }
-            if (trimmed == "$vcRuntimeSource = Get-MicrosoftVcRuntime $VcRuntimeCache $Temp") fetches += 1;
+            if (trimmed.Contains("Get-MicrosoftVcRuntime $VcRuntimeCache $Temp", StringComparison.Ordinal))
+            {
+                fetches += 1;
+                fetchLine = index;
+            }
+            if (trimmed.StartsWith("New-Item -ItemType Directory -Force $Runtime", StringComparison.Ordinal) && runtimeMade < 0) runtimeMade = index;
+            if (trimmed.StartsWith("if ($runBase)", StringComparison.Ordinal) && baseBegins < 0) baseBegins = index;
         }
         Assert.Equal(2, placements);
-        Assert.Equal(placements, fetches);
+        Assert.Equal(1, fetches);
+        Assert.True(runtimeMade >= 0 && baseBegins >= 0, "fetch-runtime.ps1 no longer makes runtime\\ or has no base phase where this test expects them.");
+        Assert.True(fetchLine < runtimeMade && fetchLine < baseBegins,
+            "fetch-runtime.ps1 obtains Microsoft's vcruntime140.dll after runtime\\ is made or after the base phase begins: a refused bundle would leave a half-made runtime with no manifest (#1010 review).");
         Assert.False(recipe.Contains("Install-NodeVcRuntime $pyDir", StringComparison.Ordinal),
             "fetch-runtime.ps1 still places the copy from runtime\\python (the Python zip), which #1010 replaced with Microsoft's redistributable.");
         Assert.True(HasStatement(recipe, "$VcRuntimeCache = Join-Path $VendorDir \"vc-runtime\""),
