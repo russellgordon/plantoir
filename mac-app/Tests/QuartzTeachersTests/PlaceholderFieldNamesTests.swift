@@ -180,7 +180,8 @@ final class PlaceholderFieldNamesTests: XCTestCase {
     }
 
     /// Renaming the unit word: the field is named by the question printed
-    /// beside it.
+    /// beside it, which its `LabeledContent` links as the field's title
+    /// element (named before #1012; pinned).
     func testTheUnitWordRenameFieldIsNamed() throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
         defer {
@@ -195,9 +196,8 @@ final class PlaceholderFieldNamesTests: XCTestCase {
     // MARK: - Settings
 
     /// Settings' Cloudflare Account ID field is named by the label beside it:
-    /// a `LabeledContent` inside a `Form` links its label to the field
-    /// (named before #1012; pinned). Outside a `Form` it links nothing, as
-    /// the unit word sheet's field showed.
+    /// a `LabeledContent` links its label to the field as its title element
+    /// (named before #1012; pinned).
     func testTheCloudflareAccountFieldIsNamed() throws {
         let read: AccessibilityTree = try tree(of: DeployingSettingsView())
         assertField("cloudflareAccountField", in: read, isNamed: "Cloudflare Account ID")
