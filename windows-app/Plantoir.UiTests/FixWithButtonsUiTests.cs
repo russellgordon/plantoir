@@ -169,6 +169,7 @@ public class FixWithButtonsUiTests
         string? into = Environment.GetEnvironmentVariable("PLANTOIR_MEASURE_TOOLTIPS");
         if (string.IsNullOrEmpty(into)) return;
         var lines = new List<string>();
+        int pictureNumber = 1;
         void Rest(AutomationElement element, string describedAs)
         {
             Mouse.MoveTo(DrivenApp.MiddleOf(app.Window));
@@ -193,7 +194,23 @@ public class FixWithButtonsUiTests
                     if (!seen.Exists(line => line.EndsWith($"\"{tip.Name}\"", StringComparison.Ordinal))) seen.Add(said);
                 }
             }
-            lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.HelpText}\"): " + (seen.Count == 0 ? "no tooltip seen in 4 s" : string.Join("; ", seen)));
+            // Anything at the top of the desktop that is not an ordinary
+            // window, and a picture of the window with the pointer still
+            // resting: UI Automation may not expose a WinUI tooltip at all,
+            // and the picture is the evidence either way.
+            try
+            {
+                foreach (var top in app.Desktop.FindAllChildren())
+                    if (top.ClassName is { } name && (name.Contains("Popup", StringComparison.OrdinalIgnoreCase)
+                        || name.Contains("ToolTip", StringComparison.OrdinalIgnoreCase) || name.Contains("tooltips", StringComparison.OrdinalIgnoreCase)))
+                        seen.Add($"top-level {name} \"{top.Name}\" at {top.BoundingRectangle}");
+            }
+            catch (Exception failure) { seen.Add($"top-level search failed: {failure.Message}"); }
+            string picture = Path.ChangeExtension(into, null) + "-" + pictureNumber++ + ".png";
+            try { FlaUI.Core.Capturing.Capture.Rectangle(app.Window.BoundingRectangle).ToFile(picture); }
+            catch (Exception failure) { seen.Add($"picture failed: {failure.Message}"); }
+            lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.HelpText}\", pointer {DrivenApp.MiddleOf(element)}, picture {picture}): "
+                      + (seen.Count == 0 ? "no tooltip seen in 4 s" : string.Join("; ", seen)));
         }
         Rest(Wait(app, "fixWithClaudeButton"), "Fix with Claude…, dimmed");
         Rest(app.Find("problemRow-pageSettingsUnreadable|Unit 1/Lesson 1", "the first row"), "the first problem row, enabled");
