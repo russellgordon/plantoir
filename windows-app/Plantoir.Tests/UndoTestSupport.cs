@@ -62,16 +62,21 @@ internal static class UndoContract
 /// (<see cref="UndoPruning.Deletable"/>), and the next number
 /// (<see cref="UndoFolded.NextSeq"/>). The journal is read back from the disk
 /// by <see cref="UndoJournal.Read"/> after every line, so the format reader is
-/// on every path. What it does NOT have is everything W2 owns: no lock, no
-/// staged swap, no flush, one process. Pages are written whole with
-/// <see cref="File.WriteAllBytes"/>.</para>
+/// on every path.</para>
+///
+/// <para><b>Since W2a it writes through the real store</b>: every line, blob
+/// and pruning goes through <see cref="UndoJournal.WithLock{T}"/>, the
+/// <see cref="UndoJournalWriter"/> and <see cref="UndoJournal.Prune"/>, so every
+/// stack case and trace runs through the real lock, append, segments, blobs,
+/// reading on and deletion. What it still does NOT have is W2b's: no staged
+/// swap, no door. Pages are written whole with <see cref="File.WriteAllBytes"/>;
+/// W2b replaces the step logic here with the door.</para>
 /// </summary>
 internal sealed class UndoScribe : IDisposable
 {
     internal const string ThisCourse = "TST1O";
     private const string FolderPrefix = "plantoir-undo-w1-";
 
-    private static readonly UTF8Encoding Utf8 = new(false);
 
     private readonly string _root;
     private readonly HashSet<long> _alive = [];
@@ -93,7 +98,8 @@ internal sealed class UndoScribe : IDisposable
             _folderIds[key] = new FolderIdentityFile(Path.Combine(folder, "courses", ".internal", "folder-id"), Clock).ReadOrMake()!;
         }
         Journal = new UndoJournal(JournalFolder, Clock, process => process is not null && _alive.Contains(process.Pid),
-                                  step => UndoJournalChecks.FolderIsReachable(step, Clock), isLive: true, readRetry: TimeSpan.Zero);
+                                  step => UndoJournalChecks.FolderIsReachable(step, Clock), isLive: true, readRetry: TimeSpan.Zero,
+                                  memory: new UndoProcessMemory());
     }
 
     internal UndoTestClock Clock { get; }
@@ -148,16 +154,10 @@ internal sealed class UndoScribe : IDisposable
 
     internal bool BlobIsThere(string name) => File.Exists(BlobPath(name));
 
-    private string BlobPath(string name) => Path.Combine(JournalFolder, "content", name[..2], name);
+    private string BlobPath(string name) => Journal.BlobPath(name);
 
-    internal string PutBlob(byte[] bytes)
-    {
-        string name = UndoCheck.Sha(bytes);
-        string path = BlobPath(name);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        if (!File.Exists(path)) File.WriteAllBytes(path, bytes);
-        return name;
-    }
+    /// <summary>A blob, stored by the real writer under the lock.</summary>
+    internal string PutBlob(byte[] bytes) => Journal.WithLock(writer => writer.WriteBlob(bytes));
 
     // ---- The journal ------------------------------------------------------
 
@@ -172,15 +172,11 @@ internal sealed class UndoScribe : IDisposable
 
     internal int LinesOnDisk => File.Exists(SegmentPath) ? File.ReadAllBytes(SegmentPath).Count(b => b == (byte)'\n') : 0;
 
-    /// <summary>Appends one line as written: LF, UTF-8 with no byte-order mark.</summary>
-    internal void AppendRaw(string json) => File.AppendAllText(SegmentPath, json + "\n", Utf8);
+    /// <summary>Appends one line already encoded (another version's), by the real writer under the lock.</summary>
+    internal void AppendRaw(string json) => Journal.WithLock(writer => writer.AppendRaw(json));
 
-    internal void Append(JsonObject line)
-    {
-        line["v"] ??= 1;
-        line["at"] ??= UndoMoment.Format(Clock.GetUtcNow());
-        AppendRaw(line.ToJsonString());
-    }
+    /// <summary>Appends one event by the real writer under the lock: keys sorted, <c>v</c> and <c>at</c> stamped, LF, no BOM.</summary>
+    internal void Append(JsonObject line) => Journal.WithLock(writer => writer.Append(line));
 
     internal JsonObject Process(long pid) => new()
     {
@@ -267,44 +263,15 @@ internal sealed class UndoScribe : IDisposable
     }
 
     /// <summary>The applied of a step in flight: every undone step below it dropped first, then pruning.</summary>
-    internal void Finish(long seq)
+    internal void Finish(long seq) => Journal.WithLock(writer =>
     {
-        foreach (UndoFoldedStep below in Fold().Steps.Values)
-        {
-            if (below.State == UndoStepState.Undone && below.Seq < seq)
-                Event(below.Seq, "dropped", new JsonObject { ["reason"] = "newStep" });
-        }
-        Event(seq, "applied");
-        Prune();
-    }
+        writer.DropTheRedoBranch(below: seq);
+        writer.Append(new JsonObject { ["seq"] = seq, ["event"] = "applied" });
+        Journal.Prune(writer);
+    });
 
-    /// <summary>What pruning and deletion decide, carried out.</summary>
-    internal void Prune()
-    {
-        UndoReading reading = Journal.Read();
-        Assert.True(reading.IsFresh, "the scribe's own journal is never held");
-        foreach (UndoPruneAction action in Journal.Pruning(reading))
-        {
-            switch (action)
-            {
-                case UndoPruneAction.Pruned pruned:
-                    Event(pruned.Seq, "pruned", new JsonObject { ["reason"] = pruned.Reason });
-                    break;
-                case UndoPruneAction.ClosedUnsettled closed:
-                    Event(closed.Seq, "interrupted", new JsonObject
-                    {
-                        ["phase"] = closed.Phase.ToString().ToLowerInvariant(),
-                        ["reason"] = "unsettled",
-                        ["paths"] = new JsonArray(closed.Paths.Select(path => (JsonNode)path).ToArray()),
-                    });
-                    break;
-            }
-        }
-        UndoReading after = Journal.Read();
-        Assert.True(after.IsFresh, "the scribe's own journal is never held");
-        UndoDeletion deletion = Journal.Deletable(after);
-        foreach (string blob in deletion.Blobs) File.Delete(BlobPath(blob));
-    }
+    /// <summary>What pruning and deletion decide, carried out by the product inside the lock.</summary>
+    internal void Prune() => Journal.WithLock(writer => Journal.Prune(writer));
 
     /// <summary>One `cleared` line with the highest seq, written only when something is on the list.</summary>
     internal long? Clear(string reason)
