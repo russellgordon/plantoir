@@ -155,8 +155,19 @@ tools' own runs) and `WaitUntilFinishedOrKill` looked at `IsRunning` every
 of each run. `WaitUntilFinishedOrKill`'s bound is the caller's and stays.
 
 **Measured** on the PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
-26200): see the entry in `windows-app/PROGRESS.md` for #1016, which carries
-the run labels. What changes for a teacher is small: the preview notices that
+26200), 2026-11-20, with a throwaway test on the branch: the old look (output
+arrived, so `DisplayText` is joined again, then searched twice) cost 0.039 ms
+on a transcript of 300 lines (24 KB), 0.067 ms at 1,000 lines (82 KB) and
+0.47 ms at the 4,000 lines `TranscriptBuilder` keeps (329 KB), once a second.
+The new wake, from the launch line arriving to the waiting loop resuming:
+median 0.027 ms, 95th percentile 0.040 ms, largest 1.6 ms of 200; where the
+old loop resumed up to 1,000 ms later (500 ms on average). A wait for the
+run's end resumed a median 1.8 ms after the force-finish began, largest
+19.5 ms of 100, `FinishRun`'s own trail line included; the old loop added up
+to 100 ms. So the cost saved is small; what was wrong was the shape, a guess
+at a cadence where the runner already says what happened.
+
+What changes for a teacher is small: the preview notices that
 its run ended, or was stopped, at once instead of up to a second later, and a
 deploy's next leg starts on the end of the last instead of up to 100 ms after
 it. The launch line comes long before the server (it is printed before

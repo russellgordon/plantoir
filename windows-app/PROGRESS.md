@@ -20,6 +20,7 @@ Branch `issue/1016-win-timed-polls`. Lenovo 20QES70500 (i5-8365U, 16 GB, Windows
 - `WaitUntilFinished` and `WaitUntilFinishedOrKill` end on `FinishRun` instead of looking every 100 ms; the force-finish bound stays.
 - Nothing to replace for #998's other two shapes: Windows restores each window from its own remembered entry, and no view polls for its window.
 - Every timed wait in `Plantoir` and `Plantoir.Core` was inventoried with a verdict (47 rows: 31 kept, 3 replaced here, 13 owed, the ContentDialog slot nine of them). The owed list and the reasons: documentation/12, "What the preview's wait waits on (#1016, the mac's #998)".
+- Measured (throwaway test, this PC): the old look cost 0.04 to 0.47 ms a second (300 to 4,000 lines); the new wake on the launch line, median 0.027 ms where the old loop resumed up to 1 s later. Unit suite `1016-full1`: 4,659 tests, exactly the six known failures. Sabotage run `1016-sab1` (the watch woken by any property, `WaitUntilFinished` polling again, the view searching the transcript): 4 of the 11 fail, each sabotage caught.
 - Tests: `PreviewWaitWakesOnTheRunTests` (11). No `mac` issue: the mac already has the same design (#998); nothing shared changed.
 
 ## 2026-11-19 — a missing assistant dimmed in the menu bar and on Fix with (#990, the mac's D11 and Q14)
