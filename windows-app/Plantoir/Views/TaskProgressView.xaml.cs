@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
@@ -75,6 +77,13 @@ public sealed partial class TaskProgressView : UserControl
         {
             _tick.Stop();
             _leaving = true;
+            // A stop question up as the view goes: it is taken down and counts
+            // as Cancel, so nothing is stopped or remembered unasked.
+            if (_openStopQuestion is { } stopQuestion)
+            {
+                _stopAsking?.ChooseCancel();
+                try { stopQuestion.Hide(); } catch { }
+            }
             QuestionAskers.LeftUnanswered -= AskIfStillWaiting;
             foreach (var (runner, handler) in _hooked) runner.PropertyChanged -= handler;
             _hooked.Clear();
@@ -144,6 +153,16 @@ public sealed partial class TaskProgressView : UserControl
     public Action? OnCancel { get; set; }
 
     /// <summary>
+    /// The question asked before the shown task stops (#1009, the mac's #988):
+    /// "Stop the deploy?" for a deploy, none for a preview, which stops at once.
+    /// </summary>
+    private StopQuestion? _stopQuestion;
+
+    /// <summary>The stop question this view has up, and its model, so a task that ends under it, or a view that leaves, takes it down.</summary>
+    private ContentDialog? _openStopQuestion;
+    private StopQuestionAsking? _stopAsking;
+
+    /// <summary>
     /// Choose which registered runner the panel displays.
     /// <paramref name="multiRunner"/>, when set and carrying more than one
     /// leg, adds the destination checklist, the combined console (every leg
@@ -153,8 +172,10 @@ public sealed partial class TaskProgressView : UserControl
     /// for every caller with a single runner: the wizard's preview, and a
     /// single-destination deploy behave byte-for-byte as before.
     /// </summary>
-    public void Show(ScriptRunner runner, string title, Action? onCancel = null, MultiDestinationDeployRunner? multiRunner = null)
+    public void Show(ScriptRunner runner, string title, Action? onCancel = null, MultiDestinationDeployRunner? multiRunner = null,
+                     StopQuestion? stopQuestion = null)
     {
+        _stopQuestion = stopQuestion;
         Register(runner);
         if (!ReferenceEquals(_runner, runner)) _renderedTranscriptVersion = -1;
         _runner = runner;
@@ -190,6 +211,7 @@ public sealed partial class TaskProgressView : UserControl
         _runner = null;
         _multiRunner = null;
         OnCancel = null;
+        _stopQuestion = null;
         EnsureTicking(false);
 
         TitleText.Text = title;
@@ -226,6 +248,13 @@ public sealed partial class TaskProgressView : UserControl
         if (e.PropertyName == nameof(ScriptRunner.LastExitCode) && !runner.IsRunning
             && ReferenceEquals(runner, _runner))
             AutoExpandOnUnexplainedFailure();
+        // The task ended under its stop question: nothing is left to stop.
+        if (e.PropertyName == nameof(ScriptRunner.IsRunning) && !runner.IsRunning
+            && ReferenceEquals(runner, _runner) && _openStopQuestion is { } stopQuestion)
+        {
+            _stopAsking?.TaskEnded();
+            try { stopQuestion.Hide(); } catch { }
+        }
         if (ReferenceEquals(runner, _runner)) Render();
     }
 
@@ -667,7 +696,83 @@ public sealed partial class TaskProgressView : UserControl
 
     private string? _publishedFolder;
 
-    private void TaskCancel_Click(object sender, RoutedEventArgs e)
+    private void TaskCancel_Click(object sender, RoutedEventArgs e) => _ = PressCancelAsync();
+
+    // ---- Stopping, by click, by UI Automation and by Escape (#1009) ---------
+
+    /// <summary>
+    /// Gives the visible Cancel the Escape key (#1009, the mac's #988): a
+    /// <c>KeyboardAccelerator</c> on the button itself, which WinUI shows in
+    /// the button's tooltip ("Cancel (Esc)"), and no hidden control or key
+    /// handler anywhere. Called once by a section's view; the New Course
+    /// wizard's panel keeps Escape for its dialog (#979).
+    /// </summary>
+    /// <remarks>
+    /// An app accelerator with no <c>ScopeOwner</c> is looked for only after
+    /// the key has bubbled from the focused element to the root unhandled
+    /// (Microsoft, "Keyboard accelerators", Resolving accelerators), so a
+    /// control that uses Escape itself (an open flyout, a dialog, a list's
+    /// drop-down) has it first. The key is then decided as it arrives
+    /// (<see cref="StopKey.GoesToCancel"/>). <c>Handled</c> is set whatever
+    /// is decided: an accelerator left unhandled goes on to press the button
+    /// through its Invoke pattern, which would stop the task from a text box.
+    /// </remarks>
+    public void GiveCancelTheEscapeKey()
+    {
+        var escape = new KeyboardAccelerator { Key = VirtualKey.Escape };
+        escape.Invoked += (_, args) =>
+        {
+            args.Handled = true;
+            bool goesToCancel = StopKey.GoesToCancel(
+                cancelIsShown: IsOnScreen(TaskCancelButton),
+                taskIsRunning: _runner is { IsRunning: true, WasCancelled: false },
+                aDialogIsOpen: Plantoir.Services.DialogGate.IsOpen(XamlRoot),
+                anEditableTextBoxHasTheFocus: IsEditableText(XamlRoot is { } root ? FocusManager.GetFocusedElement(root) : null));
+            if (goesToCancel) _ = PressCancelAsync();
+        };
+        TaskCancelButton.KeyboardAccelerators.Add(escape);
+    }
+
+    /// <summary>An editable text box: the key is its own. Read-only text (the console's output) is not one.</summary>
+    internal static bool IsEditableText(object? focused) => focused switch
+    {
+        TextBox box => !box.IsReadOnly,
+        PasswordBox => true,
+        RichEditBox rich => !rich.IsReadOnly,
+        _ => false,
+    };
+
+    /// <summary>Whether an element and every one of its parents is shown.</summary>
+    private static bool IsOnScreen(UIElement element)
+    {
+        DependencyObject? at = element;
+        while (at is not null)
+        {
+            if (at is UIElement shown && shown.Visibility != Visibility.Visible) return false;
+            at = VisualTreeHelper.GetParent(at);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// The panel's Cancel, however it was pressed. A preview, or a task whose
+    /// question is off, stops at once; a deploy asks "Stop the deploy?" first
+    /// (<see cref="StopQuestionAsking"/>).
+    /// </summary>
+    private async System.Threading.Tasks.Task PressCancelAsync()
+    {
+        if (_openStopQuestion is not null) return;
+        var asking = new StopQuestionAsking(_stopQuestion, App.Settings);
+        bool canStillBeStopped = _runner is { IsRunning: true, WasCancelled: false };
+        if (asking.PressCancel(canStillBeStopped))
+        {
+            StopTheTask();
+            return;
+        }
+        if (asking.IsAsking && asking.Question is { } question) await AskBeforeStoppingAsync(asking, question);
+    }
+
+    private void StopTheTask()
     {
         if (OnCancel is not null)
         {
@@ -676,6 +781,63 @@ public sealed partial class TaskProgressView : UserControl
         else
         {
             _runner?.CancelByUser();
+        }
+    }
+
+    /// <summary>
+    /// "Stop the deploy?": Stop Deploy is the default, so Enter stops (the
+    /// mac's ruling 1, plain, not destructive), and Cancel is WinUI's Close
+    /// button, rightmost, which Escape presses (Windows' own order, ruled on
+    /// #979). The box counts only with Stop Deploy; Cancel remembers nothing.
+    /// </summary>
+    private async System.Threading.Tasks.Task AskBeforeStoppingAsync(StopQuestionAsking asking, StopQuestion question)
+    {
+        if (XamlRoot is null || Plantoir.Services.DialogGate.IsOpen(XamlRoot))
+        {
+            asking.ChooseCancel();
+            return;
+        }
+        var dontAskAgain = new CheckBox { Content = StopQuestionWording.DontAskAgain, IsChecked = false, Margin = new Thickness(0, 12, 0, 0) };
+        AutomationProperties.SetAutomationId(dontAskAgain, "stopQuestionDontAskAgain");
+        var content = new StackPanel();
+        content.Children.Add(new TextBlock { Text = StopQuestionWording.Message(question), TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(dontAskAgain);
+        var dialog = new ContentDialog
+        {
+            Title = StopQuestionWording.Title(question),
+            Content = content,
+            PrimaryButtonText = StopQuestionWording.StopButton(question),
+            CloseButtonText = StopQuestionWording.CancelButton,
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+        _openStopQuestion = dialog;
+        _stopAsking = asking;
+        try
+        {
+            var result = await dialog.ShowAsync();
+            if (!asking.IsAsking) return;   // the task ended, or the view left, under it
+            if (result == ContentDialogResult.Primary)
+            {
+                asking.DontAskAgain = dontAskAgain.IsChecked == true;
+                asking.ChooseStop();
+                if (_runner is { IsRunning: true }) StopTheTask();
+            }
+            else
+            {
+                asking.ChooseCancel();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Not shown (another dialog opened in the same beat): nothing stops.
+            App.LogDiagnostic($"The stop question could not be shown: {ex.Message}");
+            asking.ChooseCancel();
+        }
+        finally
+        {
+            _openStopQuestion = null;
+            _stopAsking = null;
         }
     }
 
