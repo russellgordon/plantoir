@@ -26,22 +26,16 @@ public class PreviewCouldNotStartUiTests
 
         app.Find("previewButton", "the Preview button").AsButton().Invoke();
 
-        var sentence = Retry.WhileNull(() =>
-        {
-            try
-            {
-                var found = app.Window.FindFirstDescendant(cf => cf.ByAutomationId("launchProblemText"));
-                return found is not null && !found.IsOffscreen && found.Name.Contains("(preview.ps1)") ? found : null;
-            }
-            catch (System.Runtime.InteropServices.COMException) { return null; }
-        }, TimeSpan.FromSeconds(30)).Result;
-        Assert.True(sentence is not null, "the window never said why the preview could not start");
+        // Any question Preview asks on the way (today's class, a folder
+        // problem) is answered as a teacher would, as the other preview tests do.
+        bool shown = app.WaitAnsweringDialogs(() => SentenceShown(app, "(preview.ps1)"), TimeSpan.FromSeconds(60));
+        Assert.True(shown, "the window never said why the preview could not start. It shows: "
+                           + string.Join(" | ", DrivenApp.TextsUnder(app.Window)) + app.AnsweredSoFar
+                           + " Trail: " + MenuBar.Trail(app));
 
         // Still there a few seconds on: nothing collapses it again.
         Thread.Sleep(3000);
-        var still = app.Window.FindFirstDescendant(cf => cf.ByAutomationId("launchProblemText"));
-        Assert.True(still is not null && !still.IsOffscreen && still.Name.Contains("missing a piece it needs (preview.ps1)"),
-                    "the sentence went away on its own");
+        Assert.True(SentenceShown(app, "missing a piece it needs (preview.ps1)"), "the sentence went away on its own");
 
         Assert.True(Retry.WhileFalse(() =>
         {
@@ -54,5 +48,15 @@ public class PreviewCouldNotStartUiTests
             var held = WorkLease.HeldBy(app.WorkspacePath, CourseFixtures.NeverAsked);
             return !held.Contains(WorkLease.Previewing) && !held.Contains(WorkLease.Building);
         }, TimeSpan.FromSeconds(10)).Result, "the preview's leases were left behind");
+    }
+
+    private static bool SentenceShown(DrivenApp app, string part)
+    {
+        try
+        {
+            var found = app.Window.FindFirstDescendant(cf => cf.ByAutomationId("launchProblemText"));
+            return found is not null && !found.IsOffscreen && found.Name.Contains(part, StringComparison.Ordinal);
+        }
+        catch (System.Runtime.InteropServices.COMException) { return false; }
     }
 }
