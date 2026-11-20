@@ -47,18 +47,18 @@ public class StopByKeyboardUiTests
 
     private static bool CancelShows(DrivenApp app) => app.FindOrNull("taskCancelButton", TimeSpan.FromMilliseconds(300)) is { IsOffscreen: false };
 
-    private static AutomationElement? StopQuestion(DrivenApp app) =>
+    private static AutomationElement? OpenStopQuestion(DrivenApp app) =>
         app.OpenDialog() is { } dialog && dialog.Name == StopQuestionWording.DeployTitle ? dialog : null;
 
     private static AutomationElement Asked(DrivenApp app, string after)
     {
-        var dialog = Retry.WhileNull(() => StopQuestion(app), Patience, TimeSpan.FromMilliseconds(200)).Result;
+        var dialog = Retry.WhileNull(() => OpenStopQuestion(app), Patience, TimeSpan.FromMilliseconds(200)).Result;
         Assert.True(dialog is not null, $"{after} asked nothing: no \"{StopQuestionWording.DeployTitle}\"");
         return dialog!;
     }
 
     private static void AssertGone(DrivenApp app, string after) =>
-        Assert.True(Retry.WhileFalse(() => StopQuestion(app) is null, Patience, TimeSpan.FromMilliseconds(200)).Result,
+        Assert.True(Retry.WhileFalse(() => OpenStopQuestion(app) is null, Patience, TimeSpan.FromMilliseconds(200)).Result,
                     $"{after} left the question up");
 
     private void AssertStillDeploying(DrivenApp app, string after)
@@ -129,7 +129,7 @@ public class StopByKeyboardUiTests
         // Enter, then Space, on the focused Cancel: the deploy runs on.
         foreach (var key in new[] { VirtualKeyShort.RETURN, VirtualKeyShort.SPACE })
         {
-            var dialog = StopQuestion(app) ?? Asked(app, "Escape on a running deploy");
+            var dialog = OpenStopQuestion(app) ?? Asked(app, "Escape on a running deploy");
             dialog.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))!.Focus();
             Thread.Sleep(400);
             Press(app, key);
@@ -177,7 +177,7 @@ public class StopByKeyboardUiTests
         StartDeploy(app, 3);
         Press(app, VirtualKeyShort.ESCAPE);
         AssertCancelled(app, "Escape with the question off");
-        Assert.Null(StopQuestion(app));
+        Assert.Null(OpenStopQuestion(app));
         Assert.False(File.Exists(Path.Combine(published, "section1", "index.html")), "a deploy finished, so it was never stopped");
     }
 
