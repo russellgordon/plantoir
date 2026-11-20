@@ -58,6 +58,14 @@ Branch `issue/979-windows-question-dialogs`. Proven on the Windows VM (Windows 1
 - Ruled by Russell (2026-11-19): keep Windows' own button order, go-ahead left and Cancel right; on a question with no default the focus starts on Cancel and Enter or Space cancels. `documentation/12-windows-app.md` → "The question dialogs' keys (#979)".
 - **After the review (NOT CLEAN, two MEDIUM, four LOW), 8e099e291:** the wizard's `LayoutRoot` Escape catcher is gone: while the course is made Cancel is the Secondary button and `Closing` refuses a close with no answer (measured on the VM: Escape does nothing then, a click on Cancel stops it, Escape closes afterwards). Create Course is plain (`PrimaryKind.NotTheDefaultYet`, no default, no accent) until it is the default. The update offer's Escape catcher is deleted (Escape still closes it, `UpdateOfferUiTests`). Undo Getting Ready is greyed when nothing would go back. `AskWithNoDefault` keeps the go-ahead out of the tab order until the dialog is open, so it never holds the first focus. The scan sees `new() { }` dialogs.
 
+## 2026-11-20 — Undo and Redo, W2a: the lock, the store, blobs, reading on, pruning carried out (#899, #949)
+
+Branch `issue/899-w2a-lock-store-pruning`. Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200) over SSH. Core only: nothing calls it, nothing a teacher sees changed, no trail line, the built-in assistant's surface did not move; the switch stays off.
+
+- `Plantoir.Core/Undo/`: `UndoLock` (`LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY` on a `CreateFileW` overlapped handle, cancel-then-wait on a timeout), `UndoProcessMemory` (shadow try-once, closings kept for a busy lock; an object, never a static), `UndoJournal.WithLock` / `Prune` / reading on, `UndoJournalWriter` (sorted keys, LF, no BOM, 4 MiB segments, `FlushFileBuffers` every hold that wrote, blobs by a no-replace move, `WriteBlobs` four at a time), `UndoFileIdentity`, `UndoJournalLocation`. A reading that is not fresh inside the lock refuses the hold.
+- `UndoScribe` now writes through the real store, so the stack cases and traces W1 walks run through the lock, append, segments, blobs and deletion. New: `UndoLockTests` (8), `UndoStoreTests` (18), `UndoPruningCarriedOutTests` (4); six must-fail proofs red and restored.
+- Measured outside and inside a signed-in OneDrive with `Plantoir.UndoHarness` (in no solution): 1,600 of 1,600 live holds from 8 processes; a killed holder's lock granted in about 24 ms; `FlushFileBuffers` 0.9 ms; reading on at 10.6 MB 35 to 64 ms against 360 read whole; a 233-page step's 466 blobs held the lock 1.3 to 1.5 s one at a time, 0.4 s four at a time. `documentation/12-windows-app.md` → "What Windows has built: W2a, the lock and the store".
+
 ## 2026-11-19 — Undo and Redo: the mac's U2b rows met by the W1 reader (#899)
 
 Branch `issue/899-u2b-op-kinds` (the mac's U2b, with `dev` merged in). Lenovo 20QES70500 over SSH.
