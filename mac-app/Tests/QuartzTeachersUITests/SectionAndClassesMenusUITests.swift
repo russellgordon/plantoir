@@ -12,7 +12,9 @@ import XCTest
 ///   live and Rebuild Preview is dimmed (no preview runs);
 /// - while a preview runs, Section's first item reads Stop Preview and
 ///   Rebuild Preview is live; once it is stopped, Preview is back and
-///   Rebuild Preview dims again.
+///   Rebuild Preview dims again;
+/// - with a club selected the Classes menu is titled Meetings, and Classes
+///   again on a course (#990, 2026-11-20 evening).
 ///
 /// A synthetic course in the runner's own temporary folder, `--state-dir`
 /// (IsolatedLaunch) and a STUB `preview.sh`: nothing is built and no
@@ -101,19 +103,74 @@ final class SectionAndClassesMenusUITests: XCTestCase {
         XCTAssertTrue(SectionAndClassesMenusUITests.isLive("Rebuild Preview", inMenu: "Section", of: application).live,
                       "Rebuild Preview comes live while a preview runs")
 
-        // Stopped from the menu: Preview again, Rebuild dimmed again.
+        // Stopped from the menu: Preview again, Rebuild dimmed again. The
+        // window's own button turns back into Preview when the preview has
+        // stopped (its identifier follows the same running state the menu
+        // reads), so the test waits on that element, then opens the menu once.
         SectionAndClassesMenusUITests.item("Stop Preview", inMenu: "Section", of: application).click()
-        var previewIsBack: Bool = false
-        let deadline: Date = Date().addingTimeInterval(30)
-        while !previewIsBack && Date() < deadline {
-            previewIsBack = SectionAndClassesMenusUITests.isLive("Preview", inMenu: "Section", of: application).live
-            if !previewIsBack {
-                RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-            }
-        }
-        XCTAssertTrue(previewIsBack, "Section ▸ Preview is back once the preview stopped")
+        XCTAssertTrue(application.buttons["previewButton"].firstMatch.waitForExistence(timeout: 30),
+                      "the window's Preview button is back once the preview stopped")
+        XCTAssertTrue(SectionAndClassesMenusUITests.isLive("Preview", inMenu: "Section", of: application).live,
+                      "Section ▸ Preview is back once the preview stopped")
         XCTAssertFalse(SectionAndClassesMenusUITests.isLive("Rebuild Preview", inMenu: "Section", of: application).live,
                        "Rebuild Preview dims again once the preview stopped")
         application.terminate()
+    }
+
+    /// Russell's ruling on #990 (2026-11-20 evening): "in a club the menu
+    /// itself is titled Meetings, on both platforms, so no sentence a club's
+    /// teacher reads says 'class'." The title follows the selected course
+    /// live (`subjectMenus.layout.titleForAMeeting`): a course reads Classes,
+    /// a club (its pages called meetings) reads Meetings with the same items,
+    /// and back. MUST FAIL with the menu titled by an ordinary course's noun
+    /// whatever is selected.
+    func testTheClassesMenuIsTitledMeetingsWhileAClubIsSelected() throws {
+        guard ProcessInfo.processInfo.environment["PLANTOIR_UI_TESTS"] == "1" else {
+            throw XCTSkip("Opt-in: set PLANTOIR_UI_TESTS=1. This drives the real app and needs the foreground.")
+        }
+        let fixtureURL: URL = try UITestFolders.makeFixture()
+        try SectionAndClassesMenusUITests.addAClub(named: "CODING", besideTheExampleCourseIn: fixtureURL)
+
+        let launch: IsolatedLaunch = try IsolatedLaunch.launch(workspace: fixtureURL)
+        let application: XCUIApplication = launch.application
+        let menuBar: XCUIElement = application.menuBars.firstMatch
+        let courseRow: XCUIElement = application.outlines.staticTexts["EXC2O"]
+        let clubRow: XCUIElement = application.outlines.staticTexts["CODING"]
+        XCTAssertTrue(courseRow.waitForExistence(timeout: 10))
+        XCTAssertTrue(clubRow.waitForExistence(timeout: 10))
+
+        courseRow.click()
+        XCTAssertTrue(menuBar.menuBarItems["Classes"].waitForExistence(timeout: 5), "a course's menu bar reads Classes")
+        XCTAssertFalse(menuBar.menuBarItems["Meetings"].exists, "no Meetings menu for a course")
+
+        clubRow.click()
+        XCTAssertTrue(menuBar.menuBarItems["Meetings"].waitForExistence(timeout: 5), "a club's menu bar reads Meetings")
+        XCTAssertTrue(menuBar.menuBarItems["Classes"].waitForNonExistence(timeout: 5), "no Classes menu while a club is selected")
+        let classDates: (drawn: Bool, live: Bool) = SectionAndClassesMenusUITests.isLive(
+            "Class Dates…", inMenu: "Meetings", of: application
+        )
+        XCTAssertTrue(classDates.drawn, "the Meetings menu holds the same items")
+
+        courseRow.click()
+        XCTAssertTrue(menuBar.menuBarItems["Classes"].waitForExistence(timeout: 5), "back to Classes on a course")
+        XCTAssertTrue(menuBar.menuBarItems["Meetings"].waitForNonExistence(timeout: 5))
+        application.terminate()
+    }
+
+    /// A club beside the Example Course: its copy, coded `code` (a code with
+    /// no grade digit, as a club's is), whose class pages are called
+    /// meetings (`class_noun`).
+    static func addAClub(named code: String, besideTheExampleCourseIn fixtureURL: URL) throws {
+        let coursesURL: URL = fixtureURL.appendingPathComponent("courses")
+        let clubURL: URL = coursesURL.appendingPathComponent(code)
+        try FileManager.default.copyItem(at: coursesURL.appendingPathComponent("EXC2O"), to: clubURL)
+        let configURL: URL = clubURL.appendingPathComponent("course_config.json")
+        let read: Any = try JSONSerialization.jsonObject(with: Data(contentsOf: configURL))
+        var configuration: [String: Any] = try XCTUnwrap(read as? [String: Any], "the fixture's course_config.json")
+        configuration["course_code"] = code
+        configuration["course_name"] = "Coding Club"
+        configuration["class_noun"] = "meeting"
+        let written: Data = try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
+        try written.write(to: configURL)
     }
 }
