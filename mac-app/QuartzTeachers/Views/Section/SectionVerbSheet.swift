@@ -1083,6 +1083,22 @@ struct SectionVerbSheet: View {
         .accessibilityIdentifier("sectionVerbSheetSourceTable")
     }
 
+    /// The picker's Folder and Date columns (#997, D48): set widths, the
+    /// widths they came to at the sheet's opening size (135 and 175), so
+    /// Page is the one column that takes the table's width as it changes.
+    /// With all three flexible (Folder 80 to 140, Date 120 to 180) the
+    /// table shared each change between them, and when the rows arrived
+    /// after it was drawn, with the scroll bars a mouse shows, the shares
+    /// came out in half points (146.5, 134.5, 174.5) ending at 501.5 in a
+    /// table showing 501, and a sideways scroll bar appeared under the
+    /// rows. Folder and Date could be dragged 5 pt wider at most, so set
+    /// widths cost a teacher almost nothing; Page, the column that holds
+    /// long titles, still resizes. HIG, Lists and tables: "Consider ways to
+    /// preserve readability of text that might otherwise get clipped or
+    /// truncated."
+    static let pickerFolderColumnWidth: CGFloat = 135
+    static let pickerDateColumnWidth: CGFloat = 175
+
     /// The pages to tick (#608): a bordered, banded table — Page (with its
     /// checkbox), Folder and Date — the look of the plan that follows it, so
     /// the two steps of one flow look alike. A click on a box ticks it;
@@ -1103,12 +1119,12 @@ struct SectionVerbSheet: View {
                     .foregroundStyle(.secondary)
                     .help(row.folder)
             }
-            .width(min: 80, ideal: 110, max: 140)
+            .width(SectionVerbSheet.pickerFolderColumnWidth)
             TableColumn(AssistWording.menuPickDateColumn) { (row: SectionVerbSheetModel.PageRow) in
                 Text(dateCell(for: row))
                     .foregroundStyle(.secondary)
             }
-            .width(min: 120, ideal: 150, max: 180)
+            .width(SectionVerbSheet.pickerDateColumnWidth)
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(pickerTableHeight)
