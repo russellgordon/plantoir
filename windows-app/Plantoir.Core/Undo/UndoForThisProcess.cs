@@ -35,9 +35,12 @@ internal sealed class UndoForThisProcess
     /// <param name="mode">Live or shadow: the switch in the app, the test's own choice in a test.</param>
     /// <param name="trail">Where Undo's trail lines go: the real activity trail in the app.</param>
     /// <param name="clock">The clock the limits are judged by; the system's in the app.</param>
-    internal UndoForThisProcess(string folder, UndoMode mode, Action<UndoTrailLine>? trail, TimeProvider? clock = null)
+    /// <param name="maintainers">Who re-derives the files a rule keeps true: the app's own (<see cref="UndoSectionFrontPage"/>) unless a test passes its own.</param>
+    internal UndoForThisProcess(string folder, UndoMode mode, Action<UndoTrailLine>? trail, TimeProvider? clock = null,
+                                IUndoMaintainers? maintainers = null)
     {
         Folder = folder;
+        Maintainers = maintainers ?? new UndoSectionFrontPage();
         Mode = mode;
         Trail = trail;
         TimeProvider theClock = clock ?? TimeProvider.System;
@@ -60,9 +63,12 @@ internal sealed class UndoForThisProcess
     internal UndoProcessMemory Memory { get; }
     internal UndoJournal Journal { get; }
 
-    /// <summary>A door for one action, over this process's journal, in this process's mode, writing Undo's trail lines to its trail.</summary>
-    internal UndoDoor Door(IUndoMaintainers? maintainers = null) =>
-        new(Journal, Mode, maintainers, trail: Trail);
+    /// <summary>The runners every door of this process is given (W4's review, LOW 5: never none, or a draft holding a recompute would be refused even in shadow).</summary>
+    internal IUndoMaintainers Maintainers { get; }
+
+    /// <summary>A door for one action, over this process's journal, in this process's mode, with its maintainers, writing Undo's trail lines to its trail.</summary>
+    internal UndoDoor Door() =>
+        new(Journal, Mode, Maintainers, trail: Trail);
 
     /// <summary>
     /// Recovery at launch (W3's <see cref="UndoDoor.Recover"/>): every step a
@@ -78,6 +84,7 @@ internal sealed class UndoForThisProcess
         try
         {
             UndoRecoveryRun run = Door().Recover();
+            if (run.NotRun is { } why) diagnostic?.Invoke($"undo recovery at launch did not run: {why}");
             if (run.Settled.Count > 0) diagnostic?.Invoke($"undo recovery at launch settled {run.Settled.Count} step(s) in {Folder}");
             return run;
         }

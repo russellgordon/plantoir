@@ -34,11 +34,15 @@ namespace Plantoir.Tests;
 /// a <c>StreamWriter</c> made on a path; a zip extracted or made; the Win32
 /// calls that write (<c>MoveFileEx</c>, <c>CreateHardLink</c>,
 /// <c>SetFileInformationByHandle</c> and the like; never their
-/// <c>extern</c> declaration); the Recycle Bin; a launcher named in quotes
-/// (<c>setup.ps1</c>, <c>preview.ps1</c>, <c>deploy.ps1</c>), since a
-/// launcher writes course files itself; a tool that writes named in quotes
-/// (<c>powershell</c>, <c>cmd</c>, <c>robocopy</c>, <c>schtasks</c> and the
-/// others); and, at most once a line, a stream opened to write
+/// <c>extern</c> declaration); the Recycle Bin; a zip made or updated
+/// (<c>ZipFile.Open</c> or <c>new ZipArchive</c> with
+/// <c>ZipArchiveMode.Create</c> or <c>Update</c>); a launcher named in quotes
+/// (<c>setup.ps1</c>, <c>preview.ps1</c>, <c>deploy.ps1</c>) or run by its
+/// constant (<c>Workspace.MarkerLauncher</c>, <c>DeployCommand.ScriptName</c>
+/// handed to a call whose name holds <c>Run</c> or <c>Start</c>), since a
+/// launcher writes course files itself; a tool that writes named in quotes,
+/// alone or at the start of a command line (<c>powershell</c>, <c>cmd</c>,
+/// <c>robocopy</c>, <c>schtasks</c> and the others; W4's review, LOW 3); and, at most once a line, a stream opened to write
 /// (<c>FileMode.Create</c>, <c>CreateNew</c>, <c>Append</c>,
 /// <c>OpenOrCreate</c>, <c>Truncate</c>, <c>FileAccess.Write</c> or
 /// <c>ReadWrite</c>, a handle with write or delete access). Comments are not
@@ -61,8 +65,11 @@ public sealed class UndoWriterScanTests
         + @"|\.SetAccessControl\s*\("
         + @"|(?<![\w.])(?:MoveFileExW?|MoveFileW?|CreateHardLinkW?|DeleteFileW?|SetFileInformationByHandle|SetFileAttributesW?|RemoveDirectoryW?|CreateDirectoryW?|ReplaceFileW?|CopyFileW?|CopyFile2|SetEndOfFile|SHFileOperationW?|CreateSymbolicLinkW?)\s*\("
         + @"|\bFileSystem\.(?:DeleteFile|DeleteDirectory|MoveFile|MoveDirectory|CopyFile|CopyDirectory)\s*\("
+        + @"|\bZipFile\.Open\s*\([^;]*ZipArchiveMode\.(?:Create|Update)\b"
+        + @"|\bnew\s+ZipArchive\s*\([^;]*ZipArchiveMode\.(?:Create|Update)\b"
         + @"|""(?:setup|preview|deploy)\.ps1"""
-        + @"|""(?:powershell|pwsh|cmd|robocopy|xcopy|tar|attrib|icacls|schtasks)(?:\.exe)?""",
+        + @"|\b\w*(?:Run|Start)\w*\s*\([^;]*\b(?:Workspace\.MarkerLauncher|DeployCommand\.ScriptName)\b"
+        + @"|""(?:powershell|pwsh|cmd|robocopy|xcopy|tar|attrib|icacls|schtasks)(?:\.exe)?(?:""|\s)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly Regex OpenedToWrite = new(
@@ -339,6 +346,14 @@ public sealed class UndoWriterScanTests
             ("FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);", 1),
             ("runner.Run(\"preview.ps1\", args, folder);", 1),
             ("FileName = \"powershell.exe\",", 1),
+            // W4's review, LOW 3: a tool named at the start of a command line,
+            // a launcher run by its constant, and a zip made or changed.
+            ("string command = \"powershell.exe -NoLogo -NoProfile -File \" + script;", 1),
+            ("await runner.Run(DeployCommand.ScriptName, arguments, folder);", 1),
+            ("runner.Run(Workspace.MarkerLauncher, args, folder, null, token);", 1),
+            ("using var zip = ZipFile.Open(path, ZipArchiveMode.Create);", 1),
+            ("using var zip = ZipFile.Open(path, ZipArchiveMode.Update);", 1),
+            ("using var archive = new ZipArchive(stream, ZipArchiveMode.Create);", 1),
             ("Directory.CreateDirectory(d); File.Copy(a, b);", 2),
             ("SafeFileHandle h = CreateFileW(path, GenericRead | GenericWrite, Share, IntPtr.Zero, OpenAlways, 0, IntPtr.Zero);", 1),
             // Not writes.
@@ -351,6 +366,9 @@ public sealed class UndoWriterScanTests
             ("using var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);", 0),
             ("string name = path.Replace('/', '\\\\');", 0),
             ("Process.Start(new ProcessStartInfo(\"explorer.exe\", folder));", 0),
+            ("using var zip = ZipFile.Open(path, ZipArchiveMode.Read);", 0),
+            ("if (File.Exists(Path.Combine(folder, Workspace.MarkerLauncher))) return true;", 0),
+            ("string label = \"cmdlet\";", 0),
         ];
         var wrong = new List<string>();
         foreach ((string source, int calls) in samples)

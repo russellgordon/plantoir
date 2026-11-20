@@ -25,8 +25,9 @@ internal sealed record UndoRecoveryResult(long Seq, UndoPhase Phase, UndoRecover
 /// <summary>What one run of recovery came to: the steps it settled, and whether a test (or the harness) stopped it at a kill point.</summary>
 /// <param name="Left">The steps it tried and left for later, each with why (a file in use, a page that cannot be read now):
 /// the true answer an Undo or a Redo gives when such a step is the newest (W3's review, LOW 4).</param>
+/// <param name="NotRun">Why recovery did not run at all (the list busy past its wait, unreadable, its folder not makeable), or null when it ran.</param>
 internal sealed record UndoRecoveryRun(IReadOnlyList<UndoRecoveryResult> Settled, bool StoppedByATest,
-                                       IReadOnlyDictionary<long, UndoRefusal>? Left = null);
+                                       IReadOnlyDictionary<long, UndoRefusal>? Left = null, string? NotRun = null);
 
 /// <summary>One line for the activity trail: the course and section it is about, and the words after them.</summary>
 internal sealed record UndoTrailLine(ActivityTrail.Event Event, string? Course, long? Section, string Words);
@@ -296,10 +297,14 @@ internal static class UndoRecovery
                 order.Add(path);
             }
             UndoOpState state = currents[path] is { } current ? UndoCheck.StateOf(op, current) : UndoOpState.Neither;
-            if (state is UndoOpState.InUse) state = UndoOpState.CannotTell;
             if (states.TryGetValue(path, out UndoOpState earlier))
             {
-                if (earlier == UndoOpState.CannotTell || state == UndoOpState.CannotTell) states[path] = UndoOpState.CannotTell;
+                // A page another program holds with no read sharing stays IN
+                // USE, so the refusal names the file in use, never cannot tell
+                // (W4's review, LOW 4); otherwise one that cannot be read now
+                // stays cannot tell.
+                if (earlier == UndoOpState.InUse || state == UndoOpState.InUse) states[path] = UndoOpState.InUse;
+                else if (earlier == UndoOpState.CannotTell || state == UndoOpState.CannotTell) states[path] = UndoOpState.CannotTell;
                 else if (earlier != state) states[path] = UndoOpState.Neither;
             }
             else
@@ -342,6 +347,8 @@ internal static class UndoRecovery
         // tried again on the schedule, as for a file in use (ruling 4).
         foreach ((string path, UndoOpState state) in files)
         {
+            if (state is UndoOpState.InUse)
+                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.FileIsInUse, path));
             if (state is UndoOpState.CannotTell or UndoOpState.NotReadable)
                 return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, path));
         }
