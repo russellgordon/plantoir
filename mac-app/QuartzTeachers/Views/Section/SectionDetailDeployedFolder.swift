@@ -129,8 +129,15 @@ extension SectionDetailView {
         guard let folder = workingFolderPathForTheDeployedFolder else {
             return
         }
-        DeployedFolderShows.shared.stop(courseCode: course.code, sectionNumber: sectionNumber, workingFolderPath: folder)
-        refreshTheDeployedFolder()
+        let courseCode: String = course.code
+        let number: Int = sectionNumber
+        // The show leaves the list at once, so the notice goes as soon as
+        // Stop is pressed; the look-up runs again once the address is free
+        // (#1013).
+        Task { @MainActor in
+            await DeployedFolderShows.shared.stop(courseCode: courseCode, sectionNumber: number, workingFolderPath: folder)
+            refreshTheDeployedFolder()
+        }
     }
 
     /// The notice, while shown or after the folder went away.

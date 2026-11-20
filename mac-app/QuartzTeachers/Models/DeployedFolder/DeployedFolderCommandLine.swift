@@ -90,7 +90,7 @@ nonisolated enum DeployedFolderCommandLine {
             let candidates: [Int] = DeployedFolderAddress.candidates(forCanonicalPath: canonical, remembered: nil)
             do {
                 let server: DeployedFolderServer = try await DeployedFolderServer.start(
-                    root: URL(fileURLWithPath: canonical), candidates: candidates, onFolderGone: {}
+                    root: URL(fileURLWithPath: canonical), candidates: candidates, onFolderGone: { _ in }
                 ).server
                 state.keep(server)
                 if state.claimTheOneLine() {
