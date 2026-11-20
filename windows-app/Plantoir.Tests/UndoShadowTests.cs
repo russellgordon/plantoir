@@ -257,4 +257,67 @@ public sealed class UndoShadowTests : IDisposable
         TheChangeWentInWhole(outcome, (APage, New));
         Assert.Equal(UndoStepState.Done, Assert.Single(Journal().Read().Folded.Steps.Values).State);
     }
+
+    /// <summary>Counts how often the front page's rule ran.</summary>
+    private sealed class CountingFrontPage : IUndoMaintainers
+    {
+        internal int Rederived { get; private set; }
+        public bool CanRun(string maintainer) => maintainer == UndoOp.SectionFrontPage;
+        public void Rederive(UndoOp op, string root) => Rederived++;
+    }
+
+    /// <summary>
+    /// W4's review, MEDIUM: a draft that keeps the section's front page true
+    /// by a rule has that page re-derived whether or not the list could record
+    /// the step: every way the list can fail at the begin, and the list
+    /// working. Without it a failure of the list would leave the front page
+    /// stale, changing what the teacher's action does (<c>rule.shadow</c>).
+    /// </summary>
+    [Theory]
+    [InlineData("theListWorks")]
+    [InlineData("lockHeld")]
+    [InlineData("folderUnmakeable")]
+    [InlineData("listUnreadable")]
+    [InlineData("identifierUnmakeable")]
+    [InlineData("contentUnstorable")]
+    [InlineData("unforeseen")]
+    public void AFrontPageKeptByARuleIsReDerivedWhateverTheListDoes(string failure)
+    {
+        Write(APage, Old);
+        Write(AnotherPage, Old);
+        UndoJournal journal = Journal();
+        AnotherHolder? holder = null;
+        switch (failure)
+        {
+            case "lockHeld": holder = new AnotherHolder(Journal(memory: new UndoProcessMemory())); break;
+            case "folderUnmakeable": Directory.CreateDirectory(_root); File.WriteAllText(JournalFolder, "not a folder"); break;
+            case "listUnreadable":
+                new UndoDoor(Journal(), UndoMode.Shadow).Perform(Draft((AnotherPage, Old, New)));
+                journal = Journal(open: path => path.EndsWith(".jsonl", StringComparison.Ordinal)
+                    ? throw new IOException("The device is not ready.")
+                    : File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+                break;
+            case "identifierUnmakeable": File.WriteAllText(Path.Combine(Folder, "courses", ".internal"), "not a folder"); break;
+            case "contentUnstorable": Directory.CreateDirectory(JournalFolder); File.WriteAllText(Path.Combine(JournalFolder, "content"), "not a folder"); break;
+            case "unforeseen":
+                new UndoDoor(Journal(), UndoMode.Shadow).Perform(Draft((AnotherPage, Old, New)));
+                journal = Journal(open: _ => throw new InvalidOperationException("Something nobody planned for."));
+                break;
+        }
+        byte[] after = failure == "contentUnstorable" ? Rewritten : New;
+        var frontPage = new CountingFrontPage();
+        UndoStepDraft draft = Draft((APage, Old, after)) with
+        {
+            Recomputes = [new System.Text.Json.Nodes.JsonObject
+            {
+                ["kind"] = "recompute", ["path"] = "courses/TST1O/Section 1/index.md", ["maintainer"] = "sectionFrontPage", ["section"] = 1,
+            }],
+        };
+        UndoOutcome outcome;
+        try { outcome = new UndoDoor(journal, UndoMode.Shadow, frontPage).Perform(draft); }
+        finally { holder?.Dispose(); }
+        Assert.Equal(failure == "theListWorks" ? UndoOutcomeKind.Applied : UndoOutcomeKind.AppliedWithoutARecord, outcome.Kind);
+        TheChangeWentInWhole(outcome, (APage, after));
+        Assert.Equal(1, frontPage.Rederived);
+    }
 }

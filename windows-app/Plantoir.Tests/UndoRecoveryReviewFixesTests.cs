@@ -143,4 +143,34 @@ public sealed class UndoRecoveryReviewFixesTests : IDisposable
         Assert.Equal(UndoStepState.RolledBack, scribe.Fold().Steps[seq].State);
         Assert.Equal(Old(First), scribe.Page("A", First));
     }
+
+    /// <summary>
+    /// W4's review, LOW 4: the same, with the page held by a program that
+    /// shares NO reading (<c>FileShare.None</c>), so recovery cannot even read
+    /// it. That is a file in use (32), and Undo names it so, never cannot tell;
+    /// a page that cannot be read for any other reason stays cannot tell.
+    /// </summary>
+    [Fact]
+    public void AnUndoBehindAGoneStepWhosePageCannotEvenBeReadSaysWhichFileIsInUse()
+    {
+        using UndoScribe scribe = Scribe();
+        Assert.Equal(UndoOutcomeKind.StoppedByATest,
+            scribe.Door(StopAt("beforeSwap", 1), UndoScribe.AProcessThatIsGone).Perform(scribe.Draft("A", [(First, New(First)), (Second, New(Second))])).Kind);
+        long seq = scribe.Fold().Steps.Keys.Max();
+        UndoOutcome refused;
+        using (new FileStream(scribe.FullPath("A", First), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            Assert.IsType<UndoCurrent.CannotReadNow>(UndoCurrent.Read(scribe.FullPath("A", First)));
+            refused = scribe.Door().Undo();
+        }
+        Assert.Equal(UndoOutcomeKind.Refused, refused.Kind);
+        Assert.Equal(UndoRefusalKind.FileIsInUse, refused.Refusal!.Kind);
+        Assert.Equal(First, refused.Refusal.Path);
+        Assert.False(refused.ClearedTheList);
+        Assert.Equal(UndoStepState.Begun, scribe.Fold().Steps[seq].State);
+
+        scribe.Door().Undo();
+        Assert.Equal(UndoStepState.RolledBack, scribe.Fold().Steps[seq].State);
+        Assert.Equal(Old(First), scribe.Page("A", First));
+    }
 }

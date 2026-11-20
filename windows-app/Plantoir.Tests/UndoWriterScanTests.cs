@@ -34,11 +34,15 @@ namespace Plantoir.Tests;
 /// a <c>StreamWriter</c> made on a path; a zip extracted or made; the Win32
 /// calls that write (<c>MoveFileEx</c>, <c>CreateHardLink</c>,
 /// <c>SetFileInformationByHandle</c> and the like; never their
-/// <c>extern</c> declaration); the Recycle Bin; a launcher named in quotes
-/// (<c>setup.ps1</c>, <c>preview.ps1</c>, <c>deploy.ps1</c>), since a
-/// launcher writes course files itself; a tool that writes named in quotes
-/// (<c>powershell</c>, <c>cmd</c>, <c>robocopy</c>, <c>schtasks</c> and the
-/// others); and, at most once a line, a stream opened to write
+/// <c>extern</c> declaration); the Recycle Bin; a zip made or updated
+/// (<c>ZipFile.Open</c> or <c>new ZipArchive</c> with
+/// <c>ZipArchiveMode.Create</c> or <c>Update</c>); a launcher named in quotes
+/// (<c>setup.ps1</c>, <c>preview.ps1</c>, <c>deploy.ps1</c>) or run by its
+/// constant (<c>Workspace.MarkerLauncher</c>, <c>DeployCommand.ScriptName</c>
+/// handed to a call whose name holds <c>Run</c> or <c>Start</c>), since a
+/// launcher writes course files itself; a tool that writes named in quotes,
+/// alone or at the start of a command line (<c>powershell</c>, <c>cmd</c>,
+/// <c>robocopy</c>, <c>schtasks</c> and the others; W4's review, LOW 3); and, at most once a line, a stream opened to write
 /// (<c>FileMode.Create</c>, <c>CreateNew</c>, <c>Append</c>,
 /// <c>OpenOrCreate</c>, <c>Truncate</c>, <c>FileAccess.Write</c> or
 /// <c>ReadWrite</c>, a handle with write or delete access). Comments are not
@@ -61,8 +65,11 @@ public sealed class UndoWriterScanTests
         + @"|\.SetAccessControl\s*\("
         + @"|(?<![\w.])(?:MoveFileExW?|MoveFileW?|CreateHardLinkW?|DeleteFileW?|SetFileInformationByHandle|SetFileAttributesW?|RemoveDirectoryW?|CreateDirectoryW?|ReplaceFileW?|CopyFileW?|CopyFile2|SetEndOfFile|SHFileOperationW?|CreateSymbolicLinkW?)\s*\("
         + @"|\bFileSystem\.(?:DeleteFile|DeleteDirectory|MoveFile|MoveDirectory|CopyFile|CopyDirectory)\s*\("
+        + @"|\bZipFile\.Open\s*\([^;]*ZipArchiveMode\.(?:Create|Update)\b"
+        + @"|\bnew\s+ZipArchive\s*\([^;]*ZipArchiveMode\.(?:Create|Update)\b"
         + @"|""(?:setup|preview|deploy)\.ps1"""
-        + @"|""(?:powershell|pwsh|cmd|robocopy|xcopy|tar|attrib|icacls|schtasks)(?:\.exe)?""",
+        + @"|\b\w*(?:Run|Start)\w*\s*\([^;]*\b(?:Workspace\.MarkerLauncher|DeployCommand\.ScriptName)\b"
+        + @"|""(?:powershell|pwsh|cmd|robocopy|xcopy|tar|attrib|icacls|schtasks)(?:\.exe(?:""|\s)|""|\s+[-/])",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly Regex OpenedToWrite = new(
@@ -105,7 +112,7 @@ public sealed class UndoWriterScanTests
         ["Plantoir.Core/Models/AppSettings.cs"] = (2, "notAStep: the app's own settings, outside every course (a preference is U4's only where it changes a course)"),
         ["Plantoir.Core/Models/BackupDeleter.cs"] = (3, W9 + " (Delete Backup, to the Recycle Bin by ruling 12, the mac's U5)"),
         ["Plantoir.Core/Models/BuildOutputLocation.cs"] = (3, "notAStep: the built websites' folder and its marker"),
-        ["Plantoir.Core/Models/CourseArchiver.cs"] = (3, W9),
+        ["Plantoir.Core/Models/CourseArchiver.cs"] = (4, W9 + " (the archive zip it makes, seen since W4's review, LOW 3)"),
         ["Plantoir.Core/Models/CourseConfiguration.cs"] = (6, W8 + " (a course's course_config.json, as editJSON)"),
         ["Plantoir.Core/Models/CoursePageCopy.cs"] = (6, W8 + " (Copy a Page, the mac's CoursePageCopier)"),
         ["Plantoir.Core/Models/CourseRenamer.cs"] = (1, W8),
@@ -133,10 +140,11 @@ public sealed class UndoWriterScanTests
         ["Plantoir.Core/Models/UnitWordRenamer.cs"] = (6, W8),
         ["Plantoir.Core/Models/Workspace.cs"] = (1, "notAStep: names preview.ps1 as the marker of a working folder; runs nothing"),
         ["Plantoir.Core/Scripting/ActivityTrail.cs"] = (2, "notAStep: the activity trail"),
-        ["Plantoir.Core/Scripting/MultiDestinationDeployRunner.cs"] = (1, W8 + " (the build before a deploy is preview.ps1, whose preflight rewrites course_config.json; the deploy itself is not counted, rulings 17 and 18)"),
+        ["Plantoir.Core/Scripting/MultiDestinationDeployRunner.cs"] = (2, W8 + " (the build before a deploy is preview.ps1, whose preflight rewrites course_config.json; the deploy it runs by DeployCommand.ScriptName is not counted, rulings 17 and 18)"),
         ["Plantoir.Core/Scripting/NewCourseCreator.cs"] = (4, W8 + " (New Course: the course folder and setup.ps1)"),
         ["Plantoir.Core/Scripting/PreviewCommand.cs"] = (1, W8 + " (starts preview.ps1, whose preflight rewrites a course's course_config.json outside the door; the mac's AssistSiteWork)"),
-        ["Plantoir.Core/Scripting/ProblemReportBuilder.cs"] = (4, "notAStep: a problem report, built outside every course"),
+        ["Plantoir.Core/Scripting/ProblemReportBuilder.cs"] = (5, "notAStep: a problem report and its zip, built outside every course"),
+        ["Plantoir.Core/Scripting/ScriptRunner.cs"] = (1, W8 + " (runs every launcher for the window through powershell.exe, seen since W4's review, LOW 3: preview.ps1's preflight rewrites course_config.json and setup.ps1 makes a course; a deploy it runs is not counted, rulings 17 and 18)"),
         ["Plantoir.Core/Scripting/ProblemReportStore.cs"] = (3, "notAStep: problem reports' records, outside every course"),
         ["Plantoir.Core/Undo/FolderIdentityFile.cs"] = (6, "door: a working folder's courses/.internal/folder-id, made the first time a step is recorded there"),
         ["Plantoir.Core/Undo/UndoJournal.cs"] = (3, "door: the list itself, outside every working folder"),
@@ -339,6 +347,14 @@ public sealed class UndoWriterScanTests
             ("FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);", 1),
             ("runner.Run(\"preview.ps1\", args, folder);", 1),
             ("FileName = \"powershell.exe\",", 1),
+            // W4's review, LOW 3: a tool named at the start of a command line,
+            // a launcher run by its constant, and a zip made or changed.
+            ("string command = \"powershell.exe -NoLogo -NoProfile -File \" + script;", 1),
+            ("await runner.Run(DeployCommand.ScriptName, arguments, folder);", 1),
+            ("runner.Run(Workspace.MarkerLauncher, args, folder, null, token);", 1),
+            ("using var zip = ZipFile.Open(path, ZipArchiveMode.Create);", 1),
+            ("using var zip = ZipFile.Open(path, ZipArchiveMode.Update);", 1),
+            ("using var archive = new ZipArchive(stream, ZipArchiveMode.Create);", 1),
             ("Directory.CreateDirectory(d); File.Copy(a, b);", 2),
             ("SafeFileHandle h = CreateFileW(path, GenericRead | GenericWrite, Share, IntPtr.Zero, OpenAlways, 0, IntPtr.Zero);", 1),
             // Not writes.
@@ -351,6 +367,11 @@ public sealed class UndoWriterScanTests
             ("using var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);", 0),
             ("string name = path.Replace('/', '\\\\');", 0),
             ("Process.Start(new ProcessStartInfo(\"explorer.exe\", folder));", 0),
+            ("using var zip = ZipFile.Open(path, ZipArchiveMode.Read);", 0),
+            ("if (File.Exists(Path.Combine(folder, Workspace.MarkerLauncher))) return true;", 0),
+            ("string label = \"cmdlet\";", 0),
+            ("return (1, \"schtasks could not be started.\");", 0),
+            ("string run = \"cmd /c start \" + target;", 1),
         ];
         var wrong = new List<string>();
         foreach ((string source, int calls) in samples)

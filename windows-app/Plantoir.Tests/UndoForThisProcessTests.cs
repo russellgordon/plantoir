@@ -178,8 +178,14 @@ public sealed class UndoForThisProcessTests : IDisposable
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ListFolder)!);
         File.WriteAllText(ListFolder, "not a folder");
-        UndoRecoveryRun? run = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null).RecoverAtLaunch();
-        Assert.True(run is null || run.Settled.Count == 0);
+        var saidOfTheFolder = new List<string>();
+        UndoRecoveryRun? run = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null).RecoverAtLaunch(saidOfTheFolder.Add);
+        // It ran, found it could not have the list, and says so in the
+        // startup log (W4's review, LOW 2): never silently, never thrown.
+        Assert.NotNull(run);
+        Assert.Empty(run!.Settled);
+        Assert.NotNull(run.NotRun);
+        Assert.Contains(saidOfTheFolder, line => line.StartsWith("undo recovery at launch did not run: ", StringComparison.Ordinal));
 
         var said = new List<string>();
         UndoRecoveryRun? unforeseen = new UndoForThisProcess(Path.Combine(_root, "state", "undo2"), UndoMode.Shadow, null, new AClockThatFails())
@@ -254,5 +260,44 @@ public sealed class UndoForThisProcessTests : IDisposable
         Assert.Equal(2, folded.Steps.Count);
         Assert.Equal(UndoStepState.RolledBack, folded.Steps[1].State);
         Assert.Equal(UndoStepState.Done, folded.Steps[2].State);
+    }
+
+    /// <summary>
+    /// W4's review, LOW 5: the composition root gives every door the app's
+    /// own front-page runner. A step whose draft carries a recompute of the
+    /// section's front page is made (never refused for want of a runner, which
+    /// in shadow would stop the teacher's action), and the front page is
+    /// re-derived by Windows' own rule: pointed at the class just published.
+    /// </summary>
+    [Fact]
+    public void TheProcessesDoorReDerivesTheFrontPageWithTheAppsOwnRule()
+    {
+        Directory.CreateDirectory(Folder);
+        File.WriteAllText(Path.Combine(Folder, "preview.ps1"), "# marker");
+        File.WriteAllText(Path.Combine(Folder, "deploy.ps1"), "# marker");
+        string course = Path.Combine(Folder, "courses", "ICS3U");
+        Directory.CreateDirectory(Path.Combine(course, "section1", "All Classes"));
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            "{\"course_code\":\"ICS3U\",\"course_name\":\"Computer Science\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
+        string Class(int day, bool draft) =>
+            $"---\ntitle: Unit 1, Day {day}\ncreated: 2026-09-0{7 + day}T07:00:00.000-0400\ndraft: {(draft ? "true" : "false")}\n---\nThe lesson.\n";
+        const string Day2 = "courses/ICS3U/section1/All Classes/Unit 1, Day 2.md";
+        const string Index = "courses/ICS3U/section1/index.md";
+        Write("courses/ICS3U/section1/All Classes/Unit 1, Day 1.md", Encoding.UTF8.GetBytes(Class(1, draft: false)));
+        Write(Day2, Encoding.UTF8.GetBytes(Class(2, draft: true)));
+        Write(Index, Encoding.UTF8.GetBytes("---\ntitle: Section 1\ncreated: 2026-09-08T07:00:00.000-0400\ndraft: false\n---\n# Most Recent Class\n![[Unit 1, Day 1]]\n"));
+        var draft = new UndoStepDraft
+        {
+            ActionKey = "publishPages", MadeBy = "menu", WorkingFolder = Folder, Course = "ICS3U", Section = 1, Holds = "section",
+            Changes = [new UndoFileChange(Day2, Encoding.UTF8.GetBytes(Class(2, draft: true)), Encoding.UTF8.GetBytes(Class(2, draft: false)))],
+            Recomputes = [new JsonObject { ["kind"] = "recompute", ["path"] = Index, ["maintainer"] = "sectionFrontPage", ["section"] = 1 }],
+        };
+
+        UndoOutcome outcome = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null).Door().Perform(draft);
+
+        Assert.Equal(UndoOutcomeKind.Applied, outcome.Kind);
+        string front = File.ReadAllText(Full(Index));
+        Assert.Contains("![[Unit 1, Day 2]]", front);
+        Assert.Contains("created: 2026-09-09T07:00:00.000-0400", front);
     }
 }

@@ -15,6 +15,7 @@ Branch `issue/899-w4-switch` (on W3, `dev` 2ba8490e7 merged). Lenovo 20QES70500 
 - Shadow made total: with the switch off, ANY failure of the list (not only disk and permission errors) lets the teacher's change go ahead unrecorded, at the begin, at the closing and when a step is given up. A step given only as its ops is refused (`couldNotRecordTheStep`) before anything changes in either mode, as on the mac.
 - The writer scan (`UndoWriterScanTests`, the mac's): 75 product files that write, each `door` (5), `notAStep` with its reason (37) or `waitsFor` (33: W7 8, one of them also W8; W8 21; W9 3; W11a 1); a new writer or a stale count fails; `TheSwitchStaysOffWhileWritersWait`. `TaskScheduling.cs` waits for W8 by ruling 23 (the mac's entry still says held, M10).
 - W3's review lows 2, 3 and 4 and the final sweep's recompute finding fixed, each with a test.
+- W4's own review (one MEDIUM, four LOWs), each fixed with a test that fails without it (`vm-tools/guest/899-w4r-mustfail.json`): a shadow step whose list failed re-derives the files a rule keeps true, as the recorded path does (MEDIUM); recovery at launch that cannot have the list says why in the window's startup log (`UndoRecoveryRun.NotRun`); the writer scan sees a launcher run by its constant (`Workspace.MarkerLauncher`, `DeployCommand.ScriptName`), a tool at the start of a command line and a zip made or updated (`ScriptRunner.cs` now listed, W8); a page held with no read sharing during recovery is a file in use, never cannot tell; every door the process makes has the app's own front-page runner (`UndoSectionFrontPage`, Windows' publish rule through `AssistWorkspace.RederiveTheFrontPage`), so a draft holding a recompute is never refused for want of one. On the mac the runner is registered with the switch (U7); on Windows it is given from W4, because a shadow step's door makes the change itself.
 - Tests: `UndoShadowTests` (13), `UndoForThisProcessTests` (7), `UndoWriterScanTests` (5), `UndoRecoveryReviewFixesTests` (3), `UndoDoorTests` extended. PC `899w4-c1`: the Undo classes (contract classes included) 639 passed, 1 not run (`UndoWebsiteContractTests.ARecordFolderThatDeniesListingCannotTell`, a `[DenyBitesFact]` that cannot bite over SSH), 0 failed. Thirteen must-fail proofs, every one red (`899w4-mf1`, `899w4-mf2`; `vm-tools/guest/899-w4-mustfail.json`).
 - The real `plantoir-mcp.exe` and `Plantoir.exe` find one list, under `--state-dir` and under the default, and settle at launch a step a killed process left (`899w4-p1`): `documentation/12-windows-app.md` → "What Windows has built: W4, the switch".
 
@@ -60,6 +61,10 @@ changed. The plan is `vm-tools/reference/899-w4-plan.md`.
   Recovery in shadow records what it finds and writes nothing into a working
   folder, so a step killed part way leaves its staged files beside the pages
   (`staged=8` below); that is moot until W7 puts actions through the door.
+  A shadow step that goes ahead unrecorded still has the files a rule keeps
+  true re-derived (the section's front page), as the mac's
+  `performAndRederive` does on `appliedWithoutARecord`: every door the
+  process makes is given the app's own runner (`UndoSectionFrontPage`).
   The exception, as on the mac's `JournaledWrite.perform(ops:)`: a step given
   only as its ops is refused (`couldNotRecordTheStep`) before anything changes
   in either mode, since the door cannot carry out an ops step it has not

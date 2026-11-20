@@ -230,13 +230,18 @@ internal sealed class UndoDoor
         catch (Exception error) when (IsAFailureOfTheList(error))
         {
             if (Live) return new UndoOutcome(UndoOutcomeKind.CouldNotRecordTheStep);
-            // Shadow: the change goes ahead exactly as it would have (rule.shadow).
-            return UndoSwap.Swap(targets, "shadow", draft.WorkingFolder, _seams) switch
+            // Shadow: the change goes ahead exactly as it would have
+            // (rule.shadow), the files a rule keeps true re-derived as on the
+            // recorded path: a list that failed never leaves the section's
+            // front page stale (the mac's performAndRederive re-derives on
+            // appliedWithoutARecord; W4's review, MEDIUM).
+            switch (UndoSwap.Swap(targets, "shadow", draft.WorkingFolder, _seams))
             {
-                UndoSwapResult.Refused refused => new UndoOutcome(UndoOutcomeKind.Refused, Refusal: refused.Refusal),
-                UndoSwapResult.StoppedByATest => new UndoOutcome(UndoOutcomeKind.StoppedByATest),
-                _ => new UndoOutcome(UndoOutcomeKind.AppliedWithoutARecord),
-            };
+                case UndoSwapResult.Refused refused: return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: refused.Refusal);
+                case UndoSwapResult.StoppedByATest: return new UndoOutcome(UndoOutcomeKind.StoppedByATest);
+            }
+            Rederive(OpsOf(ops), draft.WorkingFolder);
+            return new UndoOutcome(UndoOutcomeKind.AppliedWithoutARecord);
         }
         return MakeTheStep(seq, targets, draft.WorkingFolder, ops);
     }
@@ -529,7 +534,9 @@ internal sealed class UndoDoor
         }
         catch (Exception error) when (error is UndoJournalException or IOException or UnauthorizedAccessException)
         {
-            return new UndoRecoveryRun([], StoppedByATest: false);
+            // Never fails the caller, and says why it did not run, so the
+            // window's startup log can (W4's review, LOW 2).
+            return new UndoRecoveryRun([], StoppedByATest: false, NotRun: $"{error.GetType().Name}: {error.Message}");
         }
         if (!run.StoppedByATest) RederiveWhatRecoverySettled(run);
         return run;
@@ -627,14 +634,18 @@ internal sealed class UndoDoor
 
     /// <summary>Phases two and three of making a step: the swap outside the lock, then <c>applied</c> or <c>failed</c>.</summary>
     private UndoOutcome MakeTheStep(long seq, IReadOnlyList<UndoSwapTarget> targets, string root, IEnumerable<JsonNode?> opsJson,
-                                    bool alreadyAskedAfterBegin = false)
+                                    bool alreadyAskedAfterBegin = false) =>
+        MakeTheStep(seq, targets, root, OpsOf(opsJson), alreadyAskedAfterBegin);
+
+    /// <summary>The ops of a step as this version reads them.</summary>
+    private static List<UndoOp> OpsOf(IEnumerable<JsonNode?> opsJson)
     {
         var ops = new List<UndoOp>();
         foreach (JsonNode? node in opsJson)
         {
             if (node is JsonObject op) ops.Add(UndoLineOps.Read(op));
         }
-        return MakeTheStep(seq, targets, root, ops, alreadyAskedAfterBegin);
+        return ops;
     }
 
     private UndoOutcome MakeTheStep(long seq, IReadOnlyList<UndoSwapTarget> targets, string root, IReadOnlyList<UndoOp> ops,
