@@ -1684,47 +1684,76 @@ keyboard at all. Keyboards
 operation." Progress indicators: "When it's feasible, let people halt
 processing."
 
-**The visible button carries the key** (the fourth #988 round). Cancel has
-`.keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)`, the same shape
-as Copy a Page's and the New Course wizard's Cancel. `cancelKeysAreLive`
-(`TaskProgressView.cancelHoldsTheKeys`) is true only while Cancel shows, the
-run is under way, no preview's site covers the panel (below), no question
-about stopping is open, the panel's window is the key window
-(`controlActiveState == .key`: a sheet, an alert or a popover in front is the
-key window then), and nobody is typing in a box there
-(`KeyWindowTextEditing`, which watches the key window's `firstResponder` by
-key-value observing and reports whether it is `NSText`, the field editor
-every text field and search field edits through). The fourth round
-measured, with that condition taken out (`988-r4-sabotage-text`), Escape and
-Command-Period typed in a text field going to the field, and wrote that
-AppKit offers a key without Command to the first responder before any
-button. That is NOT safe to rely on: in run `988-n2` (Keyboard Navigation
-on), whenever Cancel still held `.cancelAction` with the Filter field
-focused, Escape reached Cancel and stopped the task, and an Escape handed to
-the field editor directly came back to Cancel through `cancelOperation`. So
-the condition is the guard, not a second one. Command-Period reaches the
-same button.
+**The visible button carries the key, and decides each key when it
+arrives** (the fifth #988 round). Cancel is `TaskCancelButton`, a real
+`NSButton` wrapped for SwiftUI (`CancelKeyNSButton`, a regular push button,
+the bezel SwiftUI's `.bordered` draws on the Mac: 66 x 24 points for both,
+measured by `testTheCancelButtonIsTheSizeAndKindOfTheOneItReplaced`; its cell
+is the accessibility element, role button, title "Cancel"). It overrides
+`performKeyEquivalent(with:)`, which AppKit calls with the key itself before
+the focused box sees it, and takes Escape (no Command, Option, Control or
+Shift) or Command-Period only while `cancelKeysAreLive`
+(`TaskProgressView.cancelHoldsTheKeys`: Cancel shows, the run is under way,
+no preview's site covers the panel (below), no question about stopping is
+open, the panel's window is the key window, `controlActiveState == .key`, so
+a sheet, an alert or a popover in front lets go of it) AND, read at that
+moment, no box in its window is being typed in
+(`KeyWindowTextEditing.isEditingText(in:)`: the window's first responder is
+EDITABLE `NSText`, the field editor every text field and search field edits
+through, or an editable text view). Refused, the key goes on to the box as if
+there were no Cancel; a box with no use for Escape sends `cancelOperation`
+back up to the window, which offers it to Cancel again and is refused again,
+so nothing loops (`testEscapeInAFieldWithNoUseForItStopsNothing`). A click
+and an accessibility press (VoiceOver's VO-Space, Voice Control's "Click
+Cancel", Switch Control) reach `pressCancel` with nothing to inspect and
+always stop the task. The button sets no `keyEquivalent`, so there is one
+route for its keys; with Escape set there as well every pressed-key test still
+passed (sabotage S4, run `988-n4`), so that is a choice, not a fix.
+
+**Why it moved off a SwiftUI shortcut.** Round four put
+`.keyboardShortcut(cancelKeysAreLive ? .cancelAction : nil)` on a SwiftUI
+Cancel. SwiftUI applies a change to that only when it next updates the view,
+so in run `988-n2` (Keyboard Navigation on) a click in the Filter field and
+Escape already waiting together in the event queue, which is what a
+teacher's input becomes when the app is busy for longer than the gap between
+them, met a Cancel that still held the key, and Escape stopped the task.
+The next writer had `pressCancel` read `NSApp.currentEvent` and refuse a
+press that was a key while a box was being typed in. The fifth review found
+that `NSApp.currentEvent` is the last event taken off the queue, not the
+event that pressed the button: an accessibility press has no event of its
+own, so a VoiceOver press coming after a key typed in a box was taken for
+that key and the task kept running (`testAnAccessibilityPressStopsTheTaskWhileABoxHasTheFocus`,
+red with that check put back, sabotage S1). It also still took the key away
+from the box. Deciding in `performKeyEquivalent` reads the key that is
+actually arriving and the window as it is then.
+
+**Only editable text is a box** (the fifth review's low). The console's
+output is `.textSelection(.enabled)`; measured on the main Mac with
+Keyboard Navigation on and off (run `988-n4`), a click in it makes a
+read-only `NSTextView` the window's first responder, so with "is `NSText`"
+as the test, selecting a line of output silenced Escape and Command-Period for
+the running task. Nobody types there, so `isEditingText` asks for
+`isEditable` too (`testSelectingConsoleTextLeavesTheKeysWithCancel`,
+`testOnlyEditableTextIsABox`). The console's own answer field is a box, and
+keeps the keys.
 
 Russell's ruling on #988 (2026-11-19, evening): left as built. While any box
 has the focus (with Keyboard Navigation on, AppKit focuses the sidebar's
 Filter field when the window becomes key), Escape and Command-Period are
-both the box's; a click on Cancel still stops the task.
+both the box's; a click on Cancel still stops the task
+(`testAClickOnCancelStopsTheTaskWhileABoxHasTheFocus`, a real click through
+the event queue).
 
-**The press reads the box too.** SwiftUI applies a change to Cancel's
-shortcut only when it next updates the view. Measured on the main Mac (run
-`988-n2`, Keyboard Navigation on): a click in the Filter field and Escape
-already waiting together in the event queue, which is what a teacher's
-input becomes when the app is busy for longer than the gap between them,
-were handed out with no update between, and Escape stopped the task. So
-`pressCancel` asks `TaskProgressView.pressIsAKeyTypedInABox` about the event
-that pressed it, reading the key window's first responder at that moment,
-and a key typed in a box stops nothing; a click always stops the task. The
-box misses that one key (Escape does not clear it); the next press is the
-box's as usual. Rejected: passing the key on to the box, measured to come
-straight back to Cancel (the field editor's `cancelOperation` reaches the
-window's cancel button) without end. The opposite gap (focus has just left a
-box, and Cancel does not hold the key yet) loses one press and does nothing
-wrong.
+**What SwiftUI's field does with a queued Escape is SwiftUI's.** Measured in
+run `988-n4`: with the Filter field's `.onExitCommand`, an Escape queued
+straight behind the click that focused the field runs nothing, with Cancel
+in the window or with no Cancel at all, because SwiftUI learns that its field
+has the focus only when it next updates the view. The queued-key tests
+therefore hold the box to what it does with no Cancel in the window,
+measured first in the same window, and the task to running on; the next
+Escape clears the box as usual. Passing the key on to the box from Cancel's
+action, rejected in round four because it came straight back to Cancel
+through `cancelOperation`, is not needed: the key never reaches the action.
 
 **Rejected, in order:** `CancelKeyCatcher` (round one), an invisible view
 that took the keys: the kind of hidden key-carrying control Russell rejected
@@ -1815,7 +1844,8 @@ the window made the key window of the active app, and the key sent through
 `NSApp.sendEvent`. Escape and Command-Period stop a preview once; a held key
 stops it once; typed in the Filter box, Escape clears the box and neither key
 stops the task, a click in the box with Escape or Command-Period already
-queued behind it stops nothing, and once focus leaves the box Escape stops it; behind a sheet
+queued behind it stops nothing and leaves the box as it is with no Cancel
+there, and once focus leaves the box Escape stops it; behind a sheet
 (one whose Cancel holds Escape, and one with no use for it) and behind an
 alert neither key stops it; with the site covering the panel neither does;
 on a deploy either key asks, Escape or Command-Period in the question is
@@ -1841,20 +1871,31 @@ box when the window becomes key, so the box owns Escape until the teacher
 clicks elsewhere; the tests start with focus in no box, and
 `testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst` records that case
 as it is (skipped with Keyboard Navigation off); Russell ruled on 2026-11-19
-that it stays so. A test that moves the focus has the window's SwiftUI
-content update before the next key (`applyPendingViewUpdates`): the watch
-flips inside `makeFirstResponder`, but Cancel takes up or lets go of its key
-only at SwiftUI's next update, and a key sent inside that gap met the button
-as it was (run `988-n2`, Keyboard Navigation on: Escape in the Filter box
-stopped the task, and Escape after focus left the box did nothing; a gap no
-teacher can press a key inside). Measured on the main Mac with Keyboard
-Navigation on and off (`AppleKeyboardUIMode` 3 and 0), the same results. Source checks: the key
-is on the visible Cancel, and nothing in `Views/Console` is a representable
-or a responder. With the typing condition taken out, the rule's own test
-(`testCancelHoldsTheKeysOnlyWhenNothingElseWantsThem`) fails; what the
-pressed-key tests do then is not settled (above). The press-time check
-has its own test (`testAKeyTypedInABoxNeverPressesCancel`), and the two
-queued-click tests fail without it (run `988-n2`).
+that it stays so. Also pressed: an accessibility press (`AXPress`
+on Cancel's accessibility element, the button's cell) and a real click on
+Cancel each stop the task while the Filter box has the focus, the press
+coming straight after a key typed in the box; typed in a text view, or in a
+field with no use for Escape, neither key stops the task; after selecting
+console output, Escape does. A test that focuses the Filter box has the
+window's SwiftUI content update before the next key
+(`applyPendingViewUpdates`), because the field's own `onExitCommand` runs
+only once SwiftUI knows the field has the focus (above; a gap no teacher can
+press a key inside). Measured on the main Mac with Keyboard Navigation on
+and off (`AppleKeyboardUIMode` 3 and 0), the same results (run `988-n4`: 35
+of 35 on, 34 and the one Keyboard-Navigation-on test skipped off). Gated, in
+every suite: the button's rule (`testCancelTakesAKeyOnlyWhenNoBoxIsBeingTypedIn`),
+the keys it answers (`testTheCancelKeysAreEscapeAndCommandPeriod`), only
+editable text is a box, the button's size, kind and accessibility element
+against the SwiftUI Cancel it replaced, and a source check that nothing in
+`Views/Console` is a hidden key catcher: the one representable there is the
+visible Cancel, a titled `NSButton`, and nothing adds a responder, watches
+the event stream, hides a view or reads `NSApp.currentEvent`. Sabotaged in a
+scratch worktree (run `988-n4`): S1, the `currentEvent` check put back, turns
+the accessibility-press test red (the click test stays green, as it was
+before: a mouse-up is the current event); S2, the typing condition taken out
+of `performKeyEquivalent`, turns the text-field, text-view, no-use field and
+both queued-key tests red; S3, selectable text counted as a box, turns the
+console test and `testOnlyEditableTextIsABox` red.
 
 `StopQuestionTests` (in every suite) holds the rest without a key. The
 question's open state and its box are a small `@Observable` model,
@@ -1878,7 +1919,13 @@ one setting per question, and both turned back on in the Deploying part of
 Settings. The words are Mac-only (`DeployStopWording`, `ShareStopWording`,
 `StopQuestionSettingsWording`), not yet in `contracts/`; the trail event
 `stop question setting changed` is in `activityTrail.mustRecord`, held on
-Windows by `NamedGapLedger` against #1009.
+Windows by `NamedGapLedger` against #1009. Two lessons from the Mac's fifth
+round travel: decide whether a key is the text box's when the key arrives,
+from the focused element as it is then, never afterwards from a "last event"
+global (a click or a UI Automation Invoke on Cancel must always stop the
+task, whatever was typed before it); and a read-only text block a teacher can
+select (the console's output) is not a text box, so selecting a line of it
+must not take the keys from Cancel.
 
 ## Red and orange: the colours of a problem, measured (#994)
 

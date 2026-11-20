@@ -5,6 +5,7 @@ covers:
 - mac-app/QuartzTeachers/Views/Planning/PlanShareBar.swift
 - mac-app/QuartzTeachers/Views/Planning/PlanShareListsSheet.swift
 - mac-app/QuartzTeachers/Views/Planning/PlanShareConsoleSheet.swift
+- mac-app/QuartzTeachers/Views/Console/TaskCancelButton.swift
 - mac-app/QuartzTeachers/Models/StopQuestion.swift
 - mac-app/QuartzTeachers/Views/Settings/StopQuestionSettingsSection.swift
 - mac-app/QuartzTeachers/Models/PlanShareTables.swift

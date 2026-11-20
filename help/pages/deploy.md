@@ -4,6 +4,7 @@ checked: 2.0.0
 covers:
 - mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift
 - mac-app/QuartzTeachers/Views/Console/TaskProgressView.swift
+- mac-app/QuartzTeachers/Views/Console/TaskCancelButton.swift
 - mac-app/QuartzTeachers/Models/StopQuestion.swift
 - mac-app/QuartzTeachers/Views/Settings/StopQuestionSettingsSection.swift
 - mac-app/QuartzTeachers/Views/Section/DeployDestinationLinks.swift

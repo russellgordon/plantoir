@@ -113,13 +113,14 @@ final class CancelKeyNSButton: NSButton {
 
     /// Whether the button holds the cancel keys, apart from typing in a box.
     ///
-    /// Deliberately NOT written into `keyEquivalent`: measured on the main
-    /// Mac (run `988-n4`, Keyboard Navigation on), a button whose
-    /// `keyEquivalent` is Escape made AppKit keep Escape from a focused
-    /// field even when the button refused it (the field's own Escape never
-    /// ran). AppKit offers every key to every view's
-    /// `performKeyEquivalent(with:)` whatever its `keyEquivalent`, so the
-    /// button decides there and nowhere else.
+    /// Deliberately NOT written into `keyEquivalent`. AppKit offers every
+    /// key to every view's `performKeyEquivalent(with:)` whatever its
+    /// `keyEquivalent`, so the button decides there and nowhere else; with
+    /// Escape as its `keyEquivalent` as well, AppKit's own cancel-button
+    /// routes could reach the button around that one decision. Measured
+    /// with Escape set there too (run `988-n4`, sabotage S4): every pressed
+    /// key test still passed, so this keeps one route rather than fixing a
+    /// failure.
     var holdsTheCancelKeys: Bool = false
 
     /// Escape, as AppKit spells a key equivalent.

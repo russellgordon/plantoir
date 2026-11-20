@@ -1084,8 +1084,7 @@ final class ProgressCancelKeysTests: XCTestCase {
         let element: NSCell = try XCTUnwrap(button.cell)
         print("PROGRESS-CANCEL-KEYS Cancel accessibility: role=\(String(describing: element.accessibilityRole())) title=\(String(describing: element.accessibilityTitle())) element=\(element.isAccessibilityElement())")
         // No `keyEquivalent`: the button takes its keys only through
-        // `performKeyEquivalent`, so AppKit never takes Escape from a focused
-        // box on the button's behalf (measured, run `988-n4`).
+        // `performKeyEquivalent`, one route, decided when the key arrives.
         XCTAssertEqual(button.keyEquivalent, "", "the keys are decided in performKeyEquivalent alone")
         XCTAssertTrue(element.isAccessibilityElement(), "Cancel is an accessibility element")
         XCTAssertEqual(element.accessibilityRole(), .button)
