@@ -200,6 +200,9 @@ public sealed class UndoDoorTests : IDisposable
     /// <c>rule.recovery</c> and <c>undoJournal.stagedFiles</c>: a dead process's
     /// step pruning closes <c>unsettled</c> leaves none of its staged files in a
     /// course when its folder can be reached; another step's are not touched.
+    /// Since W3 recovery runs before every prune and would settle the step
+    /// first, so its page is held with no sharing at all while the step that
+    /// prunes is made: recovery cannot read it, which leaves it to pruning.
     /// </summary>
     [Fact]
     public void PruningTidiesTheStagedFilesOfAStepItClosesUnsettled()
@@ -229,7 +232,10 @@ public sealed class UndoDoorTests : IDisposable
         _clock.Advance(TimeSpan.FromDays(61));
         const string other = "courses/TST1O/Section 1/b.md";
         Write(other, Old);
-        Assert.Equal(UndoOutcomeKind.Applied, door.Perform(Draft((other, Old, New))).Kind);
+        using (new FileStream(Full(APage), FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.Equal(UndoOutcomeKind.Applied, door.Perform(Draft((other, Old, New))).Kind);
+        }
 
         UndoFolded folded = journal.Read().Folded;
         Assert.Equal(UndoStepState.Interrupted, folded.Steps[1].State);

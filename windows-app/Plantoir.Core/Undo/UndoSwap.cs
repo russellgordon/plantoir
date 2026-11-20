@@ -150,9 +150,22 @@ internal static class UndoSwap
 
     internal static UndoSwapResult Swap(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams = null)
     {
+        // Every staged file's handle is let go however the swap ends, a test's
+        // kill point included, as a process that died there would let it go.
+        var staged = new UndoStagedFile?[targets.Count];
+        var originals = new UndoStagedFile?[targets.Count];
+        try { return SwapStaged(targets, label, root, seams, staged, originals); }
+        finally
+        {
+            foreach (UndoStagedFile? file in staged) file?.LetGo();
+            foreach (UndoStagedFile? file in originals) file?.LetGo();
+        }
+    }
+
+    private static UndoSwapResult SwapStaged(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams,
+                                             UndoStagedFile?[] staged, UndoStagedFile?[] originals)
+    {
         int count = targets.Count;
-        var staged = new UndoStagedFile?[count];
-        var originals = new UndoStagedFile?[count];
         int swapsMade = 0;
 
         void Tidy()
@@ -300,7 +313,11 @@ internal static class UndoSwap
             // A leftover of an earlier try may be a link to this very page:
             // removed without touching its attributes (LOW 4).
             UndoStagedFile.RemoveByName(originalPath);
-            UndoStagedFile? kept = UndoStagedFile.Keep(target.FullPath, originalPath, out int failure);
+            // A page the step removes has no staged content holding its folder
+            // in place: its original holds the handle instead, from the keep
+            // to the delete, which an editor's save cannot meet (the page is
+            // going). A page the step replaces is held by its staged content.
+            UndoStagedFile? kept = UndoStagedFile.Keep(target.FullPath, originalPath, out int failure, holdItsFolder: staged[index] is null);
             if (kept is null)
             {
                 // On a volume without hard links the original is COPIED, and a
@@ -605,26 +622,36 @@ internal static class UndoSwap
 }
 
 /// <summary>
-/// A file a swap makes beside a page: the page's original, kept under its
-/// staged <c>-orig</c> name while its swap goes in, or a new content staged as
-/// <c>-new</c> (#899 W2b; W3 made it an object, from W2b's review, LOWs 2 to
-/// 4). It holds an attributes-only handle to the file, opened the moment it
-/// is made: that handle takes part in no sharing check, so no editor is kept
-/// out, and it is how the file is found again to be removed, never by a name
-/// that may lead elsewhere by then (a folder on its path replaced by a
-/// junction leaves nothing of the swap's in the folder that was moved aside).
+/// A file a swap makes beside a page (#899 W2b; W3 made it an object, from
+/// W2b's review, LOWs 2 to 4): a new content staged as <c>-new</c>, or the
+/// page's original kept under its staged <c>-orig</c> name.
+///
+/// <para>A STAGED new content holds an attributes-only handle from the moment
+/// it is written until it is renamed in or removed. That handle takes part in
+/// no sharing check, so it keeps no program from the file, but Windows will
+/// not rename or move a folder with a file open below it (measured: access
+/// denied), so while a swap is under way the folders of its pages cannot be
+/// replaced by a junction: the race the containment checks catch is made
+/// impossible for those folders rather than merely detected, and a staged
+/// file is removed by its handle, never through a name that leads elsewhere.
+/// A KEPT original holds no handle (the file IS the page, a hard link, and
+/// an open handle on it would refuse an editor's save by replace): it keeps
+/// the file identity it was made with, and is removed by name only when that
+/// name is still that file. The one exception is the original of a page the
+/// step REMOVES, which has no staged content to hold its folder: it holds
+/// the handle itself, from the keep to the delete.</para>
 /// </summary>
 internal sealed class UndoStagedFile
 {
     private SafeFileHandle? _handle;
     private readonly (uint Volume, ulong Index)? _identity;
 
-    private UndoStagedFile(string path, bool isALink, SafeFileHandle? handle)
+    private UndoStagedFile(string path, bool isALink, SafeFileHandle? handle, (uint Volume, ulong Index)? identity)
     {
         Path = path;
         IsALink = isALink;
         _handle = handle;
-        _identity = handle is null ? null : UndoFileIdentity.Of(handle);
+        _identity = identity;
     }
 
     internal string Path { get; }
@@ -632,21 +659,21 @@ internal sealed class UndoStagedFile
     /// <summary>A hard link to the page (the same file); false for a copy, on a volume with no links.</summary>
     internal bool IsALink { get; }
 
+    /// <summary>A staged new content just written (not a link), its handle held.</summary>
+    internal static UndoStagedFile Made(string path)
+    {
+        SafeFileHandle handle = CreateFileW(UndoLock.LongPath(path), ReadAttributes, ShareAll, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+        if (!handle.IsInvalid) return new UndoStagedFile(path, false, handle, UndoFileIdentity.Of(handle));
+        handle.Dispose();
+        return new UndoStagedFile(path, false, null, null);
+    }
+
     /// <summary>
     /// Keeps <paramref name="page"/> as <paramref name="keptPath"/>: a hard
     /// link where the volume has them, a copy where it does not. Null when it
     /// could not be kept, with the error number of the last try.
     /// </summary>
-    /// <summary>A staged new content just written (not a link).</summary>
-    internal static UndoStagedFile Made(string path)
-    {
-        SafeFileHandle handle = CreateFileW(UndoLock.LongPath(path), ReadAttributes, ShareAll, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
-        if (!handle.IsInvalid) return new UndoStagedFile(path, false, handle);
-        handle.Dispose();
-        return new UndoStagedFile(path, false, null);
-    }
-
-    internal static UndoStagedFile? Keep(string page, string keptPath, out int failure)
+    internal static UndoStagedFile? Keep(string page, string keptPath, out int failure, bool holdItsFolder = false)
     {
         failure = 0;
         bool linked = CreateHardLinkW(UndoLock.LongPath(keptPath), UndoLock.LongPath(page), IntPtr.Zero);
@@ -663,9 +690,12 @@ internal sealed class UndoStagedFile
         if (handle.IsInvalid)
         {
             handle.Dispose();
-            return new UndoStagedFile(keptPath, linked, null);
+            return new UndoStagedFile(keptPath, linked, null, null);
         }
-        return new UndoStagedFile(keptPath, linked, handle);
+        (uint, ulong)? identity = UndoFileIdentity.Of(handle);
+        if (holdItsFolder) return new UndoStagedFile(keptPath, linked, handle, identity);
+        handle.Dispose();
+        return new UndoStagedFile(keptPath, linked, null, identity);
     }
 
     /// <summary>
@@ -706,13 +736,14 @@ internal sealed class UndoStagedFile
     }
 
     /// <summary>
-    /// Removes the kept file. By its own handle, reopened for delete, so a
-    /// folder on its path replaced by a junction since cannot send the delete
-    /// elsewhere (LOW 2); with the read-only attribute IGNORED rather than
-    /// cleared, because a hard link shares its attributes with the live page
-    /// and clearing it there would change the teacher's page (LOW 4). Where
-    /// the handle cannot be reopened, the name is opened for delete and
-    /// removed only if it is still the kept file. True when it is gone.
+    /// Removes the file. A staged content by its own handle, reopened for
+    /// delete; a kept original (or a staged file whose handle cannot be
+    /// reopened) by its name, opened for delete without following a link and
+    /// removed only if it is still the file that was made, so a name that now
+    /// leads elsewhere removes nothing (LOW 2). Always with the read-only
+    /// attribute IGNORED rather than cleared, because a hard link shares its
+    /// attributes with the live page and clearing it there would change the
+    /// teacher's page (LOW 4). True when it is gone.
     /// </summary>
     internal bool Remove()
     {
