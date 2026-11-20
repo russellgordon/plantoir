@@ -103,6 +103,8 @@ struct CredentialRequestSheet: View {
                     SecureField(request.fieldPlaceholder, text: $answer)
                         .borderedTextField()
                         .labelsHidden()
+                        // Named by the label printed above it (#1012).
+                        .accessibilityLabel(Text(request.fieldLabel))
                         .accessibilityIdentifier("credentialField")
                         .onSubmit {
                             sendAnswer()
@@ -111,6 +113,8 @@ struct CredentialRequestSheet: View {
                     TextField(request.fieldPlaceholder, text: $answer)
                         .borderedTextField()
                         .labelsHidden()
+                        // Named by the label printed above it (#1012).
+                        .accessibilityLabel(Text(request.fieldLabel))
                         .accessibilityIdentifier("credentialField")
                         .onSubmit {
                             sendAnswer()

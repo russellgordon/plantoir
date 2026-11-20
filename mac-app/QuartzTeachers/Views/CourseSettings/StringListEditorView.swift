@@ -165,6 +165,15 @@ struct StringListEditorView: View {
     }
 
     /// The label for the add control, keyed to the list's kind.
+    /// The add field's name for VoiceOver (#1012): the words of its prompt
+    /// ("Type new folder name here").
+    var addFieldName: String {
+        if hidesMarkdownExtension {
+            return "New file name"
+        }
+        return "New folder name"
+    }
+
     var addLabel: String {
         if hidesMarkdownExtension {
             return "Add new file…"
@@ -404,6 +413,9 @@ struct StringListEditorView: View {
                         isAddingItem = false
                     }
                 }
+                // The popover shows only the prompt, so the field is named
+                // by its words (#1012).
+                .accessibilityLabel(Text(addFieldName))
                 .accessibilityIdentifier("addField-\(title)")
             HStack {
                 Spacer()
@@ -443,6 +455,9 @@ struct StringListEditorView: View {
         VStack(alignment: .leading, spacing: 12) {
             TextField("New name", text: $proposedName)
                 .borderedTextField()
+                // Its placeholder's words (#1012): the sheet prints no
+                // label of its own.
+                .accessibilityLabel(Text("New name"))
                 .accessibilityIdentifier("renameField")
                 .onSubmit {
                     Task { await performRename(of: item, finishing: finishing) }
