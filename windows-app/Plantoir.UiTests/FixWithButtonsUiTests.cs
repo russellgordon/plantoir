@@ -213,31 +213,58 @@ public class FixWithButtonsUiTests
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetCursorPos(out System.Drawing.Point point);
 
     /// <summary>
-    /// Moves the real pointer away and then onto the middle of
-    /// <paramref name="element"/>, leaves it there, and polls UI Automation
-    /// for 4 s for a ToolTip named <paramref name="tip"/> in the window or
-    /// among the desktop's top-level windows. With a folder given, the whole
-    /// screen in real pixels is saved there as <c>&lt;name&gt;.png</c>.
+    /// Glides the real pointer from above onto the middle of
+    /// <paramref name="element"/> as a person's mouse would, leaves it there,
+    /// and polls UI Automation for 3 s for a ToolTip named
+    /// <paramref name="tip"/> in the window or among the desktop's top-level
+    /// windows; up to three rests, as a person moves off and back. With a
+    /// folder given, the whole screen in real pixels is saved there for each rest.
     /// </summary>
     private static bool RestThePointerOn(DrivenApp app, AutomationElement element, string tip, string pictures, string name)
     {
         app.BringToFront();
         var middle = DrivenApp.MiddleOf(element, app.Window.BoundingRectangle);
-        Mouse.MoveTo(new System.Drawing.Point(middle.X, middle.Y - 120));
-        Thread.Sleep(600);
-        Mouse.MoveTo(middle);
-        // Mouse.MoveTo places the cursor (SetCursorPos); a nudge through
-        // mouse_event is real input, which WinUI's pointer events follow.
-        mouse_event(0x0001, 2, 0, 0, IntPtr.Zero);
-        Thread.Sleep(50);
-        mouse_event(0x0001, -2, 0, 0, IntPtr.Zero);
-        Thread.Sleep(1500);
-        Picture(pictures, name + "-1s5", element);
-        var seen = Retry.WhileFalse(() => ToolTipShowing(app, tip), TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(250)).Result;
-        Picture(pictures, name + "-4s5", element);
-        Mouse.MoveTo(new System.Drawing.Point(middle.X, middle.Y - 120));
-        Thread.Sleep(400);
-        return seen;
+        var above = new System.Drawing.Point(middle.X, middle.Y - 120);
+        for (int rest = 1; rest <= 3; rest++)
+        {
+            Glide(above, above, 1);
+            Thread.Sleep(700);
+            Glide(above, middle, 15);
+            bool seen = Retry.WhileFalse(() => ToolTipShowing(app, tip), TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(250)).Result;
+            Picture(pictures, $"{name}-rest{rest}", element);
+            if (pictures.Length > 0)
+                File.AppendAllText(Path.Combine(pictures, "measured.txt"), $"{DateTime.Now:o} {name} rest {rest}: tooltip seen by UIA: {seen}{Environment.NewLine}");
+            if (seen)
+            {
+                Glide(middle, above, 5);
+                return true;
+            }
+        }
+        Glide(middle, above, 5);
+        return false;
+    }
+
+    /// <summary>
+    /// Real pointer input, not a placed cursor: absolute moves through
+    /// <c>mouse_event</c> in <paramref name="steps"/> steps 20 ms apart.
+    /// FlaUI's <c>Mouse.MoveTo</c> sets the cursor with <c>SetCursorPos</c>,
+    /// after which WinUI opened no tooltip, the control's included (measured
+    /// 2026-11-19 and 2026-11-20). Points are in this process's (unaware)
+    /// pixels, as <see cref="DrivenApp.MiddleOf"/> gives them and as
+    /// <c>GetSystemMetrics</c> measures the screen here.
+    /// </summary>
+    private static void Glide(System.Drawing.Point from, System.Drawing.Point to, int steps)
+    {
+        int width = GetSystemMetrics(0), height = GetSystemMetrics(1);
+        for (int step = 1; step <= steps; step++)
+        {
+            int x = from.X + (to.X - from.X) * step / steps;
+            int y = from.Y + (to.Y - from.Y) * step / steps;
+            int normalizedX = (int)Math.Round(x * 65535.0 / (width - 1));
+            int normalizedY = (int)Math.Round(y * 65535.0 / (height - 1));
+            mouse_event(0x8001, normalizedX, normalizedY, 0, IntPtr.Zero);   // MOVE | ABSOLUTE
+            Thread.Sleep(20);
+        }
     }
 
     /// <summary>The whole screen in real pixels into <paramref name="pictures"/>, and where the cursor was.</summary>

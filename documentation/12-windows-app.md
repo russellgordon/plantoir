@@ -8142,38 +8142,56 @@ here where Windows has the same thing:
   activation off the interface thread; its `Changed` re-runs
   `ApplyMenuEnablement`, and `Invoke` asks presence again at the click.
   `ReviseWithPresenceTests` holds the rule, the two contract keys and the
-  source (no installed test around the menu bar's `Add`). The mac's dimmed
+  source (no installed test around the menu bar's `Add`; since #1017, that
+  `ApplyMenuEnablement` sets only `IsEnabled` on the ruled items and the
+  only `Visibility` it sets is Preview's alternate). The mac's dimmed
   Fix with buttons (and Revert on Planning) also carry the reason as a help
   tag, shown when the pointer rests on them, and the shared Help page says
   "Hold the pointer over the button to read why". Since #990's second review
   Windows gives a dimmed Fix with button its reason twice:
   `AutomationProperties.HelpText` for Narrator AND `ToolTipService.ToolTip`
   (`SectionProblemsView.ShowTheFixButtons`; no tooltip while it can be
-  pressed). **Whether WinUI SHOWS that tooltip on a disabled button is not
-  known.** Tried on this PC on 2026-11-19 (Lenovo i5-8365U, Windows 11 Pro
-  26200, the desktop session through Task Scheduler): `FixWithButtonsUiTests`
-  rested the real pointer on the dimmed Fix with Claude… (UI Automation
-  confirmed the pointer was over `fixWithClaudeButton`) and, as the control,
-  on the sidebar's enabled + button, whose XAML tooltip is "Add a course or
-  club", and polled UI Automation for 4 s for a ToolTip element in the
-  window and among the desktop's top-level windows. Neither showed one, the
-  control included, so the probe cannot see a WinUI tooltip at all and says
-  nothing about disabled ones; a screen picture was tried too and came back
-  as a 1280 x 720 crop of the scaled screen, missing both controls. The probe
-  was taken out again rather than left in a test that asserts nothing. Until
-  someone looks at the screen, no Windows Help page may say "Hold the pointer
-  over the button": the Windows Help book (886b onward) must not copy the
-  mac's sentence, and `help/pages/fix-with.md` was left as the mac wrote it
-  (help/README.md rule 7: no `{{windows}}` runs yet). Revert on the Planning
+  pressed). **The tooltip is on the button's frame, not the button (#1017).**
+  WinUI 3's `ToolTipService` has no `ShowOnDisabled` (that is WPF's), and
+  Microsoft Learn's Control.IsEnabled page says a disabled control "can't
+  handle any input events on itself" but is "still visible to hit testing",
+  and its input events "can bubble to a parent where they can be handled".
+  So each Fix with button sits in a `Border` of exactly its box
+  (`FixButtonFrame`: transparent background, shown and collapsed with the
+  button, drawing nothing of its own), and the frame owns the tooltip;
+  `HelpText` stays on the button. Measured on the PC on 2026-11-20 (Lenovo
+  i5-8365U, Windows 11 Pro 26200, 1920 x 1080 at 150%, the desktop session
+  through Task Scheduler) by `FixWithButtonsUiTests.ACodexThisPcLacks_IsDrawnDimmedWithItsReason`:
+  the real pointer placed on the button's middle and then nudged with
+  `mouse_event` (FlaUI's `Mouse.MoveTo` sets the cursor with `SetCursorPos`,
+  and without the nudge no tooltip showed, the control's included, both on
+  2026-11-19 and in this run's first try), then UI Automation polled for 3 s for a
+  ToolTip named with the reason, in the window and among the desktop's
+  top-level windows, and the screen captured in real pixels (the thread
+  made per-monitor DPI aware; the earlier 1280 x 720 crop was the
+  unaware capture). **Before** (tooltip on the button, `2c4ce92e0`): the
+  control, the sidebar's enabled + ("Add a course or club"), showed its
+  tooltip on screen and to UI Automation; the dimmed Fix with Codex…
+  showed none, in either. **After** (`55e0f60e7`): "Not set up on this PC."
+  showed above the dimmed button, on screen and to UI Automation. The test
+  now requires both. Only the not-installed reason was looked at on screen;
+  the nothing-ticked reason ("Tick a problem this section still has to hand
+  it over.") goes through the same frame and was not hovered. Keyboard: a
+  dimmed button cannot take focus, so a keyboard user does not get the
+  tooltip; Narrator reads `HelpText`. The mac's Help sentence "Hold the
+  pointer over the button to read why" is now true on Windows for a mouse
+  user; `help/pages/fix-with.md` was not changed (886b onward owns the
+  Windows Help book). Revert on the Planning
   tab, the mac's other new help tag (`unitPlanning.tab.saveOnPlanning.rule`),
   has no Windows counterpart until #801 builds the Planning tab; when it
-  does, `PlanningTab.RevertOnPlanning` is that item's reason, given as the
-  dimmed menu item's `ToolTipService.ToolTip` and `HelpText` as the review
-  asks, and the same tooltip question applies to a dimmed `MenuFlyoutItem`.
-  The same run also failed `FixWithButtonsUiTests` later, at the Codex door's
-  argument count (12 expected, 14 sent), after every assertion #990 touches
-  in it had passed; that test is in no gate, the count is not this piece's,
-  and whether `dev` fails the same way was not checked. A dimmed Revise
+  does, `PlanningTab.RevertOnPlanning` is that item's reason, and a disabled
+  `MenuFlyoutItem` has the same problem, with no frame of its own to carry a
+  tooltip (not measured).
+  `FixWithButtonsUiTests` had also failed on 2026-11-19 at the Codex door's
+  argument count (12 expected, 14 sent): #884 (c319d04f5) added the sixth
+  `-c` pair, `PLANTOIR_DOOR_ASSISTANT="codex"`, on purpose. Since #1017 the
+  test names each of the six pairs and its value, and both of its tests
+  pass on the PC. A dimmed Revise
   item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
   shows no tooltip, and the ruling Q14 rules out a grey text row.
 - **A row's context menu still HIDES a missing assistant**
