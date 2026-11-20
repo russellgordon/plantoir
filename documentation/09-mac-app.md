@@ -2562,6 +2562,70 @@ not reopened` (the reason key and the path). `working folder opened` stays
 the teacher's choice only. A window opened beside another (⌘N) writes
 nothing — neither a choice nor a reopen.
 
+### When a restored window looks for its folder (#998)
+
+Until #998 a window tried its frame against the remembered windows every
+150 ms, seven times, because "a reopened window's frame settles a moment
+after the window exists", and gave up to the next folder by order after
+about a second, showing its quiet spinner meanwhile. `WindowClaimRound` now
+waits on the events instead.
+
+**Measured** with a probe app (a SwiftUI `WindowGroup`, ad-hoc signed,
+2026-11-19), three launches on each system: no saved state, two windows
+restored, and saved state with none restored:
+
+| Step | macOS 26.7.3 (this Mac) | macOS 15.7.7 (Tart guest) |
+|---|---|---|
+| Restored frames put back | before the notification | the window is handed over WITH its restored frame, then SwiftUI moves and resizes it to another frame, all before the notification |
+| `didFinishRestoringWindowsNotification` | posted in all three cases | posted in all three cases |
+| Windows' content joins them (`WindowAccessor`) | after the notification and after `applicationDidFinishLaunching`, frame already final | before the notification |
+| Restored windows handed over | all in one pass of the main actor, before a task the first enqueued | the same |
+
+(On 15.7.7 a stray word in the launch arguments, read as a file to open,
+made SwiftUI open no window at all; the probe's flags take a value for that
+reason.) So no one reading of the frame is right on both systems: on 15 the
+one at hand-over matches and a later one does not.
+
+**What a window does now:**
+
+- **It tries its frame at hand-over, at every move or resize of its own
+  window (`NSWindow.didMoveNotification`, `didResizeNotification`), and when
+  restoration is said to be finished** (`LaunchRestoration`, which records
+  the notification from `applicationWillFinishLaunching`).
+- **It gives up by order only after restoration has finished, one pass of
+  the main actor later** (a task enqueued then, no clock). By then every
+  restored window exists and has been handed its frame, on both systems.
+- **A give-up never takes an entry remembered at another open window's
+  current frame** (`WindowFolderMemory.claimNextEntry(skippingFrames:)`):
+  that entry is that window's, even if its content has not been handed
+  over yet, since AppKit has already made the window. When only such
+  entries are left, the window shows the picker.
+- **What closes claims:** for one window, claiming, giving up, or having
+  settled its folder otherwise; for the launch, the existing ten-second
+  deadline (`WindowFolderMemory.claimsOpenUntil`). The give-up cannot come
+  early because nothing triggers it before AppKit's notification, and
+  nothing but the notification marks restoration finished. If it were ever
+  not posted, a launching window would keep its spinner rather than guess;
+  no launch measured did that. The observers go when the round ends.
+- **`WindowRootView`'s `onReceive` for the notification is gone.** SwiftUI
+  subscribes when the view appears, which on 26 is after the notification,
+  so it could never fire at launch.
+
+Tests: `WindowClaimRoundTests` (a frame right only after a move, two windows
+in one pass, two in separate passes, entries left only for others, no
+give-up without the notification, a real window's move).
+
+What a teacher sees: a restored window shows its folder at once rather than
+after about a second of spinner (HIG, Launching: "Launch instantly", and
+"display windows in the same state and location in which people left
+them"). Not measured: a log-in restore, a full-screen window, a window on
+another display.
+
+`WindowAccessor` lost its own timer at the same time: a fifty-millisecond
+GCD poll stood behind `viewDidMoveToWindow` for "anything installed into a
+view hierarchy that is not yet in a window", and AppKit tells such a view
+when its hierarchy joins a window (`WindowAccessorTests`).
+
 ### Rejected
 
 In the contract's `rejected`: a security-scoped bookmark instead of a plain
@@ -3926,6 +3990,49 @@ every forward failed; the tell is the `failed to set up forwarding` warning,
 and on a healthy Mac that warning appears too — but only for the duplicate
 `[::]` attempt after the `0.0.0.0` one has already succeeded. A host listener,
 or an actual connection, is the only signal that decides.
+
+### What the wait waits ON, and what it still reads once a second (#998)
+
+The wait used to sleep a second at a time in all three phases. Since #998
+it waits on whatever it can be told about, and reads again after a second
+only what cannot tell it anything:
+
+| What the wait needs | Where it comes from | How it waits |
+|---|---|---|
+| The run has ended, could not start, or was stopped | `ScriptRunner` (`@Observable`) | Woken by the change (`ScriptRunnerWait`) |
+| The address | the launcher's line, collected as it arrives (#235) | Woken by the change |
+| "Launching Quartz preview" (phase 1) | `build_site.py`'s line, collected as it arrives (`ScriptRunner.hasAnnouncedQuartzLaunch`) | Woken by the change |
+| The build has written the site (phase 2) | the section's built `index.html`, written from inside the builder | Read again after a second |
+| The server answers (phase 3), the page last viewed (#504) | an HTTP request | Asked again after a second |
+| The quiet bound (#225) | the clock | Read with the file or the request |
+
+`ScriptRunnerWait.untilTheRunChanges(orAfter:)` registers with Observation
+for the runner's standing (running, exit code, launch problem, address,
+launch line, stopped, start time) and returns on the first change or at the
+bound. A registration cannot be withdrawn on macOS 15 (`Observations`, which
+can, needs 26), so each wait holds ONE and a bounded wait leaves it for the
+next instead of adding another; the run's next change releases it, and every
+run ends with one. It does not read the transcript: that would wake it for
+every chunk of build output, which is why the launch line is collected as
+lines arrive, as the address already was, instead of being searched for in
+`displayText` once a second. Phase 1's ten minutes are wall-clock time from
+the start of the phase; phases 2 and 3 still count their one-second turns.
+
+**The late reload.** When phase 2's two minutes ran out (or the run went
+quiet) before the build was seen to land, the page shown may be the build
+before, and the view reloaded it once, 900 ms later: a guess, which a
+build landing later than that missed. It now reloads once WHEN the build
+lands, `index.html` changing from what it was before the run
+(`PreviewLateBuild.waitForTheBuildToLand`), and not at all if the run ends,
+is stopped or is replaced first, or after ten minutes.
+
+**Rejected, for now:** watching `index.html` with a file-system event. It is
+written by the builder's own mirror thread, through the virtual machine's
+shared folder, and whether macOS reports such a write to a watcher has not
+been measured; the APIs that deliver the events are also GCD-based. The
+toolchain printing a line when the mirrored site has landed would let
+phase 2 wait on the run as phase 1 does; it changes `build_site.py`, so it
+is shared with Windows and was left as a question (#998's report).
 
 ## Which folders Plantoir uses
 

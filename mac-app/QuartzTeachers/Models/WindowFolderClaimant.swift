@@ -19,9 +19,8 @@ final class WindowFolderClaimant {
 
     // MARK: - Functions
 
-    /// Offers the window's current frame; claims the matching entry when
-    /// there is one. The frame settles a moment after the window exists,
-    /// so this is called repeatedly until it matches or time runs out.
+    /// Offers the window's frame; claims the matching entry when there is
+    /// one. Called once, when the frame is final (`WindowClaimRound`).
     ///
     /// `windowHasSettled`: the window's folder is already decided (reopened,
     /// requested, left to the picker). Such a window never claims — one
@@ -45,7 +44,11 @@ final class WindowFolderClaimant {
 
     /// The frame never matched: take the next entry by order — the path
     /// for launches where no frames were restored at all.
-    func giveUp(windowHasSettled: Bool = false) -> WindowFolderMemory.Entry? {
+    ///
+    /// `reservedFrames`: the frames other open windows have now. An entry
+    /// remembered at one of them belongs to that window, which may not have
+    /// looked yet, so it is never taken by order (#998).
+    func giveUp(windowHasSettled: Bool = false, reservedFrames: [String] = []) -> WindowFolderMemory.Entry? {
         if windowHasSettled {
             isDone = true
             return nil
@@ -54,10 +57,11 @@ final class WindowFolderClaimant {
             return nil
         }
         isDone = true
-        if let entry = WindowFolderMemory.claimNextEntry() {
+        if let entry = WindowFolderMemory.claimNextEntry(skippingFrames: reservedFrames) {
             claimed = entry
             return entry
         }
         return nil
     }
 }
+

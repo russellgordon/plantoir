@@ -3184,6 +3184,10 @@ struct SectionDetailView: View {
                     attempts: PreviewStartPage.attempts,
                     fetch: SectionDetailView.statusOfPage,
                     pause: {
+                        // The server has answered for the root; this page is
+                        // asked again after a second, a paced retry of a
+                        // server that says nothing when a page is ready
+                        // (#998 kept it, deliberately).
                         try? await Task.sleep(for: .seconds(1))
                     }
                 )
@@ -3303,8 +3307,16 @@ struct SectionDetailView: View {
         // (which happens right after it has freed the port).
         // Up to 10 minutes: a first-ever build may pull the Docker image
         // and install npm dependencies.
+        //
+        // Everything this phase decides on is the runner's own state, so it
+        // waits for that state to CHANGE (`ScriptRunnerWait`) rather than
+        // looking once a second (#998): the moment the launch line arrives,
+        // the address is announced or the run ends, the wait moves on. The
+        // ten minutes are wall-clock time from here.
+        let phaseOneBegan: Date = Date()
+        let runChanges: ScriptRunnerWait = ScriptRunnerWait(previewRunner)
         var waitedSeconds: Int = 0
-        while waitedSeconds < 600 {
+        while true {
             let standing: PreviewStartRecords.RunStanding = PreviewStartRecords.howTheRunStands(
                 isRunning: previewRunner.isRunning,
                 lastExitCode: previewRunner.lastExitCode,
@@ -3343,11 +3355,18 @@ struct SectionDetailView: View {
             if let announced = previewRunner.previewAddress {
                 serverURL = announced
             }
-            if previewRunner.transcript.displayText.contains("Launching Quartz preview") {
+            if previewRunner.hasAnnouncedQuartzLaunch {
                 break
             }
-            try? await Task.sleep(for: .seconds(1))
-            waitedSeconds += 1
+            let secondsSoFar: TimeInterval = Date().timeIntervalSince(phaseOneBegan)
+            // A cancelled wait is over, as it was when a cancelled sleep ran
+            // the old count out at once: nothing below is waited for.
+            if secondsSoFar >= 600 || Task.isCancelled {
+                waitedSeconds = 600
+                break
+            }
+            await runChanges.untilTheRunChanges(orAfter: .seconds(600 - secondsSoFar))
+            waitedSeconds = Int(Date().timeIntervalSince(phaseOneBegan))
         }
 
         // Phase 2: wait for THIS build to have written the site.
@@ -3404,7 +3423,11 @@ struct SectionDetailView: View {
             if silenceThatCannotBeExplained() != nil {
                 break
             }
-            try? await Task.sleep(for: .seconds(1))
+            // The file is written by the builder, outside the app, and nothing
+            // says when, so it is read again after a second: a paced reading,
+            // not a wait for something to settle (#998). The run ending wakes
+            // the wait at once rather than a second later.
+            await runChanges.untilTheRunChanges(orAfter: .seconds(1))
             waitedSeconds += 1
             waitedForBuild += 1
         }
@@ -3439,7 +3462,10 @@ struct SectionDetailView: View {
             case .tryTheAddress(let announced):
                 addressToOpen = announced
             case .keepWaiting:
-                try? await Task.sleep(for: .seconds(1))
+                // Waiting for the address to be announced, which wakes this
+                // at once (#998), or for the silence bound, which is read
+                // again after a second.
+                await runChanges.untilTheRunChanges(orAfter: .seconds(1))
                 waitedSeconds += 1
                 continue
             case .stopBecauseNothingWasAnnounced:
@@ -3531,14 +3557,42 @@ struct SectionDetailView: View {
                         // an unconditional reload-after-load worse than the
                         // problem it addressed.
                         previewController.showFreshBuild(pageToShow)
-                        // And a second, later reload ONLY when we never saw
-                        // the build finish: the bounded Phase 2 wait ran out,
-                        // so what was just loaded may itself predate the
-                        // build that is still landing.
+                        // And a second reload ONLY when we never saw the
+                        // build finish: the bounded Phase 2 wait ran out, so
+                        // what was just loaded may itself predate the build
+                        // that is still landing. It happens when that build
+                        // lands, not after a guessed 900 ms (#998,
+                        // `PreviewLateBuild`), and never for a run that has
+                        // ended or been replaced by then.
                         if !buildFinished {
+                            let runTheReloadIsFor: Date? = previewRunner.startedAt
+                            let lateRunChanges: ScriptRunnerWait = ScriptRunnerWait(previewRunner)
                             Task { @MainActor in
-                                try? await Task.sleep(for: .milliseconds(900))
-                                previewController.reload()
+                                let buildLanded: Bool = await PreviewLateBuild.waitForTheBuildToLand(
+                                    siteAsItWas: siteAsItWas,
+                                    whenWritten: {
+                                        return builtIndexWrittenAt()
+                                    },
+                                    theRunIsStillTheOne: {
+                                        return PreviewReachability.isStillTheSameWait(
+                                            startedAt: runTheReloadIsFor,
+                                            theRunNowStartedAt: previewRunner.startedAt,
+                                            theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+                                            theRunIsStillGoing: previewRunner.isRunning
+                                        )
+                                    },
+                                    limit: 600,
+                                    pause: {
+                                        // A second between readings of the
+                                        // file, or less when the run itself
+                                        // changes (ends, is stopped).
+                                        await lateRunChanges.untilTheRunChanges(orAfter: .seconds(1))
+                                    }
+                                )
+                                if buildLanded {
+                                    AppLog.interface.info("the preview's late build landed; reloading it once")
+                                    previewController.reload()
+                                }
                             }
                         }
                         return
@@ -3562,7 +3616,10 @@ struct SectionDetailView: View {
                 )
                 return
             }
-            try? await Task.sleep(for: .seconds(1))
+            // A server says nothing when it starts answering, so it is asked
+            // again after a second: a deliberately paced retry (#998). The
+            // run ending or being stopped wakes the wait at once.
+            await runChanges.untilTheRunChanges(orAfter: .seconds(1))
             waitedSeconds += 1
         }
         previewBuildWait.end()

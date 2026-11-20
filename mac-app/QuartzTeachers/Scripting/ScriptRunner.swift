@@ -828,6 +828,19 @@ class ScriptRunner {
     /// after the fact.
     private(set) var announcedPreviewAddress: URL?
 
+    /// True once this run has printed the builder's "Launching Quartz
+    /// preview" line: the build script has freed the preview's port and is
+    /// starting ITS server, so an answer from the address from now on can
+    /// only be this run's (`SectionDetailView.waitForPreviewServer`, phase 1).
+    ///
+    /// Collected as output arrives, like the address above, so the preview
+    /// wait can wait ON it (`ScriptRunnerWait`) rather than reading the
+    /// whole transcript once a second to find out (#998).
+    private(set) var hasAnnouncedQuartzLaunch: Bool = false
+
+    /// The words of that line, as `build_site.py` prints them.
+    static let quartzLaunchLine: String = "Launching Quartz preview"
+
     /// Whatever arrived after the last newline, kept until the rest of the
     /// line turns up.
     ///
@@ -869,6 +882,7 @@ class ScriptRunner {
         linksChecklistMarkers = []
         problemsMarkers = []
         announcedPreviewAddress = nil
+        hasAnnouncedQuartzLaunch = false
         planShareLists = nil
         isAskingAboutPlanShareLists = false
         planPasswordSaved = nil
@@ -1014,6 +1028,9 @@ class ScriptRunner {
             let plainLine: String = TranscriptBuilder.strippingControlSequences(from: line)
             if let address = ScriptRunner.previewAddress(in: plainLine) {
                 announcedPreviewAddress = address
+            }
+            if !hasAnnouncedQuartzLaunch && plainLine.contains(ScriptRunner.quartzLaunchLine) {
+                hasAnnouncedQuartzLaunch = true
             }
         }
     }

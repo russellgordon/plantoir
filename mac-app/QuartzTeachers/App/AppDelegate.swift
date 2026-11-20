@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Nothing for a teacher, nothing in a UI-tested app, nothing in a
         // release build — see `UnitTestHostWindows`.
         UnitTestHostWindows.installIfThisIsTheUnitTestHost()
+        // Before AppKit restores any window, so its word that restoration
+        // has finished is heard: restored windows wait for it before they
+        // look for their folders by frame (#998, `LaunchRestoration`).
+        LaunchRestoration.shared.startListening()
         // Before any window exists, so before AppKit's first frame save: a
         // run a test drives puts AppKit's own preference keys back (#361).
         // HERE and not in `QuartzTeachersApp.init` — see
