@@ -193,10 +193,13 @@ final class JournaledStepTests: XCTestCase {
 
     /// A step written plainly, killed between its two swaps: the staged
     /// files are left beside the pages, as a process that died there leaves
-    /// them. The next recovery, once that process is gone, removes them and
-    /// writes nothing of the teacher's: the pages stay as the process left
-    /// them. MUST FAIL with `UndoShadowStaging.tidyLeftovers` taken out of
-    /// recovery (U3a's first round never tidied a `shadow` swap's files).
+    /// them. The next recovery, once that process is gone, removes the
+    /// staged new content and writes nothing of the teacher's: the pages
+    /// stay as the process left them. The first page's kept original is
+    /// the only copy of what it held and stays beside it (the second review
+    /// of U3a, MEDIUM c). MUST FAIL with `UndoShadowStaging.tidyLeftovers`
+    /// taken out of recovery (U3a's first round never tidied a `shadow`
+    /// swap's files), and with the kept original tidied away.
     func testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery() throws {
         let made = try course(inAWorkingFolder: false)
         let day1Text: String = try String(contentsOf: made.day1, encoding: .utf8)
@@ -222,7 +225,11 @@ final class JournaledStepTests: XCTestCase {
         try later.withLock(waitingAtMost: 2, inShadow: true) { writer in
             UndoRecovery.run(writer, mode: .shadow, trySwapsNow: true, resolveRoot: { _ in nil })
         }
-        XCTAssertEqual(stagedNames(under: made.course), [], "a staged file was left in the course")
+        let left: [String] = stagedNames(under: made.course)
+        XCTAssertEqual(left.count, 1, "the staged new content was left, or the original tidied away: \(left)")
+        XCTAssertTrue((left.first ?? "").hasSuffix("-orig"), "\(left)")
+        let keptURL: URL = made.course.appendingPathComponent(left.first ?? "?")
+        XCTAssertEqual(try String(contentsOf: keptURL, encoding: .utf8), day1Text, "the kept original is not what the page held")
         XCTAssertEqual(
             [try String(contentsOf: made.day1, encoding: .utf8), try String(contentsOf: made.day2, encoding: .utf8)],
             leftByTheProcess, "recovery wrote into the course"
@@ -281,7 +288,9 @@ final class JournaledStepTests: XCTestCase {
     /// `failed`: the first page is new with its original beside it, and
     /// only recovery, once this process is gone, can settle that from the
     /// content (the Windows W3 review's finding, matched on the Mac; no new
-    /// refusal word). Recovery then puts the page back and closes the step
+    /// refusal word). It is refused PART WAY (`leftPartWay`, the second
+    /// review of U3a, MEDIUM a), never as a plain refusal that says nothing
+    /// was changed. Recovery then puts the page back and closes the step
     /// rolled back, with nothing staged left. MUST FAIL on the swap before,
     /// which ignored `reverse()` and closed the step `failed`, so recovery
     /// never looked at it and the page stayed new.
@@ -296,8 +305,8 @@ final class JournaledStepTests: XCTestCase {
         UndoKillPoints.fileInUseAtSwap = { index in index == 1 }
         UndoKillPoints.putBackFailsAt = { index in index == 0 }
         XCTAssertThrowsError(try step.make()) { error in
-            guard case JournaledStepError.refused(.fileIsInUse, _) = error else {
-                return XCTFail("not refused as in use: \(error)")
+            guard case JournaledStepError.leftPartWay(.fileIsInUse, _, _) = error else {
+                return XCTFail("not refused part way, as in use: \(error)")
             }
         }
         UndoKillPoints.fileInUseAtSwap = nil
@@ -397,12 +406,14 @@ final class JournaledStepTests: XCTestCase {
     // MARK: - Tests: recovery and pruning keep what has not settled
 
     /// A live step killed between its swaps whose content the list no
-    /// longer holds: recovery cannot put it back and closes it
-    /// `interrupted`. The kept original of the page that was swapped is the
-    /// only copy of what it held, and stays (the Windows recovery review's
-    /// 15). MUST FAIL with recovery's first tidy removing every staged name,
+    /// longer holds: recovery's first tidy, before it knows whether the
+    /// step can be settled, leaves the kept original of the page that was
+    /// swapped, the only copy of what it held (the Windows recovery
+    /// review's 15). Seen at the kill point just after that tidy. What the
+    /// closing does with it is the two `recoveryCases` rows on missing
+    /// content. MUST FAIL with the first tidy removing every staged name,
     /// as before.
-    func testRecoveryKeepsAnOriginalWhenItCannotSettleTheStep() throws {
+    func testRecoveryTidiesNoOnlyCopyBeforeItKnowsTheStepSettles() throws {
         let made = try course(inAWorkingFolder: true)
         JournaledStep.modeOverride = .live
         let day1Text: String = try String(contentsOf: made.day1, encoding: .utf8)
@@ -419,10 +430,12 @@ final class JournaledStepTests: XCTestCase {
 
         let root: URL = made.course.deletingLastPathComponent().deletingLastPathComponent()
         let later: UndoJournal = UndoJournal(folderURL: made.list, processIsAlive: { _ in false })
+        UndoKillPoints.hook = { point in point == .afterRecoveryTidied }
         try later.withLock(waitingAtMost: 2, inShadow: false) { writer in
             UndoRecovery.run(writer, mode: .live, trySwapsNow: true, resolveRoot: { _ in root })
         }
-        XCTAssertEqual(try later.read().records[1]?.phase, .interrupted)
+        UndoKillPoints.hook = nil
+        XCTAssertEqual(try later.read().records[1]?.phase, .begun, "recovery went past the tidy, so this proves nothing")
         var originals: [String] = []
         for name in stagedNames(under: made.course) where name.hasSuffix("-orig") {
             originals.append(name)

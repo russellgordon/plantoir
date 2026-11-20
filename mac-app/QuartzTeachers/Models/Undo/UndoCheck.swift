@@ -598,10 +598,6 @@ nonisolated enum UndoSwap {
             return false
         }
 
-        /// Puts back every swap already made, newest first. False when any
-        /// could not be put back (the result was ignored until the Windows
-        /// W3 review: the step was then closed `failed` with a page left new
-        /// and its original hidden beside it, recorded nowhere).
         /// The kept originals of files still swapped: what a reversal that
         /// could not complete leaves beside its pages.
         func originalsLeft() -> [String] {
@@ -616,6 +612,10 @@ nonisolated enum UndoSwap {
             return names
         }
 
+        /// Puts back every swap already made, newest first. False when any
+        /// could not be put back (the result was ignored until the Windows
+        /// W3 review: the step was then closed `failed` with a page left new
+        /// and its original hidden beside it, recorded nowhere).
         func reverse() -> Bool {
             var everyOnePutBack: Bool = true
             var index: Int = swapsMade - 1
@@ -1097,14 +1097,6 @@ nonisolated enum UndoSwap {
         return copied
     }
 
-    /// Removes one of the swap's OWN staged files. A kept original copied
-    /// from a file marked immutable carries the mark (copyfile keeps it:
-    /// measured in U1's third round, the copy was `uchg` and could not be
-    /// removed), so a removal that is refused clears the file's flags and
-    /// tries once more. Only ever a staged file, and only one with a single
-    /// link: a kept original that is a hard link shares its flags with the
-    /// teacher's page (a reference course's lock, plan 2.6), and those are
-    /// never touched.
     /// Whether a kept original is NOT the only copy of what it holds: its
     /// place holds a file with the same bytes (the original was kept and the
     /// new content never went in, or recovery put it back). A kept original
@@ -1121,6 +1113,14 @@ nonisolated enum UndoSwap {
         return kept == there
     }
 
+    /// Removes one of the swap's OWN staged files. A kept original copied
+    /// from a file marked immutable carries the mark (copyfile keeps it:
+    /// measured in U1's third round, the copy was `uchg` and could not be
+    /// removed), so a removal that is refused clears the file's flags and
+    /// tries once more. Only ever a staged file, and only one with a single
+    /// link: a kept original that is a hard link shares its flags with the
+    /// teacher's page (a reference course's lock, plan 2.6), and those are
+    /// never touched.
     static func removeStaged(_ url: URL) -> Bool {
         if (try? FileManager.default.removeItem(at: url)) != nil {
             return true
@@ -1210,7 +1210,8 @@ nonisolated enum UndoSwap {
         asideListings: [String: String] = [:],
         onAside: ((UndoAsideFolder) -> Void)? = nil,
         root: URL? = nil,
-        keepingOnlyCopies: Bool = false
+        keepingOnlyCopies: Bool = false,
+        unlessTheListCanPutBack listCanPutBack: ((URL) -> Bool)? = nil
     ) -> Bool {
         var allGone: Bool = true
         var folders: [URL] = []
@@ -1272,9 +1273,16 @@ nonisolated enum UndoSwap {
                 // the only copy of what its page held (the second review of
                 // U3a, MEDIUM b, and the Windows recovery review's 15): never
                 // tidied away, left beside its page under its staged name.
-                if keepingOnlyCopies && name.hasSuffix("-orig"), let place = UndoSwap.placeOfStagedName(name),
-                   !UndoSwap.isACopyOfItsPlace(stagedURL, place: folder.appendingPathComponent(place)) {
-                    continue
+                // With `listCanPutBack`, a kept original of a page the list
+                // holds every piece of content for is not the only copy:
+                // recovery can put the page back from the list, so it is
+                // tidied as before.
+                if keepingOnlyCopies && name.hasSuffix("-orig"), let place = UndoSwap.placeOfStagedName(name) {
+                    let placeURL: URL = folder.appendingPathComponent(place)
+                    let theListCanPutItBack: Bool = listCanPutBack?(placeURL) ?? false
+                    if !UndoSwap.isACopyOfItsPlace(stagedURL, place: placeURL) && !theListCanPutItBack {
+                        continue
+                    }
                 }
                 if !UndoSwap.removeStaged(stagedURL) {
                     allGone = false
