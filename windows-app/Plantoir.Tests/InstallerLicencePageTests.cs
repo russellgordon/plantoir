@@ -85,22 +85,71 @@ public sealed class InstallerLicencePageTests
         }
     }
 
+    /// <summary>
+    /// Pascal ignores spacing and the case of its words, so the settings are
+    /// matched that way: <c>Checked:=True</c> and <c>checked := true</c> are
+    /// the same line to Inno and to these tests.
+    /// </summary>
+    private static bool Sets(string code, string property, string value) =>
+        Regex.IsMatch(code, $@"\b{Regex.Escape(property).Replace(@"\.", @"\s*\.\s*")}\s*:=\s*{value}\s*;", RegexOptions.IgnoreCase);
+
+    private static string Code => Installer[Installer.IndexOf("[Code]", StringComparison.Ordinal)..];
+
+    private static string InitializeWizardBody()
+    {
+        var initialize = Regex.Match(Code, @"(?msi)^\s*procedure\s+InitializeWizard\s*;\s*\nbegin\s*\n(.*?)^\s*end;");
+        Assert.True(initialize.Success, "installer.iss has no InitializeWizard outside comments");
+        return initialize.Groups[1].Value;
+    }
+
     [Fact]
     public void ThePageOpensWithNeitherChoiceMade()
     {
-        string code = Installer[Installer.IndexOf("[Code]", StringComparison.Ordinal)..];
-        var initialize = Regex.Match(code, @"(?ms)^procedure InitializeWizard;\s*\nbegin\n(.*?)^end;");
-        Assert.True(initialize.Success, "installer.iss has no InitializeWizard outside comments");
-        string body = initialize.Groups[1].Value;
-        Assert.Contains("WizardForm.LicenseNotAcceptedRadio.Checked := False;", body);
+        string code = Code;
+        string body = InitializeWizardBody();
+        Assert.True(Sets(body, "WizardForm.LicenseNotAcceptedRadio.Checked", "False"), "InitializeWizard does not clear \"I do not accept the agreement\"");
         // Nothing anywhere chooses "I accept" for the teacher, or turns Next on for the page.
-        Assert.DoesNotContain("LicenseAcceptedRadio.Checked := True", code);
-        Assert.DoesNotContain("NextButton.Enabled := True", code);
+        Assert.False(Sets(code, "LicenseAcceptedRadio.Checked", "True"), "installer.iss chooses \"I accept the agreement\"");
+        Assert.False(Sets(code, "NextButton.Enabled", "True"), "installer.iss turns Next on");
         // The include defines no InitializeWizard of its own to override this one.
         string include = File.ReadAllText(Path.Combine(WindowsApp, "installer-running-work.iss"));
-        Assert.DoesNotContain("InitializeWizard", InstallerRunningWorkTests.WithoutComments(include, startsInCode: true));
+        Assert.DoesNotContain("InitializeWizard", InstallerRunningWorkTests.WithoutComments(include, startsInCode: true), StringComparison.OrdinalIgnoreCase);
         // And no ShouldSkipPage brings the page into a silent install or skips it in a visible one.
-        Assert.DoesNotContain("ShouldSkipPage", code);
+        Assert.DoesNotContain("ShouldSkipPage", code, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("WizardForm.LicenseNotAcceptedRadio.Checked := False;", true)]
+    [InlineData("WizardForm.LicenseNotAcceptedRadio.Checked:=False;", true)]
+    [InlineData("  wizardform.licensenotacceptedradio.checked  :=  false ;", true)]
+    [InlineData("WizardForm.LicenseNotAcceptedRadio.Checked := True;", false)]
+    [InlineData("WizardForm.LicenseAcceptedRadio.Checked := False;", false)]
+    public void TheSettingIsReadWhateverItsSpacing(string line, bool readsAsClearingTheRefusal)
+    {
+        Assert.Equal(readsAsClearingTheRefusal, Sets(line, "WizardForm.LicenseNotAcceptedRadio.Checked", "False"));
+    }
+
+    /// <summary>
+    /// The #1010 review: Delphi's radio button sets its Tab stop to match
+    /// Checked, so clearing both choices took the pair out of the Tab order
+    /// (measured on the Windows VM: Tab went only between the text and
+    /// Cancel). The pair gets back one Tab stop, on the safe choice: Windows
+    /// chooses a radio button when the keyboard moves the focus onto it, so a
+    /// stop on "I accept the agreement" would accept by Tab alone. The keys,
+    /// measured, are in documentation/12-windows-app.md, "The Licence
+    /// Agreement page in the installer (#1010)".
+    /// </summary>
+    [Fact]
+    public void TabReachesTheChoicesOnTheSafeOne()
+    {
+        string body = InitializeWizardBody();
+        Assert.True(Sets(body, "WizardForm.LicenseNotAcceptedRadio.TabStop", "True"), "InitializeWizard does not give \"I do not accept the agreement\" its Tab stop");
+        Assert.False(Sets(Code, "LicenseAcceptedRadio.TabStop", "True"), "a Tab stop on \"I accept the agreement\" would accept by Tab alone");
+        Assert.False(Sets(Code, "LicenseNotAcceptedRadio.TabStop", "False"), "installer.iss takes the pair's Tab stop away");
+        // The Tab stop comes after both are cleared: clearing a choice takes its Tab stop away again.
+        int stop = Regex.Match(body, @"(?i)LicenseNotAcceptedRadio\s*\.\s*TabStop").Index;
+        foreach (Match cleared in Regex.Matches(body, @"(?i)License(Not)?AcceptedRadio\s*\.\s*Checked"))
+            Assert.True(cleared.Index < stop, "a choice is cleared after the Tab stop is set, which takes the stop away");
     }
 
     // MARK: - The page's words say "Licence"
@@ -200,6 +249,33 @@ public sealed class InstallerLicencePageTests
         Assert.Contains("THIRD_PARTY_LICENSES.txt in the folder Plantoir is installed in", LicencePageText);
         Assert.Contains(@"Source: ""..\THIRD_PARTY_LICENSES.md""; DestDir: ""{app}""; DestName: ""THIRD_PARTY_LICENSES.txt""; Flags: ignoreversion",
                         SectionLines(Installer, "Files"));
+        Assert.True(File.Exists(Path.Combine(RepoRoot, "THIRD_PARTY_LICENSES.md")));
+    }
+
+    /// <summary>
+    /// Russell's ruling 6 (2026-11-19): the portable <c>Plantoir-win-x64.zip</c>
+    /// carries <c>LICENSE</c> and <c>THIRD_PARTY_LICENSES.txt</c> beside the
+    /// app, the notice under the name the installer gives it. They are added
+    /// to the zip once it is made, not put in the publish folder, which the
+    /// installer takes whole. The zip's name is a frozen asset name
+    /// (RELEASING.md) and is held here too.
+    /// </summary>
+    [Fact]
+    public void ThePortableZipCarriesTheLicencesBesideTheApp()
+    {
+        string publish = InstallerRunningWorkTests.PowerShellWithoutComments(File.ReadAllText(Path.Combine(WindowsApp, "publish.ps1")));
+        Assert.Contains(@"$zip = ""dist\Plantoir-win-x64.zip""", publish);
+        Assert.Contains(@"Copy-Item ""..\LICENSE"" ""$zipLicences\LICENSE""", publish);
+        Assert.Contains(@"Copy-Item ""..\THIRD_PARTY_LICENSES.md"" ""$zipLicences\THIRD_PARTY_LICENSES.txt""", publish);
+        string added = @"Compress-Archive -Path ""$zipLicences\LICENSE"", ""$zipLicences\THIRD_PARTY_LICENSES.txt"" -Update -DestinationPath $zip";
+        Assert.Contains(added, publish);
+        // In that order: the zip is made, then the two files go in, before the drive is unmapped.
+        int made = publish.IndexOf(@"Compress-Archive -Path ""$substDrive\*"" -DestinationPath $zip", StringComparison.Ordinal);
+        int licences = publish.IndexOf(added, StringComparison.Ordinal);
+        int unmapped = publish.IndexOf("} finally {", Math.Max(made, 0), StringComparison.Ordinal);
+        Assert.True(made >= 0, "publish.ps1 no longer makes the zip from the publish folder");
+        Assert.True(made < licences && licences < unmapped, "the licences are not added to the zip after it is made");
+        Assert.True(File.Exists(Path.Combine(RepoRoot, "LICENSE")));
         Assert.True(File.Exists(Path.Combine(RepoRoot, "THIRD_PARTY_LICENSES.md")));
     }
 

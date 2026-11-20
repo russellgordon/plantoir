@@ -13426,7 +13426,11 @@ page's text is not.
   (Inno's own source, `Setup.WizardForm.pas`; its help: under `/SILENT` "the
   wizard and the background window are not displayed"). So Plantoir's own
   update, which runs the installer `/VERYSILENT /PLANTOIRUPDATE=1`, never
-  shows it: a teacher accepts once, at the first install.
+  shows it. **A teacher already on 1.x is updated to 2.0.0 silently and is
+  not asked** (Russell, 2026-11-19, ruling 5): no page and no prompt on an
+  update, then or later. A newer installer downloaded and run by hand is a
+  visible install, so it shows the page again and asks again; only the
+  update path skips it.
 - `InitializeWizard` sets `WizardForm.LicenseNotAcceptedRadio.Checked :=
   False` (and the accept radio too, for symmetry). Inno opens the page with
   "I do not accept the agreement" checked; Microsoft's Windows desktop UX
@@ -13436,6 +13440,23 @@ page's text is not.
   while `LicenseAcceptedRadio.Checked` (`UpdateCurPageButtonState`) and in
   the accept radio's own click handler, so with neither checked Next is
   disabled until the teacher chooses.
+- `InitializeWizard` then sets `WizardForm.LicenseNotAcceptedRadio.TabStop
+  := True` (the first review of 1010b, its one MEDIUM). Delphi's radio
+  button sets its Tab stop to match `Checked` (Inno's form gives the stop to
+  the checked refusal; `Setup.WizardForm.dfm`, read 2026-11-19), so clearing
+  both choices took the pair out of the Tab order, and a keyboard-only
+  teacher could reach them only by Alt+A or Alt+D (measured below). The stop
+  goes on the **refusal**, not the acceptance, because Windows chooses a
+  radio button when the keyboard moves the focus onto it: with the stop on
+  "I accept the agreement", one Tab from the text accepted the agreement and
+  enabled Next (measured below). Microsoft's guidance, read 2026-11-19
+  (Windows UX guide, "Radio Buttons" and "Keyboard"): a group of radio
+  buttons "behaves like a single control" with a single Tab stop and the
+  arrow keys move within it, and "keyboard navigation shouldn't change
+  control values"; Win32 radio buttons cannot be focused by the keyboard
+  without being chosen, so the stop sits where that change is the safe one,
+  the state Inno itself opens with. The page still opens with neither
+  chosen.
 - `[Messages]` sets all five messages the page shows (Default.isl's
   "License Agreement" wizard page section: `WizardLicense`, `LicenseLabel`,
   `LicenseLabel3`, `LicenseAccepted`, `LicenseNotAccepted`). Two say
@@ -13447,14 +13468,25 @@ page's text is not.
 - `[Files]` copies the repository's `THIRD_PARTY_LICENSES.md` into `{app}`
   as `THIRD_PARTY_LICENSES.txt`, so the notice travels with the files it
   describes and a double-click opens it in Notepad. (The page cannot hold the
-  notice's tables readably.) The portable zip that `publish.ps1` also makes
-  does not carry it: it is the folder as published, and nothing about it
-  changed here.
+  notice's tables readably.)
+- **The portable zip carries both licences beside the app** (Russell,
+  2026-11-19, ruling 6). `publish.ps1` makes `Plantoir-win-x64.zip` from the
+  published folder as before, then adds the repository's `LICENSE` and
+  `THIRD_PARTY_LICENSES.md` to its root, the notice as
+  `THIRD_PARTY_LICENSES.txt`, the name the installer gives it. They are
+  added to the zip rather than copied into the published folder, which the
+  installer takes whole (`{#PublishDir}\*`) and would then install twice.
+  The zip's name is unchanged (a frozen asset name, `RELEASING.md`).
 
-**Tests.** `windows-app/Plantoir.Tests/InstallerLicencePageTests.cs` (nine
-facts, source text with comments taken out): the `LicenseFile` setting and
+**Tests.** `windows-app/Plantoir.Tests/InstallerLicencePageTests.cs` (eleven
+facts and one theory, source text with comments taken out, Pascal's
+settings matched whatever their spacing and case, so `Checked:=False` reads
+as `Checked := False`): the `LicenseFile` setting and
 no `InfoBeforeFile`; `InitializeWizard` clears the refusal and nothing
-checks the acceptance or enables Next, and no `ShouldSkipPage` exists; all
+checks the acceptance or enables Next, and no `ShouldSkipPage` exists;
+the Tab stop is set on the refusal, after both are cleared, and never on the
+acceptance; publish.ps1 adds `LICENSE` and `THIRD_PARTY_LICENSES.txt` to
+the zip after making it, under its frozen name; all
 five messages are set, to these words, and none says "License"; `LICENSE` is
 MIT in Russell's name and README points at it; the page carries `LICENSE`
 word for word and scoped; the Microsoft paragraph's limits and the sentence
@@ -13474,10 +13506,20 @@ checked from the Win32 button itself (`BM_GETCHECK`). A driver that looked
 only for RadioButton controls would have stopped on every run. It stops PRODUCT STOPPED, never a silent
 pass, if the page is there and that choice cannot be found, if the page
 opened with either choice made, or if Next is still disabled 30 s after the
-choice (`WindowRules.LicenceNextLimit`). An installer without the page
-(1.9.3 and before) is walked as before. `WindowRulesTests` holds the
-heading, the names (the refusal is never taken for the acceptance) and the
-limit.
+choice (`WindowRules.LicenceNextLimit`). Since the first review of 1010b,
+two more: **a choice whose state cannot be read is not "not chosen"** (no
+window handle, a `BM_GETCHECK` answer other than checked or clear, or UI
+Automation failing: `WindowRules.CheckStateMeans` returns null and the run
+stops DRIVER PROBLEM, saying it could not look), and **an install of
+2.0.0 or later must have shown the page** (`WindowRules.LicencePageRequiredFor`
+reads the installed `Plantoir.exe`'s product version; a 2.0.0+ install whose
+pages seen hold no Licence Agreement page is PRODUCT STOPPED, and a version
+the driver cannot read is DRIVER PROBLEM rather than a guess). An installer
+older than 2.0.0 (1.9.3 and before) has no page and is walked as before.
+`WindowRulesTests` holds the heading, the names (the refusal is never taken
+for the acceptance), the limit, the check-state reading, the version rule
+(suffixes such as `2.0.0+1ba4ceaf6` read as 2.0.0; `1.10.0` is before it)
+and, as source text, that `Steps.cs` stops on both.
 
 **Measured on the Windows VM, 2026-11-19** (Parallels, Windows 11 Pro
 ARM64, the x64 installer under emulation; snapshot 02, the development

@@ -24,7 +24,6 @@ internal static class Steps_
 
     private const uint BM_CLICK = 0x00F5;
     private const uint BM_GETCHECK = 0x00F0;
-    private const int BST_CHECKED = 1;
     private const uint WM_SETTEXT = 0x000C;
 
     private static readonly string Downloads =
@@ -392,6 +391,15 @@ internal static class Steps_
             throw Stopped.Product($"the installer finished but there is no {InstalledApp}");
         var version = FileVersionInfo.GetVersionInfo(InstalledApp);
         Program.Note($"installed {InstalledApp}, version {version.ProductVersion}");
+        // The #1010 review: from 2.0.0 the installer shows the Licence
+        // Agreement page, so an install of 2.0.0 or later that never showed
+        // it has lost the page, and that is the product's fault, not a pass.
+        bool? licenceRequired = WindowRules.LicencePageRequiredFor(version.ProductVersion);
+        if (licenceRequired is null)
+            throw Stopped.Driver($"the installed {InstalledApp} has a version this driver cannot read (\"{version.ProductVersion}\"), so it could not tell whether the Licence Agreement page was owed");
+        if (licenceRequired == true && !WindowRules.LicencePageWasSeen(pagesSeen))
+            throw Stopped.Product($"the installer of Plantoir {version.ProductVersion} never showed the Licence Agreement page "
+                                  + $"(every installer from {WindowRules.FirstVersionWithLicencePage} shows it first); pages seen: {string.Join(" > ", pagesSeen)}");
     }
 
     /// <summary>
@@ -412,12 +420,18 @@ internal static class Steps_
         if (chosenAt is null)
         {
             var refuse = LicenceChoice(wizard, WindowRules.LicenceRefuseName);
-            bool acceptChosen = IsChosen(accept);
-            bool refuseChosen = refuse is not null && IsChosen(refuse);
-            Program.Note($"installer: \"{page}\" opened with \"{WindowRules.LicenceAcceptName}\" {(acceptChosen ? "chosen" : "not chosen")} "
-                         + $"and \"{WindowRules.LicenceRefuseName}\" {(refuse is null ? "not found" : refuseChosen ? "chosen" : "not chosen")}"
+            bool? acceptChosen = IsChosen(accept);
+            bool? refuseChosen = refuse is null ? false : IsChosen(refuse);
+            Program.Note($"installer: \"{page}\" opened with \"{WindowRules.LicenceAcceptName}\" {ChoiceWords(acceptChosen)} "
+                         + $"and \"{WindowRules.LicenceRefuseName}\" {(refuse is null ? "not found" : ChoiceWords(refuseChosen))}"
                          + $" [screenshot {Program.Shot("licence-page")}]");
-            if (acceptChosen || refuseChosen)
+            // The #1010 review: a state that cannot be read is not "not
+            // chosen"; the driver did not look, so it says so.
+            if (acceptChosen is null || refuseChosen is null)
+                throw Stopped.Driver($"the driver could not read whether the choices on the installer's \"{page}\" page were made "
+                                     + $"(\"{WindowRules.LicenceAcceptName}\" {ChoiceWords(acceptChosen)}, \"{WindowRules.LicenceRefuseName}\" {ChoiceWords(refuseChosen)}), "
+                                     + "so it could not look whether the page opened with neither chosen");
+            if (acceptChosen == true || refuseChosen == true)
                 throw Stopped.Product($"the installer's \"{page}\" page opened with a choice already made; neither may be chosen when it opens");
             // A click, as a teacher's: Inno's own click handler is what enables Next.
             PostMessage(accept.Properties.NativeWindowHandle.ValueOrDefault, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
@@ -428,7 +442,7 @@ internal static class Steps_
         if (DateTime.UtcNow - chosenAt.Value > WindowRules.LicenceNextLimit
             && !(InnoButton(wizard, "Next") is { } next && next.IsEnabled))
             throw Stopped.Product($"Next was still disabled on the installer's \"{page}\" page {WindowRules.LicenceNextLimit.TotalSeconds:0} s after "
-                                  + $"\"{WindowRules.LicenceAcceptName}\" was chosen (the choice reads {(IsChosen(accept) ? "chosen" : "not chosen")}) "
+                                  + $"\"{WindowRules.LicenceAcceptName}\" was chosen (the choice reads {ChoiceWords(IsChosen(accept))}) "
                                   + $"[screenshot {Program.Shot("licence-next-disabled")}]");
     }
 
@@ -454,17 +468,31 @@ internal static class Steps_
         return null;
     }
 
-    /// <summary>Whether a choice is checked, asked of the Win32 button itself (BM_GETCHECK): Inno's radios offer UI Automation no state.</summary>
-    private static bool IsChosen(AutomationElement radio)
+    /// <summary>
+    /// Whether a choice is checked, asked of the Win32 button itself
+    /// (BM_GETCHECK): Inno's radios offer UI Automation no state. Null when
+    /// the state cannot be read (no window handle, an answer that is neither
+    /// checked nor clear, or UI Automation failing), never "not chosen".
+    /// </summary>
+    private static bool? IsChosen(AutomationElement radio)
     {
         try
         {
-            if (radio.Patterns.SelectionItem.TryGetPattern(out var selection)) return selection.IsSelected.ValueOrDefault;
+            if (radio.Patterns.SelectionItem.TryGetPattern(out var selection))
+                return selection.IsSelected.TryGetValue(out bool selected) ? selected : null;
             IntPtr handle = radio.Properties.NativeWindowHandle.ValueOrDefault;
-            return handle != IntPtr.Zero && SendMessageNoText(handle, BM_GETCHECK, IntPtr.Zero, IntPtr.Zero).ToInt64() == BST_CHECKED;
+            if (handle == IntPtr.Zero) return null;
+            return WindowRules.CheckStateMeans(SendMessageNoText(handle, BM_GETCHECK, IntPtr.Zero, IntPtr.Zero).ToInt64());
         }
-        catch { return false; }
+        catch { return null; }
     }
+
+    private static string ChoiceWords(bool? chosen) => chosen switch
+    {
+        true => "chosen",
+        false => "not chosen",
+        null => "unreadable",
+    };
 
     /// <summary>The heading of the wizard's current page (the first non-empty static text in its top panel).</summary>
     private static string InnoPageTitle(AutomationElement wizard)

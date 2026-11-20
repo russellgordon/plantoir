@@ -675,4 +675,81 @@ public class WindowRulesTests
         Assert.True(WindowRules.IsChoiceNamed("I &do not accept the agreement", WindowRules.LicenceRefuseName));
         Assert.Equal(TimeSpan.FromSeconds(30), WindowRules.LicenceNextLimit);
     }
+
+    // The #1010 review's two lows on the driver.
+
+    [Fact]
+    public void AChoiceWhoseStateCannotBeReadIsNotNotChosen()
+    {
+        Assert.True(WindowRules.CheckStateMeans(1));    // BST_CHECKED
+        Assert.False(WindowRules.CheckStateMeans(0));   // BST_UNCHECKED
+        Assert.Null(WindowRules.CheckStateMeans(2));    // BST_INDETERMINATE: no radio button is ever this
+        Assert.Null(WindowRules.CheckStateMeans(-1));
+        Assert.Null(WindowRules.CheckStateMeans(4));    // BST_PUSHED alone: not a check state
+    }
+
+    [Theory]
+    [InlineData("2.0.0", true)]
+    [InlineData("2.0.0+1ba4ceaf6", true)]
+    [InlineData("2.0.1", true)]
+    [InlineData("2.1", true)]
+    [InlineData("10.0.0", true)]
+    [InlineData("1.9.3", false)]
+    [InlineData("1.9.3+abc", false)]
+    [InlineData("1.10.0", false)]
+    public void TheLicencePageIsOwedFromTwoPointZero(string productVersion, bool owed)
+    {
+        Assert.Equal(owed, WindowRules.LicencePageRequiredFor(productVersion));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("two")]
+    [InlineData("v2.0.0")]
+    public void AVersionThatCannotBeReadOwesNoGuess(string? productVersion)
+    {
+        Assert.Null(WindowRules.LicencePageRequiredFor(productVersion));
+    }
+
+    [Fact]
+    public void TheLicencePageIsFoundAmongThePagesSeen()
+    {
+        Assert.True(WindowRules.LicencePageWasSeen(new[] { "Licence Agreement", "Select Destination Location", "Ready to Install" }));
+        Assert.True(WindowRules.LicencePageWasSeen(new[] { "Select Destination Location", "License Agreement" }));
+        Assert.False(WindowRules.LicencePageWasSeen(new[] { "Select Destination Location", "Select Additional Tasks", "Ready to Install", "Installing" }));
+        Assert.False(WindowRules.LicencePageWasSeen(Array.Empty<string>()));
+    }
+
+    /// <summary>
+    /// The driver's own source uses the rules above as the review asked: an
+    /// unreadable choice stops the run as a DRIVER PROBLEM, and an install of
+    /// 2.0.0 or later that never showed the page is PRODUCT STOPPED. Read as
+    /// text, because Steps.cs needs UI Automation and is not compiled here.
+    /// </summary>
+    [Fact]
+    public void TheDriverStopsOnBothAsTheReviewAsked()
+    {
+        string steps = DriverSource("Steps.cs");
+        Assert.Contains("private static bool? IsChosen(AutomationElement radio)", steps);
+        Assert.Contains("return WindowRules.CheckStateMeans(", steps);
+        Assert.Contains("catch { return null; }", steps);
+        Assert.Contains("if (acceptChosen is null || refuseChosen is null)\n                throw Stopped.Driver(", steps.Replace("\r\n", "\n"));
+        Assert.Contains("bool? licenceRequired = WindowRules.LicencePageRequiredFor(version.ProductVersion);", steps);
+        Assert.Contains("if (licenceRequired is null)\n            throw Stopped.Driver(", steps.Replace("\r\n", "\n"));
+        Assert.Contains("if (licenceRequired == true && !WindowRules.LicencePageWasSeen(pagesSeen))\n            throw Stopped.Product(", steps.Replace("\r\n", "\n"));
+    }
+
+    private static string DriverSource(string file)
+    {
+        var folder = new DirectoryInfo(AppContext.BaseDirectory);
+        while (folder is not null)
+        {
+            string candidate = Path.Combine(folder.FullName, "Plantoir.UiTests.FirstInstall", file);
+            if (File.Exists(candidate)) return File.ReadAllText(candidate);
+            folder = folder.Parent;
+        }
+        throw new FileNotFoundException($"no Plantoir.UiTests.FirstInstall/{file} above {AppContext.BaseDirectory}");
+    }
 }

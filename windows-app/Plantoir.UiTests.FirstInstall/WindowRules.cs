@@ -321,6 +321,55 @@ internal static class WindowRules
     /// </summary>
     public static readonly TimeSpan LicenceNextLimit = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// What a Win32 button's BM_GETCHECK answer says about a choice: 1
+    /// (BST_CHECKED) is chosen, 0 (BST_UNCHECKED) is not, and anything else
+    /// (2 is BST_INDETERMINATE, which a radio button never is) is a state
+    /// this driver cannot read, null. The #1010 review: a choice whose state
+    /// could not be read is not "not chosen", or a page that opened with a
+    /// choice made would pass unseen; the caller stops with DRIVER PROBLEM.
+    /// </summary>
+    public static bool? CheckStateMeans(long answer) => answer switch
+    {
+        1 => true,
+        0 => false,
+        _ => null,
+    };
+
+    /// <summary>
+    /// The first Plantoir whose installer shows the Licence Agreement page
+    /// (#1010, Russell's rulings of 2026-11-19). An installer of this version
+    /// or later that never showed the page has lost it, and the run stops.
+    /// </summary>
+    public static readonly Version FirstVersionWithLicencePage = new(2, 0, 0);
+
+    /// <summary>
+    /// Whether the installer of the installed version must have shown the
+    /// Licence Agreement page: true from <see
+    /// cref="FirstVersionWithLicencePage"/> on, false before it (1.9.3 has
+    /// none), and null when the version cannot be read, which the caller
+    /// treats as a DRIVER PROBLEM rather than guess. The product version
+    /// may carry a suffix ("2.0.0+1ba4ceaf6", "2.0.0-beta"); the numbers
+    /// before it are read.
+    /// </summary>
+    public static bool? LicencePageRequiredFor(string? productVersion)
+    {
+        if (string.IsNullOrWhiteSpace(productVersion)) return null;
+        var numbers = Regex.Match(productVersion.Trim(), @"^(\d+)\.(\d+)(?:\.(\d+))?");
+        if (!numbers.Success) return null;
+        int build = numbers.Groups[3].Success ? int.Parse(numbers.Groups[3].Value) : 0;
+        var version = new Version(int.Parse(numbers.Groups[1].Value), int.Parse(numbers.Groups[2].Value), build);
+        return version >= FirstVersionWithLicencePage;
+    }
+
+    /// <summary>Whether any page the installer showed was the Licence Agreement page.</summary>
+    public static bool LicencePageWasSeen(IEnumerable<string> pagesSeen)
+    {
+        foreach (string page in pagesSeen)
+            if (IsLicencePage(page)) return true;
+        return false;
+    }
+
     /// <summary>The first of <see cref="BlockWords"/> the text holds, or null.</summary>
     public static string? BlockWordIn(string text)
     {

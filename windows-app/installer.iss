@@ -51,9 +51,12 @@ UninstallDisplayIcon={app}\Plantoir.exe
 ; first, before the folder, and lets Next work only while "I accept the
 ; agreement" is chosen. It is never shown under /SILENT or /VERYSILENT (Inno
 ; skips the page unless the install is a normal, visible one), so Plantoir's
-; own update passes it by and a teacher accepts once, at the first install.
+; own update passes it by: a teacher already on 1.x is updated silently and
+; never asked (Russell, 2026-11-19, ruling 5). A newer installer run by hand
+; is a visible install, so it shows the page again and asks again.
 ; The page's words are in [Messages]; InitializeWizard clears its default
-; choice. documentation/12-windows-app.md, "The Licence Agreement page".
+; choice and gives the pair its Tab stop. documentation/12-windows-app.md,
+; "The Licence Agreement page".
 LicenseFile=installer-licence.txt
 
 [Languages]
@@ -186,10 +189,22 @@ end;
 // guide, "First Experience"). With neither checked, Inno keeps Next disabled
 // (it enables Next only while LicenseAcceptedRadio is checked) until the
 // teacher chooses "I accept the agreement".
+//
+// The pair keeps one Tab stop, on "I do not accept the agreement" (#1010
+// review). Delphi's radio button sets its Tab stop to match Checked, so
+// clearing both took the pair out of the Tab order: measured on the Windows
+// VM, Tab went only between the text and Cancel, and Alt+A was the one way
+// in. Windows chooses a radio button when the keyboard moves the focus onto
+// it, so the stop is on the safe choice: Tab lands on "I do not accept" (Next
+// stays disabled), the up arrow moves to "I accept the agreement" and
+// chooses it, and Alt+A still chooses it directly. A Tab stop on "I accept"
+// would accept the agreement by Tab alone. Microsoft: a group of radio
+// buttons has a single Tab stop and the arrow keys move within it.
 procedure InitializeWizard;
 begin
   WizardForm.LicenseNotAcceptedRadio.Checked := False;
   WizardForm.LicenseAcceptedRadio.Checked := False;
+  WizardForm.LicenseNotAcceptedRadio.TabStop := True;
 end;
 
 function WantsRelaunch: Boolean;
