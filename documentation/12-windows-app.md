@@ -8172,8 +8172,9 @@ here where Windows has the same thing:
   dimmed menu item's `ToolTipService.ToolTip` and `HelpText` as the review
   asks, and the same tooltip question applies to a dimmed `MenuFlyoutItem`.
   The same run also failed `FixWithButtonsUiTests` later, at the Codex door's
-  argument count (12 expected, 14 sent), before any #990 change is reached;
-  that test is in no gate and the count is not this piece's. A dimmed Revise
+  argument count (12 expected, 14 sent), after every assertion #990 touches
+  in it had passed; that test is in no gate, the count is not this piece's,
+  and whether `dev` fails the same way was not checked. A dimmed Revise
   item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
   shows no tooltip, and the ruling Q14 rules out a grey text row.
 - **A row's context menu still HIDES a missing assistant**
