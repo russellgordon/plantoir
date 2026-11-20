@@ -14260,15 +14260,68 @@ the box's: the button would then be invoked.
 
 **Not built here, and why.** Windows has no share of unit plans yet (#824),
 so no panel asks "Stop this share?"; the words, the setting and its
-Settings row are in place for it, as the mac shows both rows. The console's
-own "Stop" button beside the answer box (`ConsoleStop_Click`, `Terminate`)
-still stops a deploy without asking, as before; the mac has no such button.
+Settings row are in place for it, as the mac shows both rows.
+
+**The first review's fixes (2026-11-20).** *Every route asks.* The console's
+own "Stop" beside the answer box (`consoleStopButton`; the mac has no such
+button) used to kill the launcher (`Terminate`) with no question, skipping
+the section's `CancelDeploy` sweep and never setting `WasCancelled`, so the
+deploy read "Something went wrong". Ruled: stopping a deploy asks first by
+every route. It now goes through `PressCancelAsync`, as Cancel does: a
+deploy asks, is swept and ends "Cancelled"; a preview stops at once; the
+button stays. *One "under way" rule.* A deploy that builds first runs both
+scripts on one runner, and between them `IsRunning` is false for up to the
+100 ms `WaitUntilFinished` takes to notice (`IsBetweenPhases`, row 318b).
+The stopping code read `IsRunning` alone, so a "Stop the deploy?" open when
+the build ended was taken down while the deploy went on, and a press in the
+gap asked nothing. Now `ScriptRunner.IsUnderWay` (running, or between
+phases: the mac's rule) is the one rule: the key, a click, the console's
+Stop, Stop Deploy, taking the question down, Cancel's row staying on screen
+(`TaskIsUnderWay`), and `MultiDestinationDeployRunner.Cancel`, which now
+marks a runner cancelled in the gap so `RunAsync` stops before the deploy
+starts. `ScriptRunner.Run` clears `IsBetweenPhases` only once the next
+script is running (or has failed to start): cleared first, its own
+notification read as the run having ended. *Settings follows the box.* An
+open File ▸ Settings ▸ Deploying shows the change at once when the
+question's "Don't ask again" turns it off (`AppSettings.StopQuestionSettingChanged`,
+listened to while the row is loaded; setting the row to the stored value
+writes no second trail line). *The contract.* `stopQuestions.knownLimits[1]`
+pointed at a closing comment that does not exist; it now says what is true:
+no panel asks the share's question, and its row stands beside the deploy's.
+
+**Measured in the VM, after the fixes** (same machine, 2026-11-20): a build
+of the 600-page test course ended 30.8 s after the question opened during
+it, and the question stayed up across the change; Stop Deploy then ended
+the deploy "Cancelled" with nothing published. **A held Escape** (one
+press, then 30 key-downs 33 ms apart with no key-up, as a keyboard repeats;
+one `SendInput` held down sends no repeats, so a test must send them):
+the question opened and stayed open, the deploy ran on, and the next fresh
+Escape was its Cancel as before. The repeats do not answer the question, so
+nothing was added for them. **Escape where another control owns it**: with
+the menu bar's File menu open, it closed the menu; with a sidebar row's
+context menu open, it closed the menu; neither asked or stopped the deploy
+(the accelerator is reached only by a key that bubbled to the root
+unhandled). The main window has no ComboBox while a section's panel shows:
+the only one is in a course's settings ("Language and region"), which
+replace the panel; there, Escape with it focused, and with it open (it
+closed), asked nothing, and the deploy was still running on return.
+
+**Left as they are, for Russell or a later issue.** The question's first
+focus is the "Don't ask again" box (WinUI's rule, above), so Space ticks it
+and Enter is Stop Deploy; whether the first focus should be a button is a
+design question. Settings ▸ Deploying ▸ Stopping uses checkboxes, as the
+pane's other setting does, where the mac uses switches; whether Windows
+should use toggle switches there is the same kind of question.
 
 **Tests.** `StopQuestionsContractTests` (unit): every word against the
 contract, every case, the trail lines and the `mustRecord` example, the
 setting kept, the key rule, and by source the accelerator on the visible
 Cancel, no key handler, the question's words with Stop Deploy as default, the
-box read only before Stop, and Stopping first in Settings ▸ Deploying.
+box read only before Stop, and Stopping first in Settings ▸ Deploying; since
+the review, a run between its phases is under way and a press there asks, a
+cancel in the gap marks the run cancelled, every stop decision reads
+`TaskIsUnderWay`, the console's Stop goes through `PressCancelAsync`, and a
+changed question is announced once per change.
 `StopByKeyboardUiTests` (opt-in, `[UiFact]`, real keys in the VM): Escape
 stops a running preview; Escape on a running deploy asks, Enter and Space on
 the focused Cancel and Escape on the question keep it running and remember
@@ -14278,6 +14331,15 @@ stops a deploy at once; Escape in the console's focused answer box stops
 nothing and an Invoke on Cancel then stops the preview. Sabotaged in the VM,
 each red: no accelerator (the preview and deploy tests), the box check
 removed (the text-box test), Cancel reading the box (the deploy test).
+Since the review: the console's Stop on a deploy asks and Stop Deploy ends
+it "Cancelled"; the question opened during the build stays across the
+change to the deploy and Stop Deploy stops it; a held Escape's repeats do
+not answer the question; Escape with a menu open or a ComboBox focused is
+theirs (a measurement). Sabotaged in the VM, each red: the console's Stop
+back to `Terminate` (its test: "asked nothing"), the question taken down on
+`IsRunning` alone (its test: "taken down when the build finished");
+`IsUnderWay` as `IsRunning` alone and the announcement removed (their two
+unit tests).
 
 ## The lap cap on Windows (#720, the mac's #689)
 
