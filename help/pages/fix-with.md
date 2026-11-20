@@ -62,7 +62,8 @@ Plantoir holds the course, as it does for any session opened from Plantoir. [Rev
 
 ## If it does not work
 
-- **There are no Fix with buttons.** None of the three assistants was found on this {{machine}}, or the course is kept for reference.
+- **There are no Fix with buttons.** The course is kept for reference.
+- **A button is dimmed and the others are not.** That assistant was not found on this {{machine}}. To have Plantoir set it up, choose {{menu:reviseWithSetUpAnAssistant}}.
 - **The buttons cannot be pressed.** They need at least one ticked row for a problem the section still has. A row that says the problem is fixed in the source does not count.
 - **Plantoir says the course is already being revised.** A session is already open on the course. Finish that session, then press the button again.
 - **An alert says the assistant did not open.** Plantoir could not start the session. If the assistant was updated or moved recently, quitting Plantoir and opening it again may be enough.

@@ -33,7 +33,7 @@ You sign in to the tool yourself, with your own GitHub account. You can install 
 
 ## Where it appears
 
-Once GitHub's program is installed, GitHub Copilot is listed after Claude and Codex in three places.
+GitHub Copilot is listed after Claude and Codex in three places. Until GitHub's program is installed, its menu bar item and its {{control:problemsTab}} button are dimmed. It is left out of the right-click menus and the {{control:courseDetailPlanningTab}} tab.
 
 - **Revise With.** {{menu:courseReviseWithCopilot}} in the menu bar, and {{menu:sectionReviseWithCopilot}} for a section. See [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with).
 - **The {{control:problemsTab}} tab of a section.** {{control:fixWithGitHubCopilotButton}} is under the table. See [Fix a problem with Claude Code, Codex or GitHub Copilot](page:fix-with).
