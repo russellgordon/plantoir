@@ -1298,14 +1298,16 @@ opening message: `open(…, greeting:)` sends `FixWithAssistant.greeting`'s text
 in place of the plain greeting. Every word, number and case is
 `app-rules.json` → `outsideAgents.fixWith`.
 
-**Shown, enabled, handed over.** Each button is shown only while its assistant
-is installed, read from `OutsideAssistantPresence` (asked at launch and when
-the app becomes active, never while the table draws — the view's source scan
-holds that it never calls `isAvailable`), and never on a course kept for
-reference: HIDDEN, never greyed, as Revise With ▸'s door items (`hiddenWhenNotInstalled`;
-the submenu itself has been drawn always since #855, with its set-up item).
-They are enabled while at least one row is handed over: ticked (absent means
-ticked) AND not `fixedInTheSource`. A ticked row another section's later build
+**Shown, enabled, handed over.** All three buttons are shown on every course
+not kept for reference. Since #990 (the HIG review's D11, Russell's ruling
+Q9) a button whose assistant is not installed is DIMMED rather than left out,
+as the menu bar's Revise With items are, and its accessibility hint is
+`fixWith.notInstalledHelp`; until then it was hidden. Presence is read from
+`OutsideAssistantPresence` (asked at launch and when the app becomes active,
+never while the table draws — the view's source scan holds that it never
+calls `isAvailable`). Each is enabled while its assistant is installed AND at
+least one row is handed over: ticked (absent means ticked) AND not
+`fixedInTheSource`. A ticked row another section's later build
 shows fixed in the source is LEFT OUT (`fixWith.fixedInTheSourceIsLeftOut`):
 the page is already right, this section needs only a build, and an assistant
 asked to fix it would find nothing wrong and might change something that is not
@@ -5877,8 +5879,10 @@ on the Planning tab for as long as the form would; one refused (a held-back
 Save, with the form's reason), failed (a write error) or saved with a notice
 to read takes the teacher to Settings, where the form shows its sentence
 beside the field (`CourseDetailTabs.afterASave`). Revert is dimmed on
-Planning, with `words.revertOnPlanning` as a line under it in the Course menu,
-which VoiceOver reads: it would discard edits the teacher cannot see.
+Planning: it would discard edits the teacher cannot see. (Until #990
+`words.revertOnPlanning` was a line under it in the Course menu; the menus
+hold no grey text rows since, Russell's ruling Q14. The sentence stays in the
+contract for Windows until stage 3 of #975 brings its menu to match.)
 `CourseDetailStructureTests` draws the real form in a window never put on
 screen and checks the tree with Planning showing (no editable field, box or
 table), the footer case, Undo, that a draft typed on Settings survives the
@@ -7224,7 +7228,7 @@ anything was written. What it found, and what is true now:
 | Edit | the system's, plus **Rename Course** | the system's only |
 | View | nothing of Plantoir's | Back ⌘[, Forward ⌘], Reload Page ⌘R, before the system's items |
 | Window | listed **About Plantoir** a second time | windows only (`.commandsRemoved()` on the About scene) |
-| Print / Page Setup | none (so ⇧⌘P was free) | none |
+| Print / Page Setup | none (so ⇧⌘P was free; #990 moved Preview off it anyway, to ⌘Y, since the HIG keeps ⇧⌘P for Page Setup whether or not an app has one) | none |
 
 The whole tree is pinned by `MenuBarTreeTests` against
 `mac-app/Tests/Goldens/menu-bar.txt`, read out of the real menu bar — titles,
@@ -7249,11 +7253,28 @@ the teacher has left.
 `SubjectMenuRules.enabledItems(situation)`, and its cases are the contract:
 `contracts/shared-rules.json` → `subjectMenus` (neutral item names, so
 Windows can run them). **Presence follows the Mac, enablement follows the
-selection**: a Revise With target is DRAWN only when this Mac has it
-(`OutsideAssistantPresence`, asked at launch and on becoming active, never
-while the menu is drawn), and ENABLED by the rule. Everything else GREYS
-rather than disappears; the context menus keep HIDING, because they are about
-one row.
+selection**: since #990 (the HIG review's D11, Russell's ruling Q9) every
+Revise With target is DRAWN on every Mac, and ENABLED only when this Mac has
+it (`OutsideAssistantPresence`, asked at launch and on becoming active, never
+while the menu is drawn) and the rule allows it (`ReviseWithMenu.entries`,
+pinned by `SubjectMenusHIGTests`). HIG, The menu bar: "Always show the same
+set of menu items… If a menu bar item isn't actionable, disable the action
+instead of hiding it from the menu." Until #990 a target this Mac lacked was
+left out. Everything else GREYS rather than disappears too; the context menus
+keep HIDING, because they are about one row (HIG, Context menus: "Hide
+unavailable menu items, don't dim them"), and that includes an assistant this
+Mac lacks.
+
+**No grey text rows** (#990, Russell's ruling Q14, 2026-11-18). Until then
+the Course and Section menus drew a dimmed line of explanation under some
+items: why Rename and Add Section wait, why Revert is dimmed on the Planning
+tab (`revertOnPlanning`), why Open in Browser is greyed, "Available once
+deploy completed" under the start-of-year group, and why a Revise item is
+greyed. They were drawn exactly like dimmed commands (the inventory's capture
+of the Course menu), and the HIG describes menus as commands only, so they
+are gone from the menu bar; `SubjectMenusHIGTests` fails on any `Text` in
+`SubjectMenus.swift`. A row's context menu keeps its lines; the ruling named
+the two menus.
 
 **The same code, not a copy.** Every menu item calls what its other route
 calls: the sidebar's `performMenuItem` dispatches to the same functions the
@@ -7299,13 +7320,13 @@ onto Course ▸ Save Course Settings.
 | ⇧⌘R | File ▸ Reload Courses |
 | ⌘[ ⌘] ⌘R | View ▸ Back, Forward, Reload Page (on menu items because a focused web view swallows keys before toolbar shortcuts see them) |
 | ⌥⌘N | Course ▸ Add Section… |
-| ⇧⌘C | Course ▸ Copy a Page from This Course… (there is no Format menu, so no Show Colors to collide with) |
+| ⇧⌘K | Course ▸ Copy a Page from This Course… (#990; it was ⇧⌘C, the system's Show Colors and Shift added to ⌘C Copy, both against the HIG's Keyboards page) |
 | ⌘S | Course ▸ Save Course Settings |
 | ⇧⌘O | Open in Obsidian — Course's, or Section's when a section is selected |
-| ⇧⌘P | Section ▸ Preview / Stop Preview — titled "Preview" or "Preview at Last Viewed" by Settings ▸ Preview (#504) |
-| ⌥⇧⌘P | Section ▸ Preview's Option alternate: the other start page (#504; a native `NSMenuItem.isAlternate`, so it is not a second item and `testEachKeyEquivalentMeansOneThing` skips it) |
+| ⌘Y | Section ▸ Preview / Stop Preview — titled "Preview" or "Preview at Last Viewed" by Settings ▸ Preview (#504). ⌘Y since #990 (Russell, 2026-11-18): it was ⇧⌘P, the HIG's Page Setup; ⌘Y is Finder's Quick Look, the same idea |
+| ⌥⌘Y | Section ▸ Preview's Option alternate: the other start page (#504; a native `NSMenuItem.isAlternate`, so it is not a second item and `testEachKeyEquivalentMeansOneThing` skips it) |
 | ⇧⌘D | Section ▸ Deploy… |
-| ⇧⌘B | Section ▸ Rebuild Preview (batch B: free in batch A's census; not a macOS system-wide key; Bold only under a Format menu, which Plantoir has none of; `WKWebView` binds nothing to it) |
+| ⇧⌘B | Section ▸ Rebuild Preview (batch B: free in batch A's census; Bold only under a Format menu, which Plantoir has none of; `WKWebView` binds nothing to it). Russell ruled ⇧⌘Y on 2026-11-18 (#990), the Shift partner of Preview's ⌘Y, but a stock Mac gives ⇧⌘Y to the Services menu's Make New Sticky Note (Stickies' `NSServices`, listed in System Settings ▸ Keyboard ▸ Keyboard Shortcuts ▸ Services), so it stays ⇧⌘B until he rules again; ⇧⌘B is itself the stock Send File To Bluetooth Device service (`vm-tools/briefs/MORNING-QUESTIONS.md`, #990) |
 
 Never taken: ⌘Q ⌘H ⌥⌘H ⌘, ⌘W ⌥⌘W ⌘M ⌘` ⌃⌘F ⌃⌘S ⌥⌘T ⌘Z ⇧⌘Z ⌘X ⌘C ⌘V ⌘A ⌘F
 ⌘G ⇧⌘G ⌘E ⌘P ⌘T ⇧⌘/ ⌘. ⌃⌘Space ⌥⌘D (the Dock, system-wide) ⇧⌘Q ⌃⌘Q ⌥⌘Esc
@@ -8846,8 +8867,8 @@ page left off). The rule, every case and the words are in
 - **The toolbar button** reads "Preview" or "Preview at Last Viewed" — the
   setting's choice, or the other one while Option is held — and "Stop Preview"
   while a preview runs, when Option changes nothing.
-- **Section ▸ Preview** (⇧⌘P) carries the same title, with an Option
-  **alternate** (⌥⇧⌘P) titled the other way.
+- **Section ▸ Preview** (⌘Y; ⇧⌘P until #990) carries the same title, with
+  an Option **alternate** (⌥⌘Y; ⌥⇧⌘P until #990) titled the other way.
 - **A page that has gone** — renamed, deleted, unpublished — opens the front
   page with **no dialog and no band** (decision 504-3); the trail says why.
 
@@ -9002,7 +9023,8 @@ follows the setting through `SectionSiteCommands.previewOpensAt`, which is in
 its `==`, so the menu is republished when the setting changes.
 `MenuBarTreeTests` reads the pair back in its resting form (front-page
 default) whatever the teacher's setting is, and the golden carries
-`Preview at Last Viewed  [⌥⇧⌘P]  (alternate)`.
+`Preview at Last Viewed  [⌥⇧⌘P]  (alternate)` (`[⌥⌘Y]` since #990 moved
+Preview to ⌘Y; the probe's finding holds for any key).
 
 **The toolbar** has no native alternate. Whether `modifierKeyAlternate` swaps
 a TOOLBAR label could not be measured headlessly — in a window that was never
@@ -20211,10 +20233,11 @@ days (the 40-day sweep case), and the second round's scan (11 checks).
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
-reached also from Help ▸ Set Up an Assistant… and Revise With ▸ Set Up an
-Assistant… (the same words in both since Russell's evening ruling; one view, `SetUpAnotherAssistantButton`, in the menu bar, every
-live row's context menu and the Help menu, so the item cannot differ between
-them). Each row's sentence and buttons come from `AssistantSetUpState.decide`,
+reached also from Revise With ▸ Set Up an Assistant… (one view,
+`SetUpAnotherAssistantButton`, in the menu bar and every live row's context
+menu, so the item cannot differ between them). Help ▸ Set Up an Assistant…
+carried the same words until #990, when Russell ruled it out of the Help menu
+(Q10): the same words twice in the menu bar is what #457 item 4 rules out. Each row's sentence and buttons come from `AssistantSetUpState.decide`,
 run against `outsideAgents.setUp.stateCases`. Set Up… opens
 `AssistantSetUpSheet` (on `SheetTitleScanTests.sheets`): what is downloaded,
 from whom, where it goes, that it is checked once in place, and where the

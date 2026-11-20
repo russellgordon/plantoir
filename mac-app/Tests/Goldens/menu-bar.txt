@@ -3,8 +3,8 @@
 # enablement NOT pinned (SubjectMenuRules and contracts/shared-rules.json ->
 # subjectMenus pin that). View shows only its own group (Back to Reload Page),
 # not the system's tab, toolbar and full-screen items around it.
-# A line tagged [if claude] / [if codex] / [if copilot] / [if local] / [if any reviser] is
-# expected only on a Mac that has it: presence follows the Mac.
+# Every Revise With item is drawn on every Mac since #990 (D11): one this Mac
+# does not have is dimmed, and enablement is not pinned here.
 # Open in Obsidian's key (Shift-Command-O) is checked on its own: it moves to
 # whichever of the two items is live.
 # Section > Preview and its Option alternate (#504) are read back in their
@@ -33,7 +33,7 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Reload Page  [⌘R]
 == Course
   Add Section…  [⌥⌘N]
-  Copy a Page from This Course…  [⇧⌘C]
+  Copy a Page from This Course…  [⇧⌘K]
   ----
   Save Course Settings  [⌘S]
   Revert Course Settings
@@ -47,11 +47,11 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Restore from Backup…
   ----
   Revise With
-    Claude…  [if claude]
-    Codex…  [if codex]
-    GitHub Copilot…  [if copilot]
-    Local AI Assistant…  [if local]
-    ----  [if any reviser]
+    Claude…
+    Codex…
+    GitHub Copilot…
+    Local AI Assistant…
+    ----
     Set Up an Assistant…
   ----
   Open in Obsidian
@@ -62,8 +62,8 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Delete Archive…
   Remove Course…
 == Section
-  Preview  [⇧⌘P]
-  Preview at Last Viewed  [⌥⇧⌘P]  (alternate)
+  Preview  [⌘Y]
+  Preview at Last Viewed  [⌥⌘Y]  (alternate)
   Deploy…  [⇧⌘D]
   Open in Browser
   Stop Showing Deployed Folder
@@ -88,11 +88,11 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Publish Pages That Links Lead To…
   ----
   Revise With
-    Claude…  [if claude]
-    Codex…  [if codex]
-    GitHub Copilot…  [if copilot]
-    Local AI Assistant…  [if local]
-    ----  [if any reviser]
+    Claude…
+    Codex…
+    GitHub Copilot…
+    Local AI Assistant…
+    ----
     Set Up an Assistant…
   ----
   Open in Obsidian
@@ -102,6 +102,5 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Remove Section…
 == Help
   Plantoir Help
-  Set Up an Assistant…
   Publishing and Deploying…
   Report a Problem…

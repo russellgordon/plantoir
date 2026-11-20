@@ -97,25 +97,10 @@ struct ProblemsTableView: View {
         })
     }
 
-    var showsClaude: Bool {
-        return FixWithAssistant.buttonIsShown(
-            assistantIsInstalled: presence.claudeIsInstalled,
-            courseIsKeptForReference: course.isKeptForReference
-        )
-    }
-
-    var showsCodex: Bool {
-        return FixWithAssistant.buttonIsShown(
-            assistantIsInstalled: presence.codexIsInstalled,
-            courseIsKeptForReference: course.isKeptForReference
-        )
-    }
-
-    var showsCopilot: Bool {
-        return FixWithAssistant.buttonIsShown(
-            assistantIsInstalled: presence.copilotIsInstalled,
-            courseIsKeptForReference: course.isKeptForReference
-        )
+    /// The three Fix with buttons are drawn on every course not kept for
+    /// reference, whatever this Mac has (#990, D11).
+    var showsFixButtons: Bool {
+        return FixWithAssistant.buttonIsShown(courseIsKeptForReference: course.isKeptForReference)
     }
 
     /// Every row, in the order the teacher sorted them.
@@ -167,7 +152,7 @@ struct ProblemsTableView: View {
                 .width(min: 90, ideal: 130)
             }
             .accessibilityIdentifier("problemsTable")
-            if showsClaude || showsCodex || showsCopilot {
+            if showsFixButtons {
                 fixButtons
             }
         }
@@ -210,38 +195,35 @@ struct ProblemsTableView: View {
     }
 
     /// Fix with Claude…, Fix with Codex… and Fix with GitHub Copilot…,
-    /// trailing under the table, in that order.
+    /// trailing under the table, in that order. Each is dimmed while its
+    /// assistant is not on this Mac (#990, D11, Russell's ruling Q9) or
+    /// while no row is handed over.
     var fixButtons: some View {
-        HStack(spacing: 8) {
+        let hasRows: Bool = handover.hasRows
+        return HStack(spacing: 8) {
             Spacer()
-            if showsClaude {
-                Button(FixWithAssistant.claudeButtonTitle) {
-                    fix(with: .claude)
-                }
-                .accessibilityIdentifier("fixWithClaude")
-                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
-            }
-            if showsCodex {
-                Button(FixWithAssistant.codexButtonTitle) {
-                    fix(with: .codex)
-                }
-                .accessibilityIdentifier("fixWithCodex")
-                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
-            }
-            if showsCopilot {
-                Button(FixWithAssistant.copilotButtonTitle) {
-                    fix(with: .copilot)
-                }
-                .accessibilityIdentifier("fixWithCopilot")
-                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
-            }
+            fixButton(.claude, identifier: "fixWithClaude", installed: presence.claudeIsInstalled, hasRows: hasRows)
+            fixButton(.codex, identifier: "fixWithCodex", installed: presence.codexIsInstalled, hasRows: hasRows)
+            fixButton(.copilot, identifier: "fixWithCopilot", installed: presence.copilotIsInstalled, hasRows: hasRows)
         }
-        .disabled(!handover.hasRows)
         .padding(.horizontal)
         .padding(.bottom, 10)
     }
 
     // MARK: - Functions
+
+    /// One Fix with button: enabled only while its assistant is installed
+    /// and a row is handed over, with the hint that says which is missing.
+    func fixButton(
+        _ assistant: FixWithAssistant.Assistant, identifier: String, installed: Bool, hasRows: Bool
+    ) -> some View {
+        return Button(assistant.buttonTitle) {
+            fix(with: assistant)
+        }
+        .disabled(!FixWithAssistant.buttonIsEnabled(assistantIsInstalled: installed, hasRows: hasRows))
+        .accessibilityIdentifier(identifier)
+        .accessibilityHint(Text(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows)))
+    }
 
     @ViewBuilder
     func problemCell(_ tableRow: ProblemsTableRow) -> some View {

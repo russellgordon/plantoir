@@ -43,7 +43,7 @@ An outside assistant is a separate program, made by another company. You sign in
 
 Plantoir can open that program in your working folder, on one of your courses, with what it needs to know about the course. You then type to the assistant in its own window.
 
-- Plantoir installs an outside assistant only when you ask it to. You can also install one yourself. To have Plantoir do it, choose {{menu:helpSetUpAnAssistant}}. See [Set up an assistant's command-line tool](page:set-up-assistant).
+- Plantoir installs an outside assistant only when you ask it to. You can also install one yourself. To have Plantoir do it, choose {{menu:reviseWithSetUpAnAssistant}}. See [Set up an assistant's command-line tool](page:set-up-assistant).
 - Plantoir never signs in for you. Signing in is done in the assistant's own window, with its maker.
 - When Plantoir opens an assistant on a course, it does not check whether you are signed in, or what kind of account you have.
 - What an outside assistant reads is sent to its maker's service.

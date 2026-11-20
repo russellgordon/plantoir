@@ -9687,9 +9687,10 @@ teacher there and never to share or deploy a plan itself.
 **What it is.** Settings ▸ Other Assistants lists GitHub Copilot, Claude Code
 and Codex (in that order: GitHub's plans page says every plan includes
 Copilot), each with what is true of it now and one next step. It is reached
-three ways (ruling 3): the pane's own tab, Help ▸ Set Up an Assistant…, and
-Revise With ▸ Set Up an Assistant…, last in every Revise With submenu.
-The two menu items open the pane and set up nothing themselves. **Revise With
+two ways since #990: the pane's own tab, and Revise With ▸ Set Up an
+Assistant…, last in every Revise With submenu (ruling 3 made it three, with
+Help ▸ Set Up an Assistant…, which Russell's ruling Q10 of the HIG review
+removed). The menu item opens the pane and sets up nothing itself. **Revise With
 is now always drawn** (ruling, 2026-11-13): a teacher with no assistant at all
 sees it holding the one set-up item. Until #855 a teacher with none saw no
 sign that any existed (`outsideAgents.hiddenWhenNotInstalledWhy`, rewritten).

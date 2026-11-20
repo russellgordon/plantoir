@@ -913,7 +913,6 @@ struct SectionDetailView: View {
                 previewIsShowing: previewURL != nil,
                 deployedFolderReady: deployedFolderIsReady,
                 deployedFolderShown: deployedFolderShowHere != nil,
-                deployedFolderReason: deployedFolderMenuReason,
                 lastChangeIsHere: lastMenuChangeIsHere,
                 verbIsRunning: verbIsRunningHere,
                 previewOpensAt: AppSettings.shared.previewOpensAt,

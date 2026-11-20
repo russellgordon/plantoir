@@ -30,12 +30,6 @@ struct SidebarMenuCommands: Equatable {
     /// true of it.
     var situation: SubjectMenuRules.Situation
 
-    /// Why Rename and Add Section wait, said under Course ▸ Rename.
-    var structuralReason: String?
-
-    /// Why the Revise items are greyed, each reason once (#458).
-    var reviseNotes: [String]
-
     /// When the selected section deploys on its own, for the Cancel item's title.
     var scheduledFor: Date?
 
@@ -46,8 +40,6 @@ struct SidebarMenuCommands: Equatable {
 
     static func == (left: SidebarMenuCommands, right: SidebarMenuCommands) -> Bool {
         return left.situation == right.situation
-            && left.structuralReason == right.structuralReason
-            && left.reviseNotes == right.reviseNotes
             && left.scheduledFor == right.scheduledFor
     }
 }
@@ -64,11 +56,11 @@ struct SectionSiteCommands: Equatable {
     var deployButtonEnabled: Bool
     var previewIsShowing: Bool
 
-    /// The deployed folder (#850): it can be opened, it is shown, and why
-    /// Open in Browser is greyed for it, said under the item.
+    /// The deployed folder (#850): it can be opened, and it is shown. Why
+    /// Open in Browser is greyed is no longer said under the item (#990,
+    /// Russell's ruling Q14: no grey text rows in the menus).
     var deployedFolderReady: Bool = false
     var deployedFolderShown: Bool = false
-    var deployedFolderReason: String? = nil
 
     /// The assistant's functions (#457 batch B): Undo Last Change's target is
     /// this section, and one of them is running on it.
@@ -97,7 +89,6 @@ struct SectionSiteCommands: Equatable {
             && left.previewIsShowing == right.previewIsShowing
             && left.deployedFolderReady == right.deployedFolderReady
             && left.deployedFolderShown == right.deployedFolderShown
-            && left.deployedFolderReason == right.deployedFolderReason
             && left.lastChangeIsHere == right.lastChangeIsHere
             && left.verbIsRunning == right.verbIsRunning
             && left.previewOpensAt == right.previewOpensAt
@@ -110,13 +101,11 @@ struct CourseSettingsCommands: Equatable {
 
     // MARK: - Stored properties
 
+    /// Revert is dimmed on the Planning tab; since #990 (Russell's ruling
+    /// Q14: no grey text rows in the menus) no line under it says why, as
+    /// #708's `PlanningWording.revertOnPlanning` did.
     var maySave: Bool
     var mayRevert: Bool
-
-    /// Why Revert is dimmed, when it is for a reason the teacher can act
-    /// on: drawn as a line under it, which VoiceOver reads with the menu
-    /// (#708: on the Planning tab, `PlanningWording.revertOnPlanning`).
-    var revertNote: String? = nil
 
     var perform: (SubjectMenuRules.Item) -> Void
 
@@ -124,7 +113,6 @@ struct CourseSettingsCommands: Equatable {
 
     static func == (left: CourseSettingsCommands, right: CourseSettingsCommands) -> Bool {
         return left.maySave == right.maySave && left.mayRevert == right.mayRevert
-            && left.revertNote == right.revertNote
     }
 }
 

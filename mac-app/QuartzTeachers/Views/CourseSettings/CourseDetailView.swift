@@ -235,9 +235,10 @@ enum CourseDetailTabs {
     /// nothing SwiftUI keeps for a drawn view. It is offered whenever there
     /// is something unsaved, held back or not, so a held-back Save is
     /// pressed, refused with the form's own reason, and shown on Settings
-    /// rather than dimmed with none (`afterASave`). Revert is dimmed here
-    /// with `PlanningWording.revertOnPlanning` under it: it would throw away
-    /// edits the teacher cannot see.
+    /// rather than dimmed with none (`afterASave`). Revert is dimmed here:
+    /// it would throw away edits the teacher cannot see. (Until #990
+    /// `PlanningWording.revertOnPlanning` said so in a line under it; the
+    /// menus hold no grey text rows since, Russell's ruling Q14.)
     static func planningCommands(
         course: Course, session: CourseSettingsSession, showSettings: @escaping () -> Void
     ) -> CourseSettingsCommands {
@@ -245,7 +246,6 @@ enum CourseDetailTabs {
         return CourseSettingsCommands(
             maySave: course.configuration.hasUnsavedChanges,
             mayRevert: false,
-            revertNote: PlanningWording.revertOnPlanning,
             perform: { (item: SubjectMenuRules.Item) in
                 if item != .saveCourseSettings || !course.configuration.hasUnsavedChanges {
                     return

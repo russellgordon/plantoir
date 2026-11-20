@@ -214,22 +214,39 @@ nonisolated enum FixWithAssistant {
     /// is left out, so a table of ticked rows can still leave both greyed.
     static let notEnabledHelp: String = "Tick a problem this section still has to hand it over."
 
+    /// What a button whose assistant is not on this Mac tells VoiceOver
+    /// (`fixWith.notInstalledHelp`, #990): since then the button is drawn
+    /// dimmed rather than left out (D11, Russell's ruling Q9), and a dimmed
+    /// button alone says nothing about why, as `notEnabledHelp` says.
+    static let notInstalledHelp: String = "This assistant is not set up on this Mac. Revise With ▸ Set Up an Assistant… can set it up."
+
     // MARK: - Functions
 
-    /// The accessibility hint both buttons carry: `notEnabledHelp` while
-    /// nothing is handed over, and nothing at all while a press would work.
-    static func buttonHint(hasRows: Bool) -> String {
+    /// The accessibility hint a button carries: `notInstalledHelp` while its
+    /// assistant is not on this Mac, `notEnabledHelp` while nothing is
+    /// handed over, and nothing at all while a press would work.
+    static func buttonHint(assistantIsInstalled: Bool, hasRows: Bool) -> String {
+        if !assistantIsInstalled {
+            return notInstalledHelp
+        }
         if hasRows {
             return ""
         }
         return notEnabledHelp
     }
 
-    /// `fixWith.buttonCases` → `shown`: the door exists on this Mac and the
-    /// course is not kept for reference. Hidden, never greyed, when the
-    /// assistant is not installed (`outsideAgents.hiddenWhenNotInstalled`).
-    static func buttonIsShown(assistantIsInstalled: Bool, courseIsKeptForReference: Bool) -> Bool {
-        return assistantIsInstalled && !courseIsKeptForReference
+    /// `fixWith.buttonCases` → `shown`: on every course not kept for
+    /// reference, whether or not the assistant is on this Mac. Since #990
+    /// (D11, Russell's ruling Q9) a button whose assistant is not installed
+    /// is DIMMED, not left out (`buttonIsEnabled`); until then it was hidden.
+    static func buttonIsShown(courseIsKeptForReference: Bool) -> Bool {
+        return !courseIsKeptForReference
+    }
+
+    /// `fixWith.buttonCases` → `claudeEnabled` and its siblings: the
+    /// assistant is on this Mac and at least one row is handed over.
+    static func buttonIsEnabled(assistantIsInstalled: Bool, hasRows: Bool) -> Bool {
+        return assistantIsInstalled && hasRows
     }
 
     /// The rows a press hands over: ticked (absent means ticked, #717 ruling
