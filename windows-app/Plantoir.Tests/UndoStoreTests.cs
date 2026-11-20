@@ -424,7 +424,7 @@ public sealed class UndoStoreTests : IDisposable
                 {
                     ran = true;
                     writer.Append(Event(2, "undoing"));
-                    journal.Prune(writer);
+                    new UndoDoor(journal, UndoMode.Live).RecoverThenPrune(writer);
                 }))).Failure);
         }
         Assert.False(ran);
