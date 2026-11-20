@@ -173,6 +173,25 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// The one rule a task panel decides every stop by (#1009's second
+    /// review): the task it shows can still be stopped. The shown runner is
+    /// under way (running, or between its build and its deploy,
+    /// <see cref="ScriptRunner.IsUnderWay"/>) and not cancelled, OR the whole
+    /// deploy run it belongs to is still running and not cancelled. The
+    /// second half is the gap between two destinations: the first leg's
+    /// runner has stopped, and <see cref="RunAsync"/> has not yet moved to the
+    /// next leg (up to one poll of <see cref="ScriptRunner.WaitUntilFinished"/>),
+    /// so the shown runner alone reads as ended while the deploy goes on.
+    /// <paramref name="deployRun"/> is null for a task that is not a deploy
+    /// to two or more destinations.
+    /// </summary>
+    public static bool ShownTaskIsUnderWay(ScriptRunner? shown, MultiDestinationDeployRunner? deployRun)
+    {
+        if (deployRun is { IsRunning: true, WasCancelled: false }) return true;
+        return shown is { IsUnderWay: true, WasCancelled: false };
+    }
+
+    /// <summary>
     /// Refuses up front, against EVERY configured destination, rather than
     /// discovering a missing credential halfway through a redundancy run —
     /// exactly the surprise redundancy exists to prevent.
@@ -277,6 +296,11 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         {
             for (int index = 0; index < Legs.Count; index++)
             {
+                // A cancel that landed between two destinations (#1009's
+                // second review): the last leg had already ended, so no
+                // runner carries the mark, and the run's own flag is what
+                // stops the next leg from starting.
+                if (WasCancelled) break;
                 CurrentLegIndex = index;
                 Notify(nameof(CurrentLegIndex));
                 var leg = Legs[index];
@@ -376,6 +400,15 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
             // it reads the stale one and the marker stays up until the next
             // unrelated refresh.
             RecordWhatWentOut(course, sectionNumber, publishedFingerprint);
+            // No leg is left between its build and its deploy once the run
+            // is over, however it ended (#1009's second review): an exception
+            // after the build and before the deploy's Run started would
+            // otherwise leave the mark set for good, and the panel would ask
+            // about a run that has ended.
+            foreach (var finishedLeg in Legs)
+            {
+                if (finishedLeg.Runner.IsBetweenPhases) finishedLeg.Runner.IsBetweenPhases = false;
+            }
             IsRunning = false;
             Notify(nameof(IsRunning));
         }

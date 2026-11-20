@@ -194,6 +194,7 @@ public sealed partial class TaskProgressView : UserControl
         _multiRunner = multiRunner is { Legs.Count: > 1 } ? multiRunner : null;
         _title = title;
         OnCancel = onCancel;
+        TakeDownTheStopQuestionIfTheTaskEnded();
         Render();
     }
 
@@ -262,15 +263,26 @@ public sealed partial class TaskProgressView : UserControl
             AutoExpandOnUnexplainedFailure();
         // The task ended under its stop question: nothing is left to stop.
         // Ended, not merely between its build and its deploy (#1009's
-        // review): the question stays up across the change of phase.
+        // review) or between two destinations (its second review): the
+        // question stays up across either change.
         if (e.PropertyName is nameof(ScriptRunner.IsRunning) or nameof(ScriptRunner.IsBetweenPhases)
-            && !runner.IsUnderWay
-            && ReferenceEquals(runner, _runner) && _openStopQuestion is { } stopQuestion)
-        {
-            _stopAsking?.TaskEnded();
-            try { stopQuestion.Hide(); } catch { }
-        }
+            && ReferenceEquals(runner, _runner))
+            TakeDownTheStopQuestionIfTheTaskEnded();
         if (ReferenceEquals(runner, _runner)) Render();
+    }
+
+    /// <summary>
+    /// A stop question up over a task that can no longer be stopped is taken
+    /// down and counts as nothing chosen. Asked by the one rule
+    /// (<see cref="TaskIsUnderWay"/>) when the shown runner changes state, and
+    /// when the section shows the panel again: the whole deploy run ending
+    /// reaches this view only that way.
+    /// </summary>
+    private void TakeDownTheStopQuestionIfTheTaskEnded()
+    {
+        if (TaskIsUnderWay || _openStopQuestion is not { } stopQuestion) return;
+        _stopAsking?.TaskEnded();
+        try { stopQuestion.Hide(); } catch { }
     }
 
     private void Render()
@@ -325,7 +337,9 @@ public sealed partial class TaskProgressView : UserControl
                 // destination failed and second succeeded must never read
                 // as "Done" just because the last leg to run was fine.
                 var outcome = multi.CurrentOutcome;
-                if (_runner.WasCancelled) Outcome("Cancelled", Glyphs.Cancel, Caution(), $"{_title} was cancelled.");
+                // The run's own mark too: a cancel between two destinations
+                // reaches no leg's runner (#1009's second review).
+                if (_runner.WasCancelled || multi.WasCancelled) Outcome("Cancelled", Glyphs.Cancel, Caution(), $"{_title} was cancelled.");
                 else if (_runner.WasStoppedByUser) Outcome("Stopped", Glyphs.Stop, Secondary(), null);
                 else if (outcome.AllSucceeded) Outcome("Done", Glyphs.CheckMark, Success(), null);
                 else if (outcome.AnySucceeded)
@@ -795,13 +809,15 @@ public sealed partial class TaskProgressView : UserControl
     }
 
     /// <summary>
-    /// The one rule this panel's stopping decides by (#1009's review): the
-    /// shown task is under way (running, or between its build and its deploy,
-    /// <see cref="ScriptRunner.IsUnderWay"/>) and not already cancelled. The
-    /// key, a click, the console's Stop, the question's Stop Deploy and the
-    /// question's taking down all read it.
+    /// The one rule this panel's stopping decides by (#1009's reviews): the
+    /// shown task is under way (running, or between its build and its deploy)
+    /// and not already cancelled, or the whole deploy run is still going (the
+    /// gap between two destinations), as
+    /// <see cref="MultiDestinationDeployRunner.ShownTaskIsUnderWay"/> says.
+    /// The key, a click, the console's Stop, the question's Stop Deploy, the
+    /// Cancel row's showing and the question's taking down all read it.
     /// </summary>
-    private bool TaskIsUnderWay => _runner is { IsUnderWay: true, WasCancelled: false };
+    private bool TaskIsUnderWay => MultiDestinationDeployRunner.ShownTaskIsUnderWay(_runner, _multiRunner);
 
     private void StopTheTask()
     {

@@ -103,11 +103,18 @@ public class StopByKeyboardUiTests
         Measured($"deploy {which} running, phase \"{Phase(app)}\"");
     }
 
-    private static void WriteCourse(string courses, out string published)
+    private static void WriteCourse(string courses, out string published, bool alsoToNetlify = false)
     {
         published = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(courses)!)!, "published");
         Directory.CreateDirectory(published);
-        string dir = EndToEnd.WriteCourse(courses, Code, "Stop By Keyboard", new[] { "Concepts" }, EndToEnd.PublishesTo(published));
+        var toTheFolder = EndToEnd.PublishesTo(published);
+        string dir = EndToEnd.WriteCourse(courses, Code, "Stop By Keyboard", new[] { "Concepts" }, config =>
+        {
+            toTheFolder(config);
+            // A second destination after the folder: two legs, and a gap between them.
+            if (alsoToNetlify)
+                config["additional_deploy_targets"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "netlify" });
+        });
         for (int page = 1; page <= PaddingPages; page++)
             EndToEnd.WritePage(Path.Combine(dir, "Concepts", $"Padding {page:0000}.md"),
                 $"title: Padding {page:0000}\npublish: true", $"A page to make the build take a while ({page}).");
@@ -362,6 +369,88 @@ public class StopByKeyboardUiTests
         AssertGone(app, "Stop Deploy across the change");
         AssertCancelled(app, "Stop Deploy across the change");
         AssertNotPublished(published, "Stop Deploy across the change");
+    }
+
+    private static int DeployStarts(DrivenApp app)
+    {
+        string trail = MenuBar.Trail(app);
+        string started = $"started deploy.ps1 {Code} 1";
+        int count = 0;
+        int at = trail.IndexOf(started, StringComparison.Ordinal);
+        while (at >= 0)
+        {
+            count += 1;
+            at = trail.IndexOf(started, at + started.Length, StringComparison.Ordinal);
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// #1009's second review: a course that deploys to a folder and then to
+    /// Netlify runs two legs, and between them destination 1's runner has
+    /// stopped before the run moves on. The question opened during the build
+    /// stays up across the change of destination, and Stop Deploy then stops
+    /// the deploy, with no later leg started. Before the change the question
+    /// was taken down when destination 1 finished.
+    /// </summary>
+    [UiFact]
+    public void TheQuestionStaysAcrossTheChangeOfDestination_AndStopDeployStartsNoLaterOne()
+    {
+        string published = "";
+        using var app = new DrivenApp(courses => WriteCourse(courses, out published, alsoToNetlify: true));
+        app.SelectSection(Code, 1);
+        StartDeploy(app, 1);
+        Assert.True(DeployStarts(app) == 0, "destination 1's deploy began before the build was seen; nothing here tests the change");
+        Press(app, VirtualKeyShort.ESCAPE);
+        var asked = Asked(app, "Escape during the build");
+        var opened = DateTime.Now;
+        Assert.True(Retry.WhileFalse(() => DeployStarts(app) >= 2, TimeSpan.FromMinutes(10), TimeSpan.FromMilliseconds(200)).Result,
+                    $"the deploy never reached destination 2 (deploys started: {DeployStarts(app)}, phase \"{Phase(app)}\")");
+        bool openAtTheChange = OpenStopQuestion(app) is not null;
+        int startsAtTheStop = DeployStarts(app);
+        Measured($"destination 2 began {(DateTime.Now - opened).TotalSeconds:0.0} s after the question opened; question {(openAtTheChange ? "open" : "gone")}");
+        Assert.True(File.Exists(Path.Combine(published, "section1", "index.html")), "destination 1 never published, so the change was not between two destinations");
+        Assert.True(openAtTheChange, "the question was taken down when destination 1 finished, though the deploy went on to destination 2");
+        asked.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
+        AssertGone(app, "Stop Deploy across the change of destination");
+        AssertCancelled(app, "Stop Deploy across the change of destination");
+        Thread.Sleep(3000);
+        Assert.True(DeployStarts(app) == startsAtTheStop, $"a later leg started after Stop Deploy ({startsAtTheStop} deploys started at the stop, {DeployStarts(app)} after)");
+        Assert.False(CancelShows(app), "Cancel still shows after the deploy was stopped");
+    }
+
+    /// <summary>
+    /// The console's own Stop in the New Course wizard (no stop question
+    /// there): it stops the wizard's work at once, as the teacher's stop,
+    /// so it ends "Cancelled" (<c>ScriptRunner.CancelByUser</c>). Before
+    /// #1009's first review it killed the process (<c>Terminate</c>), which
+    /// read as "Something went wrong".
+    /// </summary>
+    [UiFact]
+    public void TheConsolesStopInTheNewCourseWizardStopsAtOnce_AsTheTeachersStop()
+    {
+        using var app = new DrivenApp(courses => EndToEnd.WriteCourse(courses, Code, "Stop By Keyboard", new[] { "Concepts" }));
+        NewCourseWizardUiTests.OpenWizard(app);
+        NewCourseWizardUiTests.PutCodeIn(app, "STPWZ");
+        var create = app.Find("PrimaryButton", "the wizard's Create button");
+        Assert.True(Retry.WhileFalse(() => create.IsEnabled, TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result,
+                    "Create never became available");
+        create.AsButton().Invoke();
+        Assert.True(Retry.WhileNull(() => app.FindOrNull("taskPhaseLabel", TimeSpan.FromSeconds(1)),
+                                    TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(200)).Result is not null,
+                    "Create was pressed but the wizard never started work");
+        app.Find("taskDetailsDisclosure", "Show details").AsButton().Invoke();
+        var stop = Retry.WhileNull(() => app.FindOrNull("consoleStopButton", TimeSpan.FromMilliseconds(300)) is { IsOffscreen: false } shown ? shown : null,
+                                   TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result;
+        Assert.True(stop is not null, $"the wizard's console shows no Stop while it works (phase \"{Phase(app)}\")");
+        string before = Phase(app);
+        Measured($"the wizard's work, phase \"{before}\" before its console's Stop");
+        Assert.True(before is not "Done" and not "Cancelled" and not "Something went wrong", $"the wizard's work ended before its Stop was pressed (phase \"{before}\")");
+        stop!.AsButton().Invoke();
+        Assert.Null(OpenStopQuestion(app));
+        Assert.True(Retry.WhileFalse(() => Phase(app) == "Cancelled", TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(250)).Result,
+                    $"the console's Stop did not end the wizard's work as the teacher's stop (phase \"{Phase(app)}\")");
+        Assert.Null(OpenStopQuestion(app));
     }
 
     private static bool AMenuIsOpen(DrivenApp app)

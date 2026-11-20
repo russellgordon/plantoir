@@ -267,11 +267,15 @@ public sealed class StopQuestionsContractTests : IDisposable
     public void ThePanelDecidesEveryStopByOneUnderWayRule_AndTheConsolesStopAsksToo()
     {
         string panel = AppSource("Views", "TaskProgressView.xaml.cs");
-        Assert.Contains("private bool TaskIsUnderWay => _runner is { IsUnderWay: true, WasCancelled: false };", panel);
+        Assert.Contains("private bool TaskIsUnderWay => MultiDestinationDeployRunner.ShownTaskIsUnderWay(_runner, _multiRunner);", panel);
         Assert.Contains("taskIsRunning: TaskIsUnderWay,", panel);
         Assert.Contains("if (asking.PressCancel(TaskIsUnderWay))", panel);
         Assert.Contains("if (TaskIsUnderWay) StopTheTask();", panel);
-        Assert.Contains("&& !runner.IsUnderWay", panel);
+        // The question comes down by the same rule, on a runner's change and
+        // when the section shows the panel again (the whole run ending).
+        Assert.Contains("if (TaskIsUnderWay || _openStopQuestion is not { } stopQuestion) return;", panel);
+        Assert.Equal(3, CountOf(panel, "TakeDownTheStopQuestionIfTheTaskEnded()"));
+        Assert.DoesNotContain("!runner.IsUnderWay", panel);
         Assert.Contains("RunningActionsRow.Visibility = TaskIsUnderWay ?", panel);
         int from = panel.IndexOf("// ---- Stopping, by click", StringComparison.Ordinal);
         Assert.True(from >= 0, "the stopping code is not where this test looks");
@@ -279,6 +283,181 @@ public sealed class StopQuestionsContractTests : IDisposable
         // The console's own Stop goes the way Cancel goes: it asks, it is swept, it reads "Cancelled".
         Assert.Contains("private void ConsoleStop_Click(object sender, RoutedEventArgs e) => _ = PressCancelAsync();", panel);
         Assert.DoesNotContain("Terminate()", panel);
+    }
+
+    private static int CountOf(string text, string part)
+    {
+        int count = 0;
+        int at = text.IndexOf(part, StringComparison.Ordinal);
+        while (at >= 0)
+        {
+            count += 1;
+            at = text.IndexOf(part, at + part.Length, StringComparison.Ordinal);
+        }
+        return count;
+    }
+
+    // ---- between two destinations, and a stuck mark (#1009's second review) ------
+
+    [Fact]
+    public void BetweenTwoDestinationsTheDeployIsUnderWay_AndAPressThereAsks()
+    {
+        // Destination 1's runner has stopped; the run has not yet moved on.
+        var finishedLeg = new ScriptRunner();
+        var run = new MultiDestinationDeployRunner();
+        run.SetStateForTests(running: true, startedAt: DateTime.UtcNow);
+        Assert.False(finishedLeg.IsUnderWay);
+        Assert.True(MultiDestinationDeployRunner.ShownTaskIsUnderWay(finishedLeg, run),
+                    "the gap between two destinations read as the deploy having ended");
+        var asking = new StopQuestionAsking(StopQuestion.Deploy, new AppSettings(), note: _ => { });
+        Assert.False(asking.PressCancel(MultiDestinationDeployRunner.ShownTaskIsUnderWay(finishedLeg, run)),
+                     "a press between two destinations stopped at once");
+        Assert.True(asking.IsAsking, "a press between two destinations asked nothing");
+
+        // Cancelled, or over, it can no longer be stopped; with no run, the runner alone decides.
+        run.Cancel();
+        Assert.False(MultiDestinationDeployRunner.ShownTaskIsUnderWay(finishedLeg, run), "a cancelled run still reads as under way");
+        var over = new MultiDestinationDeployRunner();
+        over.SetStateForTests(running: false, startedAt: DateTime.UtcNow);
+        Assert.False(MultiDestinationDeployRunner.ShownTaskIsUnderWay(finishedLeg, over));
+        Assert.False(MultiDestinationDeployRunner.ShownTaskIsUnderWay(finishedLeg, null));
+        Assert.True(MultiDestinationDeployRunner.ShownTaskIsUnderWay(new ScriptRunner { IsBetweenPhases = true }, null));
+    }
+
+    /// <summary>A course in a working folder whose launchers are stand-ins: each deploy adds a line to <c>deploys.txt</c>.</summary>
+    private Course StandInCourse(string code, out string deploysLog)
+    {
+        string course = Path.Combine(_folder, "courses", code);
+        Directory.CreateDirectory(Path.Combine(course, "section1"));
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            $$"""{"course_code":"{{code}}","section_numbers":[1],"num_sections":1,"deploy_target":"local_folder","deploy_folder_path":"C:\sites"}""");
+        File.WriteAllText(Path.Combine(course, "section1", "index.md"), "# Section 1\n");
+        deploysLog = Path.Combine(_folder, "deploys.txt");
+        // preview.ps1 is also what makes the folder a working folder (Workspace.MarkerLauncher).
+        File.WriteAllText(Path.Combine(_folder, "preview.ps1"), "exit 0\r\n");
+        File.WriteAllText(Path.Combine(_folder, DeployCommand.ScriptName),
+            $"Add-Content -LiteralPath '{deploysLog.Replace("'", "''")}' -Value deployed\r\nexit 0\r\n");
+        foreach (var found in Workspace.DiscoverCourses(_folder))
+        {
+            if (found.Code == code) return found;
+        }
+        throw new InvalidOperationException($"the stand-in course {code} was not found");
+    }
+
+    private static int LinesIn(string path) => File.Exists(path) ? File.ReadAllLines(path).Length : 0;
+
+    /// <summary>Runs <see cref="MultiDestinationDeployRunner.RunAsync"/> on a one-thread context, as the window's thread runs it.</summary>
+    private static async Task RunOn(SingleThreadContext context, Func<Task> run)
+    {
+        var finished = new TaskCompletionSource();
+        context.Post(async _ =>
+        {
+            try { await run(); finished.SetResult(); }
+            catch (Exception error) { finished.SetException(error); }
+        }, null);
+        await finished.Task.WaitAsync(TimeSpan.FromMinutes(2));
+    }
+
+    [Fact]
+    public async Task ACancelBetweenTwoDestinationsAsks_AndStartsNoLaterDestination()
+    {
+        var course = StandInCourse("GAPTWO", out string deploysLog);
+        var destinations = new[]
+        {
+            new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-one")),
+            new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-two")),
+            new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-three")),
+        };
+        using var context = new SingleThreadContext();
+        var run = new MultiDestinationDeployRunner(context);
+        bool hooked = false;
+        bool? underWayInTheGap = null;
+        bool? askedInTheGap = null;
+        run.PropertyChanged += (_, changed) =>
+        {
+            if (hooked || changed.PropertyName != nameof(MultiDestinationDeployRunner.IsRunning) || !run.IsRunning) return;
+            hooked = true;
+            var first = run.Legs[0].Runner;
+            first.PropertyChanged += (_, firstChanged) =>
+            {
+                // Destination 1 has just ended, on the window's thread: RunAsync
+                // has not yet seen it (its poll is queued behind this), so this
+                // is the gap between two destinations.
+                if (firstChanged.PropertyName != nameof(ScriptRunner.IsRunning) || first.IsRunning || first.LastExitCode is null) return;
+                if (underWayInTheGap is not null) return;
+                underWayInTheGap = MultiDestinationDeployRunner.ShownTaskIsUnderWay(first, run);
+                var asking = new StopQuestionAsking(StopQuestion.Deploy, new AppSettings(), note: _ => { });
+                askedInTheGap = !asking.PressCancel(underWayInTheGap == true) && asking.IsAsking;
+                // Stop Deploy, chosen in the gap: the panel's StopTheTask → the section's CancelDeploy.
+                run.Cancel();
+            };
+        };
+        await RunOn(context, () => run.RunAsync(course, 1, destinations, "", _folder, buildReason: null));
+
+        Assert.True(underWayInTheGap == true, "the gap between two destinations was never reached, or read as ended");
+        Assert.True(askedInTheGap == true, "a press between two destinations did not ask");
+        Assert.True(run.WasCancelled);
+        Assert.False(run.IsRunning);
+        Assert.Equal(1, LinesIn(deploysLog));
+        Assert.Null(run.Legs[1].Runner.StartedAt);
+        Assert.Null(run.Legs[2].Runner.StartedAt);
+    }
+
+    [Fact]
+    public async Task AnExceptionBetweenTheBuildAndTheDeployLeavesNoRunBetweenPhases()
+    {
+        var course = StandInCourse("GAPTHROW", out string deploysLog);
+        var destinations = new[] { new CourseConfiguration.DeployDestination("local_folder", Path.Combine(_folder, "site-one")) };
+        using var context = new SingleThreadContext();
+        var run = new MultiDestinationDeployRunner(context);
+        bool hooked = false;
+        run.PropertyChanged += (_, changed) =>
+        {
+            if (hooked || changed.PropertyName != nameof(MultiDestinationDeployRunner.IsRunning) || !run.IsRunning) return;
+            hooked = true;
+            var leg = run.Legs[0].Runner;
+            leg.PropertyChanged += (_, legChanged) =>
+            {
+                // The deploy's Run beginning, after the build: anything that
+                // throws here is an exception between the build and the deploy.
+                if (legChanged.PropertyName == nameof(ScriptRunner.IsRunning) && leg.IsBetweenPhases && leg.LastExitCode is null)
+                    throw new InvalidOperationException("thrown between the build and the deploy");
+            };
+        };
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RunOn(context, () => run.RunAsync(course, 1, destinations, "", _folder, buildReason: BuildFreshness.ReasonPages)));
+        Assert.Equal("thrown between the build and the deploy", thrown.Message);
+        Assert.False(run.IsRunning);
+        Assert.False(run.Legs[0].Runner.IsBetweenPhases, "the run ended with its leg still marked between the build and the deploy");
+        Assert.False(MultiDestinationDeployRunner.ShownTaskIsUnderWay(run.Legs[0].Runner, run), "the panel would still ask about a run that has ended");
+        Assert.Equal(0, LinesIn(deploysLog));
+    }
+
+    /// <summary>One thread, one queue: what the window's thread is to RunAsync and to a runner's posted endings.</summary>
+    private sealed class SingleThreadContext : SynchronizationContext, IDisposable
+    {
+        private readonly System.Collections.Concurrent.BlockingCollection<(SendOrPostCallback Callback, object? State)> _queue = new();
+
+        public SingleThreadContext()
+        {
+            var thread = new Thread(() =>
+            {
+                SetSynchronizationContext(this);
+                foreach (var (callback, state) in _queue.GetConsumingEnumerable()) callback(state);
+            }) { IsBackground = true };
+            thread.Start();
+        }
+
+        public override void Post(SendOrPostCallback d, object? state) => _queue.Add((d, state));
+
+        public override void Send(SendOrPostCallback d, object? state)
+        {
+            using var done = new ManualResetEventSlim();
+            _queue.Add((_ => { try { d(state); } finally { done.Set(); } }, null));
+            done.Wait();
+        }
+
+        public void Dispose() => _queue.CompleteAdding();
     }
 
     [Fact]
