@@ -94,6 +94,52 @@ def deployed_answer(case):
     return "noOffer"
 
 
+class ActionTraceTests(unittest.TestCase):
+    """U3: the action traces, made from the steps the Mac recorded from the
+    real action code (contracts/undo-action-steps.json)."""
+
+    def test_every_recorded_step_is_reproduced_by_its_ops_both_ways(self):
+        for step in traces.read_action_steps():
+            model = traces.Model(pages={entry["path"]: entry["before"] for entry in step["files"]
+                                        if entry["before"] is not None})
+            outcome = model.files_step([(entry["path"], entry["before"], entry["after"]) for entry in step["files"]],
+                                       step.get("recomputes", []))
+            self.assertEqual(outcome[0], "applied", step["name"])
+            self.assertEqual([op["kind"] for op in outcome[2]], step["ops"], step["name"] + ": the op kinds")
+            undone = traces.plan(outcome[2], True, dict(model.pages))
+            self.assertEqual(undone[0], "ready", step["name"])
+            for entry in step["files"]:
+                self.assertEqual(undone[1].get(entry["path"], model.pages.get(entry["path"])), entry["before"],
+                                 step["name"] + ": " + entry["path"] + " undone")
+
+    def test_there_are_about_120_action_traces_and_each_starts_with_its_step(self):
+        steps = traces.read_action_steps()
+        document = committed()
+        self.assertEqual(len(document["actionTraces"]), len(steps) * traces.ACTION_TRACES_PER_STEP)
+        if steps:
+            self.assertGreaterEqual(len(document["actionTraces"]), 120)
+        names = {step["name"] for step in steps}
+        for trace in document["actionTraces"]:
+            self.assertIn(trace["step"], names)
+            self.assertEqual(trace["calls"][0]["call"], "action")
+            self.assertEqual(trace["calls"][0]["expect"], "applied")
+
+    def test_undoing_an_action_with_no_hand_edits_gives_back_its_befores(self):
+        steps = {step["name"]: step for step in traces.read_action_steps()}
+        for trace in committed()["actionTraces"]:
+            if trace["handEdits"]:
+                continue
+            step = steps[trace["step"]]
+            for entry in step["files"]:
+                wanted = None if entry["before"] is None else traces.sha(entry["before"])
+                self.assertEqual(trace["afterUndoingAll"][entry["path"]], wanted, trace["name"] + " " + entry["path"])
+
+    def test_the_twenty_seeded_traces_are_unchanged_by_the_action_traces(self):
+        with_steps = traces.generate()
+        without = traces.generate(steps=[])
+        self.assertEqual(with_steps["traces"], without["traces"])
+
+
 class GeneratorTests(unittest.TestCase):
 
     def test_two_runs_write_the_same_bytes(self):

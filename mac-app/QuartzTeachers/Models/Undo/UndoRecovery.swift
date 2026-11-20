@@ -111,9 +111,13 @@ nonisolated enum UndoRecovery {
                 UndoRefusedSwaps.noteARefusal(key, now: now)
             }
         }
-        if mode == .live {
-            tidyClosedSteps(writer, resolveRoot: resolveRoot)
-        }
+        // In shadow too, since U3: a shadow step is now staged beside its
+        // pages like a live one, so one closed interrupted would otherwise
+        // leave its dot-files in the course until the switch flips. Shadow
+        // removes only the journal's own staged FILES, never a folder set
+        // aside (steps that move or make folders are left to a live
+        // recovery), so it still writes nothing of the teacher's.
+        tidyClosedSteps(writer, resolveRoot: resolveRoot, onlyStepsOfFiles: mode == .shadow)
         return results
     }
 
@@ -145,9 +149,16 @@ nonisolated enum UndoRecovery {
     /// tidied once per process, a few folder listings for the rare step that
     /// was closed; one whose file could not be removed (held, or made
     /// immutable) is looked for again at the next lock.
-    static func tidyClosedSteps(_ writer: UndoJournalWriter, resolveRoot: (UndoWorkingFolder) -> URL?) {
+    static func tidyClosedSteps(
+        _ writer: UndoJournalWriter,
+        resolveRoot: (UndoWorkingFolder) -> URL?,
+        onlyStepsOfFiles: Bool = false
+    ) {
         for seq in writer.fold.orderedSeqs {
             guard let record = writer.fold.records[seq], record.phase == .interrupted else {
+                continue
+            }
+            if onlyStepsOfFiles && !UndoRecovery.changesOnlyFiles(record.step) {
                 continue
             }
             let key: String = writer.journal.folderURL.standardizedFileURL.path + "#" + String(seq)
@@ -168,6 +179,21 @@ nonisolated enum UndoRecovery {
             tidied.insert(key)
             tidiedLock.unlock()
         }
+    }
+
+    /// Whether every op of the step changes a file in place (`writeFile`,
+    /// `editLine`, `replaceText`, `editJSON`) or is a `recompute`: nothing
+    /// it stages is a folder or a moved item.
+    static func changesOnlyFiles(_ step: UndoStep) -> Bool {
+        for op in step.ops {
+            switch op.knownKind {
+            case .writeFile, .editLine, .replaceText, .editJSON, .recompute:
+                continue
+            default:
+                return false
+            }
+        }
+        return true
     }
 
     /// Every staged file a step's apply, undo, redo or recovery left beside
