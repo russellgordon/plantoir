@@ -281,6 +281,7 @@ internal static class Steps_
         DateTime lastProgress = DateTime.UtcNow;
         string pressedOn = "";
         DateTime pressedAt = DateTime.MinValue;
+        DateTime? licenceChosenAt = null;
 
         void Answer(SeenWindow window, string kind)
         {
@@ -301,6 +302,10 @@ internal static class Steps_
                     // still showing, its button still enabled, half a minute on.
                     bool again = page == pressedOn && DateTime.UtcNow - pressedAt > TimeSpan.FromSeconds(30);
                     if (page == pressedOn && !again) return;
+                    // The Licence Agreement page (#1010): Next works only once
+                    // "I accept the agreement" is chosen, so it is chosen first.
+                    if (WindowRules.IsLicencePage(page) && page != pressedOn)
+                        AnswerLicencePage(window.Element, page, ref licenceChosenAt);
                     foreach (string button in new[] { "Finish", "Install", "Next" })
                     {
                         if (InnoButton(window.Element, button) is { } found && found.IsEnabled)
@@ -384,6 +389,61 @@ internal static class Steps_
             throw Stopped.Product($"the installer finished but there is no {InstalledApp}");
         var version = FileVersionInfo.GetVersionInfo(InstalledApp);
         Program.Note($"installed {InstalledApp}, version {version.ProductVersion}");
+    }
+
+    /// <summary>
+    /// The Licence Agreement page (#1010): chooses "I accept the agreement"
+    /// by its UI Automation name, once, so the button loop can press Next.
+    /// Stops the run (PRODUCT STOPPED, never a silent pass) when the page is
+    /// there and that choice cannot be found, when the page opened with a
+    /// choice already made (the ruling: neither is chosen when it opens), or
+    /// when Next is still disabled <see cref="WindowRules.LicenceNextLimit"/>
+    /// after the choice.
+    /// </summary>
+    private static void AnswerLicencePage(AutomationElement wizard, string page, ref DateTime? chosenAt)
+    {
+        var accept = LicenceChoice(wizard, WindowRules.LicenceAcceptName);
+        if (accept is null)
+            throw Stopped.Product($"the installer's \"{page}\" page has no \"{WindowRules.LicenceAcceptName}\" choice this driver can find by name; "
+                                  + $"it showed: \"{WindowWatch.Words(wizard)}\" [screenshot {Program.Shot("licence-no-accept")}]");
+        if (chosenAt is null)
+        {
+            var refuse = LicenceChoice(wizard, WindowRules.LicenceRefuseName);
+            bool acceptChosen = IsChosen(accept);
+            bool refuseChosen = refuse is not null && IsChosen(refuse);
+            Program.Note($"installer: \"{page}\" opened with \"{WindowRules.LicenceAcceptName}\" {(acceptChosen ? "chosen" : "not chosen")} "
+                         + $"and \"{WindowRules.LicenceRefuseName}\" {(refuse is null ? "not found" : refuseChosen ? "chosen" : "not chosen")}"
+                         + $" [screenshot {Program.Shot("licence-page")}]");
+            if (acceptChosen || refuseChosen)
+                throw Stopped.Product($"the installer's \"{page}\" page opened with a choice already made; neither may be chosen when it opens");
+            if (accept.Patterns.SelectionItem.TryGetPattern(out var selection)) selection.Select();
+            else PostMessage(accept.Properties.NativeWindowHandle.ValueOrDefault, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+            chosenAt = DateTime.UtcNow;
+            Program.Note($"installer: chose \"{WindowRules.LicenceAcceptName}\" on \"{page}\"");
+            return;
+        }
+        if (DateTime.UtcNow - chosenAt.Value > WindowRules.LicenceNextLimit
+            && !(InnoButton(wizard, "Next") is { } next && next.IsEnabled))
+            throw Stopped.Product($"Next was still disabled on the installer's \"{page}\" page {WindowRules.LicenceNextLimit.TotalSeconds:0} s after "
+                                  + $"\"{WindowRules.LicenceAcceptName}\" was chosen (the choice reads {(IsChosen(accept) ? "chosen" : "not chosen")}) "
+                                  + $"[screenshot {Program.Shot("licence-next-disabled")}]");
+    }
+
+    private static AutomationElement? LicenceChoice(AutomationElement wizard, string choice)
+    {
+        try
+        {
+            foreach (var radio in wizard.FindAllDescendants(cf => cf.ByControlType(ControlType.RadioButton)))
+                if (WindowRules.IsChoiceNamed(radio.Properties.Name.ValueOrDefault ?? "", choice) && !radio.IsOffscreen) return radio;
+        }
+        catch { }
+        return null;
+    }
+
+    private static bool IsChosen(AutomationElement radio)
+    {
+        try { return radio.Patterns.SelectionItem.TryGetPattern(out var selection) && selection.IsSelected.ValueOrDefault; }
+        catch { return false; }
     }
 
     /// <summary>The heading of the wizard's current page (the first non-empty static text in its top panel).</summary>

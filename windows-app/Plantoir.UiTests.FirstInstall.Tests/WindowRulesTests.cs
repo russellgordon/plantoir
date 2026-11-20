@@ -650,4 +650,29 @@ public class WindowRulesTests
         Assert.Equal(Settling.KeepLooking, WindowRules.Settle(0, TimeSpan.FromSeconds(3), false));
         Assert.Equal(Settling.NoRecentLook, WindowRules.Settle(2, WindowRules.SettleLimit, false));   // a stale pending set says nothing
     }
+
+    // #1010: the installer's Licence Agreement page, answered by step 2.
+
+    [Fact]
+    public void TheLicencePageIsKnownByItsHeadingInEitherSpelling()
+    {
+        Assert.True(WindowRules.IsLicencePage("Licence Agreement"));
+        Assert.True(WindowRules.IsLicencePage("License Agreement"));   // Inno's own, should the override be lost
+        Assert.False(WindowRules.IsLicencePage("Select Destination Location"));
+        Assert.False(WindowRules.IsLicencePage("Information"));   // a page to read is not an agreement to accept
+        Assert.False(WindowRules.IsLicencePage(""));
+    }
+
+    [Fact]
+    public void TheAcceptChoiceIsFoundByItsNameOnly()
+    {
+        Assert.Equal("I accept the agreement", WindowRules.LicenceAcceptName);
+        Assert.True(WindowRules.IsChoiceNamed("I accept the agreement", WindowRules.LicenceAcceptName));
+        Assert.True(WindowRules.IsChoiceNamed("I &accept the agreement", WindowRules.LicenceAcceptName));
+        // The refusal is never taken for the acceptance, nor the acceptance for the refusal.
+        Assert.False(WindowRules.IsChoiceNamed("I do not accept the agreement", WindowRules.LicenceAcceptName));
+        Assert.False(WindowRules.IsChoiceNamed("I accept the agreement", WindowRules.LicenceRefuseName));
+        Assert.True(WindowRules.IsChoiceNamed("I &do not accept the agreement", WindowRules.LicenceRefuseName));
+        Assert.Equal(TimeSpan.FromSeconds(30), WindowRules.LicenceNextLimit);
+    }
 }

@@ -286,6 +286,41 @@ internal static class WindowRules
         && window.ControlName("1152") is not null && window.ControlName("1") is { } select
         && select.Replace("&", "").Equals("Select Folder", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The installer's Licence Agreement page (#1010), by its heading:
+    /// installer.iss sets it to "Licence Agreement" (Russell, 2026-11-19,
+    /// ruling 4); Inno's own "License Agreement" is recognised too, so an
+    /// installer that lost the override still has its page answered, and the
+    /// spelling is held by the source tests, not here. An older installer
+    /// (1.9.3 and before) has no such page and nothing changes for it.
+    /// </summary>
+    public static bool IsLicencePage(string pageTitle) =>
+        Is(pageTitle.Trim(), "Licence Agreement") || Is(pageTitle.Trim(), "License Agreement");
+
+    /// <summary>The choice step 2 makes on the Licence Agreement page, by its UI Automation name.</summary>
+    public const string LicenceAcceptName = "I accept the agreement";
+
+    /// <summary>The other choice on the page, read only to say what the page opened with.</summary>
+    public const string LicenceRefuseName = "I do not accept the agreement";
+
+    /// <summary>
+    /// Whether a control's UI Automation name is the named choice. Win32
+    /// controls usually give their caption without its access-key ampersand
+    /// ("I &amp;accept the agreement" reads "I accept the agreement"); it is
+    /// taken out here too, so either reading matches, and nothing else does.
+    /// </summary>
+    public static bool IsChoiceNamed(string controlName, string choice) =>
+        controlName.Replace("&", "").Trim().Equals(choice, StringComparison.Ordinal);
+
+    /// <summary>
+    /// How long after "I accept the agreement" was chosen Next may stay
+    /// disabled before the run stops on it: Inno enables Next in the choice's
+    /// own click handler, so on a working page it is enabled at the next look;
+    /// thirty seconds is the same allowance the wizard's other pages get
+    /// before a press is repeated.
+    /// </summary>
+    public static readonly TimeSpan LicenceNextLimit = TimeSpan.FromSeconds(30);
+
     /// <summary>The first of <see cref="BlockWords"/> the text holds, or null.</summary>
     public static string? BlockWordIn(string text)
     {
