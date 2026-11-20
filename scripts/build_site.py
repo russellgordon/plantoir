@@ -10630,6 +10630,56 @@ def link_coverage_from_key_links(content_root: Path, maps: list):
         key_links.write_text("\n".join(lines), encoding="utf-8")
 
 
+def ensure_node_dependencies(output_dir: Path, force_npm_install: bool) -> None:
+    """
+    Make the section's work folder carry the scaffold's node_modules: the
+    pre-baked one linked (a hardlink mirror on Windows) when the folder has
+    none, `npm install` when asked or when there is nothing to link, and
+    otherwise the existing one kept. An existing Windows mirror is not
+    remade, but gains the library copies the runtime carries beside its
+    native modules that a mirror made by an older Plantoir lacks (#1006).
+    ALWAYS, on every build: never inside the first-build branch.
+    """
+    node_modules_dir = output_dir / "node_modules"
+    # A junction left by an older build dies on the very next stat (WinError
+    # 448) - repair BEFORE the exists() below ever touches it.
+    if toolchain_paths.remove_stale_reparse_point(node_modules_dir):
+        print("♻️ Replaced an older-style dependency link.")
+
+    needs_install = (
+        force_npm_install or
+        not node_modules_dir.exists()
+    )
+
+    if needs_install:
+        if (toolchain_paths.QUARTZ_DIR / "node_modules").exists() and not force_npm_install:
+            print("📦 Linking pre-baked dependencies from image...")
+            if node_modules_dir.exists() or node_modules_dir.is_symlink():
+                try:
+                    node_modules_dir.unlink()
+                except Exception:
+                    shutil.rmtree(node_modules_dir, ignore_errors=True)
+            how = toolchain_paths.link_directory(toolchain_paths.QUARTZ_DIR / "node_modules", node_modules_dir)
+            if how == "copy":
+                print("   (copied rather than linked - links need privileges this account lacks)")
+        else:
+            print("\n📦 Installing dependencies...")
+            subprocess.run([toolchain_paths.NPM, "install", "--no-audit", "--silent"], cwd=output_dir, check=True)
+    else:
+        print("✅ Skipping npm install (dependencies already present)")
+        # #1006: a mirror made under 1.9.3 has no vcruntime140.dll beside the
+        # two native modules, so they found only the copy beside node.exe,
+        # through PATH and behind any older copy in System32. Windows only;
+        # never stops a build (the copy beside node.exe is still there).
+        try:
+            added = toolchain_paths.bring_module_libraries_into_mirror(node_modules_dir)
+        except Exception as error:
+            added = []
+            print(f"⚠️ Could not bring the native modules' libraries into the dependencies: {error}")
+        if added:
+            print(f"🔗 Added {len(added)} library file(s) beside the native modules in the dependencies.")
+
+
 def build_section_site(
     course_code: str,
     section_number: int,
@@ -11383,36 +11433,7 @@ def build_section_site(
     except Exception as e:
         print(f"⚠️ Could not draw the social sharing card: {e}")
 
-    # Ensure npm dependencies are present (linking pre-baked node_modules if available)
-    node_modules_dir = output_dir / "node_modules"
-    # A junction left by an older build dies on the very next stat (WinError
-    # 448) - repair BEFORE the exists() below ever touches it.
-    if toolchain_paths.remove_stale_reparse_point(node_modules_dir):
-        print("♻️ Replaced an older-style dependency link.")
-    package_json = output_dir / "package.json"
-    package_lock = output_dir / "package-lock.json"
-
-    needs_install = (
-        force_npm_install or
-        not node_modules_dir.exists()
-    )
-
-    if needs_install:
-        if (toolchain_paths.QUARTZ_DIR / "node_modules").exists() and not force_npm_install:
-            print("📦 Linking pre-baked dependencies from image...")
-            if node_modules_dir.exists() or node_modules_dir.is_symlink():
-                try:
-                    node_modules_dir.unlink()
-                except Exception:
-                    shutil.rmtree(node_modules_dir, ignore_errors=True)
-            how = toolchain_paths.link_directory(toolchain_paths.QUARTZ_DIR / "node_modules", node_modules_dir)
-            if how == "copy":
-                print("   (copied rather than linked - links need privileges this account lacks)")
-        else:
-            print("\n📦 Installing dependencies...")
-            subprocess.run([toolchain_paths.NPM, "install", "--no-audit", "--silent"], cwd=output_dir, check=True)
-    else:
-        print("✅ Skipping npm install (dependencies already present)")
+    ensure_node_dependencies(output_dir, force_npm_install)
 
     # ===========================
     # Build or Preview (server?)

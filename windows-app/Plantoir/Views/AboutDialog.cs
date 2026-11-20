@@ -2,7 +2,6 @@ using System;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Documents;
 
 namespace Plantoir.Views;
 
@@ -82,22 +81,32 @@ public sealed class AboutDialog : ContentDialog
             Grid.SetColumn(link, 1);
             contact.Children.Add(link);
         }
-        ContactRow(0, "Website", Link("https://plantoir.app", "https://plantoir.app"));
-        ContactRow(1, "Email", Link("mailto:support@plantoir.app", "support@plantoir.app"));
+        ContactRow(0, "Website", Link("https://plantoir.app", "https://plantoir.app", "aboutWebsiteLink"));
+        ContactRow(1, "Email", Link("mailto:support@plantoir.app", "support@plantoir.app", "aboutEmailLink"));
         panel.Children.Add(contact);
 
         // The sponsor callout, arranged as plantoir.app's footer arranges it:
-        // the rounded panel making the case for Jacky, then the plain
-        // acknowledgement lines beneath.
-        var sponsorText = new TextBlock { FontSize = 12, Opacity = 0.85, TextWrapping = TextWrapping.Wrap };
-        sponsorText.Inlines.Add(new Run { Text = "Plantoir is a friendly wrapper around " });
-        sponsorText.Inlines.Add(InlineLink("Quartz", "https://quartz.jzhao.xyz"));
-        sponsorText.Inlines.Add(new Run { Text = ", which Jacky Zhao builds and gives away for free. If you end up using Plantoir regularly, please consider " });
-        sponsorText.Inlines.Add(InlineLink("sponsoring him on GitHub", "https://github.com/sponsors/jackyzha0"));
-        sponsorText.Inlines.Add(new Run { Text = " — it is his work that makes all of this possible." });
+        // the rounded panel making the case for Jacky, its sentence whole as
+        // plain text, then its two links on one line beneath it. Each link is
+        // a HyperlinkButton of its own, as on the mac (#993, D46; Russell's
+        // ruling, option A of vm-tools/reference/993-about-window-design.md):
+        // a link inside a sentence is not one element a screen reader lists
+        // and Tab reaches with its own words.
+        var callout = new StackPanel { Spacing = 8 };
+        callout.Children.Add(new TextBlock
+        {
+            Text = "Plantoir is a friendly wrapper around " + QuartzName + ", which Jacky Zhao builds and gives away for free. If you end up using Plantoir regularly, please consider sponsoring him on GitHub — it is his work that makes all of this possible.",
+            FontSize = 12,
+            Opacity = 0.85,
+            TextWrapping = TextWrapping.Wrap,
+        });
+        var sponsorLinks = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
+        sponsorLinks.Children.Add(Link("https://quartz.jzhao.xyz", QuartzName, "aboutQuartzLink", semibold: true));
+        sponsorLinks.Children.Add(Link("https://github.com/sponsors/jackyzha0", "Sponsor Jacky Zhao on GitHub", "aboutSponsorLink", semibold: true));
+        callout.Children.Add(sponsorLinks);
         panel.Children.Add(new Border
         {
-            Child = sponsorText,
+            Child = callout,
             Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorSecondaryBrush"],
             BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
             BorderThickness = new Thickness(1),
@@ -107,11 +116,28 @@ public sealed class AboutDialog : ContentDialog
         });
 
         // No "Built on Quartz" line: the sponsor callout above already says
-        // whose work this stands on.
-        var credits = new StackPanel { Spacing = 3, Margin = new Thickness(0, 14, 0, 0) };
-        credits.Children.Add(CreditLine("Icon from ", "Phosphor Icons", "https://phosphoricons.com", " (MIT)."));
-        credits.Children.Add(CreditLine("Designed by ", "Russell Gordon", "https://www.russellgordon.ca", "."));
-        credits.Children.Add(new TextBlock { Text = "Made with Claude.", FontSize = 12, Opacity = 0.7 });
+        // whose work this stands on. The credits are label-and-value rows in
+        // the shape of the Website and Email rows, as on the mac.
+        var credits = new Grid { ColumnSpacing = 16, RowSpacing = 3, Margin = new Thickness(0, 14, 0, 0) };
+        credits.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        credits.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        void CreditRow(int row, string label, FrameworkElement value)
+        {
+            credits.RowDefinitions.Add(new RowDefinition());
+            var caption = new TextBlock { Text = label, FontSize = 12, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetRow(caption, row);
+            credits.Children.Add(caption);
+            value.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetRow(value, row);
+            Grid.SetColumn(value, 1);
+            credits.Children.Add(value);
+        }
+        var iconCredit = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+        iconCredit.Children.Add(Link("https://phosphoricons.com", "Phosphor Icons", "aboutIconCreditLink"));
+        iconCredit.Children.Add(new TextBlock { Text = "(MIT)", FontSize = 12, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center });
+        CreditRow(0, "Icon", iconCredit);
+        CreditRow(1, "Design", Link("https://www.russellgordon.ca", "Russell Gordon", "aboutDesignCreditLink"));
+        CreditRow(2, "Made with", new TextBlock { Text = "Claude", FontSize = 12, Opacity = 0.7 });
         panel.Children.Add(credits);
 
         panel.Children.Add(new TextBlock
@@ -125,29 +151,21 @@ public sealed class AboutDialog : ContentDialog
         Content = layout;
     }
 
-    private static HyperlinkButton Link(string uri, string label) => new()
-    {
-        Content = label,
-        NavigateUri = new Uri(uri),
-        Padding = new Thickness(0),
-        FontSize = 12,
-    };
+    /// <summary>The credit's name, by itself: the one place the label scan
+    /// (<c>userFacingLabelWords</c>, exceptions[0]) lets the word stand.</summary>
+    private const string QuartzName = "Quartz";
 
-    private static Hyperlink InlineLink(string text, string uri)
+    private static HyperlinkButton Link(string uri, string label, string automationId, bool semibold = false)
     {
-        var link = new Hyperlink { NavigateUri = new Uri(uri) };
-        link.Inlines.Add(new Run { Text = text });
+        var link = new HyperlinkButton
+        {
+            Content = label,
+            NavigateUri = new Uri(uri),
+            Padding = new Thickness(0),
+            FontSize = 12,
+        };
+        if (semibold) link.FontWeight = FontWeights.SemiBold;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(link, automationId);
         return link;
-    }
-
-    private static TextBlock CreditLine(string before, string linkText, string uri, string after)
-    {
-        var block = new TextBlock { FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
-        block.Inlines.Add(new Run { Text = before });
-        var link = new Hyperlink { NavigateUri = new Uri(uri) };
-        link.Inlines.Add(new Run { Text = linkText });
-        block.Inlines.Add(link);
-        block.Inlines.Add(new Run { Text = after });
-        return block;
     }
 }

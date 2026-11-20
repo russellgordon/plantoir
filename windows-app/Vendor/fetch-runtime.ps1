@@ -367,9 +367,11 @@ function Get-BaseFields {
 # before and after. A module's own folder is where Windows looks first for
 # the libraries of a .node file Node loads (see the pin lines above), so
 # every Node however started finds it, launcher or not, and ahead of an
-# older copy in System32.
+# older copy in System32. $RuntimeFolder is the runtime the module folders
+# are under (passed, not read from the script's $Runtime, so the function
+# can be lifted between its markers and run on a made-up runtime).
 # BEGIN Install-NodeVcRuntime
-function Install-NodeVcRuntime([string]$From, [string]$To) {
+function Install-NodeVcRuntime([string]$From, [string]$To, [string]$RuntimeFolder) {
     $source = Join-Path $From "vcruntime140.dll"
     if (-not (Test-Path -LiteralPath $source)) {
         throw "$From has no vcruntime140.dll to place beside node.exe and its modules (#965): the Python zip no longer carries it, so contracts/toolchain.json -> windowsNodeVcRuntime -> source needs another answer."
@@ -377,7 +379,7 @@ function Install-NodeVcRuntime([string]$From, [string]$To) {
     Assert-Sha256 $source $NodeVcRuntimeSha256 $NodeVcRuntimeLength
     $places = @($To)
     foreach ($relative in $NodeVcRuntimeModuleFolders) {
-        $folder = Join-Path $Runtime $relative
+        $folder = Join-Path $RuntimeFolder $relative
         if (-not (Get-ChildItem -LiteralPath $folder -Filter "*.node" -File -ErrorAction SilentlyContinue)) {
             throw "$folder holds no .node file (#965): the module that imports vcruntime140.dll has moved, so contracts/toolchain.json -> windowsNodeVcRuntime -> besideModules and `$NodeVcRuntimeModuleFolders here must move with it."
         }
@@ -392,14 +394,20 @@ function Install-NodeVcRuntime([string]$From, [string]$To) {
 }
 # END Install-NodeVcRuntime
 
+# The place-the-file-only path (#965), in a try/finally of its own like the
+# main run's below, so a refusal part-way still removes $Temp (#1006).
 if ($vcRuntimeOnly) {
-    Install-NodeVcRuntime $pyDir $nodeDir
-    $fields = Get-BaseFields
-    foreach ($key in $VendorPins.Keys) { $fields[$key] = $VendorPins[$key] }
-    Write-RuntimeManifest $fields
-    Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host ""
-    Write-Host "[OK] Native runtime ready at $Runtime" -ForegroundColor Green
+    try {
+        Install-NodeVcRuntime $pyDir $nodeDir $Runtime
+        $fields = Get-BaseFields
+        foreach ($key in $VendorPins.Keys) { $fields[$key] = $VendorPins[$key] }
+        Write-RuntimeManifest $fields
+        Write-Host ""
+        Write-Host "[OK] Native runtime ready at $Runtime" -ForegroundColor Green
+    }
+    finally {
+        Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
+    }
     exit 0
 }
 
@@ -610,7 +618,7 @@ try {
     # first manifest written, right after the base phases): from here until
     # the end, a failure leaves a runtime the build refuses and a re-run
     # finishes by fetching runtime\vendor alone.
-    Install-NodeVcRuntime $pyDir $nodeDir
+    Install-NodeVcRuntime $pyDir $nodeDir $Runtime
     Write-RuntimeManifest (Get-BaseFields)
     if (Test-Path $VendorOut) { Remove-Item $VendorOut -Recurse -Force }
     New-Item -ItemType Directory -Force $VendorOut | Out-Null

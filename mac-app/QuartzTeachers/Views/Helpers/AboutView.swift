@@ -33,14 +33,32 @@ struct AboutView: View {
     /// The case for Jacky, in a callout — arranged as plantoir.app's
     /// footer arranges it. No separate "Built on Quartz" credit line:
     /// this already says whose work the app stands on.
-    let sponsorMessage: LocalizedStringKey = "Plantoir is a friendly wrapper around [Quartz](https://quartz.jzhao.xyz), which Jacky Zhao builds and gives away for free. If you end up using Plantoir regularly, please consider [sponsoring him on GitHub](https://github.com/sponsors/jackyzha0) — it is his work that makes all of this possible."
+    ///
+    /// Plain words, no inline links (#993, D46): SwiftUI hands an inline
+    /// Markdown link in a `Text` to VoiceOver as a disabled link that Tab
+    /// cannot reach. The two places the sentence points to are separate
+    /// `Link` views beneath it (`sponsorLinks`), as Russell ruled
+    /// (option A of `vm-tools/reference/993-about-window-design.md`).
+    let sponsorMessage: LocalizedStringKey = "Plantoir is a friendly wrapper around Quartz, which Jacky Zhao builds and gives away for free. If you end up using Plantoir regularly, please consider sponsoring him on GitHub — it is his work that makes all of this possible."
 
-    /// The plain acknowledgement lines beneath the sponsor callout.
-    let credits: [LocalizedStringKey] = [
-        "Icon from [Phosphor Icons](https://phosphoricons.com) (MIT).",
-        "Designed by [Russell Gordon](https://www.russellgordon.ca).",
-        "Made with Claude.",
-    ]
+    /// The two links beneath the sponsor sentence. The second starts with
+    /// a verb, as the HIG's Writing page asks of a link's label.
+    let quartzLinkTitle: String = "Quartz"
+    let quartzURL: URL? = URL(string: "https://quartz.jzhao.xyz")
+    let sponsorLinkTitle: String = "Sponsor Jacky Zhao on GitHub"
+    let sponsorURL: URL? = URL(string: "https://github.com/sponsors/jackyzha0")
+
+    /// The credits beneath the callout, as label-and-value rows in the
+    /// shape of the Website and Email rows.
+    let iconCreditLabel: String = "Icon"
+    let iconCreditName: String = "Phosphor Icons"
+    let iconCreditURL: URL? = URL(string: "https://phosphoricons.com")
+    let iconCreditLicence: String = "(MIT)"
+    let designCreditLabel: String = "Design"
+    let designCreditName: String = "Russell Gordon"
+    let designCreditURL: URL? = URL(string: "https://www.russellgordon.ca")
+    let madeWithLabel: String = "Made with"
+    let madeWithName: String = "Claude"
 
     // The measurements, at the SYSTEM text size. Scaling from these keeps
     // the panel's proportions as the text grows.
@@ -127,10 +145,13 @@ struct AboutView: View {
         .padding(outerPadding)
         .frame(width: panelWidth, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
-        // Without this, the window opens with a focus ring around the
-        // support link — the panel has nothing else to focus. The links
-        // still work; they just stop being haloed on arrival.
-        .focusEffectDisabled()
+        // No `.focusEffectDisabled()` (#993b). It was added on 2026-08-10
+        // so the window did not open with a ring around its one link; with
+        // six links Tab reaches under Keyboard Navigation, it hid where the
+        // focus was (measured: Tab moved through all six with no ring). The
+        // HIG's Focus and Selection page: "Rely on system-provided focus
+        // effects" and "Indicate focus using visual appearances that are
+        // consistent with the platform."
     }
 
     /// The application icon itself — the compiled artwork macOS shows in
@@ -158,6 +179,7 @@ struct AboutView: View {
                         Text(websiteURL.absoluteString)
                             .font(.system(size: bodySize, weight: .semibold))
                     }
+                    .accessibilityIdentifier("aboutWebsiteLink")
                 }
             }
 
@@ -170,6 +192,7 @@ struct AboutView: View {
                         Text(supportEmailAddress)
                             .font(.system(size: bodySize, weight: .semibold))
                     }
+                    .accessibilityIdentifier("aboutEmailLink")
                 }
             }
         }
@@ -178,34 +201,88 @@ struct AboutView: View {
     }
 
     /// The sponsor message in a rounded-rect callout, matching the
-    /// Windows About panel and plantoir.app's footer.
+    /// Windows About panel and plantoir.app's footer: the sentence whole,
+    /// then its two links on one line beneath it.
     var sponsorCallout: some View {
-        Text(sponsorMessage)
-            .font(.system(size: bodySize))
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .quaternarySystemFill))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-            )
-            .tint(.accentColor)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(sponsorMessage)
+                .font(.system(size: bodySize))
+                .fixedSize(horizontal: false, vertical: true)
+
+            sponsorLinks
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .quaternarySystemFill))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+        .tint(.accentColor)
     }
 
-    /// Who and what the app is built on, one quiet line each.
+    /// Quartz and the sponsor page, each a `Link` of its own, so VoiceOver
+    /// reads each as an enabled link with its own words and lists it in
+    /// the rotor's Links, and Tab reaches it with Keyboard Navigation on.
+    var sponsorLinks: some View {
+        HStack(spacing: 16) {
+            if let quartzURL {
+                Link(quartzLinkTitle, destination: quartzURL)
+                    .accessibilityIdentifier("aboutQuartzLink")
+            }
+            if let sponsorURL {
+                Link(sponsorLinkTitle, destination: sponsorURL)
+                    .accessibilityIdentifier("aboutSponsorLink")
+            }
+        }
+        .font(.system(size: bodySize, weight: .semibold))
+    }
+
+    /// Who and what the app is built on: a label and its value on each
+    /// row, the values left-aligned to a common edge, as the Website and
+    /// Email rows are.
     var creditLines: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            ForEach(Array(credits.indices), id: \.self) { index in
-                Text(credits[index])
-                    .font(.system(size: creditsSize))
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 3) {
+            GridRow {
+                Text(iconCreditLabel)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    if let iconCreditURL {
+                        Link(iconCreditName, destination: iconCreditURL)
+                            .accessibilityIdentifier("aboutIconCreditLink")
+                    } else {
+                        Text(iconCreditName)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(iconCreditLicence)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            GridRow {
+                Text(designCreditLabel)
+                    .foregroundStyle(.secondary)
+                if let designCreditURL {
+                    Link(designCreditName, destination: designCreditURL)
+                        .accessibilityIdentifier("aboutDesignCreditLink")
+                } else {
+                    Text(designCreditName)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            GridRow {
+                Text(madeWithLabel)
+                    .foregroundStyle(.secondary)
+                Text(madeWithName)
                     .foregroundStyle(.secondary)
             }
         }
+        .font(.system(size: creditsSize))
         .tint(.accentColor)
     }
 }

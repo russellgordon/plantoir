@@ -13194,11 +13194,32 @@ what is imported).
   upgrade over 1.9.3, a section 1.9.3 already built keeps its old mirror,
   which has no module copies (run C below fails there, `ERR_DLOPEN_FAILED`);
   in that folder the copy beside `node.exe`, on the PATH the launchers set,
-  is the one found (run D). So neither place alone covers every teacher: the
-  module copies cover any Node however started and an older System32 copy,
-  the `node.exe` copy covers mirrors made before this change.
-- `THIRD_PARTY_LICENSES.md` has the licence row (Microsoft's redistributable
-  code terms; the file is on the list an application may carry).
+  is the one found (run D). So neither place alone covered every teacher:
+  the module copies cover any Node however started and an older System32
+  copy, the `node.exe` copy covered mirrors made before this change.
+- **An upgraded mirror gains the module copies (#1006).** Since #1006 every
+  build on Windows brings each file in `windowsNodeVcRuntime` → `files` into
+  an EXISTING mirror at each `besideModules` folder under
+  `quartz\node_modules`, as a hardlink to the runtime's copy (a copy if the
+  link is refused), replacing a different file of that name and touching
+  nothing else (`build_site.py` → `ensure_node_dependencies`, in the ALWAYS
+  path; `toolchain_paths.bring_module_libraries_into_mirror`). So a section
+  1.9.3 built has the copies beside its modules from its first build under
+  the new app, and an older `vcruntime140.dll` in System32 no longer comes
+  before them there. It is a few stats per build, not a remade mirror
+  (remaking it would walk the whole `node_modules` tree, tens of thousands of
+  files, on every build), and it does nothing off Windows, where
+  `node_modules` is a symlink to the image's own and no copies exist. It
+  never stops a build: a runtime without the copies, a mirror without a
+  module's folder, or an unreadable contract leaves the mirror as it is.
+  Pinned by `scripts/test_mirror_module_libraries.py` (a mirror laid out as
+  1.9.3 left it gains both copies through the build's own dependency step).
+  The `node.exe` copy stays beside them.
+- `THIRD_PARTY_LICENSES.md` has the licence row, as Russell ruled on #1006
+  (2026-11-19): Microsoft's Distributable Code terms in the Visual Studio
+  licence, with Russell Gordon as the licence holder under the free Community
+  or Build Tools terms; the file is on the Distributable List for Visual
+  Studio 2026 (any file in `VC\redist`, unmodified, with the program).
 - `NativeModuleImportsTests`: every `.node` file in a fetched runtime, and
   every library beside it that it pulls in, finds each import **beside
   itself** or on `windowsSystemLibraries`, a named list that deliberately
@@ -13264,9 +13285,10 @@ A shows Node does not look beside `node.exe` for a module's libraries;
 C and E show what the mirror changes. On the PC, `fetch-runtime.ps1` at this
 branch repaired the runtime fetched by the first version in place (manifest
 `nodeVcRuntimeLayout` `beside-node-and-modules`, all three copies the
-contract's SHA-256); whether `publish.ps1 -WithoutAssistantEngine`
-(unsigned, nothing uploaded) carried all three into the published `runtime`
-was still running when this was written. Not
+contract's SHA-256), and `publish.ps1 -WithoutAssistantEngine` (unsigned,
+nothing uploaded) carried all three into the published `runtime`, each with
+the contract's hash (PC run `965-finish`, which also ran the unit suite:
+4,370 passed, exactly the six known failures, 2 skipped). Not
 proven: an end-to-end rehearsal PASSED, which needs a signed candidate build
 (Edge holds an unsigned branch build at "isn't commonly downloaded"); and a
 PC whose System32 has an OLDER `vcruntime140.dll` than 14.51, where the copy
@@ -13557,6 +13579,61 @@ async-local the static `Sentence()` reads, which also fills `{machine}` with
 refusal answers. And, as the mac's runner since #610, a scripted `modelReply`
 answers the FIRST request only and plain text after it — unless
 `given.modelReplyAnswers` is `everyRequest` (#720, below).
+
+## The About panel's links (#993, the mac's D46)
+
+Written 2026-11-19 for [#993](https://github.com/russellgordon/plantoir/issues/993).
+The design, the ruling (option A of `vm-tools/reference/993-about-window-design.md`)
+and the reasons are the mac's: `09-mac-app.md` → "The About window's links
+(D46, #993's second piece)". This section says where Windows does it.
+
+**What was there, and why it changed.** `AboutDialog.cs` built "Quartz",
+"sponsoring him on GitHub", "Phosphor Icons" and "Russell Gordon" as inline
+`Hyperlink`s inside a `TextBlock`'s sentences. Unlike the mac's inline
+Markdown links, these were NOT broken for a screen reader or a keyboard:
+measured on the Windows VM on 2026-11-19 with the old panel put back in a
+scratch copy, UI Automation gave all six links as enabled, keyboard-focusable
+Hyperlink elements with their own words, and Tab from Website reached Email,
+Quartz, "sponsoring him on GitHub", Phosphor Icons, Russell Gordon, Close and
+round again. The change on Windows is the ruling's last line, "the Windows
+About panel follows": the same layout and words as the mac, not a fix of a
+Windows fault. An inline `Hyperlink` takes no AutomationId (asking UI
+Automation for one throws `PropertyNotSupportedException`), which is the one
+thing the old panel could not give a test to find each link by.
+
+**Where it is now.** All six links are `HyperlinkButton`s of their own, made
+by one helper, `Link(uri, words, automationId)`, which gives each an
+AutomationId (`aboutWebsiteLink`, `aboutEmailLink`, `aboutQuartzLink`,
+`aboutSponsorLink`, `aboutIconCreditLink`, `aboutDesignCreditLink`). The
+sponsor sentence is one plain `TextBlock`, whole, with "Quartz" and "Sponsor
+Jacky Zhao on GitHub" on one line beneath it inside the callout; the credits
+are label-and-value rows (Icon, Phosphor Icons (MIT); Design, Russell Gordon;
+Made with, Claude) in the shape of the Website and Email rows. No key
+catcher, no invisible control: each key reaches a visible link. "Quartz"
+stays a constant, `QuartzName`, so the label scan's one exception (the bare
+credit name, `CourseSettingsSaveTests`) still covers it.
+
+**What pins it.** `AboutDialogLinksSourceTests` (unit, plain facts) pins the
+source: no inline `Hyperlink` and no `Inlines.Add`, six `Link(` calls each
+with its own words and AutomationId and no seventh, the credits as rows, the
+sentence whole. `AboutDialogLinksUiTests` (`[UiFact]`, opt-in) opens Help ▸
+About Plantoir through the menu bar and reads the dialog as UI Automation
+gives it to a screen reader: exactly six elements of control type Hyperlink,
+each with its own words, enabled, keyboard-focusable and on screen, then
+presses Tab from the dialog's first stop until every one of the six has held
+the focus. Measured on the Windows VM (Parallels, Windows 11 Pro ARM64, the
+app win-x64 under emulation), 2026-11-19: 1 of 1 passed, 17 s. Against the
+old panel (put back in a scratch copy on the VM, 2026-11-19) the four source
+tests fail ("a link is built inside a sentence (new Hyperlink)", "no link of
+its own reads "https://plantoir.app" (aboutWebsiteLink)", and the rows and
+the sentence not found), and the UI test fails with "the About panel has no
+aboutWebsiteLink". Read that UI failure for what it is: on the old panel only
+the test's count of six Hyperlink elements can pass; its enabled, focusable
+and Tab checks find each link by AutomationId, which an inline Hyperlink
+cannot carry, so they never get to look. That the old links were enabled,
+focusable and reached by Tab comes from a separate manual probe (above), not
+from this test. Nothing is
+pressed, so no browser or mail program opens.
 
 ## Windows never closes Obsidian unasked (#1003, the mac's #995)
 
