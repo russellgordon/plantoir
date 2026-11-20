@@ -21077,8 +21077,17 @@ cannot go in reverses the swaps already made. The error is Foundation's
   `aClassOfItsOwn` before that, and the front page's embed names only a
   class. So every class of a unit is planned the same with the front page
   as it was before the unit or after any class of it.
-- **The flaky test (LOW 5).** See the flake's note in
-  `UndoActionStepsTests.testAListThatCannotBeWrittenChangesNothingAboutAnAction`.
+- **The flaky test (LOW 5).**
+  `UndoActionStepsTests.testAListThatCannotBeWrittenChangesNothingAboutAnAction`
+  failed once in three for the review, comparing the two courses' files.
+  It was not reproduced here: 15 runs alone, 26 in its class (6 and then
+  20 in a row), every one green, on the M4 Pro with other agents' builds
+  running. Read for a cause: both courses are laid out from fixed dates,
+  Add Classes dates its pages from the timetable, the copy it makes first
+  and the folder's id are outside what is compared, and a list whose lock
+  is busy for longer than 0.05 s goes through the same staged swap and
+  leaves the same files. No timed wait was added. The assertion now names
+  every file that differs and both texts, so a failure says which.
 
 #### If the app dies part way: what is on disk
 
