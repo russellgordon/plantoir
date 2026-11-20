@@ -41,4 +41,6 @@ as [PRESENTATION.md](PRESENTATION.md).
 
 ## License
 
-MIT License. Use, remix, and share freely — especially with other educators.
+MIT License: the full text is in [`LICENSE`](LICENSE). Use, remix, and share freely — especially with other educators.
+
+The MIT License covers Plantoir's own code. Software by other people that Plantoir carries is under its own licence, listed in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).

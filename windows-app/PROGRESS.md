@@ -20,6 +20,16 @@ Branch `issue/1009-win-stop-by-keyboard`. Built and tested on the Windows VM (Pa
 - The words moved into `shared-rules.json` → `stopQuestions` (added from Windows; the mac owes a pinning test and a case runner). Windows' footer names Escape alone: Windows has no Command-Period.
 - Not built: "Stop this share?" has nothing to stop until #824. Tests: `StopQuestionsContractTests`, `StopByKeyboardUiTests` (3 real-key tests, each red under its sabotage). Details: documentation/12, "Escape stops a running preview or deploy, and the stop questions (#1009, the mac's #988)".
 
+## 2026-11-19 — the installer opens on a Licence Agreement page (#1010, piece 1010b)
+
+Branch `issue/1010b-installer-licence-page` (on `night2/integration-2`). Built and proven on the Windows VM (Parallels, Windows 11 Pro ARM64, the installer x64 under emulation), not on the PC.
+
+- Russell's rulings of 2026-11-19 (option A): Inno Setup's License Agreement page, first, titled "Licence Agreement", with Plantoir's MIT text (a new root `LICENSE`, carried word for word), the third-party notice and the terms for Microsoft's `vcruntime140.dll`; neither choice made when it opens, Next disabled until "I accept the agreement"; skipped by Plantoir's own `/VERYSILENT` update, so a teacher already on 1.x is updated silently and not asked (ruling 5); a newer installer run by hand asks again. The notice is installed as `{app}\THIRD_PARTY_LICENSES.txt`, and the portable zip carries it and `LICENSE` beside the app (ruling 6).
+- Keyboard (first review's MEDIUM): clearing both choices had taken them out of the Tab order; the refusal gets the pair's Tab stop back, so Tab lands on "I do not accept" (Next stays disabled) and the up arrow chooses "I accept the agreement". Measured key by key on the VM (documentation/12).
+- The first-install rehearsal's driver chooses "I accept the agreement" by name and stops PRODUCT STOPPED if it cannot, or if an install of 2.0.0 or later never showed the page; a choice whose state it cannot read is DRIVER PROBLEM, never "not chosen".
+- Second review: the terms for `vcruntime140.dll` are in `THIRD_PARTY_LICENSES.md` too (a section that says only the Windows app carries the file), so the zip's and `{app}`'s notice carry them; the same words as the page, held equal by a test. The driver reads a refusal it cannot find as DRIVER PROBLEM, and gains `--self-test-install <file>` (step 2 alone on an installer already on the machine, never PASSED) so `AnswerLicencePage` can run before a signed candidate exists.
+- Tests: `InstallerLicencePageTests` (12 facts, 1 theory), `WindowRulesTests` (9: 2 at first, 5 since the first review, 2 since the second). No `mac` issue: the Mac has no licence screen and carries nothing of Microsoft's. Details: documentation/12, "The Licence Agreement page in the installer (#1010)".
+
 ## 2026-11-19 — the About panel's links are links of their own (#993, the mac's D46)
 
 Branch `issue/993b-about-window-links`. Built and tested on the Windows VM (Parallels, Windows 11 Pro ARM64, the app win-x64 under emulation), not on the PC.
