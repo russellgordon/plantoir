@@ -23,7 +23,10 @@ internal sealed record UndoRecoveryResult(long Seq, UndoPhase Phase, UndoRecover
                                           int FilesPutBack = 0, int FilesInTheWay = 0);
 
 /// <summary>What one run of recovery came to: the steps it settled, and whether a test (or the harness) stopped it at a kill point.</summary>
-internal sealed record UndoRecoveryRun(IReadOnlyList<UndoRecoveryResult> Settled, bool StoppedByATest);
+/// <param name="Left">The steps it tried and left for later, each with why (a file in use, a page that cannot be read now):
+/// the true answer an Undo or a Redo gives when such a step is the newest (W3's review, LOW 4).</param>
+internal sealed record UndoRecoveryRun(IReadOnlyList<UndoRecoveryResult> Settled, bool StoppedByATest,
+                                       IReadOnlyDictionary<long, UndoRefusal>? Left = null);
 
 /// <summary>One line for the activity trail: the course and section it is about, and the words after them.</summary>
 internal sealed record UndoTrailLine(ActivityTrail.Event Event, string? Course, long? Section, string Words);
@@ -124,6 +127,7 @@ internal static class UndoRecovery
     {
         writer.RecoveredThisHold = true;
         var settled = new List<UndoRecoveryResult>();
+        var left = new Dictionary<long, UndoRefusal>();
         DateTimeOffset now = journal.Now;
         HashSet<long>? pruningWouldClose = null;
         var inFlight = writer.Folded.Steps.Values.Where(step => step.IsInFlight).ToList();
@@ -135,8 +139,15 @@ internal static class UndoRecovery
             bool keepsAFileTrue = KeepsAFileTrue(record.Step);
             // Never settled with its re-derivation skipped (the hard review of U2b, MEDIUM 5).
             if (keepsAFileTrue && !CanRederive(record.Step, maintainers)) continue;
-            // Settled only by a recovery that will re-derive it (MEDIUM 1).
-            if (keepsAFileTrue && leavingStepsThatRederive && mode == UndoMode.Live) continue;
+            // Settled only by a recovery that will re-derive it (MEDIUM 1), and
+            // never closed unsettled by this hold's pruning meanwhile: one more
+            // try, by the next recovery that re-derives (an Undo, a Redo, the
+            // next launch's), can settle it (W3's review, LOW 2).
+            if (keepsAFileTrue && leavingStepsThatRederive && mode == UndoMode.Live)
+            {
+                writer.LeftForARederivingRecovery.Add(record.Seq);
+                continue;
+            }
             string key = KeyOf(record, journal);
             if (!trySwapsNow && !journal.Memory.RefusedSwapIsDue(key, now))
             {
@@ -144,20 +155,21 @@ internal static class UndoRecovery
                 if (!pruningWouldClose.Contains(record.Seq)) continue;
             }
             SettleAnswer answer = Settle(record, root, writer, journal, mode, trail, seams);
-            if (answer.Stopped) return new UndoRecoveryRun(settled, StoppedByATest: true);
+            if (answer.Stopped) return new UndoRecoveryRun(settled, StoppedByATest: true, left);
             if (answer.Result is { } result)
             {
                 journal.Memory.ForgetTheRefusedSwap(key);
-                journal.Memory.ForgetAbandoned(key);
+                journal.Memory.ForgetAbandoned(AbandonedKeyOf(journal, record.Seq, record.State, record.Process?.Pid ?? 0));
                 settled.Add(result);
             }
             else if (answer.TryAgain)
             {
+                if (answer.Why is { } why) left[record.Seq] = why;
                 journal.Memory.NoteARefusedSwap(key, now);
             }
         }
         if (mode == UndoMode.Live) TidyClosedSteps(writer, journal);
-        return new UndoRecoveryRun(settled, StoppedByATest: false);
+        return new UndoRecoveryRun(settled, StoppedByATest: false, left);
     }
 
     /// <summary>
@@ -192,7 +204,7 @@ internal static class UndoRecovery
     internal static bool MaySettle(UndoFoldedStep record, UndoJournal journal)
     {
         if (record.Process is not { } process || process.Pid is <= 0 or > int.MaxValue) return false;
-        if (journal.Memory.IsAbandoned(KeyOf(record, journal))) return true;
+        if (journal.Memory.IsAbandoned(AbandonedKeyOf(journal, record.Seq, record.State, process.Pid))) return true;
         return !journal.IsAlive(process);
     }
 
@@ -200,6 +212,14 @@ internal static class UndoRecovery
     internal static string KeyOf(UndoFoldedStep record, UndoJournal journal) =>
         UndoProcessMemory.KeyOf(journal.Folder) + "#" + record.Seq + "#" + record.State + "#"
         + (record.Step.MadeAt?.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "");
+
+    /// <summary>
+    /// A step this process gave up on: the list, its number, where its work
+    /// stands, and the process (only a step named by this process's own id is
+    /// ever settled as abandoned while it lives).
+    /// </summary>
+    internal static string AbandonedKeyOf(UndoJournal journal, long seq, UndoStepState working, long pid) =>
+        UndoProcessMemory.KeyOf(journal.Folder) + "#" + seq + "#" + working + "#pid" + pid;
 
     private static bool CanRederive(UndoStep step, IUndoMaintainers? maintainers)
     {
@@ -249,8 +269,11 @@ internal static class UndoRecovery
         }
     }
 
-    private sealed record SettleAnswer(UndoRecoveryResult? Result, bool TryAgain, bool Stopped)
+    private sealed record SettleAnswer(UndoRecoveryResult? Result, bool TryAgain, bool Stopped, UndoRefusal? Why = null)
     {
+        /// <summary>Left, to be tried again, for the reason given.</summary>
+        internal static SettleAnswer AgainFor(UndoRefusal why) => new(null, true, false, why);
+
         internal static readonly SettleAnswer Again = new(null, true, false);
         internal static readonly SettleAnswer Nothing = new(null, false, false);
         internal static readonly SettleAnswer Halted = new(null, false, true);
@@ -317,7 +340,11 @@ internal static class UndoRecovery
         IReadOnlyList<(string Path, UndoOpState State)> files = FileStates(step, root);
         // A file that could not be read now is never judged changed by hand:
         // tried again on the schedule, as for a file in use (ruling 4).
-        if (files.Any(file => file.State is UndoOpState.CannotTell or UndoOpState.NotReadable)) return SettleAnswer.Again;
+        foreach ((string path, UndoOpState state) in files)
+        {
+            if (state is UndoOpState.CannotTell or UndoOpState.NotReadable)
+                return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, path));
+        }
 
         int atStart = 0, atEnd = 0;
         var inTheWay = new List<string>();
@@ -362,12 +389,12 @@ internal static class UndoRecovery
                 catch (UndoListUnreadableException)
                 {
                     // Content it needs cannot be read just now: tried again.
-                    return SettleAnswer.Again;
+                    return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow));
                 }
                 switch (plan)
                 {
                     case UndoCheck.PlanResult.FileIsInUse or UndoCheck.PlanResult.CannotTellNow or UndoCheck.PlanResult.FolderCannotBeReached:
-                        return SettleAnswer.Again;
+                        return SettleAnswer.AgainFor(UndoDoor.RefusalOf(plan));
                     case UndoCheck.PlanResult.Ready ready:
                     {
                         var targets = ready.InOrder.Select(change => new UndoSwapTarget(UndoDoor.FullPath(root, change.Path), change.Path,
@@ -379,7 +406,7 @@ internal static class UndoRecovery
                         switch (UndoSwap.Swap(targets, label + "-recover", root, recoverySeams))
                         {
                             case UndoSwapResult.StoppedByATest: return SettleAnswer.Halted;
-                            case UndoSwapResult.Refused: return SettleAnswer.Again;   // a file in use: tried again on the schedule
+                            case UndoSwapResult.Refused refused: return SettleAnswer.AgainFor(refused.Refusal);   // a file in use: tried again on the schedule
                         }
                         putBack = targets.Count;
                         break;

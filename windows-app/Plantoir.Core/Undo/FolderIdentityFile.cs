@@ -33,9 +33,11 @@ namespace Plantoir.Core.Undo;
 /// at the name is never moved (the review's second round; see
 /// <see cref="SetAside"/>).</para>
 ///
-/// <para>Nothing in the app calls this yet: the first step recorded in a folder
-/// makes its <c>folder-id</c> (W2's door, W4's start-up for
-/// <c>computer-id</c>). Its clock is passed in, so "less than ten seconds"
+/// <para>The first step recorded in a folder makes its <c>folder-id</c>
+/// (W2's door; no action reaches the door before W7). Nothing makes
+/// <c>computer-id</c> yet, on either platform: no reader needs it (the mac's
+/// <c>UndoJournal.computerID()</c> has no caller), so W4's start-up does not
+/// make one either. Its clock is passed in, so "less than ten seconds"
 /// never waits on a real clock in a test.</para>
 /// </summary>
 internal sealed class FolderIdentityFile

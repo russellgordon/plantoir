@@ -151,6 +151,14 @@ public sealed class UndoDoorTests : IDisposable
         {
             Recomputes = [new JsonObject { ["kind"] = "recompute", ["maintainer"] = "sectionFrontPage", ["path"] = "courses/TST1O/Section 1/index.md", ["section"] = 1 }],
         };
+        // Made without a runner, it is refused before anything is written, as
+        // the ops entry refuses it (the final sweep of W2a/W2b): never recorded
+        // and made with its re-derivation skipped, which would leave it not
+        // available to every Undo and block the list.
+        UndoOutcome withoutARunner = new UndoDoor(journal, UndoMode.Live).Perform(draft);
+        Assert.Equal("notReadable", withoutARunner.Word);
+        Assert.Equal(Old, File.ReadAllBytes(Full(APage)));
+        Assert.Empty(journal.Read().Folded.Steps);
         Assert.Equal(UndoOutcomeKind.Applied, new UndoDoor(journal, UndoMode.Live, maintainers).Perform(draft).Kind);
         Assert.Equal(1, maintainers.Rederived);
         Assert.Equal("notAvailable", new UndoDoor(journal, UndoMode.Live).Undo().Word);

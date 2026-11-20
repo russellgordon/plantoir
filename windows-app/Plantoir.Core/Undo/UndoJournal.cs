@@ -300,6 +300,9 @@ internal sealed class UndoJournal
                             ["seq"] = pruned.Seq, ["event"] = "pruned", ["reason"] = pruned.Reason,
                         });
                         break;
+                    case UndoPruneAction.ClosedUnsettled closed when writer.LeftForARederivingRecovery.Contains(closed.Seq):
+                        // One more try can settle it: left in flight (W3's review, LOW 2).
+                        break;
                     case UndoPruneAction.ClosedUnsettled closed:
                         var paths = new System.Text.Json.Nodes.JsonArray();
                         foreach (string path in closed.Paths) paths.Add(path);
@@ -732,7 +735,7 @@ internal sealed class UndoJournal
     }
 }
 
-/// <summary>The checks the app's start-up will hand a journal (W4 and W11a); nothing calls them yet.</summary>
+/// <summary>The checks the app's start-up hands its journal (<see cref="UndoForThisProcess"/>, W4).</summary>
 internal static class UndoJournalChecks
 {
     /// <summary>

@@ -61,6 +61,15 @@ internal sealed class UndoJournalWriter : IDisposable
     /// </summary>
     internal bool RecoveredThisHold { get; set; }
 
+    /// <summary>
+    /// The steps this hold's recovery left for a recovery that re-derives
+    /// (a gone process's step that keeps a file true, which this hold could
+    /// settle but not re-derive after): pruning in the same hold never closes
+    /// them unsettled (W3's review, LOW 2). The next re-deriving recovery
+    /// settles them: an Undo, a Redo, or the next launch's (W4).
+    /// </summary>
+    internal HashSet<long> LeftForARederivingRecovery { get; } = [];
+
     /// <summary>The list as read fresh when the lock was taken, with every line this writer has appended.</summary>
     internal UndoFolded Folded { get; private set; }
 

@@ -277,6 +277,15 @@ public partial class App : Application
             return;
         }
 
+        // Undo's list (#899 W4): recovery at launch, on a thread of its own so
+        // the window never waits on the list's lock. Once per process, here,
+        // after --state-dir is applied and after the marketing scenes (which
+        // stage a window and must never open the list); a deploy set for later
+        // never gets this far (Program.Main), so it never opens the list. With
+        // the switch off it only records what it finds; it never stops, slows
+        // or changes the launch, and says only in the startup log.
+        _ = Plantoir.Core.Undo.UndoAtLaunch.Recover(LogDiagnostic);
+
         // Windows has no system restoration: the remembered list is the
         // mechanism. Replay it when the preference asks; otherwise one
         // window, which shows the picker when no folder is remembered.
