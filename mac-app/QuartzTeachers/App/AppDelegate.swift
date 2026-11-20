@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Nothing for a teacher, nothing in a UI-tested app, nothing in a
         // release build — see `UnitTestHostWindows`.
         UnitTestHostWindows.installIfThisIsTheUnitTestHost()
+        // Before AppKit restores any window, so its word that restoration
+        // has finished is heard: restored windows wait for it before they
+        // look for their folders by frame (#998, `LaunchRestoration`).
+        LaunchRestoration.shared.startListening()
         // Before any window exists, so before AppKit's first frame save: a
         // run a test drives puts AppKit's own preference keys back (#361).
         // HERE and not in `QuartzTeachersApp.init` — see
@@ -54,6 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // AppKit restores windows before launch finishes, and says so first
+        // (measured on macOS 26.7.3, every launch). Should a system ever not
+        // say so, launch finishing is the same fact, so no window waits for
+        // a word that never comes (#998). Doing it twice does nothing.
+        LaunchRestoration.shared.restorationFinished()
         ActivityTrail.noteLaunch()
         OutsideAssistantPresence.shared.refresh()
         // The Preview button's title follows Option while it is held (#504).

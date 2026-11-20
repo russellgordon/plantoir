@@ -49,26 +49,9 @@ struct WindowRootView: View {
                 // decides when the claim below resolves.
                 workspace.adoptFolderForNewWindow()
             }
-            .onReceive(NotificationCenter.default.publisher(
-                for: NSApplication.didFinishRestoringWindowsNotification
-            )) { _ in
-                // AppKit has just finished state restoration, so every
-                // restored frame is final — try the frame match NOW
-                // rather than waiting for the settle-polling to notice.
-                // Success only: on a mismatch the polling keeps running,
-                // so this window cannot give up early and order-claim an
-                // entry that rightly belongs to a sibling's frame.
-                if let window = workspace.window,
-                   let entry = claimant.frameDidSettle(
-                       NSStringFromRect(window.frame),
-                       windowHasSettled: workspace.hasSettledItsFolder
-                   ) {
-                    adopt(entry, how: "matched at restoration-complete")
-                }
-            }
             .background(WindowAccessor { window in
                 workspace.window = window
-                attemptClaim(for: window, attemptsLeft: 7)
+                attemptClaim(for: window)
                 let folderPath: String = LogRedactor.redacting(workspace.workspaceURL?.path ?? "")
                 AppLog.interface.info("""
                     window \(windowIdentity, privacy: .public) opened in \
@@ -124,52 +107,35 @@ struct WindowRootView: View {
 
     // MARK: - Functions
 
-    /// Finds this window's folder by its frame, retrying briefly because a
-    /// reopened window's frame settles a moment after the window exists.
+    /// Finds this window's folder by its frame, once macOS has finished
+    /// restoring windows, and gives up to the next remembered folder by
+    /// order only after every sibling restored with it has tried its own
+    /// frame (`WindowClaimRound`, #998: this used to retry every 150 ms).
     /// The claimant claims at most once, and claims close shortly after
     /// launch — a window opened mid-session inherits nothing.
     ///
-    /// A window that has already settled its folder — decided in onAppear,
-    /// or claimed at restoration-complete — never claims, and never reaches
-    /// the give-up below: one decision per window (#311 review B1). Before
-    /// that rule the give-up's "harmless backstop" could have become a
-    /// second decision, putting a window whose folder had gone onto a
-    /// sibling's folder and wiping the sentence that said why.
-    func attemptClaim(for window: NSWindow, attemptsLeft: Int) {
-        // The claimant refuses for a settled window and marks itself done,
-        // so the give-up below is never reached for one either.
-        if workspace.hasSettledItsFolder {
-            _ = claimant.giveUp(windowHasSettled: true)
-            return
-        }
-        if let entry = claimant.frameDidSettle(
-            NSStringFromRect(window.frame),
-            windowHasSettled: workspace.hasSettledItsFolder
-        ) {
-            adopt(entry, how: "matched by frame")
-            return
-        }
-        // Once the claims have closed there is nothing to keep retrying
-        // for — this is a mid-session window, and it should get its folder
-        // (or its picker) right away rather than a second later.
-        let claimsHaveClosed: Bool = Date() > WindowFolderMemory.claimsOpenUntil
-        if attemptsLeft <= 0 || claimsHaveClosed {
-            if let entry = claimant.giveUp(windowHasSettled: workspace.hasSettledItsFolder) {
-                adopt(entry, how: "fell back to order")
-            } else {
-                // No remembered window for this one: macOS brought back a
-                // window whose folder was not recorded. The picker is the
-                // honest screen — it does NOT inherit a sibling's folder.
+    /// A window that has already settled its folder — decided in onAppear
+    /// — never claims, and never reaches the give-up: one decision per
+    /// window (#311 review B1). Before that rule the give-up's "harmless
+    /// backstop" could have become a second decision, putting a window
+    /// whose folder had gone onto a sibling's folder and wiping the
+    /// sentence that said why.
+    func attemptClaim(for window: NSWindow) {
+        WindowClaimRound.begin(
+            claimant: claimant,
+            frame: {
+                return NSStringFromRect(window.frame)
+            },
+            windowHasSettled: {
+                return workspace.hasSettledItsFolder
+            },
+            adopt: { entry, how in
+                adopt(entry, how: how)
+            },
+            settleWithNoEntry: {
                 workspace.settleItsFolder()
             }
-            return
-        }
-        // A bounded retry while the frame settles; the restoration-complete
-        // notification above is the real signal, and this the fallback.
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(150))
-            attemptClaim(for: window, attemptsLeft: attemptsLeft - 1)
-        }
+        )
     }
 
     /// Takes a remembered window as this window's own.
