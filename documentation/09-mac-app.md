@@ -19550,6 +19550,55 @@ Mac can reach the address while it runs, as it can a preview. `~/Desktop`
 and `~/Documents` are `drwx------`, so this is longer exposure than a
 preview's, and a one-time key cookie was offered and declined.
 
+### Stop is finished only when nothing is listening (#1013)
+
+`NWListener.cancel()` only asks: the listener lets its address go a moment
+later, on the framework's own time, and reports `.cancelled` through its
+delivery queue once it has. Until #1013 `DeployedFolderShows.stop` returned as soon as it
+had asked, so under load the address went on answering after Stop had
+returned. Measured on the M4 Pro with twelve busy processes beside the
+suite: **3 of 40** runs of `DeployedFolderOfferTests` failed, at both
+places that check the address right after Stop. With the delivery queue
+held back (`testStopIsNotFinishedWhileTheListenerIsStillOpen`, which waits
+for Stop to announce that it is waiting rather than counting yields) it
+failed **5 of 5**, without load. So it was the product, not the test's timing.
+
+Now:
+
+- `DeployedFolderServer.stop()` is `async` and returns once the listener's
+  own `.cancelled` has arrived (`ListenerClosed`). One state handler serves
+  the listener's whole life, so no state change falls between a starting
+  handler and a running one, as it could before.
+- `DeployedFolderShows.stop(_:reason:)` and `stop(courseCode:…)` are
+  `async`. The show leaves the list BEFORE any wait, so the notice goes the
+  moment Stop is pressed and a second Stop finds nothing to do; the trail
+  line ("stopped showing the deployed folder…") is written once the address
+  is free. Stop pressed while a start is under way waits for that start to
+  stop itself.
+- Open pressed while a Stop of the same folder is still letting the address
+  go waits for it (`stopsUnderWay`), so the folder comes back at its usual
+  address rather than moving because its own old listener held it, and the
+  trail does not wrongly say the address moved
+  (`testOpenRightAfterStopGetsTheSameAddressBack`, which holds the queue
+  back so the Stop is certainly still waiting when Open is pressed; with
+  the wait removed it failed 3 of 3).
+- A listener's "ended" and a server's "folder gone" are matched on the
+  server, not the folder's path, so a late word from an old listener cannot
+  stop a newer show of the same folder
+  (`testAnOldListenerEndingDoesNotStopANewerShowOfTheFolder`).
+
+**Rejected:** a fixed wait in the tests before checking the address, which
+would only hide the product's race and load can outlast; and polling the
+port until it is free, a duration by another name. Quitting
+(`stopEverything`) still does not wait: the process is about to end and the
+kernel lets the address go with it.
+
+**Windows** does not have this shape in its Stop: `TcpListener.Stop()`
+closes the socket before it returns, so the port is free when
+`DeployedFolderShows.Stop` returns. Its Stop pressed while a start is under
+way returns before that start has stopped itself, as the mac's did; the
+window is the few milliseconds of one bind.
+
 ### Measured (2026-11-13, M4 Pro, macOS 26)
 
 - `browser-checks/crawl_deployed_folder.py --app <Plantoir.app>` on a
