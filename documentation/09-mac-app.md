@@ -4574,7 +4574,12 @@ brought to match in stage 3.
   Text fields: "Consider using an expansion tooltip to show the full
   version of clipped or truncated text." `AccessibilityTreeTests` reads the
   help tags off the tree (`AccessibilityTree.Element.help`): one on a
-  12-character code in a 140-point sidebar, none on EXC2O at 228.
+  12-character code in a 140-point sidebar, none on EXC2O at 228. NOT
+  proven: the tag in the sidebar's own folding course row. There the row's
+  label reaches the tree merged into one heading, without its help tag
+  (measured 2026-11-20), and a pointer resting on the row, sent from a
+  script in the running app, showed no help tag on any control at all, so
+  that drive could not tell either way.
 - **The Backups total keeps a margin (D45).** `BackupsSectionHeader` puts
   `trailingMargin` (10 pt) after the total; it was drawn about 2 pt from
   the divider while the heading's name sits about 14 pt in. HIG, Layout:
