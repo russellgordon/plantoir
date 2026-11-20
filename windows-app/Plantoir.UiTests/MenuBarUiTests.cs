@@ -287,14 +287,19 @@ public class SectionAndClassesUiTests
 
     /// <summary>
     /// Open a menu and read its lines in order: each item's AutomationId, and
-    /// a separator as "----". A <c>MenuFlyoutSeparator</c> has no element in
-    /// UI Automation (measured on the VM, 2026-11-20: the flyout's children
-    /// are its items only), so a separator is read where it is drawn: as a
-    /// gap between two items' rectangles more than 2 pixels larger than the
+    /// a separator as "----". A <c>MenuFlyoutSeparator</c> has no UI Automation
+    /// element at all, so the separator cannot be read as structure: measured
+    /// in the VM on 2026-11-20 (#990 review), the RAW view under the open
+    /// flyout's <c>MenuFlyout</c> and its <c>Popup</c> holds the five
+    /// <c>MenuFlyoutItem</c>s and their text and nothing else (WinUI gives the
+    /// separator no automation peer). So it is read where it is drawn: a gap
+    /// between two items' rectangles more than 1 pixel larger than the
     /// smallest gap in the menu, which is the gap between two items of one
-    /// group. Measured in the VM at 100%: 4 or 5 pixels between items of one
-    /// group, 7 or 8 across a separator (<see cref="LastGaps"/> says what was
-    /// measured when it fails).
+    /// group. Measured at 100%: 4 or 5 pixels within a group, 7 or 8 across a
+    /// separator (<see cref="LastGaps"/> says what was measured when it
+    /// fails). The groups themselves are pinned without pixels by
+    /// <c>SubjectMenuLayoutContractTests</c>, against the lists the window
+    /// draws from.
     /// </summary>
     private static List<(string Line, AutomationElement? Element)> Read(DrivenApp app, string menu, string anyItemId)
     {
@@ -315,7 +320,7 @@ public class SectionAndClassesUiTests
         var lines = new List<(string, AutomationElement?)>();
         for (int index = 0; index < items.Count; index++)
         {
-            if (index > 0 && gaps[index - 1] > between + 2) lines.Add((Separator, null));
+            if (index > 0 && gaps[index - 1] > between + 1) lines.Add((Separator, null));
             lines.Add((items[index].Id, items[index].Element));
         }
         return lines;
