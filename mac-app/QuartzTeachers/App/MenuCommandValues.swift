@@ -111,8 +111,11 @@ struct CourseSettingsCommands: Equatable {
     /// Planning tab; until #990 a grey line under it in the Course menu said
     /// why (#708's `PlanningWording.revertOnPlanning`). Russell's ruling Q14
     /// took the grey rows out of the menus, and the same sentence became
-    /// this help tag, which AppKit also gives VoiceOver as the item's help
-    /// (HIG, Offering help: "Consider offering context-sensitive tooltips").
+    /// this help tag (HIG, Offering help: "Consider offering
+    /// context-sensitive tooltips"). Measured: the tag shows on the dimmed
+    /// item, but a menu item's tag is not exposed to accessibility (no
+    /// AXHelp, an accessibility hint included), so a VoiceOver user has the
+    /// same sentence from Help's course-settings page.
     var revertHelp: String = ""
 
     // MARK: - Functions
