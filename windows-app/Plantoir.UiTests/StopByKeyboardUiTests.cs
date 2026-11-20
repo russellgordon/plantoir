@@ -274,6 +274,17 @@ public class StopByKeyboardUiTests
         return app;
     }
 
+    /// <summary>The trail's lines about preview.ps1, for a failure message.</summary>
+    private static string PreviewTrailLines(DrivenApp app)
+    {
+        var lines = new List<string>();
+        foreach (string line in MenuBar.Trail(app).Split('\n'))
+        {
+            if (line.Contains("preview.ps1", StringComparison.Ordinal)) lines.Add(line.Trim());
+        }
+        return lines.Count == 0 ? "none" : string.Join(" / ", lines);
+    }
+
     private static void AssertStopped(DrivenApp app, string after)
     {
         // The phase, or the trail: the console of a preview stopped before it
@@ -283,7 +294,7 @@ public class StopByKeyboardUiTests
         Assert.True(Retry.WhileFalse(() => Phase(app) is "Stopped" or "Cancelled"
                                            || MenuBar.Trail(app).Contains("finished preview.ps1 — stopped by the teacher"),
                                      TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(250)).Result,
-                    $"{after} did not stop the running preview (phase \"{Phase(app)}\", Preview button \"{app.Find("previewButton", "the Preview button").Name}\")");
+                    $"{after} did not stop the running preview (phase \"{Phase(app)}\", Preview button \"{app.Find("previewButton", "the Preview button").Name}\", the trail's preview lines: {PreviewTrailLines(app)})");
         Assert.False(PreviewRuns(app), $"the preview still runs after {after}");
         Assert.Null(app.OpenDialog());
     }
