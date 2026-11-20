@@ -14432,6 +14432,44 @@ down when destination 1 finished"), no `WasCancelled` check before a leg
 between the build and the deploy"), the wizard's Stop back to `Terminate`
 ("Something went wrong").
 
+**The third review's fixes (2026-11-20).** *A stopped deploy is never
+every destination deployed.* A stop between two destinations reached no
+leg's runner, the run never started leg 2, and `CurrentOutcome` counted
+finished legs only, so the outcome was `AllSucceeded`: `RecordWhatWentOut`
+stamped the section published (its " — Edited" went away) and the window
+and the assistant were told "deployed to all 2 destinations". A destination
+a stop kept the run from reaching now counts as not deployed, as the one a
+stop lands in does: the case is `shared-rules.json` → `stopQuestions` →
+`aStoppedDeploy`, added from here and played by both suites through their
+own runner's outcome and `MultiDestinationDeployRunner.Result` (the mac's
+`outcome` and `result`, changed the same way). The sentence for a stop
+between two is `deployPartiallySucceeded` naming the unreached
+destinations, the one the mac says for a stop during the second of two;
+the mac's Cancel answers only while the shown leg runs, so it has no gap
+case of its own. A leg not reached because the shared BUILD failed is still
+not counted (the build's own answer is said). *A stop after the last leg
+stops nothing.* Once the last leg's runner has ended, `IsRunning` stays
+true until `RunAsync`'s next poll; the panel's rule read that as under way,
+so a press there asked, and Stop Deploy marked the run cancelled: the badge
+read "Cancelled" over a deploy that had gone out everywhere. The run's half
+of the rule is now `CanStillBeStopped`: running, not cancelled, and its
+current leg under way or a later leg still to start; `Cancel()` marks
+nothing when it is false, and a question open at that moment comes down.
+*No outcome badge beside Cancel.* In the gap between two destinations
+`Render` drew leg 1's ending ("Done", or "Something went wrong" since no leg
+had yet been marked finished) beside a Cancel that still stopped the
+deploy; it now draws the working state by
+`MultiDestinationDeployRunner.ShownTaskShowsAsWorking`. *A throw in the
+ending.* `RunAsync`'s `finally` stamped, cleared the marks and set
+`IsRunning` false in sequence, so a throw from the stamp or from a listener
+skipped the rest and left the run going for good; each step now runs in a
+`finally` of the one before. *No real account from the UI class.*
+`StopByKeyboardUiTests` deployed its two-destination course to a folder and
+then Netlify, and `deploy.ps1` reads the machine's own Netlify credential
+from Windows Credential Manager, so on a PC with one it could publish for
+real; every destination in the class is now a folder in the test's own temp
+tree.
+
 ## The lap cap on Windows (#720, the mac's #689)
 
 One teacher action asks the model at most `shared-rules.json` →
