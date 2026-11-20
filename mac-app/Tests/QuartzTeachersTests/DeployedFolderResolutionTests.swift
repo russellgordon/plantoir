@@ -219,7 +219,7 @@ final class DeployedFolderResolutionTests: XCTestCase {
                 try? FileManager.default.removeItem(at: fixture.top)
             }
             let started: (server: DeployedFolderServer, firstWasTaken: Bool) = try await DeployedFolderServer.start(
-                root: fixture.root, candidates: DeployedFolderResolutionTests.testPorts(), onFolderGone: {}
+                root: fixture.root, candidates: DeployedFolderResolutionTests.testPorts(), onFolderGone: { _ in }
             )
             let port: Int = started.server.port
             let request: DeployedFolderResolver.Request = try DeployedFolderResolutionTests.request(from: testCase, port: port)
@@ -289,7 +289,7 @@ final class DeployedFolderResolutionTests: XCTestCase {
             try? FileManager.default.removeItem(at: fixture.top)
         }
         let started: (server: DeployedFolderServer, firstWasTaken: Bool) = try await DeployedFolderServer.start(
-            root: fixture.root, candidates: DeployedFolderResolutionTests.testPorts(), onFolderGone: {}
+            root: fixture.root, candidates: DeployedFolderResolutionTests.testPorts(), onFolderGone: { _ in }
         )
         let port: Int = started.server.port
         let host: String = "Host: 127.0.0.1:\(port)\r\n"
@@ -372,7 +372,7 @@ final class DeployedFolderResolutionTests: XCTestCase {
         let big: Data = Data(count: 16 * 1024 * 1024)
         try big.write(to: fixture.root.appendingPathComponent("big.mp4"))
         let started: (server: DeployedFolderServer, firstWasTaken: Bool) = try await DeployedFolderServer.start(
-            root: fixture.root, candidates: DeployedFolderResolutionTests.testPorts(), onFolderGone: {}
+            root: fixture.root, candidates: DeployedFolderResolutionTests.testPorts(), onFolderGone: { _ in }
         )
         let port: Int = started.server.port
         var readers: [Int32] = []
