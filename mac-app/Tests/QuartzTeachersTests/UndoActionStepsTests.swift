@@ -794,6 +794,43 @@ final class UndoActionStepsTests: XCTestCase {
         XCTAssertNotEqual(fullSentence, AssistToolRefusal.unreadablePage("ICS3U").message)
     }
 
+    /// A press the door could not check (`cannotTellNow`) says "could not
+    /// be read" only for a file that really cannot be read now; a place
+    /// that is a folder, not a page, is the could-not-be-saved sentence (the
+    /// second review of U3a, LOW 3). MUST FAIL with the unreadable-page
+    /// sentence said for every `cannotTellNow`.
+    func testAPressThatCannotBeCheckedSaysUnreadableOnlyForAFileThatCannotBeRead() throws {
+        let pressed = try checklistToPress()
+        let course: Course = pressed.made.course
+        let graph: AssistSectionGraph = AssistSectionGraph.read(
+            forSection: 1, in: course, workspaceURL: pressed.made.root
+        )
+        let step: JournaledStep = JournaledStep(
+            course: course, section: 1, maker: UndoStepMaker.sheet("answerTheLinksChecklist")
+        )
+        let unreadableSentence: String = AssistToolRefusal.unreadablePage(pressed.offer.course).message
+
+        let classURL: URL = AssistFixture.pageURL(of: "Unit 2, Day 5", in: course)
+        let folderURL: URL = classURL.deletingLastPathComponent().appendingPathComponent("A folder.md", isDirectory: true)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        let atAFolder: String = LinksChecklistPublisher.sentence(
+            forRefused: JournaledStepError.refused(.cannotTellNow(path: folderURL.path), fileName: "A folder.md"),
+            of: step, graph: graph, offer: pressed.offer, in: course
+        )
+        XCTAssertTrue(atAFolder.hasPrefix("Nothing was changed: "), atAFolder)
+        XCTAssertNotEqual(atAFolder, unreadableSentence)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: classURL.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: classURL.path)
+        }
+        let atAnUnreadableFile: String = LinksChecklistPublisher.sentence(
+            forRefused: JournaledStepError.refused(.cannotTellNow(path: classURL.path), fileName: "Unit 2, Day 5.md"),
+            of: step, graph: graph, offer: pressed.offer, in: course
+        )
+        XCTAssertEqual(atAnUnreadableFile, unreadableSentence)
+    }
+
     /// The fixture's course settings list their keys in sorted order, so
     /// two fixture courses hold the same bytes (the second review of U3a,
     /// LOW 1: written without `.sortedKeys`, a dictionary's order made
