@@ -19,7 +19,11 @@ Pinned here, each measured failing before the change:
     runtime's file, through the build's own dependency step;
   * nothing else in the mirror is touched, and a second build adds nothing;
   * a copy the mirror holds that is not the runtime's file (an older one
-    left by an earlier upgrade) is replaced by the runtime's;
+    left by an earlier upgrade) is replaced by the runtime's, even at the
+    same size;
+  * a copy that already holds the runtime's bytes under its own inode (made
+    where a hardlink was refused) is left alone, not copied again on every
+    build (#1010: files are compared by size and SHA-256, not by inode);
   * a runtime without the copies, or a mirror without the module's folder,
     is left as it is and the build goes on;
   * off Windows (the Mac, the container) the step does nothing at all.
@@ -130,6 +134,33 @@ class AnUpgradedMirrorGainsTheModuleCopies(unittest.TestCase):
         stale.write_bytes(b"MZ vcruntime 14.29")
         self.build_dependencies(on_windows=True)
         self.assertTrue(same_file(stale, self.runtime_modules / TYPST[0] / LIBRARY))
+        self.assertEqual(b"MZ vcruntime 14.51", stale.read_bytes())
+
+    def test_a_copy_made_where_a_link_was_refused_is_not_copied_again(self):
+        # #1010: os.link can be refused (another volume, a file system without
+        # hardlinks), and then the step COPIES. That copy holds the runtime's
+        # bytes under its own inode, and comparing inodes replaced it, and
+        # said "Added 2", on every build. Compared by content, it is left.
+        for folder, _ in (LIGHTNINGCSS, TYPST):
+            copy = self.mirror / folder / LIBRARY
+            copy.write_bytes((self.runtime_modules / folder / LIBRARY).read_bytes())
+            self.assertFalse(same_file(copy, self.runtime_modules / folder / LIBRARY))
+        before = {}
+        for folder, _ in (LIGHTNINGCSS, TYPST):
+            before[folder] = (self.mirror / folder / LIBRARY).stat().st_ino
+        said = self.build_dependencies(on_windows=True)
+        self.assertNotIn("library file(s)", said)
+        self.assertEqual([], toolchain_paths.bring_module_libraries_into_mirror(self.mirror, windows=True))
+        for folder, _ in (LIGHTNINGCSS, TYPST):
+            self.assertEqual(before[folder], (self.mirror / folder / LIBRARY).stat().st_ino,
+                             f"{folder}/{LIBRARY} was replaced although it already held the runtime's bytes")
+
+    def test_a_copy_of_the_same_size_with_other_bytes_is_replaced(self):
+        stale = self.mirror / TYPST[0] / LIBRARY
+        stale.write_bytes(b"MZ vcruntime 14.29")
+        self.assertEqual(stale.stat().st_size, (self.runtime_modules / TYPST[0] / LIBRARY).stat().st_size)
+        added = toolchain_paths.bring_module_libraries_into_mirror(self.mirror, windows=True)
+        self.assertIn(TYPST[0] + "/" + LIBRARY, added)
         self.assertEqual(b"MZ vcruntime 14.51", stale.read_bytes())
 
     def test_a_runtime_without_the_copies_leaves_the_mirror_as_it_is(self):
