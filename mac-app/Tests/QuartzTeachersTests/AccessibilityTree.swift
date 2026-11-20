@@ -38,12 +38,6 @@ struct AccessibilityTree {
         /// where it does not.
         let enabled: String
 
-        /// The words of the element AppKit names as this one's title
-        /// (`AXTitleUIElement`): a printed label a `Form` row links to its
-        /// control, which VoiceOver reads as the control's name (#1012).
-        /// Empty where none is linked.
-        let titleElementWords: String
-
         /// The role of the element this one sits in.
         let parentRole: String
 
@@ -51,6 +45,12 @@ struct AccessibilityTree {
         /// ("AXPress" and the like): what VoiceOver and Full Keyboard
         /// Access use to activate it, with Keyboard Navigation on or off.
         let actions: [String]
+
+        /// The words of the element AppKit names as this one's title
+        /// (`AXTitleUIElement`): a printed label a `Form` row links to its
+        /// control, which VoiceOver reads as the control's name (#1012).
+        /// Empty where none is linked.
+        let titleElementWords: String
 
         // MARK: - Computed properties
 
@@ -241,35 +241,13 @@ struct AccessibilityTree {
             label: text(of: node, attribute: kAXDescriptionAttribute),
             value: text(of: node, attribute: kAXValueAttribute),
             enabled: text(of: node, attribute: kAXEnabledAttribute),
-            titleElementWords: titleElementWords(of: node),
             parentRole: parentRole,
-            actions: actionNames(of: node)
+            actions: actionNames(of: node),
+            titleElementWords: titleElementWords(of: node)
         ))
         for child in elementList(of: node, attribute: kAXChildrenAttribute) {
             collect(child, parentRole: role, into: &found, depth: depth + 1)
         }
-    }
-
-    /// The value (or title) of the element linked as `element`'s title, or
-    /// empty where none is.
-    static func titleElementWords(of element: AXUIElement) -> String {
-        var linked: CFTypeRef?
-        let result: AXError = AXUIElementCopyAttributeValue(element, kAXTitleUIElementAttribute as CFString, &linked)
-        if result != .success {
-            return ""
-        }
-        guard let linked else {
-            return ""
-        }
-        if CFGetTypeID(linked) != AXUIElementGetTypeID() {
-            return ""
-        }
-        let titleElement: AXUIElement = linked as! AXUIElement
-        let value: String = text(of: titleElement, attribute: kAXValueAttribute)
-        if !value.isEmpty {
-            return value
-        }
-        return text(of: titleElement, attribute: kAXTitleAttribute)
     }
 
     static func actionNames(of element: AXUIElement) -> [String] {
@@ -315,5 +293,27 @@ struct AccessibilityTree {
             return number.stringValue
         }
         return ""
+    }
+
+    /// The value (or title) of the element linked as `element`'s title, or
+    /// empty where none is.
+    static func titleElementWords(of element: AXUIElement) -> String {
+        var linked: CFTypeRef?
+        let result: AXError = AXUIElementCopyAttributeValue(element, kAXTitleUIElementAttribute as CFString, &linked)
+        if result != .success {
+            return ""
+        }
+        guard let linked else {
+            return ""
+        }
+        if CFGetTypeID(linked) != AXUIElementGetTypeID() {
+            return ""
+        }
+        let titleElement: AXUIElement = linked as! AXUIElement
+        let value: String = text(of: titleElement, attribute: kAXValueAttribute)
+        if !value.isEmpty {
+            return value
+        }
+        return text(of: titleElement, attribute: kAXTitleAttribute)
     }
 }
