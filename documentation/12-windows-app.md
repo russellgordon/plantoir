@@ -16858,7 +16858,18 @@ are carried by the attribute copy (they stick on any NTFS file, measured).
 JSON: 20 run through the real door, swap and recovery, `fileInUseDuringRecovery`
 a real `FileShare.ReadWrite` holder; the 21 rows of U2b's kinds held on the
 ledger for W6, each still stopping at its key), `UndoRecoveryTests` (14 methods, 16 cases),
-six new `UndoSwapTests`. MUSTFAIL_AND_SUITE_PLACEHOLDER
+six new `UndoSwapTests`. The Undo classes on the PC: 611 passed, 1 skipped (the deny-listing ACE probe of W5).
+The whole unit suite on 0284c2613 (run `w3-full2`): 4,796 tests, exactly the six known
+failures. Twenty-three must-fail proofs, each red alone and green restored
+(`vm-tools/guest/899-w3-mustfail.json`, runs `w3-full1` and `w3-full2`): recovery doing
+nothing (17 contract rows red); a refused put-back retried at every lock (a test and a
+contract row); an Undo waiting its turn; the wait never doubling; a step past the limits
+waiting its turn; pruning without recovery; a reversal not reported; an abandoned step not
+settled; a pid of 0 read as a process; a plain write settling a step that keeps a file true;
+nothing re-derived; no closed-step tidy; no tidy before judging (3 cases); no trail line;
+LOWs 2 to 6 and 8, one each (two for LOW 4, two for LOW 2). The first run also caught a
+trail wiring scan this piece had to satisfy (`ActivityTrailWiringTests`: the sink now names
+its event).
 
 **The kill harness** (`Plantoir.UndoHarness recovery-kill`, Release, the PC
 above, `vm-tools/guest/899-w3-pc-run.ps1 -Mode recovery`, run `w3-r1`), outside
