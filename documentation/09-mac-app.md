@@ -5052,9 +5052,10 @@ reads on the blue with or without the card; the assistant's composer wears it
 instead of the Messages-shaped stroke it drew itself (the plan review measured
 24, 40 and 72 points tall for one, two and four lines, stopping at four), with
 the send button just outside the trailing edge; and the alert's
-`taskAnswerField` carries it although AppKit draws a field inside an `.alert`
-and ignores it — written so a field that ever moves out of the alert is
-bordered without anyone remembering. `TextEditor`s are not text fields; the
+`taskAnswerField` was given it on the belief that AppKit draws a field inside
+an `.alert` and ignores its style. That belief was wrong, and it hid the
+field: see "The Input required alert's field carries no style (#1019)" below,
+which made that field the scan's one named exception. `TextEditor`s are not text fields; the
 footer's already strokes its own border. (The composer was not driven
 visually in this batch: opening it starts the assistant. The model-free
 scan pins the modifier.)
@@ -5064,6 +5065,70 @@ of line with the picker, measured); a scan for `.plain` alone (an unstyled
 field in a grouped `Form` is the borderless look and carries no `.plain`); a
 lock glyph on the read-only rows (cut by the director — Russell did not ask
 for it, and after #376 only clubs see them).
+
+### The Input required alert's field carries no style (#1019)
+
+**The fault, in every release from v1.5.0 (#457, a5a6d28c5) to #1019.** A
+running task that asks a plain question (not a credential, which has its own
+sheet, and not the plan-share lists, which have theirs) is asked in
+`TaskProgressView`'s `.alert("Input required")`, whose `TextField` wore
+`.borderedTextField()`. Measured on 2026-11-20 by hosting the alert and
+listing the alert panel's views (#1012's probe, then
+`InputRequiredAlertTests`): a field with `.borderedTextField()` or
+`.textFieldStyle(.roundedBorder)` is NOT IN THE PANEL — it holds the title,
+the question, Send and Cancel — while a bare field, a field with only an
+identifier, and a field with only an accessibility label are each drawn
+(one editable field, 212 by 24 points, placeholder "Your answer"). So the
+teacher had nowhere to type, Send sent the task an empty line, and the
+console's own answer box sat behind the alert.
+
+**Option A, the fix built (held for Russell's choice between A and B).** The
+field carries no style; the alert draws its own bordered field.
+`TextFieldStyleScanTests` names it as its ONE exception
+(`alertAnswerField`: `TaskProgressView.swift` and the identifier
+`taskAnswerField`), holds that field to carrying NO style, and fails if the
+exception ever matches anything but exactly one field.
+
+**Keys (HIG, Alerts, read 2026-11-20).** Send is the default button, so
+Return sends: answering is what the task is waiting for, and the HIG says
+not to make Cancel the default. Escape presses Cancel ("Pressing Escape
+(Esc) or Command-Period"), which backs out the way the task's own cancel
+option would, or stops it when it has none. Both are measured in
+`InputRequiredAlertTests` (Send's key equivalent is Return, Cancel's is
+Escape; typed text reaches the task; Escape sends no answer and marks the
+run cancelled).
+
+**What VoiceOver is given, measured.** In process the drawn field reports no
+accessibility label and no identifier, placeholder "Your answer"; through the
+accessibility interface of the real app (`InputRequiredAlertUITests`, opt-in,
+driven once on 2026-11-20 in the isolated Debug build) the field's label,
+title and identifier are all empty and its placeholder is "Your answer". So
+VoiceOver reads the placeholder, and neither `.accessibilityLabel` nor
+`.accessibilityIdentifier` reaches a field inside an alert. That is option
+A's known limit: the field cannot be named.
+
+**What does not take this path.** A recognised credential (the Netlify and
+Cloudflare tokens, the site name, the teacher's surname, the unit-plan
+username and password: `CredentialRequest.matching`) is asked in
+`CredentialRequestSheet`, a sheet whose fields are bordered and named, and is
+unaffected. A question that asks for a secret in words `matching` does not
+recognise would still come to this alert as a plain, unmasked field. The launchers'
+other hidden reads (`read -rsp`) were matched against `matching` by eye on
+2026-11-20: all but one are recognised; `deploy.sh`'s token-settings mode asks
+"Paste the token:", which is not, and whether the app ever runs that mode on
+a terminal was not checked (#1019's report says so). No other `.alert` in `mac-app` holds a `TextField`
+or `SecureField` (a scan of every `.alert(` block under `QuartzTeachers`,
+2026-11-20), so there was nothing else to fix.
+
+**Windows** asks the same question in a `ContentDialog` with its own `TextBox`
+in the dialog's content (`TaskProgressView.xaml.cs`, `AskQuestion`), Send the
+primary and default button, so it does not have this fault; nothing is owed
+there.
+
+REJECTED, so far: leaving it (option C: a teacher asked a plain question
+cannot answer it). Option B, asking in a sheet where the field can be
+bordered and named like `CredentialRequestSheet`'s, is Russell's to choose
+against A; it is not built.
 
 **The machinery in a label (#369).** Course Settings' first settings row read
 "Language / region (Quartz locale)" from v1.1.0 to v1.4.0. It is now
