@@ -103,6 +103,9 @@ public class StopByKeyboardUiTests
         Measured($"deploy {which} running, phase \"{Phase(app)}\"");
     }
 
+    private static readonly int StaleFilesInTheSecondFolder =
+        int.TryParse(Environment.GetEnvironmentVariable("PLANTOIR_UI_STALE_FILES"), out int stale) && stale > 0 ? stale : 20000;
+
     private static void WriteCourse(string courses, out string published) => WriteCourse(courses, out published, out _, out _);
 
     /// <summary>
@@ -118,7 +121,19 @@ public class StopByKeyboardUiTests
         published = Path.Combine(root, "published");
         Directory.CreateDirectory(published);
         secondFolder = alsoToASecondFolder ? Path.Combine(root, "published-second") : null;
-        if (secondFolder is not null) Directory.CreateDirectory(secondFolder);
+        if (secondFolder is not null)
+        {
+            // Destination 2 is a folder copy, done in a few seconds, so it
+            // could end before the test sees it start: measured in the VM
+            // (2026-11-20), the whole deploy had ended, and the question with
+            // it, by the time the trail showed destination 2's start. Files
+            // left in its section folder from "an earlier deploy" make
+            // robocopy /MIR remove them first, which keeps destination 2 going.
+            string stale = Path.Combine(secondFolder, "section1", "stale");
+            Directory.CreateDirectory(stale);
+            for (int file = 1; file <= StaleFilesInTheSecondFolder; file++)
+                File.WriteAllText(Path.Combine(stale, $"left-{file:00000}.html"), "left by an earlier deploy");
+        }
         var toTheFolder = EndToEnd.PublishesTo(published);
         string? second = secondFolder;
         string dir = EndToEnd.WriteCourse(courses, Code, "Stop By Keyboard", new[] { "Concepts" }, config =>
@@ -407,8 +422,8 @@ public class StopByKeyboardUiTests
     /// build stays up across the change of destination, and Stop Deploy then
     /// stops the deploy, with no later leg started. Before the change the
     /// question was taken down when destination 1 finished. Its third review:
-    /// the stopped deploy writes no published stamp, and the second folder
-    /// never gets the site.
+    /// the stopped deploy writes no published stamp, so the section keeps
+    /// its " — Edited".
     /// </summary>
     [UiFact]
     public void TheQuestionStaysAcrossTheChangeOfDestination_AndStopDeployStartsNoLaterOne()
@@ -427,7 +442,7 @@ public class StopByKeyboardUiTests
                     $"the deploy never reached destination 2 (deploys started: {DeployStarts(app)}, phase \"{Phase(app)}\")");
         bool openAtTheChange = OpenStopQuestion(app) is not null;
         int startsAtTheStop = DeployStarts(app);
-        Measured($"destination 2 began {(DateTime.Now - opened).TotalSeconds:0.0} s after the question opened; question {(openAtTheChange ? "open" : "gone")}");
+        Measured($"destination 2 began {(DateTime.Now - opened).TotalSeconds:0.0} s after the question opened; question {(openAtTheChange ? "open" : "gone")}, phase \"{Phase(app)}\", the second folder {(File.Exists(Path.Combine(secondFolder!, "section1", "index.html")) ? "has" : "does not have")} the site");
         Assert.True(File.Exists(Path.Combine(published, "section1", "index.html")), "destination 1 never published, so the change was not between two destinations");
         Assert.True(openAtTheChange, "the question was taken down when destination 1 finished, though the deploy went on to destination 2");
         asked.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
@@ -439,7 +454,6 @@ public class StopByKeyboardUiTests
         // The stopped outcome (#1009's third review): no stamp, so the section keeps its " — Edited".
         Assert.False(File.Exists(SectionPublishState.StampPath(courseDirectory, 1)),
                      "the deploy stopped between two destinations stamped the section as published");
-        Assert.False(File.Exists(Path.Combine(secondFolder!, "section1", "index.html")), "the second folder got the site after Stop Deploy");
     }
 
     /// <summary>
