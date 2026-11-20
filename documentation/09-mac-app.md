@@ -1308,8 +1308,10 @@ same reason is the button's help tag as well (`.help`, the one
 handed over, nothing while a press would work), so a sighted teacher holding
 the pointer over a dimmed button reads why: HIG, Offering help, "Consider
 offering context-sensitive tooltips". The HIG asks a tooltip to stay within
-60 to 75 characters "as much as possible"; `notInstalledHelp` is 91, and it
-was left as the contract has it rather than given a second, shorter copy. Presence is read from
+60 to 75 characters "as much as possible" ("Be brief"); since the second
+review `notInstalledHelp` is 70 (it was 91), and it names the place Revise With
+▸ Set Up an Assistant… opens, Settings ▸ Other Assistants, rather than the menu
+item; `FixWithAssistantTests` holds both. Presence is read from
 `OutsideAssistantPresence` (asked at launch and when the app becomes active,
 never while the table draws — the view's source scan holds that it never
 calls `isAvailable`). Each is enabled while its assistant is installed AND at
@@ -7372,6 +7374,24 @@ and Stickies was not started in the five seconds watched: the menu item
 fired and no sticky note was made. The only loss is making a sticky note
 from text selected inside Plantoir with that key; the Services menu still
 offers it by click. The test skips, saying so, while Stickies is running.
+
+Since the second review the test no longer selects text, and is opt-in
+(`PLANTOIR_UI_TESTS=1`, as `ContainerIdentifiersUITests` is), because the
+scheme's Test action includes the UI target: with the page's text selected,
+a regressed key would have let the service start Stickies, which reopens
+the teacher's own notes, and save a note with the fixture's text that
+nothing removed. A note made that way cannot be removed safely: the runner
+is sandboxed and cannot read or change Stickies' container
+(`~/Library/Containers/com.apple.Stickies`), and a note must never be picked
+out from the teacher's own by guessing. So the test now presses ⇧⌘Y with
+the sidebar's row focused and nothing selected, after checking that
+Plantoir ▸ Services offers no live Stickies item (the service's send types
+are plain text, RTF and flat RTFD, and an outline row's selection holds
+none), so the failing path cannot make a note at all; the trail's `Section ▸
+Rebuild Preview` line is the proof the menu item ran. It records whether
+Stickies was running before the key, and the tear-down quits a Stickies the
+test caused, through XCTest. The precedence over a LIVE service is the
+measurement above, taken once; it is not re-taken by the test.
 
 **Why ⇧⌘O moves rather than sitting on both Open in Obsidian items** — the
 director's ruling allowed one key on two items that are never enabled at the

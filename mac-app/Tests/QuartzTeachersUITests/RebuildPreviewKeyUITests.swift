@@ -3,24 +3,38 @@ import XCTest
 
 /// #990: Rebuild Preview is ⇧⌘Y, as Russell ruled on 2026-11-18, although a
 /// stock Mac's Services menu gives ⇧⌘Y to Stickies' "Make Sticky" service
-/// (Stickies' own `NSServices` entry, key `Y`, which needs selected text).
-/// Apple's Services Implementation Guide: "When an application already has
-/// a shortcut with that key equivalent, the application's shortcut wins."
-/// This test is the measurement that sentence is true for Plantoir: with
-/// a preview running and the page's text SELECTED, so the service is live
-/// in the Services menu, a real ⇧⌘Y runs Rebuild Preview (its "ran from a
-/// menu" line on the trail) and Stickies is not started.
+/// (Stickies' own `NSServices` entry, key `Y`, send types plain text, RTF
+/// and flat RTFD, so it is offered only while text is selected). Apple's
+/// Services Implementation Guide: "When an application already has a
+/// shortcut with that key equivalent, the application's shortcut wins."
+/// That was measured once, with the page's text selected, on 2026-11-19
+/// (documentation 09, "Rebuild Preview's ⇧⌘Y beside the Stickies service").
+///
+/// What this test holds, from the second review on: a real ⇧⌘Y runs
+/// Section ▸ Rebuild Preview (its "ran from a menu" line on the trail is the
+/// proof the menu item ran). It presses the key with NOTHING selected, and
+/// checks first that Plantoir ▸ Services offers no live Stickies item, so
+/// even if the key ever regresses, the failing path cannot make a sticky
+/// note: the service is not offered for a selection that holds no text. A
+/// note made by the key could not be removed safely afterwards, because
+/// this sandboxed runner cannot read or change Stickies' container, and a
+/// note must never be picked out from the teacher's own by guessing.
 ///
 /// A synthetic course in the runner's own temporary folder, `--state-dir`
 /// (IsolatedLaunch) and a STUB `preview.sh`: nothing is built, and no
-/// container is used. It skips, saying so, when Stickies is already
-/// running, because then a new note could not be told from the teacher's
-/// own. Part of no gate, as the whole UI target is.
+/// container is used. It skips while Stickies is running, and if Stickies
+/// starts during the test anyway, the tear-down quits the copy the test
+/// caused. Opt-in (`PLANTOIR_UI_TESTS=1`): it needs the foreground. Part of
+/// no gate, as the whole UI target is.
 final class RebuildPreviewKeyUITests: XCTestCase {
 
     // MARK: - Stored properties
 
     private var stubPreviewPIDFileURL: URL?
+
+    /// Whether Stickies was running just before the key was pressed; nil
+    /// until then. Only a copy the test caused is quit in tear-down.
+    private var stickiesWasRunningBeforeTheKey: Bool?
 
     static let stickiesBundleIdentifier: String = "com.apple.Stickies"
 
@@ -31,12 +45,23 @@ final class RebuildPreviewKeyUITests: XCTestCase {
             StubLaunchers.reap(pidFileURL: pidFileURL, expectingNamePrefix: "python")
         }
         stubPreviewPIDFileURL = nil
+        if stickiesWasRunningBeforeTheKey == false && RebuildPreviewKeyUITests.stickiesIsRunning() {
+            // The test caused this copy: quit it, through XCTest (the
+            // sandboxed runner may not signal another app itself).
+            let stickies: XCUIApplication = XCUIApplication(bundleIdentifier: RebuildPreviewKeyUITests.stickiesBundleIdentifier)
+            stickies.terminate()
+            XCTFail("Stickies started during the test and was quit")
+        }
+        stickiesWasRunningBeforeTheKey = nil
         super.tearDown()
     }
 
     // MARK: - Tests
 
     func testShiftCommandYRebuildsThePreviewAndMakesNoStickyNote() throws {
+        guard ProcessInfo.processInfo.environment["PLANTOIR_UI_TESTS"] == "1" else {
+            throw XCTSkip("Opt-in: set PLANTOIR_UI_TESTS=1. This drives the real app and needs the foreground.")
+        }
         if RebuildPreviewKeyUITests.stickiesIsRunning() {
             throw XCTSkip("Stickies is already running, so a note made by the key could not be told from the teacher's own")
         }
@@ -59,29 +84,46 @@ final class RebuildPreviewKeyUITests: XCTestCase {
         let webView: XCUIElement = application.webViews.firstMatch
         XCTAssertTrue(webView.waitForExistence(timeout: 90), "The preview did not start")
 
-        // The page's text selected, so Stickies' service has something to
-        // take: without a selection the service is not live at all, and the
-        // key would prove nothing.
-        webView.click()
-        application.typeKey("a", modifierFlags: [.command])
+        // The sidebar's row, not the page, takes the key: an outline row
+        // selection holds no text, so Stickies' service has nothing to take.
+        sectionRow.click()
 
-        // Plantoir ▸ Services offers Stickies' item, live, at the moment
-        // the key is pressed.
+        // Plantoir ▸ Services offers no live Stickies item at the moment the
+        // key is pressed, so a regressed key could not make a note.
         let appMenu: XCUIElement = application.menuBars.menuBarItems["Plantoir"]
         appMenu.click()
         let services: XCUIElement = appMenu.menuItems["Services"]
         XCTAssertTrue(services.waitForExistence(timeout: 5))
         services.hover()
+        // The submenu always ends with Services Settings…, so once any item
+        // is drawn the submenu is there to be read.
+        XCTAssertTrue(services.menuItems.firstMatch.waitForExistence(timeout: 5), "the Services submenu opened")
         // "Make Sticky" in Stickies' Info.plist, "Make New Sticky Note" as
         // System Settings lists it: matched by the word both share.
-        let makeSticky: XCUIElement = services.menuItems.matching(
+        let stickyItems: XCUIElementQuery = services.menuItems.matching(
             NSPredicate(format: "title CONTAINS[c] %@", "sticky")
-        ).firstMatch
-        XCTAssertTrue(makeSticky.waitForExistence(timeout: 5), "Stickies' service is in the Services menu")
-        XCTAssertTrue(makeSticky.isEnabled, "and live, with the page's text selected")
+        )
+        var liveStickyItems: Int = 0
+        var index: Int = 0
+        while index < stickyItems.count {
+            if stickyItems.element(boundBy: index).isEnabled {
+                liveStickyItems += 1
+            }
+            index += 1
+        }
         application.typeKey(.escape, modifierFlags: [])
         application.typeKey(.escape, modifierFlags: [])
+        guard liveStickyItems == 0 else {
+            XCTFail("Stickies' service is live, so the key is not pressed: a regressed key would make a note")
+            application.terminate()
+            return
+        }
 
+        stickiesWasRunningBeforeTheKey = RebuildPreviewKeyUITests.stickiesIsRunning()
+        if stickiesWasRunningBeforeTheKey == true {
+            application.terminate()
+            throw XCTSkip("Stickies started before the key was pressed, by something else")
+        }
         let linesBefore: Int = launch.trailLines().count
         application.typeKey("y", modifierFlags: [.command, .shift])
 
@@ -89,29 +131,33 @@ final class RebuildPreviewKeyUITests: XCTestCase {
         let deadline: Date = Date().addingTimeInterval(60)
         while rebuildLine == nil && Date() < deadline {
             let lines: [String] = launch.trailLines()
-            var index: Int = linesBefore
-            while index < lines.count {
-                if lines[index].contains("Section ▸ Rebuild Preview") {
-                    rebuildLine = lines[index]
+            var lineIndex: Int = linesBefore
+            while lineIndex < lines.count {
+                if lines[lineIndex].contains("Section ▸ Rebuild Preview") {
+                    rebuildLine = lines[lineIndex]
                 }
-                index += 1
+                lineIndex += 1
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         }
         XCTAssertNotNil(rebuildLine, "⇧⌘Y ran Section ▸ Rebuild Preview")
         print("RebuildPreviewKeyUITests trail: \(rebuildLine ?? "none")")
 
-        // The service would start Stickies at once; it is given five seconds
-        // to appear, on purpose, as the window of observation.
+        // Stickies would start at once if anything handed it the key; it is
+        // given five seconds to appear, on purpose, as the window of
+        // observation.
         let watchEnds: Date = Date().addingTimeInterval(5)
         var stickiesStarted: Bool = false
         while !stickiesStarted && Date() < watchEnds {
             stickiesStarted = RebuildPreviewKeyUITests.stickiesIsRunning()
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
-        XCTAssertFalse(stickiesStarted, "⇧⌘Y started Stickies: the service took the key")
+        XCTAssertFalse(stickiesStarted, "⇧⌘Y started Stickies")
 
-        application.buttons["stopPreviewButton"].firstMatch.click()
+        let stopButton: XCUIElement = application.buttons["stopPreviewButton"].firstMatch
+        if stopButton.exists {
+            stopButton.click()
+        }
         application.terminate()
     }
 
