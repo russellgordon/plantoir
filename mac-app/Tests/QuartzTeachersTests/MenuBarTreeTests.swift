@@ -252,10 +252,13 @@ final class MenuBarTreeTests: XCTestCase {
 
     /// #990 (D24, D25): no Plantoir item takes a shortcut the HIG's
     /// Keyboards table gives to another command — ⇧⌘P is Page Setup, ⇧⌘C
-    /// Show Colors — nor ⇧⌘Y, the stock Mac's Make New Sticky Note service.
-    /// The ruled keys (Russell, 2026-11-18) sit where they were ruled.
+    /// Show Colors. The ruled keys (Russell, 2026-11-18) sit where they were
+    /// ruled, Rebuild Preview's ⇧⌘Y among them: a Services key such as
+    /// Stickies' ⇧⌘Y is not a standard shortcut, and inside Plantoir the
+    /// app's own item wins over it (Apple's Services Implementation Guide;
+    /// measured in the running app, documentation/09 → "Mac conventions").
     /// MUST FAIL on `dev` before #990, where Preview held ⇧⌘P and Copy a
-    /// Page ⇧⌘C.
+    /// Page ⇧⌘C, and on 23b554773, where Rebuild Preview held ⇧⌘B.
     func testNoItemTakesAStandardShortcut() throws {
         var keys: [String: String] = [:]
         for name in ["File", "Course", "Section", "Help"] {
@@ -273,10 +276,12 @@ final class MenuBarTreeTests: XCTestCase {
                 }
             }
         }
-        for standard in ["⇧⌘P", "⇧⌘C", "⇧⌘Y"] {
+        for standard in ["⇧⌘P", "⇧⌘C"] {
             XCTAssertNil(keys[standard], "\(standard) is a standard or system shortcut, taken by \(keys[standard] ?? "")")
         }
+        XCTAssertNil(keys["⇧⌘B"], "⇧⌘B adds Shift to ⌘B, Bold, for an unrelated command; taken by \(keys["⇧⌘B"] ?? "")")
         XCTAssertEqual(keys["⌘Y"], "Section ▸ " + PreviewStartPage.title(for: AppSettings.shared.previewOpensAt))
+        XCTAssertEqual(keys["⇧⌘Y"], "Section ▸ Rebuild Preview")
         XCTAssertEqual(keys["⇧⌘K"], "Course ▸ " + CopyPageWording.menuItem)
         XCTAssertEqual(keys["⇧⌘D"], "Section ▸ Deploy…")
     }

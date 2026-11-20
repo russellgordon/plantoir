@@ -112,6 +112,23 @@ final class SubjectMenusHIGTests: XCTestCase {
         XCTAssertEqual(rows, [], "a Text in a menu is a grey text row")
     }
 
+    /// #990 review (MEDIUM): with the grey row gone, Revert dimmed on the
+    /// Planning tab still says why — as the item's help tag (HIG, Offering
+    /// help: "Consider offering context-sensitive tooltips … different text
+    /// for a control's different states"), which AppKit also hands
+    /// VoiceOver as the item's help. The words come from the page in front
+    /// (`CourseSettingsCommands.revertHelp`: `PlanningWording.revertOnPlanning`
+    /// on Planning, nothing on Settings). The focused value cannot be set up
+    /// in a hosted test, so the source is read; the running app was measured
+    /// (documentation/09 → "No grey text rows"). MUST FAIL on 23b554773,
+    /// where nothing said why.
+    func testRevertSaysWhyItIsDimmedOnPlanning() throws {
+        let source: String = try String(contentsOf: SubjectMenusHIGTests.subjectMenusURL(), encoding: .utf8)
+        XCTAssertTrue(source.contains(
+            "item(\"Revert Course Settings\", .revertCourseSettings, enabled)\n                .help(settings?.revertHelp ?? \"\")"
+        ), "Revert carries the page's reason as its help tag")
+    }
+
     static func subjectMenusURL() -> URL {
         return URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

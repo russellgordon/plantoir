@@ -101,18 +101,25 @@ struct CourseSettingsCommands: Equatable {
 
     // MARK: - Stored properties
 
-    /// Revert is dimmed on the Planning tab; since #990 (Russell's ruling
-    /// Q14: no grey text rows in the menus) no line under it says why, as
-    /// #708's `PlanningWording.revertOnPlanning` did.
     var maySave: Bool
     var mayRevert: Bool
 
     var perform: (SubjectMenuRules.Item) -> Void
 
+    /// Why Revert is dimmed, as the menu item's help tag, or nothing when
+    /// the page in front has no reason to give. Revert is dimmed on the
+    /// Planning tab; until #990 a grey line under it in the Course menu said
+    /// why (#708's `PlanningWording.revertOnPlanning`). Russell's ruling Q14
+    /// took the grey rows out of the menus, and the same sentence became
+    /// this help tag, which AppKit also gives VoiceOver as the item's help
+    /// (HIG, Offering help: "Consider offering context-sensitive tooltips").
+    var revertHelp: String = ""
+
     // MARK: - Functions
 
     static func == (left: CourseSettingsCommands, right: CourseSettingsCommands) -> Bool {
         return left.maySave == right.maySave && left.mayRevert == right.mayRevert
+            && left.revertHelp == right.revertHelp
     }
 }
 

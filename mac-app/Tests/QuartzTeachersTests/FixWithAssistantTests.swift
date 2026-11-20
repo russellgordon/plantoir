@@ -574,6 +574,13 @@ final class FixWithAssistantTests: XCTestCase {
         XCTAssertTrue(button.contains(
             ".accessibilityHint(Text(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows)))"
         ))
+        // #990 review: the same reason as a help tag, so a sighted teacher
+        // holding the pointer over a dimmed button reads it too (HIG,
+        // Offering help: context-sensitive tooltips). MUST FAIL on
+        // 23b554773, where only VoiceOver was told.
+        XCTAssertTrue(button.contains(
+            ".help(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows))"
+        ), "the dimmed button's help tag says why")
     }
 
     // MARK: - Helpers

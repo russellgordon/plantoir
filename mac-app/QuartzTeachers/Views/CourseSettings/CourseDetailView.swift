@@ -33,8 +33,9 @@ import SwiftUI
 /// It is never silent: a Save that worked says the form's "Saved ✓" on the
 /// Planning tab; one refused, failed or with something to say takes the
 /// teacher to Settings, where the form shows its own sentence by the field.
-/// Revert is dimmed on Planning, with a line under it saying why: it would
-/// discard edits the teacher cannot see.
+/// Revert is dimmed on Planning, because it would discard edits the teacher
+/// cannot see, and its help tag says so (`PlanningWording.revertOnPlanning`;
+/// a grey line under it until #990).
 ///
 /// **No assistant, no tab.** With neither installed the page is exactly what
 /// it was before #708: no tabs and no word about planning (Russell,
@@ -236,9 +237,10 @@ enum CourseDetailTabs {
     /// is something unsaved, held back or not, so a held-back Save is
     /// pressed, refused with the form's own reason, and shown on Settings
     /// rather than dimmed with none (`afterASave`). Revert is dimmed here:
-    /// it would throw away edits the teacher cannot see. (Until #990
-    /// `PlanningWording.revertOnPlanning` said so in a line under it; the
-    /// menus hold no grey text rows since, Russell's ruling Q14.)
+    /// it would throw away edits the teacher cannot see, and
+    /// `PlanningWording.revertOnPlanning` says so as the item's help tag
+    /// (`revertHelp`). Until #990 it was a grey line under the item; the
+    /// menus hold no text rows since, Russell's ruling Q14.
     static func planningCommands(
         course: Course, session: CourseSettingsSession, showSettings: @escaping () -> Void
     ) -> CourseSettingsCommands {
@@ -254,7 +256,8 @@ enum CourseDetailTabs {
                 if afterASave(session) == .showsSettings {
                     showSettings()
                 }
-            }
+            },
+            revertHelp: PlanningWording.revertOnPlanning
         )
     }
 }

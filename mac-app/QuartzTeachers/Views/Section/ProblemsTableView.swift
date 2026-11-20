@@ -43,11 +43,12 @@ nonisolated struct ProblemsTableRow: Identifiable, Hashable, Sendable {
 /// Fix with Codex… hand over — sortable by kind, and the repair inline where
 /// a problem has one, because the alert no longer comes with every build.
 ///
-/// The two Fix buttons sit under the table (#717 part two,
-/// `FixWithAssistant`): each shown only while its assistant is installed
-/// (`OutsideAssistantPresence`, never asked while this view draws), never on
-/// a course kept for reference, and enabled while a ticked row is still this
-/// section's problem.
+/// The Fix buttons sit under the table (#717 part two, `FixWithAssistant`):
+/// one per outside assistant, never on a course kept for reference, enabled
+/// while its assistant is installed (`OutsideAssistantPresence`, never asked
+/// while this view draws) and a ticked row is still this section's problem.
+/// Since #990 one whose assistant is missing is dimmed, not left out, and a
+/// dimmed button's help tag and VoiceOver hint say why.
 ///
 /// Drawn OVER the section's site, which stays mounted underneath (see
 /// `DetailTabs`).
@@ -221,6 +222,11 @@ struct ProblemsTableView: View {
             fix(with: assistant)
         }
         .disabled(!FixWithAssistant.buttonIsEnabled(assistantIsInstalled: installed, hasRows: hasRows))
+        // The same reason as a help tag (#990 review), so a sighted teacher
+        // who holds the pointer over a dimmed button reads why: HIG,
+        // Offering help, "Consider offering context-sensitive tooltips".
+        // Empty, so no tag, while a press would work.
+        .help(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows))
         .accessibilityIdentifier(identifier)
         .accessibilityHint(Text(FixWithAssistant.buttonHint(assistantIsInstalled: installed, hasRows: hasRows)))
     }

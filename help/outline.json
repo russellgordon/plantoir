@@ -982,7 +982,7 @@
       "Select the section and press Preview (⌘Y); the button becomes Stop Preview while it runs",
       "Read the site in the window; Back, Forward and Reload work as in a browser",
       "Open in Browser shows the running preview in your web browser",
-      "After editing, Section > Rebuild Preview (⇧⌘B) builds it again",
+      "After editing, Section > Rebuild Preview (⇧⌘Y) builds it again",
       "Hold Option to open the other start page (front page or last page viewed); Settings > Preview chooses which is normal"
      ],
      "pictures": [
@@ -4695,7 +4695,7 @@
      "opensFrom": [
       "sheet: the set-up sheet (#855)",
       "settings: the assistants pane (#855)",
-      "menu: the Help menu item (#855)"
+      "menu: Course or Section > Revise With > Set Up an Assistant… (#855; in the Help menu too until #990)"
      ],
      "assistant": true,
      "needsPictures": true,
