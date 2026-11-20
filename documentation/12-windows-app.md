@@ -13605,9 +13605,12 @@ old panel (put back in a scratch copy on the VM, 2026-11-19) the four source
 tests fail ("a link is built inside a sentence (new Hyperlink)", "no link of
 its own reads "https://plantoir.app" (aboutWebsiteLink)", and the rows and
 the sentence not found), and the UI test fails with "the About panel has no
-aboutWebsiteLink". Read that UI failure for what it is: the old panel passes
-the count of six, enabled, focusable and Tab parts, and fails only on the
-AutomationIds and the sponsor link's new words. Nothing is
+aboutWebsiteLink". Read that UI failure for what it is: on the old panel only
+the test's count of six Hyperlink elements can pass; its enabled, focusable
+and Tab checks find each link by AutomationId, which an inline Hyperlink
+cannot carry, so they never get to look. That the old links were enabled,
+focusable and reached by Tab comes from a separate manual probe (above), not
+from this test. Nothing is
 pressed, so no browser or mail program opens.
 
 ## Windows never closes Obsidian unasked (#1003, the mac's #995)
