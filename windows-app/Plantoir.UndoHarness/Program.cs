@@ -29,7 +29,7 @@ internal static class Program
                 "child-wait" => ChildWait(folder, Int(args[2])),
                 "flush" => Flush(folder, Int(args[2])),
                 "read" => ReadSizes(folder),
-                "blobs" => Blobs(folder, Int(args[2])),
+                "blobs" => Blobs(folder, Int(args[2]), 1) + Blobs(folder + "-p4", Int(args[2]), 4) + Blobs(folder + "-p8", Int(args[2]), 8) + BlobParts(folder + "-parts", Int(args[2])),
                 "onedrive" => OneDriveWatch(folder, Int(args[2])),
                 _ => Unknown(mode),
             };
@@ -268,6 +268,7 @@ internal static class Program
             var first = new List<double>();
             var readOnNothing = new List<double>();
             var readOnOneStep = new List<double>();
+            var readOnAfterAPause = new List<double>();
             var whole = new List<double>();
             for (int round = 0; round < 5; round++)
             {
@@ -287,6 +288,16 @@ internal static class Program
                 clock.Restart();
                 UndoReading readOn = reader.Read();
                 readOnOneStep.Add(clock.Elapsed.TotalMilliseconds);
+                maker.WithLock(writer =>
+                {
+                    long next = writer.Folded.NextSeq;
+                    writer.Append(Begin(next, Environment.ProcessId));
+                    writer.Append(Applied(next));
+                });
+                Thread.Sleep(500);
+                clock.Restart();
+                readOn = reader.Read();
+                readOnAfterAPause.Add(clock.Elapsed.TotalMilliseconds);
                 if (reader.LastReadWasWhole) Console.WriteLine("RESULT read warning: the read after one step was whole");
                 UndoJournal wholeReader = Journal(folder);
                 wholeReader.ReadWholeEveryTime();
@@ -296,14 +307,14 @@ internal static class Program
                 whole.Add(clock.Elapsed.TotalMilliseconds);
                 if (wholeReading.Folded.Highest != readOn.Folded.Highest) Console.WriteLine("RESULT read MISMATCH between read on and whole");
             }
-            Console.WriteLine($"RESULT read bytes={onDisk} segments={Directory.GetFiles(folder, "journal-*.jsonl").Length} steps={seq} firstReadMs median={Ms(Median(first))} readOnNothingNewMs median={Ms(Median(readOnNothing))} readOnAfterOneStepMs median={Ms(Median(readOnOneStep))} wholeReadMs median={Ms(Median(whole))}");
+            Console.WriteLine($"RESULT read bytes={onDisk} segments={Directory.GetFiles(folder, "journal-*.jsonl").Length} steps={seq} firstReadMs median={Ms(Median(first))} readOnNothingNewMs median={Ms(Median(readOnNothing))} readOnAfterOneStepMs median={Ms(Median(readOnOneStep))} readOnOneStepHalfASecondLaterMs median={Ms(Median(readOnAfterAPause))} wholeReadMs median={Ms(Median(whole))}");
         }
         return 0;
     }
 
     // ---- blobs: a 233-page whole-file step's hold, with a waiter beside it ---
 
-    private static int Blobs(string folder, int pages)
+    private static int Blobs(string folder, int pages, int parallelism)
     {
         Directory.CreateDirectory(folder);
         var random = new Random(899);
@@ -337,14 +348,44 @@ internal static class Program
         journal.WithLock(writer =>
         {
             entered.Set();
-            foreach (byte[] content in contents) writer.WriteBlob(content);
+            writer.WriteBlobs(contents, parallelism);
             long seq = writer.Folded.NextSeq;
             writer.Append(Begin(seq, Environment.ProcessId));
             writer.Sync();
         });
         holdMs = hold.Elapsed.TotalMilliseconds;
         waiter.Wait();
-        Console.WriteLine($"RESULT blobs pages={pages} blobs={contents.Count} holdMs={Ms(holdMs)} waiter2s={waiterResult}");
+        Console.WriteLine($"RESULT blobs pages={pages} blobs={contents.Count} parallelism={parallelism} holdMs={Ms(holdMs)} waiter2s={waiterResult}");
+        return 0;
+    }
+
+    /// <summary>Where a blob's time goes: the create and write, FlushFileBuffers, the close, the no-replace move.</summary>
+    private static int BlobParts(string folder, int pages)
+    {
+        Directory.CreateDirectory(folder);
+        var random = new Random(900);
+        var create = new List<double>(); var flush = new List<double>(); var close = new List<double>(); var move = new List<double>();
+        var clock = new Stopwatch();
+        for (int index = 0; index < pages * 2; index++)
+        {
+            var page = new byte[2048];
+            random.NextBytes(page);
+            string temporary = Path.Combine(folder, ".tmp-" + index.ToString(CultureInfo.InvariantCulture));
+            clock.Restart();
+            var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, bufferSize: 0);
+            stream.Write(page, 0, page.Length);
+            create.Add(clock.Elapsed.TotalMilliseconds);
+            clock.Restart();
+            stream.Flush(flushToDisk: true);
+            flush.Add(clock.Elapsed.TotalMilliseconds);
+            clock.Restart();
+            stream.Dispose();
+            close.Add(clock.Elapsed.TotalMilliseconds);
+            clock.Restart();
+            File.Move(temporary, Path.Combine(folder, "blob-" + index.ToString(CultureInfo.InvariantCulture)), overwrite: false);
+            move.Add(clock.Elapsed.TotalMilliseconds);
+        }
+        Console.WriteLine($"RESULT blobparts blobs={pages * 2} createWriteMs median={Ms(Median(create))} sum={Ms(create.Sum())} flushMs median={Ms(Median(flush))} sum={Ms(flush.Sum())} closeMs median={Ms(Median(close))} sum={Ms(close.Sum())} moveMs median={Ms(Median(move))} sum={Ms(move.Sum())}");
         return 0;
     }
 

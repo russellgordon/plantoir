@@ -327,6 +327,19 @@ public sealed class UndoStoreTests : IDisposable
         Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, ".tmp-*"));
     }
 
+    /// <summary>Many blobs written at once, the same content twice among them: each under its hash, nothing temporary left.</summary>
+    [Fact]
+    public void ManyBlobsWrittenAtOnceAreEachStoredUnderTheirHash()
+    {
+        UndoJournal journal = Journal();
+        var contents = Enumerable.Range(0, 40).Select(index => Encoding.UTF8.GetBytes($"page {index % 30}\n")).ToList();
+        IReadOnlyList<string> names = journal.WithLock(writer => writer.WriteBlobs(contents, parallelism: 4));
+        Assert.Equal(contents.Select(UndoCheck.Sha), names);
+        foreach ((byte[] content, string name) in contents.Zip(names)) Assert.Equal(content, File.ReadAllBytes(journal.BlobPath(name)));
+        Assert.Equal(30, journal.BlobsOnDisk().Count);
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(_folder, "content"), ".tmp-*", SearchOption.AllDirectories));
+    }
+
     [Fact]
     public void ABlobThatCannotBeStoredLeavesNothingOfItBehind()
     {

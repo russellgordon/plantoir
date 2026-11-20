@@ -216,6 +216,35 @@ internal sealed class UndoJournalWriter : IDisposable
     /// </summary>
     internal string WriteBlob(byte[] bytes) => WriteBlob(bytes, triesLeft: 2);
 
+    /// <summary>
+    /// Many blobs at once, as a whole-file step writes them, each exactly as
+    /// <see cref="WriteBlob(byte[])"/> does, <paramref name="parallelism"/> at a
+    /// time: each must be flushed to the disk before its rename, and those
+    /// flushes overlap. Returns the names in the order given. The first
+    /// failure is thrown once the others have finished, each having removed
+    /// its own temporary file.
+    /// </summary>
+    internal IReadOnlyList<string> WriteBlobs(IReadOnlyList<byte[]> contents, int parallelism)
+    {
+        var names = new string[contents.Count];
+        if (parallelism <= 1)
+        {
+            for (int index = 0; index < contents.Count; index++) names[index] = WriteBlob(contents[index]);
+            return names;
+        }
+        try
+        {
+            Parallel.For(0, contents.Count, new ParallelOptions { MaxDegreeOfParallelism = parallelism },
+                         index => names[index] = WriteBlob(contents[index]));
+        }
+        catch (AggregateException failures)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures.InnerExceptions[0]).Throw();
+            throw;
+        }
+        return names;
+    }
+
     private string WriteBlob(byte[] bytes, int triesLeft)
     {
         string name = UndoCheck.Sha(bytes);
