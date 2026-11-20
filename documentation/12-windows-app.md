@@ -13568,9 +13568,9 @@ s of it Inno's compression), run by hand-equivalent through UI Automation:
   "Installation process succeeded." in setup's log, and no visible window
   of setup or its child in 268 looks at the desktop (every 200 ms, by
   `EnumWindows` and UI Automation) over the 62 s it ran.
-- Not measured: a clean machine (the first-install rehearsal needs a
-  signed build), and the driver's own run over the page; the driver's
-  calls are the ones the measurement above used.
+- Not measured then: a clean machine (the first-install rehearsal needs a
+  signed build), and the driver's own run over the page. The second is
+  measured now (below, "The driver over the page, end to end").
 
 **The keyboard, measured** (the first review of 1010b asked whether a
 keyboard-only teacher could reach and choose "I accept the agreement"; VM as
@@ -13616,6 +13616,43 @@ Select Additional Tasks > Ready to Install > Installing > Completing, exit
 and its log says "Installation process succeeded."; and the zip's root
 holds `LICENSE` (1,088 bytes) and `THIRD_PARTY_LICENSES.txt` (12,847
 bytes), each the same bytes as the repository's file.
+
+**The driver over the page, end to end** (the second review of 1010b:
+`AnswerLicencePage` had never run). Neither `win-rehearsal.py` nor the
+driver could start from an installer already on the machine: the
+rehearsal restores a clean snapshot and downloads with Edge, and Edge
+holds an unsigned branch build at "isn't commonly downloaded" (#965), so a
+real rehearsal of this page waits for a signed candidate. Loosening either
+of those would weaken what PASSED means. Instead the driver has an opt-in
+mode, `PlantoirFirstInstall.exe --self-test-install <PlantoirSetup.exe>
+--out <folder>`, which runs step 2 alone (the same `Steps_.Install`, with
+the same window watch, allow-list and proof-of-looking rules) on a file
+already on the machine, and ends `SELF-TEST INSTALL DONE` (status
+`self-test-install-done`, exit 5), never PASSED; `win-rehearsal.py` does
+not know that status and would read it as DRIVER PROBLEM
+(`WindowRulesTests.TheInstallSelfTestCanNeverSayPassed`). Run on the VM's
+snapshot 02, 2026-11-19, against the installer built from 84cb5c91d
+(`vm-tools/guest/1010b-driver-install.ps1`), the driver's own lines:
+
+```text wrap
+installer page: "Licence Agreement"
+installer: "Licence Agreement" opened with "I accept the agreement" not chosen and "I do not accept the agreement" not chosen [screenshot shot-03-licence-page]
+installer: chose "I accept the agreement" on "Licence Agreement"
+installer: pressed Next on "Licence Agreement"
+installer finished; pages: Licence Agreement > Select Destination Location > Select Additional Tasks > Ready to Install > Installing > Completing the Plantoir Setup Wizard
+installed C:\Users\<account>\AppData\Local\Programs\Plantoir\Plantoir.exe, version 2.0.0
+DRIVER RESULT (...): SELF-TEST INSTALL DONE
+```
+
+84 looks, none failed, largest gap 3.8 s. Plantoir's `/VERYSILENT` update
+over that install: exit 0, no visible window of setup in 370 looks,
+"Installation process succeeded."; the installed and the zip's
+`THIRD_PARTY_LICENSES.txt` are the repository's notice byte for byte and
+hold the Microsoft terms. **Still unproven until a signed candidate
+exists:** the whole rehearsal on a clean machine (download with the mark
+of the web, SmartScreen, then steps 3 to 7), and the page on the clean
+machines 11 to 16 (a standard user, an accented name, French, hardened,
+a nearly full disk).
 
 **Rejected** (the design, `vm-tools/reference/1010-installer-licence-page-design.md`
 in the private tools repository):
