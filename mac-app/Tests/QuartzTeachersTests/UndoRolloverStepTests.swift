@@ -61,6 +61,7 @@ final class UndoRolloverStepTests: XCTestCase {
         UndoKillPoints.hook = nil
         UndoKillPoints.putBackFailsAt = nil
         UndoKillPoints.fileInUseAtSwap = nil
+        DeployCommand.bringInDiesAfterWriting = nil
         ActivityTrail.store = previousTrail
         for folder in listFolders {
             try? FileManager.default.removeItem(at: folder)
@@ -784,5 +785,74 @@ final class UndoRolloverStepTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: fragment.path), "the move was reversed")
         XCTAssertFalse(FileManager.default.fileExists(atPath: kept.deletingLastPathComponent().path), "the kept folder it made is gone")
         XCTAssertTrue(FileManager.default.fileExists(atPath: state.path), "a folder that was there before stays")
+    }
+
+    // MARK: - The re-review's lows
+
+    /// A bring-in that dies part way through writing the record leaves no
+    /// partial record where a deploy reads one; the next rollover brings the
+    /// GOOD legacy record in, never setting it aside as stale beside a
+    /// partial one. MUST FAIL with the record written in place.
+    func testABringInKilledMidWriteLeavesNoPartialRecord() async throws {
+        let made: AssistFixture.Made = try sectionWithOnlyTheLegacyRecord()
+        DeployCommand.bringInDiesAfterWriting = { written in
+            try? Data("{\"site_id\": \"la".utf8).write(to: written)
+            return true
+        }
+        _ = await rollOver(made, surface: .menu)
+        DeployCommand.bringInDiesAfterWriting = nil
+        XCTAssertNil(text(UndoRolloverStepTests.markerPath, in: made), "no partial record where a deploy reads one")
+        XCTAssertEqual(siteADeployReads(made), "last-year")
+
+        _ = await rollOver(made, surface: .menu)
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in made.root }), .undone(seq: 1, leftApart: []))
+        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: made), UndoRolloverStepTests.lastYear)
+        XCTAssertNil(text(UndoRolloverStepTests.leftoverPath, in: made), "the good record was never taken for a stale one")
+        let entries: [String] = (try? FileManager.default.contentsOfDirectory(
+            atPath: made.course.directoryURL.appendingPathComponent(".netlify_sites").path
+        )) ?? []
+        for entry in entries {
+            XCTAssertFalse(entry.contains(".bringing-in-"), entry)
+        }
+    }
+
+    /// A bring-in refused after it made `.netlify_sites` (the record could
+    /// not be written whole) leaves no current record and no folder it
+    /// made. MUST FAIL with the refusal leaving them.
+    func testARefusedBringInLeavesNoRecordAndNoFolderItMade() async throws {
+        let made: AssistFixture.Made = try sectionWithOnlyTheLegacyRecord()
+        let folder: URL = made.course.directoryURL.appendingPathComponent(".netlify_sites")
+        try FileManager.default.removeItem(at: folder)
+        DeployCommand.bringInDiesAfterWriting = { written in
+            try? FileManager.default.removeItem(at: written)
+            return true
+        }
+        let said: AssistToolOutcome = await rollOver(made, surface: .menu)
+        DeployCommand.bringInDiesAfterWriting = nil
+        XCTAssertTrue(said.summary.hasPrefix("Nothing was changed: the website record"), said.summary)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path), "the folder it made is gone")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyURL(made).path))
+    }
+
+    /// launchd refuses the job at Undo and its plist cannot be taken away
+    /// again: it stays in LaunchAgents and loads at the next login, so the
+    /// Undo never names it as left apart. MUST FAIL with the removal's
+    /// failure ignored (named left apart while the plist is there).
+    func testAScheduleWhosePlistCannotBeTakenAwayAgainIsNotSaidToBeLeftApart() async throws {
+        let made: AssistFixture.Made = try section(surface: .menu)
+        let label: String = try scheduleADeploy(in: made, at: Date().addingTimeInterval(7 * 86_400))
+        _ = await rollOver(made, surface: .menu)
+        let agents: URL = ScheduledDeploy.plistURL(label: label).deletingLastPathComponent()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: agents.path)
+        }
+        let launchd: FakeLaunchControl = FakeLaunchControl()
+        launchd.bootstrapFailure = "Bootstrap failed: 5: Input/output error"
+        launchd.onBootstrap = { _ in
+            try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: agents.path)
+        }
+        let places: UndoAppPlaces = UndoAppPlaces(schedules: UndoScheduledDeploys(runner: launchd))
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in made.root }, places: places), .undone(seq: 1, leftApart: []))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: ScheduledDeploy.plistURL(label: label).path))
     }
 }

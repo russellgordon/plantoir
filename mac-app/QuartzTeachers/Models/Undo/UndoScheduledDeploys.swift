@@ -158,7 +158,15 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
             return job.bootstrap(plistURL: plistURL)
         }
         if refusal != nil {
-            try? FileManager.default.removeItem(at: plistURL)
+            // launchd refused it now. If its plist cannot be taken away
+            // again, it stays in LaunchAgents and loads at the next login,
+            // so the job IS set back, its files as the value says: answered
+            // true (never "left apart" while a job that will run is there;
+            // the re-review of U3b, LOW 4). Its script stays with it.
+            if (try? FileManager.default.removeItem(at: plistURL)) == nil
+                && FileManager.default.fileExists(atPath: plistURL.path) {
+                return true
+            }
             if files.script != nil {
                 try? FileManager.default.removeItem(at: scriptURL)
             }
