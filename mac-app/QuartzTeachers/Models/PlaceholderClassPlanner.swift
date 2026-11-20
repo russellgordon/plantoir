@@ -154,7 +154,8 @@ enum PlaceholderClassPlanner {
     @discardableResult
     static func apply(
         _ plan: PlaceholderClassPlan,
-        in course: Course
+        in course: Course,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("addNextClass")
     ) throws -> ClassChangeOutcome {
         if plan.courseCode != course.code {
             throw Problem.wrongCourse(plan.courseCode, course.code)
@@ -166,9 +167,10 @@ enum PlaceholderClassPlanner {
         }
 
 
-        let fileManager: FileManager = FileManager.default
+        // ONE step through the door (#899, U3): every new page together, all
+        // or none; the class folder is made by the door with them.
+        let step: JournaledStep = JournaledStep(course: course, section: plan.sectionNumber, maker: maker)
         let folderURL: URL = ClassPages.folderURL(forSection: plan.sectionNumber, in: course)
-        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
 
         let tail: String = ClassPages.siblingTimeAndOffset(
             from: ClassPages.list(forSection: plan.sectionNumber, in: course),
@@ -178,7 +180,7 @@ enum PlaceholderClassPlanner {
         var written: [PlannedClass] = []
         var appearedInBetween: [String] = []
         for planned in plan.classes {
-            if fileManager.fileExists(atPath: planned.fileURL.path) {
+            if step.fileExists(planned.fileURL) {
                 appearedInBetween.append(planned.title)
                 continue
             }
@@ -191,9 +193,10 @@ enum PlaceholderClassPlanner {
                 howMany: plan.classes.count,
                 tail: tail
             )
-            try body.write(to: planned.fileURL, atomically: true, encoding: .utf8)
+            step.write(body, to: planned.fileURL)
             written.append(planned)
         }
+        try step.make()
 
         var message: String = ""
         if written.isEmpty {

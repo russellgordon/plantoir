@@ -387,7 +387,12 @@ enum SectionTimetableStore {
     /// Write the dates down. The plan is trusted because the plan is the only
     /// thing that can make one — every list has already been through
     /// `checkedDates`.
-    static func applyRememberTimetable(_ plan: RememberTimetablePlan) throws {
+    ///
+    /// One step through the door (#899, U3): "remember timetable".
+    static func applyRememberTimetable(
+        _ plan: RememberTimetablePlan,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("rememberTimetable")
+    ) throws {
         var datesText: [String] = []
         for date in plan.dates {
             datesText.append(date.text)
@@ -399,17 +404,17 @@ enum SectionTimetableStore {
         values["source"] = plan.source
         values["recorded"] = plan.recorded.text
 
-        let fileManager: FileManager = FileManager.default
         do {
-            try fileManager.createDirectory(
-                at: plan.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
-            )
             // Key order is alphabetical, which neither reader minds — both
             // look keys up by name.
             let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             var data: Data = try JSONSerialization.data(withJSONObject: values, options: options)
             data.append(contentsOf: [0x0A])
-            try data.write(to: plan.fileURL, options: [.atomic])
+            let step: JournaledStep = JournaledStep(
+                courseCode: plan.courseCode, fileInside: plan.fileURL, section: plan.sectionNumber, maker: maker
+            )
+            step.write(data, to: plan.fileURL)
+            try step.make()
         } catch {
             throw Problem.couldNotWrite(plan.courseCode, plan.sectionNumber, error.localizedDescription)
         }

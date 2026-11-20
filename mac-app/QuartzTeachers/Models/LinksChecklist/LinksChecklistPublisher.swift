@@ -489,21 +489,31 @@ enum LinksChecklistPublisher {
             }
             return .refused(LinksChecklistWording.nothingLeftToPublish)
         }
+        // ONE step through the door (#899, U3): the pages, the answer, and
+        // the later classes it published kept, all or none. The front page
+        // is not repointed for the checklist (#379, ruling F1).
+        let step: JournaledStep = JournaledStep(
+            course: course, section: sectionNumber, maker: UndoStepMaker.sheet("answerTheLinksChecklist")
+        )
         do {
-            let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
-                planned.plan, forSection: sectionNumber, in: course, repointsTheFrontPage: false
+            let applied: AssistPublishPlanner.PlannedWrites = try AssistPublishPlanner.planWrites(
+                planned.plan, forSection: sectionNumber, in: course, into: step
             )
             for title in applied.leftAlone where !outcome.declined.contains(title) {
                 outcome.declined.append(title)
             }
+            rememberTheAnswer(offer: offer, leftUnticked: Set(outcome.leftUntickedPlaces),
+                              course: course, sectionNumber: sectionNumber, into: step)
+            step.whilePlanning {
+                keepTheLaterClassesItPublished(
+                    outcome.publishedPlaces, course: course, sectionNumber: sectionNumber,
+                    today: CalendarDay.today(), into: step
+                )
+            }
+            try step.make()
         } catch {
             return .refused(AssistToolRefusal.unreadablePage(offer.course).message)
         }
-        rememberTheAnswer(offer: offer, leftUnticked: Set(outcome.leftUntickedPlaces),
-                          course: course, sectionNumber: sectionNumber)
-        keepTheLaterClassesItPublished(
-            outcome.publishedPlaces, course: course, sectionNumber: sectionNumber, today: CalendarDay.today()
-        )
         ActivityTrail.note(
             .pagesPublishedFromLinksChecklist, publishedLine(outcome),
             course: course.code, section: sectionNumber
@@ -532,7 +542,8 @@ enum LinksChecklistPublisher {
     /// go dead, and the next build's checklist would offer it back: the two
     /// questions undoing each other (#457 batch B's review, finding 2).
     static func keepTheLaterClassesItPublished(
-        _ places: [String], course: Course, sectionNumber: Int, today: CalendarDay
+        _ places: [String], course: Course, sectionNumber: Int, today: CalendarDay,
+        into step: JournaledStep? = nil
     ) {
         var published: Set<String> = []
         for place in places {
@@ -543,7 +554,7 @@ enum LinksChecklistPublisher {
         where published.contains(page.place) {
             kept.append(page)
         }
-        ClassesDatedLater.keep(kept, forSection: sectionNumber, in: course)
+        ClassesDatedLater.keep(kept, forSection: sectionNumber, in: course, into: step)
     }
 
     /// Press Not Now.
@@ -562,9 +573,9 @@ enum LinksChecklistPublisher {
     /// ticked class brought — never a row left only because the row it comes
     /// under was left (#385).
     static func rememberTheAnswer(offer: LinksChecklistOffer, leftUnticked unticked: Set<String>,
-                                  course: Course, sectionNumber: Int) {
+                                  course: Course, sectionNumber: Int, into step: JournaledStep? = nil) {
         let answered: LinksChecklistAnswered = LinksChecklistAnswered(offered: offer.places, leftUnticked: unticked)
-        try? answered.write(courseDirectory: course.directoryURL, section: sectionNumber)
+        try? answered.write(courseDirectory: course.directoryURL, section: sectionNumber, into: step)
     }
 
     static func noteSetAside(course: Course, sectionNumber: Int, notNow: Bool, count: Int, withTheirPage: Int) {

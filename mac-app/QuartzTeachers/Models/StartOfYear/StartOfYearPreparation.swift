@@ -153,7 +153,9 @@ enum StartOfYearPreparation {
             await controller.stopPreview()
         }
 
-        // 4. Write.
+        // 4. Write, through the door (#899, U3), the list read off the main
+        // actor first.
+        await JournaledStep.readTheListAhead()
         let applied: (change: AssistChange, leftAlone: [String])
         do {
             applied = try StartOfYearPlanner.apply(plan, in: course)

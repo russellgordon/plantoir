@@ -43,6 +43,13 @@ LONGEST = 40
 STEPS_KEPT = 50
 DAYS_KEPT = 30
 CONTRACT = Path(__file__).resolve().parent.parent / "contracts" / "undo-traces.json"
+# U3: each daily page action's step, recorded by the Mac from the real action
+# code (UndoActionStepsTests writes it; never typed by hand), from which the
+# action traces below are made: ACTION_TRACES_PER_STEP traces per step.
+ACTION_STEPS = Path(__file__).resolve().parent.parent / "contracts" / "undo-action-steps.json"
+ACTION_TRACES_PER_STEP = 6
+ACTION_SHORTEST = 2
+ACTION_LONGEST = 12
 
 # --------------------------------------------------------------------------
 # The fixture: one section's pages, each a shape the line model must handle.
@@ -1055,6 +1062,30 @@ class Model:
         self.finish(seq)
         return ("applied", seq)
 
+    def files_step(self, changes, recomputes):
+        """JournaledWrite.perform(UndoStepDraft): one action's files, each
+        before and after, as ops (lines where they reproduce the change,
+        otherwise the whole file), in the order the action planned them,
+        the recompute ops last. ('applied', seq, ops) or ('changedNothing',)."""
+        ops = []
+        for path, before, after in changes:
+            if before == after:
+                continue
+            ops.extend(ops_for_change(path, before, after))
+        if not ops:
+            return ("changedNothing",)
+        for kept in recomputes:
+            ops.append({"kind": "recompute", "path": kept["path"], "maintainer": kept["maintainer"],
+                        "section": kept.get("section")})
+        seq = self.begin(ops)
+        for path, before, after in changes:
+            if after is None:
+                self.pages.pop(path, None)
+            else:
+                self.pages[path] = after
+        self.finish(seq)
+        return ("applied", seq, ops)
+
     def holds_a_recompute(self, step):
         return any(op["kind"] == "recompute" for op in step["ops"])
 
@@ -1348,6 +1379,111 @@ def one_trace(rng, number):
             "afterUndoingAll": undone_to, "final": final_hashes(model)}
 
 
+def read_action_steps(path=None):
+    """The recorded steps, or [] before the Mac has recorded any."""
+    source = ACTION_STEPS if path is None else path
+    if not source.exists():
+        return []
+    document = json.loads(source.read_bytes().decode("utf-8"))
+    return document.get("steps", [])
+
+
+def action_trace(rng, recorded, number):
+    """One trace of a recorded action step: the step made from the files it
+    names (their befores, an empty list), then undos, redos, hand edits of
+    its files and notes, then the closing undos and redos."""
+    files = recorded["files"]
+    paths = [entry["path"] for entry in files]
+    pages = {}
+    for entry in files:
+        if entry["before"] is not None:
+            pages[entry["path"]] = entry["before"]
+    model = Model(pages=dict(pages))
+    calls = []
+    changes = [(entry["path"], entry["before"], entry["after"]) for entry in files]
+    outcome = model.files_step(changes, recorded.get("recomputes", []))
+    call = {"call": "action", "step": recorded["name"], "expect": outcome[0]}
+    if outcome[0] == "applied":
+        call["seq"] = outcome[1]
+        call["ops"] = [op["kind"] for op in outcome[2]]
+    call.update(model.summary())
+    calls.append(call)
+
+    length = rng.randint(ACTION_SHORTEST, ACTION_LONGEST)
+    attempts = 0
+    while len(calls) < length and attempts < length * 20:
+        attempts += 1
+        roll = rng.random()
+        if roll < 0.35:
+            outcome = model.undo()
+            call = {"call": "undo", "expect": outcome[0]}
+            if outcome[0] == "undone":
+                call["seq"] = outcome[1]
+            if outcome[0] == "changedSince":
+                call["path"] = outcome[1]
+                call["others"] = outcome[2]
+                call["clearedTheList"] = True
+        elif roll < 0.65:
+            outcome = model.redo()
+            call = {"call": "redo", "expect": outcome[0]}
+            if outcome[0] == "redone":
+                call["seq"] = outcome[1]
+            if outcome[0] == "changedSince":
+                call["path"] = outcome[1]
+                call["others"] = outcome[2]
+                call["droppedTheRedo"] = True
+        elif roll < 0.90:
+            kind = rng.choice(["body", "body", "otherKey", "sameLine", "deletePage"])
+            path = rng.choice(paths)
+            if not model.hand_edit_path(kind, path):
+                continue
+            call = {"call": "handEdit", "kind": kind, "path": path}
+        else:
+            model.note()
+            call = {"call": "note"}
+        call.update(model.summary())
+        calls.append(call)
+
+    while True:
+        outcome = model.undo()
+        call = {"call": "undo", "expect": outcome[0]}
+        if outcome[0] == "undone":
+            call["seq"] = outcome[1]
+        if outcome[0] == "changedSince":
+            call["path"] = outcome[1]
+            call["others"] = outcome[2]
+            call["clearedTheList"] = True
+        call.update(model.summary())
+        calls.append(call)
+        if outcome[0] != "undone":
+            break
+    undone_to = path_hashes(model, paths)
+    while True:
+        outcome = model.redo()
+        call = {"call": "redo", "expect": outcome[0]}
+        if outcome[0] == "redone":
+            call["seq"] = outcome[1]
+        if outcome[0] == "changedSince":
+            call["path"] = outcome[1]
+            call["others"] = outcome[2]
+            call["droppedTheRedo"] = True
+        call.update(model.summary())
+        calls.append(call)
+        if outcome[0] != "redone":
+            break
+    hand_edited = any(call["call"] == "handEdit" for call in calls)
+    return {"name": "action-%03d" % number, "step": recorded["name"], "handEdits": hand_edited,
+            "calls": calls, "afterUndoingAll": undone_to, "final": path_hashes(model, paths)}
+
+
+def path_hashes(model, paths):
+    result = {}
+    for path in paths:
+        text = model.pages.get(path)
+        result[path] = None if text is None else sha(text)
+    return result
+
+
 def archived(path):
     """Where a `move` call puts a fixture page: the section's Archive folder."""
     return path.replace("/Classes/", "/Archive/", 1)
@@ -1368,9 +1504,16 @@ def final_hashes(model):
     return result
 
 
-def generate(seed=SEED, count=TRACE_COUNT):
+def generate(seed=SEED, count=TRACE_COUNT, steps=None):
     rng = random.Random(seed)
     traces = [one_trace(rng, number + 1) for number in range(count)]
+    if steps is None:
+        steps = read_action_steps()
+    action_rng = random.Random(seed * 1000 + 3)
+    action_traces = []
+    for recorded in steps:
+        for _ in range(ACTION_TRACES_PER_STEP):
+            action_traces.append(action_trace(action_rng, recorded, len(action_traces) + 1))
     return {
         "note": "Generated by scripts/make_undo_traces.py (seed %d) - never edited by hand; run it again instead, and commit what it writes. Each trace starts from `fixture` in an empty working folder with an empty list; write each page from utf8Hex, its exact bytes (`text` is the same page for reading, but at least one JSON reader, Foundation's, drops a byte-order mark inside a string). A `step` sets each named page's top-level `key` to the exact `line` with JournaledWrite.settingEntry's rule (the entry replaced when the key is there once, inserted after the opening fence when it is not, a block made when the page has none, the page left alone when the key is there twice or the page is gone), and is recorded through the app's own door. `expect` is what the call must come to; `head` and `redo` are the step numbers the folded list must answer after it (null: none). `afterUndoingAll` is every page's SHA-256 (null: absent) once the closing run of undos has stopped; `final` the same after the closing run of redos. A `note` call appends one neutral note line (file-formats.json -> undoJournal.events.note: its seq the highest in the journal, with keys a reader does not know) and must change nothing. A `move` call (U2) moves the named page to `to`, in the section's Archive folder, as one `move` op (file-formats.json -> undoJournal.opKinds.move: from the page's path, its `sha` the SHA-256 of the page's bytes now) made through the door that plans a step's ops forward (the mac's JournaledWrite.perform(ops:)); a step or hand edit naming a page that is not at its path leaves it alone. A refused undo clears the list (clearedTheList); a refused redo drops only the redo branch (droppedTheRedo, ruling 20). A trace with no hand edits must end its undos exactly at the fixture. Rules: contracts/shared-rules.json -> undo." % seed,
         "seed": seed,
@@ -1378,6 +1521,8 @@ def generate(seed=SEED, count=TRACE_COUNT):
                     for page_id, path, text, shape in FIXTURE],
         "fixtureHashes": {page_id: sha(START[page_id]) for page_id in PAGE_IDS},
         "traces": traces,
+        "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
+        "actionTraces": action_traces,
     }
 
 
@@ -1405,6 +1550,23 @@ def render(document):
         lines.append("    }")
         traces.append("\n".join(lines))
     out.append(",\n".join(traces))
+    out.append("  ],")
+    out.append('  "actionNote": %s,' % json.dumps(document["actionNote"], ensure_ascii=False))
+    out.append('  "actionTraces": [')
+    action_traces = []
+    for trace in document["actionTraces"]:
+        lines = ["    {"]
+        lines.append('      "name": %s,' % json.dumps(trace["name"]))
+        lines.append('      "step": %s,' % json.dumps(trace["step"]))
+        lines.append('      "handEdits": %s,' % json.dumps(trace["handEdits"]))
+        lines.append('      "calls": [')
+        lines.append(",\n".join("        " + json.dumps(call, ensure_ascii=False) for call in trace["calls"]))
+        lines.append("      ],")
+        lines.append('      "afterUndoingAll": %s,' % json.dumps(trace["afterUndoingAll"], ensure_ascii=False))
+        lines.append('      "final": %s' % json.dumps(trace["final"], ensure_ascii=False))
+        lines.append("    }")
+        action_traces.append("\n".join(lines))
+    out.append(",\n".join(action_traces))
     out.append("  ]")
     out.append("}")
     return ("\n".join(out) + "\n").encode("utf-8")
@@ -1427,7 +1589,8 @@ def main(arguments):
         print("PLANTOIR_UNDO_FUZZ is set: use --print, so the committed traces stay the seeded ones.")
         return 2
     CONTRACT.write_bytes(data)
-    print("wrote %s (%d traces, %d bytes)" % (CONTRACT.name, len(generate(seed)["traces"]), len(data)))
+    made = generate(seed)
+    print("wrote %s (%d traces, %d action traces, %d bytes)" % (CONTRACT.name, len(made["traces"]), len(made["actionTraces"]), len(data)))
     return 0
 
 

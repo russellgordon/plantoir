@@ -200,6 +200,11 @@ final class AssistToolRunner {
     /// Who the app-wide undo list says made a change from here
     /// (`file-formats.json` → `undoJournal.stepKeys.madeBy`). An outside
     /// assistant's client name is empty until the door names it (#884).
+    /// The maker of a step this runner makes, for the door (#899, U3).
+    func undoMaker(_ actionKey: String) -> UndoStepMaker {
+        return UndoStepMaker(madeBy: undoMadeBy, action: actionKey)
+    }
+
     var undoMadeBy: String {
         switch surface {
         case .menu:
@@ -556,6 +561,9 @@ final class AssistToolRunner {
     /// Run one tool.
     func run(call: AssistToolCall) async -> AssistToolOutcome {
         let arguments: [String: Any] = call.argumentValues
+        // The app-wide list read off the main actor first, so a step this
+        // call makes reads on from there (#899, U3; `JournaledStep`).
+        await JournaledStep.readTheListAhead()
 
         // Nothing writes to a course kept for reference, whichever client is
         // calling. First, before the tool is dispatched at all: a refusal that
@@ -652,7 +660,7 @@ final class AssistToolRunner {
             if let question = addClassesQuestion(arguments) {
                 return AssistToolOutcome.refused(question)
             }
-            return await addNextClass(addClassesArguments(from: arguments))
+            return await addNextClass(addClassesArguments(from: arguments), actionKey: "addClasses")
         case "list_courses":
             return listCourses()
         case "list_curriculum_expectations":
@@ -1094,9 +1102,17 @@ final class AssistToolRunner {
                     return AssistWording.publishedTheClassOn(
                         planned.day.text, noun: planned.located.course.configuration.classNoun
                     )
+                },
+                // The kept record goes in the publish's own step (#899, U3).
+                planningAlso: { step in
+                    self.keepTheClassNamedByItsDate(planned, into: step)
                 }
             )
-            keepTheClassNamedByItsDate(planned)
+            // A plan that changed nothing made no step: the record, when
+            // there is one to keep, is a step of its own.
+            if planned.plan.changesNothing {
+                keepTheClassNamedByItsDate(planned, into: nil)
+            }
             return outcome
         }
     }
@@ -1109,7 +1125,7 @@ final class AssistToolRunner {
     /// assistant, or one working from another app. Re-dated later, it is
     /// asked about again. Nothing is recorded for a class that would not be
     /// asked about, so tomorrow's class leaves no record.
-    private func keepTheClassNamedByItsDate(_ planned: PlannedClass) {
+    private func keepTheClassNamedByItsDate(_ planned: PlannedClass, into step: JournaledStep?) {
         let course: Course = planned.located.course
         let section: Int = planned.located.sectionNumber
         var namedPlaces: Set<String> = []
@@ -1121,7 +1137,9 @@ final class AssistToolRunner {
         where namedPlaces.contains(flagged.place) {
             kept.append(flagged)
         }
-        ClassesDatedLater.keep(kept, forSection: section, in: course)
+        ClassesDatedLater.keep(
+            kept, forSection: section, in: course, into: step, by: undoMaker("publishClassForADate")
+        )
     }
 
     /// A located class plan: everything the two halves of "publish tomorrow's
@@ -1435,14 +1453,24 @@ final class AssistToolRunner {
         // Pages the writer declined, at plan time or at the write (#186). A
         // unit whose every page was declined is NOT "already hidden".
         var leftAlone: [String] = []
+        // The whole unit is ONE step through the door (#899, U3): each
+        // class is planned into it, reading what the classes before it
+        // planned, and the step is made once they all are.
+        let unitStep: JournaledStep = JournaledStep(
+            course: located.course, section: located.sectionNumber,
+            maker: undoMaker(publishing ? "publishPages" : "hidePages")
+        )
         for summary in pages {
-            let graph: AssistSectionGraph = AssistSectionGraph.read(
-                forSection: located.sectionNumber, in: located.course,
-                workspaceURL: workspace.workspaceURL
-            )
-            let classPages: [ClassPageSummary] = ClassPages.list(
-                forSection: located.sectionNumber, in: located.course
-            )
+            // Read as the classes planned before this one left them.
+            let graph: AssistSectionGraph = unitStep.whilePlanning {
+                return AssistSectionGraph.read(
+                    forSection: located.sectionNumber, in: located.course,
+                    workspaceURL: workspace.workspaceURL
+                )
+            }
+            let classPages: [ClassPageSummary] = unitStep.whilePlanning {
+                return ClassPages.list(forSection: located.sectionNumber, in: located.course)
+            }
             // By the class's FILE, never its title (#425's review, stack 1
             // item 1): a class sharing its file name with a course-level page
             // was otherwise dropped from the plan, and the unit reported done
@@ -1463,27 +1491,46 @@ final class AssistToolRunner {
                 continue
             }
             do {
-                let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
-                    plan, forSection: located.sectionNumber, in: located.course
+                let planned: AssistPublishPlanner.PlannedWrites = try AssistPublishPlanner.planWrites(
+                    plan, forSection: located.sectionNumber, in: located.course, into: unitStep
                 )
-                for title in applied.leftAlone where !leftAlone.contains(title) {
+                for title in planned.leftAlone where !leftAlone.contains(title) {
                     leftAlone.append(title)
                 }
-                if !applied.change.files.isEmpty {
-                    touched = AssistToolRunner.merging(touched, with: applied.change.files)
+                if !planned.saved.isEmpty {
+                    touched = AssistToolRunner.merging(touched, with: planned.saved)
                     changedAnything = true
                 }
             } catch {
-                // An earlier plan of the unit written whole, or this one part
-                // way: a write with no undo entry (#531).
-                if changedAnything || error is AssistPublishPlanner.StoppedAfterWriting {
-                    writesWithNoNewUndoEntry += 1
-                }
+                // Nothing of the unit is written: its classes are one step,
+                // and the step is made only once every class is planned.
                 return AssistToolOutcome.refused(publishStoppedPartWay(
                     what: "\(located.course.configuration.unitWord) \(unit)",
                     problem: error.localizedDescription,
                     sectionNumber: located.sectionNumber
                 ))
+            }
+        }
+        if changedAnything {
+            unitStep.keepsTheFrontPageTrue(
+                of: located.sectionNumber,
+                at: SectionIndexPointer.indexURL(forSection: located.sectionNumber, in: located.course)
+            )
+            do {
+                try unitStep.make()
+            } catch {
+                return AssistToolOutcome.refused(publishStoppedPartWay(
+                    what: "\(located.course.configuration.unitWord) \(unit)",
+                    problem: error.localizedDescription,
+                    sectionNumber: located.sectionNumber
+                ))
+            }
+            // The front page follows the newest visible class once, after
+            // the whole unit, as it did after the unit's last class.
+            if let repointed = SectionIndexPointer.repointIndex(
+                forSection: located.sectionNumber, in: located.course
+            ) {
+                touched = AssistToolRunner.merging(touched, with: [repointed])
             }
         }
 
@@ -2036,7 +2083,8 @@ final class AssistToolRunner {
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
         in course: Course,
-        summary: (Int) -> String
+        summary: (Int) -> String,
+        planningAlso: ((JournaledStep) -> Void)? = nil
     ) async -> AssistToolOutcome {
         if plan.changesNothing {
             // Four words, when four words are the whole answer. A teacher who
@@ -2076,26 +2124,20 @@ final class AssistToolRunner {
         // refresh is a race they cannot see they are in.
         _ = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
 
-        // The app-wide list (#899), in SHADOW: written down before the
-        // write and closed after it, never offered while `undoJournalIsLive`
-        // is off, and never able to fail, slow or change this action
-        // (`UndoShadowPublish`). Today's history below is unchanged.
-        let undoJournal: UndoJournal = UndoJournalLocation.standardJournal()
-        let undoTicket: UndoShadowTicket? = await UndoShadowPublish.begin(
-            plan, forSection: sectionNumber, in: course,
-            workingFolderURL: workspace.workspaceURL, madeBy: undoMadeBy, journal: undoJournal
-        )
-
+        // The app-wide list (#899): the pages are written through the door
+        // as ONE step (`JournaledStep`), recorded in SHADOW while
+        // `undoJournalIsLive` is off. Today's history below is unchanged.
         let change: AssistChange
         var leftAlone: [String] = []
         do {
             let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
-                plan, forSection: sectionNumber, in: course
+                plan, forSection: sectionNumber, in: course,
+                by: undoMaker(planningAlso == nil ? (plan.publishes ? "publishPages" : "hidePages") : "publishClassForADate"),
+                planningAlso: planningAlso
             )
             change = applied.change
             leftAlone = applied.leftAlone
         } catch {
-            await UndoShadowPublish.finish(undoTicket, written: nil, forSection: sectionNumber, in: course, journal: undoJournal)
             // Not "Nothing was changed" (said here until #412): the write is
             // page by page, so pages before the one that failed are written —
             // and when one was, it is a write with no undo entry (#531).
@@ -2108,10 +2150,7 @@ final class AssistToolRunner {
                 sectionNumber: sectionNumber
             ))
         }
-        // Today's history first, so Undo Last Change knows of the write the
-        // moment it is made; the shadow list's close waits on its own task.
         history.record(change)
-        await UndoShadowPublish.finish(undoTicket, written: change, forSection: sectionNumber, in: course, journal: undoJournal)
 
         // The plan's declined pages are already on the card (`describe`);
         // one declined only at the write — edited in Obsidian since the card
@@ -3154,7 +3193,7 @@ final class AssistToolRunner {
         var leftAlone: [String] = []
         do {
             let applied: (change: AssistChange, leftAlone: [String]) = try StartOfYearPlanner.apply(
-                plan, in: course
+                plan, in: course, by: undoMaker("getReadyForTheStartOfTheYear")
             )
             change = applied.change
             leftAlone = applied.leftAlone
@@ -3948,7 +3987,7 @@ final class AssistToolRunner {
                 return changedWhileSavingACopy(asked.located)
             }
             do {
-                try SectionTimetableStore.applyRememberTimetable(asked.plan)
+                try SectionTimetableStore.applyRememberTimetable(asked.plan, by: undoMaker("rememberTimetable"))
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was remembered: \(error.localizedDescription)"
@@ -4159,9 +4198,18 @@ final class AssistToolRunner {
             return changedWhileSavingACopy(request.located)
         }
 
+        // ONE step through the door (#899, U3): the room made and the copy
+        // written together. When the copy cannot be made the room alone is
+        // made, as it was before U3 (the refusals below say so).
+        let duplicateStep: JournaledStep = JournaledStep(
+            course: request.located.course, section: request.located.sectionNumber,
+            maker: undoMaker("duplicateClass")
+        )
         let outcome: ClassChangeOutcome
         do {
-            outcome = try ClassInsertionPlanner.apply(request.plan, in: request.located.course)
+            outcome = try ClassInsertionPlanner.apply(
+                request.plan, in: request.located.course, into: duplicateStep
+            )
         } catch {
             return AssistToolOutcome.refused(
                 "Nothing was changed: \(error.localizedDescription)"
@@ -4199,6 +4247,7 @@ final class AssistToolRunner {
             // Worth its own line on the trail: the room has been made by the
             // time this is answered, so a teacher sees their classes move and
             // no copy appear, and nothing else recorded would say why.
+            try? duplicateStep.make()
             ActivityTrail.note(
                 .classCopyNotMade,
                 "did not copy a class — the page the copy would have become still held a lesson, "
@@ -4243,8 +4292,9 @@ final class AssistToolRunner {
                                             isSectionLocal: true),
             to: request.newDate,
             fallbackTail: ClassPages.siblingTimeAndOffset(
-                from: ClassPages.list(forSection: request.located.sectionNumber,
-                                      in: request.located.course),
+                from: duplicateStep.whilePlanning {
+                    return ClassPages.list(forSection: request.located.sectionNumber, in: request.located.course)
+                },
                 forSection: request.located.sectionNumber
             )
         ).text
@@ -4285,6 +4335,7 @@ final class AssistToolRunner {
         if AssistPageVisibility.answer(
             in: copied, forSection: request.located.sectionNumber
         ) != .hidden {
+            try? duplicateStep.make()
             ActivityTrail.note(
                 .classCopyNotMade,
                 "did not copy a class — the copy could not be made certainly hidden, and a copy "
@@ -4307,11 +4358,12 @@ final class AssistToolRunner {
         // which is what `AssistWording.aCreatedPageCanBeTakenBack` has always
         // said and is only now true.
         let before: String? = nil
+        duplicateStep.write(copied, to: request.newURL)
         do {
-            try copied.write(to: request.newURL, atomically: true, encoding: .utf8)
+            try duplicateStep.make()
         } catch {
             return AssistToolOutcome.refused(
-                "The page was made but could not be filled in: \(error.localizedDescription)"
+                "Nothing was changed: \(error.localizedDescription)"
             )
         }
 
@@ -4715,21 +4767,22 @@ final class AssistToolRunner {
         }
 
         let target: URL = request.newPage.fileURL
+        // One step through the door (#899, U3): a page that is not there,
+        // staged beside its place and renamed in whole, so nothing half
+        // written is ever left (#897a review, finding 11), and a page that
+        // appeared at that name meanwhile is never written over.
+        let copyStep: JournaledStep = JournaledStep(
+            course: request.located.course, section: request.located.sectionNumber,
+            maker: undoMaker("duplicateAsTheNextClass")
+        )
+        copyStep.write(Data(request.copyText.utf8), to: target)
         do {
-            try FileManager.default.createDirectory(
-                at: target.deletingLastPathComponent(), withIntermediateDirectories: true
-            )
-            try Data(request.copyText.utf8).write(to: target, options: [.withoutOverwriting])
+            try copyStep.make()
+        } catch JournaledStepError.refused(.changedSince, _) {
+            return AssistToolOutcome.refused(AssistWording.menuTheNextPageIsAlreadyThere(page: request.newPage.title))
         } catch let error as CocoaError where error.code == .fileWriteFileExists {
-            // A page appeared at that name meanwhile: it is never written over.
             return AssistToolOutcome.refused(AssistWording.menuTheNextPageIsAlreadyThere(page: request.newPage.title))
         } catch {
-            // Any other failure: `.withoutOverwriting` is not atomic, so a
-            // file this call created may be half written. It was not there
-            // before (the write would have been refused), so it is this
-            // call's, and it goes; the copy of the course saved first is the
-            // way back for anything else (#897a review, finding 11).
-            try? FileManager.default.removeItem(at: target)
             return AssistToolOutcome.refused("Nothing was created: \(error.localizedDescription)")
         }
 
@@ -5068,7 +5121,8 @@ final class AssistToolRunner {
                 let applied: (
                     change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int
                 ) = try SectionReDatePlanner.apply(
-                    asked.plan, forSection: asked.located.sectionNumber, in: asked.located.course
+                    asked.plan, forSection: asked.located.sectionNumber, in: asked.located.course,
+                    by: undoMaker(isARollover(arguments) ? "rollOver" : "reDateClasses")
                 )
                 change = applied.change
                 leftAlone = applied.leftAlone
@@ -5702,7 +5756,9 @@ final class AssistToolRunner {
             }
             let outcome: ClassChangeOutcome
             do {
-                outcome = try ClassInsertionPlanner.apply(asked.plan, in: asked.located.course)
+                outcome = try ClassInsertionPlanner.apply(
+                    asked.plan, in: asked.located.course, by: undoMaker("makeRoomForClasses")
+                )
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
@@ -6025,7 +6081,7 @@ final class AssistToolRunner {
         )
     }
 
-    private func addNextClass(_ arguments: [String: Any]) async -> AssistToolOutcome {
+    private func addNextClass(_ arguments: [String: Any], actionKey: String = "addNextClass") async -> AssistToolOutcome {
         // The Section menu's own duplicate and new unit (#897), read on
         // `.menu` only: every other surface goes on exactly as before.
         if let fromTheMenu = menuDuplicateAsked(arguments) {
@@ -6067,7 +6123,14 @@ final class AssistToolRunner {
                 // Checked a second time inside `apply`, immediately before the
                 // file is written: Obsidian is open in the other window, and a
                 // page can appear while the teacher is deciding.
-                outcome = try PlaceholderClassPlanner.apply(asked.plan, in: asked.located.course)
+                // The step's name: a new unit when one was asked for.
+                var stepKey: String = actionKey
+                if actionKey == "addNextClass" && text("unit", in: arguments).lowercased() == "next" {
+                    stepKey = "addNextClassInANewUnit"
+                }
+                outcome = try PlaceholderClassPlanner.apply(
+                    asked.plan, in: asked.located.course, by: undoMaker(stepKey)
+                )
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was created: \(error.localizedDescription)"
@@ -6250,7 +6313,7 @@ final class AssistToolRunner {
 
             let change: AssistChange
             do {
-                change = try AssistCurriculumMentions.apply(asked.plan)
+                change = try AssistCurriculumMentions.apply(asked.plan, by: undoMaker("addCurriculumMentions"))
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
@@ -6506,8 +6569,14 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(AssistWording.howITeachChangedSincePlanned(course: planned.course.code))
         }
 
+        // One step through the door (#899, U3), held by the course: the page
+        // belongs to no section.
+        let howITeachStep: JournaledStep = JournaledStep(
+            course: planned.course, section: nil, maker: undoMaker("writeHowITeach"), holds: "course"
+        )
+        howITeachStep.write(newText, to: pageURL)
         do {
-            try newText.write(to: pageURL, atomically: true, encoding: .utf8)
+            try howITeachStep.make()
         } catch {
             return AssistToolOutcome.refused("Nothing was saved: \(error.localizedDescription)")
         }
