@@ -115,8 +115,9 @@ final class SubjectMenusHIGTests: XCTestCase {
     /// #990 review (MEDIUM): with the grey row gone, Revert dimmed on the
     /// Planning tab still says why — as the item's help tag (HIG, Offering
     /// help: "Consider offering context-sensitive tooltips … different text
-    /// for a control's different states"), which AppKit also hands
-    /// VoiceOver as the item's help. The words come from the page in front
+    /// for a control's different states"); Help's course-settings page says
+    /// it for VoiceOver, which a menu item's tag does not reach (measured:
+    /// no AXHelp on the item). The words come from the page in front
     /// (`CourseSettingsCommands.revertHelp`: `PlanningWording.revertOnPlanning`
     /// on Planning, nothing on Settings). The focused value cannot be set up
     /// in a hosted test, so the source is read; the running app was measured

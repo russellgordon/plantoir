@@ -5893,13 +5893,18 @@ rows out of the menus, and the same sentence is now the Revert item's help
 tag while Planning is in front (`CourseSettingsCommands.revertHelp`, empty on
 Settings). HIG, Offering help: "Consider offering context-sensitive tooltips.
 For example, you could provide different text for a control's different
-states." AppKit hands a menu item's tooltip to VoiceOver as the item's help,
-so one sentence serves a sighted teacher holding the pointer on the item and
-a VoiceOver user; Help's course-settings page says it too, for a teacher who
-looks there first. Rejected: an accessibility hint alone (a sighted teacher
-gets nothing), a text row (the ruling), and a hidden explanatory control (no
-invisible controls). Measured in the running app: see "Revert's help tag on
-Planning, measured" below.
+states." Help's course-settings page says it too, and that is where a
+VoiceOver user learns it. Measured on 2026-11-19 (macOS 26.7.3, the debug
+build under `--state-dir`, a fixture course, Claude Code, Codex and Copilot
+installed so the Planning tab shows): with Planning in front and the pointer
+held on the dimmed item, the tag "Revert works on the Settings tab, where the
+changes are shown." appears beside it (screenshot); System Events read the
+open item as `enabled false` and found NO `AXHelp` attribute on it, with and
+without an `.accessibilityHint` added to the item (a menu item exposes title,
+key and enabled state only, as Finder's do), so neither a tooltip nor a hint
+reaches VoiceOver from a menu item and the hint was not kept. Rejected: an
+accessibility hint (measured not to reach VoiceOver), a text row (the
+ruling), and a hidden explanatory control (no invisible controls).
 `CourseDetailStructureTests` draws the real form in a window never put on
 screen and checks the tree with Planning showing (no editable field, box or
 table), the footer case, Undo, that a draft typed on Settings survives the
@@ -7350,6 +7355,23 @@ Never taken: ⌘Q ⌘H ⌥⌘H ⌘, ⌘W ⌥⌘W ⌘M ⌘` ⌃⌘F ⌃⌘S ⌥�
 ⇧⌘3/4/5 ⌥⌘I, and ⌥⌘S (SwiftUI's hidden sidebar toggle, measured in Help).
 `MenuBarTreeTests.testEachKeyEquivalentMeansOneThing` fails on any key on two
 visible items.
+
+**Rebuild Preview's ⇧⌘Y beside the Stickies service, measured** (#990).
+Russell ruled ⇧⌘Y on 2026-11-18. A stock Mac lists ⇧⌘Y in System Settings ▸
+Keyboard ▸ Keyboard Shortcuts ▸ Services as Make New Sticky Note (Stickies'
+`NSServices` entry, `NSKeyEquivalent` `Y`, send types plain text and RTF),
+and Apple's Services Implementation Guide says "When an application already
+has a shortcut with that key equivalent, the application's shortcut wins."
+`RebuildPreviewKeyUITests` measures it, and was run once on the main Mac on
+2026-11-19 (macOS 26.7.3; Stickies not running): a fixture course and a STUB
+`preview.sh` under `--state-dir`, the preview started, the page's text
+selected with ⌘A in the web view, Plantoir ▸ Services checked to offer
+Stickies' item ENABLED at that moment (so the service had something to
+take), then a real ⇧⌘Y. The trail read `Section ▸ Rebuild Preview — rebuilt`
+and Stickies was not started in the five seconds watched: the menu item
+fired and no sticky note was made. The only loss is making a sticky note
+from text selected inside Plantoir with that key; the Services menu still
+offers it by click. The test skips, saying so, while Stickies is running.
 
 **Why ⇧⌘O moves rather than sitting on both Open in Obsidian items** — the
 director's ruling allowed one key on two items that are never enabled at the
