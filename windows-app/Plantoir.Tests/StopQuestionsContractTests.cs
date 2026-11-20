@@ -330,7 +330,7 @@ public sealed class StopQuestionsContractTests : IDisposable
         string course = Path.Combine(_folder, "courses", code);
         Directory.CreateDirectory(Path.Combine(course, "section1"));
         File.WriteAllText(Path.Combine(course, "course_config.json"),
-            $$"""{"course_code":"{{code}}","section_numbers":[1],"num_sections":1,"deploy_target":"local_folder","deploy_folder_path":"C:\sites"}""");
+            $$"""{"course_code":"{{code}}","section_numbers":[1],"num_sections":1,"deploy_target":"local_folder","deploy_folder_path":"C:\\sites"}""");
         File.WriteAllText(Path.Combine(course, "section1", "index.md"), "# Section 1\n");
         deploysLog = Path.Combine(_folder, "deploys.txt");
         // preview.ps1 is also what makes the folder a working folder (Workspace.MarkerLauncher).
