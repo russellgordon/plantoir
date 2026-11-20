@@ -57,7 +57,8 @@ public sealed class UndoRecoveryReviewFixesTests : IDisposable
         };
         Assert.Equal(UndoOutcomeKind.StoppedByATest, scribe.Door(StopAt("beforeApplied"), UndoScribe.AProcessThatIsGone).Perform(withTheFrontPage).Kind);
         long seq = scribe.Fold().Steps.Keys.Max();
-        scribe.Clock.SetDaysFromStart(31);
+        // Past the limits, so this hold's pruning would close it unsettled.
+        scribe.Clock.SetDaysFromStart((UndoLimits.DaysKept + UndoLimits.Grace + TimeSpan.FromDays(2)).TotalDays);
 
         UndoOutcome other = scribe.Door().Perform(scribe.Draft("A", [(Third, New(Third))]) with { Course = "ZZZ9O" });
         Assert.Equal(UndoOutcomeKind.Applied, other.Kind);
