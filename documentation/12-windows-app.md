@@ -14593,6 +14593,57 @@ from Windows Credential Manager, so on a PC with one it could publish for
 real; every destination in the class is now a folder in the test's own temp
 tree.
 
+**The fourth review's fixes (2026-11-20).** *After #1016.* `dev`'s #1016
+replaced `WaitUntilFinished`'s 100 ms look with a `TaskCompletionSource`
+that the run's ending completes after it has announced the ending, and the
+await in `RunAsync` resumes in a post to the window's thread. Every gap this
+piece handles (between a leg's build and its deploy, between two
+destinations, after the last leg) still exists, one turn of the window's
+thread long instead of up to 100 ms: a key or a click already queued there
+lands in it. Each gap path was re-read against the new wait and every gap
+test re-run (they cancel from inside the runner's own ending, which still
+runs before the post that resumes `RunAsync`). *A leg announced and not yet
+started.* `CanStillBeStopped` counts that leg (the third review), so a
+cancel landing there marks the run cancelled and refuses a second Stop, but
+nothing read the mark before that leg's `Run`, so the leg started anyway.
+`RunAsync` now checks `WasCancelled` immediately before each `Run` (the
+build's and the deploy's), so a leg announced after a cancel can never start.
+*The mac says one new sentence.* With three destinations stopped during the
+second, the mac's `deployPartiallySucceeded` named only the second as not
+deployed and now names the second and the third (the third review's rule
+changed the mac's `outcome` too); the contract case "stopped during the
+second of three" holds it on both platforms, and documentation 09 says so.
+*The text-box test.* `EscapeInAFocusedTextBoxIsTheBoxs_AndInvokeOnCancelStillStops`
+failed in the VM. Measured there (scratch test, unpadded course): the
+answer box kept the focus when the preview's site was drawn, so the site
+takes no focus from a box a teacher is typing in and the product was not at
+fault; but the site drew about 35 s after the start, inside the test's
+presses, and a press after it lands on a console the site covers (Escape is
+then never Cancel's, so the box rule is not tested), and stopping a serving
+preview ends without the "stopped by the teacher" line the test waited for,
+since the build's `preview.ps1` had already ended "succeeded". The test now
+runs on a deploy, where no site is drawn, held by the test (below), and an
+Invoke on Cancel asks, and Stop Deploy ends it "Cancelled". *Held
+destinations, not padding.* The two-folder test kept destination 2 going
+with 20,000 stale files for `robocopy /MIR` to remove, a guess at how long
+is long enough. A destination is now held by the test instead
+(`HeldDestination`): its section's `index.html`, "left by an earlier
+deploy", open with no sharing, so robocopy cannot replace it and retries for
+as long as the test holds it. The multi-destination test deploys to three
+folders, opens the question while destination 1 is held, lets destination 1
+go (destination 2 began 4.1 s later in the VM), and stops while destination
+2 is held: it waits on events only (a leg's start on the trail, the run's
+end shown by Deploy being offered again), and with three legs "no later leg
+started" can fail (sabotaged with every `WasCancelled` check removed:
+"destination 3 started after Stop Deploy (2 deploys started at the stop, 3
+after)"). Its no-stamp check cannot fail on the third review's outcome rule
+(sabotaged, it passed): a stop during a destination keeps the stamp off
+through the stopped leg itself, so that rule is held by the unit tests
+(`EveryStoppedDeployCaseHolds`, the two `RunAsync` gap tests), which go red
+under the same sabotage.
+**Tests.** `StopQuestionsContractTests.ACancelOnceALegIsAnnouncedKeepsThatLegFromStarting`
+(the first leg's build, the second leg's deploy; red with the checks removed).
+
 ## The lap cap on Windows (#720, the mac's #689)
 
 One teacher action asks the model at most `shared-rules.json` →

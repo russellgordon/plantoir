@@ -16,14 +16,17 @@ namespace Plantoir.UiTests;
 /// Enter with the question's own first focus is Stop Deploy, the default;
 /// Stop Deploy with Don't ask again ticked turns the question off, and the
 /// next Escape stops at once; while an editable text box has the focus,
-/// Escape is the box's, and a UI Automation Invoke on Cancel still stops.
+/// Escape is the box's, and a UI Automation Invoke on Cancel still reaches
+/// the stop.
 /// </summary>
 /// <remarks>
 /// Each key press brings the app to the front first (see
 /// <see cref="CopyAPageEscapeUiTests"/>). Without the change, Escape does
 /// nothing to a running task, so every test here fails at its first press.
 /// The deploy is the real build and <c>deploy.ps1 --to-folder</c>, padded so
-/// it outlasts the questions (as <see cref="ReturningToASectionMidDeployUiTests"/>).
+/// it outlasts the questions (as <see cref="ReturningToASectionMidDeployUiTests"/>),
+/// or, where a test must not depend on how long the work takes, sent to a
+/// folder the test holds (<see cref="HeldDestination"/>).
 /// </remarks>
 [Collection("drives the real app")]
 public class StopByKeyboardUiTests
