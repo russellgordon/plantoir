@@ -60,6 +60,23 @@ public static class PreviewReachability
     }
 
     /// <summary>
+    /// How long until the quiet bound runs out (#1016): null before the
+    /// server line, when only the run's own changes can move the wait on;
+    /// otherwise what is left of <see cref="SecondsOfSilenceAllowed"/> since
+    /// the later of the server line and the latest output, never below zero.
+    /// The wait sleeps until the run changes OR this, then asks
+    /// <see cref="NextStep"/> again: output in between moved the bound, so
+    /// it simply waits the rest.
+    /// </summary>
+    public static TimeSpan? UntilTheQuietRunsOut(DateTime? serverStartedAt, DateTime lastOutputAt, DateTime now)
+    {
+        if (serverStartedAt is not { } started) return null;
+        DateTime quietSince = lastOutputAt > started ? lastOutputAt : started;
+        TimeSpan left = quietSince.AddSeconds(SecondsOfSilenceAllowed) - now;
+        return left > TimeSpan.Zero ? left : TimeSpan.Zero;
+    }
+
+    /// <summary>
     /// What the LAST attempt to open the address says about why it never
     /// answered. Only a refusal from this PC is an answer ("nothing is
     /// serving it"); a timeout, or anything else, is not — and "I asked and

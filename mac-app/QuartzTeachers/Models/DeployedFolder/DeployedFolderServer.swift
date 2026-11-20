@@ -95,8 +95,12 @@ actor DeployedFolderServer {
     nonisolated let port: Int
     nonisolated let listener: NWListener
 
-    /// Called once, the first time a request finds the folder gone.
-    private let onFolderGone: @Sendable () -> Void
+    /// Told when the listener has let its address go (#1013).
+    nonisolated let listenerClosed: ListenerClosed = ListenerClosed()
+
+    /// Called once, the first time a request finds the folder gone, with
+    /// this server, so the show it belongs to is the one stopped.
+    private let onFolderGone: @Sendable (DeployedFolderServer) -> Void
 
     private var connections: [Int: ConnectionState] = [:]
     private var nextConnectionID: Int = 0
@@ -110,7 +114,7 @@ actor DeployedFolderServer {
 
     // MARK: - Initializer
 
-    init(root: URL, port: Int, listener: NWListener, onFolderGone: @escaping @Sendable () -> Void) {
+    init(root: URL, port: Int, listener: NWListener, onFolderGone: @escaping @Sendable (DeployedFolderServer) -> Void) {
         self.root = root
         self.port = port
         self.listener = listener
@@ -123,8 +127,8 @@ actor DeployedFolderServer {
     /// `firstWasTaken` says whether the usual address was held, for the
     /// trail.
     static func start(
-        root: URL, candidates: [Int], onFolderGone: @escaping @Sendable () -> Void,
-        onEnded: @escaping @Sendable () -> Void = {}
+        root: URL, candidates: [Int], onFolderGone: @escaping @Sendable (DeployedFolderServer) -> Void,
+        onEnded: @escaping @Sendable (DeployedFolderServer) -> Void = { _ in }
     ) async throws -> (server: DeployedFolderServer, firstWasTaken: Bool) {
         var tried: Int = 0
         for candidate in candidates {
@@ -150,19 +154,12 @@ actor DeployedFolderServer {
                     await server.accept(connection)
                 }
             }
-            let started: Bool = await DeployedFolderServer.waitUntilListening(listener)
-            if started {
-                // Still listening for its state once it is ready, so a
-                // listener that fails later is noticed (the implementation
-                // review's L4).
-                listener.stateUpdateHandler = { state in
-                    switch state {
-                    case .failed, .cancelled:
-                        onEnded()
-                    default:
-                        break
-                    }
+            let started: Bool = await DeployedFolderServer.waitUntilListening(
+                listener, closed: server.listenerClosed, onEnded: {
+                    onEnded(server)
                 }
+            )
+            if started {
                 return (server: server, firstWasTaken: tried > 0)
             }
             listener.cancel()
@@ -173,15 +170,32 @@ actor DeployedFolderServer {
 
     /// Starts a listener and answers whether it is listening (false when the
     /// address is held, or it failed some other way).
-    static func waitUntilListening(_ listener: NWListener) async -> Bool {
+    ///
+    /// The one state handler stays for the listener's whole life, so no
+    /// change of state can fall between two handlers: once it is ready, a
+    /// failure or a cancel later calls `onEnded` (the implementation
+    /// review's L4), and `.cancelled`, which the framework reports only once
+    /// the address is let go, tells `closed` (#1013).
+    static func waitUntilListening(
+        _ listener: NWListener, closed: ListenerClosed = ListenerClosed(), onEnded: @escaping @Sendable () -> Void = {}
+    ) async -> Bool {
         let answered: OneAnswer = OneAnswer()
         return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             listener.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
                     answered.give(true, to: continuation)
-                case .failed, .cancelled:
+                case .failed:
+                    if answered.wasReady {
+                        onEnded()
+                    }
                     answered.give(false, to: continuation)
+                case .cancelled:
+                    if answered.wasReady {
+                        onEnded()
+                    }
+                    answered.give(false, to: continuation)
+                    closed.markClosed()
                 case .waiting:
                     // Waiting means the address could not be had now.
                     answered.give(false, to: continuation)
@@ -193,17 +207,21 @@ actor DeployedFolderServer {
         }
     }
 
-    /// Stops listening and closes every connection.
-    func stop() {
-        if isStopped {
-            return
+    /// Stops listening and closes every connection, and returns once the
+    /// listener has let its address go (#1013): `cancel()` only asks, and
+    /// under load the address went on answering after Stop had returned
+    /// (3 of 40 runs of `DeployedFolderOfferTests`). It waits for the
+    /// listener's own `.cancelled`, not for a length of time.
+    func stop() async {
+        if !isStopped {
+            isStopped = true
+            listener.cancel()
+            for (_, state) in connections {
+                state.connection.cancel()
+            }
+            connections.removeAll()
         }
-        isStopped = true
-        listener.cancel()
-        for (_, state) in connections {
-            state.connection.cancel()
-        }
-        connections.removeAll()
+        await listenerClosed.waitUntilClosed()
     }
 
     /// The counts so far, for the trail.
@@ -458,7 +476,7 @@ actor DeployedFolderServer {
         requestTally.add(1, ordering: .relaxed)
         if !DeployedFolderResolver.isFolder(root) && !folderGoneReported {
             folderGoneReported = true
-            onFolderGone()
+            onFolderGone(self)
         }
         var answer: DeployedFolderResolver.Answer = DeployedFolderResolver.answer(
             to: request.request, root: root, port: port
@@ -661,6 +679,9 @@ nonisolated final class OneAnswer: @unchecked Sendable {
 
     private var given: Bool = false
 
+    /// Whether the answer given was that it is listening.
+    private(set) var wasReady: Bool = false
+
     // MARK: - Functions
 
     func give(_ value: Bool, to continuation: CheckedContinuation<Bool, Never>) {
@@ -668,6 +689,63 @@ nonisolated final class OneAnswer: @unchecked Sendable {
             return
         }
         given = true
+        wasReady = value
         continuation.resume(returning: value)
+    }
+}
+
+/// Whether a listener has let its address go, and everyone waiting for it
+/// to (#1013). Told on the delivery queue, waited for from anywhere, so its
+/// state is behind a lock.
+nonisolated final class ListenerClosed: Sendable {
+
+    // MARK: - Types
+
+    struct State {
+        var isClosed: Bool = false
+        var waiting: [CheckedContinuation<Void, Never>] = []
+    }
+
+    // MARK: - Stored properties
+
+    private let state: Mutex<State> = Mutex<State>(State())
+
+    // MARK: - Computed properties
+
+    var isClosed: Bool {
+        return state.withLock { current in
+            return current.isClosed
+        }
+    }
+
+    // MARK: - Functions
+
+    /// The listener has let its address go: everyone waiting goes on.
+    func markClosed() {
+        let waiting: [CheckedContinuation<Void, Never>] = state.withLock { current in
+            current.isClosed = true
+            let taken: [CheckedContinuation<Void, Never>] = current.waiting
+            current.waiting = []
+            return taken
+        }
+        for continuation in waiting {
+            continuation.resume()
+        }
+    }
+
+    /// Returns once the listener has let its address go; at once if it has.
+    func waitUntilClosed() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let closedAlready: Bool = state.withLock { current in
+                if current.isClosed {
+                    return true
+                }
+                current.waiting.append(continuation)
+                return false
+            }
+            if closedAlready {
+                continuation.resume()
+            }
+        }
     }
 }
