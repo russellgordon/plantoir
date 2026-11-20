@@ -21361,24 +21361,40 @@ changed). Two exceptions are deliberate, each true:
   (`load_netlify_marker`): the current record (`.netlify_sites/section<N>.json`)
   is the one read; only when there is none is a legacy record that reads as
   JSON written there (its bytes, mode 0600) and the legacy one removed.
-  At the edges it refuses rather than guesses, and a refusal stops the
-  rollover before anything of it is planned, said as "Nothing was changed:
-  the website record “.merged_output/section1/.netlify_site.json” could not
-  be moved to “.netlify_sites/section1.json”." (`LegacyMarkerNotMovedIn`):
-  a legacy record that is not JSON, or that cannot be written or removed
-  (the current record this call wrote is removed again, so the folder is as
-  it was); and a current record beside a DIFFERENT legacy one (deploy.py
-  reads the current one now, but would migrate the legacy one once the
-  rollover had moved the current one aside, so the sentence adds that the
-  place already holds a different record). Beside the SAME bytes, the
-  legacy one is what a migration that died before its removal leaves, and
-  it is removed (the migration finished). Once brought in, a step that is
-  then refused leaves the record in its current place: the same website,
-  where a deploy would have put it, so "Nothing was changed" stays true of
-  what the teacher has. Gone with it: the move outside the step,
-  `PlannedSiteRelease` and `putTheLegacyMarkerBack`, and the action argument
-  `legacyMarkerSetAsideOutside` (and `JournaledStep.extraArguments`, which
-  only carried it). Rejected before the ruling: naming the builds root as a
+  **A legacy record a deploy would NOT read** (a current record is there
+  and holds other bytes, or it is not JSON) is a stale leftover, and the
+  rollover is never stopped by it (Russell's ruling of 2026-11-20,
+  evening, replacing the fix round's refusal): it is brought in beside the
+  current record as `.netlify_sites/section<N>.from-built-output.json`, a
+  name deploy.py never reads, and `planSiteRelease` sets it aside in the
+  step as one more `moveApart` (kept as
+  `section<N>.from-built-output.previous-<stamp>.json`), one of the
+  section's records that move as a group. It is gone from the built output,
+  so a later deploy cannot migrate it back in; Undo puts it back byte for
+  byte at the place the step found it, beside the current record (a step
+  cannot name the built output), and Redo sets it aside again. Beside the
+  SAME bytes, the legacy record is what a migration that stopped before its
+  removal leaves, and it is only removed (the migration finished). The
+  only refusal left is a record that cannot be read, written or removed,
+  said as "Nothing was changed: the website record
+  “.merged_output/section1/.netlify_site.json” could not be moved to
+  “.netlify_sites/section1.json”." (`LegacyMarkerNotMovedIn`; the place
+  written is removed again, so the folder is as it was).
+
+  **A step refused after the record was brought in puts it back**
+  (`LegacyMarkerBroughtIn.putBack`, from `makeTheRolloverStep`: never over
+  anything, and only while its new place still holds the same bytes), so
+  "Nothing was changed" is true. If it cannot be put back, the reply says
+  what moved instead: "Nothing else was changed: … The website record “…”
+  is now at “…”, where a deploy reads it; it names the same website." (for
+  a stale leftover: "The old website record “…” is now at “…”, where no
+  deploy reads it.") (`RolloverStoppedAfterARecordMoved`, `saidWhenTheRolloverStopped`). A
+  step left part way, or a process that dies, leaves it where it is: the
+  step's own `before` names it there, and recovery settles the step from
+  that. Gone with the fix round's design: the move outside the step,
+  `PlannedSiteRelease` and its `putTheLegacyMarkerBack`, the action argument
+  `legacyMarkerSetAsideOutside`, and `JournaledStep.extraArguments`, which
+  only carried it. Rejected before the ruling: naming the builds root as a
   second place of the step (a second root in the format for one file that
   only very old folders hold); leaving the whole website out of the step.
 
@@ -21483,7 +21499,11 @@ death between bringing in the legacy record and the step's begin leaves
 the record in its current place and the legacy one gone (or, between the
 write and the removal, both holding the same bytes): a deploy reads the
 current one, the same website, and the next rollover finishes the removal
-(`testACrashBetweenBringingInTheLegacyRecordAndTheStepLeavesAFolderADeployReads`). In SHADOW, recovery never writes the teacher's files (U3a's rule);
+(`testACrashBetweenBringingInTheLegacyRecordAndTheStepLeavesAFolderADeployReads`). A stale leftover brought in and then killed at
+any point is the same: after the bring-in or between the swaps it is beside
+the current record (the step closed `failed` or `rolledBack`), after the
+last swap it is set aside (`done`), and never back in the built output
+(`testADifferentLeftoverKilledAtEachPointIsSettledByRecovery`). In SHADOW, recovery never writes the teacher's files (U3a's rule);
 a rollover step moves files, so its staged files are left for a live
 recovery, as for any step with a move.
 

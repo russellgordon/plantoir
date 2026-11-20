@@ -5468,20 +5468,29 @@ final class AssistToolRunner {
 
         let placeName: String
 
+        /// Whether it went to the current record's place (a deploy reads it
+        /// there), or beside it as a stale leftover (no deploy reads it).
+        let isTheCurrentRecord: Bool
+
         // MARK: - Initializer
 
         init(underlying: Error, broughtIn: DeployCommand.LegacyMarkerBroughtIn) {
             self.underlyingSaid = underlying.localizedDescription
             self.legacyName = broughtIn.legacyName
             self.placeName = broughtIn.placeName
+            self.isTheCurrentRecord = broughtIn.placeURL.lastPathComponent.hasSuffix(".from-built-output.json") == false
         }
 
         // MARK: - Computed properties
 
         var errorDescription: String? {
+            if isTheCurrentRecord {
+                return underlyingSaid
+                    + " The website record “\(legacyName)” is now at “\(placeName)”, "
+                    + "where a deploy reads it; it names the same website."
+            }
             return underlyingSaid
-                + " The website record “\(legacyName)” is now at “\(placeName)”, "
-                + "where a deploy reads it; it names the same website."
+                + " The old website record “\(legacyName)” is now at “\(placeName)”, where no deploy reads it."
         }
     }
 

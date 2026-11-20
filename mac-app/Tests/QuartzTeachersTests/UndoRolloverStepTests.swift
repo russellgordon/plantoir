@@ -653,7 +653,24 @@ final class UndoRolloverStepTests: XCTestCase {
         XCTAssertFalse(said.summary.hasPrefix("Nothing was changed"), said.summary)
         XCTAssertTrue(said.summary.hasPrefix("Nothing else was changed"), said.summary)
         XCTAssertTrue(said.summary.contains(".netlify_sites/section1.json"), said.summary)
+        XCTAssertTrue(said.summary.contains("where a deploy reads it"), said.summary)
         XCTAssertEqual(siteADeployReads(made), "last-year")
+
+        // A stale leftover that cannot go back: no deploy reads where it is.
+        let different: AssistFixture.Made = try sectionWithADifferentLeftover()
+        let differentFolder: URL = legacyURL(different).deletingLastPathComponent()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: differentFolder.path)
+        }
+        UndoKillPoints.fileInUseAtSwap = { index in
+            try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: differentFolder.path)
+            return index == 0
+        }
+        let saidDifferent: AssistToolOutcome = await rollOver(different, surface: .menu)
+        UndoKillPoints.fileInUseAtSwap = nil
+        XCTAssertTrue(saidDifferent.summary.hasPrefix("Nothing else was changed"), saidDifferent.summary)
+        XCTAssertTrue(saidDifferent.summary.contains("section1.from-built-output.json”, where no deploy reads it"), saidDifferent.summary)
+        XCTAssertEqual(siteADeployReads(different), "last-year")
     }
 
     // MARK: - Records as a group (the director's decision of 2026-11-20)
