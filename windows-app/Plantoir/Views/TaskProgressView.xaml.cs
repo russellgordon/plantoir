@@ -817,7 +817,7 @@ public sealed partial class TaskProgressView : UserControl
             asking.ChooseCancel();
             return;
         }
-        var dontAskAgain = new CheckBox { Content = StopQuestionWording.DontAskAgain, IsChecked = false, Margin = new Thickness(0, 12, 0, 0) };
+        var dontAskAgain = new CheckBox { Content = StopQuestionWording.DontAskAgain, IsChecked = false };
         AutomationProperties.SetAutomationId(dontAskAgain, "stopQuestionDontAskAgain");
         var content = new StackPanel();
         content.Children.Add(FormBuilders.DialogExplanation(StopQuestionWording.Message(question)));
