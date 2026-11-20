@@ -179,9 +179,14 @@ public class FixWithButtonsUiTests
             while (clock.ElapsedMilliseconds < 4000)
             {
                 Thread.Sleep(250);
+                // The desktop's CHILDREN only (a whole-desktop descendant
+                // search timed out, measured), then the window's own tree,
+                // where WinUI's popups live.
                 var tips = new List<AutomationElement>();
-                tips.AddRange(app.Desktop.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip)));
-                tips.AddRange(app.Window.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip)));
+                try { tips.AddRange(app.Desktop.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip))); }
+                catch (Exception failure) { seen.Add($"desktop search failed: {failure.Message}"); }
+                try { tips.AddRange(app.Window.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip))); }
+                catch (Exception failure) { seen.Add($"window search failed: {failure.Message}"); }
                 foreach (var tip in tips)
                 {
                     string said = $"{clock.ElapsedMilliseconds} ms: \"{tip.Name}\"";
