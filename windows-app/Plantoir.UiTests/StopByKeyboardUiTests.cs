@@ -36,6 +36,13 @@ public class StopByKeyboardUiTests
     private readonly ITestOutputHelper _output;
     public StopByKeyboardUiTests(ITestOutputHelper output) => _output = output;
 
+    /// <summary>What a run measured, also in <c>%TEMP%\plantoir-1009-measurement.txt</c>, since a passing test's output is not printed.</summary>
+    private void Measured(string what)
+    {
+        _output.WriteLine("measured: " + what);
+        try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "plantoir-1009-measurement.txt"), $"{DateTime.Now:s} {what}{Environment.NewLine}"); } catch { }
+    }
+
     private static void Press(DrivenApp app, VirtualKeyShort key)
     {
         CopyAPageEscapeUiTests.Front(app);
@@ -93,7 +100,7 @@ public class StopByKeyboardUiTests
         Assert.True(app.WaitAnsweringDialogs(() => CancelShows(app), TimeSpan.FromSeconds(90)),
                     $"deploy {which} never showed its Cancel" + app.AnsweredSoFar);
         // The Deploy button keeps the focus after Invoke; Escape must not depend on where it is.
-        _output.WriteLine($"deploy {which} running, phase \"{Phase(app)}\"");
+        Measured($"deploy {which} running, phase \"{Phase(app)}\"");
     }
 
     private static void WriteCourse(string courses, out string published)
@@ -117,7 +124,7 @@ public class StopByKeyboardUiTests
         StartDeploy(app, 1);
         Press(app, VirtualKeyShort.ESCAPE);
         var asked = Asked(app, "Escape on a running deploy");
-        _output.WriteLine($"measured: the question opened with the focus on {Focused(asked)}");
+        Measured($"the question opened with the focus on {Focused(asked)}");
         Assert.Equal(StopQuestionWording.DeployStopButton, asked.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))?.Name);
         Assert.Equal(StopQuestionWording.CancelButton, asked.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))?.Name);
         Assert.Contains(StopQuestionWording.DeployMessage, DrivenApp.TextsUnder(asked));
@@ -153,7 +160,7 @@ public class StopByKeyboardUiTests
         var again = Asked(app, "Escape after Cancel with the box ticked");
         Assert.False(again.FindFirstDescendant(cf => cf.ByAutomationId("stopQuestionDontAskAgain"))!.AsCheckBox().IsChecked == true,
                      "the box kept its tick from the last time");
-        _output.WriteLine($"measured: asked again, the focus is on {Focused(again)}");
+        Measured($"asked again, the focus is on {Focused(again)}");
         Press(app, VirtualKeyShort.RETURN);
         AssertGone(app, "Enter on the question");
         AssertCancelled(app, "Enter (Stop Deploy, the default)");
