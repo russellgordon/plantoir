@@ -255,6 +255,9 @@ public class SectionAndClassesUiTests
 {
     private const string Separator = "----";
 
+    /// <summary>The gaps between items, in pixels, of the menu last read.</summary>
+    private static string LastGaps = "";
+
     /// <summary>What a menu should read, by AutomationId, from the layout.</summary>
     private static List<string> Expected(Plantoir.Core.Models.SubjectMenuLayout.Menu menu)
     {
@@ -287,9 +290,9 @@ public class SectionAndClassesUiTests
     /// a separator as "----". A <c>MenuFlyoutSeparator</c> has no element in
     /// UI Automation (measured on the VM, 2026-11-20: the flyout's children
     /// are its items only), so a separator is read where it is drawn: as a
-    /// gap between two items' rectangles larger than the gap between items
-    /// of one group (zero, measured, since an item's rectangle includes its
-    /// padding; a separator adds several pixels).
+    /// gap between two items' rectangles more than 4 pixels larger than the
+    /// smallest gap in the menu, which is the gap between two items of one
+    /// group (<see cref="LastGaps"/> says what was measured when it fails).
     /// </summary>
     private static List<(string Line, AutomationElement? Element)> Read(DrivenApp app, string menu, string anyItemId)
     {
@@ -303,10 +306,14 @@ public class SectionAndClassesUiTests
             items.Add((id, child, child.BoundingRectangle));
         }
         items.Sort((one, other) => one.Box.Top.CompareTo(other.Box.Top));
+        var gaps = new List<int>();
+        for (int index = 1; index < items.Count; index++) gaps.Add(items[index].Box.Top - items[index - 1].Box.Bottom);
+        int between = gaps.Count > 0 ? gaps.Min() : 0;   // two items of one group
+        LastGaps = string.Join(", ", gaps);
         var lines = new List<(string, AutomationElement?)>();
         for (int index = 0; index < items.Count; index++)
         {
-            if (index > 0 && items[index].Box.Top - items[index - 1].Box.Bottom > 3) lines.Add((Separator, null));
+            if (index > 0 && gaps[index - 1] > between + 4) lines.Add((Separator, null));
             lines.Add((items[index].Id, items[index].Element));
         }
         return lines;
@@ -334,7 +341,9 @@ public class SectionAndClassesUiTests
                  })
         {
             var lines = Read(app, title, anyId);
-            Assert.Equal(Expected(menu), lines.Select(l => l.Line).ToList());
+            var drawn = lines.Select(l => l.Line).ToList();
+            Assert.True(Expected(menu).SequenceEqual(drawn),
+                $"{title}: expected {string.Join(", ", Expected(menu))}\n drawn {string.Join(", ", drawn)}\n gaps {LastGaps}");
             var live = lines.Where(l => l.Element is not null && l.Line != "sectionReviseWith" && l.Element.IsEnabled)
                             .Select(l => l.Line).ToList();
             Assert.True(live.Count == 0, $"{title} items live on a course row: {string.Join(", ", live)}");
