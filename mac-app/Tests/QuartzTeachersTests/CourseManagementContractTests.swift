@@ -43,8 +43,11 @@ final class CourseManagementContractTests: XCTestCase {
                         "\(name): the menu's own backups say so in the name (#457, #990)"
                     )
                     if let words = testCase["description"] as? String {
-                        XCTAssertEqual(backup?.maker.description, words, name)
-                        XCTAssertEqual(backup?.keptDescription, testCase["kept"] as? String, name)
+                        // In a course whose pages are meetings, a club, the
+                        // menus are named as its menu bar titles them (#990).
+                        let noun: ClassNoun = try XCTUnwrap(ClassNoun(rawValue: testCase["noun"] as? String ?? "class"), name)
+                        XCTAssertEqual(backup?.maker.description(noun: noun), words, name)
+                        XCTAssertEqual(backup?.keptDescription(noun: noun), testCase["kept"] as? String, name)
                         let made: BackupMaker = try XCTUnwrap(backup?.maker)
                         XCTAssertEqual(
                             code + "_backup_2026-08-11_221530" + made.nameSuffix + ".zip", name,

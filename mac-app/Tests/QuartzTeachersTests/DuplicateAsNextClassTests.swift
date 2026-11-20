@@ -522,7 +522,7 @@ final class DuplicateAsNextClassTests: XCTestCase {
     /// Each item is on the trail by where it is in the menus, never by its
     /// raw name (`menuPath`'s `default:` returns the raw value).
     func testTheTrailNamesTheItemByItsPlaceInTheMenus() {
-        XCTAssertEqual(SectionVerbs.menuPath(of: .addClass), "Classes ▸ Add Class…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .addClass, noun: .class), "Classes ▸ Add Class…")
     }
 
     /// `subjectMenus.addClassSheet`: the ways in the contract's order are

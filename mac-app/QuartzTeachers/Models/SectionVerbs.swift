@@ -150,7 +150,8 @@ final class SectionVerbs {
                 ending = "not rebuilt"
             }
         }
-        SectionVerbs.noteRan(item, ending: ending, counts: counts, courseCode: courseCode, sectionNumber: sectionNumber)
+        SectionVerbs.noteRan(item, ending: ending, counts: counts, courseCode: courseCode, sectionNumber: sectionNumber,
+                             noun: toolRunner.classNoun(ofCourse: courseCode))
         return outcome
     }
 
@@ -171,7 +172,8 @@ final class SectionVerbs {
     /// A plan the teacher cancelled, or a sheet closed before anything ran.
     func noteCancelled(_ item: SubjectMenuRules.Item, courseCode: String, sectionNumber: Int, counts: String = "") {
         SectionVerbs.noteRan(item, ending: "cancelled at the plan", counts: counts,
-                             courseCode: courseCode, sectionNumber: sectionNumber)
+                             courseCode: courseCode, sectionNumber: sectionNumber,
+                             noun: toolRunner.classNoun(ofCourse: courseCode))
     }
 
     private func currentLastChange() -> SectionKey? {
@@ -192,9 +194,10 @@ final class SectionVerbs {
     // MARK: - The trail
 
     /// `ranFromAMenu`: "Section ▸ Publish Pages… — carried out, 3 pages
-    /// ticked". Never a page's title.
-    static func ranLine(_ item: SubjectMenuRules.Item, ending: String, counts: String) -> String {
-        var line: String = "\(menuPath(of: item)) — \(ending)"
+    /// ticked". Never a page's title. `noun` is what the course calls its
+    /// class pages: a club's line says Meetings ▸ (#990).
+    static func ranLine(_ item: SubjectMenuRules.Item, ending: String, counts: String, noun: ClassNoun) -> String {
+        var line: String = "\(menuPath(of: item, noun: noun)) — \(ending)"
         if !counts.isEmpty {
             line += ", " + counts
         }
@@ -202,21 +205,22 @@ final class SectionVerbs {
     }
 
     static func noteRan(_ item: SubjectMenuRules.Item, ending: String, counts: String,
-                        courseCode: String, sectionNumber: Int) {
+                        courseCode: String, sectionNumber: Int, noun: ClassNoun) {
         ActivityTrail.note(
-            .ranFromAMenu, ranLine(item, ending: ending, counts: counts),
+            .ranFromAMenu, ranLine(item, ending: ending, counts: counts, noun: noun),
             course: courseCode, section: sectionNumber
         )
     }
 
     /// Where the item is, the way a teacher would say it: the menu that
     /// holds it, from `SubjectMenuLayout` (#990: Section or Classes), and
-    /// the title it is drawn with there.
-    static func menuPath(of item: SubjectMenuRules.Item) -> String {
+    /// the title it is drawn with there, under the menu's title for a course
+    /// whose class pages are called `noun` (Meetings ▸ in a club).
+    static func menuPath(of item: SubjectMenuRules.Item, noun: ClassNoun) -> String {
         guard SubjectMenuLayout.menu(containing: item) != nil, let title = SectionMenu.title(for: item) else {
             return item.rawValue
         }
-        return SubjectMenuLayout.path(of: item, titled: title)
+        return SubjectMenuLayout.path(of: item, titled: title, noun: noun)
     }
 
     // MARK: - The calls, built in code

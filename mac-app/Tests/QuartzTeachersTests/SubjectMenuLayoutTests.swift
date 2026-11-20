@@ -103,7 +103,9 @@ final class SubjectMenuLayoutTests: XCTestCase {
             let name: String = try XCTUnwrap(menu["menu"] as? String)
             contractMenus.append(name)
             let mac: SubjectMenuLayout.Menu = try XCTUnwrap(SubjectMenuLayout.Menu(rawValue: name), "no menu \(name) here")
-            XCTAssertEqual(menu["title"] as? String, SubjectMenuLayout.title(of: mac))
+            XCTAssertEqual(menu["title"] as? String, SubjectMenuLayout.title(of: mac, noun: .class))
+            // #990, Russell, 2026-11-20 evening: Meetings in a club.
+            XCTAssertEqual(menu["titleForAMeeting"] as? String, SubjectMenuLayout.title(of: mac, noun: .meeting), name)
             let groups: [[String]] = try XCTUnwrap(menu["groups"] as? [[String]])
             XCTAssertEqual(SubjectMenuLayoutTests.macGroups(of: mac), groups, "\(name)'s groups")
         }
@@ -184,7 +186,9 @@ final class SubjectMenuLayoutTests: XCTestCase {
     func testTheRealMenusDrawTheLayout() throws {
         OutsideAssistantPresence.shared.refresh()
         for menu in SubjectMenuLayout.Menu.allCases {
-            let title: String = SubjectMenuLayout.title(of: menu)
+            // The hosted test has no window in front, so nothing is
+            // selected and the menus carry an ordinary course's titles.
+            let title: String = SubjectMenuLayout.title(of: menu, noun: .class)
             let real: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: title), "no \(title) menu in the menu bar")
             XCTAssertEqual(
                 SubjectMenuLayoutTests.actualLines(of: real), try SubjectMenuLayoutTests.expectedLines(of: menu),
@@ -225,7 +229,9 @@ final class SubjectMenuLayoutTests: XCTestCase {
         // The hosted test has no Plantoir window in front: the focused
         // values are empty, as with Settings or the assistant key.
         for menu in SubjectMenuLayout.Menu.allCases {
-            let title: String = SubjectMenuLayout.title(of: menu)
+            // The hosted test has no window in front, so nothing is
+            // selected and the menus carry an ordinary course's titles.
+            let title: String = SubjectMenuLayout.title(of: menu, noun: .class)
             let real: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: title))
             let lines: [String] = SubjectMenuLayoutTests.actualLines(of: real)
             XCTAssertEqual(lines, try SubjectMenuLayoutTests.expectedLines(of: menu), "\(title) hides something")
@@ -257,7 +263,9 @@ final class SubjectMenuLayoutTests: XCTestCase {
     func testTheSplitChangedNoKey() throws {
         var keys: [String: String] = [:]
         for menu in SubjectMenuLayout.Menu.allCases {
-            let title: String = SubjectMenuLayout.title(of: menu)
+            // The hosted test has no window in front, so nothing is
+            // selected and the menus carry an ordinary course's titles.
+            let title: String = SubjectMenuLayout.title(of: menu, noun: .class)
             let real: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: title))
             for item in MenuBarTreeTests.visibleItems(of: real) {
                 let key: String = MenuBarTreeTests.keyText(item)
@@ -284,14 +292,17 @@ final class SubjectMenuLayoutTests: XCTestCase {
     /// Menu paths follow the split: a trail line names the menu the item is
     /// in now. MUST FAIL on `dev` before #990, where every one said Section.
     func testMenuPathsNameTheMenuTheItemIsIn() {
-        XCTAssertEqual(SectionVerbs.menuPath(of: .addClass), "Classes ▸ Add Class…")
-        XCTAssertEqual(SectionVerbs.menuPath(of: .classDates), "Classes ▸ Class Dates…")
-        XCTAssertEqual(SectionVerbs.menuPath(of: .reDateClasses), "Classes ▸ Re-date Classes…")
-        XCTAssertEqual(SectionVerbs.menuPath(of: .makeRoomForClasses), "Classes ▸ Make Room for Classes…")
-        XCTAssertEqual(SectionVerbs.menuPath(of: .rollOverToANewYear), "Classes ▸ Roll Over to a New Year…")
-        XCTAssertEqual(SectionVerbs.menuPath(of: .publishPages), "Section ▸ Publish Pages…")
-        XCTAssertEqual(SectionVerbs.menuPath(of: .undoLastChange), "Section ▸ Undo Last Change")
-        XCTAssertEqual(SectionVerbs.menuPath(of: .rebuildPreview), "Section ▸ Rebuild Preview")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .addClass, noun: .class), "Classes ▸ Add Class…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .classDates, noun: .class), "Classes ▸ Class Dates…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .reDateClasses, noun: .class), "Classes ▸ Re-date Classes…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .makeRoomForClasses, noun: .class), "Classes ▸ Make Room for Classes…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .rollOverToANewYear, noun: .class), "Classes ▸ Roll Over to a New Year…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .publishPages, noun: .class), "Section ▸ Publish Pages…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .undoLastChange, noun: .class), "Section ▸ Undo Last Change")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .rebuildPreview, noun: .class), "Section ▸ Rebuild Preview")
+        // A club's trail names its menus as its menu bar does (#990, 2026-11-20 evening).
+        XCTAssertEqual(SectionVerbs.menuPath(of: .makeRoomForClasses, noun: .meeting), "Meetings ▸ Make Room for Classes…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .publishPages, noun: .meeting), "Section ▸ Publish Pages…")
     }
 
     /// Russell's ruling "name the real menu" (#990): the copy's trail line
@@ -305,18 +316,26 @@ final class SubjectMenuLayoutTests: XCTestCase {
         for event in events where event["event"] as? String == "section menu backed up a course" {
             cases = try XCTUnwrap(event["lineCases"] as? [[String: Any]])
         }
-        XCTAssertEqual(cases.count, 4)
+        XCTAssertEqual(cases.count, 6)
         for testCase in cases {
             let inMenu: SubjectMenuLayout.Menu = try XCTUnwrap(SubjectMenuLayout.Menu(rawValue: try XCTUnwrap(testCase["menu"] as? String)))
+            // A club's line names the Meetings menu (#990, 2026-11-20 evening).
+            let noun: ClassNoun = try XCTUnwrap(ClassNoun(rawValue: testCase["noun"] as? String ?? "class"))
             if let file = testCase["file"] as? String {
-                let line: String = ActivityTrail.sectionMenuBackedUpLine(fileName: file, bytes: 1_000_000, seconds: 2, inMenu: inMenu)
+                let line: String = ActivityTrail.sectionMenuBackedUpLine(
+                    fileName: file, bytes: 1_000_000, seconds: 2, inMenu: inMenu, noun: noun
+                )
                 XCTAssertTrue(line.hasPrefix(try XCTUnwrap(testCase["startsWith"] as? String)), line)
             } else {
                 let reason: String = try XCTUnwrap(testCase["reason"] as? String)
-                XCTAssertEqual(ActivityTrail.sectionMenuCouldNotBackUpLine(reason: reason, inMenu: inMenu), testCase["line"] as? String)
+                XCTAssertEqual(
+                    ActivityTrail.sectionMenuCouldNotBackUpLine(reason: reason, inMenu: inMenu, noun: noun),
+                    testCase["line"] as? String
+                )
             }
         }
-        XCTAssertEqual(SubjectMenuLayout.eitherMenu, "Section or Classes")
+        XCTAssertEqual(SubjectMenuLayout.eitherMenu(noun: .class), "Section or Classes")
+        XCTAssertEqual(SubjectMenuLayout.eitherMenu(noun: .meeting), "Section or Meetings")
         XCTAssertTrue(AssistWording.nothingToUndoFromTheMenu.contains("the Section or Classes menu"))
     }
 
@@ -327,7 +346,9 @@ final class SubjectMenuLayoutTests: XCTestCase {
             courseCode: "ICS3U", backedUpAt: Date(), fileURL: URL(fileURLWithPath: "/x/ICS3U_backup_2026-08-11_221530_classes-section2.zip"),
             maker: .menu(sectionNumber: 2, inMenu: .classes)
         )
-        XCTAssertEqual(view.madeBy(classes), "The Classes menu, Section 2")
+        XCTAssertEqual(view.madeBy(classes, noun: .class), "The Classes menu, Section 2")
+        // A club's says Meetings (#990, 2026-11-20 evening).
+        XCTAssertEqual(view.madeBy(classes, noun: .meeting), "The Meetings menu, Section 2")
     }
 
     /// #990's ellipsis ruling: a command that only asks for a confirmation

@@ -846,7 +846,10 @@ enum AssistContract {
             ),
             "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
-            "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),
+            "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section, noun: .class),
+            "sectionIsChangingFromTheMeetingsMenu": AssistWording.sectionIsChangingFromTheMenu(
+                course: course, section: section, noun: .meeting
+            ),
             // Classes dated after the next class (#475): the question asked
             // at Deploy (and, since #694, never at Section ▸ Publish
             // Pages…), and what an assistant is told when it cannot be asked.

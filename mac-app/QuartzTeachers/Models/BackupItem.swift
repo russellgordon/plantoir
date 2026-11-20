@@ -45,15 +45,18 @@ enum BackupMaker: Hashable {
         }
     }
 
-    /// The end of the sentence a teacher reads in the Backups list.
-    var description: String {
+    /// The end of the sentence a teacher reads in the Backups list. `noun`
+    /// is what the backup's course calls its class pages, so a menu copy
+    /// names the menu by the title that course's menu bar gives it
+    /// (Meetings in a club, #990).
+    func description(noun: ClassNoun) -> String {
         switch self {
         case .teacher:
             return "made by you"
         case .assistant(let sectionNumber):
             return "before an assistant chat about Section \(sectionNumber)"
         case .menu(let sectionNumber, let inMenu):
-            return "before a change from the \(SubjectMenuLayout.title(of: inMenu)) menu to Section \(sectionNumber)"
+            return "before a change from the \(SubjectMenuLayout.title(of: inMenu, noun: noun)) menu to Section \(sectionNumber)"
         }
     }
 
@@ -148,8 +151,8 @@ struct BackupItem: Identifiable, Hashable {
     /// "Backed up 11 August 2026 at 10:15 PM · before an assistant chat
     /// about Section 1" — because choosing between five copies of the same
     /// course is a choice about what each one was FOR.
-    var subtitle: String {
-        return "Backed up \(whenDescription) · \(maker.description)"
+    func subtitle(noun: ClassNoun) -> String {
+        return "Backed up \(whenDescription) · \(maker.description(noun: noun))"
     }
 
     /// A different mark for the assistant's own, so the two kinds can be
@@ -159,15 +162,18 @@ struct BackupItem: Identifiable, Hashable {
     /// Said per item rather than once for the list, because the two answers
     /// are genuinely different and a teacher deciding whether to keep their
     /// own copy needs THEIR answer, not the assistant's.
-    var keptDescription: String {
+    ///
+    /// `noun` is what the course calls its class pages: in a club the menus
+    /// are Section and Meetings (#990).
+    func keptDescription(noun: ClassNoun) -> String {
         switch maker {
         case .teacher:
             return "You made this one, so it is kept until you delete it."
         case .assistant:
             return "The assistant made this one; its five most recent are kept."
         case .menu(_, let inMenu):
-            return "The \(SubjectMenuLayout.title(of: inMenu)) menu made this one before a change; "
-                + "the five most recent the Section and Classes menus made are kept."
+            return "The \(SubjectMenuLayout.title(of: inMenu, noun: noun)) menu made this one before a change; "
+                + "the five most recent the \(SubjectMenuLayout.bothMenus(noun: noun)) menus made are kept."
         }
     }
 

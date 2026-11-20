@@ -1962,7 +1962,8 @@ final class AssistToolRunner {
                     fileName: backupURL.lastPathComponent,
                     bytes: bytes,
                     seconds: Date().timeIntervalSince(started),
-                    inMenu: menuMakingTheChange
+                    inMenu: menuMakingTheChange,
+                    noun: course.configuration.classNoun
                 )
             }
             ActivityTrail.note(event, line, course: code, section: sectionNumber)
@@ -1971,7 +1972,8 @@ final class AssistToolRunner {
             var line: String = ActivityTrail.assistantCouldNotBackUpLine(reason: error.localizedDescription)
             if surface == .menu {
                 line = ActivityTrail.sectionMenuCouldNotBackUpLine(
-                    reason: error.localizedDescription, inMenu: menuMakingTheChange
+                    reason: error.localizedDescription, inMenu: menuMakingTheChange,
+                    noun: course.configuration.classNoun
                 )
             }
             ActivityTrail.note(event, line, course: code, section: sectionNumber)
@@ -2465,7 +2467,7 @@ final class AssistToolRunner {
             sectionText = String(section)
         }
         return AssistToolOutcome.refused(AssistWording.sectionIsChangingFromTheMenu(
-            course: code, section: sectionText
+            course: code, section: sectionText, noun: classNoun(ofCourse: code)
         ))
     }
 
@@ -3284,6 +3286,14 @@ final class AssistToolRunner {
             plainNextUnit: next.unit,
             plainNextDay: next.day
         )
+    }
+
+    /// What the course with this code calls its class pages, for a trail
+    /// line from a menu that names the Classes menu by the title the course's
+    /// menu bar gives it (Meetings in a club, #990); Classes' noun when the
+    /// folder has no such course.
+    func classNoun(ofCourse code: String) -> ClassNoun {
+        return course(withCode: code)?.configuration.classNoun ?? .class
     }
 
     /// The course with this code, or nil when the working folder no longer has
@@ -4767,8 +4777,9 @@ final class AssistToolRunner {
         ActivityTrail.note(
             .classCopyNotMade,
             // Add Class…, as a copy, is in the Classes menu (#990): the line
-            // names the menu the layout puts it in.
-            "did not copy a class from the \(SubjectMenuLayout.title(of: SubjectMenuLayout.menu(containing: .addClass) ?? .classes)) menu — "
+            // names the menu the layout puts it in, by the title the course's
+            // menu bar gives it (Meetings in a club).
+            "did not copy a class from the \(SubjectMenuLayout.title(of: SubjectMenuLayout.menu(containing: .addClass) ?? .classes, noun: located.course.configuration.classNoun)) menu — "
             + "the copy could not be made certainly "
             + "hidden, so nothing was written",
             course: located.course.code, section: located.sectionNumber

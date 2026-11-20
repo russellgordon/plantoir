@@ -1082,13 +1082,15 @@
       },
       {
         "event": "section menu backed up a course",
-        "carries": "the course and section, the MENU the item is in (#990, Russell's ruling: name the real menu; subjectMenus.layout), the backup's FILE NAME (<CODE>_backup_<stamp>_menu-section<N>.zip from Section, _classes-section<N>.zip from Classes, course-management.json -> zipNames), its size in MB and how many seconds it took; or that it could not, and why ('the Classes menu could not back up the course: ...'). The event keeps its name from before the split.",
-        "line": "{course}/{section} · the {Section|Classes} menu backed up the course as {file} ({MB} MB, {s} s)",
+        "carries": "the course and section, the MENU the item is in (#990, Russell's ruling: name the real menu; subjectMenus.layout), the backup's FILE NAME (<CODE>_backup_<stamp>_menu-section<N>.zip from Section, _classes-section<N>.zip from Classes, course-management.json -> zipNames), its size in MB and how many seconds it took; or that it could not, and why ('the Classes menu could not back up the course: ...'). The menu is named by the title the course's menu bar gives it: the Meetings menu in a course whose class pages are meetings, a club (subjectMenus.layout.titleForAMeeting, #990). The event keeps its name from before the split.",
+        "line": "{course}/{section} · the {Section|Classes|Meetings} menu backed up the course as {file} ({MB} MB, {s} s)",
         "lineCases": [
           {"menu": "section", "file": "ICS3U_backup_2026-08-11_221530_menu-section2.zip", "startsWith": "the Section menu backed up the course as ICS3U_backup_2026-08-11_221530_menu-section2.zip ("},
           {"menu": "classes", "file": "ICS3U_backup_2026-08-11_221530_classes-section2.zip", "startsWith": "the Classes menu backed up the course as ICS3U_backup_2026-08-11_221530_classes-section2.zip ("},
           {"menu": "section", "reason": "the disk is full", "line": "the Section menu could not back up the course: the disk is full"},
-          {"menu": "classes", "reason": "the disk is full", "line": "the Classes menu could not back up the course: the disk is full"}
+          {"menu": "classes", "reason": "the disk is full", "line": "the Classes menu could not back up the course: the disk is full"},
+          {"menu": "classes", "noun": "meeting", "file": "CODING_backup_2026-08-11_221530_classes-section2.zip", "startsWith": "the Meetings menu backed up the course as CODING_backup_2026-08-11_221530_classes-section2.zip ("},
+          {"menu": "classes", "noun": "meeting", "reason": "the disk is full", "line": "the Meetings menu could not back up the course: the disk is full"}
         ],
         "why": "#457 batch B, the director's ruling on the plan review's blocker 2: the menu saves a copy of the course before EVERY change it makes, named for the menu rather than the assistant, so a teacher who declined the assistant never sees a copy said to be 'before an assistant chat'. The line answers 'where did this zip come from' and 'why did Publish take ten seconds' (9.7 s measured for a 487 MB course, #351)."
       },
@@ -28570,6 +28572,7 @@
         {
           "menu": "section",
           "title": "Section",
+          "titleForAMeeting": "Section",
           "groups": [
             ["preview", "rebuildPreview", "openInBrowser", "stopShowingDeployedFolder"],
             ["publishClassForADate", "publishPages", "hidePages", "publishPagesLinksLeadTo", "undoLastChange", "undoGettingReady"],
@@ -28582,6 +28585,7 @@
         {
           "menu": "classes",
           "title": "Classes",
+          "titleForAMeeting": "Meetings",
           "groups": [
             ["addClass"],
             ["classDates", "reDateClasses", "makeRoomForClasses"],
@@ -28609,8 +28613,9 @@
       "menuBar": {
         "mac": ["Plantoir", "File", "Edit", "View", "Course", "Section", "Classes", "Window", "Help"],
         "windows": ["File", "Course", "Section", "Classes", "View", "Help"],
-        "why": "The mac's custom menus go between View and Window (HIG, The menu bar); Windows keeps its own order with View after the app's menus (#488). Both read Course, Section, Classes: most to least general."
-      }
+        "why": "The mac's custom menus go between View and Window (HIG, The menu bar); Windows keeps its own order with View after the app's menus (#488). Both read Course, Section, Classes: most to least general. In a club the same place reads Meetings (titleForAMeeting)."
+      },
+      "titleForAMeeting": "GitHub #990 (Russell, 2026-11-20 evening, through the dialog): 'in a club the menu itself is titled Meetings, on both platforms, so no sentence a club's teacher reads says class.' Each menu's `titleForAMeeting` is its title while the selected course calls its class pages meetings (course_config.json -> class_noun, file-formats.json), which is what a club's sentences are chosen by (the ...ForAMeeting keys of assist-wording.json), so a sentence that names the menu always names the one on the screen; a club whose teacher chose 'class' keeps Classes, as its sentences do. The title follows the selection live, as the items' greying does: select a club and the menu bar reads Meetings, select a course and it reads Classes; with nothing selected it reads Classes. Only the title changes: the same items, in the same order and groups, drawn and dimmed as `cases` says. Every sentence that names the menu for a club, the backups' (course-management.json -> zipNames), the trail's (activityTrail.mustRecord -> 'section menu backed up a course' -> lineCases) and the assistant's, uses this title. The HIG has no sentence on a menu title that follows the selection; the nearest, Menus, has an item's 'changeable label that describes an item's current state', and The menu bar's 'Always show the same set of menu items' is kept: the set does not change."
     },
     "cases": [
       {

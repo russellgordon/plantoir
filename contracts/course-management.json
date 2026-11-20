@@ -2359,6 +2359,30 @@
       {
         "kind": "backup",
         "maker": "menu",
+        "menu": "classes",
+        "noun": "meeting",
+        "name": "ICS3U_backup_2026-08-11_221530_classes-section2.zip",
+        "moment": "2026-08-11 22:15:30",
+        "section": 2,
+        "description": "before a change from the Meetings menu to Section 2",
+        "kept": "The Meetings menu made this one before a change; the five most recent the Section and Meetings menus made are kept.",
+        "why": "#990 (Russell, 2026-11-20 evening: in a club the menu itself is titled Meetings, so no sentence a club's teacher reads says 'class'). The same file as the Classes case above, for a course whose class pages are meetings (`noun`, course_config.json -> class_noun): the name does not change, and the Backups list names the menus as that course's menu bar titles them (shared-rules.json -> subjectMenus.layout.titleForAMeeting). The noun is read from the course the backup belongs to when the list is drawn; a backup of a course no longer in the folder is read by its code (a club's code means meetings)."
+      },
+      {
+        "kind": "backup",
+        "maker": "menu",
+        "menu": "section",
+        "noun": "meeting",
+        "name": "ICS3U_backup_2026-08-11_221530_menu-section2.zip",
+        "moment": "2026-08-11 22:15:30",
+        "section": 2,
+        "description": "before a change from the Section menu to Section 2",
+        "kept": "The Section menu made this one before a change; the five most recent the Section and Meetings menus made are kept.",
+        "why": "#990: a Section copy in a club. Section keeps its title in a club; the sentence on how many the two menus keep names Meetings beside it."
+      },
+      {
+        "kind": "backup",
+        "maker": "menu",
         "menu": "section",
         "name": "ICS3U_backup_2026-08-11_221530_menu-section2.zip",
         "moment": "2026-08-11 22:15:30",

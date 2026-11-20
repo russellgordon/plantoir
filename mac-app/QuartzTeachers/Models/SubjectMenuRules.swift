@@ -155,6 +155,10 @@ nonisolated enum SubjectMenuRules {
         /// The selected course (or the selected section's course) is kept
         /// for reference.
         var keptForReference: Bool = false
+        /// What the selected course calls its class pages: it titles the
+        /// Classes menu, Meetings in a club (#990). Classes with nothing
+        /// selected. It greys nothing.
+        var classNoun: ClassNoun = .class
         /// Rename and Add Section must wait: previewing, deploying, or a
         /// Claude, Codex or GitHub Copilot session open on the course (#458).
         var structuralHold: Bool = false

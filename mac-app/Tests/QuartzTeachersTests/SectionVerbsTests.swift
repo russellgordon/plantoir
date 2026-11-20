@@ -136,7 +136,7 @@ final class SectionVerbsTests: XCTestCase {
                 menuCopies.append(name)
                 let item: BackupItem? = BackupItem.from(fileURL: backups.appendingPathComponent(name), courseCode: "ICS3U")
                 XCTAssertEqual(item?.maker, .menu(sectionNumber: 1, inMenu: .section))
-                XCTAssertFalse(item?.subtitle.contains("assistant") ?? true)
+                XCTAssertFalse(item?.subtitle(noun: .class).contains("assistant") ?? true)
             }
         }
         XCTAssertEqual(menuCopies.count, 2, "one copy per change: \(menuCopies)")
@@ -200,7 +200,7 @@ final class SectionVerbsTests: XCTestCase {
         XCTAssertEqual(outcome.summary, AssistWording.previewIsRebuilding(course: "ICS3U", section: "1"))
         XCTAssertTrue(
             ActivityTrail.store.activityText(includingPrompts: false)
-                .contains(SectionVerbs.ranLine(.rebuildPreview, ending: "rebuilt", counts: "")),
+                .contains(SectionVerbs.ranLine(.rebuildPreview, ending: "rebuilt", counts: "", noun: .class)),
             ActivityTrail.store.activityText(includingPrompts: false)
         )
     }
@@ -255,7 +255,7 @@ final class SectionVerbsTests: XCTestCase {
         let refused: AssistToolOutcome = await made.runner.run(call: SectionVerbs.call(
             "publish_pages", ["course": "ICS3U", "section": 1, "pages": "Unit 1, Day 1"]
         ))
-        XCTAssertEqual(refused.summary, AssistWording.sectionIsChangingFromTheMenu(course: "ICS3U", section: "1"))
+        XCTAssertEqual(refused.summary, AssistWording.sectionIsChangingFromTheMenu(course: "ICS3U", section: "1", noun: .class))
         XCTAssertEqual(try SectionVerbsTests.pages(in: made.course), before)
         XCTAssertNil(AssistActivity.store.heldBackups, "the menu's claim took the assistant window's hold")
         SectionMenuActivity.end(folderPath: made.root.path, courseCode: "ICS3U", sectionNumber: 1)
@@ -642,7 +642,7 @@ final class SectionVerbsEndingTests: XCTestCase {
                 classesCopies.append(name)
                 let item: BackupItem? = BackupItem.from(fileURL: backups.appendingPathComponent(name), courseCode: "ICS3U")
                 XCTAssertEqual(item?.maker, .menu(sectionNumber: 1, inMenu: .classes))
-                XCTAssertTrue(item?.subtitle.contains("the Classes menu") ?? false, item?.subtitle ?? "")
+                XCTAssertTrue(item?.subtitle(noun: .class).contains("the Classes menu") ?? false, item?.subtitle(noun: .class) ?? "")
             }
         }
         XCTAssertEqual(classesCopies.count, 1, "one Classes copy: \(classesCopies)")
@@ -663,7 +663,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         )
         XCTAssertNotEqual(try SectionVerbsTests.pages(in: made.course), before, "Make Room wrote nothing")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.makeRoomForClasses, ending: "carried out", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.makeRoomForClasses, ending: "carried out", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
@@ -685,7 +685,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         )
         XCTAssertEqual(try SectionVerbsTests.pages(in: made.course), before, "something was written after all")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.makeRoomForClasses, ending: "changed nothing", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.makeRoomForClasses, ending: "changed nothing", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
@@ -711,7 +711,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         let partly: String = template.components(separatedBy: "\u{1}").last ?? template
         XCTAssertTrue(undone.summary.hasSuffix(partly), "not a partial undo: \(undone.summary)")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "took part of the last change back", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "took part of the last change back", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
@@ -748,7 +748,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         )
         XCTAssertEqual(verbs.toolRunner.changeCount, 0, "the change is still on the list: \(second.summary)")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "took the last change back", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "took the last change back", counts: "", noun: .class)),
             lastMenuLine()
         )
         let page: String = try String(contentsOf: edited, encoding: .utf8)
@@ -790,7 +790,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         )
         XCTAssertEqual(verbs.toolRunner.changeCount, 1, "the change must stay on the list")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "changed nothing", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "changed nothing", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
@@ -810,7 +810,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         )
         XCTAssertNotEqual(notes, "---\ntitle: Notes\npublish: false\n---\nNotes.\n", "the linked page was not written first")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
@@ -828,7 +828,7 @@ final class SectionVerbsEndingTests: XCTestCase {
             outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "Unit 1", problem: "")), outcome.detail
         )
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
@@ -869,7 +869,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         XCTAssertFalse(outcome.summary.contains("Nothing was changed"), outcome.summary)
         XCTAssertTrue(outcome.summary.contains("Unit 1, Day 1"), "the page written is not named: \(outcome.summary)")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.reDateClasses, ending: "carried out", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.reDateClasses, ending: "carried out", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
@@ -888,7 +888,7 @@ final class SectionVerbsEndingTests: XCTestCase {
             outcome.detail
         )
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "changed nothing", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "changed nothing", counts: "", noun: .class)),
             lastMenuLine()
         )
     }

@@ -55,19 +55,6 @@ final class ClubNounTests: XCTestCase {
         )
     }
 
-    /// `text` without the menu bar's own menu names ("the Classes menu"):
-    /// a menu's title is the name a club sees in its menu bar too, not the
-    /// course's noun, and Russell ruled on #990 that a sentence names the
-    /// real menu. Only "<title> menu" is taken out, so a bare "class" still
-    /// fails.
-    private func withoutMenuNames(_ text: String) -> String {
-        var stripped: String = text
-        for menu in SubjectMenuLayout.Menu.allCases {
-            stripped = stripped.replacingOccurrences(of: SubjectMenuLayout.title(of: menu) + " menu", with: "menu")
-        }
-        return stripped
-    }
-
     /// Whether `text` says "class" or "classes" as a word of its own.
     private func saysClass(_ text: String) -> Bool {
         return text.range(of: #"\b[Cc]lass(es)?\b"#, options: .regularExpression) != nil
@@ -197,10 +184,24 @@ final class ClubNounTests: XCTestCase {
             let meeting: String = try XCTUnwrap(wording[key] as? String, key)
             let twin: String = try XCTUnwrap(wording[twinKey] as? String, "\(key) has no \(twinKey)")
             XCTAssertTrue(meeting.contains("meeting"), "\(key): \(meeting)")
-            XCTAssertFalse(saysClass(withoutMenuNames(meeting)), "\(key): \(meeting)")
+            XCTAssertFalse(saysClass(meeting), "\(key): \(meeting)")
             XCTAssertFalse(meeting.contains(", Day "), "\(key): \(meeting)")
             XCTAssertTrue(saysClass(twin), "\(twinKey): \(twin)")
         }
+    }
+
+    /// A club's menu bar titles the Classes menu Meetings (Russell's ruling
+    /// on #990, 2026-11-20 evening: "in a club the menu itself is titled
+    /// Meetings, on both platforms, so no sentence a club's teacher reads
+    /// says 'class'"), so the sentence that names both menus for a club says
+    /// neither "class" nor "Classes", and its ordinary twin says Classes.
+    func testTheSentenceNamingBothMenusSaysMeetingsInAClub() throws {
+        let wording: [String: Any] = try XCTUnwrap(AssistContract.wording()["wording"] as? [String: Any])
+        let club: String = try XCTUnwrap(wording["sectionIsChangingFromTheMeetingsMenu"] as? String)
+        XCTAssertFalse(saysClass(club), club)
+        XCTAssertTrue(club.contains("the Section or Meetings menu"), club)
+        let ordinary: String = try XCTUnwrap(wording["sectionIsChangingFromTheMenu"] as? String)
+        XCTAssertTrue(ordinary.contains("the Section or Classes menu"), ordinary)
     }
 
     // MARK: - What the window offers a club

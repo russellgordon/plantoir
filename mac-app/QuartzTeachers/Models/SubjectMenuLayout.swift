@@ -82,13 +82,27 @@ nonisolated enum SubjectMenuLayout {
         }
     }
 
-    /// The menu's title in the menu bar.
-    static func title(of menu: Menu) -> String {
+    /// The menu's title in the menu bar, for a course whose class pages are
+    /// called `noun`. Section is Section everywhere. Classes is titled
+    /// Meetings in a course whose pages are meetings, a club (Russell's
+    /// ruling on #990, 2026-11-20 evening: "in a club the menu itself is
+    /// titled Meetings, on both platforms, so no sentence a club's teacher
+    /// reads says 'class'"; `subjectMenus.layout` → `titleForAMeeting`).
+    /// The noun, not the club code, decides it, because the noun is what
+    /// every club sentence is chosen by, so a sentence that names the menu
+    /// always names the one on the screen. There is no default: a caller
+    /// says which course's menu it means.
+    static func title(of menu: Menu, noun: ClassNoun) -> String {
         switch menu {
         case .section:
             return "Section"
         case .classes:
-            return "Classes"
+            switch noun {
+            case .class:
+                return "Classes"
+            case .meeting:
+                return "Meetings"
+            }
         }
     }
 
@@ -130,25 +144,37 @@ nonisolated enum SubjectMenuLayout {
         return nil
     }
 
-    /// "Section or Classes": the two menus' titles in the layout's order, for
-    /// a sentence that covers a change from either (#990, Russell's ruling
-    /// "name the real menu": "the few sentences that cover both say 'the
-    /// Section or Classes menu'").
-    static var eitherMenu: String {
+    /// "Section or Classes" ("Section or Meetings" in a club): the two
+    /// menus' titles in the layout's order, for a sentence that covers a
+    /// change from either (#990, Russell's ruling "name the real menu": "the
+    /// few sentences that cover both say 'the Section or Classes menu'").
+    static func eitherMenu(noun: ClassNoun) -> String {
+        return bothTitles(noun: noun, joinedBy: " or ")
+    }
+
+    /// "Section and Classes" ("Section and Meetings" in a club): the two
+    /// menus together, for the Backups list's sentence on how many copies
+    /// they keep between them.
+    static func bothMenus(noun: ClassNoun) -> String {
+        return bothTitles(noun: noun, joinedBy: " and ")
+    }
+
+    /// The two titles in the layout's order, joined.
+    private static func bothTitles(noun: ClassNoun, joinedBy joiner: String) -> String {
         var titles: [String] = []
         for menu in Menu.allCases {
-            titles.append(title(of: menu))
+            titles.append(title(of: menu, noun: noun))
         }
-        return titles.joined(separator: " or ")
+        return titles.joined(separator: joiner)
     }
 
     /// Where an item is, the way a teacher would say it: "Classes ▸ Add
     /// Class…" for `.addClass` and "Add Class…". The menu's title comes from
     /// the layout, so a menu path moves when the item does.
-    static func path(of item: SubjectMenuRules.Item, titled title: String) -> String {
+    static func path(of item: SubjectMenuRules.Item, titled title: String, noun: ClassNoun) -> String {
         guard let menu = menu(containing: item) else {
             return title
         }
-        return SubjectMenuLayout.title(of: menu) + " ▸ " + title
+        return SubjectMenuLayout.title(of: menu, noun: noun) + " ▸ " + title
     }
 }

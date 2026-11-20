@@ -448,7 +448,8 @@ struct SidebarView: View {
         } message: { item in
             if let sectionNumber = workspace.backupRestoreOfferedSection {
                 Text(OneSectionRestoreWording.message(
-                    section: sectionNumber, madeBy: item.maker.description, when: item.whenDescription
+                    section: sectionNumber, madeBy: item.maker.description(noun: workspace.classNoun(ofCourse: item.courseCode)),
+                    when: item.whenDescription
                 ))
             } else {
                 Text("""
@@ -915,10 +916,11 @@ struct SidebarView: View {
 
     /// A backup's tooltip: when, who, and — once measured — what it takes.
     func backupHelp(for item: BackupItem) -> String {
+        let subtitle: String = item.subtitle(noun: workspace.classNoun(ofCourse: item.courseCode))
         guard let size = workspace.sizeDescription(of: item) else {
-            return item.subtitle
+            return subtitle
         }
-        return item.subtitle + " · " + size
+        return subtitle + " · " + size
     }
 
     /// The single delete's confirmation, with what the backup takes once it
@@ -2092,6 +2094,7 @@ struct SidebarView: View {
         }
         if let course = workspace.selectedCourse {
             situation.keptForReference = course.isKeptForReference
+            situation.classNoun = course.configuration.classNoun
             situation.structuralHold = structuralHoldReason(for: course) != nil
             situation.busy = busyReason(for: course) != nil
             situation.copying = workspace.isBeingCopied(course.code)

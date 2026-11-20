@@ -1836,20 +1836,21 @@ nonisolated enum ActivityTrail {
 
     /// The words for `sectionMenuBackedUpACourse` (#457): the copy the
     /// Section or Classes menu saves before each change it makes, naming the
-    /// menu the item is in (#990, "name the real menu"). The event keeps its
+    /// menu the item is in (#990, "name the real menu") by the title the
+    /// course's menu bar gives it (Meetings in a club). The event keeps its
     /// name from before the split.
     static func sectionMenuBackedUpLine(
-        fileName: String, bytes: Int64, seconds: Double, inMenu: SubjectMenuLayout.Menu
+        fileName: String, bytes: Int64, seconds: Double, inMenu: SubjectMenuLayout.Menu, noun: ClassNoun
     ) -> String {
         let megabytes: String = String(format: "%.1f", Double(bytes) / 1_000_000)
         let took: String = String(format: "%.1f", seconds)
-        let menu: String = SubjectMenuLayout.title(of: inMenu)
+        let menu: String = SubjectMenuLayout.title(of: inMenu, noun: noun)
         return "the \(menu) menu backed up the course as \(fileName) (\(megabytes) MB, \(took) s)"
     }
 
     /// The words for a menu backup that could not be made.
-    static func sectionMenuCouldNotBackUpLine(reason: String, inMenu: SubjectMenuLayout.Menu) -> String {
-        return "the \(SubjectMenuLayout.title(of: inMenu)) menu could not back up the course: \(reason)"
+    static func sectionMenuCouldNotBackUpLine(reason: String, inMenu: SubjectMenuLayout.Menu, noun: ClassNoun) -> String {
+        return "the \(SubjectMenuLayout.title(of: inMenu, noun: noun)) menu could not back up the course: \(reason)"
     }
 
     /// Where a start-of-the-year act was asked from, in the trail's words.

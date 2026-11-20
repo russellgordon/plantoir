@@ -3594,6 +3594,21 @@ class WorkspaceModel {
         return sizeDescription(of: item)
     }
 
+    /// What the course with this code calls its class pages, for a sentence
+    /// about one of its backups that names the Classes menu by the title
+    /// that course's menu bar gives it (Meetings in a club, #990). A backup
+    /// of a course no longer in the folder is read by its code: a club's
+    /// code means a club, whose pages are meetings.
+    func classNoun(ofCourse code: String) -> ClassNoun {
+        for course in courses where course.code.lowercased() == code.lowercased() {
+            return course.configuration.classNoun
+        }
+        if ClubCodeRule.isClub(code) {
+            return .meeting
+        }
+        return .class
+    }
+
     /// "15.9 MB" for one backup, `AssistWording.backupSizeCouldNotBeRead` for
     /// one a finished measurement could not size, or nil until it has been
     /// measured.

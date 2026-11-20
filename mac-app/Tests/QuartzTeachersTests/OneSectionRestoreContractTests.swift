@@ -94,7 +94,7 @@ final class OneSectionRestoreContractTests: XCTestCase {
         let block: [String: Any] = try OneSectionRestoreContractTests.block()
         let wording: [String: Any] = try XCTUnwrap(block["wording"] as? [String: Any])
         let when: String = "November 13, 2026 at 8:15 PM"
-        let madeBy: String = BackupMaker.menu(sectionNumber: 2, inMenu: .section).description
+        let madeBy: String = BackupMaker.menu(sectionNumber: 2, inMenu: .section).description(noun: .class)
         let keptAt: String = "courses/_backups/ICS3U/Section 2 before a restore 2026-11-13_201500"
         func filled(_ key: String, count: Int = 0, reason: String = "") throws -> String {
             let template: String = try XCTUnwrap(wording[key] as? String, key)
