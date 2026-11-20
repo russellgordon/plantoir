@@ -4578,16 +4578,27 @@ brought to match in stage 3.
   **When the window is moved.** A taller pane grows the window down from
   its top edge, so a window that sat on its screen with a short pane runs
   past the bottom (past the Dock) with a tall one. It is moved ONLY after
-  a resize that grew it and pushed its bottom past the visible area,
+  a resize that grew it and left its bottom in no display's visible area,
   judged from the frame before and after that resize
-  (`SettingsPaneHeight.originAfterResize`; the frame before is kept on
-  every resize and every move): up just far enough to undo what the growth
-  hid, to the visible bottom, or, when the person had left the bottom
-  lower than that, back to where they left it, never so far the title bar
-  leaves the top. A focus change, a screen change, a resize that did not
-  grow it, or a person's own drag of an edge (`inLiveResize`) never moves
-  it, so a window left partly below the screen, or across two displays
-  stacked one above the other, stays where it was put. HIG, Windows:
+  (`SettingsPaneHeight.originAfterResize` and `bottomIsShown`; the frame
+  before is kept on every resize and every move): up just far enough to
+  undo what the growth hid, to the visible bottom, or, when the person had
+  left the bottom lower than that, back to where they left it, never so
+  far the title bar leaves the top. What it was lifted by is remembered
+  (`SettingsWindowLift`) and given back when a shorter pane shrinks it
+  again, so the same pane lands in the same place every time; the fourth
+  review measured the version before this one: Short at y = 30, Tall,
+  Short ended 451 pt higher than placed, and a window left low at -120
+  went to -120 the first time the tall pane was chosen and to 0 the
+  second. A move that kept the window's size is the person's
+  (`isThePersonsMove`; the placement's own `setFrameOrigin` is not
+  counted), and it clears what is owed: where they put it is theirs. A
+  focus change, a screen change or a person's own drag of an edge
+  (`inLiveResize`) never moves it, so a window left partly below the
+  screen stays where it was put, and one on the upper of two stacked
+  displays whose bottom hangs onto the lower display's visible area is
+  not lifted when a taller pane grows it (the fourth review found a
+  300 pt jump there, with nothing hidden). HIG, Windows:
   people "can reposition them", and "the system remembers window size and
   placement". The second version moved it on every one of those
   notifications, and the third review found it snapped back on every
@@ -4598,7 +4609,10 @@ brought to match in stage 3.
   origins it is asked to move to, since the host pins every frame) and
   resizes it through AppKit: a growing resize past the bottom moves it
   once, to the visible bottom; a window left low is not moved on becoming
-  key, on a screen change or on a resize that did not grow it.
+  key, on a screen change or on a resize that did not grow it. On injected
+  frames and displays it also checks Short, Tall, Short, Tall landing in
+  the same places (placed at 30 and left low at -120), a person's move
+  clearing what was lifted, and a bottom on the display below left alone.
 
   NOT proven: a real second display (this Mac has one screen), and so the
   cap changing while a person drags Settings across to a display of

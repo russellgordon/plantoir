@@ -534,20 +534,99 @@ final class LayoutAndSmallBehaviourTests: XCTestCase {
         let visible: NSRect = LayoutAndSmallBehaviourTests.laptopScreen(at: NSPoint(x: 0, y: 70)).visibleFrame
         let before: NSRect = NSRect(x: 100, y: 150, width: 560, height: 488)
         let grown: NSRect = NSRect(x: 100, y: 150 - 112, width: 560, height: 600)
-        XCTAssertEqual(SettingsPaneHeight.originAfterResize(from: before, to: grown, visible: visible), NSPoint(x: 100, y: 70))
+        XCTAssertEqual(SettingsPaneHeight.originAfterResize(from: before, to: grown, visible: visible, shownAreas: [visible]), NSPoint(x: 100, y: 70))
 
         let grownOnScreen: NSRect = NSRect(x: 100, y: 150 - 50, width: 560, height: 538)
-        XCTAssertNil(SettingsPaneHeight.originAfterResize(from: before, to: grownOnScreen, visible: visible))
+        XCTAssertNil(SettingsPaneHeight.originAfterResize(from: before, to: grownOnScreen, visible: visible, shownAreas: [visible]))
 
         let leftLow: NSRect = NSRect(x: 100, y: -100, width: 560, height: 300)
         let shrunk: NSRect = NSRect(x: 100, y: -50, width: 560, height: 250)
-        XCTAssertNil(SettingsPaneHeight.originAfterResize(from: leftLow, to: shrunk, visible: visible), "a resize that did not grow the window moved it")
+        XCTAssertNil(SettingsPaneHeight.originAfterResize(from: leftLow, to: shrunk, visible: visible, shownAreas: [visible]), "a resize that did not grow the window moved it")
         let leftLowAndGrown: NSRect = NSRect(x: 100, y: -300, width: 560, height: 500)
-        XCTAssertEqual(SettingsPaneHeight.originAfterResize(from: leftLow, to: leftLowAndGrown, visible: visible), NSPoint(x: 100, y: -100), "a window left low was not put back where the person left its bottom")
+        XCTAssertEqual(SettingsPaneHeight.originAfterResize(from: leftLow, to: leftLowAndGrown, visible: visible, shownAreas: [visible]), NSPoint(x: 100, y: -100), "a window left low was not put back where the person left its bottom")
 
         let tallerThanTheScreen: NSRect = NSRect(x: 100, y: 150 - 412, width: 560, height: 900)
-        let highest: NSPoint? = SettingsPaneHeight.originAfterResize(from: before, to: tallerThanTheScreen, visible: visible)
+        let highest: NSPoint? = SettingsPaneHeight.originAfterResize(from: before, to: tallerThanTheScreen, visible: visible, shownAreas: [visible])
         XCTAssertEqual(highest?.y ?? 0, visible.maxY - 900, accuracy: 0.5, "the title bar was pushed above the screen")
+    }
+
+    /// A person's placement survives every pane change (#997, the fourth
+    /// review): what a taller pane lifted the window by is given back when
+    /// a shorter pane shrinks it, so the same pane lands in the same place
+    /// each time. Before, Short at y = 30, Tall, Short again ended 451 pt
+    /// higher; and a window left low at y = -120 went to -120 for the first
+    /// Tall and to the visible bottom for the second.
+    func testWhatATallerPaneLiftedIsGivenBackWhenItShrinks() {
+        let visible: NSRect = NSRect(x: 0, y: 0, width: 1280, height: 900)
+        let short: CGFloat = 300
+        let tall: CGFloat = 781
+        var lift: SettingsWindowLift = SettingsWindowLift()
+
+        func paneChange(_ frame: NSRect, toHeight height: CGFloat) -> NSRect {
+            let resized: NSRect = NSRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height)
+            if let origin = lift.origin(afterResizeFrom: frame, to: resized, visible: visible, shownAreas: [visible]) {
+                return NSRect(origin: origin, size: resized.size)
+            }
+            return resized
+        }
+
+        let placed: NSRect = NSRect(x: 100, y: 30, width: 560, height: short)
+        let tallOnce: NSRect = paneChange(placed, toHeight: tall)
+        XCTAssertEqual(tallOnce.minY, 0, accuracy: 0.5, "the tall pane was not lifted onto the screen")
+        let shortAgain: NSRect = paneChange(tallOnce, toHeight: short)
+        XCTAssertEqual(shortAgain.minY, 30, accuracy: 0.5, "the short pane did not go back where the person put it")
+        let tallTwice: NSRect = paneChange(shortAgain, toHeight: tall)
+        XCTAssertEqual(tallTwice.minY, tallOnce.minY, accuracy: 0.5, "the same pane landed in two places")
+
+        lift = SettingsWindowLift()
+        let leftLow: NSRect = NSRect(x: 100, y: -120, width: 560, height: short)
+        let lowTall: NSRect = paneChange(leftLow, toHeight: tall)
+        XCTAssertEqual(lowTall.minY, -120, accuracy: 0.5)
+        let lowShort: NSRect = paneChange(lowTall, toHeight: short)
+        XCTAssertEqual(lowShort.minY, -120, accuracy: 0.5, "the short pane did not go back where the person left it")
+        let lowTallTwice: NSRect = paneChange(lowShort, toHeight: tall)
+        XCTAssertEqual(lowTallTwice.minY, -120, accuracy: 0.5, "the same pane landed in two places for a window left low")
+    }
+
+    /// Once the person moves the window, where it is is theirs: nothing
+    /// lifted is given back on the next shrink. A move that kept the size
+    /// is the person's; a pane change, which moves the origin AND changes
+    /// the size, is not.
+    func testAPersonsMoveClearsWhatWasLifted() {
+        let visible: NSRect = NSRect(x: 0, y: 0, width: 1280, height: 900)
+        var lift: SettingsWindowLift = SettingsWindowLift()
+        let placed: NSRect = NSRect(x: 100, y: 30, width: 560, height: 300)
+        let grown: NSRect = NSRect(x: 100, y: 30 - 481, width: 560, height: 781)
+        XCTAssertNotNil(lift.origin(afterResizeFrom: placed, to: grown, visible: visible, shownAreas: [visible]))
+        XCTAssertEqual(lift.owed, 451, accuracy: 0.5)
+
+        let lifted: NSRect = NSRect(x: 100, y: 0, width: 560, height: 781)
+        let dragged: NSRect = NSRect(x: 300, y: -40, width: 560, height: 781)
+        XCTAssertTrue(SettingsPaneHeight.isThePersonsMove(from: lifted, to: dragged))
+        XCTAssertFalse(SettingsPaneHeight.isThePersonsMove(from: placed, to: grown), "a pane change was taken for the person's move")
+        XCTAssertFalse(SettingsPaneHeight.isThePersonsMove(from: lifted, to: lifted))
+        lift.personMovedTheWindow()
+        let shrunk: NSRect = NSRect(x: 300, y: -40 + 481, width: 560, height: 300)
+        XCTAssertNil(lift.origin(afterResizeFrom: dragged, to: shrunk, visible: visible, shownAreas: [visible]), "a lift was given back after the person moved the window")
+    }
+
+    /// Two displays stacked: the upper one holds most of the window and its
+    /// bottom hangs onto the lower one's visible area. A taller pane hides
+    /// nothing there, so the window is not lifted (the fourth review found
+    /// a 300 pt jump: y = 760, 500 tall, grown to y = 460, 800 tall, moved
+    /// back to 760). The bottom counts as on show in ANY display's visible
+    /// area.
+    func testABottomOnTheDisplayBelowIsOnShow() {
+        let lower: NSRect = NSRect(x: 0, y: 70, width: 1280, height: 730)
+        let upper: NSRect = NSRect(x: 0, y: 800, width: 1920, height: 1055)
+        let before: NSRect = NSRect(x: 200, y: 760, width: 560, height: 500)
+        let after: NSRect = NSRect(x: 200, y: 460, width: 560, height: 800)
+        XCTAssertTrue(SettingsPaneHeight.bottomIsShown(of: after, on: [upper, lower]))
+        XCTAssertNil(SettingsPaneHeight.originAfterResize(from: before, to: after, visible: upper, shownAreas: [upper, lower]), "a window whose bottom is on the display below was lifted")
+
+        // Beside the lower display, not over it: the bottom is out of sight.
+        let besideTheLower: NSRect = NSRect(x: 1400, y: 460, width: 400, height: 800)
+        XCTAssertFalse(SettingsPaneHeight.bottomIsShown(of: besideTheLower, on: [upper, lower]))
     }
 
     /// A shown window and a placement watching it, with one pretend display
