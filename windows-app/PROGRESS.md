@@ -16,7 +16,7 @@ Read this first; the dated entries below are history, newest first, and an earli
 
 Branch `issue/990-menus-windows`, on the mac's `issue/990-menus`. Lenovo 20QES70500 over SSH.
 
-- Fix with Claude… / Codex…: both drawn on every live course, each enabled only when its assistant is installed and a row is handed over (`buttonCases`' `claudeEnabled`/`codexEnabled`); a missing one says "This assistant is not set up on this PC." to Narrator. The contract's second sentence (Revise With ▸ Set Up an Assistant…) is held by name against #903, which builds that item.
+- Fix with Claude… / Codex…: both drawn on every live course, each enabled only when its assistant is installed and a row is handed over (`buttonCases`' `claudeEnabled`/`codexEnabled`); a missing one says "Not set up on this PC." to Narrator and as its tooltip. The contract's second sentence (Settings ▸ Other Assistants) is held by name against #903, which builds that page.
 - Course ▸ and Section ▸ Revise With ▸ Claude… and Codex…: always drawn, dimmed when not installed (`SubjectMenuRules.EnabledInTheMenuBar`, re-read on `OutsideAssistantPresence.Changed` and at the click). A row's context menu still hides them.
 - Course ▸ Rename's grey reason line is gone (ruling Q14); the row's context menu keeps its notes.
 - Not on Windows, so nothing done: Set Up an Assistant… (no set-up until #903, so no Help item to remove), the deployed folder's context-menu group (#889).

@@ -1048,14 +1048,13 @@ since #776). Not set up outranks nothing ticked (`FixWithAssistant.HelpFor`).
 `ButtonState` carries `ClaudeEnabled` and `CodexEnabled` beside `Enabled`
 (a row is handed over), and `buttonCases`' `claudeEnabled`/`codexEnabled` are
 run against them. **The help text is the contract's first sentence only**,
-"This assistant is not set up on this PC." (the contract's "Mac" said as
-`platformWording.machine`'s "PC"): its second sentence names Revise With ▸
-Set Up an Assistant…, which Windows does not have until #903 builds the
-set-up, so it is held open by name (`NamedGapLedger.FixWithWordsSaidDifferently`,
+"Not set up on this PC." (the contract's "Mac" said as
+`platformWording.machine`'s "PC"): its second sentence names Settings ▸
+Other Assistants, which Windows does not have until #903 builds the set-up, so it is held open by name (`NamedGapLedger.FixWithWordsSaidDifferently`,
 `notInstalledHelp`, #903, v2.0.0) and comes back whole, asserted by
 `FixWithAssistantContractTests.PiecesAndBoundsAreTheContracts`, the day that
 entry goes. REJECTED: saying the whole sentence now, which sends a teacher
-looking for a menu item that is not there.
+looking for a page that is not there.
 Whether each door exists is `OutsideAssistantPresence`, asked at launch and on
 `MainWindow.Activated` off the interface thread — never while the tab draws,
 and false until the first answer, so a tab that draws first shows its buttons

@@ -108,7 +108,7 @@ public class FixWithAssistantContractTests
     /// <c>fixWith.notInstalledHelp</c> (#990), said with Windows' word for the
     /// computer (<c>specialNames.platformWording.machine</c>: PC for Mac). While
     /// <see cref="NamedGapLedger.FixWithWordsSaidDifferently"/> holds it (#903:
-    /// no Set Up an Assistant… here yet), this app says exactly the contract's
+    /// no Settings ▸ Other Assistants here yet), this app says exactly the contract's
     /// FIRST sentence and must not say the whole; the day the hold goes, the
     /// whole sentence is asserted.
     /// </summary>
@@ -125,7 +125,7 @@ public class FixWithAssistantContractTests
             int firstStop = ours.IndexOf(". ", StringComparison.Ordinal);
             Assert.True(firstStop > 0, "notInstalledHelp no longer has a second sentence to hold: " + NamedGapLedger.ClosedMessage(owed));
             Assert.Equal(ours[..(firstStop + 1)], FixWithAssistant.NotInstalledHelp);
-            Assert.Contains("Set Up an Assistant", ours[(firstStop + 1)..], StringComparison.Ordinal);
+            Assert.Contains("Other Assistants", ours[(firstStop + 1)..], StringComparison.Ordinal);
         }
         else
             Assert.Equal(ours, FixWithAssistant.NotInstalledHelp);

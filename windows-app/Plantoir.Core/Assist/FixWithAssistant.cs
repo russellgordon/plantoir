@@ -78,12 +78,12 @@ public static class FixWithAssistant
     /// (<c>fixWith.notInstalledHelp</c>, #990): the contract's first sentence,
     /// with Windows' word for the computer (<c>specialNames.platformWording.machine</c>:
     /// "PC" where the mac says "Mac"). Its second sentence, which points at
-    /// Revise With ▸ Set Up an Assistant…, is held open by name in
-    /// <c>NamedGapLedger</c> against #903: this app has no set-up yet, so the
-    /// item it names does not exist here, and saying it would send a teacher
-    /// looking for something that is not there.
+    /// Settings ▸ Other Assistants (where the mac's Revise With ▸ Set Up an
+    /// Assistant… goes), is held open by name in <c>NamedGapLedger</c> against
+    /// #903: this app has no set-up and no such Settings page yet, and saying
+    /// it would send a teacher looking for something that is not there.
     /// </summary>
-    public const string NotInstalledHelp = "This assistant is not set up on this PC.";
+    public const string NotInstalledHelp = "Not set up on this PC.";
 
     /// <summary>The help text a button carries: why it cannot be pressed, or nothing when it can.</summary>
     public static string HelpFor(Assistant assistant, bool installed, ButtonState state)
