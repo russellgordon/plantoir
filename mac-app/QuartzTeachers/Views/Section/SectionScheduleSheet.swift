@@ -55,6 +55,12 @@ struct SectionScheduleSheet: View {
 
     @State var route: Route = .typed
 
+    /// Whether the teacher has chosen another route since the sheet opened
+    /// (#997). The dates box takes the focus when the sheet opens on it,
+    /// not when someone arrows the route picker back onto Typed: that
+    /// would pull the keyboard out of the picker mid-choice.
+    @State var hasChangedRoute: Bool = false
+
     /// The pasted column, as typed.
     @State var typed: String = ""
 
@@ -201,6 +207,7 @@ struct SectionScheduleSheet: View {
         .accessibilityIdentifier("sectionScheduleRoutePicker")
         .onChange(of: route) {
             failure = nil
+            hasChangedRoute = true
         }
     }
 
@@ -218,7 +225,8 @@ struct SectionScheduleSheet: View {
                 ClassDatesTextBox(
                     text: $typed,
                     accessibilityName: AccessibilityNames.classDates,
-                    identifier: "sectionScheduleTypedField"
+                    identifier: "sectionScheduleTypedField",
+                    takesTheFocusWhenShown: !hasChangedRoute
                 )
                 .frame(minHeight: 150)
                 .border(Color.secondary.opacity(0.3))

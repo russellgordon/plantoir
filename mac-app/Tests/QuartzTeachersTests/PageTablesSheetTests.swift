@@ -521,70 +521,55 @@ final class PageTablesSheetTests: XCTestCase {
         XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
     }
 
-    /// The picker's columns fit inside the table at the sheet's opening
-    /// width, with the scroll bars a mouse shows (#997, D48): before, Page,
-    /// Folder and Date added up wider than the table once its up-and-down
-    /// scroll bar took its room, and a sideways scroll bar appeared.
+    /// The picker's columns, and what its table shows, with the scroll bars
+    /// a mouse shows, once its rows are in.
+    func pickerColumnsEnd(in host: SheetHost) throws -> (end: CGFloat, shown: CGFloat, sidewaysBarOn: Bool, widths: [CGFloat]) {
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
+        let scrollView: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
+        scrollView.scrollerStyle = .legacy
+        host.pump()
+        scrollView.tile()
+        host.pump()
+        XCTAssertEqual(table.numberOfColumns, 3)
+        let end: CGFloat = table.rect(ofColumn: table.numberOfColumns - 1).maxX
+        return (end, scrollView.contentView.bounds.width, scrollView.hasHorizontalScroller, PageTablesSheetTests.widths(of: table))
+    }
+
+    /// The picker's columns fit inside the table, with the scroll bars a
+    /// mouse shows (#997, D48), both when it opens with its rows and when
+    /// they arrive after it is drawn, as they do in the app. Asked for 130,
+    /// 110 and 150, the columns came out at 145, 135 and 175 at open but at
+    /// 146.5, 134.5 and 174.5 once rows arrived, ending at 501.5 in a table
+    /// showing 501, and a sideways scroll bar appeared under the rows. No
+    /// half point is allowed for: the half point was the fault. The table
+    /// keeps its sideways scroll bar ready (it is not hidden to hide the
+    /// fault), so the columns have to fit.
     func testThePickerShowsNoSidewaysScrollBar() throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
         defer {
             try? FileManager.default.removeItem(at: made.root)
         }
-        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 20)
-        let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
-        defer {
-            host.close()
-        }
-        let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
-        let scrollView: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
-        scrollView.scrollerStyle = .legacy
-        host.pump()
-        scrollView.tile()
-        host.pump()
-        let lastColumn: Int = table.numberOfColumns - 1
-        XCTAssertEqual(lastColumn, 2)
-        let columnsEnd: CGFloat = table.rect(ofColumn: lastColumn).maxX
-        let shown: CGFloat = scrollView.contentView.bounds.width
-        print("PageTablesSheetTests: picker columns \(PageTablesSheetTests.widths(of: table)) end at \(columnsEnd) pt; "
-              + "the table is \(table.frame.width) wide and shows \(shown) pt")
-        XCTAssertLessThanOrEqual(columnsEnd, shown + 0.5, "the picker's columns run past what it shows, so it scrolls sideways")
-        XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
-    }
-
-    /// The picker shows no sideways scroll bar when its rows arrive after
-    /// it opened, with the scroll bars a mouse shows (#997, D48): the table
-    /// then spreads the width over the columns in half points, they ran
-    /// half a point past what the table shows (measured 146.5, 134.5 and
-    /// 174.5 ending at 501.5 in 501), and a sideways scroll bar appeared
-    /// under the rows, as the inventory's capture shows.
-    func testThePickerShowsNoSidewaysScrollBarWhenItsRowsArriveLater() throws {
-        let made = try AssistFixture.makeRunner(surface: .menu)
-        defer {
-            try? FileManager.default.removeItem(at: made.root)
-        }
         let full: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 20)
+        let opened: SheetHost = SheetHost(SectionVerbSheet(model: full, pressDefault: {}, cancel: {}))
+        let atOpen = try pickerColumnsEnd(in: opened)
+        let openedReachedAScreen: Bool = opened.reachedAScreen
+        opened.close()
+
         let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 0, pages: 1)
         let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
         defer {
             host.close()
         }
-        let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
-        let scrollView: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
-        scrollView.scrollerStyle = .legacy
-        host.pump()
+        _ = try pickerColumnsEnd(in: host)
         model.pageRows = full.pageRows
         host.pump(0.6)
-        scrollView.tile()
-        host.pump()
-        let columnsEnd: CGFloat = table.rect(ofColumn: table.numberOfColumns - 1).maxX
-        let shown: CGFloat = scrollView.contentView.bounds.width
-        let sidewaysBar: Bool = scrollView.hasHorizontalScroller && scrollView.horizontalScroller?.isHidden == false
-            && columnsEnd > shown
-        print("PageTablesSheetTests: picker with rows added: \(PageTablesSheetTests.widths(of: table)) end at \(columnsEnd) "
-              + "in \(shown); sideways scroller \(scrollView.hasHorizontalScroller), hidden \(String(describing: scrollView.horizontalScroller?.isHidden))")
-        XCTAssertEqual(table.numberOfRows, 23)
-        XCTAssertFalse(sidewaysBar, "the picker shows a sideways scroll bar: its columns end at \(columnsEnd) in \(shown)")
-        XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
+        let later = try pickerColumnsEnd(in: host)
+        print("PageTablesSheetTests: picker columns at open \(atOpen.widths) end at \(atOpen.end) in \(atOpen.shown); "
+              + "with rows added later \(later.widths) end at \(later.end) in \(later.shown); sideways bar on \(later.sidewaysBarOn)")
+        XCTAssertLessThanOrEqual(atOpen.end, atOpen.shown + 0.01, "at open the picker's columns run past what it shows, so it scrolls sideways")
+        XCTAssertLessThanOrEqual(later.end, later.shown + 0.01, "with rows added the picker's columns run past what it shows, so it scrolls sideways")
+        XCTAssertTrue(later.sidewaysBarOn, "the sideways scroll bar is turned off, which hides a fault rather than fixing it")
+        XCTAssertFalse(openedReachedAScreen || host.reachedAScreen, "the sheet reached a display")
     }
 
     /// The width a teacher adds goes to the Page column: dragged from 560 to

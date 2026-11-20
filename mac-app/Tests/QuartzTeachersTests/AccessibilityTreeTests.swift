@@ -171,28 +171,42 @@ final class AccessibilityTreeTests: XCTestCase {
 
     // MARK: - The sidebar (#997)
 
-    /// A course's row carries its whole code as a help tag (D44), so a code
-    /// cut short at the sidebar's default width can still be read.
-    func testACourseRowShowsItsWholeCodeOnHover() throws {
-        let made = try AssistFixture.makeRunner(surface: .menu)
-        defer {
-            try? FileManager.default.removeItem(at: made.root)
-        }
+    /// The help tags in a sidebar `width` points wide (228, the sidebar's
+    /// default) holding one course code's label.
+    func helpTags(ofCourseCode code: String, width: CGFloat = 228) throws -> (helps: [String], described: String) {
         let row: some View = List {
-            CourseRowLabel(course: made.course, isBeingRenamed: false)
+            CourseCodeLabel(code: code)
         }
         .listStyle(.sidebar)
-        let read: AccessibilityTree = try tree(of: row, size: NSSize(width: 228, height: 200))
+        let read: AccessibilityTree = try tree(of: row, size: NSSize(width: width, height: 200))
         var helps: [String] = []
         for element in read.elements {
             if !element.help.isEmpty {
                 helps.append(element.help)
             }
         }
-        XCTAssertTrue(
-            helps.contains(made.course.displayCode),
-            "no help tag carries the code \(made.course.displayCode); help tags: \(helps)\n\(read.described())"
-        )
+        return (helps, read.described())
+    }
+
+    /// A course code cut short in its row carries its whole code as a help
+    /// tag (D44), so it can still be read: a 12-character code, the most a
+    /// code may have, in a sidebar narrowed to 140 points.
+    func testATruncatedCourseCodeShowsItsWholeCodeOnHover() throws {
+        let code: String = "WWWWWWWWWWWW"
+        let read = try helpTags(ofCourseCode: code, width: 140)
+        XCTAssertTrue(read.helps.contains(code), "no help tag carries the cut-short code \(code); help tags: \(read.helps)\n\(read.described)")
+    }
+
+    /// A code that fits is not repeated in a tag over itself (D44): the
+    /// HIG's expansion tooltip is for clipped or truncated text.
+    func testACourseCodeThatFitsHasNoHelpTag() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let code: String = made.course.displayCode
+        let read = try helpTags(ofCourseCode: code)
+        XCTAssertFalse(read.helps.contains(code), "the code \(code) fits, yet carries a help tag; help tags: \(read.helps)\n\(read.described)")
     }
 
     /// The Backups heading's total keeps the sidebar's margin on its

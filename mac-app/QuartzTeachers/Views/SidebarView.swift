@@ -2471,12 +2471,6 @@ struct RemovalRequest: Identifiable {
     }
 }
 
-/// One course's row: its code, or a field to type a new one into.
-///
-/// Which of the two it is arrives as a plain `Bool` rather than being read
-/// from the window's model here, because a row inside a `List` cannot be
-/// relied on to observe that model — see the note at the sidebar's own body,
-/// where the read happens instead.
 /// The Backups section's heading in the sidebar: the name, and the space
 /// every backup takes once all have been measured (#242).
 ///
@@ -2494,7 +2488,7 @@ struct BackupsSectionHeader: View {
     /// The room kept between the total and the sidebar's trailing edge.
     static let trailingMargin: CGFloat = 10
 
-    // MARK: - Body
+    // MARK: - Computed properties
 
     var body: some View {
         HStack {
@@ -2517,6 +2511,12 @@ struct BackupsSectionHeader: View {
     }
 }
 
+/// One course's row: its code, or a field to type a new one into.
+///
+/// Which of the two it is arrives as a plain `Bool` rather than being read
+/// from the window's model here, because a row inside a `List` cannot be
+/// relied on to observe that model — see the note at the sidebar's own body,
+/// where the read happens instead.
 struct CourseRowLabel: View {
 
     // MARK: - Stored properties
@@ -2530,7 +2530,7 @@ struct CourseRowLabel: View {
     /// Whether a copy of the course is being zipped right now (#351).
     var isBeingCopied: Bool = false
 
-    // MARK: - Body
+    // MARK: - Computed properties
 
     var body: some View {
         if isBeingRenamed {
@@ -2541,13 +2541,7 @@ struct CourseRowLabel: View {
             // already says 2025–26, so the suffix would be redundant as
             // well as wrong.
             HStack(spacing: 6) {
-                Label(course.displayCode, systemImage: "books.vertical")
-                    // The whole code on hover (#997, D44): a 12-character
-                    // code, the most a code may have, is cut short at the
-                    // sidebar's default width. The HIG's Text fields page:
-                    // "Consider using an expansion tooltip to show the full
-                    // version of clipped or truncated text."
-                    .help(course.displayCode)
+                CourseCodeLabel(code: course.displayCode)
                 // A copy of the course is being zipped (#351) — a backup, or
                 // the archive before a restore or removal. The row says so
                 // rather than the window going quiet for the minute it takes.
@@ -2559,6 +2553,40 @@ struct CourseRowLabel: View {
                 }
             }
         }
+    }
+}
+
+/// A course's code in its sidebar row, with the whole code on hover only
+/// when the row cuts it short (#997, D44).
+///
+/// A 12-character code, the most a code may have, is cut short at the
+/// sidebar's default width. The HIG's Text fields page: "Consider using an
+/// expansion tooltip to show the full version of clipped or truncated
+/// text." An expansion tooltip is for text that is cut short, so a code
+/// that fits is not repeated
+/// in a tag over itself, so the help tag is on the truncated version only:
+/// `ViewThatFits` shows the plain label when its whole width fits, and the
+/// tagged one, cut short, when it does not.
+struct CourseCodeLabel: View {
+
+    // MARK: - Stored properties
+
+    /// The code as a teacher reads it (`displayCode`).
+    let code: String
+
+    // MARK: - Computed properties
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            label
+            label
+                .help(code)
+        }
+    }
+
+    var label: some View {
+        return Label(code, systemImage: "books.vertical")
+            .lineLimit(1)
     }
 }
 

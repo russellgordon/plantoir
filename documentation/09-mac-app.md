@@ -4533,29 +4533,48 @@ Part of the Mac's review against Apple's Human Interface Guidelines (#975,
 stage 2). Each change names the HIG sentence it follows; the Windows app is
 brought to match in stage 3.
 
-- **Settings panes fit what they hold (D42).** Every pane goes through
-  `settingsPaneFitsItsContent()` (`PlantoirSettingsView.swift`): the
-  window's 560-point width and `.fixedSize(horizontal: false, vertical:
-  true)`, so the Settings window, which takes the chosen pane's size, is
-  as tall as that pane. Measured in the unit host on 2026-11-19: Preview
-  159 pt, Obsidian 167 pt, Assistant 674 pt (holding 674, so it no longer
-  scrolls). Until then every pane opened at 560 × 648: the Assistant pane
-  was held at `.frame(height: 560)` and scrolled, and the others, grouped
-  forms with only a `minHeight`, opened at the same size, so Preview and
-  Obsidian were mostly empty space (the inventory's captures). The `minHeight`s the other panes
-  carried went with it. HIG, Settings: "a settings window accommodates the
-  size of the current pane, people don't need to expand the window to see
-  more." `LayoutAndSmallBehaviourTests` pins the sizes and that Assistant
-  does not scroll at its own; Deploying and Other Assistants are not hosted
-  there, because hosting them reads the keychain and looks for the outside
-  assistants.
-- **A course's whole code on hover (D44).** `CourseRowLabel` carries
-  `.help(course.displayCode)`, so a 12-character code, cut short at the
-  sidebar's default 228-point width, can still be read. Middle truncation
-  was not taken: a code is short and read from its start. HIG, Text fields:
-  "Consider using an expansion tooltip to show the full version of clipped
-  or truncated text." `AccessibilityTreeTests` reads the help tag off the
-  tree (`AccessibilityTree.Element.help`, new).
+- **Settings panes fit what they hold, up to what the screen shows (D42).**
+  Every pane goes through `settingsPaneFitsItsContent()`
+  (`PlantoirSettingsView.swift`): the window's 560-point width, then
+  `.frame(maxHeight:)` with the cap `SettingsPaneHeight` gives, then
+  `.fixedSize(horizontal: false, vertical: true)`. Asked for its ideal
+  height, the capped frame answers the content's own height or the cap,
+  whichever is less, and the grouped form inside, given that height,
+  scrolls the rest. The cap is the visible height of the screen the window
+  opens on (the key window's, else the main one, without the menu bar and
+  the Dock) less the window's title bar and pane buttons
+  (`windowChrome`, 88 pt, measured on the running window: 648 pt around
+  a pane held at 560) and 20 pt above and below, and never under 240 pt. Measured in the unit host on 2026-11-20, each pane's own height:
+  Assistant 674 pt, Deploying 532 pt (with its Stopping section, #988),
+  Other Assistants 428 pt, Obsidian 167 pt, Preview 159 pt. The cap is
+  577 pt on a 1280 x 800 screen with the Dock (about 705 pt visible) and
+  432 pt on a scaled 1024 x 640 one (about 560 pt), so on either the
+  Assistant pane scrolls to its last download's button (Download or
+  Remove…) instead of running off the bottom of the screen; on this Mac's
+  1512 x 982 it is 820 pt and nothing scrolls. The first version of #997
+  used `fixedSize` alone, and its review found the 674 pt pane could not
+  be scrolled to its bottom on a short screen. Until #997 every pane opened
+  at 560 x 648: the Assistant pane was held at `.frame(height: 560)` and
+  scrolled, and Preview and Obsidian were mostly empty space (the
+  inventory's captures). HIG, Settings: "a settings window accommodates
+  the size of the current pane, people don't need to expand the window to
+  see more." `LayoutAndSmallBehaviourTests` measures every pane, holds the
+  Assistant pane to 400 pt and scrolls its form to the end, where the last
+  download's button must be inside the window (read off the accessibility
+  tree), and checks the cap on the two short screens.
+- **A course's whole code on hover, when it is cut short (D44).** The row's
+  code is `CourseCodeLabel`, a `ViewThatFits` of the plain label and the
+  same label with `.help(code)`: the plain one shows when the whole code
+  fits, the tagged one, cut short, when it does not. So a 12-character
+  code, cut short at the sidebar's default 228-point width, can still be
+  read, and a code that fits is not repeated in a tag over itself (the
+  first version tagged every row, and its review pointed out that the
+  HIG's expansion tooltip is for clipped or truncated text). Middle
+  truncation was not taken: a code is short and read from its start. HIG,
+  Text fields: "Consider using an expansion tooltip to show the full
+  version of clipped or truncated text." `AccessibilityTreeTests` reads the
+  help tags off the tree (`AccessibilityTree.Element.help`): one on a
+  12-character code in a 140-point sidebar, none on EXC2O at 228.
 - **The Backups total keeps a margin (D45).** `BackupsSectionHeader` puts
   `trailingMargin` (10 pt) after the total; it was drawn about 2 pt from
   the divider while the heading's name sits about 14 pt in. HIG, Layout:

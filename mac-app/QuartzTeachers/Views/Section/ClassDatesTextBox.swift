@@ -27,6 +27,12 @@ struct ClassDatesTextBox: NSViewRepresentable {
     /// The box's identifier, for tests.
     let identifier: String
 
+    /// Whether the box takes the focus when it is put in its window: true
+    /// when the sheet opens on it, false when the teacher brings it back by
+    /// choosing Typed in the route picker, so the keyboard stays in the
+    /// picker (#997).
+    var takesTheFocusWhenShown: Bool = true
+
     // MARK: - Functions
 
     func makeCoordinator() -> Coordinator {
@@ -39,6 +45,7 @@ struct ClassDatesTextBox: NSViewRepresentable {
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = true
         let textView: ClassDatesTextView = ClassDatesTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 150))
+        textView.hasTakenTheFocus = !takesTheFocusWhenShown
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
@@ -47,6 +54,7 @@ struct ClassDatesTextBox: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
         textView.delegate = context.coordinator
         textView.string = text
+        textView.textStorage?.delegate = context.coordinator
         textView.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         textView.isRichText = false
         textView.allowsUndo = true
@@ -76,9 +84,9 @@ struct ClassDatesTextBox: NSViewRepresentable {
 
     // MARK: - Coordinator
 
-    /// Keeps the binding in step with the text view, and turns Tab and
-    /// Shift-Tab into moves along the window's key view loop.
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    /// Keeps the binding in step with the text view's characters, and
+    /// turns Tab and Shift-Tab into moves along the window's key view loop.
+    final class Coordinator: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
 
         // MARK: - Stored properties
 
@@ -92,11 +100,25 @@ struct ClassDatesTextBox: NSViewRepresentable {
 
         // MARK: - Functions
 
-        func textDidChange(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else {
+        /// Every change to the box's characters, however it was made:
+        /// typing and pasting, and also Undo and Redo, which change the
+        /// text without the text view's did-change notice
+        /// (`textDidChange`), so a binding kept by that notice alone went
+        /// on holding the undone text (#997, found by
+        /// `testUndoAndRedoInTheDatesBoxReachTheBinding`).
+        func textStorage(
+            _ textStorage: NSTextStorage,
+            didProcessEditing editedMask: NSTextStorageEditActions,
+            range editedRange: NSRange,
+            changeInLength delta: Int
+        ) {
+            if !editedMask.contains(.editedCharacters) {
                 return
             }
-            text.wrappedValue = textView.string
+            let now: String = textStorage.string
+            if text.wrappedValue != now {
+                text.wrappedValue = now
+            }
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -128,8 +150,8 @@ struct ClassDatesTextBox: NSViewRepresentable {
 }
 
 /// The box's text view: AppKit's own, which takes the focus when the box
-/// is put in a window, as the `TextEditor` before it did when the sheet
-/// opened (the inventory's captures of 2026-11-18, with Keyboard Navigation
+/// is put in a window as the sheet opens, as the `TextEditor` before it did
+/// when the sheet opened (the inventory's captures of 2026-11-18, with Keyboard Navigation
 /// on and off). Without this the sheet opened with the focus on the route
 /// picker (Keyboard Navigation on), measured in the running app on
 /// 2026-11-20, and a teacher who pastes straight away pasted nowhere.
@@ -138,7 +160,9 @@ final class ClassDatesTextView: NSTextView {
     // MARK: - Stored properties
 
     /// Once only: a view moved again (as SwiftUI may) must not take the
-    /// focus back from wherever Tab has put it since.
+    /// focus back from wherever Tab has put it since. Set from the start
+    /// for a box brought back by the route picker
+    /// (`takesTheFocusWhenShown`), which never takes it.
     var hasTakenTheFocus: Bool = false
 
     // MARK: - Functions

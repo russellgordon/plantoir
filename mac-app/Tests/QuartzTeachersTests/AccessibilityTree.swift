@@ -193,6 +193,38 @@ struct AccessibilityTree {
         return lines.joined(separator: "\n")
     }
 
+    /// The element that has the keyboard focus in this process, as an
+    /// assistive app is told it (#997): the text field being typed in, not
+    /// the field editor AppKit lends it. Nil when nothing has the focus.
+    static func focusedElement() -> Element? {
+        let application: AXUIElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(application, kAXFocusedUIElementAttribute as CFString, &value) != .success {
+            return nil
+        }
+        guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else {
+            return nil
+        }
+        let focused: AXUIElement = value as! AXUIElement
+        return element(of: focused, parentRole: "")
+    }
+
+    /// One element's own attributes, without its children.
+    static func element(of node: AXUIElement, parentRole: String) -> Element {
+        return Element(
+            role: text(of: node, attribute: kAXRoleAttribute),
+            identifier: text(of: node, attribute: kAXIdentifierAttribute),
+            title: text(of: node, attribute: kAXTitleAttribute),
+            label: text(of: node, attribute: kAXDescriptionAttribute),
+            value: text(of: node, attribute: kAXValueAttribute),
+            help: text(of: node, attribute: kAXHelpAttribute),
+            frame: frame(of: node),
+            enabled: text(of: node, attribute: kAXEnabledAttribute),
+            parentRole: parentRole,
+            actions: actionNames(of: node)
+        )
+    }
+
     static func collect(_ node: AXUIElement, parentRole: String, into found: inout [Element], depth: Int) {
         if depth > 60 {
             return
