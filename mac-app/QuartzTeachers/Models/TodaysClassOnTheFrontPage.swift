@@ -232,6 +232,13 @@ enum TodaysClassOnTheFrontPage {
         ) else {
             return nil
         }
+        // Either answer makes a step on the main actor (the front page, or
+        // Not Today's record): the list is read off it while the question is
+        // up, unawaited (#899, ruling 8 on U1's third round; the first review
+        // of U3a, LOW 6).
+        Task {
+            await JournaledStep.readTheListAhead()
+        }
         return Offer(
             classTitle: decision.todaysClass,
             shownTitle: decision.shown,
@@ -300,7 +307,12 @@ enum TodaysClassOnTheFrontPage {
             course: course, section: offer.sectionNumber, maker: UndoStepMaker.sheet("showTodaysClassOnTheFrontPage")
         )
         step.write(result.text, to: indexURL)
-        guard (try? step.make()) != nil else {
+        do {
+            try step.make()
+        } catch JournaledStepError.leftPartWay {
+            // The page went in and could not be put back: the read-back
+            // below says what it shows now, which is what is true.
+        } catch {
             return .couldNotSave
         }
         // Read back: the page on disk must now name the class.

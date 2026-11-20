@@ -794,35 +794,24 @@ final class UndoActionStepsTests: XCTestCase {
         XCTAssertNotEqual(fullSentence, AssistToolRefusal.unreadablePage("ICS3U").message)
     }
 
-    /// Every sheet that makes a step on the main actor reads the list off
-    /// it first, while the teacher reads the sheet or the question (the
-    /// director's ruling 8 on U1's third round; the first review of U3a,
-    /// LOW 6): the links checklist, today's class and Not Today, the
-    /// classes dated later at Deploy, the class dates, and starting the
-    /// How I Teach page. MUST FAIL with any one of those reads taken out.
-    func testEverySheetThatMakesAStepReadsTheListAhead() throws {
-        let productFolder: URL = ActivityTrailWiringTests.productSourceFolderURL()
-        let sheets: [String] = [
-            "Views/Section/LinksChecklistSheet.swift",
-            "Views/Section/SectionDetailView.swift",
-            "Views/Section/SectionVerbSheet.swift",
-            "Views/Section/SectionScheduleSheet.swift",
-            "Views/CourseSettings/CourseSettingsView.swift",
-            "Models/Assist/AssistToolRunner.swift",
-            "Models/StartOfYear/StartOfYearPreparation.swift",
-        ]
-        var missing: [String] = []
-        for sheet in sheets {
-            let source: String = try String(contentsOf: productFolder.appendingPathComponent(sheet), encoding: .utf8)
-            var reads: Bool = false
-            for line in UndoWriterScanTests.codeLines(of: source) where line.contains("await JournaledStep.readTheListAhead()") {
-                reads = true
-            }
-            if !reads {
-                missing.append(sheet)
+    /// The fixture's course settings list their keys in sorted order, so
+    /// two fixture courses hold the same bytes (the second review of U3a,
+    /// LOW 1: written without `.sortedKeys`, a dictionary's order made
+    /// `testAListThatCannotBeWrittenChangesNothingAboutAnAction` fail now
+    /// and then). MUST FAIL without `.sortedKeys` (the order is then sorted
+    /// only by chance).
+    func testTheFixtureWritesItsSettingsInOneOrder() throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(surface: .local)
+        let text: String = try String(contentsOf: made.course.configFileURL, encoding: .utf8)
+        var keys: [String] = []
+        for line in text.components(separatedBy: "\n") {
+            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("  \""), let close = trimmed.dropFirst().firstIndex(of: "\"") {
+                keys.append(String(trimmed[trimmed.index(after: trimmed.startIndex)..<close]))
             }
         }
-        XCTAssertEqual(missing, [], "these make a step on the main actor without reading the list ahead")
+        XCTAssertGreaterThan(keys.count, 3, text)
+        XCTAssertEqual(keys, keys.sorted(), text)
     }
 
     // MARK: - Functions

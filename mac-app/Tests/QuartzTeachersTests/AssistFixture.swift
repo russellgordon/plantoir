@@ -104,7 +104,11 @@ enum AssistFixture {
         if let curriculumFolders {
             configuration["curriculum_folders"] = curriculumFolders
         }
-        try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
+        // Keys sorted: without it two fixture courses got their keys in
+        // different orders (a dictionary's order is not fixed), and a test
+        // comparing two courses' files failed now and then (the second
+        // review of U3a, LOW 1).
+        try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted, .sortedKeys])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
 
         if let secondCode = alsoCourse {

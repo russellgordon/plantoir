@@ -70,6 +70,7 @@ nonisolated enum UndoRecovery {
         places: UndoExternalPlaces = UndoAppPreferences(),
         leavingStepsThatRederive: Bool = true
     ) -> [UndoRecoveryResult] {
+        writer.recoveredInThisHold = true
         var results: [UndoRecoveryResult] = []
         let now: Date = writer.journal.now()
         for record in writer.fold.inFlight {
@@ -174,7 +175,10 @@ nonisolated enum UndoRecovery {
             guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
                 continue
             }
-            if !tidyStagedFiles(of: record.step, root: root) {
+            // Closed `interrupted`: the step did not settle, so a kept
+            // original that is the only copy of its page's earlier content
+            // stays beside the page (the second review of U3a, MEDIUM b).
+            if !tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true) {
                 // Something held or locked: looked for again at the next lock.
                 continue
             }
@@ -200,9 +204,11 @@ nonisolated enum UndoRecovery {
     }
 
     /// Every staged file a step's apply, undo, redo or recovery left beside
-    /// the files it names. True when none is left.
+    /// the files it names. True when none is left. `keepingOnlyCopies`, for
+    /// a step that did not settle: a kept original that differs from its
+    /// page is left where it is (`UndoSwap.isACopyOfItsPlace`).
     @discardableResult
-    static func tidyStagedFiles(of step: UndoStep, root: URL) -> Bool {
+    static func tidyStagedFiles(of step: UndoStep, root: URL, keepingOnlyCopies: Bool = false) -> Bool {
         var urls: [URL] = []
         for op in step.ops {
             for path in op.pathsNamed {
@@ -214,7 +220,7 @@ nonisolated enum UndoRecovery {
             if !UndoSwap.tidyLeftovers(
                 label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) },
-                root: root
+                root: root, keepingOnlyCopies: keepingOnlyCopies
             ) {
                 allGone = false
             }
@@ -458,10 +464,14 @@ nonisolated enum UndoRecovery {
             }
         }
         if mode == .live {
+            // Before the plan is known to settle, every kept original that is
+            // the only copy of its page's earlier content stays (the Windows
+            // recovery review's 15): it is tidied only once the step settles,
+            // below.
             UndoSwap.tidyLeftovers(
                 label: label, beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) },
-                root: root
+                root: root, keepingOnlyCopies: true
             )
             if UndoKillPoints.stopsHere(.afterRecoveryTidied) {
                 return nil
@@ -610,6 +620,18 @@ nonisolated enum UndoRecovery {
         if !UndoRecovery.write(events, step: step, writer) {
             return nil
         }
+        // Settled (made, nothing taken effect, or put back): its kept
+        // originals are needed no more. An `interrupted` or shadow outcome
+        // keeps them (`tidyClosedSteps`, keeping only copies).
+        switch outcome {
+        case .completed, .nothingTookEffect, .rolledBack:
+            if mode == .live {
+                UndoSwap.tidyLeftovers(label: label, beside: urls, root: root)
+                UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root)
+            }
+        case .interrupted, .leftAlone:
+            break
+        }
         // The files kept true by a rule are re-derived, whichever way the
         // step was settled, by `recoverAndRederive` once the lock is
         // released (re-deriving is idempotent): judged by its content ops
@@ -698,6 +720,13 @@ nonisolated enum UndoPruning {
         mode: UndoMode = .live,
         resolveRoot: (UndoWorkingFolder) -> URL? = UndoReach.root
     ) {
+        // Recovery runs before every prune, in the same hold (the Windows
+        // recovery review's 14): a dead step past the limits would otherwise
+        // be closed `unsettled`, its original tidied and its content deleted,
+        // though a recovery could still have settled it.
+        if !writer.recoveredInThisHold {
+            return
+        }
         let fold: UndoFold = writer.fold
         let now: Date = writer.journal.now()
         let ageLimit: Double = Double(UndoSwitch.daysKept + UndoFold.deletionGraceDays) * 86_400
@@ -736,8 +765,11 @@ nonisolated enum UndoPruning {
                 // Nothing of the journal's is left in a course: its staged
                 // files go now when its folder can be reached, or at the
                 // first recovery that can reach it (`tidyClosedSteps`).
+                // Closed unsettled: a kept original that is the only copy of
+                // its page's earlier content stays (the Windows recovery
+                // review's 14).
                 if mode == .live, let folder = record.step.workingFolder, let root = resolveRoot(folder) {
-                    UndoRecovery.tidyStagedFiles(of: record.step, root: root)
+                    UndoRecovery.tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true)
                 }
                 UndoRefusedSwaps.forget(UndoRefusedSwaps.key(for: record, in: writer.journal))
                 remaining -= 1

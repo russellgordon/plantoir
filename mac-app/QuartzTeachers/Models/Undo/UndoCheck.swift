@@ -526,7 +526,10 @@ nonisolated enum UndoSwapResult: Equatable, Sendable {
     /// FLIGHT, so recovery settles it from the content once this process is
     /// gone (`undo.rule.recovery`; the Windows W3 review's finding, matched
     /// here). The refusal is the one that stopped the swap; no new word.
-    case notPutBack(UndoRefusal)
+    /// `keptOriginals` names each kept original left beside its page (its
+    /// staged name, in the page's own folder): the only copy of what that
+    /// page held, which no tidy removes while it differs from the page.
+    case notPutBack(UndoRefusal, keptOriginals: [String])
     /// A test stopped it at a kill point, leaving everything as it was.
     case stoppedByATest
 }
@@ -599,6 +602,20 @@ nonisolated enum UndoSwap {
         /// could not be put back (the result was ignored until the Windows
         /// W3 review: the step was then closed `failed` with a page left new
         /// and its original hidden beside it, recorded nowhere).
+        /// The kept originals of files still swapped: what a reversal that
+        /// could not complete leaves beside its pages.
+        func originalsLeft() -> [String] {
+            var names: [String] = []
+            var index: Int = 0
+            while index < targets.count && index < originals.count {
+                if case .file = targets[index].change, let original = originals[index] {
+                    names.append(original.lastPathComponent)
+                }
+                index += 1
+            }
+            return names
+        }
+
         func reverse() -> Bool {
             var everyOnePutBack: Bool = true
             var index: Int = swapsMade - 1
@@ -658,7 +675,7 @@ nonisolated enum UndoSwap {
         /// recovery to settle.
         func refusedAfterSwapping(_ refusal: UndoRefusal) -> UndoSwapResult {
             if !reverse() {
-                return .notPutBack(refusal)
+                return .notPutBack(refusal, keptOriginals: originalsLeft())
             }
             tidy()
             return .refused(refusal)
@@ -766,7 +783,7 @@ nonisolated enum UndoSwap {
                     // This file's own swap could not be put back: nothing
                     // more is reversed or tidied, recovery settles it.
                     _ = reverse()
-                    return .notPutBack(fileRefusal)
+                    return .notPutBack(fileRefusal, keptOriginals: originalsLeft())
                 }
             case .moveHere(let from, _, let op):
                 // The pair once more, just before the rename: the content at
@@ -1088,6 +1105,22 @@ nonisolated enum UndoSwap {
     /// link: a kept original that is a hard link shares its flags with the
     /// teacher's page (a reference course's lock, plan 2.6), and those are
     /// never touched.
+    /// Whether a kept original is NOT the only copy of what it holds: its
+    /// place holds a file with the same bytes (the original was kept and the
+    /// new content never went in, or recovery put it back). A kept original
+    /// that differs from its place, or whose place is gone, is the only copy
+    /// of what the page held before, and of an edit that raced the swap
+    /// (the second review of U3a, MEDIUM b).
+    static func isACopyOfItsPlace(_ keptURL: URL, place: URL) -> Bool {
+        guard case .file(let kept) = UndoItem.read(at: keptURL) else {
+            return false
+        }
+        guard case .file(let there) = UndoItem.read(at: place) else {
+            return false
+        }
+        return kept == there
+    }
+
     static func removeStaged(_ url: URL) -> Bool {
         if (try? FileManager.default.removeItem(at: url)) != nil {
             return true
@@ -1176,7 +1209,8 @@ nonisolated enum UndoSwap {
         beside urls: [URL],
         asideListings: [String: String] = [:],
         onAside: ((UndoAsideFolder) -> Void)? = nil,
-        root: URL? = nil
+        root: URL? = nil,
+        keepingOnlyCopies: Bool = false
     ) -> Bool {
         var allGone: Bool = true
         var folders: [URL] = []
@@ -1232,6 +1266,14 @@ nonisolated enum UndoSwap {
                     if !UndoSwap.keepUnderAVisibleName(stagedURL, place: originalURL, hiddenName: name, matched: matched, onAside: onAside) {
                         allGone = false
                     }
+                    continue
+                }
+                // A step that did not settle keeps a kept original that is
+                // the only copy of what its page held (the second review of
+                // U3a, MEDIUM b, and the Windows recovery review's 15): never
+                // tidied away, left beside its page under its staged name.
+                if keepingOnlyCopies && name.hasSuffix("-orig"), let place = UndoSwap.placeOfStagedName(name),
+                   !UndoSwap.isACopyOfItsPlace(stagedURL, place: folder.appendingPathComponent(place)) {
                     continue
                 }
                 if !UndoSwap.removeStaged(stagedURL) {
@@ -1495,7 +1537,7 @@ nonisolated extension UndoJournal {
             // Caught at the swap rather than the check: the same hand edit,
             // so the same answer (rulings 13 and 20; the core review's M2).
             return .refused(refusal, clearedTheList: answerARefusal(refusal, of: seq, direction: direction))
-        case .notPutBack(let refusal):
+        case .notPutBack(let refusal, _):
             // Left IN FLIGHT (`undoing` or `redoing` with no closing event),
             // never `failed` and never a clearing: recovery settles it from
             // the content once this process is gone (`undo.rule.recovery`).
@@ -1563,6 +1605,7 @@ nonisolated extension UndoJournal {
                 return false
             }
             try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: reason.rawValue))
+            UndoRecovery.run(writer, mode: .live, trySwapsNow: false, resolveRoot: UndoReach.root)
             UndoPruning.prune(writer)
             return true
         }
@@ -1581,6 +1624,7 @@ nonisolated extension UndoJournal {
                 return false
             }
             try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: UndoClearing.wentLive.rawValue))
+            UndoRecovery.run(writer, mode: .live, trySwapsNow: false, resolveRoot: UndoReach.root)
             UndoPruning.prune(writer)
             return true
         }

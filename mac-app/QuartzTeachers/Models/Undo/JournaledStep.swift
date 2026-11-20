@@ -53,17 +53,38 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
     /// A test stopped the step at a kill point, as a process that died.
     case stoppedByATest
 
+    /// Refused PART WAY: a file could not be put back after the step was
+    /// refused, so it holds the new content while what it held before is
+    /// kept beside it under each name in `keptOriginals` (hidden, in the
+    /// page's own folder, never tidied away while it differs from the page).
+    /// Never said as "Nothing was changed": a caller says only part was
+    /// (`AssistWording.publishStoppedPartWay`).
+    case leftPartWay(UndoRefusal, fileName: String, keptOriginals: [String])
+
     // MARK: - Computed properties
 
     var errorDescription: String? {
         switch self {
         case .refused(_, let fileName):
             return CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: fileName]).localizedDescription
+        case .leftPartWay(_, let fileName, let keptOriginals):
+            var said: String = CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: fileName]).localizedDescription
+            for kept in keptOriginals {
+                said += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”."
+            }
+            return said
         case .couldNotRecordTheStep, .anotherChangeIsUnderWay:
             return CocoaError(.fileWriteUnknown).localizedDescription
         case .stoppedByATest:
             return "stopped by a test"
         }
+    }
+
+    // MARK: - Functions
+
+    /// The page a kept original stands beside, quoted: “Unit 1, Day 2.md”.
+    static func placeName(ofKept name: String) -> String {
+        return "“" + (UndoSwap.placeOfStagedName(name) ?? name) + "”"
     }
 }
 
@@ -193,6 +214,10 @@ nonisolated final class JournaledStep {
     }
 
     // MARK: - Functions: planning
+
+    /// Called as each read ahead starts, so a test can see that a sheet
+    /// reads ahead (the second review of U3a, LOW 4). Nil in the app.
+    nonisolated(unsafe) static var readAheadHook: (@Sendable () -> Void)?
 
     /// The step being planned right now, while `whilePlanning` runs: the
     /// readers a plan is built from (`AssistSectionGraph.read`,
@@ -349,6 +374,7 @@ nonisolated final class JournaledStep {
     /// the list left when its process died (`UndoShadowStaging`).
     @concurrent
     static func readTheListAhead() async {
+        JournaledStep.readAheadHook?()
         let journal: UndoJournal = UndoJournalLocation.standardJournal()
         _ = try? journal.read()
         UndoShadowStaging.tidyLeftovers(of: journal)
@@ -401,6 +427,10 @@ nonisolated final class JournaledStep {
             return
         case .refused(let refusal):
             throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+        case .leftPartWay(let refusal, let keptOriginals):
+            throw JournaledStepError.leftPartWay(
+                refusal, fileName: JournaledStep.fileName(in: refusal), keptOriginals: keptOriginals
+            )
         case .couldNotRecordTheStep:
             throw JournaledStepError.couldNotRecordTheStep
         case .anotherChangeIsUnderWay:
@@ -411,7 +441,8 @@ nonisolated final class JournaledStep {
     }
 
     /// Every planned file as a change inside the working folder, its before
-    /// the disk's bytes now; nil when any cannot be named in a step.
+    /// the bytes it held when it was FIRST planned (`plannedBefore`, never a
+    /// second read now); nil when any cannot be named in a step.
     func recordableChanges(under root: URL) -> [UndoFileChange]? {
         var result: [UndoFileChange] = []
         for key in plannedOrder {
@@ -481,8 +512,12 @@ nonisolated final class JournaledStep {
         switch UndoShadowStaging.swap(targets, noting: journal) {
         case .swapped:
             return
-        case .refused(let refusal), .notPutBack(let refusal):
+        case .refused(let refusal):
             throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+        case .notPutBack(let refusal, let keptOriginals):
+            throw JournaledStepError.leftPartWay(
+                refusal, fileName: JournaledStep.fileName(in: refusal), keptOriginals: keptOriginals
+            )
         case .stoppedByATest:
             throw JournaledStepError.stoppedByATest
         }

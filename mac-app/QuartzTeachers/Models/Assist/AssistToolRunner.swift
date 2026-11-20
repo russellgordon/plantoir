@@ -1519,7 +1519,7 @@ final class AssistToolRunner {
             } catch {
                 // The door writes every class of the unit or none
                 // (`undo.rule.stagedThenSwapped`): a refusal wrote nothing.
-                return AssistToolOutcome.refused("Nothing was changed: \(error.localizedDescription)")
+                return AssistToolOutcome.refused(saidWhenTheStepStopped(error, what: "\(located.course.configuration.unitWord) \(unit)", sectionNumber: located.sectionNumber))
             }
             // The front page follows the newest visible class once, after
             // the whole unit, as it did after the unit's last class.
@@ -2140,7 +2140,7 @@ final class AssistToolRunner {
             // every page as it was. #412's `publishStoppedPartWay` ("Only
             // part of …") was true only while the write went page by page
             // (the first review of U3a, MEDIUM 1).
-            return AssistToolOutcome.refused("Nothing was changed: \(error.localizedDescription)")
+            return AssistToolOutcome.refused(saidWhenTheStepStopped(error, what: "the pages you named", sectionNumber: sectionNumber))
         }
         history.record(change)
 
@@ -2362,6 +2362,25 @@ final class AssistToolRunner {
             return said + " " + AssistWording.restoreFromBackupPutsItBack
         }
         return said
+    }
+
+    /// What is said when an action's step did not go in (#899, U3): the
+    /// action's own "Nothing was …: …" when nothing was written, which the
+    /// door makes true (all or none). When a file could not be put back
+    /// after the step was refused (`JournaledStepError.leftPartWay`, the
+    /// second review of U3a, MEDIUM a) a page holds the new content, so it
+    /// is said as part way (`publishStoppedPartWay`, true there), naming
+    /// where each page's earlier content is kept, and counted as a write
+    /// with no new undo entry (#531), so the Section menu's trail does not
+    /// say "changed nothing".
+    private func saidWhenTheStepStopped(
+        _ error: Error, nothing: String = "Nothing was changed", what: String, sectionNumber: Int
+    ) -> String {
+        if case JournaledStepError.leftPartWay = error {
+            writesWithNoNewUndoEntry += 1
+            return publishStoppedPartWay(what: what, problem: error.localizedDescription, sectionNumber: sectionNumber)
+        }
+        return "\(nothing): \(error.localizedDescription)"
     }
 
     /// What another program on this Mac holds that stands in the way of
@@ -3982,7 +4001,7 @@ final class AssistToolRunner {
                 try SectionTimetableStore.applyRememberTimetable(asked.plan, by: undoMaker("rememberTimetable"))
             } catch {
                 return AssistToolOutcome.refused(
-                    "Nothing was remembered: \(error.localizedDescription)"
+                    saidWhenTheStepStopped(error, nothing: "Nothing was remembered", what: "the class dates", sectionNumber: asked.located.sectionNumber)
                 )
             }
 
@@ -4204,7 +4223,7 @@ final class AssistToolRunner {
             )
         } catch {
             return AssistToolOutcome.refused(
-                "Nothing was changed: \(error.localizedDescription)"
+                saidWhenTheStepStopped(error, what: "the classes and the copy", sectionNumber: request.located.sectionNumber)
             )
         }
 
@@ -4355,7 +4374,7 @@ final class AssistToolRunner {
             try duplicateStep.make()
         } catch {
             return AssistToolOutcome.refused(
-                "Nothing was changed: \(error.localizedDescription)"
+                saidWhenTheStepStopped(error, what: "the classes and the copy", sectionNumber: request.located.sectionNumber)
             )
         }
 
@@ -4775,7 +4794,7 @@ final class AssistToolRunner {
         } catch let error as CocoaError where error.code == .fileWriteFileExists {
             return AssistToolOutcome.refused(AssistWording.menuTheNextPageIsAlreadyThere(page: request.newPage.title))
         } catch {
-            return AssistToolOutcome.refused("Nothing was created: \(error.localizedDescription)")
+            return AssistToolOutcome.refused(saidWhenTheStepStopped(error, nothing: "Nothing was created", what: "the copy of the class", sectionNumber: request.located.sectionNumber))
         }
 
         history.record(AssistChange(
@@ -5132,7 +5151,7 @@ final class AssistToolRunner {
                 ) + "\n\nThe pages already re-dated:\n" + listing(stopped.written))
             } catch {
                 return AssistToolOutcome.refused(
-                    "Nothing was changed: \(error.localizedDescription)"
+                    saidWhenTheStepStopped(error, what: "the section's class dates", sectionNumber: asked.located.sectionNumber)
                 )
             }
             // A rollover sets aside the section's published-pages record
@@ -5753,7 +5772,7 @@ final class AssistToolRunner {
                 )
             } catch {
                 return AssistToolOutcome.refused(
-                    "Nothing was changed: \(error.localizedDescription)"
+                    saidWhenTheStepStopped(error, what: "the classes you made room among", sectionNumber: asked.located.sectionNumber)
                 )
             }
             // Written, with no undo entry (#531): counted, so the Section
@@ -6125,7 +6144,7 @@ final class AssistToolRunner {
                 )
             } catch {
                 return AssistToolOutcome.refused(
-                    "Nothing was created: \(error.localizedDescription)"
+                    saidWhenTheStepStopped(error, nothing: "Nothing was created", what: "the classes you asked for", sectionNumber: asked.located.sectionNumber)
                 )
             }
 
@@ -6308,7 +6327,7 @@ final class AssistToolRunner {
                 change = try AssistCurriculumMentions.apply(asked.plan, by: undoMaker("addCurriculumMentions"))
             } catch {
                 return AssistToolOutcome.refused(
-                    "Nothing was changed: \(error.localizedDescription)"
+                    saidWhenTheStepStopped(error, what: "the curriculum mentions", sectionNumber: asked.located.sectionNumber)
                 )
             }
             history.record(change)
@@ -6570,7 +6589,7 @@ final class AssistToolRunner {
         do {
             try howITeachStep.make()
         } catch {
-            return AssistToolOutcome.refused("Nothing was saved: \(error.localizedDescription)")
+            return AssistToolOutcome.refused(saidWhenTheStepStopped(error, nothing: "Nothing was saved", what: "the How I Teach page", sectionNumber: standInSection))
         }
 
         // `after` is the file as the undo will READ it back — Foundation's
