@@ -272,6 +272,7 @@ public sealed class UndoForThisProcessTests : IDisposable
     [Fact]
     public void TheProcessesDoorReDerivesTheFrontPageWithTheAppsOwnRule()
     {
+        Directory.CreateDirectory(Folder);
         File.WriteAllText(Path.Combine(Folder, "preview.ps1"), "# marker");
         File.WriteAllText(Path.Combine(Folder, "deploy.ps1"), "# marker");
         string course = Path.Combine(Folder, "courses", "ICS3U");
