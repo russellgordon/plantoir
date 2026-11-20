@@ -14453,8 +14453,13 @@ true until `RunAsync`'s next poll; the panel's rule read that as under way,
 so a press there asked, and Stop Deploy marked the run cancelled: the badge
 read "Cancelled" over a deploy that had gone out everywhere. The run's half
 of the rule is now `CanStillBeStopped`: running, not cancelled, and its
-current leg under way or a later leg still to start; `Cancel()` marks
-nothing when it is false, and a question open at that moment comes down.
+current leg under way, or announced and not yet started, or a later leg
+still to start; `Cancel()` marks nothing when it is false, and a question
+open at that moment comes down. The "not yet started" clause was found in
+the VM: `RunAsync` announces the new `CurrentLegIndex`, and the section
+shows that leg's runner, a moment before the leg's `Run`, and without it a
+question open across the change of destination came down there (the
+two-folder UI test, red: "taken down when destination 1 finished").
 *No outcome badge beside Cancel.* In the gap between two destinations
 `Render` drew leg 1's ending ("Done", or "Something went wrong" since no leg
 had yet been marked finished) beside a Cancel that still stopped the
