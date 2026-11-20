@@ -1265,10 +1265,17 @@ struct SidebarView: View {
     /// it, ending with Set Up an Assistant… (the same view the menu bar
     /// uses). Still left out on a course kept for reference, where no door
     /// opens (decision s), and with no working folder.
+    ///
+    /// Its own icon since #990 (D43), the items' sparkles: on a course row
+    /// it shares a group with Open in Obsidian, which has one, and the HIG
+    /// asks for "icons for all menu items in a group, or none of them"
+    /// (Menus ▸ Icons). An assistant this Mac lacks stays HIDDEN here, not
+    /// dimmed as in the menu bar: "Hide unavailable menu items, don't dim
+    /// them" (Context menus).
     @ViewBuilder
     func reviseWithSubmenu(course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
         if !course.isKeptForReference && workspace.workspaceURL != nil {
-            Menu("Revise With") {
+            Menu("Revise With", systemImage: "sparkles") {
                 reviseWithClaudeItem(course: course, row: row)
                 reviseWithCodexItem(course: course, row: row)
                 reviseWithCopilotItem(course: course, row: row)
@@ -1864,6 +1871,10 @@ struct SidebarView: View {
     /// shown. Read when the menu is drawn, which is when it opens. The row
     /// is selected first and its window acts, so the one Open in Browser
     /// opens the preview there if one is showing.
+    ///
+    /// A group of their own, after a divider, since #990 (D43): they have no
+    /// icon, and they sat in Open in Obsidian's group, which has one — "provide
+    /// icons for all menu items in a group, or none of them" (Menus ▸ Icons).
     @ViewBuilder
     func deployedFolderItems(course: Course, sectionNumber: Int, row: SidebarSelection) -> some View {
         if let folder = workspace.workspaceURL?.path {
@@ -1873,6 +1884,9 @@ struct SidebarView: View {
             let shown: Bool = DeployedFolderShows.shared.show(
                 courseCode: course.code, sectionNumber: sectionNumber, workingFolderPath: folder
             ) != nil
+            if lookup.decision == .offered || shown {
+                Divider()
+            }
             if lookup.decision == .offered {
                 sectionVerbItem(DeployedFolderWording.menuItem, .openInBrowser, course: course, sectionNumber: sectionNumber, row: row)
             }
@@ -2053,8 +2067,6 @@ struct SidebarView: View {
     var menuCommands: SidebarMenuCommands {
         var situation: SubjectMenuRules.Situation = SubjectMenuRules.Situation()
         situation.obsidianInstalled = FolderActions.obsidianIsInstalled
-        var structuralReason: String? = nil
-        var notes: [String] = []
         var scheduledFor: Date? = nil
         var sectionNumber: Int? = nil
         switch workspace.selection {
@@ -2079,8 +2091,7 @@ struct SidebarView: View {
         }
         if let course = workspace.selectedCourse {
             situation.keptForReference = course.isKeptForReference
-            structuralReason = structuralHoldReason(for: course)
-            situation.structuralHold = structuralReason != nil
+            situation.structuralHold = structuralHoldReason(for: course) != nil
             situation.busy = busyReason(for: course) != nil
             situation.copying = workspace.isBeingCopied(course.code)
             situation.deploying = isBeingDeployed(course)
@@ -2099,7 +2110,6 @@ struct SidebarView: View {
                 blocked.insert(.localAssistant)
             }
             situation.reviseBlocked = blocked
-            notes = reviseNoteLines(course: course, sectionNumber: sectionNumber)
             if let sectionNumber, let folder = workspace.workspaceURL {
                 situation.hasStartOfYearUndo = StartOfYearUndoRegistry.shared.entry(
                     folderPath: folder.path, courseCode: course.code, sectionNumber: sectionNumber
@@ -2113,8 +2123,6 @@ struct SidebarView: View {
         }
         return SidebarMenuCommands(
             situation: situation,
-            structuralReason: structuralReason,
-            reviseNotes: notes,
             scheduledFor: scheduledFor,
             perform: performMenuItem
         )

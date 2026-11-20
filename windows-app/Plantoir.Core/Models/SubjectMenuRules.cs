@@ -8,9 +8,10 @@ namespace Plantoir.Core.Models;
 /// </summary>
 /// <remarks>
 /// <para><b>Presence follows the computer, enablement follows the selection.</b>
-/// Whether "Revise With ▸ Claude…" is DRAWN depends on whether Claude is
-/// installed — decided when the menu bar is built, never here. Whether it can
-/// be USED depends on what is selected, and that is this type's whole job. The
+/// Since #990 "Revise With ▸ Claude…" is DRAWN on every computer, and dimmed
+/// where Claude is not installed (<see cref="EnabledInTheMenuBar"/>); until
+/// then it was left out. Whether it can be USED otherwise depends on what is
+/// selected, and that is this type's main job. The
 /// menu bar GREYS what does not apply rather than hiding it, because a menu
 /// whose items come and go with the selection cannot be learned; the sidebar's
 /// context menus keep HIDING, because they are about one row.</para>
@@ -263,6 +264,34 @@ public static class SubjectMenuRules
             if (situation.CanGoForward) enabled.Add(Item.Forward);
         }
         return enabled;
+    }
+
+    /// <summary>
+    /// The outside door a Revise With item opens, or null for every other
+    /// item (the local assistant is Plantoir's own and runs wherever this app
+    /// does).
+    /// </summary>
+    public static ReviseTarget? OutsideDoorOf(Item item) => item switch
+    {
+        Item.CourseReviseWithClaude or Item.SectionReviseWithClaude => ReviseTarget.Claude,
+        Item.CourseReviseWithCodex or Item.SectionReviseWithCodex => ReviseTarget.Codex,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Whether the MENU BAR's item can be pressed on this computer (#990, the
+    /// mac's D11): the rule's answer (<see cref="Enabled"/>) AND, for a Revise
+    /// With item that opens an outside door, that door's assistant is
+    /// installed. Every item is drawn whatever this computer has; one whose
+    /// assistant is missing is dimmed, never left out
+    /// (<c>app-rules.json</c> → <c>outsideAgents.hiddenWhenNotInstalled</c>,
+    /// false since #990). A row's context menu HIDES such an item instead
+    /// (<c>hiddenInContextMenusWhenNotInstalled</c>), which is not this.
+    /// </summary>
+    public static bool EnabledInTheMenuBar(Item item, IReadOnlySet<Item> enabledByTheRule, Func<ReviseTarget, bool> isInstalled)
+    {
+        if (!enabledByTheRule.Contains(item)) return false;
+        return OutsideDoorOf(item) is not { } door || isInstalled(door);
     }
 
     /// <summary>The contract's name for an item: the enum name with its first letter lowered.</summary>

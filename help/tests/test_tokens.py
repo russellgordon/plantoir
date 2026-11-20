@@ -31,7 +31,7 @@ class RealGoldenTests(unittest.TestCase):
         self.assertEqual(len(paths), menus + items)
         self.assertIn(("Section",), paths)
         self.assertEqual(paths[("Section", "Deploy…")], "⇧⌘D")
-        self.assertEqual(paths[("Section", "Preview at Last Viewed")], "⌥⇧⌘P")
+        self.assertEqual(paths[("Section", "Preview at Last Viewed")], "⌥⌘Y")
         self.assertIn(("Course", "Revise With", "Claude…"), paths)
         self.assertIn(("File", "Open Recent", "Clear Menu"), paths)
         self.assertIsNone(paths[("Help", "Plantoir Help")])

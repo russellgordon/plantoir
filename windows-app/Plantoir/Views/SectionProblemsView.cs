@@ -39,11 +39,12 @@ namespace Plantoir.Views;
 /// its headers sort.</para>
 ///
 /// <para>Fix with Claude… and Fix with Codex… sit UNDER the table, Claude's
-/// first (#736, <c>fixWith.where</c>), in <see cref="Footer"/>: each shown
-/// only while its assistant is installed (<see cref="OutsideAssistantPresence"/>,
-/// asked at launch and when the window comes to the front, never while this
-/// draws) and never on a course kept for reference, and both enabled while a
-/// ticked row is still this section's problem (<see cref="FixWithAssistant.Buttons"/>).
+/// first (#736, <c>fixWith.where</c>), in <see cref="Footer"/>: both shown on
+/// every course not kept for reference, and each enabled while its assistant
+/// is installed (<see cref="OutsideAssistantPresence"/>, asked at launch and
+/// when the window comes to the front, never while this draws) and a ticked
+/// row is still this section's problem (<see cref="FixWithAssistant.Buttons"/>;
+/// dimmed, not hidden, when the assistant is missing since #990).
 /// A press is the section view's (<c>fix</c>), which makes Revise With's
 /// refusal first and opens the door.</para>
 /// </remarks>
@@ -325,23 +326,38 @@ internal sealed class SectionProblemsView : UserControl
     private void PresenceChanged() => DispatcherQueue?.TryEnqueue(ShowTheFixButtons);
 
     /// <summary>
-    /// Shown, hidden, enabled: <c>fixWith.buttonCases</c>. A button that
-    /// cannot be pressed says why to assistive technology
-    /// (<see cref="FixWithAssistant.NotEnabledHelp"/>), since a
-    /// greyed button alone tells a Narrator user nothing.
+    /// Shown, hidden, enabled: <c>fixWith.buttonCases</c>. Since #990 both
+    /// buttons are drawn on every live course and one whose assistant is not
+    /// on this PC is DIMMED, as Revise With ▸ in the menu bar dims it. A
+    /// button that cannot be pressed says why to assistive technology
+    /// (<see cref="FixWithAssistant.HelpFor"/>: not set up, or nothing ticked),
+    /// since a greyed button alone tells a Narrator user nothing.
     /// </summary>
     private void ShowTheFixButtons()
     {
         var handover = CurrentHandover();
+        bool claudeInstalled = OutsideAssistantPresence.ClaudeIsInstalled;
+        bool codexInstalled = OutsideAssistantPresence.CodexIsInstalled;
         var state = handover is null
-            ? new FixWithAssistant.ButtonState(false, false, false)
-            : FixWithAssistant.Buttons(OutsideAssistantPresence.ClaudeIsInstalled, OutsideAssistantPresence.CodexIsInstalled,
-                                       ReferenceCourse.IsKeptForReference(_course), handover);
-        foreach (var (button, shown) in new[] { (_fixWithClaude, state.ClaudeShown), (_fixWithCodex, state.CodexShown) })
+            ? FixWithAssistant.ButtonState.None
+            : FixWithAssistant.Buttons(claudeInstalled, codexInstalled, ReferenceCourse.IsKeptForReference(_course), handover);
+        var buttons = new[]
+        {
+            (Button: _fixWithClaude, Assistant: FixWithAssistant.Assistant.Claude, Shown: state.ClaudeShown, Installed: claudeInstalled),
+            (Button: _fixWithCodex, Assistant: FixWithAssistant.Assistant.Codex, Shown: state.CodexShown, Installed: codexInstalled),
+        };
+        foreach (var (button, assistant, shown, installed) in buttons)
         {
             button.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
-            button.IsEnabled = state.Enabled;
-            AutomationProperties.SetHelpText(button, state.Enabled ? "" : FixWithAssistant.NotEnabledHelp);
+            button.IsEnabled = state.CanPress(assistant);
+            // The reason twice (#990's second review): HelpText for Narrator,
+            // and the tooltip the mac's help tag is. Whether WinUI SHOWS a
+            // tooltip on a DISABLED button is not settled: the attempt to
+            // measure it is in documentation 12, "Revise With: dimmed in the
+            // menu bar, hidden in a row's menu".
+            string help = FixWithAssistant.HelpFor(assistant, installed, state);
+            AutomationProperties.SetHelpText(button, help);
+            ToolTipService.SetToolTip(button, help.Length > 0 ? help : null);
         }
     }
 
