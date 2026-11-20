@@ -134,10 +134,10 @@ Quartz server". Since #1016:
 
 | What the wait needs | Where it comes from | How it waits |
 |---|---|---|
-| The run has ended, could not start, or was stopped | `ScriptRunner` (`IsRunning`, `LastExitCode`, `LaunchProblem`, `WasStoppedByUser`) | Woken by the change |
+| The run has ended, could not start, or was stopped | `ScriptRunner` (`IsRunning`, `LastExitCode`, `LaunchProblem`, `WasStoppedByUser`) | Woken by the change. A run that could not start counts as over whether it set `LastExitCode` (a folder whose tools are not ready, -1) or only `LaunchProblem` (no `preview.ps1`, a pseudo console that would not open, where `LastExitCode` stays null) |
 | The address | the launcher's line, collected as lines arrive (#278) | Woken by the change (`PreviewAddress` now raises `PropertyChanged` when it changes) |
 | "Launching Quartz preview" | `build_site.py`'s line, collected as lines arrive (`ScriptRunner.HasAnnouncedQuartzLaunch`) | Woken by the change |
-| "Started a Quartz server" | Quartz's line, collected as lines arrive (`ScriptRunner.ServerStartedAt`, the time it ARRIVED, where the old loop stamped the look that first saw it, up to a second late) | Woken by the change |
+| "Started a Quartz server" | Quartz's line, collected as it arrives (`ScriptRunner.ServerStartedAt`, the time it ARRIVED, where the old loop stamped the look that first saw it, up to a second late), read in the unfinished line too: it is the last line before a quiet server, and ConPTY can hold a line's end back until the next drawing (#623, #661), so waiting for the end would leave the 45 s bound unstarted (#233). The address alone still waits for its line to end | Woken by the change |
 | The server answers | an HTTP request | Asked again after a second; #1011's landed line would let it wait |
 | The quiet bound (45 s, #233) | the clock | `PreviewReachability.UntilTheQuietRunsOut`: the wait sleeps until the run changes OR the bound, then asks `NextStep` again |
 
@@ -153,6 +153,19 @@ is left behind.
 tools' own runs) and `WaitUntilFinishedOrKill` looked at `IsRunning` every
 100 ms; they now end on `FinishRun`, which completes a task made at the start
 of each run. `WaitUntilFinishedOrKill`'s bound is the caller's and stays.
+
+Each run has a number. The reader (end of output) and the exit watcher (the
+process ended) both post a finish, and the first one wins; under the old
+100 ms look the second arrived long before anyone noticed the first, but a
+wait that resumes at once can start the next leg (a build's deploy, on the
+same runner) before it lands. So each posted finish carries its run's number
+and does nothing once another run has started; without that the build's
+late finish ended the deploy with the build's exit code, disposed the
+deploy's process and reported the leg a success (first review of #1016,
+`AFinishFromAnEarlierRunDoesNotEndTheNextOne`). `FinishRun` also takes the
+run's task before it notifies, so a handler that starts the next run there
+cannot strand the first run's waiters, and the bounded wait force-finishes
+only the run it was waiting for.
 
 **Measured** on the PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
 26200), 2026-11-20, with a throwaway test on the branch: the old look (output
@@ -208,6 +221,9 @@ gives a view its `XamlRoot` through `Loaded`.
   20 s): the process's exit and the sweep's own task, with the same bounds.
 - **The course wizard's answer pump** (`NewCourseCreator.PumpAnswers`, 200 ms):
   the transcript's change; its 600 ms settle is measured behaviour and stays.
+- **The sidebar's expansion timer** (`SidebarPane.ReassertExpansion`, 100 ms
+  for about 2 s): each row's TreeView container being realised, which the
+  TreeView announces, so the row can be set open then.
 
 Kept, with the reason: cadences that ARE the behaviour (the progress
 counter, output coalescing, the question's three seconds of silence,
