@@ -13549,6 +13549,50 @@ s of it Inno's compression), run by hand-equivalent through UI Automation:
   signed build), and the driver's own run over the page; the driver's
   calls are the ones the measurement above used.
 
+**The keyboard, measured** (the first review of 1010b asked whether a
+keyboard-only teacher could reach and choose "I accept the agreement"; VM as
+above, 2026-11-19). Real keys (SendInput) to the wizard in front, the page
+opened afresh for each row, and after every key the focused control, both
+choices' `BM_GETCHECK` and Next read back (`vm-tools/guest/1010b-keyboard.ps1`
+in the private tools repository). Before: the installer built from
+1ba4ceaf6 (both choices cleared, no Tab stop). After: the installer built
+from this fix (Tab stop on the refusal). The page opens with the focus in the
+text, neither choice chosen and Next disabled, before and after.
+
+| Key, from the page as it opens | Before | After |
+|---|---|---|
+| Tab | the focus goes to Cancel, then back to the text; never to a choice (8 presses) | the focus goes to "I do not accept the agreement", which is chosen; Next stays disabled. Then Cancel, then the text |
+| Shift+Tab | Cancel, then the text; never a choice | Cancel, then "I do not accept the agreement" (chosen; Next disabled) |
+| Up arrow, from "I do not accept" | not reachable | the focus moves to "I accept the agreement", which is chosen; Next enabled |
+| Down arrow, from "I accept" | not reachable | back to "I do not accept the agreement", chosen; Next disabled |
+| Space, on "I accept" | not reachable | stays chosen; Next enabled |
+| Down arrow or Space in the text | nothing changes | nothing changes |
+| Alt+D | "I do not accept" focused and chosen; Next disabled | the same |
+| Alt+A | "I accept" focused and chosen; Next enabled | the same |
+
+Three tiny installers with this page and three `InitializeWizard` bodies
+measured the choice of stop first: with both cleared, the same as "Before";
+with the stop on "I accept the agreement", **one Tab from the text chose
+"I accept" and enabled Next**, and the up arrow then left the pair for the
+text (Windows chooses a radio button the keyboard focuses, and Inno's pair
+has no group boundary above it); with the stop on the refusal, the "After"
+column. That is why the stop is on the refusal. What a keyboard user meets
+is Inno's stock page (Tab to "I do not accept", up arrow to accept) with
+one difference: the page opens with neither chosen.
+
+Two more things measured that night. The Win32 `WS_TABSTOP` style reads
+clear on both choices before AND after the fix: Delphi moves the focus on
+Tab itself, from its own `TabStop` property, so a check of the window style
+says nothing about whether Tab reaches a control; press the key and read
+the focus. And at this fix's head (installer built from 612159ca0, 14
+minutes): the page opened as before (the two captures still show it), the
+first install by hand ran Licence Agreement > Select Destination Location >
+Select Additional Tasks > Ready to Install > Installing > Completing, exit
+0; the `/VERYSILENT` update over it showed no window of setup in 268 looks
+and its log says "Installation process succeeded."; and the zip's root
+holds `LICENSE` (1,088 bytes) and `THIRD_PARTY_LICENSES.txt` (12,847
+bytes), each the same bytes as the repository's file.
+
 **Rejected** (the design, `vm-tools/reference/1010-installer-licence-page-design.md`
 in the private tools repository):
 
