@@ -92,6 +92,12 @@ final class DeployedFolderShows {
     /// Folders whose Stop was pressed while their start was still under way.
     private var stopsAskedForWhileStarting: Set<String> = []
 
+    /// Stops not yet finished, by canonical folder path: each ends when its
+    /// listener has let the address go (#1013). An Open of the same folder
+    /// waits for it, so it gets its usual address back rather than finding
+    /// it still held and moving.
+    private var stopsUnderWay: [String: Task<Void, Never>] = [:]
+
     // MARK: - Functions: looking
 
     /// The show for a section, if one is running.
@@ -179,6 +185,11 @@ final class DeployedFolderShows {
     ) async -> Bool {
         dismissFolderWentAway(courseCode: courseCode, sectionNumber: sectionNumber, workingFolderPath: workingFolderPath)
         let canonicalRoot: String = FolderIdentity.canonicalPath(sectionFolder.path)
+        // Opened again straight after Stop: the old listener lets the
+        // address go first (#1013).
+        if let stopping = stopsUnderWay[canonicalRoot] {
+            await stopping.value
+        }
         for show in shows where show.id == canonicalRoot {
             ActivityTrail.note(
                 .deployedFolderOpened, DeployedFolderShows.openedLine(from: from, alreadyOpen: true, moved: false),
@@ -240,11 +251,11 @@ final class DeployedFolderShows {
         do {
             started = try await DeployedFolderServer.start(root: root, candidates: candidates, onFolderGone: {
                 Task { @MainActor in
-                    DeployedFolderShows.shared.theFolderWentAway(canonicalRoot: canonicalRoot)
+                    await DeployedFolderShows.shared.theFolderWentAway(canonicalRoot: canonicalRoot)
                 }
             }, onEnded: {
                 Task { @MainActor in
-                    DeployedFolderShows.shared.theListenerEnded(canonicalRoot: canonicalRoot)
+                    await DeployedFolderShows.shared.theListenerEnded(canonicalRoot: canonicalRoot)
                 }
             })
         } catch {
@@ -266,7 +277,7 @@ final class DeployedFolderShows {
         )
         if stopsAskedForWhileStarting.contains(canonicalRoot) {
             stopsAskedForWhileStarting.remove(canonicalRoot)
-            stop(show, reason: .stopPressed)
+            await stop(show, reason: .stopPressed)
             return nil
         }
         return show
@@ -311,8 +322,18 @@ final class DeployedFolderShows {
         return "could not open the deployed folder in the web browser — \(why.rawValue)"
     }
 
-    /// Stops showing one folder.
-    func stop(_ show: Show, reason: StopReason) {
+    /// Stops showing one folder, and returns once nothing is listening at
+    /// its address (#1013). The show leaves the list at once, before any
+    /// wait, so the window says it has stopped as soon as Stop is pressed
+    /// and a second Stop finds nothing to stop; the trail line is written
+    /// once the address is free.
+    ///
+    /// Waits for the listener's own `.cancelled` (`DeployedFolderServer.stop`),
+    /// never for a length of time: before #1013 this returned as soon as it
+    /// had ASKED the listener to cancel, and under load the address went on
+    /// answering afterwards (3 of 40 runs of `DeployedFolderOfferTests`
+    /// failed, and with the framework's queue held back, 5 of 5).
+    func stop(_ show: Show, reason: StopReason) async {
         var remaining: [Show] = []
         var found: Bool = false
         for each in shows {
@@ -323,6 +344,10 @@ final class DeployedFolderShows {
             }
         }
         if !found {
+            // Already being stopped: wait for that Stop to finish.
+            if let stopping = stopsUnderWay[show.id] {
+                await stopping.value
+            }
             return
         }
         shows = remaining
@@ -335,20 +360,27 @@ final class DeployedFolderShows {
         let server: DeployedFolderServer = show.server
         let courseCode: String = show.courseCode
         let sectionNumber: Int = show.sectionNumber
-        Task {
+        let stopping: Task<Void, Never> = Task { @MainActor in
             let counts: (requests: Int, notFound: Int) = await server.counts()
             await server.stop()
             DeployedFolderShows.noteStopped(reason, counts: counts, courseCode: courseCode, sectionNumber: sectionNumber)
         }
+        stopsUnderWay[show.id] = stopping
+        await stopping.value
+        // A later show of the same folder may have started its own Stop.
+        if let current = stopsUnderWay[show.id], current == stopping {
+            stopsUnderWay.removeValue(forKey: show.id)
+        }
     }
 
-    /// Stop on a section: the notice's button and the menu item.
+    /// Stop on a section: the notice's button and the menu item. Returns
+    /// once nothing of the section's is listening (#1013).
     ///
     /// Every show of the section, not only the first: one started before the
     /// course's deploy folder was changed is the section's too (the
     /// implementation review's L5). A start still under way for it is
-    /// stopped as soon as it finishes.
-    func stop(courseCode: String, sectionNumber: Int, workingFolderPath: String) {
+    /// stopped as soon as it finishes, and this waits for that too.
+    func stop(courseCode: String, sectionNumber: Int, workingFolderPath: String) async {
         var ending: [Show] = []
         for show in shows {
             if show.courseCode == courseCode && show.sectionNumber == sectionNumber
@@ -356,14 +388,22 @@ final class DeployedFolderShows {
                 ending.append(show)
             }
         }
-        for show in ending {
-            stop(show, reason: .stopPressed)
-        }
         let section: String = DeployedFolderShows.key(
             courseCode: courseCode, sectionNumber: sectionNumber, workingFolderPath: workingFolderPath
         )
+        var startsToWaitFor: [Task<Show?, Never>] = []
         for (root, owner) in startingFor where owner == section {
             stopsAskedForWhileStarting.insert(root)
+            if let starting = startsUnderWay[root] {
+                startsToWaitFor.append(starting)
+            }
+        }
+        for show in ending {
+            await stop(show, reason: .stopPressed)
+        }
+        // A start under way stops itself, listener closed, before it ends.
+        for starting in startsToWaitFor {
+            _ = await starting.value
         }
     }
 
@@ -382,16 +422,16 @@ final class DeployedFolderShows {
 
     /// The listener ended without being asked. Our own Stop removes the
     /// show first, so this finds nothing then.
-    func theListenerEnded(canonicalRoot: String) {
+    func theListenerEnded(canonicalRoot: String) async {
         for show in shows where show.id == canonicalRoot {
-            stop(show, reason: .endedOnItsOwn)
+            await stop(show, reason: .endedOnItsOwn)
         }
     }
 
     /// The server found its folder gone.
-    func theFolderWentAway(canonicalRoot: String) {
+    func theFolderWentAway(canonicalRoot: String) async {
         for show in shows where show.id == canonicalRoot {
-            stop(show, reason: .folderGone)
+            await stop(show, reason: .folderGone)
         }
     }
 
@@ -411,5 +451,6 @@ final class DeployedFolderShows {
         shows = []
         stoppedBecauseTheFolderWentAway = []
         stopsAskedForWhileStarting = []
+        stopsUnderWay = [:]
     }
 }
