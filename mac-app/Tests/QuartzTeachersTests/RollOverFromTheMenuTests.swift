@@ -186,13 +186,25 @@ final class RollOverFromTheMenuTests: XCTestCase {
     /// schedule turned off, a copy saved first, and ONE undo entry, which
     /// one Undo Last Change takes back whole (the dates and the markers).
     /// Red before #897 piece B: two entries, and one undo left the dates.
+    ///
+    /// The legacy marker holds the Netlify record's own bytes, as a deploy's
+    /// migration that stopped before removing it leaves them: since #899
+    /// U3b's second round (Russell's ruling of 2026-11-20) a rollover brings
+    /// the legacy record into the working folder first, by deploy.py's rule,
+    /// so it is finished (removed) here, and the undo puts the Netlify record
+    /// back in its current place, never the legacy one in the built output.
+    /// A legacy record that DIFFERS refuses the rollover
+    /// (`UndoRolloverStepTests`).
     func testANewWebsiteFromTheMenuIsOneChange() async throws {
         let made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: .menu, for: self)
         defer {
             try? FileManager.default.removeItem(at: made.root)
         }
         let copies: CopiesSaved = RollOverFromTheMenuTests.countCopies(of: made)
-        let markers: [URL] = try RollOverFromTheMenuTests.writeEveryMarker(in: made.course)
+        var markers: [URL] = try RollOverFromTheMenuTests.writeEveryMarker(in: made.course)
+        let legacy: URL = DeployCommand.legacyMarkerURL(forSection: 1, in: made.course)
+        try Data(contentsOf: markers[0]).write(to: legacy)
+        markers.removeLast()
         let plistURL: URL = ScheduledDeploy.plistURL(courseCode: made.course.code, sectionNumber: 1, inWorkingFolder: made.root)
         try RolloverWebsiteTests.writeAgent(
             courseCode: made.course.code, sectionNumber: 1, workingFolder: made.root, at: plistURL
@@ -209,6 +221,7 @@ final class RollOverFromTheMenuTests: XCTestCase {
         for marker in markers {
             XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path), marker.path)
         }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the legacy record was brought in")
         XCTAssertFalse(FileManager.default.fileExists(atPath: plistURL.path), "the schedule must really be off")
         XCTAssertNotEqual(try String(contentsOf: page, encoding: .utf8), pageBefore, "the page was not re-dated")
         XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(outcome.summary), outcome.summary)
@@ -219,6 +232,7 @@ final class RollOverFromTheMenuTests: XCTestCase {
         for marker in markers {
             XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "one undo puts \(marker.lastPathComponent) back")
         }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the record stays in its current place")
     }
 
     /// A new website from the menu on Cloudflare, rolled over from last

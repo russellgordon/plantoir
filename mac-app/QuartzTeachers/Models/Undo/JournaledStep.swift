@@ -169,10 +169,6 @@ nonisolated final class JournaledStep {
     /// for later (`UndoAppPlaces`).
     var places: UndoExternalPlaces = UndoAppPreferences()
 
-    /// Arguments the step's action carries beside `pageCount` (open strings,
-    /// `undoJournal.stepKeys.action`): a rollover says when a marker was
-    /// set aside outside the step (`legacyMarkerSetAsideOutside`).
-    var extraArguments: [String: String] = [:]
 
     // MARK: - Computed properties
 
@@ -502,13 +498,11 @@ nonisolated final class JournaledStep {
     }
 
     /// The action, its `pageCount` counting every file the step changes
-    /// or moves, with the step's extra arguments.
+    /// or moves. (A rollover's legacy marker is brought into the working
+    /// folder before its step, `DeployCommand.moveTheLegacyMarkerIn`, so no
+    /// argument says a marker was moved outside the step.)
     private func action(changedFiles: Int) -> UndoAction {
-        var arguments: [String: String] = ["pageCount": String(changedFiles)]
-        for (key, value) in extraArguments {
-            arguments[key] = value
-        }
-        return UndoAction(key: maker.actionKey, arguments: arguments)
+        return UndoAction(key: maker.actionKey, arguments: ["pageCount": String(changedFiles)])
     }
 
     /// A step holding moves or external ops (U3b), made through the door

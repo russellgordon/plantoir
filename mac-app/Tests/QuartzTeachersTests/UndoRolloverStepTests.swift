@@ -59,6 +59,7 @@ final class UndoRolloverStepTests: XCTestCase {
         UndoJournalLocation.folderOverride = nil
         JournaledStep.modeOverride = nil
         UndoKillPoints.hook = nil
+        UndoKillPoints.putBackFailsAt = nil
         ActivityTrail.store = previousTrail
         for folder in listFolders {
             try? FileManager.default.removeItem(at: folder)
@@ -146,6 +147,43 @@ final class UndoRolloverStepTests: XCTestCase {
             count += inside.count
         }
         return count
+    }
+
+    /// Where the LEGACY Netlify marker lives: in the built output.
+    func legacyURL(_ made: AssistFixture.Made) -> URL {
+        return DeployCommand.legacyMarkerURL(forSection: 1, in: made.course)
+    }
+
+    /// A section whose ONLY website record is the legacy one, in the built
+    /// output, as an older folder never deployed since has it.
+    func sectionWithOnlyTheLegacyRecord() throws -> AssistFixture.Made {
+        let made: AssistFixture.Made = try section(surface: .menu)
+        try FileManager.default.removeItem(at: made.root.appendingPathComponent(UndoRolloverStepTests.markerPath))
+        try FileManager.default.createDirectory(at: legacyURL(made).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try UndoRolloverStepTests.lastYear.write(to: legacyURL(made), atomically: true, encoding: .utf8)
+        return made
+    }
+
+    /// The site a deploy of Section 1 to Netlify would go to: deploy.py's
+    /// `load_netlify_marker`, read for read (`scripts/deploy.py`): the
+    /// current record when there is one that reads, otherwise the legacy
+    /// one in the built output, otherwise none (a new website).
+    func siteADeployReads(_ made: AssistFixture.Made) -> String? {
+        let current: URL = made.root.appendingPathComponent(UndoRolloverStepTests.markerPath)
+        for url in [current, legacyURL(made)] {
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                continue
+            }
+            guard let data = try? Data(contentsOf: url),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                if url == current {
+                    continue
+                }
+                return nil
+            }
+            return object["site_id"] as? String
+        }
+        return nil
     }
 
     func journal(processIsAlive: Bool = true) -> UndoJournal {
@@ -243,7 +281,10 @@ final class UndoRolloverStepTests: XCTestCase {
         XCTAssertEqual(list.redoNewest(resolveRoot: { _ in made.root }), .redone(seq: 1))
         XCTAssertEqual(list.redoNewest(resolveRoot: { _ in made.root }), .redone(seq: 2, leftApart: [UndoRolloverStepTests.markerPath]))
         XCTAssertNotEqual(text(UndoRolloverStepTests.pagePath, in: made), pageBefore)
+        // Redo re-dates and leaves BOTH website records alone (Russell's
+        // ruling of 2026-11-20): the new one in its place, last year's kept.
         XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: made), UndoRolloverStepTests.thisYear)
+        XCTAssertEqual(keptMarkers(in: made).count, 1, "Redo left last year's kept record alone")
         XCTAssertFalse(UndoContractReplay.staysBeside(made.root))
     }
 
@@ -394,5 +435,205 @@ final class UndoRolloverStepTests: XCTestCase {
         XCTAssertEqual(keptMarkers(in: broken).count, 1)
         XCTAssertEqual(fragmentsSetAside(in: broken), 1)
         XCTAssertFalse(UndoContractReplay.staysBeside(broken.root))
+    }
+
+    // MARK: - The legacy record (Russell's ruling of 2026-11-20)
+
+    /// A folder whose only website record is the legacy one in the built
+    /// output: it is brought into the working folder first, as a deploy
+    /// would, so the step names it as a `moveApart`; Undo puts it back
+    /// whole, and a deploy then goes to the SAME site, not a new one. MUST
+    /// FAIL with the legacy marker moved aside outside the step (an Undo
+    /// left it aside, and the next deploy made a new website).
+    func testALegacyRecordAloneIsRolledOverUndoneAndDeploysToTheSameSite() async throws {
+        let made: AssistFixture.Made = try sectionWithOnlyTheLegacyRecord()
+        XCTAssertEqual(siteADeployReads(made), "last-year")
+        let said: AssistToolOutcome = await rollOver(made, surface: .menu)
+        var apart: [String] = []
+        for op in try journal().read().records[1]?.step.ops ?? [] where op.knownKind == .moveApart {
+            apart.append(op.from ?? "")
+        }
+        XCTAssertEqual(apart, [UndoRolloverStepTests.markerPath], said.summary)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL(made).path))
+        XCTAssertNil(siteADeployReads(made), "a deploy now would start the new website")
+
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in made.root }), .undone(seq: 1, leftApart: []))
+        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: made), UndoRolloverStepTests.lastYear)
+        XCTAssertEqual(keptMarkers(in: made), [])
+        XCTAssertEqual(siteADeployReads(made), "last-year", "after Undo a deploy goes to last year's site")
+    }
+
+    /// A process that dies after the legacy record was brought in and
+    /// before the step went in leaves a folder a deploy still reads
+    /// correctly: the record in its current place, the legacy one gone.
+    /// MUST FAIL with the legacy marker moved aside outside the step (the
+    /// deploy found no record and would have made a new website).
+    func testACrashBetweenBringingInTheLegacyRecordAndTheStepLeavesAFolderADeployReads() async throws {
+        let made: AssistFixture.Made = try sectionWithOnlyTheLegacyRecord()
+        UndoKillPoints.hook = { point in point == .afterBegin }
+        _ = await rollOver(made, surface: .menu)
+        UndoKillPoints.hook = nil
+        await UndoRecovery.recoverAndRederive(journal(processIsAlive: false), resolveRoot: { _ in made.root })
+        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: made), UndoRolloverStepTests.lastYear)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL(made).path))
+        XCTAssertEqual(siteADeployReads(made), "last-year")
+    }
+
+    /// A migration that died between its write and its removal leaves both
+    /// records, the same bytes: the rollover finishes it (the legacy one
+    /// removed) and goes on. MUST FAIL with the both-there case refused.
+    func testALegacyRecordBesideTheSameCurrentOneIsFinishedAndTheRolloverGoesOn() async throws {
+        let made: AssistFixture.Made = try section(surface: .menu)
+        try FileManager.default.createDirectory(at: legacyURL(made).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try UndoRolloverStepTests.lastYear.write(to: legacyURL(made), atomically: true, encoding: .utf8)
+        let said: AssistToolOutcome = await rollOver(made, surface: .menu)
+        XCTAssertFalse(said.summary.hasPrefix("Nothing was changed"), said.summary)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL(made).path))
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in made.root }), .undone(seq: 1, leftApart: []))
+        XCTAssertEqual(siteADeployReads(made), "last-year")
+    }
+
+    /// A legacy record that cannot be brought in refuses the rollover
+    /// before anything is changed, and says so truly: one that differs from
+    /// the current record, and one whose folder will not let it go (the
+    /// current record this wrote is removed again). MUST FAIL with the
+    /// conversion's refusal ignored.
+    func testALegacyRecordThatCannotBeBroughtInRefusesTheRolloverBeforeAnythingChanges() async throws {
+        let differing: AssistFixture.Made = try section(surface: .menu)
+        try FileManager.default.createDirectory(at: legacyURL(differing).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try UndoRolloverStepTests.thisYear.write(to: legacyURL(differing), atomically: true, encoding: .utf8)
+        let pagesBefore: [String: Data] = UndoActionStepsTests.pages(of: differing.course)
+        let saidDiffering: AssistToolOutcome = await rollOver(differing, surface: .menu)
+        XCTAssertTrue(saidDiffering.summary.hasPrefix("Nothing was changed: the website record"), saidDiffering.summary)
+        XCTAssertTrue(saidDiffering.summary.contains("already holds a different record"), saidDiffering.summary)
+        XCTAssertEqual(UndoActionStepsTests.pages(of: differing.course), pagesBefore)
+        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: differing), UndoRolloverStepTests.lastYear)
+        XCTAssertEqual(try String(contentsOf: legacyURL(differing), encoding: .utf8), UndoRolloverStepTests.thisYear)
+        XCTAssertEqual(try journal().read().records.count, 0)
+
+        let held: AssistFixture.Made = try sectionWithOnlyTheLegacyRecord()
+        let folder: URL = legacyURL(held).deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        }
+        let saidHeld: AssistToolOutcome = await rollOver(held, surface: .menu)
+        XCTAssertTrue(saidHeld.summary.hasPrefix("Nothing was changed: the website record"), saidHeld.summary)
+        XCTAssertNil(text(UndoRolloverStepTests.markerPath, in: held), "the current record written was removed again")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyURL(held).path))
+        XCTAssertEqual(siteADeployReads(held), "last-year")
+    }
+
+    // MARK: - Records as a group (the director's decision of 2026-11-20)
+
+    /// Two hosts: a deploy reaches Netlify and not Cloudflare. Undo leaves
+    /// BOTH records apart, never Cloudflare's back and Netlify's not, and
+    /// takes the rest back. MUST FAIL without the group rule (Cloudflare's
+    /// record went back, the section split across two websites).
+    func testRecordsOnTwoHostsStayApartTogetherWhenOnlyOneWasDeployed() async throws {
+        let made: AssistFixture.Made = try section(surface: .menu)
+        let cloudflare: String = "courses/ICS3U/.cloudflare_sites/section1.json"
+        try FileManager.default.createDirectory(
+            at: made.root.appendingPathComponent(cloudflare).deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try "{\"project\": \"ics3u-s1-2025\"}".write(to: made.root.appendingPathComponent(cloudflare), atomically: true, encoding: .utf8)
+        let pageBefore: String? = text(UndoRolloverStepTests.pagePath, in: made)
+        _ = await rollOver(made, surface: .menu)
+        XCTAssertNil(text(cloudflare, in: made))
+        try UndoRolloverStepTests.thisYear.write(to: made.root.appendingPathComponent(UndoRolloverStepTests.markerPath), atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(
+            journal().undoNewest(resolveRoot: { _ in made.root }),
+            .undone(seq: 1, leftApart: [UndoRolloverStepTests.markerPath, cloudflare])
+        )
+        XCTAssertEqual(text(UndoRolloverStepTests.pagePath, in: made), pageBefore)
+        XCTAssertNil(text(cloudflare, in: made), "Cloudflare's record stays apart with Netlify's")
+        let keptCloudflare: [String] = RollOverFromTheMenuSafetyTests.keptMarkers(
+            in: made.course.directoryURL.appendingPathComponent(".cloudflare_sites")
+        )
+        XCTAssertEqual(keptCloudflare.count, 1)
+    }
+
+    // MARK: - The review's lows
+
+    /// A step refused PART WAY (a file could not be put back after the
+    /// schedule's removal was refused) is never tried again, and is said as
+    /// part way, never "Nothing was changed". MUST FAIL with `notPutBack`
+    /// read as a plain refusal (the rollover retried, a second step begun).
+    func testAStepLeftPartWayIsNeverTriedAgainAndIsSaidAsPartWay() async throws {
+        let made: AssistFixture.Made = try section(surface: .menu)
+        let label: String = try scheduleADeploy(in: made, at: Date().addingTimeInterval(7 * 86_400))
+        let agents: URL = ScheduledDeploy.plistURL(label: label).deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: agents.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: agents.path)
+        }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        let said: AssistToolOutcome = await rollOver(made, surface: .menu)
+        UndoKillPoints.putBackFailsAt = nil
+        XCTAssertTrue(said.summary.hasPrefix("Only part of"), said.summary)
+        XCTAssertFalse(said.summary.contains("Nothing was changed"), said.summary)
+        XCTAssertEqual(try journal().read().records.count, 1, "never tried a second time")
+    }
+
+    /// A plist that does not say its moment (older jobs) is never set again:
+    /// its calendar entry has no year. One whose moment is ahead is. MUST
+    /// FAIL with an unknown moment read as ahead.
+    func testADeployForLaterThatDoesNotSayItsMomentIsNeverSetAgain() throws {
+        let places: UndoScheduledDeploys = UndoScheduledDeploys(runner: FakeLaunchControl())
+        let target: String = UndoScheduledDeploys.target(label: ScheduledDeploy.labelPrefix + "undo-test")
+        let older: [String: Any] = ["Label": "x", "StartCalendarInterval": ["Month": 9, "Day": 8, "Hour": 7, "Minute": 0]]
+        let olderPlist: Data = try PropertyListSerialization.data(fromPropertyList: older, format: .xml, options: 0)
+        XCTAssertFalse(places.canSet(target, .object(["plist": .string(olderPlist.base64EncodedString())])))
+        let ahead: [String: Any] = [
+            "Label": "x",
+            "EnvironmentVariables": [ScheduledDeploy.scheduledForKey: ISO8601DateFormatter().string(from: Date().addingTimeInterval(86_400))],
+        ]
+        let aheadPlist: Data = try PropertyListSerialization.data(fromPropertyList: ahead, format: .xml, options: 0)
+        XCTAssertTrue(places.canSet(target, .object(["plist": .string(aheadPlist.base64EncodedString())])))
+    }
+
+    /// launchd refuses the job at Undo: the schedule is left as it is and
+    /// named as left apart, and the rest of the rollover is taken back, so
+    /// the step never blocks the list. MUST FAIL with the refusal refusing
+    /// the whole Undo (`couldNotWrite`).
+    func testUndoLeavesADeployForLaterThatLaunchdRefusesApartAndTakesBackTheRest() async throws {
+        let made: AssistFixture.Made = try section(surface: .menu)
+        let label: String = try scheduleADeploy(in: made, at: Date().addingTimeInterval(7 * 86_400))
+        let pageBefore: String? = text(UndoRolloverStepTests.pagePath, in: made)
+        _ = await rollOver(made, surface: .menu)
+        let launchd: FakeLaunchControl = FakeLaunchControl()
+        launchd.bootstrapFailure = "Bootstrap failed: 5: Input/output error"
+        let places: UndoAppPlaces = UndoAppPlaces(schedules: UndoScheduledDeploys(runner: launchd))
+        XCTAssertEqual(
+            journal().undoNewest(resolveRoot: { _ in made.root }, places: places),
+            .undone(seq: 1, leftApart: [UndoScheduledDeploys.target(label: label)])
+        )
+        XCTAssertEqual(text(UndoRolloverStepTests.pagePath, in: made), pageBefore)
+        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: made), UndoRolloverStepTests.lastYear)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ScheduledDeploy.plistURL(label: label).path))
+    }
+
+    /// A refused swap removes the folder it made for a move (the record's
+    /// kept folder, `published-pages.previous-<stamp>/`), and never a folder
+    /// that was there before. MUST FAIL with the folders left.
+    func testARefusedSwapRemovesTheFolderItMadeForAMove() throws {
+        let root: URL = listFolder.appendingPathComponent("work", isDirectory: true)
+        let state: URL = root.appendingPathComponent(".publish_state", isDirectory: true)
+        let fragment: URL = state.appendingPathComponent("section1.published-pages/a.json")
+        try FileManager.default.createDirectory(at: fragment.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: fragment)
+        let kept: URL = state.appendingPathComponent("section1.published-pages.previous-2026-11-20_120000/a.json")
+        let page: URL = root.appendingPathComponent("page.md")
+        try Data("changed by hand\n".utf8).write(to: page)
+        let move: UndoOp = UndoOp.moveFile(from: fragment.path, to: kept.path, sha: UndoHash.sha256(of: Data("{}".utf8)))
+        let targets: [UndoSwapTarget] = [
+            UndoSwapTarget(url: kept, relativePath: "kept", change: .moveHere(from: fragment, fromPath: "fragment", op: move)),
+            UndoSwapTarget(url: page, relativePath: "page.md", expected: Data("as planned\n".utf8), replacement: Data("new\n".utf8)),
+        ]
+        XCTAssertEqual(UndoSwap.swap(targets, label: "test"), .refused(.changedSince(firstPath: "page.md", others: 0)))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fragment.path), "the move was reversed")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: kept.deletingLastPathComponent().path), "the kept folder it made is gone")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: state.path), "a folder that was there before stays")
     }
 }

@@ -748,8 +748,14 @@ def plan(ops, backward, pages_by_path, content_missing=False, leaves_apart=False
     (`content_missing`). With `leaves_apart` (an Undo or a Redo, never the
     making of a step), a `moveApart` found changed since is left where it is
     and named in left_apart, and the rest goes ahead (U3b, Russell's ruling
-    of 2026-11-19 on Q3)."""
+    of 2026-11-19 on Q3), as is an external op on a scheduledDeploy. The
+    step's moveApart ops (a section's website records) go as a GROUP: when
+    any one is changed since, every one not already where it is wanted is
+    left apart (the director's decision of 2026-11-20, on #899)."""
     ordered = list(reversed(ops)) if backward else list(ops)
+    group_stays_apart = leaves_apart and any(
+        op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
+    )
     original = {}
     working = {}
     in_the_way = []
@@ -774,8 +780,11 @@ def plan(ops, backward, pages_by_path, content_missing=False, leaves_apart=False
             # Judged whole against what is there (opKinds.wholeOps).
             state = whole_state(op, pages_by_path)
             place = op.get("path") or op.get("from") or op.get("target")
+            if group_stays_apart and kind == "moveApart" and state in ("neither", wanted_from):
+                left_apart.append(place)
+                continue
             if state == "neither":
-                if leaves_apart and kind == "moveApart":
+                if leaves_apart and stands_apart(op):
                     left_apart.append(place)
                     continue
                 if place not in in_the_way:
@@ -834,6 +843,30 @@ def plan(ops, backward, pages_by_path, content_missing=False, leaves_apart=False
 
 
 WHOLE_KINDS = ("move", "moveApart", "createTree", "removeTree", "external")
+SCHEDULED_DEPLOY = "scheduledDeploy:"
+
+
+def stands_apart(op):
+    """UndoOp.standsApart: a moveApart, or an external op on a deploy set
+    for later."""
+    if op["kind"] == "moveApart":
+        return True
+    return op["kind"] == "external" and op.get("target", "").startswith(SCHEDULED_DEPLOY)
+
+
+def set_or_leave_apart(model, result):
+    """The swap of an Undo or a Redo (UndoSwap.swap's leaveApart): a deploy
+    set for later that cannot be set now (launchd refuses it, or the write
+    is off the main thread: `refuses_schedules`) is left as it is and named
+    after what the check left apart; the rest goes in."""
+    changes = {}
+    left_apart = list(result[2])
+    for path, text in result[1].items():
+        if model.refuses_schedules and path.startswith(SCHEDULED_DEPLOY):
+            left_apart.append(path)
+            continue
+        changes[path] = text
+    return changes, left_apart
 LINKED_OUTSIDE = "\0linkedOutside"
 # What a deploy after a rollover onto a new website writes in the place the
 # marker left (an action trace's `deploy` call, U3b).
@@ -935,6 +968,7 @@ class Model:
         self.maintainer_registered = True   # UndoMaintainers has a runner
         self.linked_outside = set()   # folders replaced by a link to outside
         self.rederived = 0   # how many times a recompute's runner ran
+        self.refuses_schedules = False   # every write to a scheduledDeploy fails
 
     # -- the fold -----------------------------------------------------
 
@@ -1207,14 +1241,15 @@ class Model:
                 self.clear()
                 self.prune()
             return result
+        changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
-            self.write(result[1])
+            self.write(changes)
             if self.holds_a_recompute(undo):
                 self.rederived += 1
             undo["phase"] = "undone"
             self.write_line()
             self.prune()
-        return ("undone", undo["seq"], result[2])
+        return ("undone", undo["seq"], left_apart)
 
     def redo(self, dry=False):
         _, candidate, _ = self.offer()
@@ -1238,14 +1273,15 @@ class Model:
                         step["phase"] = "dropped"
                 self.write_line()
             return result
+        changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
-            self.write(result[1])
+            self.write(changes)
             if self.holds_a_recompute(candidate):
                 self.rederived += 1
             candidate["phase"] = "done"
             self.write_line()
             self.prune()
-        return ("redone", candidate["seq"], result[2])
+        return ("redone", candidate["seq"], left_apart)
 
     def write(self, changes):
         for path, text in changes.items():

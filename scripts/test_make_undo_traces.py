@@ -514,7 +514,7 @@ class ContractCaseTests(unittest.TestCase):
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
                   "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-                  "leftApart", "schoolYear"}
+                  "leftApart", "schoolYear", "cloudflareMarkers"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
     MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
@@ -525,6 +525,11 @@ class ContractCaseTests(unittest.TestCase):
     SETTINGS = "courses/TST1O/settings.json"
     NOTES = "courses/TST1O/notes.md"
     PREFERENCE = "preference:undoCasesPreference"
+    CLOUDFLARE_FROM = "courses/TST1O/.cloudflare_sites/section1.json"
+    CLOUDFLARE_TO = "courses/TST1O/.cloudflare_sites/section1.previous.json"
+    CLOUDFLARE_MARKER = "{\"project\": \"tst1o-s1-2025\"}\n"
+    SCHEDULE = "scheduledDeploy:org.plantoir.deploy.undo-cases"
+    SCHEDULE_VALUE = {"plist": "cGxpc3Q=", "script": "c2NyaXB0"}
 
     def kind_call(self, call, model):
         """U2's calls (stackCasesHow), on the model's pages. Answers what
@@ -546,6 +551,29 @@ class ContractCaseTests(unittest.TestCase):
             year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
             marker = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(content)}
             return model.ops_step([year, marker])
+        if call == "rollOverOntoNewWebsitesOnTwoHosts":
+            # U3b, records as a group: the year and both hosts' markers.
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.CLOUDFLARE_FROM) is None and pages.get(self.CLOUDFLARE_TO) is None:
+                pages[self.CLOUDFLARE_FROM] = self.CLOUDFLARE_MARKER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            netlify = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(self.OLD_MARKER)}
+            cloudflare = {"kind": "moveApart", "from": self.CLOUDFLARE_FROM, "to": self.CLOUDFLARE_TO,
+                          "sha": traces.sha(self.CLOUDFLARE_MARKER)}
+            return model.ops_step([year, netlify, cloudflare])
+        if call == "rollOverTurningOffASchedule":
+            # U3b: the year and the deploy set for later turned off.
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            pages[self.SCHEDULE] = self.SCHEDULE_VALUE
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            return model.ops_step([year, {"kind": "external", "target": self.SCHEDULE, "before": self.SCHEDULE_VALUE}])
+        if call == "theScheduleCannotBeSetNow":
+            model.refuses_schedules = True
+            return None
         if call == "deployANewMarker":
             pages[self.MARKER_FROM] = self.NEW_MARKER
             return None
@@ -613,7 +641,16 @@ class ContractCaseTests(unittest.TestCase):
 
     KIND_CALLS = ("moveTheMarker", "rollOverOntoANewWebsite", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
                   "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
-                  "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside")
+                  "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
+                  "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow")
+
+    def cloudflare_markers(self, model):
+        source, destination = model.pages.get(self.CLOUDFLARE_FROM), model.pages.get(self.CLOUDFLARE_TO)
+        if source is None and destination == self.CLOUDFLARE_MARKER:
+            return "moved"
+        if source == self.CLOUDFLARE_MARKER and destination is None:
+            return "movedBack"
+        return (source, destination)
 
     def test_stack_cases(self):
         folder_b = "@B/"
@@ -790,6 +827,8 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual([step["seq"] for step in model.steps if step["phase"] == "interrupted"], case["interrupted"])
                 if "markers" in case:
                     self.assertEqual(self.markers(model), case["markers"])
+                if "cloudflareMarkers" in case:
+                    self.assertEqual(self.cloudflare_markers(model), case["cloudflareMarkers"])
                 if "folderKept" in case:
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:

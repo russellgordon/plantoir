@@ -686,7 +686,7 @@ nonisolated enum UndoContractReplay {
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-        "leftApart", "schoolYear",
+        "leftApart", "schoolYear", "cloudflareMarkers",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1076,6 +1076,9 @@ nonisolated enum UndoContractReplay {
             }
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("stackCases '\(name)': the folder is there: \(!kept)")
+            }
+            if let wanted = string(testCase["cloudflareMarkers"]), UndoContractKinds.cloudflareMarkers(in: root) != wanted {
+                failures.append("stackCases '\(name)': the second host's markers are \(UndoContractKinds.cloudflareMarkers(in: root)), not \(wanted)")
             }
             if let wanted = testCase["leftApart"] as? [String], lastLeftApart != wanted {
                 failures.append("stackCases '\(name)': left apart \(lastLeftApart), not \(wanted)")

@@ -21332,25 +21332,55 @@ make and FINISHED after it (`finishTheWebsite`: the sentences, the trail
 line, the window's second history entry). A step that is refused changes
 nothing and the reply is the runner's "Nothing was changed: …", so every
 sentence a teacher or an assistant hears on a failed rollover is true of
-the disk. Two exceptions are deliberate, each true:
+the disk. A step refused PART WAY (a file could not be put back after the
+refusal: `JournaledStepError.leftPartWay`, U3a's third round) is never
+tried again and is said through `saidWhenTheStepStopped`, as part way, on
+all three of the rollover's paths (the review of U3b, LOW 1: the retry
+below once ran after a half-made first attempt, and the reply said
+"Nothing was changed" while a removed schedule or a moved file stayed
+changed). Two exceptions are deliberate, each true:
 
 - **A deploy set for later that cannot be removed** (its plist will not
   go): the step is refused `couldNotWrite` on that target; the runner takes
   that op out and makes the rest (`makeTheRolloverStep`), and the reply says
   `rolloverCouldNotTurnOffTheScheduledPublish`, as before U3b. The failed
-  attempt leaves a `failed` step on the list, which is never offered. A job
-  whose files cannot be read is left out the same way.
+  attempt leaves a `failed` step on the list, which is never offered, and
+  nothing else: the swap removes every folder it made for a place that had
+  none (`UndoSwap.swap`'s `foldersMade`, by `rmdir`, so never a folder with
+  anything in it), where a refused step once left an empty
+  `…published-pages.previous-<stamp>/` behind (the review of U3b, LOW 4).
+  A job whose files cannot be read is left out the same way. Only a plain
+  refusal is retried; a step left part way never is.
 - **The legacy Netlify marker** (`.merged_output/section<N>/.netlify_site.json`)
   lives in the built output, a link out of the working folder, where a step
-  cannot name a place (`undo.rule.stagedThenSwapped`). It is moved aside
-  OUTSIDE the step before the make, put back if the step is refused
-  (`PlannedSiteRelease.putTheLegacyMarkerBack`), and the step's action
-  carries `legacyMarkerSetAsideOutside: "true"`, so U7 can say an Undo
-  leaves it aside. `deploy.py` migrates a legacy marker into the stable path
-  on its next deploy anyway (`load_netlify_marker`). Rejected: naming the
-  builds root as a second place of the step (a second root in the format for
-  one file that only very old folders hold); leaving the whole website out
-  of the step. **Held for Russell** (the report's first question).
+  cannot name a place (`undo.rule.stagedThenSwapped`). **Russell ruled on
+  2026-11-20**: before the step it is brought into the working folder in the
+  current format, exactly as a deploy does on its next run, and the step
+  then names it like any other record (`moveApart`), so Undo puts it back
+  whole. `DeployCommand.moveTheLegacyMarkerIn` reuses `deploy.py`'s rule
+  (`load_netlify_marker`): the current record (`.netlify_sites/section<N>.json`)
+  is the one read; only when there is none is a legacy record that reads as
+  JSON written there (its bytes, mode 0600) and the legacy one removed.
+  At the edges it refuses rather than guesses, and a refusal stops the
+  rollover before anything of it is planned, said as "Nothing was changed:
+  the website record “.merged_output/section1/.netlify_site.json” could not
+  be moved to “.netlify_sites/section1.json”." (`LegacyMarkerNotMovedIn`):
+  a legacy record that is not JSON, or that cannot be written or removed
+  (the current record this call wrote is removed again, so the folder is as
+  it was); and a current record beside a DIFFERENT legacy one (deploy.py
+  reads the current one now, but would migrate the legacy one once the
+  rollover had moved the current one aside, so the sentence adds that the
+  place already holds a different record). Beside the SAME bytes, the
+  legacy one is what a migration that died before its removal leaves, and
+  it is removed (the migration finished). Once brought in, a step that is
+  then refused leaves the record in its current place: the same website,
+  where a deploy would have put it, so "Nothing was changed" stays true of
+  what the teacher has. Gone with it: the move outside the step,
+  `PlannedSiteRelease` and `putTheLegacyMarkerBack`, and the action argument
+  `legacyMarkerSetAsideOutside` (and `JournaledStep.extraArguments`, which
+  only carried it). Rejected before the ruling: naming the builds root as a
+  second place of the step (a second root in the format for one file that
+  only very old folders hold); leaving the whole website out of the step.
 
 **What changed in the order of effects, and why.** The window's rollover
 moved its markers and turned its schedule off AFTER the preview was
@@ -21398,23 +21428,45 @@ list" came from; the U7 menu greys Redo as for any other step only when
 there is none. With no deploy between, the marker is moved back from its
 kept copy (one rename, its 0600 mode kept, #961) and nothing is apart.
 
+**Records move as a group** (the director's decision of 2026-11-20, on
+#899). A section on two hosts has two records, each a `moveApart`. If a
+deploy reached one host and not the other, judging them one by one would
+put one back and leave the other: the section split across two websites.
+So `UndoCheck.plan` first asks whether any `moveApart` of the step is
+changed since (`aWebsiteRecordIsChangedSince`); if one is, every one not
+already where it is wanted is left apart and named, and U7 says once that
+the section stays on its new website. Redo the same way.
+
 The schedule stands apart too, by its family: an `external` op on
 `scheduledDeploy:` that an Undo cannot set back because the job's moment
 has gone by (`UndoExternalPlaces.canSet`, false for a moment past) is left
 off and named (#897 piece B, seam 2: never registered again for a moment
-already past). Undone while its moment is ahead, the plist and its script
+already past). A plist with no `PLANTOIR_SCHEDULED_FOR` (older jobs) is
+never set back either: its moment cannot be known to be ahead, and its
+calendar entry has no year, so it would fire on that day next year (the
+review of U3b, LOW 2). A schedule the SWAP cannot set (launchd refuses the
+job, or the write is off the main thread) is left apart the same way and
+named after what the check left apart, never a refusal of the whole Undo
+(`UndoSwap.swap`'s `leaveApart`, given only by an Undo or a Redo): a label
+that stayed loaded would otherwise block its step, and every step under
+it, for good (the review of U3b, LOW 3). Undone while its moment is ahead, the plist and its script
 come back byte for byte and the job is loaded again (`UndoScheduledDeploys`,
 through the action's own `LaunchControlRunning`, never the real
 `launchctl` under the suite). That runner is the main actor's, so a write
 made off the main thread answers false (a change that could not be made,
-nothing changed): **U7 must make an Undo of such a step on the main actor**,
+left apart, as above): **U7 should make an Undo of such a step on the main actor**,
 or give the runner a nonisolated form, and must pass `UndoAppPlaces` (not
 the core's default `UndoAppPreferences`) as `places` to every Undo, Redo
 and recovery.
 
-Cases: `checkCases` (4 `moveApart` rows), `stackCases` (4 U3b rows, the
-call `rollOverOntoANewWebsite`, keys `leftApart` and `schoolYear`), both
-replayed by the Mac and the Python model (`plan(…, leaves_apart=True)`).
+Cases: `checkCases` (4 `moveApart` rows), `stackCases` (8 U3b rows: the
+calls `rollOverOntoANewWebsite`, `rollOverOntoNewWebsitesOnTwoHosts`,
+`rollOverTurningOffASchedule` and `theScheduleCannotBeSetNow`, keys
+`leftApart`, `schoolYear` and `cloudflareMarkers`), both replayed by the
+Mac and the Python model (`plan(…, leaves_apart=True)`, its group rule, and
+`set_or_leave_apart` for a schedule the swap cannot set). The group rule
+is a rule of a step, not of one op, so it has no `checkCases` row: a check
+case holds a single op.
 
 #### If the app dies part way through a rollover
 
@@ -21426,12 +21478,12 @@ in the OLD year, marker in place, record in place, schedule registered
 again through the same places. Place 4 is completed (`done`): whole in the
 NEW year. `UndoRolloverStepTests.testARolloverKilledBetweenItsSwapsIsWholeInItsOldYearAfterRecovery`
 (killed at `beforeSwap(2)`) and `…KilledAfterItsLastSwapIsWholeInItsNewYearAfterRecovery`
-(at `beforeApplied`) prove both, and the closing line says which. The
-legacy marker outside the step is the one file a death between its move and
-the step's begin leaves aside with nothing on the list; `deploy.py` reads
-the stable marker first and migrates a legacy one only when there is none,
-so the section stays on its old website unless it had only the legacy
-marker. In SHADOW, recovery never writes the teacher's files (U3a's rule);
+(at `beforeApplied`) prove both, and the closing line says which. A
+death between bringing in the legacy record and the step's begin leaves
+the record in its current place and the legacy one gone (or, between the
+write and the removal, both holding the same bytes): a deploy reads the
+current one, the same website, and the next rollover finishes the removal
+(`testACrashBetweenBringingInTheLegacyRecordAndTheStepLeavesAFolderADeployReads`). In SHADOW, recovery never writes the teacher's files (U3a's rule);
 a rollover step moves files, so its staged files are left for a live
 recovery, as for any step with a move.
 
@@ -21471,9 +21523,11 @@ A settings save goes through the same door: `JournaledStep.write` for
 `course_config.json` (the door then chooses `writeFile` for it), or, finer,
 one `editJSON` per member, which U4 adds to `JournaledStep` the way U3b
 added `move` and `setExternal` (a planned list beside the files, so the step
-is made as ops: `isMixed`); `setExternal` for a preference; `extraArguments`
-for anything U7 needs to name the step; `places` set to `UndoAppPlaces`
-whenever a step holds an external op.
+is made as ops: `isMixed`); `setExternal` for a preference; `places` set to `UndoAppPlaces`
+whenever a step holds an external op. (`extraArguments` is gone: nothing
+used it once the legacy record moved inside the step; a piece that needs
+an action argument adds it back with its reason.) An Undo or Redo passes
+`leaveApart` to `UndoSwap.swap`; making a step and recovery never do.
 
 ### The U1 harness
 

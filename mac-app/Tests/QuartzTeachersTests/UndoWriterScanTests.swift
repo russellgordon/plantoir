@@ -153,7 +153,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/CoursePageCopier.swift": (3, "waitsFor: U4"),
         "Models/CourseRenamer.swift": (3, "waitsFor: U4"),
         "Models/CourseRestorer.swift": (29, "waitsFor: U5"),
-        "Models/DeployCommand.swift": (5, "waitsFor: U4 (releaseSite's plain moves serve only Keep a Copy for Reference, on the copy it makes, U4's step; the rollover PLANS its markers into its one step, planSiteRelease, U3b, and moves only the legacy marker in the built output, outside every working folder, and back if the step is refused; the deploy.sh it names is not counted, rulings 17 and 18)"),
+        "Models/DeployCommand.swift": (9, "waitsFor: U4 (releaseSite's plain moves serve only Keep a Copy for Reference, on the copy it makes, U4's step; the rollover PLANS its markers into its one step, planSiteRelease, U3b; before that step moveTheLegacyMarkerIn brings the legacy marker from the built output into .netlify_sites by deploy.py's own migration (load_netlify_marker), the same change a deploy makes, which leaves the same website and is not a step (Russell's ruling of 2026-11-20); the deploy.sh it names is not counted, rulings 17 and 18)"),
         "Models/DeployTokens/DeployTokenPanel.swift": (1, "notAStep: runs deploy.sh --token through /bin/bash in its mode with no course and no section (#696): the teacher's deploy tokens, which are credentials and not on the list (ruling 8), in the launcher's token store outside every course"),
         "Models/FolderContainers.swift": (2, "notAStep: the website builder's containers, through a shell, outside every course"),
         "Models/FolderScaffold.swift": (1, "waitsFor: U4 (a new working folder's scaffold, made with New Course)"),
