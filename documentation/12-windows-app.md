@@ -8118,15 +8118,16 @@ when they land.
 | Menu | Items (Windows key) |
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
-| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
-| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| Course | Add Section…, Copy a Page from This Course… (Ctrl+Shift+K since #990) · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
+| Section | Since #990 (grouping A, drawn from `subjectMenus.layout`; "Section and Classes, drawn from the contract (#990)" below): Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Rebuild Preview (Ctrl+Shift+B), Open in Browser · Publish Class for a Date…, Publish Pages…, Hide Pages…, Publish Pages That Links Lead To…, Undo Last Change, Undo Getting Ready for the Start of the Year… · Deploy… (Ctrl+Shift+D), Schedule Deploy…, Remove Scheduled Deploy (Cancel Scheduled Deploy… until #987; no ellipsis since #990) · Revise With ▸ · Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section (no ellipsis since #990) |
+| Classes | Since #990: Add Next Class (Add Class… with #927) · Class Dates…, Re-date Classes…, Make Room for Classes… · Get Ready for the Start of the Year… (Roll Over to a New Year… joins with #954) |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
 **One table, in code** (`Plantoir/MainWindow.Menus.cs`): every item is built
 by one `Add(…)` that carries its contract item (`SubjectMenuRules.Item`), its
 key and its AutomationId, so an item cannot exist without its rule or its id.
-The menu bar's XAML holds five empty `MenuBarItem`s and nothing else.
+The menu bar's XAML holds six empty `MenuBarItem`s (five until #990 added Classes) and nothing else.
 
 **Which items can be used** is `Plantoir.Core/Models/SubjectMenuRules.cs`, a
 port of the mac's `SubjectMenuRules.enabledItems`, run by
@@ -8233,7 +8234,8 @@ O follow the mac's ⇧⌘ letters. **Not Ctrl+Alt+anything**: on many European
 layouts AltGr IS Ctrl+Alt, so a Ctrl+Alt key fires while a teacher types @,
 € or { — so Add Section… has no key here (the mac's ⌥⌘N). **Not Ctrl+Shift+C**
 for Copy a Page: it is the browser's inspect-element key and a teacher who has
-used one expects that; Copy a Page has no key. **Settings… lost its "Ctrl+,"
+used one expects that; Copy a Page had no key until Russell ruled Ctrl+Shift+K
+on #990 (2026-11-20), the mac's ⇧⌘K. **Settings… lost its "Ctrl+,"
 label**: it was drawn with nothing behind it, and a comma key measured above
 does not fire. Ctrl+Shift+B was kept free for 2B's Rebuild Preview, which has it now.
 
@@ -8345,9 +8347,60 @@ this app's own Undo plan gives it Edit ▸ Redo (W11b), so Preview cannot follow
 the mac to Ctrl+Y. Ctrl+Shift+P is not a Windows reserved key (the reason the
 mac moved, Page Setup, is a macOS convention). Whether Windows moves Preview,
 Rebuild Preview, or gives Copy a Page a key (it has none: Ctrl+Shift+C is the
-browser's inspect-element key) is Russell's question, asked on #990's
-hand-back; until he rules, Preview stays Ctrl+Shift+P, Rebuild Preview
-Ctrl+Shift+B and Copy a Page keyless.
+browser's inspect-element key) was Russell's question, asked on #990's
+hand-back. **Ruled 2026-11-20:** Preview stays Ctrl+Shift+P, Rebuild Preview
+Ctrl+Shift+B, and Copy a Page takes Ctrl+Shift+K (Ctrl+Y is Redo on Windows).
+Ctrl+Shift+K was checked against every key in the app before it was given:
+no `KeyboardAccelerator`, `KeyDown` or `PreviewKeyDown` handler in
+`Plantoir/` names K (they name Enter, Up, Delete, Escape, Space, the arrows
+and the modifier keys), and no other menu item carries it.
+
+### Section and Classes, drawn from the contract (#990, grouping A)
+
+Russell's ruling of 2026-11-20 on #990 (the mac's D27, the Section menu's
+length; the mac's write-up and the HIG sentences are in [09 → "Section and
+Classes: two menus drawn from the contract"](09-mac-app.md#section-and-classes-two-menus-drawn-from-the-contract-990-grouping-a)):
+the Section menu splits into **Section**, the website jobs, and **Classes**
+after it, the class calendar. Windows' menu bar reads File · Course ·
+Section · Classes · View · Help: Windows keeps its own order with View after
+the app's menus (#488), and both read Course, Section, Classes, most to least
+general (`subjectMenus.layout.menuBar`).
+
+**Drawn from data.** `contracts/shared-rules.json` → `subjectMenus.layout`
+says which menu each section item is in, in groups.
+`Plantoir.Core/Models/SubjectMenuLayout.cs` holds the same lists for the
+items Windows has, and `MainWindow.BuildLayoutMenu` draws both menus from
+them, a separator before every group but the first; an item's words
+(`SubjectMenuLayout.TitleHere`: Show in File Explorer and Open in Terminal
+are Windows' own) and AutomationId (`AutomationIdHere`: the menu's contract
+name, then the item's; the Section ids are #488's, unchanged, and the Classes
+ones are new, `classesClassDates` and so on) are this app's. Keys did not
+move: Preview Ctrl+Shift+P, Rebuild Preview Ctrl+Shift+B, Deploy…
+Ctrl+Shift+D, Open in Obsidian Ctrl+Shift+O on the live one. The trail's menu
+path (`SectionVerbDialog.MenuPath`) takes its menu from the layout, so it
+reads "Classes ▸ Re-date Classes… — carried out" now.
+
+**What Windows does not have yet** is left out by its named gap, and its
+neighbours keep their order: Stop Showing Deployed Folder (#889), GitHub
+Copilot (#884), Roll Over to a New Year… (#954); Add Class… is drawn as Add
+Next Class until #927. `SubjectMenuLayoutContractTests` builds the expected
+menus from the contract less those gaps and compares them with
+`SubjectMenuLayout`; the day a gap closes, the item must be added to the
+Windows lists, in its place, or the test goes red. The two Undo items stay in
+Section, last in the publishing group, until W11b. Change Deploy Time… (#525)
+has its place reserved in `layout.reservedPlaces`.
+
+**Ellipses.** Remove Section and Remove Scheduled Deploy lost theirs (ruled
+on #990: a command that only asks for a confirmation takes none), in the
+menu bar and on the section row's right-click menu.
+
+**Tests.** `SubjectMenuLayoutContractTests` (the groups, the submenu, every
+section item in one menu once, the bar's order in `MainWindow.xaml`, menu
+paths); `RemovalQuestionsContractTests` (the words); and, through the real
+window, `SectionAndClassesUiTests` in `MenuBarUiTests.cs`: the bar's order,
+both menus line for line against the layout with every item drawn and
+dimmed on a course row, the Classes items live on a section row, Classes ▸
+Class Dates… opening and its trail line, and Copy a Page on Ctrl+Shift+K.
 
 ### What does NOT exist here: File with no window
 

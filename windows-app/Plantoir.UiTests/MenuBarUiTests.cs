@@ -306,9 +306,11 @@ public class SectionAndClassesUiTests
     {
         using var app = new DrivenApp(CourseFixtures.WriteBoth);
 
-        // The menu bar's order, Classes after Section.
+        // The menu bar's order, Classes after Section: the app's own bar, not
+        // the window's title-bar System menu, which UI Automation also shows
+        // as a menu bar.
         var titles = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))
-            .Where(e => e.Parent?.ControlType == ControlType.MenuBar).Select(e => e.Name).ToList();
+            .Where(e => e.Parent?.ControlType == ControlType.MenuBar && e.Name != "System").Select(e => e.Name).ToList();
         Assert.Equal(new[] { "File", "Course", "Section", "Classes", "View", "Help" }, titles);
 
         // A COURSE row selected: the rule greys every Section and Classes item,
