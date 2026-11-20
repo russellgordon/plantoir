@@ -40,8 +40,9 @@ public sealed class UndoPruningCarriedOutTests
 
         UndoFolded folded = scribe.Fold();
         Assert.Equal(UndoLimits.StepsKept, folded.OnTheList.Count());
-        Assert.Equal(Enumerable.Range(1, 10).Select(seq => (long)seq),
-                     folded.Steps.Values.Where(step => step.State == UndoStepState.Pruned).Select(step => step.Seq));
+        Assert.Equal(Enumerable.Range(11, UndoLimits.StepsKept).Select(seq => (long)seq), folded.OnTheList.Select(step => step.Seq));
+        // The ten pruned are pruned on the disk, or gone with the segments that held them.
+        Assert.All(folded.Steps.Values.Where(step => step.Seq <= 10), step => Assert.Equal(UndoStepState.Pruned, step.State));
 
         List<int> segments = SegmentsOnDisk(scribe);
         Assert.True(segments[0] > 1, "no segment was deleted");

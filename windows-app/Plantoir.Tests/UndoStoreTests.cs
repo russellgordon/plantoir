@@ -38,6 +38,14 @@ public sealed class UndoStoreTests : IDisposable
         ["step"] = new JsonObject { ["seq"] = seq, ["madeAt"] = "2026-11-14T12:00:00Z", ["ops"] = new JsonArray() },
     };
 
+    /// <summary>A line's bytes as the writer writes them, for a file a test makes by hand.</summary>
+    private static byte[] Raw(JsonObject line)
+    {
+        line["v"] = 1;
+        line["at"] = "2026-11-14T12:00:00Z";
+        return [.. UndoJournalWriter.Encode(line), (byte)'\n'];
+    }
+
     private static JsonObject Event(long seq, string name) => new() { ["seq"] = seq, ["event"] = name };
 
     private static void Step(UndoJournalWriter writer, long seq)
@@ -104,7 +112,8 @@ public sealed class UndoStoreTests : IDisposable
     {
         Match size = Regex.Match(FilesSentence("journal-NNNNNN.jsonl"), @"once the newest passes (\d+) MiB");
         Assert.True(size.Success);
-        Assert.Equal(long.Parse(size.Groups[1].Value) * 1024 * 1024, UndoJournal.SegmentBytesInTheApp);
+        long named = long.Parse(size.Groups[1].Value) * 1024 * 1024;
+        Assert.True(named == UndoJournal.SegmentBytesInTheApp, $"the contract names {named} bytes");
 
         UndoJournal journal = Journal(segmentBytes: 600);
         for (long seq = 1; seq <= 12; seq++) journal.WithLock(writer => Step(writer, seq));
@@ -139,12 +148,12 @@ public sealed class UndoStoreTests : IDisposable
 
     /// <summary>A reader in another journal reads on while a writer appends: never unreadable, never going back.</summary>
     [Fact]
-    public void AReaderReadsOnWhileAWriterAppends()
+    public async Task AReaderReadsOnWhileAWriterAppends()
     {
         UndoJournal writerJournal = Journal(segmentBytes: 4096);
         UndoJournal readerJournal = Journal();
         using var stop = new CancellationTokenSource();
-        Task<(int Reads, string? Fault)> reader = Task.Run(() =>
+        Task<(int Reads, string? Fault)> reader = Task.Run<(int Reads, string? Fault)>(() =>
         {
             long highest = 0;
             int reads = 0;
@@ -161,7 +170,7 @@ public sealed class UndoStoreTests : IDisposable
         });
         for (long seq = 1; seq <= 150; seq++) writerJournal.WithLock(writer => Step(writer, seq));
         stop.Cancel();
-        (int reads, string? fault) = reader.Result;
+        (int reads, string? fault) = await reader;
         Assert.Null(fault);
         Assert.True(reads > 0);
         UndoReading last = readerJournal.Read();
@@ -196,7 +205,7 @@ public sealed class UndoStoreTests : IDisposable
         reader.Read();
         byte[] bytes = File.ReadAllBytes(Segment(1));
         string replacement = Path.Combine(_folder, "replacement");
-        File.WriteAllBytes(replacement, [.. bytes, .. UndoJournalWriter.Encode(Begin(2)), (byte)'\n']);
+        File.WriteAllBytes(replacement, [.. bytes, .. Raw(Begin(2))]);
         File.Move(replacement, Segment(1), overwrite: true);
         UndoReading reading = reader.Read();
         Assert.True(reader.LastReadWasWhole);
@@ -257,7 +266,7 @@ public sealed class UndoStoreTests : IDisposable
         File.Move(Segment(1), Segment(2));
         UndoJournal reader = Journal();
         reader.Read();
-        File.WriteAllBytes(Segment(1), [.. UndoJournalWriter.Encode(Begin(5)), (byte)'\n']);
+        File.WriteAllBytes(Segment(1), [.. Raw(Begin(5))]);
         UndoReading reading = reader.Read();
         Assert.True(reader.LastReadWasWhole);
         Assert.Equal([1, 2], reading.SegmentsOnDisk);

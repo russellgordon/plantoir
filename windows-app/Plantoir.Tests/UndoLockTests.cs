@@ -79,7 +79,7 @@ public sealed class UndoLockTests : IDisposable
     /// (<c>LOCKFILE_FAIL_IMMEDIATELY</c> would refuse it: the must-fail proof).
     /// </summary>
     [Fact]
-    public void AWaiterIsWokenByTheRelease()
+    public async Task AWaiterIsWokenByTheRelease()
     {
         var memory = new UndoProcessMemory();
         UndoLock held = UndoLock.Take(LockPath, UndoJournal.LiveWait, false, memory);
@@ -88,18 +88,20 @@ public sealed class UndoLockTests : IDisposable
             using UndoLock granted = UndoLock.Take(LockPath, TimeSpan.FromSeconds(20), false, memory);
             return true;
         });
-        Assert.False(waiter.Wait(TimeSpan.FromMilliseconds(300)), "the waiter was answered while the lock was held");
+        Task first = await Task.WhenAny(waiter, Task.Delay(TimeSpan.FromMilliseconds(300)));
+        Assert.False(first == waiter, "the waiter was answered while the lock was held: " + waiter.Exception?.InnerException?.Message);
         held.Dispose();
-        Assert.True(waiter.Wait(TimeSpan.FromSeconds(20)) && waiter.Result, "the waiter was not woken by the release");
+        Task second = await Task.WhenAny(waiter, Task.Delay(TimeSpan.FromSeconds(20)));
+        Assert.True(second == waiter && await waiter, "the waiter was not woken by the release");
     }
 
     /// <summary>The lock belongs to the handle, not the thread: let go on another thread, it is free.</summary>
     [Fact]
-    public void ALockTakenOnOneThreadIsLetGoOnAnother()
+    public async Task ALockTakenOnOneThreadIsLetGoOnAnother()
     {
         var memory = new UndoProcessMemory();
         UndoLock held = UndoLock.Take(LockPath, UndoJournal.LiveWait, false, memory);
-        Task.Run(held.Dispose).Wait();
+        await Task.Run(held.Dispose);
         using UndoLock again = UndoLock.Take(LockPath, TimeSpan.FromMilliseconds(500), false, memory);
         held.Dispose();   // twice is harmless
     }
