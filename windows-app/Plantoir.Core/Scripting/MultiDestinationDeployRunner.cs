@@ -316,7 +316,7 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                     // (row 318b).
                     runner.IsBetweenPhases = true;
                     bool built = await runner.WaitUntilFinished();
-                    if (runner.WasCancelled || runner.WasStoppedByUser || WasCancelled)
+                    if (runner.WasCancelled || runner.WasStoppedByUser)
                     {
                         runner.IsBetweenPhases = false;
                         WasCancelled = WasCancelled || runner.WasCancelled;

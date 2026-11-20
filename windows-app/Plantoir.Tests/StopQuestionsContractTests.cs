@@ -251,7 +251,8 @@ public sealed class StopQuestionsContractTests : IDisposable
         string multi = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Core", "Scripting", "MultiDestinationDeployRunner.cs"))
             .Replace("\r\n", "\n");
         Assert.Contains("if (CurrentLeg is { Runner.IsUnderWay: true } leg) leg.Runner.CancelByUser();", multi);
-        Assert.Contains("if (runner.WasCancelled || runner.WasStoppedByUser || WasCancelled)", multi);
+        // RunAsync's own check after the build then reads the runner's mark.
+        Assert.Contains("bool built = await runner.WaitUntilFinished();\n                    if (runner.WasCancelled || runner.WasStoppedByUser)", multi);
         // The run is never out of the way between the two: Run clears
         // IsBetweenPhases only once the deploy is running.
         string script = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Core", "Scripting", "ScriptRunner.cs"))
