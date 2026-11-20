@@ -168,4 +168,98 @@ final class AccessibilityTreeTests: XCTestCase {
         let wordsWidth: CGFloat = NSHostingView(rootView: Text(words).fixedSize()).fittingSize.width
         XCTAssertGreaterThan(sentenceWidth, wordsWidth + 8, "no symbol is drawn before the words")
     }
+
+    // MARK: - The sidebar (#997)
+
+    /// The help tags in a sidebar `width` points wide (228, the sidebar's
+    /// default) holding one course code's label.
+    func helpTags(ofCourseCode code: String, width: CGFloat = 228) throws -> (helps: [String], described: String) {
+        // A plain row, because inside the sidebar's folding course row the
+        // label is merged into one heading and this reader does not find its
+        // help tag there (measured 2026-11-20). The real row was proven by
+        // the second review of #997: the folding row's heading carries the
+        // help text for a truncated code, a real hover drew the tooltip, and
+        // a code that fits has none.
+        let row: some View = List {
+            CourseCodeLabel(code: code)
+        }
+        .listStyle(.sidebar)
+        let read: AccessibilityTree = try tree(of: row, size: NSSize(width: width, height: 200))
+        var helps: [String] = []
+        for element in read.elements {
+            if !element.help.isEmpty {
+                helps.append(element.help)
+            }
+        }
+        return (helps, read.described())
+    }
+
+    /// A course code cut short in its row carries its whole code as a help
+    /// tag (D44), so it can still be read: a 12-character code, the most a
+    /// code may have, in a row 140 points wide, where it is cut short.
+    func testATruncatedCourseCodeShowsItsWholeCodeOnHover() throws {
+        let code: String = "WWWWWWWWWWWW"
+        let read = try helpTags(ofCourseCode: code, width: 140)
+        XCTAssertTrue(read.helps.contains(code), "no help tag carries the cut-short code \(code); help tags: \(read.helps)\n\(read.described)")
+    }
+
+    /// A code that fits is not repeated in a tag over itself (D44): the
+    /// HIG's expansion tooltip is for clipped or truncated text.
+    func testACourseCodeThatFitsHasNoHelpTag() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let code: String = made.course.displayCode
+        let read = try helpTags(ofCourseCode: code)
+        XCTAssertFalse(read.helps.contains(code), "the code \(code) fits, yet carries a help tag; help tags: \(read.helps)\n\(read.described)")
+    }
+
+    /// The Backups heading's total keeps the sidebar's margin on its
+    /// trailing side (D45). The heading's row, read off the tree, runs to
+    /// within a point or two of the sidebar's trailing edge, and the total
+    /// is pushed to its end, so the room the total has is the row's own
+    /// trailing room plus the margin the heading keeps; that is at least the
+    /// room the heading's name has on its leading side. Without the margin
+    /// it sat about 2 pt from the divider.
+    func testTheBackupsTotalKeepsTheSidebarsMargin() throws {
+        let sidebar: some View = List {
+            Section(isExpanded: .constant(true)) {
+                Label("All Backups", systemImage: "square.stack.3d.up")
+            } header: {
+                BackupsSectionHeader(total: "271 KB")
+            }
+        }
+        .listStyle(.sidebar)
+        let read: AccessibilityTree = try tree(of: sidebar, size: NSSize(width: 228, height: 200))
+        let heading: AccessibilityTree.Element = try XCTUnwrap(read.element(identifiedAs: "backupsTotal"))
+        var list: AccessibilityTree.Element?
+        for element in read.elements {
+            if list == nil && element.role == "AXOutline" {
+                list = element
+            }
+        }
+        let column: CGRect = try XCTUnwrap(list, "no sidebar list in the tree:\n\(read.described())").frame
+        XCTAssertFalse(column.isNull || heading.frame.isNull, "a frame was not read")
+        let leadingRoom: CGFloat = heading.frame.minX - column.minX
+        let rowTrailingRoom: CGFloat = column.maxX - heading.frame.maxX
+
+        // The margin is really drawn: the heading asks for that much more
+        // width than the same heading without it.
+        let withMargin: CGFloat = NSHostingView(rootView: BackupsSectionHeader(total: "271 KB").fixedSize()).fittingSize.width
+        let without: CGFloat = NSHostingView(rootView: HStack {
+            Text("Backups")
+            Spacer()
+            Text("271 KB")
+        }.fixedSize()).fittingSize.width
+        let drawnMargin: CGFloat = withMargin - without
+        let totalsRoom: CGFloat = rowTrailingRoom + drawnMargin
+        print("AccessibilityTreeTests: Backups heading \(heading.frame) in \(column); name's room \(leadingRoom), "
+              + "row's trailing room \(rowTrailingRoom), margin drawn \(drawnMargin)")
+        XCTAssertEqual(drawnMargin, BackupsSectionHeader.trailingMargin, accuracy: 0.5)
+        XCTAssertGreaterThanOrEqual(
+            totalsRoom, leadingRoom - 1,
+            "the total sits \(totalsRoom) pt from the sidebar's edge; the heading's name has \(leadingRoom) pt"
+        )
+    }
 }

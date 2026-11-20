@@ -521,6 +521,57 @@ final class PageTablesSheetTests: XCTestCase {
         XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
     }
 
+    /// The picker's columns, and what its table shows, with the scroll bars
+    /// a mouse shows, once its rows are in.
+    func pickerColumnsEnd(in host: SheetHost) throws -> (end: CGFloat, shown: CGFloat, sidewaysBarOn: Bool, widths: [CGFloat]) {
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
+        let scrollView: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
+        scrollView.scrollerStyle = .legacy
+        host.pump()
+        scrollView.tile()
+        host.pump()
+        XCTAssertEqual(table.numberOfColumns, 3)
+        let end: CGFloat = table.rect(ofColumn: table.numberOfColumns - 1).maxX
+        return (end, scrollView.contentView.bounds.width, scrollView.hasHorizontalScroller, PageTablesSheetTests.widths(of: table))
+    }
+
+    /// The picker's columns fit inside the table, with the scroll bars a
+    /// mouse shows (#997, D48), both when it opens with its rows and when
+    /// they arrive after it is drawn, as they do in the app. Asked for 130,
+    /// 110 and 150, the columns came out at 145, 135 and 175 at open but at
+    /// 146.5, 134.5 and 174.5 once rows arrived, ending at 501.5 in a table
+    /// showing 501, and a sideways scroll bar appeared under the rows. No
+    /// half point is allowed for: the half point was the fault. The table
+    /// keeps its sideways scroll bar ready (it is not hidden to hide the
+    /// fault), so the columns have to fit.
+    func testThePickerShowsNoSidewaysScrollBar() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let full: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 20)
+        let opened: SheetHost = SheetHost(SectionVerbSheet(model: full, pressDefault: {}, cancel: {}))
+        let atOpen = try pickerColumnsEnd(in: opened)
+        let openedReachedAScreen: Bool = opened.reachedAScreen
+        opened.close()
+
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 0, pages: 1)
+        let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+        defer {
+            host.close()
+        }
+        _ = try pickerColumnsEnd(in: host)
+        model.pageRows = full.pageRows
+        host.pump(0.6)
+        let later = try pickerColumnsEnd(in: host)
+        print("PageTablesSheetTests: picker columns at open \(atOpen.widths) end at \(atOpen.end) in \(atOpen.shown); "
+              + "with rows added later \(later.widths) end at \(later.end) in \(later.shown); sideways bar on \(later.sidewaysBarOn)")
+        XCTAssertLessThanOrEqual(atOpen.end, atOpen.shown + 0.01, "at open the picker's columns run past what it shows, so it scrolls sideways")
+        XCTAssertLessThanOrEqual(later.end, later.shown + 0.01, "with rows added the picker's columns run past what it shows, so it scrolls sideways")
+        XCTAssertTrue(later.sidewaysBarOn, "the sideways scroll bar is turned off, which hides a fault rather than fixing it")
+        XCTAssertFalse(openedReachedAScreen || host.reachedAScreen, "the sheet reached a display")
+    }
+
     /// The width a teacher adds goes to the Page column: dragged from 560 to
     /// 900 wide, Page gains more than Folder and What changes together.
     func testThePageColumnTakesTheWidthAdded() async throws {
