@@ -103,52 +103,80 @@ public class StopByKeyboardUiTests
         Measured($"deploy {which} running, phase \"{Phase(app)}\"");
     }
 
-    private static readonly int StaleFilesInTheSecondFolder =
-        int.TryParse(Environment.GetEnvironmentVariable("PLANTOIR_UI_STALE_FILES"), out int stale) && stale > 0 ? stale : 20000;
+    /// <summary>
+    /// A destination folder the deploy cannot finish until the test lets it
+    /// go (#1009's fourth review, in place of a guessed amount of work): its
+    /// section's <c>index.html</c>, left "by an earlier deploy", is held open
+    /// with no sharing, so <c>robocopy /MIR</c> cannot replace it and waits to
+    /// try again for as long as the file is held. The test waits on events
+    /// only: the leg's start on the trail, then the stop it makes.
+    /// </summary>
+    private sealed class HeldDestination : IDisposable
+    {
+        private readonly FileStream _held;
 
-    private static void WriteCourse(string courses, out string published) => WriteCourse(courses, out published, out _, out _);
+        public HeldDestination(string folder)
+        {
+            Folder = folder;
+            string section = Path.Combine(folder, "section1");
+            Directory.CreateDirectory(section);
+            string page = Path.Combine(section, "index.html");
+            File.WriteAllText(page, LeftByAnEarlierDeploy);
+            _held = new FileStream(page, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        }
+
+        public const string LeftByAnEarlierDeploy = "left by an earlier deploy";
+
+        public string Folder { get; }
+
+        /// <summary>What the held page holds now, read through the test's own handle.</summary>
+        public string HeldPage()
+        {
+            _held.Position = 0;
+            var reader = new StreamReader(_held, leaveOpen: true);
+            return reader.ReadToEnd();
+        }
+
+        public void Dispose() => _held.Dispose();
+    }
+
+    private static void WriteCourse(string courses, out string published) => WriteCourse(courses, out published, out _, padded: true);
 
     /// <summary>
     /// The course every deploy test here uses. Every destination is a folder
     /// in the test's own temp tree (#1009's third review): a host destination
     /// would make deploy.ps1 read this machine's real credential and publish
     /// for real, so no test in this class can reach an account on any machine.
+    /// <paramref name="moreFolders"/> are destinations 2, 3 and on, after the
+    /// first, <paramref name="published"/>.
     /// </summary>
     private static void WriteCourse(string courses, out string published, out string courseDirectory,
-                                    out string? secondFolder, bool alsoToASecondFolder = false)
+                                    bool padded, params string[] moreFolders)
     {
-        string root = Path.GetDirectoryName(Path.GetDirectoryName(courses)!)!;
-        published = Path.Combine(root, "published");
+        published = PublishedFolder(courses);
         Directory.CreateDirectory(published);
-        secondFolder = alsoToASecondFolder ? Path.Combine(root, "published-second") : null;
-        if (secondFolder is not null)
-        {
-            // Destination 2 is a folder copy, done in a few seconds, so it
-            // could end before the test sees it start: measured in the VM
-            // (2026-11-20), the whole deploy had ended, and the question with
-            // it, by the time the trail showed destination 2's start. Files
-            // left in its section folder from "an earlier deploy" make
-            // robocopy /MIR remove them first, which keeps destination 2 going.
-            string stale = Path.Combine(secondFolder, "section1", "stale");
-            Directory.CreateDirectory(stale);
-            for (int file = 1; file <= StaleFilesInTheSecondFolder; file++)
-                File.WriteAllText(Path.Combine(stale, $"left-{file:00000}.html"), "left by an earlier deploy");
-        }
         var toTheFolder = EndToEnd.PublishesTo(published);
-        string? second = secondFolder;
         string dir = EndToEnd.WriteCourse(courses, Code, "Stop By Keyboard", new[] { "Concepts" }, config =>
         {
             toTheFolder(config);
-            // A second folder after the first: two legs, and a gap between them.
-            if (second is not null)
-                config["additional_deploy_targets"] = new System.Text.Json.Nodes.JsonArray(
-                    new System.Text.Json.Nodes.JsonObject { ["type"] = "local_folder", ["path"] = second });
+            if (moreFolders.Length == 0) return;
+            var targets = new System.Text.Json.Nodes.JsonArray();
+            foreach (string folder in moreFolders)
+                targets.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = "local_folder", ["path"] = folder });
+            config["additional_deploy_targets"] = targets;
         });
         courseDirectory = dir;
+        if (!padded) return;
         for (int page = 1; page <= PaddingPages; page++)
             EndToEnd.WritePage(Path.Combine(dir, "Concepts", $"Padding {page:0000}.md"),
                 $"title: Padding {page:0000}\npublish: true", $"A page to make the build take a while ({page}).");
     }
+
+    /// <summary>A folder beside the test's working folder, in its own temp tree.</summary>
+    private static string BesideTheWorkingFolder(string courses, string name) =>
+        Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(courses)!)!, name);
+
+    private static string PublishedFolder(string courses) => BesideTheWorkingFolder(courses, "published");
 
     [UiFact]
     public void EscapeOnADeployAsks_CancelKeepsItRunning_AndDontAskAgainCountsOnlyWithStop()
@@ -416,44 +444,71 @@ public class StopByKeyboardUiTests
     }
 
     /// <summary>
-    /// #1009's second review: a course that deploys to a folder and then to
-    /// a second folder runs two legs, and between them destination 1's runner
-    /// has stopped before the run moves on. The question opened during the
-    /// build stays up across the change of destination, and Stop Deploy then
-    /// stops the deploy, with no later leg started. Before the change the
-    /// question was taken down when destination 1 finished. Its third review:
-    /// the stopped deploy writes no published stamp, so the section keeps
-    /// its " — Edited".
+    /// #1009's second review: a course that deploys to several folders runs a
+    /// leg each, and between two of them the shown leg's runner has stopped
+    /// before the run moves on. The question opened during destination 1
+    /// stays up across the change to destination 2, and Stop Deploy then
+    /// stops the deploy. Its fourth review: three folders, stopped during the
+    /// second, so a later leg is left that could start (two legs stopped
+    /// during the second had none, and that half could never fail); and
+    /// destinations 1 and 2 are held by the test (<see cref="HeldDestination"/>)
+    /// instead of a padded build and files to remove, so neither can end
+    /// before the test lets it, whatever the machine's speed: the question is
+    /// opened while destination 1 is held, destination 1 is let go, and the
+    /// stop lands while destination 2 is held. The stopped deploy writes no
+    /// published stamp, so the section keeps its " — Edited" (the third review).
     /// </summary>
     [UiFact]
     public void TheQuestionStaysAcrossTheChangeOfDestination_AndStopDeployStartsNoLaterOne()
     {
         string published = "";
         string courseDirectory = "";
-        string? secondFolder = null;
-        using var app = new DrivenApp(courses => WriteCourse(courses, out published, out courseDirectory, out secondFolder, alsoToASecondFolder: true));
+        string thirdFolder = "";
+        HeldDestination? first = null;
+        HeldDestination? second = null;
+        using var app = new DrivenApp(courses =>
+        {
+            first = new HeldDestination(PublishedFolder(courses));
+            second = new HeldDestination(BesideTheWorkingFolder(courses, "published-second"));
+            thirdFolder = BesideTheWorkingFolder(courses, "published-third");
+            WriteCourse(courses, out published, out courseDirectory, padded: false, second.Folder, thirdFolder);
+        });
+        // Let go before the app's own clean-up, which deletes the temp tree.
+        using var releaseTheSecond = second!;
+        using var releaseTheFirst = first!;
         app.SelectSection(Code, 1);
         StartDeploy(app, 1);
-        Assert.True(DeployStarts(app) == 0, "destination 1's deploy began before the build was seen; nothing here tests the change");
+        Assert.True(Retry.WhileFalse(() => DeployStarts(app) >= 1, TimeSpan.FromMinutes(10), TimeSpan.FromMilliseconds(200)).Result,
+                    $"the deploy never reached destination 1 (phase \"{Phase(app)}\")");
         Press(app, VirtualKeyShort.ESCAPE);
-        var asked = Asked(app, "Escape during the build");
-        var opened = DateTime.Now;
-        Assert.True(Retry.WhileFalse(() => DeployStarts(app) >= 2, TimeSpan.FromMinutes(10), TimeSpan.FromMilliseconds(200)).Result,
+        var asked = Asked(app, "Escape during destination 1");
+        Assert.True(DeployStarts(app) == 1, $"the question opened after destination 1 ({DeployStarts(app)} deploys started)");
+
+        // Destination 1 let go: it finishes, and the run moves on to destination 2.
+        var released = DateTime.Now;
+        first!.Dispose();
+        Assert.True(Retry.WhileFalse(() => DeployStarts(app) >= 2, TimeSpan.FromMinutes(3), TimeSpan.FromMilliseconds(200)).Result,
                     $"the deploy never reached destination 2 (deploys started: {DeployStarts(app)}, phase \"{Phase(app)}\")");
         bool openAtTheChange = OpenStopQuestion(app) is not null;
         int startsAtTheStop = DeployStarts(app);
-        Measured($"destination 2 began {(DateTime.Now - opened).TotalSeconds:0.0} s after the question opened; question {(openAtTheChange ? "open" : "gone")}, phase \"{Phase(app)}\", the second folder {(File.Exists(Path.Combine(secondFolder!, "section1", "index.html")) ? "has" : "does not have")} the site");
-        Assert.True(File.Exists(Path.Combine(published, "section1", "index.html")), "destination 1 never published, so the change was not between two destinations");
+        Measured($"destination 2 began {(DateTime.Now - released).TotalSeconds:0.0} s after destination 1 was let go; question {(openAtTheChange ? "open" : "gone")}, phase \"{Phase(app)}\", deploys started {startsAtTheStop}");
+        Assert.NotEqual(HeldDestination.LeftByAnEarlierDeploy, File.ReadAllText(Path.Combine(published, "section1", "index.html")));
         Assert.True(openAtTheChange, "the question was taken down when destination 1 finished, though the deploy went on to destination 2");
+        Assert.True(startsAtTheStop == 2, $"the stop is not during destination 2 ({startsAtTheStop} deploys started)");
+        Assert.Equal(HeldDestination.LeftByAnEarlierDeploy, second!.HeldPage());
+
         asked.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
-        AssertGone(app, "Stop Deploy across the change of destination");
-        AssertCancelled(app, "Stop Deploy across the change of destination");
-        Thread.Sleep(3000);
-        Assert.True(DeployStarts(app) == startsAtTheStop, $"a later leg started after Stop Deploy ({startsAtTheStop} deploys started at the stop, {DeployStarts(app)} after)");
+        AssertGone(app, "Stop Deploy during destination 2");
+        AssertCancelled(app, "Stop Deploy during destination 2");
+        // The run's own end, an event: Deploy is offered again only once it has ended.
+        Assert.True(Retry.WhileFalse(() => app.Find("deployButton", "the Deploy button").IsEnabled, TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(250)).Result,
+                    "the deploy run never ended after Stop Deploy");
+        Assert.True(DeployStarts(app) == startsAtTheStop, $"destination 3 started after Stop Deploy ({startsAtTheStop} deploys started at the stop, {DeployStarts(app)} after)");
+        Assert.False(File.Exists(Path.Combine(thirdFolder, "section1", "index.html")), "destination 3 got the site after Stop Deploy");
         Assert.False(CancelShows(app), "Cancel still shows after the deploy was stopped");
         // The stopped outcome (#1009's third review): no stamp, so the section keeps its " — Edited".
         Assert.False(File.Exists(SectionPublishState.StampPath(courseDirectory, 1)),
-                     "the deploy stopped between two destinations stamped the section as published");
+                     "the deploy stopped during destination 2 of 3 stamped the section as published");
     }
 
     /// <summary>
