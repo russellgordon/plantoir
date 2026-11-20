@@ -249,6 +249,8 @@ struct SectionScheduleSheet: View {
                     .foregroundStyle(.secondary)
                 TextField("https://docs.google.com/spreadsheets/d/…/edit", text: $googleSheetLink)
                     .borderedTextField()
+                    // Its placeholder is an address, not a name (#1012).
+                    .accessibilityLabel(Text(AccessibilityNames.googleSheetAddress))
                     .accessibilityIdentifier("sectionScheduleGoogleSheetField")
 
                 // Said plainly, and before the button is pressed. Everything

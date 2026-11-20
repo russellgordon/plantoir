@@ -38,8 +38,11 @@ struct TaskConsoleView: View {
             HStack {
                 Spacer()
                 if runner.isRunning {
+                    // Named, as "Finished" beside it in its place is
+                    // (#1012); a bare spinner gave VoiceOver nothing.
                     ProgressView()
                         .controlSize(.small)
+                        .accessibilityLabel(Text(AccessibilityNames.running))
                 } else if let exitCode = runner.lastExitCode {
                     if exitCode == 0 {
                         Label("Finished", systemImage: "checkmark.circle.fill")
@@ -96,6 +99,8 @@ struct TaskConsoleView: View {
                         .onSubmit {
                             sendPendingInput()
                         }
+                        // Named, not left to the placeholder (#1012).
+                        .accessibilityLabel(Text(AccessibilityNames.yourAnswer))
                         .accessibilityIdentifier("consoleInputField")
                     Button("Send") {
                         sendPendingInput()
