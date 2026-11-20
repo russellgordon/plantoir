@@ -234,14 +234,18 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
 
     /// <summary>
     /// The run is going, not cancelled, and has something left to stop: its
-    /// current leg is under way, or a later leg is still to start (the gap
-    /// between two destinations). Once the last leg has ended nothing is left
-    /// (#1009's third review), though <see cref="IsRunning"/> stays true until
-    /// RunAsync notices, up to one poll later.
+    /// current leg is under way or has not started yet (RunAsync announces a
+    /// new <see cref="CurrentLegIndex"/>, and the section shows that leg's
+    /// runner, a moment before the leg's Run), or a later leg is still to
+    /// start (the gap between two destinations). Once the last leg has ended
+    /// nothing is left (#1009's third review), though <see cref="IsRunning"/>
+    /// stays true until RunAsync notices, up to one poll later.
     /// </summary>
     public bool CanStillBeStopped =>
         IsRunning && !WasCancelled
-        && (CurrentLeg is { Runner.IsUnderWay: true } || CurrentLegIndex < Legs.Count - 1);
+        && (CurrentLeg is { Runner.IsUnderWay: true }
+            || CurrentLeg is { IsFinished: false, Runner.StartedAt: null }
+            || CurrentLegIndex < Legs.Count - 1);
 
     /// <summary>
     /// Refuses up front, against EVERY configured destination, rather than

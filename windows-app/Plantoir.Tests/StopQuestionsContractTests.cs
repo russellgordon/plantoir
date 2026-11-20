@@ -505,8 +505,14 @@ public sealed class StopQuestionsContractTests : IDisposable
         var run = new MultiDestinationDeployRunner(context);
         bool hooked = false;
         bool? underWayAfterTheLast = null;
+        bool? underWayAsTheLastIsShown = null;
         run.PropertyChanged += (_, changed) =>
         {
+            // RunAsync moves to the last leg and the section shows its runner,
+            // before that leg's Run: still a deploy to stop (measured in the
+            // VM: a question open across the change came down here).
+            if (changed.PropertyName == nameof(MultiDestinationDeployRunner.CurrentLegIndex) && run.CurrentLegIndex == 1)
+                underWayAsTheLastIsShown = MultiDestinationDeployRunner.ShownTaskIsUnderWay(run.Legs[1].Runner, run);
             if (hooked || changed.PropertyName != nameof(MultiDestinationDeployRunner.IsRunning) || !run.IsRunning) return;
             hooked = true;
             var last = run.Legs[1].Runner;
@@ -521,6 +527,7 @@ public sealed class StopQuestionsContractTests : IDisposable
         };
         await RunOn(context, () => run.RunAsync(course, 1, destinations, "", _folder, buildReason: null));
 
+        Assert.True(underWayAsTheLastIsShown == true, $"as the last destination was shown, before it started, the deploy read as ended ({underWayAsTheLastIsShown})");
         Assert.True(underWayAfterTheLast == false, $"after the last destination the deploy still read as under way ({underWayAfterTheLast})");
         Assert.False(run.WasCancelled, "a cancel after the last destination marked the run cancelled");
         Assert.Equal(2, LinesIn(deploysLog));
