@@ -158,10 +158,10 @@ public class FixWithButtonsUiTests
     /// missing assistant's, not the ticks'). Needs a PC without Codex (the
     /// development PC has none); on one that has it the test says so and
     /// fails rather than pass on nothing. Then the real pointer rests on the
-    /// dimmed button: UI Automation is asked for a ToolTip saying the reason,
-    /// and with <c>PLANTOIR_1017_PICTURES</c> set to a folder the whole screen
-    /// is captured there, once on the dimmed button and once on the sidebar's
-    /// + (an enabled button with a XAML tooltip, the control).
+    /// dimmed button and UI Automation must find a ToolTip saying the reason,
+    /// as it finds the sidebar's + button's (an enabled button with a XAML
+    /// tooltip, the control). With <c>PLANTOIR_1017_PICTURES</c> set to a
+    /// folder the whole screen is captured there at each rest.
     /// </summary>
     [UiFact]
     public void ACodexThisPcLacks_IsDrawnDimmedWithItsReason()
@@ -199,6 +199,12 @@ public class FixWithButtonsUiTests
         if (pictures.Length > 0)
             File.AppendAllText(Path.Combine(pictures, "measured.txt"),
                 $"{DateTime.Now:o} dimmed-codex tooltip seen by UIA: {dimmedShown}; control-add: {controlShown}{Environment.NewLine}");
+        // The control first: a probe that cannot see the + button's tooltip
+        // says nothing about the dimmed one. Measured 2026-11-20 on the PC:
+        // with the tooltip on the button itself the control showed and the
+        // dimmed button did not; on the button's frame both show.
+        Assert.True(controlShown, "the probe saw no tooltip on the sidebar's +, so it cannot judge the dimmed button");
+        Assert.True(dimmedShown, "resting the pointer on the dimmed Fix with Codex… showed no tooltip saying why");
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
