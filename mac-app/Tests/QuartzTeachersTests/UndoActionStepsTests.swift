@@ -36,6 +36,8 @@ final class UndoActionStepsTests: XCTestCase {
         UndoJournalLocation.folderOverride = nil
         JournaledStep.modeOverride = nil
         UndoKillPoints.hook = nil
+        UndoKillPoints.beforeTheRename = nil
+        UndoKillPoints.stagingWriteFailsAt = nil
         ActivityTrail.store = previousTrail
         for folder in listFolders {
             try? FileManager.default.removeItem(at: folder)
@@ -702,6 +704,26 @@ final class UndoActionStepsTests: XCTestCase {
     /// its step leaves the pages. MUST FAIL with `JournaledStep.textAsPlanned`
     /// reading the disk (LOW 4).
     func testTheLinksChecklistKeepsTheLaterClassItPublishes() async throws {
+        let pressed = try checklistToPress()
+        let made: AssistFixture.Made = pressed.made
+        let offer: LinksChecklistOffer = pressed.offer
+        let later: CalendarDay = try UndoActionStepsTests.day(fromToday: 10)
+        let result: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
+            offer: offer, ticked: ["section1/All Classes/Unit 2, Day 5"], course: made.course, sectionNumber: 1,
+            workspaceURL: made.root, shownComingWith: []
+        )
+        guard case .published = result else {
+            return XCTFail("Publish did not publish: \(result)")
+        }
+        let kept: ClassesDatedLater.KeptRecord? = ClassesDatedLater.KeptRecord.read(
+            courseDirectory: made.course.directoryURL, section: 1
+        )
+        XCTAssertEqual(kept?.kept, [ClassesDatedLater.Kept(place: "section1/All Classes/Unit 2, Day 5", date: later.text)])
+    }
+
+    /// The links checklist with one class row ticked, the class dated
+    /// later and using a hidden page: the case both refusals below press.
+    func checklistToPress() throws -> (made: AssistFixture.Made, offer: LinksChecklistOffer) {
         let made: AssistFixture.Made = try AssistFixture.makeRunner(surface: .local)
         ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
         let next: CalendarDay = try UndoActionStepsTests.day(fromToday: 1)
@@ -721,17 +743,55 @@ final class UndoActionStepsTests: XCTestCase {
                 "claimedBy": NSNull(), "date": NSNull(), "why": "classNeverDated", "firstUsedIn": NSNull(),
             ],
         ])
-        let result: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
-            offer: offer, ticked: ["section1/All Classes/Unit 2, Day 5"], course: made.course, sectionNumber: 1,
-            workspaceURL: made.root, shownComingWith: []
-        )
-        guard case .published = result else {
-            return XCTFail("Publish did not publish: \(result)")
+        return (made: made, offer: offer)
+    }
+
+    /// A press the door refuses says what is true of that refusal (the
+    /// first review of U3a, LOW 7), never "could not be read" for a page
+    /// that was read: a page changed by another program while the step
+    /// went in is `linksChecklist.wording.pageChangedSince`, naming it; a
+    /// full disk is "Nothing was changed: …" with the file that could not
+    /// be saved. Nothing is written either way. MUST FAIL on U3a's first
+    /// round, which said the unreadable-page sentence for both.
+    func testARefusedLinksChecklistPressSaysWhatIsTrue() throws {
+        let raced = try checklistToPress()
+        let classURL: URL = AssistFixture.pageURL(of: "Unit 2, Day 5", in: raced.made.course)
+        UndoKillPoints.beforeTheRename = { _, url in
+            if url.lastPathComponent != classURL.lastPathComponent {
+                return
+            }
+            guard let handle = try? FileHandle(forWritingTo: url) else {
+                return
+            }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data("Edited in Obsidian.\n".utf8))
+            try? handle.close()
         }
-        let kept: ClassesDatedLater.KeptRecord? = ClassesDatedLater.KeptRecord.read(
-            courseDirectory: made.course.directoryURL, section: 1
+        let racedResult: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
+            offer: raced.offer, ticked: ["section1/All Classes/Unit 2, Day 5"], course: raced.made.course,
+            sectionNumber: 1, workspaceURL: raced.made.root, shownComingWith: []
         )
-        XCTAssertEqual(kept?.kept, [ClassesDatedLater.Kept(place: "section1/All Classes/Unit 2, Day 5", date: later.text)])
+        UndoKillPoints.beforeTheRename = nil
+        guard case .refused(let racedSentence) = racedResult else {
+            return XCTFail("the raced press was not refused: \(racedResult)")
+        }
+        XCTAssertEqual(
+            racedSentence, LinksChecklistWording.pageChangedSince(name: StartOfYearWording.pageName(page: "Unit 2, Day 5"))
+        )
+        XCTAssertTrue(try String(contentsOf: classURL, encoding: .utf8).contains("publish: false"))
+
+        let full = try checklistToPress()
+        UndoKillPoints.stagingWriteFailsAt = { index in index == 0 }
+        let fullResult: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
+            offer: full.offer, ticked: ["section1/All Classes/Unit 2, Day 5"], course: full.made.course,
+            sectionNumber: 1, workspaceURL: full.made.root, shownComingWith: []
+        )
+        UndoKillPoints.stagingWriteFailsAt = nil
+        guard case .refused(let fullSentence) = fullResult else {
+            return XCTFail("the press on a full disk was not refused: \(fullResult)")
+        }
+        XCTAssertTrue(fullSentence.hasPrefix("Nothing was changed: "), fullSentence)
+        XCTAssertNotEqual(fullSentence, AssistToolRefusal.unreadablePage("ICS3U").message)
     }
 
     /// Every sheet that makes a step on the main actor reads the list off
