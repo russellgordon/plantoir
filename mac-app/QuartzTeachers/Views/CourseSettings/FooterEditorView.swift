@@ -24,6 +24,9 @@ struct FooterEditorView: View {
                         RoundedRectangle(cornerRadius: 6)
                             .strokeBorder(.tertiary)
                     )
+                    // Named by its section's heading (#1012); the example
+                    // drawn over the empty box is not a name.
+                    .accessibilityLabel(Text("Footer"))
                     .accessibilityIdentifier("footerEditor")
 
                 if footerHTML.isEmpty {

@@ -134,7 +134,7 @@ public class FixWithButtonsUiTests
             Wait(app, "fixWithCodexButton").AsButton().Invoke();
             var codexArgv = Arrived(output);
             Assert.EndsWith("cli.js", codexArgv[0]);
-            Assert.Equal(12, codexArgv.Count);
+            AssertTheCodexPairs(codexArgv, Code);
             Assert.Equal(expected, codexArgv[^1]);
 
             string trail = File.ReadAllText(Path.Combine(app.StateDirectory, "Logs", "activity.txt"));
@@ -149,6 +149,194 @@ public class FixWithButtonsUiTests
             Environment.SetEnvironmentVariable("PLANTOIR_PROBE_OUTPUT", oldOutput);
             try { Directory.Delete(stubs, recursive: true); } catch { }
         }
+    }
+
+    /// <summary>
+    /// #1017: an assistant this PC does not have, in the real window. Fix with
+    /// Codex… is drawn, dimmed, and carries <see cref="FixWithAssistant.NotInstalledHelp"/>
+    /// as its help text, while every row is ticked (so the dimming is the
+    /// missing assistant's, not the ticks'). Needs a PC without Codex (the
+    /// development PC has none); on one that has it the test says so and
+    /// fails rather than pass on nothing. Then the real pointer rests on the
+    /// dimmed button and UI Automation must find a ToolTip saying the reason,
+    /// as it finds the sidebar's + button's (an enabled button with a XAML
+    /// tooltip, the control). With <c>PLANTOIR_1017_PICTURES</c> set to a
+    /// folder the whole screen is captured there at each rest.
+    /// </summary>
+    [UiFact]
+    public void ACodexThisPcLacks_IsDrawnDimmedWithItsReason()
+    {
+        Assert.True(CodexLauncher.FindCodex() is null,
+                    $"this test needs a PC without Codex; found {CodexLauncher.FindCodex()}");
+        string recordJson = SeededRecord(Code, "FIX-MISSING");
+        using var app = new DrivenApp(courses => EndToEnd.WriteCourse(courses, Code, "Grade 10 Math", new[] { "Concepts" }),
+            beforeLaunch: workspace =>
+            {
+                Seed(workspace, Code, recordJson);
+                var kept = ProblemsAcknowledgements.Read(workspace);
+                kept.RememberAnswered("FIX-MISSING", Code, 1);
+                kept.Write(workspace);
+            });
+
+        app.SelectSection(Code, 1);
+        OpenTheProblemsTab(app);
+        var codex = Wait(app, "fixWithCodexButton");
+        Assert.True(Retry.WhileFalse(() => Showing(app, "fixWithCodexButton"), TimeSpan.FromSeconds(10)).Result,
+                    "Fix with Codex… is drawn when Codex is missing, never hidden");
+        Assert.Equal(FixWithAssistant.CodexButtonTitle, codex.Name);
+        foreach (int lesson in new[] { 1, 2 })
+            Assert.True(app.Find($"problemTick-pageSettingsUnreadable|Unit 1/Lesson {lesson}", "a tick").AsCheckBox().IsChecked == true,
+                        "every row starts ticked, so only the missing assistant can dim the button");
+        Assert.True(Retry.WhileFalse(() => !Wait(app, "fixWithCodexButton").IsEnabled, TimeSpan.FromSeconds(5)).Result,
+                    "Fix with Codex… cannot be pressed without Codex");
+        Assert.Equal(FixWithAssistant.NotInstalledHelp, Wait(app, "fixWithCodexButton").HelpText);
+
+        // What a mouse user gets: the pointer at rest on the dimmed button.
+        string pictures = Environment.GetEnvironmentVariable("PLANTOIR_1017_PICTURES") ?? "";
+        bool dimmedShown = RestThePointerOn(app, Wait(app, "fixWithCodexButton"), FixWithAssistant.NotInstalledHelp, pictures, "dimmed-codex");
+        bool controlShown = RestThePointerOn(app, app.Find("addCourseButton", "the sidebar's +"), "Add a course or club", pictures, "control-add");
+        Console.WriteLine($"MEASURED: UI Automation saw a tooltip on the dimmed Fix with Codex…: {dimmedShown}; on the sidebar's + (control): {controlShown}.");
+        if (pictures.Length > 0)
+            File.AppendAllText(Path.Combine(pictures, "measured.txt"),
+                $"{DateTime.Now:o} dimmed-codex tooltip seen by UIA: {dimmedShown}; control-add: {controlShown}{Environment.NewLine}");
+        // The control first: a probe that cannot see the + button's tooltip
+        // says nothing about the dimmed one. Measured 2026-11-20 on the PC:
+        // with the tooltip on the button itself the control showed and the
+        // dimmed button did not; on the button's frame both show.
+        Assert.True(controlShown, "the probe saw no tooltip on the sidebar's +, so it cannot judge the dimmed button");
+        Assert.True(dimmedShown, "resting the pointer on the dimmed Fix with Codex… showed no tooltip saying why");
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern void mouse_event(int flags, int dx, int dy, int data, IntPtr extra);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetCursorPos(out System.Drawing.Point point);
+
+    /// <summary>
+    /// Glides the real pointer from above onto the middle of
+    /// <paramref name="element"/> as a person's mouse would, leaves it there,
+    /// and polls UI Automation for 3 s for a ToolTip named
+    /// <paramref name="tip"/> in the window or among the desktop's top-level
+    /// windows; up to three rests, as a person moves off and back. With a
+    /// folder given, the whole screen in real pixels is saved there for each rest.
+    /// </summary>
+    private static bool RestThePointerOn(DrivenApp app, AutomationElement element, string tip, string pictures, string name)
+    {
+        app.BringToFront();
+        var middle = DrivenApp.MiddleOf(element, app.Window.BoundingRectangle);
+        var above = new System.Drawing.Point(middle.X, middle.Y - 120);
+        for (int rest = 1; rest <= 3; rest++)
+        {
+            Glide(above, above, 1);
+            Thread.Sleep(700);
+            Glide(above, middle, 15);
+            bool seen = Retry.WhileFalse(() => ToolTipShowing(app, tip), TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(250)).Result;
+            Picture(pictures, $"{name}-rest{rest}", element);
+            if (pictures.Length > 0)
+                File.AppendAllText(Path.Combine(pictures, "measured.txt"), $"{DateTime.Now:o} {name} rest {rest}: tooltip seen by UIA: {seen}{Environment.NewLine}");
+            if (seen)
+            {
+                Glide(middle, above, 5);
+                return true;
+            }
+        }
+        Glide(middle, above, 5);
+        return false;
+    }
+
+    /// <summary>
+    /// Real pointer input, not a placed cursor: absolute moves through
+    /// <c>mouse_event</c> in <paramref name="steps"/> steps 20 ms apart.
+    /// FlaUI's <c>Mouse.MoveTo</c> sets the cursor with <c>SetCursorPos</c>,
+    /// after which WinUI opened no tooltip, the control's included (measured
+    /// 2026-11-19 and 2026-11-20). Points are in this process's (unaware)
+    /// pixels, as <see cref="DrivenApp.MiddleOf"/> gives them and as
+    /// <c>GetSystemMetrics</c> measures the screen here.
+    /// </summary>
+    private static void Glide(System.Drawing.Point from, System.Drawing.Point to, int steps)
+    {
+        int width = GetSystemMetrics(0), height = GetSystemMetrics(1);
+        for (int step = 1; step <= steps; step++)
+        {
+            int x = from.X + (to.X - from.X) * step / steps;
+            int y = from.Y + (to.Y - from.Y) * step / steps;
+            int normalizedX = (int)Math.Round(x * 65535.0 / (width - 1));
+            int normalizedY = (int)Math.Round(y * 65535.0 / (height - 1));
+            mouse_event(0x8001, normalizedX, normalizedY, 0, IntPtr.Zero);   // MOVE | ABSOLUTE
+            Thread.Sleep(20);
+        }
+    }
+
+    /// <summary>The whole screen in real pixels into <paramref name="pictures"/>, and where the cursor was.</summary>
+    private static void Picture(string pictures, string name, AutomationElement element)
+    {
+        if (pictures.Length == 0) return;
+        Directory.CreateDirectory(pictures);
+        // Real pixels: this process is not DPI-aware, so the thread is made
+        // per-monitor aware for the capture alone (PageTablesUiTests).
+        IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try
+        {
+            int width = GetSystemMetrics(0), height = GetSystemMetrics(1);
+            GetCursorPos(out var cursor);
+            using var bitmap = new System.Drawing.Bitmap(width, height);
+            using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                graphics.CopyFromScreen(0, 0, 0, 0, new System.Drawing.Size(width, height));
+            bitmap.Save(Path.Combine(pictures, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+            File.AppendAllText(Path.Combine(pictures, "measured.txt"),
+                $"{DateTime.Now:o} {name}: cursor at {cursor.X},{cursor.Y} real pixels (element box {element.BoundingRectangle}); screen {width} x {height}{Environment.NewLine}");
+        }
+        catch (Exception error) { Console.WriteLine("no picture: " + error.Message); }
+        finally { SetThreadDpiAwarenessContext(previous); }
+    }
+
+    private static bool ToolTipShowing(DrivenApp app, string tip)
+    {
+        try
+        {
+            var condition = app.Window.Automation.ConditionFactory.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip);
+            foreach (var found in app.Window.FindAllDescendants(condition))
+                if (found.Name == tip) return true;
+            foreach (var found in app.Desktop.FindAllChildren(condition))
+                if (found.Name == tip) return true;
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// What <c>CodexLauncher.Arguments</c> sends after the shim's <c>cli.js</c>:
+    /// six <c>-c</c> pairs, named one by one, then the message (#1017). The
+    /// sixth pair, <c>PLANTOIR_DOOR_ASSISTANT="codex"</c>, is #884's
+    /// (c319d04f5): each door writes its own agent key into its server's
+    /// environment. A count alone (12 here before #884, 14 since) would let a
+    /// pair be swapped for another or its value drift.
+    /// </summary>
+    private static void AssertTheCodexPairs(List<string> argv, string course)
+    {
+        var prefixes = new[]
+        {
+            "mcp_servers.plantoir.command=\"",
+            "mcp_servers.plantoir.args=[\"--mcp-stdio\",\"",
+            "mcp_servers.plantoir.startup_timeout_sec=60",
+            "mcp_servers.plantoir.tool_timeout_sec=1800",
+            "mcp_servers.plantoir.env." + AssistWorkspace.DoorCourseVariable + "=\"" + course + "\"",
+            "mcp_servers.plantoir.env." + AssistWorkspace.DoorAssistantVariable + "=\"codex\"",
+        };
+        Assert.Equal(1 + 2 * prefixes.Length + 1, argv.Count);
+        for (int pair = 0; pair < prefixes.Length; pair++)
+        {
+            string flag = argv[1 + 2 * pair], value = argv[2 + 2 * pair];
+            Assert.Equal("-c", flag);
+            Assert.StartsWith(prefixes[pair], value);
+        }
+        // The four with nothing after the prefix are the whole value.
+        Assert.Equal(prefixes[2], argv[6]);
+        Assert.Equal(prefixes[3], argv[8]);
+        Assert.Equal(prefixes[4], argv[10]);
+        Assert.Equal(prefixes[5], argv[12]);
+        Assert.EndsWith("plantoir-mcp.exe\"", argv[2]);
+        Assert.EndsWith("\"]", argv[4]);
     }
 
     // ---- Helpers ------------------------------------------------------------------

@@ -20877,10 +20877,45 @@ repetitive animations".
   field and Publish Pages' Find a Page field are labelled with those same
   words, and Course Settings' club short-label field with "Short label
   beside emoji" (its placeholder's words without the parenthesis; the
-  second review found it unnamed). Other placeholder-only fields remain (the assistant's composer,
-  Class Dates' Google Sheet link, the sidebar's course-code rename field,
-  Course Settings' folder path, the list editor's New name, the console's
-  answer fields), not yet checked live; they are for the next pass.
+  second review found it unnamed). The rest were named in #1012, each
+  read back from the hosted view's tree by `PlaceholderFieldNamesTests`
+  and failing without its name: the assistant's composer "Ask about this
+  section" (its placeholder's words without the ellipsis; the field is its
+  own view, `AssistComposerField`, so a test can host it without opening
+  an assistant window, which starts the assistant), Class Dates' Google
+  Sheet link "Google Sheet address" (its placeholder is an address, so the
+  words come from the sentence above it and the route it sits under), the
+  sidebar's course-code rename field "Course code", the list editor's
+  rename field "New name" and its add field "New folder name" or "New file
+  name" (its prompt's words), the console's answer box "Your answer" and
+  its spinner "Running" (the state "Finished" replaces), the credential
+  field by the label printed above it ("Netlify token"), and the footer box
+  "Footer", its section's heading.
+- **A `Form` row's label is a name.** The tree reader counts the words of
+  a control's linked title element (`AXTitleUIElement`) as its name when
+  the control carries no label or title of its own. Measured 2026-11-20: a
+  `TextField` with a title inside a `Form`, and a field inside a
+  `LabeledContent`, carry neither, and are linked to the label drawn beside
+  them, which VoiceOver reads. So five fields the first list counted as
+  placeholder-only were named already, and are pinned rather than labelled
+  twice: Course Settings' folder path ("Folder"), Printing's "School name",
+  Settings' "Cloudflare Account ID", the New Course window's code field and
+  Copy a Page's page field; the unit word sheet's field too ("What do you
+  call a unit?"). Course Settings' custom domain fields sit inside the
+  collapsed Advanced group, which the hosted view does not open, so they
+  were not read.
+- **The question alert's answer field is not drawn (found in #1012, not
+  fixed).** A task's plain question opens `.alert("Input required")` with
+  `TextField("Your answer", …).borderedTextField()`. Measured 2026-11-20 by
+  hosting the alert and listing the alert window's views: with
+  `.borderedTextField()` (or any wrapper of ours) the alert holds no text
+  field at all, only the title, the question and Cancel and Send; a bare
+  `TextField`, or one with only `.accessibilityIdentifier` or
+  `.accessibilityLabel`, is drawn. In the alert AppKit takes neither the
+  label nor the identifier, so the field could only ever be named by its
+  placeholder. #457 put the modifier there so the bordered rule had no
+  exemptions; whether the alert loses it, or the question moves to a sheet
+  whose field can be bordered and named, is Russell's, put to him in #1012's hand-back.
 - **Decorative icons are hidden.** An `info.circle` (or the token notice's
   triangle) beside a sentence that says everything is `accessibilityHidden`,
   so VoiceOver reads the sentence alone.
@@ -20926,7 +20961,12 @@ repetitive animations".
   fields and lists (that test runs in both modes; measured live in an
   isolated debug build on 2026-11-19 with Keyboard Navigation off, Tab
   left the focus on the window and reached no link, and each of the six
-  offered AXPress), and with Keyboard
+  offered AXPress), and that pressing each one opens its own page (since
+  #1012 the test performs the press through the accessibility API, with an
+  `OpenURLAction` in the environment that records the address instead of
+  opening it, and checks it against an address written in the test, so a
+  link pointed at the wrong page fails: measured with the sponsor link
+  pointed at the profile page), and with Keyboard
   Navigation on, Tab stops once on each of the six and
   comes round again (that test skips, saying why, with it off; in the test
   host the accessibility API names no focused element, so it counts the

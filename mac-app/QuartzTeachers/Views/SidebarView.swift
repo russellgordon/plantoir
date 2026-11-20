@@ -2659,6 +2659,9 @@ struct CourseCodeField: View {
                     .borderedTextField()
                     .foregroundStyle(Color(nsColor: .textColor))
                     .focused($isFocused)
+                    // Its placeholder's words (#1012), as the Filter field
+                    // above the list is named by its own.
+                    .accessibilityLabel(Text("Course code"))
                     .accessibilityIdentifier("renameField")
                     .onSubmit {
                         commit()

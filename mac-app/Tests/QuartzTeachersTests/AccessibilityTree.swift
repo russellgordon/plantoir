@@ -55,11 +55,21 @@ struct AccessibilityTree {
         /// Access use to activate it, with Keyboard Navigation on or off.
         let actions: [String]
 
+        /// The words of the element AppKit names as this one's title
+        /// (`AXTitleUIElement`): a printed label a `Form` row links to its
+        /// control, which VoiceOver reads as the control's name (#1012).
+        /// Empty where none is linked.
+        let titleElementWords: String
+
         // MARK: - Computed properties
 
         /// Every name the element carries, in the order VoiceOver speaks
         /// them: its description (the label), then its title. Both are
-        /// kept rather than merged, so a name said twice shows.
+        /// kept rather than merged, so a name said twice shows. With
+        /// neither, the words of a linked title element: a `Form` row's
+        /// printed label, which names its field (measured 2026-11-20: Course
+        /// Settings' "Folder" and "School name" fields carry no label or
+        /// title of their own and are linked to their row's label).
         var names: [String] {
             var spoken: [String] = []
             if !label.isEmpty {
@@ -67,6 +77,9 @@ struct AccessibilityTree {
             }
             if !title.isEmpty {
                 spoken.append(title)
+            }
+            if spoken.isEmpty && !titleElementWords.isEmpty {
+                spoken.append(titleElementWords)
             }
             return spoken
         }
@@ -101,6 +114,38 @@ struct AccessibilityTree {
     }
 
     // MARK: - Functions
+
+    /// Performs the press action an assistive app uses (VoiceOver, Full
+    /// Keyboard Access) on every element identified as `identifier` in the
+    /// window titled `windowTitle`, and says how many were pressed and
+    /// whether each press was accepted.
+    static func press(identifiedAs identifier: String, inWindowTitled windowTitle: String) -> [AXError] {
+        var results: [AXError] = []
+        let application: AXUIElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        for window in elementList(of: application, attribute: kAXWindowsAttribute) {
+            if text(of: window, attribute: kAXTitleAttribute) != windowTitle {
+                continue
+            }
+            var matching: [AXUIElement] = []
+            collectElements(identifiedAs: identifier, under: window, into: &matching, depth: 0)
+            for element in matching {
+                results.append(AXUIElementPerformAction(element, kAXPressAction as CFString))
+            }
+        }
+        return results
+    }
+
+    static func collectElements(identifiedAs identifier: String, under node: AXUIElement, into found: inout [AXUIElement], depth: Int) {
+        if depth > 60 {
+            return
+        }
+        if text(of: node, attribute: kAXIdentifierAttribute) == identifier {
+            found.append(node)
+        }
+        for child in elementList(of: node, attribute: kAXChildrenAttribute) {
+            collectElements(identifiedAs: identifier, under: child, into: &found, depth: depth + 1)
+        }
+    }
 
     /// The elements with this identifier.
     func elements(identifiedAs identifier: String) -> [Element] {
@@ -188,7 +233,7 @@ struct AccessibilityTree {
     func described() -> String {
         var lines: [String] = []
         for element in elements {
-            lines.append("\(element.role) id=[\(element.identifier)] title=[\(element.title)] label=[\(element.label)] value=[\(element.value)] enabled=[\(element.enabled)]")
+            lines.append("\(element.role) id=[\(element.identifier)] title=[\(element.title)] label=[\(element.label)] titleElement=[\(element.titleElementWords)] value=[\(element.value)] enabled=[\(element.enabled)]")
         }
         return lines.joined(separator: "\n")
     }
@@ -240,7 +285,8 @@ struct AccessibilityTree {
             frame: frame(of: node),
             enabled: text(of: node, attribute: kAXEnabledAttribute),
             parentRole: parentRole,
-            actions: actionNames(of: node)
+            actions: actionNames(of: node),
+            titleElementWords: titleElementWords(of: node)
         ))
         for child in elementList(of: node, attribute: kAXChildrenAttribute) {
             collect(child, parentRole: role, into: &found, depth: depth + 1)
@@ -316,5 +362,27 @@ struct AccessibilityTree {
             return number.stringValue
         }
         return ""
+    }
+
+    /// The value (or title) of the element linked as `element`'s title, or
+    /// empty where none is.
+    static func titleElementWords(of element: AXUIElement) -> String {
+        var linked: CFTypeRef?
+        let result: AXError = AXUIElementCopyAttributeValue(element, kAXTitleUIElementAttribute as CFString, &linked)
+        if result != .success {
+            return ""
+        }
+        guard let linked else {
+            return ""
+        }
+        if CFGetTypeID(linked) != AXUIElementGetTypeID() {
+            return ""
+        }
+        let titleElement: AXUIElement = linked as! AXUIElement
+        let value: String = text(of: titleElement, attribute: kAXValueAttribute)
+        if !value.isEmpty {
+            return value
+        }
+        return text(of: titleElement, attribute: kAXTitleAttribute)
     }
 }
