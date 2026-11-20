@@ -13,10 +13,13 @@ namespace Plantoir.Core.Undo;
 internal static class UndoFileIdentity
 {
     /// <summary>The file's identity, or null where the system cannot say (not Windows, or the call failed).</summary>
-    internal static (uint Volume, ulong Index)? Of(FileStream stream)
+    internal static (uint Volume, ulong Index)? Of(FileStream stream) => Of(stream.SafeFileHandle);
+
+    /// <summary>The same, for a handle opened by other means (the swap's kept original, #899 W3).</summary>
+    internal static (uint Volume, ulong Index)? Of(SafeFileHandle handle)
     {
-        if (!OperatingSystem.IsWindows()) return null;
-        if (!GetFileInformationByHandle(stream.SafeFileHandle, out ByHandleFileInformation information)) return null;
+        if (!OperatingSystem.IsWindows() || handle.IsInvalid) return null;
+        if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information)) return null;
         return (information.VolumeSerialNumber, ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow);
     }
 

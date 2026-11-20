@@ -52,6 +52,15 @@ internal sealed class UndoJournalWriter : IDisposable
         Folded = folded;
     }
 
+    /// <summary>
+    /// Whether recovery has run in this hold (<see cref="UndoRecovery.Run"/>
+    /// sets it). Pruning refuses a hold where it has not (W2b's review, LOW
+    /// 7): pruning closes a dead step past the limits <c>unsettled</c> and
+    /// removes its staged files, so a step that died mid-swap must have been
+    /// offered to recovery first, which puts its pages back whole.
+    /// </summary>
+    internal bool RecoveredThisHold { get; set; }
+
     /// <summary>The list as read fresh when the lock was taken, with every line this writer has appended.</summary>
     internal UndoFolded Folded { get; private set; }
 

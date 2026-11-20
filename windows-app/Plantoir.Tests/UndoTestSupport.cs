@@ -227,9 +227,12 @@ internal sealed class UndoScribe : IDisposable
 
     internal FrontPageMaintainer Maintainers { get; } = new();
 
-    /// <summary>The real door on this scribe's journal, live, as this process.</summary>
-    internal UndoDoor Door(UndoSeams? seams = null) =>
-        new(Journal, UndoMode.Live, Maintainers, seams, Process(Environment.ProcessId));
+    /// <summary>The trail lines every door of this scribe wrote (recovery's <c>undo rolled back</c>).</summary>
+    internal List<UndoTrailLine> TrailLines { get; } = [];
+
+    /// <summary>The real door on this scribe's journal, live, as this process (or as the process <paramref name="pid"/> names).</summary>
+    internal UndoDoor Door(UndoSeams? seams = null, long? pid = null, UndoMode mode = UndoMode.Live, IUndoMaintainers? maintainers = null) =>
+        new(Journal, mode, maintainers ?? Maintainers, seams, Process(pid ?? Environment.ProcessId), trail: line => { lock (TrailLines) TrailLines.Add(line); });
 
     /// <summary>The ops of one file's change, as the door works them out, with any whole-file blobs stored (for the calls that write another process's or version's lines raw).</summary>
     internal JsonArray OpsFor(string relative, byte[]? before, byte[]? after)
@@ -287,11 +290,11 @@ internal sealed class UndoScribe : IDisposable
     {
         writer.DropTheRedoBranch(below: seq);
         writer.Append(new JsonObject { ["seq"] = seq, ["event"] = "applied" });
-        Journal.Prune(writer);
+        Door().RecoverThenPrune(writer);
     });
 
     /// <summary>What pruning and deletion decide, carried out by the product inside the lock.</summary>
-    internal void Prune() => Journal.WithLock(writer => Journal.Prune(writer));
+    internal void Prune() => Journal.WithLock(writer => Door().RecoverThenPrune(writer));
 
     /// <summary>The one clearing at the flip, through the door; the seq it wrote, or null when nothing was on the list.</summary>
     internal long? GoLive() => Door().ClearTheListAsTheSwitchGoesLive() ? Fold().LastClearing!.Value.Seq : null;
