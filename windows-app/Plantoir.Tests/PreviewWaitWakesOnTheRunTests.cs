@@ -9,10 +9,15 @@ namespace Plantoir.Tests;
 /// looking once a second, and a wait for a run to end ends the moment it
 /// does instead of at its next 100 ms look.
 ///
-/// <para>Every test here fails on the code before #1016: the properties and
-/// the watch did not exist (the wait searched the whole transcript each
+/// <para>Every test here fails on the code before #1016 except
+/// <c>WaitingForARunThatIsNotRunningReturnsAtOnce</c>, which pins what both
+/// keep (the old loop also returned at once when nothing ran): the properties
+/// and the watch did not exist (the wait searched the whole transcript each
 /// second), and <see cref="ScriptRunner.WaitUntilFinished"/> was a loop of
 /// 100 ms delays, so its task was still pending right after the run ended.
+/// The tests under "A finish that belongs to an earlier run" and the
+/// unfinished-line tests fail on this branch's first head (9b6728b67) too:
+/// they are the first review's two findings.
 /// Timings are asserted as "already complete" or "still pending" at a point
 /// the code fixes, never as a measured duration, so a slow machine cannot
 /// make them flaky.</para>
@@ -77,6 +82,66 @@ public class PreviewWaitWakesOnTheRunTests : IDisposable
         DateTime first = runner.ServerStartedAt.Value;
         runner.ReceiveOutput("Started a Quartz server listening at http://localhost:8080\n");
         Assert.Equal(first, runner.ServerStartedAt);   // the FIRST arrival; the quiet bound counts from it
+    }
+
+    // ---- The preview's lines before their line ends (#1016 review) -------
+
+    [Fact]
+    public void TheServerLineCountsBeforeItsLineEnds()
+    {
+        // The last line before a quiet server; ConPTY can hold its end back
+        // until the next drawing (#623, #661), so it may never end at all.
+        var runner = new ScriptRunner();
+        using var watch = runner.WatchTheStanding();
+        runner.ReceiveOutput("Done processing 12 files in 3s\nStarted a Quartz server listening at http://localhost:8080");
+        Assert.NotNull(runner.ServerStartedAt);
+        Assert.True(watch.HasChanged.IsCompleted, "an unfinished server line did not wake the wait");
+    }
+
+    [Fact]
+    public void TheServerLineCountsWhenItArrivesInPiecesWithNoEnd()
+    {
+        var runner = new ScriptRunner();
+        runner.ReceiveOutput("\u001b[36mStarted a Quartz se");
+        Assert.Null(runner.ServerStartedAt);   // the words are not all there yet
+        runner.ReceiveOutput("rver listening at http://localhost:8080/\u001b[39m");
+        Assert.NotNull(runner.ServerStartedAt);
+    }
+
+    [Fact]
+    public void TheServerLineCountsAfterALoneCarriageReturn()
+    {
+        var runner = new ScriptRunner();
+        runner.ReceiveOutput("Done processing 12 files in 3s\rStarted a Quartz server listening at http://localhost:8080\r");
+        Assert.NotNull(runner.ServerStartedAt);
+        var second = new ScriptRunner();
+        second.ReceiveOutput("Done processing 12 files in 3s\r");
+        second.ReceiveOutput("Started a Quartz server listening at http://localhost:8080");
+        Assert.NotNull(second.ServerStartedAt);
+    }
+
+    [Fact]
+    public void TheBuildersRealLaunchLineCountsWithAndWithoutItsEnd()
+    {
+        // build_site.py: print(f"\n🚀 Launching Quartz preview on http://localhost:{port}\n")
+        var ended = new ScriptRunner();
+        ended.ReceiveOutput("\n🚀 Launching Quartz preview on http://localhost:8081\n\n");
+        Assert.True(ended.HasAnnouncedQuartzLaunch);
+        var unended = new ScriptRunner();
+        unended.ReceiveOutput("\r\n🚀 Launching Quartz preview on http://localhost:8081");
+        Assert.True(unended.HasAnnouncedQuartzLaunch);
+        Assert.Null(unended.ServerStartedAt);   // the launch line is not the server line
+    }
+
+    [Fact]
+    public void QuartzLaunchLineIsTheContractsMarkerAndWhatTheBuilderPrints()
+    {
+        var origins = ContractLoader.LoadJson("app-rules.json")["markerOrigins"]!["origins"]!.AsObject();
+        Assert.True(origins.ContainsKey(ScriptRunner.QuartzLaunchLine),
+            "ScriptRunner.QuartzLaunchLine is not a key of app-rules.json → markerOrigins.origins");
+        Assert.Equal("shared-python", origins[ScriptRunner.QuartzLaunchLine]!.ToString());
+        string builder = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "scripts", "build_site.py"));
+        Assert.Contains("print(f\"\\n🚀 " + ScriptRunner.QuartzLaunchLine + " on http://", builder);
     }
 
     [Fact]
@@ -177,6 +242,101 @@ public class PreviewWaitWakesOnTheRunTests : IDisposable
         Assert.True(finished.IsCompleted);
         Assert.False(await finished);   // no run, no exit code: not a success
         Assert.True(runner.WaitUntilFinishedOrKill(60_000).IsCompleted);
+    }
+
+    // ---- A finish that belongs to an earlier run (#1016 review) ---------
+
+    /// <summary>
+    /// The build-then-deploy case: the build's reader and exit watcher each
+    /// post a finish; the first ends the build and the deploy leg starts on
+    /// the same runner; the second, arriving late, must not end the deploy.
+    /// </summary>
+    [Fact]
+    public void AFinishFromAnEarlierRunDoesNotEndTheNextOne()
+    {
+        var runner = new ScriptRunner();
+        runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "building\n");
+        int buildRun = runner.CurrentRunNumber;
+        runner.FinishRunNumber(buildRun, 0);        // the reader's finish
+        Assert.False(runner.IsRunning);
+
+        runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "deploying\n");
+        Task<bool> deployFinished = runner.WaitUntilFinished();
+        runner.FinishRunNumber(buildRun, 0);        // the exit watcher's, late
+
+        Assert.True(runner.IsRunning, "a finish posted by the build ended the deploy");
+        Assert.False(deployFinished.IsCompleted, "the deploy's wait ended on the build's finish");
+
+        runner.FinishRunNumber(runner.CurrentRunNumber, 3);
+        Assert.False(runner.IsRunning);
+        Assert.Equal(3, runner.LastExitCode);
+    }
+
+    [Fact]
+    public async Task AHandlerThatStartsTheNextRunDoesNotStrandTheWaiters()
+    {
+        var runner = new ScriptRunner();
+        runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "building\n");
+        Task<bool> buildFinished = runner.WaitUntilFinished();
+        bool startedTheNext = false;
+        runner.PropertyChanged += (sender, change) =>
+        {
+            if (change.PropertyName == nameof(ScriptRunner.IsRunning) && !runner.IsRunning && !startedTheNext)
+            {
+                startedTheNext = true;
+                runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "deploying\n");
+            }
+        };
+
+        runner.FinishRunNumber(runner.CurrentRunNumber, 0);
+
+        Assert.True(startedTheNext);
+        Assert.True(buildFinished.IsCompleted, "the build's waiters were stranded by the run their own finish started");
+        Assert.True(await buildFinished);
+        Assert.True(runner.IsRunning);
+        Assert.False(runner.WaitUntilFinished().IsCompleted, "the next run's wait was completed by the build's finish");
+    }
+
+    [Fact]
+    public async Task TheBoundedWaitNeverEndsARunStartedAfterIt()
+    {
+        var runner = new ScriptRunner();
+        runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "stopping\n");
+        Task<bool> waiting = runner.WaitUntilFinishedOrKill(60_000);
+        runner.FinishRunNumber(runner.CurrentRunNumber, 0);
+        runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "the next run\n");
+        Assert.True(await waiting);
+        Assert.True(runner.IsRunning, "the bounded wait for the first run force-finished the second");
+    }
+
+    /// <summary>
+    /// The reader and the exit watcher need a real process, so how they post
+    /// is pinned by the source: each carries its run's number, and the exit
+    /// watcher joins its own run's reader, not whatever the field holds.
+    /// </summary>
+    [Fact]
+    public void TheReaderAndTheExitWatcherPostTheirOwnRunsFinish()
+    {
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Core", "Scripting", "ScriptRunner.cs"));
+        int start = source.IndexOf("private void ReadLoop(", StringComparison.Ordinal);
+        int end = source.IndexOf("private int BeginRunNumber()", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, "ReadLoop and ExitWatch were not found");
+        string body = source[start..end];
+        Assert.Equal(2, CountOf(body, "Post(() => FinishRunNumber(runNumber, exitCode))"));
+        Assert.DoesNotContain("Post(() => FinishRun(", body);
+        Assert.DoesNotContain("_readerThread", body);
+    }
+
+    private static int CountOf(string text, string part)
+    {
+        int count = 0;
+        int at = text.IndexOf(part, StringComparison.Ordinal);
+        while (at >= 0)
+        {
+            count += 1;
+            at = text.IndexOf(part, at + part.Length, StringComparison.Ordinal);
+        }
+        return count;
     }
 
     // ---- The view's wait uses them (source rule) ------------------------
