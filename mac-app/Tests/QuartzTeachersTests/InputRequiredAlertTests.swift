@@ -60,6 +60,11 @@ final class InputRequiredAlertTests: XCTestCase {
         XCTAssertEqual(send?.keyEquivalent, "\r", "Send is the default button: Return answers the question")
         XCTAssertEqual(cancel?.keyEquivalent, "\u{1b}", "Escape presses Cancel")
 
+        // This host window is off screen and not key, so it cannot show
+        // where the focus is when the alert opens; the key-window test
+        // `ProgressCancelKeysTests.testTheQuestionsFieldHasTheFocusWhenTheAlertOpens`
+        // asserts that without setting it. Here the focus is put in the field
+        // only so the typing below has an editor.
         XCTAssertTrue(alert.makeFirstResponder(field), "the field takes the typing focus")
         guard let editor = field.currentEditor() as? NSTextView else {
             XCTFail("the field has no editor to type into")
@@ -98,11 +103,16 @@ final class InputRequiredAlertTests: XCTestCase {
 
     /// A working folder holding `ask.sh`: a task that asks one plain question
     /// (not a credential, not the plan-share lists) and prints the answer.
-    static func makeAskingTask() throws -> URL {
+    ///
+    /// With `waitsForGo`, it asks only once a file named `go` appears in the
+    /// folder (`letTheTaskAsk(in:)`), so a test can have it running while it
+    /// sets its window up, and decide when the question comes.
+    static func makeAskingTask(waitsForGo: Bool = false) throws -> URL {
         let folder: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("input-required-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let script: String = """
+        let waitLine: String = waitsForGo ? "while [ ! -e '" + folder.appendingPathComponent("go").path + "' ]; do sleep 0.1; done\n" : ""
+        let script: String = waitLine + """
         printf 'Which room is the class in? '
         read reply
         echo "\(receivedMarker)$reply]"
@@ -111,6 +121,11 @@ final class InputRequiredAlertTests: XCTestCase {
         """
         try Data(script.utf8).write(to: folder.appendingPathComponent("ask.sh"))
         return folder
+    }
+
+    /// Lets a task made with `waitsForGo` ask its question.
+    static func letTheTaskAsk(in folder: URL) throws {
+        try Data().write(to: folder.appendingPathComponent("go"))
     }
 
     /// The alert hung on the host's window once the runner has seen the

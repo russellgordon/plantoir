@@ -610,7 +610,7 @@ struct TaskProgressView: View {
             // ever moves out of the alert must wear `.borderedTextField()`.
             // The alert also ignores the identifier and any accessibility
             // label; VoiceOver reads the placeholder (documentation 09).
-            TextField("Your answer", text: $answer)
+            TextField(QuestionAlertFocus.answerPlaceholder, text: $answer)
                 .accessibilityIdentifier("taskAnswerField")
             Button("Send") {
                 runner.send(line: answer)
@@ -623,6 +623,14 @@ struct TaskProgressView: View {
             }
         } message: {
             Text(runner.pendingQuestion)
+        }
+        // The alert opens with its focus on a button, so typing at once went
+        // nowhere (#1019 review): when its window becomes key, the focus
+        // goes to the answer field (`QuestionAlertFocus` says why this way).
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
+            if awaitingInputBinding.wrappedValue, let window = notification.object as? NSWindow {
+                QuestionAlertFocus.putTheFocusInTheAnswerField(of: window)
+            }
         }
         // A launcher asking for a Netlify or Cloudflare credential gets a
         // dialog that explains where one comes from, with the page to make

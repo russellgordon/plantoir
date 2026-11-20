@@ -70,8 +70,9 @@ final class InputRequiredAlertUITests: XCTestCase {
         let sendButton: XCUIElement = application.buttons["Send"].firstMatch
         XCTAssertTrue(sendButton.exists, "the alert has its Send button")
 
-        answerField.click()
-        answerField.typeText("Room 214")
+        // Typed at once, with NO click first: the field must already have
+        // the focus when the alert opens (#1019 review).
+        application.typeText("Room 214")
         application.typeKey(.return, modifierFlags: [])
 
         var received: String = ""

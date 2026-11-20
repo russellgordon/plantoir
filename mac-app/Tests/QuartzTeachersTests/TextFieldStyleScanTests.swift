@@ -24,7 +24,8 @@ import XCTest
 /// `.borderedTextField()` or `.textFieldStyle(.roundedBorder)` the panel held
 /// no field, so Send sent an empty line), and the alert draws its own
 /// bordered field. So that one field must carry NO style, and the scan holds
-/// it to exactly that: the file and identifier below, nothing else, and a
+/// it to exactly that: the file and identifier below, inside an `.alert`
+/// (the same field moved into a sheet is not the exception), and a
 /// test fails if the exception stops matching exactly one field.
 /// `InputRequiredAlertTests` proves the field is drawn and answers the task.
 @MainActor
@@ -125,18 +126,45 @@ final class TextFieldStyleScanTests: XCTestCase {
         }
     }
 
+    /// The exception is keyed on the alert too: the same field, with the
+    /// same identifier in the same file, moved into a sheet is NOT the
+    /// exception, and must wear `.borderedTextField()` like any other.
+    func testTheAlertExceptionHoldsOnlyInsideAnAlert() {
+        let source: String = """
+        .alert("Input required", isPresented: $a) {
+            TextField("Your answer", text: $b)
+                .accessibilityIdentifier("taskAnswerField")
+            Button("Send") { }
+        } message: {
+            Text("q")
+        }
+        .sheet(isPresented: $c) {
+            TextField("Your answer", text: $b)
+                .accessibilityIdentifier("taskAnswerField")
+        }
+        """
+        let fields: [Field] = TextFieldStyleScanTests.fields(in: source, file: "TaskProgressView.swift")
+        XCTAssertEqual(fields.count, 2)
+        if fields.count == 2 {
+            XCTAssertTrue(TextFieldStyleScanTests.isTheAlertAnswerField(fields[0]), "the field inside the alert is the exception")
+            XCTAssertFalse(TextFieldStyleScanTests.isTheAlertAnswerField(fields[1]), "the same field in a sheet is not")
+        }
+    }
+
     // MARK: - Helpers
 
     struct Field {
         var location: String
         var chain: String
+        /// Whether the field sits inside the actions of an `.alert(…) { … }`.
+        var isInsideAnAlert: Bool = false
     }
 
     /// Whether `field` is the Input required alert's answer field, the one
     /// named exception (#1019).
     static func isTheAlertAnswerField(_ field: Field) -> Bool {
         let fileName: String = alertAnswerField.file + ":"
-        return field.location.hasPrefix(fileName) && field.chain.contains(alertAnswerField.identifier)
+        return field.isInsideAnAlert && field.location.hasPrefix(fileName) && field.chain.contains(alertAnswerField.identifier)
     }
 
     static func viewsURL() -> URL {
@@ -174,6 +202,22 @@ final class TextFieldStyleScanTests: XCTestCase {
             }
             index += 1
         }
+        // The actions closure of every `.alert(…) { … }`, as index ranges.
+        var alertBodies: [Range<Int>] = []
+        var alertIndex: Int = 0
+        while alertIndex < masked.count {
+            if matches(".alert(", in: masked, at: alertIndex) {
+                var cursor: Int = closing(from: alertIndex + 6, in: masked, open: "(", close: ")")
+                while cursor < masked.count && masked[cursor].isWhitespace {
+                    cursor += 1
+                }
+                if cursor < masked.count && masked[cursor] == "{" {
+                    let bodyEnd: Int = closing(from: cursor, in: masked, open: "{", close: "}")
+                    alertBodies.append(cursor..<bodyEnd)
+                }
+            }
+            alertIndex += 1
+        }
         for (position, start) in starts.enumerated() {
             let openParen: Int = start + (matches("TextField(", in: masked, at: start) ? 9 : 11)
             var end: Int = closing(from: openParen, in: masked, open: "(", close: ")")
@@ -209,7 +253,13 @@ final class TextFieldStyleScanTests: XCTestCase {
             for character in original[0..<start] where character == "\n" {
                 line += 1
             }
-            result.append(Field(location: file + ":" + String(line), chain: chain))
+            var isInsideAnAlert: Bool = false
+            for body in alertBodies {
+                if body.contains(start) {
+                    isInsideAnAlert = true
+                }
+            }
+            result.append(Field(location: file + ":" + String(line), chain: chain, isInsideAnAlert: isInsideAnAlert))
         }
         return result
     }

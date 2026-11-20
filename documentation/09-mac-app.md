@@ -5098,6 +5098,23 @@ option would, or stops it when it has none. Both are measured in
 Escape; typed text reaches the task; Escape sends no answer and marks the
 run cancelled).
 
+**The focus at open, measured on screen (#1019 review).** With the field
+drawn, the alert still opened with the focus on a button (`_NSAlertButton`,
+read in a key window by
+`ProgressCancelKeysTests.testTheQuestionsFieldHasTheFocusWhenTheAlertOpens`),
+so a teacher who typed at once typed into nothing and Return sent an empty
+answer; the opt-in UI test, typing with no click, failed the same way.
+`.focused` with `.defaultFocus` on the field were tried and changed nothing
+inside an alert. What works is AppKit's own way to say where an alert's
+typing goes, the window's first responder (an `NSAlert` with a field is
+given `initialFirstResponder`): when the alert's window becomes key,
+`QuestionAlertFocus` makes its one editable field with the "Your answer"
+placeholder the first responder. A visible field, no hidden view, no timer.
+After it, the first responder at open is the field's editor, typed letters
+land in the field, and the UI test types at once and the task receives
+exactly "Room 214". In a sheet (option B), `defaultFocus` would do this
+without reaching into AppKit.
+
 **What VoiceOver is given, measured.** In process the drawn field reports no
 accessibility label and no identifier, placeholder "Your answer"; through the
 accessibility interface of the real app (`InputRequiredAlertUITests`, opt-in,
@@ -20824,18 +20841,19 @@ repetitive animations".
   call a unit?"). Course Settings' custom domain fields sit inside the
   collapsed Advanced group, which the hosted view does not open, so they
   were not read.
-- **The question alert's answer field is not drawn (found in #1012, not
-  fixed).** A task's plain question opens `.alert("Input required")` with
-  `TextField("Your answer", …).borderedTextField()`. Measured 2026-11-20 by
-  hosting the alert and listing the alert window's views: with
-  `.borderedTextField()` (or any wrapper of ours) the alert holds no text
-  field at all, only the title, the question and Cancel and Send; a bare
-  `TextField`, or one with only `.accessibilityIdentifier` or
-  `.accessibilityLabel`, is drawn. In the alert AppKit takes neither the
-  label nor the identifier, so the field could only ever be named by its
-  placeholder. #457 put the modifier there so the bordered rule had no
-  exemptions; whether the alert loses it, or the question moves to a sheet
-  whose field can be bordered and named, is Russell's, put to him in #1012's hand-back.
+- **The question alert's answer field (found in #1012, fixed by #1019).** A
+  task's plain question opens `.alert("Input required")`. Until #1019 its
+  `TextField("Your answer", …)` wore `.borderedTextField()`, and measured on
+  2026-11-20 by hosting the alert and listing the alert window's views, a
+  field with `.borderedTextField()` (or any wrapper of ours) is left out of
+  the alert, which then holds only the title, the question, Cancel and Send;
+  a bare `TextField`, or one with only `.accessibilityIdentifier` or
+  `.accessibilityLabel`, is drawn. The field now carries no style (option A,
+  the one named exception in `TextFieldStyleScanTests`). In the alert AppKit
+  takes neither the label nor the identifier, so the field is named only by
+  its placeholder; asking in a sheet, where it could be bordered and named,
+  is option B and Russell's. See "The Input required alert's field carries
+  no style (#1019)".
 - **Decorative icons are hidden.** An `info.circle` (or the token notice's
   triangle) beside a sentence that says everything is `accessibilityHidden`,
   so VoiceOver reads the sentence alone.

@@ -815,6 +815,72 @@ final class ProgressCancelKeysTests: XCTestCase {
         XCTAssertEqual(ledger.cancelCount, 0, "a key in an alert stopped the task behind it")
     }
 
+    /// #1019: the Input required alert opens with its answer field holding
+    /// the typing focus, in a key window, without anything setting it, so a
+    /// teacher can type at once; Return then sends exactly what was typed to
+    /// the task (a real task on a real pseudo-terminal, `ask.sh`).
+    func testTheQuestionsFieldHasTheFocusWhenTheAlertOpens() throws {
+        let folder: URL = try InputRequiredAlertTests.makeAskingTask(waitsForGo: true)
+        defer {
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = ScriptRunner()
+        runner.milestones = TaskMilestones.preview
+        defer {
+            runner.terminate()
+        }
+        // Running before the panel shows, so its Cancel is drawn; it asks
+        // only once the window is key.
+        runner.run(scriptNamed: "ask.sh", arguments: [], workingDirectory: folder)
+        XCTAssertNil(runner.launchProblem, "the stub task should launch")
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner)
+        try InputRequiredAlertTests.letTheTaskAsk(in: folder)
+        XCTAssertTrue(runUntil(timeout: 15) { window.attachedSheet?.isKeyWindow == true }, "the Input required alert is in front, in a key window")
+        guard let alert = window.attachedSheet else {
+            return
+        }
+        settle(0.3)
+        let fields: [NSTextField] = InputRequiredAlertTests.editableFields(in: alert)
+        XCTAssertEqual(fields.count, 1, "the alert holds its answer field")
+        guard let field = fields.first else {
+            return
+        }
+        let fieldHasTheFocus: Bool = QuestionAlertFocus.fieldHasTheFocus(field, in: alert)
+        var responderName: String = "none"
+        if let shown = alert.firstResponder {
+            responderName = String(describing: type(of: shown))
+        }
+        print("INPUT-ALERT-FOCUS first responder at open: " + responderName + ", field has the focus: " + String(fieldHasTheFocus))
+        XCTAssertTrue(fieldHasTheFocus, "the answer field has the focus when the alert opens, so typing goes into it at once")
+
+        // Typed at once, as the keyboard sends it, with no click first.
+        for character in "Room 214" {
+            let letter: String = String(character)
+            let typed: NSEvent = try XCTUnwrap(NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: alert.windowNumber, context: nil,
+                characters: letter, charactersIgnoringModifiers: letter,
+                isARepeat: false, keyCode: 0
+            ))
+            NSApp.sendEvent(typed)
+            settle(0.05)
+        }
+        settle(0.3)
+        XCTAssertEqual(field.stringValue, "Room 214", "what was typed is in the field")
+        // Return as the alert takes it, through its key equivalents (the
+        // default button's is Return); the opt-in UI test presses the real
+        // key in the real app.
+        XCTAssertTrue(alert.performKeyEquivalent(with: try keyEvent(.returnKey, in: alert)), "Return is taken by the alert")
+        let end: Date = Date(timeIntervalSinceNow: 10)
+        while runner.isRunning && Date() < end {
+            settle(0.1)
+        }
+        let received: String = runner.transcript.recentText(maximumCharacters: 4000)
+        XCTAssertTrue(received.contains(InputRequiredAlertTests.receivedMarker + "Room 214]"), "the task receives exactly what was typed; it printed: " + received)
+    }
+
     /// With the preview's site in front of the panel the keys are the web
     /// page's: they never stop the preview underneath.
     func testNeitherKeyStopsATaskWhoseSiteCoversThePanel() throws {
