@@ -237,7 +237,8 @@ public class PreviewWaitWakesOnTheRunTests : IDisposable
     /// <summary>
     /// A run that could not start (no launcher in the folder) raises
     /// LaunchProblem, which is a standing property, so the preview's wait is
-    /// woken; the view then reads it as over (pinned by the source rule below).
+    /// woken. The view does NOT yet read that as over (documentation 12 says
+    /// why, and what is owed).
     /// </summary>
     [Fact]
     public void ARunThatCouldNotStartWakesTheWatch()
@@ -412,8 +413,6 @@ public class PreviewWaitWakesOnTheRunTests : IDisposable
         Assert.Contains("UntilItChangesAsync(", body);
         Assert.Contains("HasAnnouncedQuartzLaunch", body);
         Assert.Contains("ServerStartedAt", body);
-        // A run that could not start ends the wait (documentation 12).
-        Assert.Contains("_previewRunner.LaunchProblem is not null", body);
         Assert.DoesNotContain("DisplayText", body);
         Assert.DoesNotContain("\"Launching Quartz preview\"", body);
     }

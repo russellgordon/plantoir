@@ -73,7 +73,6 @@
                 <TextBlock Text="Waiting for your answer…" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
             </StackPanel>
             <TextBlock x:Name="LaunchProblemText" Visibility="Collapsed" TextWrapping="Wrap"
-                       AutomationProperties.AutomationId="launchProblemText"
                        Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
             <Grid x:Name="RunningActionsRow" Visibility="Collapsed" Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
