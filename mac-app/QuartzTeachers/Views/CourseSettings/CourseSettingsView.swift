@@ -68,6 +68,10 @@ struct CourseSettingsView: View {
                     if configuration.isClub {
                         TextField("Short label beside emoji (clubs, ≤ 12 characters)", text: $configuration.customShortName)
                             .borderedTextField()
+                            // Its title shows only as a placeholder, which
+                            // assistive apps do not read as the field's
+                            // name (#993, the second review).
+                            .accessibilityLabel(Text("Short label beside emoji"))
                             .accessibilityIdentifier("customShortNameField")
                     }
 

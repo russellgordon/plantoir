@@ -20281,7 +20281,9 @@ repetitive animations".
   the field's name (measured: such a field reads with no description); the
   sidebar's filter field, the Class Dates sheet's "Where these came from"
   field and Publish Pages' Find a Page field are labelled with those same
-  words. Other placeholder-only fields remain (the assistant's composer,
+  words, and Course Settings' club short-label field with "Short label
+  beside emoji" (its placeholder's words without the parenthesis; the
+  second review found it unnamed). Other placeholder-only fields remain (the assistant's composer,
   Class Dates' Google Sheet link, the sidebar's course-code rename field,
   Course Settings' folder path, the list editor's New name, the console's
   answer fields), not yet checked live; they are for the next pass.
@@ -20307,11 +20309,60 @@ repetitive animations".
   while Reduce Motion is on (`AssistTypingIndicator.breathes`), and turning
   it on mid-wait removes the repeating animation rather than leaving it
   running.
-- **Not done here, and why.** The About window's credit links are inline
-  Markdown links in a `Text`, which SwiftUI reports to accessibility as
-  disabled links (D46). Russell ruled on 2026-11-19 that they become
-  separate link views, the design shown to him before it is built:
-  `vm-tools/reference/993-about-window-design.md`.
+- **The About window's links (D46, #993's second piece).** The credit
+  links were inline Markdown links in a `Text`, which SwiftUI reports to
+  accessibility as links with AXEnabled false (measured: "Quartz",
+  "sponsoring him on GitHub", "Phosphor Icons", "Russell Gordon") and which
+  Tab does not reach with Keyboard Navigation on. Russell ruled option A of
+  `vm-tools/reference/993-about-window-design.md` on 2026-11-19: the
+  sponsor sentence stays whole as plain text, with two `Link` views beneath
+  it inside the callout ("Quartz", and "Sponsor Jacky Zhao on GitHub",
+  which starts with a verb as the HIG's Writing page asks of a link); the
+  three credit lines became a label-and-value `Grid` in the shape of the
+  Website and Email rows (Icon, Phosphor Icons (MIT); Design, Russell
+  Gordon; Made with, Claude). Each of the six links is now one enabled
+  AXLink with its own words, listed in the rotor's Links.
+  `AboutWindowLinksTests` reads the real `AboutView` through
+  `AccessibilityTree`: each link by identifier (`aboutQuartzLink` and the
+  rest) is an enabled link with its own words, the window holds exactly
+  those six, the sentence is read whole, the credits' labels are words of
+  their own, every link offers the press action an assistive app uses (VoiceOver's
+  rotor, Full Keyboard Access), which is how the HIG has a person reach it
+  with Keyboard Navigation off, when macOS moves Tab only between text
+  fields and lists (that test runs in both modes; measured live in an
+  isolated debug build on 2026-11-19 with Keyboard Navigation off, Tab
+  left the focus on the window and reached no link, and each of the six
+  offered AXPress), and with Keyboard
+  Navigation on, Tab stops once on each of the six and
+  comes round again (that test skips, saying why, with it off; in the test
+  host the accessibility API names no focused element, so it counts the
+  window's first responders, and the words of each stop were read live). With the inline links put
+  back (measured 2026-11-19, `dev`'s `AboutView` in place of this one) four of
+  the five fail: no link has its identifier, four read as disabled, the
+  credits have no labels of their own, and Tab stops only twice. The window's `.focusEffectDisabled()` (added
+  2026-08-10 so the window did not open with a ring around its one link)
+  is gone: measured live in an isolated debug build with Keyboard
+  Navigation on, Tab moved through all six links with no ring drawn on
+  any, so a keyboard user could not see where they were. The HIG's Focus
+  and Selection page asks to "rely on system-provided focus effects" and to
+  "indicate focus using visual appearances that are consistent with the
+  platform". The cost is the ring that macOS draws around the Website link
+  when the window opens with Keyboard Navigation on; with it off no link
+  takes focus and nothing is drawn. Rejected: splitting each sentence around its
+  link (SwiftUI wraps mixed `Text` and `Link` pieces as blocks, so the
+  sentence breaks oddly at larger text sizes), a row of four link buttons
+  (reads as actions, wider than the window at larger sizes), and hiding the
+  inline links behind one element with custom actions (VoiceOver would
+  hear no link and the rotor's Links would be empty). The Windows About
+  panel (`AboutDialog.cs`) follows: `HyperlinkButton`s of their own in
+  place of inline `Hyperlink`s, the same words and rows; its source is
+  pinned by `AboutDialogLinksSourceTests`, what UI Automation gives a
+  screen reader and where Tab goes by `AboutDialogLinksUiTests`
+  (`12-windows-app.md` → "The About panel's links"; there the inline links
+  were already enabled, focusable and reached by Tab, measured, so Windows
+  changed to follow the mac's layout, not to fix a fault), and the sentence holds the word
+  "Quartz" through a constant so the label scan's one exception (the bare
+  credit name) still covers it.
 - **Tests read what the app exposes.** `AccessibilityTreeTests` hosts the
   real views (the tab bar, the emoji field, Add a Section, the Class Dates
   sheet, the Publish Pages picker, the spinner, a stopping sentence) in an
