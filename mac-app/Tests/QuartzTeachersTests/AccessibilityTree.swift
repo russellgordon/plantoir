@@ -266,7 +266,8 @@ struct AccessibilityTree {
             frame: frame(of: node),
             enabled: text(of: node, attribute: kAXEnabledAttribute),
             parentRole: parentRole,
-            actions: actionNames(of: node)
+            actions: actionNames(of: node),
+            titleElementWords: titleElementWords(of: node)
         )
     }
 

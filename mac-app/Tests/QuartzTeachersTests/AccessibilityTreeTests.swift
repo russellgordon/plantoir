@@ -174,9 +174,12 @@ final class AccessibilityTreeTests: XCTestCase {
     /// The help tags in a sidebar `width` points wide (228, the sidebar's
     /// default) holding one course code's label.
     func helpTags(ofCourseCode code: String, width: CGFloat = 228) throws -> (helps: [String], described: String) {
-        // A plain row: inside the sidebar's folding course row the label is
-        // merged into one heading and its help tag is not in the tree
-        // (measured 2026-11-20), so the label is read on its own.
+        // A plain row, because inside the sidebar's folding course row the
+        // label is merged into one heading and this reader does not find its
+        // help tag there (measured 2026-11-20). The real row was proven by
+        // the second review of #997: the folding row's heading carries the
+        // help text for a truncated code, a real hover drew the tooltip, and
+        // a code that fits has none.
         let row: some View = List {
             CourseCodeLabel(code: code)
         }

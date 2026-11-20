@@ -4574,12 +4574,14 @@ brought to match in stage 3.
   Text fields: "Consider using an expansion tooltip to show the full
   version of clipped or truncated text." `AccessibilityTreeTests` reads the
   help tags off the tree (`AccessibilityTree.Element.help`): one on a
-  12-character code in a 140-point sidebar, none on EXC2O at 228. NOT
-  proven: the tag in the sidebar's own folding course row. There the row's
-  label reaches the tree merged into one heading, without its help tag
-  (measured 2026-11-20), and a pointer resting on the row, sent from a
-  script in the running app, showed no help tag on any control at all, so
-  that drive could not tell either way.
+  12-character code in a 140-point sidebar, none on EXC2O at 228. That
+  test reads the label in a plain row, because this reader does not find
+  the tag inside the sidebar's folding course row, where the label is
+  merged into one heading. The real row was proven by the second review
+  of #997 (2026-11-20): the folding row's heading carries the help text
+  for a truncated code, a real hover drew the tooltip, and a code that
+  fits has none; `ViewThatFits` decides truncation at layout time and
+  again on every resize.
 - **The Backups total keeps a margin (D45).** `BackupsSectionHeader` puts
   `trailingMargin` (10 pt) after the total; it was drawn about 2 pt from
   the divider while the heading's name sits about 14 pt in. HIG, Layout:
@@ -4662,7 +4664,17 @@ brought to match in stage 3.
   (`.scrollIndicators(.never, axes: .horizontal)`), which hid the symptom
   and left the half point; and setting the ideal widths to 145, 135 and
   175, which changed nothing (the half points came from sharing the
-  change, not from the ideals). `testThePickerShowsNoSidewaysScrollBar`
+  change, not from the ideals). Also tried, after the second review
+  (2026-11-20), so a teacher could drag Folder and Date wider to read a
+  long folder name: `.width(min: 135, ideal: 135, max: 400)` and
+  `.width(min: 175, ideal: 175, max: 400)`, with Page's ideal at 130 and
+  then at 2000. Both came out the same: Folder and Date grew to 153.5 and
+  193.0 at open and the columns ended at 501.5 in 501 once the rows
+  arrived, so the sideways bar came back; SwiftUI's `TableColumn` gives
+  no way to make a column resizable by a person without also sharing the
+  table's own changes with it. Still owed: a way to let them be widened
+  that keeps them at 501; until then a long folder name is read from its
+  help tag. `testThePickerShowsNoSidewaysScrollBar`
   checks both moments with no tolerance (the first version allowed half a
   point, which was the fault, so it passed either way) and that the
   sideways scroll bar is still on, and fails with the widths put back.

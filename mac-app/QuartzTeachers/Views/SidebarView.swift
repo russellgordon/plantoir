@@ -2562,11 +2562,11 @@ struct CourseRowLabel: View {
 /// A 12-character code, the most a code may have, is cut short at the
 /// sidebar's default width. The HIG's Text fields page: "Consider using an
 /// expansion tooltip to show the full version of clipped or truncated
-/// text." An expansion tooltip is for text that is cut short, so a code
-/// that fits is not repeated
-/// in a tag over itself, so the help tag is on the truncated version only:
-/// `ViewThatFits` shows the plain label when its whole width fits, and the
-/// tagged one, cut short, when it does not.
+/// text." That tooltip is for text that is cut short, so a code that fits
+/// carries no tag repeating it. `ViewThatFits` decides which version shows,
+/// at layout time and again whenever the sidebar is resized: the plain
+/// label when the whole code fits, and the same label with `.help(code)`,
+/// cut short, when it does not.
 struct CourseCodeLabel: View {
 
     // MARK: - Stored properties
