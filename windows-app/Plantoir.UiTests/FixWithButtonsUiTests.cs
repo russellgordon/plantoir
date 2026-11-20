@@ -209,7 +209,14 @@ public class FixWithButtonsUiTests
             string picture = Path.ChangeExtension(into, null) + "-" + pictureNumber++ + ".png";
             try { FlaUI.Core.Capturing.Capture.Screen().ToFile(picture); }
             catch (Exception failure) { seen.Add($"picture failed: {failure.Message}"); }
-            lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.HelpText}\", pointer {DrivenApp.MiddleOf(element)}, picture {picture}): "
+            string under;
+            try
+            {
+                var at = app.Window.Automation.FromPoint(Mouse.Position);
+                under = $"{at?.ControlType} '{at?.AutomationId}' '{at?.Name}'";
+            }
+            catch (Exception failure) { under = "unknown: " + failure.Message; }
+            lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.HelpText}\", element at {element.BoundingRectangle}, pointer {Mouse.Position}, under the pointer {under}, picture {picture}): "
                       + (seen.Count == 0 ? "no tooltip seen in 4 s" : string.Join("; ", seen)));
         }
         Rest(Wait(app, "fixWithClaudeButton"), "Fix with Claude…, dimmed");
