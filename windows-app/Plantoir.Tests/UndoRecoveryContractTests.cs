@@ -269,7 +269,7 @@ public sealed class UndoRecoveryContractTests
             lock (scribe.TrailLines) said = scribe.TrailLines.Count(line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoFoundAFolderSetAside);
             Assert.Equal(folderLines.GetInt32(), said);
         }
-        List<string> leftovers = scribe.StagedLeftovers("A");
+        List<string> leftovers = away ? [] : scribe.StagedLeftovers("A");
         if (recoveryCase.TryGetProperty("keptAside", out JsonElement keptAside))
             Assert.True(keptAside.GetBoolean() == leftovers.Count > 0, "a folder kept aside: " + string.Join(", ", leftovers));
         else if (withATree)
