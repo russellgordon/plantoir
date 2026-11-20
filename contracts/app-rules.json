@@ -3603,7 +3603,7 @@
         "helpAnchors" : {
           "door" : "copilot",
           "educationBenefits" : "github-education",
-          "why" : "The Help book's page ids (#839's outline, one anchor a page). Russell, 2026-11-13: wherever Plantoir offers GitHub Copilot to a teacher who does not have it, it links the github-education page. This door is shown only while Copilot is installed (hiddenWhenNotInstalled), so it offers Copilot to nobody who lacks it; the first such offer is #855's set-up item, which links github-education."
+          "why" : "The Help book's page ids (#839's outline, one anchor a page). Russell, 2026-11-13: wherever Plantoir offers GitHub Copilot to a teacher who does not have it, it links the github-education page. Since #990 (Russell's ruling Q9) this door is drawn in the menu bar's Revise With on every computer and DIMMED while Copilot is not installed (outsideAgents.hiddenWhenNotInstalled false), and a row's context menu leaves it out (hiddenInContextMenusWhenNotInstalled); a dimmed item cannot be chosen, so the door still offers Copilot to nobody who lacks it and links no page of its own. The offer to a teacher without Copilot is #855's set-up item (setUp.menuItem, at the end of Revise With only since #990, ruling Q10), which links github-education."
         },
         "identity" : {
           "rule" : "A copilot found on the search list (searchedForInOrder) is used only when it is GitHub's: either its path, links followed, lies inside an npm install of npmPackage (…/node_modules/@github/copilot/…), or it is a program signed with signedIdentifier and signedTeam under an Apple-issued certificate (requirement). Any other copilot is passed over and the search goes on down the list; none left means no door.",

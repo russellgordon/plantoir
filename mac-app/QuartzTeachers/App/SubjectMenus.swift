@@ -55,7 +55,11 @@ struct CourseMenu: Commands {
 
             item("Save Course Settings", .saveCourseSettings, enabled)
                 .keyboardShortcut("s", modifiers: [.command])
+            // Dimmed on the Planning tab, whose help tag says why
+            // (`CourseSettingsCommands.revertHelp`, #990 review): no grey
+            // text row under it, ruling Q14.
             item("Revert Course Settings", .revertCourseSettings, enabled)
+                .help(settings?.revertHelp ?? "")
 
             Divider()
 
@@ -260,11 +264,17 @@ struct SectionMenu: Commands {
             item("Publish Pages…", .publishPages, enabled)
             item("Hide Pages…", .hidePages, enabled)
             item("Publish Class for a Date…", .publishClassForADate, enabled)
-            // ⇧⌘B: free in batch A's census of every key the menu bar takes,
-            // not a macOS system-wide key, and Bold only under a Format menu,
-            // which Plantoir has none of (documentation/09 → "Mac conventions").
+            // ⇧⌘Y (#990, Russell 2026-11-18): the Shift partner of Preview's
+            // ⌘Y. It was ⇧⌘B, which added Shift to ⌘B (Bold) for an
+            // unrelated command. ⇧⌘Y is in no row of the HIG's standard
+            // table and in no symbolic hot key; a stock Mac's Services menu
+            // gives it to Stickies' Make New Sticky Note, and inside
+            // Plantoir the app's own item wins ("When an application already
+            // has a shortcut with that key equivalent, the application's
+            // shortcut wins", Services Implementation Guide), measured in
+            // the running app (documentation/09 → "Mac conventions").
             item("Rebuild Preview", .rebuildPreview, enabled)
-                .keyboardShortcut("b", modifiers: [.command, .shift])
+                .keyboardShortcut("y", modifiers: [.command, .shift])
             // No key: ⌘Z belongs to text editing in Edit, and a key that took
             // back a page change from inside a text field would be a surprise
             // nobody could undo.

@@ -1302,7 +1302,14 @@ in place of the plain greeting. Every word, number and case is
 not kept for reference. Since #990 (the HIG review's D11, Russell's ruling
 Q9) a button whose assistant is not installed is DIMMED rather than left out,
 as the menu bar's Revise With items are, and its accessibility hint is
-`fixWith.notInstalledHelp`; until then it was hidden. Presence is read from
+`fixWith.notInstalledHelp`; until then it was hidden. Since #990's review the
+same reason is the button's help tag as well (`.help`, the one
+`FixWithAssistant.buttonHint` for both, `notEnabledHelp` while nothing is
+handed over, nothing while a press would work), so a sighted teacher holding
+the pointer over a dimmed button reads why: HIG, Offering help, "Consider
+offering context-sensitive tooltips". The HIG asks a tooltip to stay within
+60 to 75 characters "as much as possible"; `notInstalledHelp` is 91, and it
+was left as the contract has it rather than given a second, shorter copy. Presence is read from
 `OutsideAssistantPresence` (asked at launch and when the app becomes active,
 never while the table draws — the view's source scan holds that it never
 calls `isAvailable`). Each is enabled while its assistant is installed AND at
@@ -5879,10 +5886,20 @@ on the Planning tab for as long as the form would; one refused (a held-back
 Save, with the form's reason), failed (a write error) or saved with a notice
 to read takes the teacher to Settings, where the form shows its sentence
 beside the field (`CourseDetailTabs.afterASave`). Revert is dimmed on
-Planning: it would discard edits the teacher cannot see. (Until #990
-`words.revertOnPlanning` was a line under it in the Course menu; the menus
-hold no grey text rows since, Russell's ruling Q14. The sentence stays in the
-contract for Windows until stage 3 of #975 brings its menu to match.)
+Planning: it would discard edits the teacher cannot see. **Where the teacher
+learns why** (#990 review): until #990 `words.revertOnPlanning` was a grey
+line under the item in the Course menu; Russell's ruling Q14 took the grey
+rows out of the menus, and the same sentence is now the Revert item's help
+tag while Planning is in front (`CourseSettingsCommands.revertHelp`, empty on
+Settings). HIG, Offering help: "Consider offering context-sensitive tooltips.
+For example, you could provide different text for a control's different
+states." AppKit hands a menu item's tooltip to VoiceOver as the item's help,
+so one sentence serves a sighted teacher holding the pointer on the item and
+a VoiceOver user; Help's course-settings page says it too, for a teacher who
+looks there first. Rejected: an accessibility hint alone (a sighted teacher
+gets nothing), a text row (the ruling), and a hidden explanatory control (no
+invisible controls). Measured in the running app: see "Revert's help tag on
+Planning, measured" below.
 `CourseDetailStructureTests` draws the real form in a window never put on
 screen and checks the tree with Planning showing (no editable field, box or
 table), the footer case, Undo, that a draft typed on Settings survives the
@@ -7326,7 +7343,7 @@ onto Course ▸ Save Course Settings.
 | ⌘Y | Section ▸ Preview / Stop Preview — titled "Preview" or "Preview at Last Viewed" by Settings ▸ Preview (#504). ⌘Y since #990 (Russell, 2026-11-18): it was ⇧⌘P, the HIG's Page Setup; ⌘Y is Finder's Quick Look, the same idea |
 | ⌥⌘Y | Section ▸ Preview's Option alternate: the other start page (#504; a native `NSMenuItem.isAlternate`, so it is not a second item and `testEachKeyEquivalentMeansOneThing` skips it) |
 | ⇧⌘D | Section ▸ Deploy… |
-| ⇧⌘B | Section ▸ Rebuild Preview (batch B: free in batch A's census; Bold only under a Format menu, which Plantoir has none of; `WKWebView` binds nothing to it). Russell ruled ⇧⌘Y on 2026-11-18 (#990), the Shift partner of Preview's ⌘Y, but a stock Mac gives ⇧⌘Y to the Services menu's Make New Sticky Note (Stickies' `NSServices`, listed in System Settings ▸ Keyboard ▸ Keyboard Shortcuts ▸ Services), so it stays ⇧⌘B until he rules again; ⇧⌘B is itself the stock Send File To Bluetooth Device service (`vm-tools/briefs/MORNING-QUESTIONS.md`, #990) |
+| ⇧⌘Y | Section ▸ Rebuild Preview. ⇧⌘Y since #990 (Russell, 2026-11-18), the Shift partner of Preview's ⌘Y; it was ⇧⌘B (batch B), which added Shift to ⌘B, Bold, for an unrelated command. ⇧⌘Y is in no row of the HIG's Keyboards table and in no symbolic hot key. A stock Mac's Services menu gives it to Stickies' Make New Sticky Note (Stickies' `NSServices` entry, key `Y`, which takes selected text), and inside Plantoir the app's own item wins: "When an application already has a shortcut with that key equivalent, the application's shortcut wins" (Apple's Services Implementation Guide). See "Rebuild Preview's ⇧⌘Y beside the Stickies service, measured" below |
 
 Never taken: ⌘Q ⌘H ⌥⌘H ⌘, ⌘W ⌥⌘W ⌘M ⌘` ⌃⌘F ⌃⌘S ⌥⌘T ⌘Z ⇧⌘Z ⌘X ⌘C ⌘V ⌘A ⌘F
 ⌘G ⇧⌘G ⌘E ⌘P ⌘T ⇧⌘/ ⌘. ⌃⌘Space ⌥⌘D (the Dock, system-wide) ⇧⌘Q ⌃⌘Q ⌥⌘Esc
@@ -7436,7 +7453,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 | Publish Pages… | a searchable table of the hidden pages to tick, classes first (#608), then the plan as a table (#524), the pages already visible folded under it (#622) | `plan_publish_pages`, then `publish_pages` |
 | Hide Pages… | the same, of the visible pages | `plan_unpublish_pages`, then `unpublish_pages` |
 | Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan as a table (#524) | `plan_publish_class_on`, then `publish_class_on` |
-| Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
+| Rebuild Preview ⇧⌘Y | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
 | Undo Last Change | nothing: it runs and says what it put back | `undo_last_change` |
 | Add Class… (since #897; it replaced Add Next Class) | a sheet asking how: the next class in this unit, in a new unit, or as a copy of a class; the first two are added at once, a copy shows its plan first (the section after this one) | `add_next_class` (with `unit: "next"` for a new unit); a copy `plan_add_next_class`, then `add_next_class`, with its source's path |
 | Re-date Classes… | the plan | `plan_re_date_classes`, then `re_date_classes` (never a `website` key: that makes it a rollover) |

@@ -8068,9 +8068,11 @@ ran `/mcp disable plantoir` gets sessions with no Plantoir tools, which
 
 **Where a teacher without Copilot is sent.** Russell, 2026-11-13: wherever
 Plantoir offers Copilot to a teacher who does not have it, it links Help's
-`github-education` page (#839). This door is hidden while Copilot is not
-installed, so it offers Copilot to nobody who lacks it; the first such offer
-is #855's set-up item. The anchors are recorded in
+`github-education` page (#839). Since #990 the door is drawn in the menu
+bar's Revise With on every Mac and dimmed while Copilot is not installed (a
+row's context menu still leaves it out); a dimmed item cannot be chosen, so
+it offers Copilot to nobody who lacks it. The offer is #855's set-up item,
+at the end of Revise With only since #990. The anchors are recorded in
 `outsideAgents.agents[copilot].helpAnchors`.
 
 **What #855 builds on.** `CopilotLauncher.findCopilot()` and
