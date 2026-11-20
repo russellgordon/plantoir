@@ -93,7 +93,7 @@ public class PreviewWaitWakesOnTheRunTests : IDisposable
             runner.ReceiveOutput(OutputParsers.PreviewAnnouncementMarker + "http://localhost:8081/\n");
             Assert.False(again.HasChanged.IsCompleted, "the same address announced twice is not a change");
         }
-        Assert.Equal(new Uri("http://localhost:8081/"), runner.PreviewAddress);
+        Assert.Equal(new Uri("http://127.0.0.1:8081/"), runner.PreviewAddress);   // localhost is read as 127.0.0.1 (#278)
     }
 
     [Fact]

@@ -124,6 +124,92 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   spelling of an NFC-named folder is another (nonexistent) folder — ids
   `b7e56301` / `bbdbaf32` — and there is no second spelling to disagree about.
 
+
+### What the preview's wait waits on (#1016, the mac's #998)
+
+Until #1016 `SectionDetailView.WaitForPreviewServer` looked once a second in
+every phase, and each look stripped and searched the whole transcript
+(`Transcript.DisplayText`) for "Launching Quartz preview" and "Started a
+Quartz server". Since #1016:
+
+| What the wait needs | Where it comes from | How it waits |
+|---|---|---|
+| The run has ended, could not start, or was stopped | `ScriptRunner` (`IsRunning`, `LastExitCode`, `LaunchProblem`, `WasStoppedByUser`) | Woken by the change |
+| The address | the launcher's line, collected as lines arrive (#278) | Woken by the change (`PreviewAddress` now raises `PropertyChanged` when it changes) |
+| "Launching Quartz preview" | `build_site.py`'s line, collected as lines arrive (`ScriptRunner.HasAnnouncedQuartzLaunch`) | Woken by the change |
+| "Started a Quartz server" | Quartz's line, collected as lines arrive (`ScriptRunner.ServerStartedAt`, the time it ARRIVED, where the old loop stamped the look that first saw it, up to a second late) | Woken by the change |
+| The server answers | an HTTP request | Asked again after a second; #1011's landed line would let it wait |
+| The quiet bound (45 s, #233) | the clock | `PreviewReachability.UntilTheQuietRunsOut`: the wait sleeps until the run changes OR the bound, then asks `NextStep` again |
+
+`ScriptRunner.WatchTheStanding()` returns a `StandingWatch` that is completed
+by the first change of `ScriptRunner.StandingProperties`. The loop takes it
+BEFORE it reads the state it decides on, so a change landing between the
+reading and the wait is not lost (`AChangeBeforeTheAwaitIsNotLost`), and
+disposes it every turn. Unlike the mac's Observation registration (which
+cannot be withdrawn on macOS 15) a .NET event handler is removed, so nothing
+is left behind.
+
+`ScriptRunner.WaitUntilFinished` (a deploy leg, a build before a deploy, the
+tools' own runs) and `WaitUntilFinishedOrKill` looked at `IsRunning` every
+100 ms; they now end on `FinishRun`, which completes a task made at the start
+of each run. `WaitUntilFinishedOrKill`'s bound is the caller's and stays.
+
+**Measured** on the PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200): see the entry in `windows-app/PROGRESS.md` for #1016, which carries
+the run labels. What changes for a teacher is small: the preview notices that
+its run ended, or was stopped, at once instead of up to a second later, and a
+deploy's next leg starts on the end of the last instead of up to 100 ms after
+it. The launch line comes long before the server (it is printed before
+`quartz build --serve` starts), so the site still opens on the HTTP tries'
+one-second cadence; that is #1011's.
+
+**Rejected:**
+
+- Waking on every `PropertyChanged`. `Transcript` and `LastOutputAt` change
+  with every coalesced piece of output (150 ms), which would be the poll
+  again, faster; the quiet bound is met by the clock instead.
+- Searching the transcript when woken. The point of collecting the lines is
+  that nothing re-reads a transcript that can be hundreds of kilobytes.
+- Replacing the HTTP tries. Nothing announces that the server answers until
+  #1011 adds a line.
+
+**Nothing to replace for the other two shapes #998 changed on the mac.**
+Restored windows do not claim folders by frame on Windows: there is no system
+restoration, and `App.OnLaunched` hands each remembered window its own entry
+(`OpenWindow(entry.Path, entry)`). And no view polls for its window: WinUI
+gives a view its `XamlRoot` through `Loaded`.
+
+**Still owed** (each waits out something an event announces; inventoried for
+#1016 with a verdict for every timed wait in `Plantoir` and `Plantoir.Core`):
+
+- **WinUI's one ContentDialog slot**, nine places: the guidance question's 2 s
+  timer and the quit question's 50 ms looks (`MainWindow.Guidance.cs`,
+  `MainWindow.xaml.cs`), a script's question (`TaskProgressView`, 200 ms and
+  500 ms), the Section menu's dialog and the folder-problem dialog (150 ms
+  retries), the problems alert's 2 s re-ask and the checklist's 300 ms wait
+  (`SectionDetailView`), and the assistant's Open in Obsidian (300 ms). One
+  "the slot is free" signal raised from every dialog's `Closed` would replace
+  them all; it needs the UI suites that stack dialogs.
+- **The automation hooks' 1.5 s** (`MainWindow.RunAutomationHooks`): the
+  window's first `Activated` or `Loaded`. Every UI suite starts through them.
+- **Obsidian's processes ending** (`ObsidianProcesses.QuitAndWaitAsync`, 100 ms
+  within 3 s) and **a section's stop sweeps** (`PreviewStopper`, 120 ms within
+  20 s): the process's exit and the sweep's own task, with the same bounds.
+- **The course wizard's answer pump** (`NewCourseCreator.PumpAnswers`, 200 ms):
+  the transcript's change; its 600 ms settle is measured behaviour and stays.
+
+Kept, with the reason: cadences that ARE the behaviour (the progress
+counter, output coalescing, the question's three seconds of silence,
+Control-C's grace, the daily update clock, the "Saved" fade, the next whole
+second for a backup's name); bounded waits on what nothing announces (another
+program's windows, HTTP, files another program holds, leases held by other
+processes); and the marketing captures, which never run for a teacher.
+
+Tests: `PreviewWaitWakesOnTheRunTests` (the lines and the watch, the bound and
+the cancel, the run's end, and a source rule pinning that the view's wait
+watches the run and never searches the transcript); end to end,
+`PreviewStartPageUiTests` (real previews opening their page).
+
 ## The solution
 
 | Project | Role |
