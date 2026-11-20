@@ -307,7 +307,7 @@ public class StopByKeyboardUiTests
         Keyboard.Press(VirtualKeyShort.ESCAPE);
         Thread.Sleep(500);
         bool openBeforeTheRepeats = OpenStopQuestion(app) is not null;
-        for (int repeat = 0; repeat < 30; repeat++)
+        for (int repeat = 0; repeat < 90; repeat++)
         {
             Keyboard.Press(VirtualKeyShort.ESCAPE);
             Thread.Sleep(33);
@@ -315,7 +315,7 @@ public class StopByKeyboardUiTests
         Keyboard.Release(VirtualKeyShort.ESCAPE);
         Thread.Sleep(700);
         bool open = OpenStopQuestion(app) is not null;
-        Measured($"a held Escape (one press, 30 repeats): question {(openBeforeTheRepeats ? "open" : "not yet open")} before the repeats, {(open ? "still open" : "gone")} after, phase \"{Phase(app)}\"");
+        Measured($"a held Escape (one press, 90 repeats): question {(openBeforeTheRepeats ? "open" : "not yet open")} before the repeats, {(open ? "still open" : "gone")} after, phase \"{Phase(app)}\"");
         Assert.True(open, "a held Escape opened the question and its repeats closed it");
         AssertStillDeploying(app, "a held Escape");
         // A fresh Escape, after the release, is the question's Cancel as before.

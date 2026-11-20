@@ -850,6 +850,18 @@ public sealed partial class TaskProgressView : UserControl
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = XamlRoot,
         };
+        // A held Escape: the press that asked repeats while the key is held
+        // (Microsoft: an accelerator auto-repeats), and a repeat reaching the
+        // open question pressed its Cancel (measured in the VM, 1 run in 3).
+        // The question takes Escape only as a fresh press: a repeat
+        // (KeyStatus.WasKeyDown) is swallowed on its way down, as TickTable
+        // swallows a held Space's. On the visible question itself, for its
+        // own key; every other key, and a fresh Escape, is the dialog's as
+        // before.
+        dialog.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key == VirtualKey.Escape && args.KeyStatus.WasKeyDown) args.Handled = true;
+        };
         _openStopQuestion = dialog;
         _stopAsking = asking;
         try

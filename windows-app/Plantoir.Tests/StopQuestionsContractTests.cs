@@ -174,8 +174,11 @@ public sealed class StopQuestionsContractTests : IDisposable
         string panel = AppSource("Views", "TaskProgressView.xaml.cs");
         Assert.Contains("TaskCancelButton.KeyboardAccelerators.Add(escape);", panel);
         Assert.Contains("new KeyboardAccelerator { Key = VirtualKey.Escape }", panel);
-        // No key handler of its own: no PreviewKeyDown, no KeyDown on the panel.
-        Assert.DoesNotContain("PreviewKeyDown", panel);
+        // No key handler of its own: no KeyDown on the panel, and one
+        // PreviewKeyDown only, on the open stop question, which swallows
+        // nothing but a held Escape's repeats (#1009's first review).
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(panel, @"PreviewKeyDown \+="));
+        Assert.Contains("dialog.PreviewKeyDown += (_, args) =>\n        {\n            if (args.Key == VirtualKey.Escape && args.KeyStatus.WasKeyDown) args.Handled = true;\n        };", panel);
         Assert.DoesNotContain("this.KeyDown", panel);
         // A click and an accessibility press reach the same path, with no box check.
         Assert.Contains("private void TaskCancel_Click(object sender, RoutedEventArgs e) => _ = PressCancelAsync();", panel);
