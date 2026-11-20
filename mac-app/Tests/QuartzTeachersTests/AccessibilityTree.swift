@@ -106,6 +106,38 @@ struct AccessibilityTree {
 
     // MARK: - Functions
 
+    /// Performs the press action an assistive app uses (VoiceOver, Full
+    /// Keyboard Access) on every element identified as `identifier` in the
+    /// window titled `windowTitle`, and says how many were pressed and
+    /// whether each press was accepted.
+    static func press(identifiedAs identifier: String, inWindowTitled windowTitle: String) -> [AXError] {
+        var results: [AXError] = []
+        let application: AXUIElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        for window in elementList(of: application, attribute: kAXWindowsAttribute) {
+            if text(of: window, attribute: kAXTitleAttribute) != windowTitle {
+                continue
+            }
+            var matching: [AXUIElement] = []
+            collectElements(identifiedAs: identifier, under: window, into: &matching, depth: 0)
+            for element in matching {
+                results.append(AXUIElementPerformAction(element, kAXPressAction as CFString))
+            }
+        }
+        return results
+    }
+
+    static func collectElements(identifiedAs identifier: String, under node: AXUIElement, into found: inout [AXUIElement], depth: Int) {
+        if depth > 60 {
+            return
+        }
+        if text(of: node, attribute: kAXIdentifierAttribute) == identifier {
+            found.append(node)
+        }
+        for child in elementList(of: node, attribute: kAXChildrenAttribute) {
+            collectElements(identifiedAs: identifier, under: child, into: &found, depth: depth + 1)
+        }
+    }
+
     /// The elements with this identifier.
     func elements(identifiedAs identifier: String) -> [Element] {
         var matching: [Element] = []
