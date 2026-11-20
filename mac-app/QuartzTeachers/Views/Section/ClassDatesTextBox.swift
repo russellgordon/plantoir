@@ -34,24 +34,30 @@ struct ClassDatesTextBox: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView: NSScrollView = NSTextView.scrollableTextView()
+        let scrollView: NSScrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = true
-        if let textView = scrollView.documentView as? NSTextView {
-            textView.delegate = context.coordinator
-            textView.string = text
-            textView.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-            textView.isRichText = false
-            textView.allowsUndo = true
-            textView.isAutomaticQuoteSubstitutionEnabled = false
-            textView.isAutomaticDashSubstitutionEnabled = false
-            textView.isAutomaticTextReplacementEnabled = false
-            textView.isAutomaticSpellingCorrectionEnabled = false
-            textView.textContainerInset = NSSize(width: 2, height: 4)
-            textView.setAccessibilityLabel(accessibilityName)
-            textView.setAccessibilityIdentifier(identifier)
-        }
+        let textView: ClassDatesTextView = ClassDatesTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 150))
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        textView.delegate = context.coordinator
+        textView.string = text
+        textView.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.textContainerInset = NSSize(width: 2, height: 4)
+        textView.setAccessibilityLabel(accessibilityName)
+        textView.setAccessibilityIdentifier(identifier)
+        scrollView.documentView = textView
         return scrollView
     }
 
@@ -118,5 +124,25 @@ struct ClassDatesTextBox: NSViewRepresentable {
             }
             return false
         }
+    }
+}
+
+/// The box's text view: AppKit's own, which takes the focus when the box
+/// is put in a window, as the `TextEditor` before it did when the sheet
+/// opened (the inventory's captures of 2026-11-18, with Keyboard Navigation
+/// on and off). Without this the sheet opened with the focus on the route
+/// picker (Keyboard Navigation on), measured in the running app on
+/// 2026-11-20, and a teacher who pastes straight away pasted nowhere.
+final class ClassDatesTextView: NSTextView {
+
+    // MARK: - Functions
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else {
+            return
+        }
+        window.initialFirstResponder = self
+        window.makeFirstResponder(self)
     }
 }

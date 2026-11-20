@@ -521,6 +521,72 @@ final class PageTablesSheetTests: XCTestCase {
         XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
     }
 
+    /// The picker's columns fit inside the table at the sheet's opening
+    /// width, with the scroll bars a mouse shows (#997, D48): before, Page,
+    /// Folder and Date added up wider than the table once its up-and-down
+    /// scroll bar took its room, and a sideways scroll bar appeared.
+    func testThePickerShowsNoSidewaysScrollBar() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 20)
+        let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
+        let scrollView: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
+        scrollView.scrollerStyle = .legacy
+        host.pump()
+        scrollView.tile()
+        host.pump()
+        let lastColumn: Int = table.numberOfColumns - 1
+        XCTAssertEqual(lastColumn, 2)
+        let columnsEnd: CGFloat = table.rect(ofColumn: lastColumn).maxX
+        let shown: CGFloat = scrollView.contentView.bounds.width
+        print("PageTablesSheetTests: picker columns \(PageTablesSheetTests.widths(of: table)) end at \(columnsEnd) pt; "
+              + "the table is \(table.frame.width) wide and shows \(shown) pt")
+        XCTAssertLessThanOrEqual(columnsEnd, shown + 0.5, "the picker's columns run past what it shows, so it scrolls sideways")
+        XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
+    }
+
+    /// The picker shows no sideways scroll bar when its rows arrive after
+    /// it opened, with the scroll bars a mouse shows (#997, D48): the table
+    /// then spreads the width over the columns in half points, they ran
+    /// half a point past what the table shows (measured 146.5, 134.5 and
+    /// 174.5 ending at 501.5 in 501), and a sideways scroll bar appeared
+    /// under the rows, as the inventory's capture shows.
+    func testThePickerShowsNoSidewaysScrollBarWhenItsRowsArriveLater() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let full: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 20)
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 0, pages: 1)
+        let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
+        let scrollView: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
+        scrollView.scrollerStyle = .legacy
+        host.pump()
+        model.pageRows = full.pageRows
+        host.pump(0.6)
+        scrollView.tile()
+        host.pump()
+        let columnsEnd: CGFloat = table.rect(ofColumn: table.numberOfColumns - 1).maxX
+        let shown: CGFloat = scrollView.contentView.bounds.width
+        let sidewaysBar: Bool = scrollView.hasHorizontalScroller && scrollView.horizontalScroller?.isHidden == false
+            && columnsEnd > shown
+        print("PageTablesSheetTests: picker with rows added: \(PageTablesSheetTests.widths(of: table)) end at \(columnsEnd) "
+              + "in \(shown); sideways scroller \(scrollView.hasHorizontalScroller), hidden \(String(describing: scrollView.horizontalScroller?.isHidden))")
+        XCTAssertEqual(table.numberOfRows, 23)
+        XCTAssertFalse(sidewaysBar, "the picker shows a sideways scroll bar: its columns end at \(columnsEnd) in \(shown)")
+        XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
+    }
+
     /// The width a teacher adds goes to the Page column: dragged from 560 to
     /// 900 wide, Page gains more than Folder and What changes together.
     func testThePageColumnTakesTheWidthAdded() async throws {

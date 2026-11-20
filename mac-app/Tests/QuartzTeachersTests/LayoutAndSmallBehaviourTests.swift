@@ -85,6 +85,7 @@ final class LayoutAndSmallBehaviourTests: XCTestCase {
         let boxes: [NSTextView] = LayoutAndSmallBehaviourTests.textViews(in: content)
         XCTAssertEqual(boxes.count, 1, "the sheet should hold one dates box")
         let box: NSTextView = try XCTUnwrap(boxes.first)
+        XCTAssertTrue(host.window.firstResponder === box, "the dates box does not have the focus as the sheet opens")
         box.string = "2026-09-08"
         box.setSelectedRange(NSRange(location: 10, length: 0))
 

@@ -4516,6 +4516,87 @@ test, and choosing it over a hosted-view geometry check was the same call
 `Form` renders lazily on macOS, so walking the view tree means fighting the
 layout for an answer the source already gives.
 
+## Layout and small behaviour after the HIG review (#997)
+
+Part of the Mac's review against Apple's Human Interface Guidelines (#975,
+stage 2). Each change names the HIG sentence it follows; the Windows app is
+brought to match in stage 3.
+
+- **Settings panes fit what they hold (D42).** Every pane goes through
+  `settingsPaneFitsItsContent()` (`PlantoirSettingsView.swift`): the
+  window's 560-point width and `.fixedSize(horizontal: false, vertical:
+  true)`, so the Settings window, which takes the chosen pane's size, is
+  as tall as that pane. Measured in the unit host on 2026-11-19: Preview
+  159 pt, Obsidian 167 pt, Assistant 674 pt (holding 674, so it no longer
+  scrolls). Until then every pane opened at 560 × 648: the Assistant pane
+  was held at `.frame(height: 560)` and scrolled, and the others, grouped
+  forms with only a `minHeight`, opened at the same size, so Preview and
+  Obsidian were mostly empty space (the inventory's captures). The `minHeight`s the other panes
+  carried went with it. HIG, Settings: "a settings window accommodates the
+  size of the current pane, people don't need to expand the window to see
+  more." `LayoutAndSmallBehaviourTests` pins the sizes and that Assistant
+  does not scroll at its own; Deploying and Other Assistants are not hosted
+  there, because hosting them reads the keychain and looks for the outside
+  assistants.
+- **A course's whole code on hover (D44).** `CourseRowLabel` carries
+  `.help(course.displayCode)`, so a 12-character code, cut short at the
+  sidebar's default 228-point width, can still be read. Middle truncation
+  was not taken: a code is short and read from its start. HIG, Text fields:
+  "Consider using an expansion tooltip to show the full version of clipped
+  or truncated text." `AccessibilityTreeTests` reads the help tag off the
+  tree (`AccessibilityTree.Element.help`, new).
+- **The Backups total keeps a margin (D45).** `BackupsSectionHeader` puts
+  `trailingMargin` (10 pt) after the total; it was drawn about 2 pt from
+  the divider while the heading's name sits about 14 pt in. HIG, Layout:
+  "make it easy to apply standard margins around content." The tree gives
+  the heading's row and the sidebar's frames (`Element.frame`, new), not
+  the total's own, because a section header reaches it as one heading
+  ("Backups, 271 KB"); the test adds the margin it measures the heading
+  drawing (with against without) to the row's own trailing room.
+- **Tab leaves the class-dates box (ruling Q-C on #975).** The Class Dates
+  sheet's box (also reached from Add Class, Make Room and Roll Over) is
+  `ClassDatesTextBox`, AppKit's own text view in a representable, whose
+  delegate answers `insertTab:` and `insertBacktab:` by moving along the
+  window's key view loop (from the scroll view, then from the text view if
+  that left the focus where it was), and types nothing. Return still makes
+  a new line, and typing, undo, pasting and VoiceOver are the text view's.
+  A SwiftUI `TextEditor` typed a tab and kept the focus, as a text view
+  does (Keyboards lists Control-Tab for moving on); the box only holds
+  dates, so Russell ruled Tab moves on. HIG, Text fields: "Ensure that
+  tabbing between multiple fields flows as people expect." REJECTED:
+  `.onKeyPress(.tab)` on the `TextEditor` (whether SwiftUI sees the key
+  before the text view inserts it is not documented), and making the text
+  view a field editor (Return would end editing instead of starting a new
+  line). The box's VoiceOver name (D41) moved onto the text view itself,
+  where VoiceOver lands: SwiftUI's `.accessibilityLabel` on a representable
+  names the scroll view around it, and the tree then had two elements
+  called `sectionScheduleTypedField`. The text view
+  (`ClassDatesTextView`) takes the focus when it is put in the sheet's
+  window, as the `TextEditor` did: without that, measured in the running
+  app on 2026-11-20 with Keyboard Navigation on, the sheet opened with the
+  focus on the route picker. Driven in that app (an isolated copy with
+  `--state-dir`, Keyboard Navigation on): Tab from the picker entered the
+  box, Tab from the box went to "Where these came from", Shift-Tab came
+  back and Shift-Tab again reached the picker, and the box held only what
+  was typed.
+- **No sideways scroll bar under the Publish Pages picker (D48).** The
+  picker's table carries `.scrollIndicators(.never, axes: .horizontal)`.
+  Measured in `PageTablesSheetTests` with the scroll bars a mouse shows:
+  when the rows arrive after the table is drawn, it spreads the width over
+  Page, Folder and Date in half points (146.5, 134.5, 174.5) and the
+  columns end at 501.5 in a table that shows 501, so AppKit put a sideways
+  scroll bar under the rows. The columns are meant to fit the sheet, so
+  there is nothing to scroll to but that half point. HIG, Lists and
+  tables: "Consider ways to preserve readability of text that might
+  otherwise get clipped or truncated." NOT done: rounding the columns
+  down to whole points, because SwiftUI's `Table` chooses their widths and
+  gives no hold on its `NSTableView`.
+- **D12 (the empty Planning tab with no assistant installed) cannot be
+  reached.** The Planning tab is absent unless an assistant is installed
+  (`unitPlanning.tab.tabCases`, `PlanningTab.isShown`, read from the same
+  `OutsideAssistantPresence` as the empty tab's buttons), so the empty tab
+  is never drawn with no button under it. Nothing was changed for it.
+
 ## Course Settings lists are tables, and why
 
 Issue #266, 2026-09-24. Every list of folders or files in Course Settings and

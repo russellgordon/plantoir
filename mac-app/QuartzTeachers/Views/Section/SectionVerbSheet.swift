@@ -1105,6 +1105,13 @@ struct SectionVerbSheet: View {
             .width(min: 120, ideal: 150, max: 180)
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        // No sideways scroll bar (#997, D48): the columns are meant to fit
+        // the sheet's width, and when the rows arrive after the table is
+        // drawn it spreads the width in half points, ending half a point
+        // past what it shows, which put a scroll bar under the rows. HIG,
+        // Lists and tables: "Consider ways to preserve readability of text
+        // that might otherwise get clipped or truncated."
+        .scrollIndicators(.never, axes: .horizontal)
         .flexibleTableHeight(pickerTableHeight)
         .onKeyPress(.space) {
             if pickedRowID == nil {
