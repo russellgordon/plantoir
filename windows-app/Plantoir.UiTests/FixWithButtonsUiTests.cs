@@ -203,6 +203,8 @@ public class FixWithButtonsUiTests
 
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern void mouse_event(int flags, int dx, int dy, int data, IntPtr extra);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetCursorPos(out System.Drawing.Point point);
 
     /// <summary>
     /// Moves the real pointer away and then onto the middle of
@@ -218,28 +220,41 @@ public class FixWithButtonsUiTests
         Mouse.MoveTo(new System.Drawing.Point(middle.X, middle.Y - 120));
         Thread.Sleep(600);
         Mouse.MoveTo(middle);
-        var seen = Retry.WhileFalse(() => ToolTipShowing(app, tip), TimeSpan.FromSeconds(4), TimeSpan.FromMilliseconds(250)).Result;
-        if (pictures.Length > 0)
-        {
-            Directory.CreateDirectory(pictures);
-            // Real pixels: this process is not DPI-aware, so the thread is
-            // made per-monitor aware for the capture alone (PageTablesUiTests).
-            IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
-            try
-            {
-                int width = GetSystemMetrics(0), height = GetSystemMetrics(1);
-                using var bitmap = new System.Drawing.Bitmap(width, height);
-                using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
-                    graphics.CopyFromScreen(0, 0, 0, 0, new System.Drawing.Size(width, height));
-                bitmap.Save(Path.Combine(pictures, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
-                File.AppendAllText(Path.Combine(pictures, "measured.txt"),
-                    $"{DateTime.Now:o} {name}: pointer at {middle.X},{middle.Y} (element box {element.BoundingRectangle}); screen {width} x {height}{Environment.NewLine}");
-            }
-            finally { SetThreadDpiAwarenessContext(previous); }
-        }
+        // Mouse.MoveTo places the cursor (SetCursorPos); a nudge through
+        // mouse_event is real input, which WinUI's pointer events follow.
+        mouse_event(0x0001, 2, 0, 0, IntPtr.Zero);
+        Thread.Sleep(50);
+        mouse_event(0x0001, -2, 0, 0, IntPtr.Zero);
+        Thread.Sleep(1500);
+        Picture(pictures, name + "-1s5", element);
+        var seen = Retry.WhileFalse(() => ToolTipShowing(app, tip), TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(250)).Result;
+        Picture(pictures, name + "-4s5", element);
         Mouse.MoveTo(new System.Drawing.Point(middle.X, middle.Y - 120));
         Thread.Sleep(400);
         return seen;
+    }
+
+    /// <summary>The whole screen in real pixels into <paramref name="pictures"/>, and where the cursor was.</summary>
+    private static void Picture(string pictures, string name, AutomationElement element)
+    {
+        if (pictures.Length == 0) return;
+        Directory.CreateDirectory(pictures);
+        // Real pixels: this process is not DPI-aware, so the thread is made
+        // per-monitor aware for the capture alone (PageTablesUiTests).
+        IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try
+        {
+            int width = GetSystemMetrics(0), height = GetSystemMetrics(1);
+            GetCursorPos(out var cursor);
+            using var bitmap = new System.Drawing.Bitmap(width, height);
+            using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                graphics.CopyFromScreen(0, 0, 0, 0, new System.Drawing.Size(width, height));
+            bitmap.Save(Path.Combine(pictures, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+            File.AppendAllText(Path.Combine(pictures, "measured.txt"),
+                $"{DateTime.Now:o} {name}: cursor at {cursor.X},{cursor.Y} real pixels (element box {element.BoundingRectangle}); screen {width} x {height}{Environment.NewLine}");
+        }
+        catch (Exception error) { Console.WriteLine("no picture: " + error.Message); }
+        finally { SetThreadDpiAwarenessContext(previous); }
     }
 
     private static bool ToolTipShowing(DrivenApp app, string tip)
