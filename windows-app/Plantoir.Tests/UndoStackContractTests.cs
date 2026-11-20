@@ -35,15 +35,15 @@ public sealed class UndoStackContractTests
         Assert.Equal(UndoContract.Undo.GetProperty("stackCases").GetArrayLength(), Cases().Count());
     }
 
-    /// <summary>Every case held open by name (U2's op kinds, W6) is a case the contract still has.</summary>
+    /// <summary>Every case held open by name is a case the contract still has (none since W6).</summary>
     [Fact]
     public void EveryHeldStackCaseIsStillInTheContract() =>
         NamedGapLedger.StillNamed(NamedGapLedger.UndoStackCases, Cases().Select(row => (string)row[0]));
 
     /// <summary>
-    /// Every case, asserted in full. A case the ledger holds open (a call or
-    /// a key of U2's op kinds, which W6 brings) must still stop at that call
-    /// or key, and goes from the ledger the day it passes.
+    /// Every case, asserted in full, U2's calls and keys included (W6). A case
+    /// the ledger holds open (a call or a key a later piece brings) must still
+    /// stop at that call or key, and goes from the ledger the day it passes.
     /// </summary>
     [Theory]
     [MemberData(nameof(Cases))]
@@ -52,8 +52,7 @@ public sealed class UndoStackContractTests
     /// <summary>
     /// One case, walked by <paramref name="walk"/>, held or not as
     /// <paramref name="entries"/> say. <see cref="EveryStackCase"/> passes the
-    /// real walk (and a later piece's held cases would be proved against
-    /// W6's, to prove that a held case does not outlive its gap.
+    /// real walk; a held case that plays through fails as its gap closing.
     /// </summary>
     private static void RunAsTheLedgerSays(string name, IEnumerable<NamedGapLedger.Entry> entries, Action walk)
     {

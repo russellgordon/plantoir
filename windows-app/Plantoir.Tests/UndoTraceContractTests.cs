@@ -17,6 +17,10 @@ namespace Plantoir.Tests;
 /// pages' hashes must be <c>afterUndoingAll</c> once the closing undos stop and
 /// <c>final</c> at the end.
 ///
+/// <para>A <c>move</c> call (U2) moves the page aside as one move through the
+/// door for ops, <c>Perform(UndoOpsDraft)</c> (W6); a step or hand edit naming
+/// a page that is not at its path leaves it alone; no staged item is left.</para>
+///
 /// <para>What W2 adds on top: the same traces through the real door (the
 /// lock, the staged swap, the flush), and from U3 the ~120 traces of the real
 /// action code.</para>
@@ -47,7 +51,7 @@ public sealed class UndoTraceContractTests
         Assert.Equal([0xEF, 0xBB, 0xBF], fixture.Single(page => page.Id == "p6").Bytes[..3]);
     }
 
-    /// <summary>Every trace held open by name (it holds U2's <c>move</c>, which W6 brings) is a trace the contract still has.</summary>
+    /// <summary>Every trace held open by name is a trace the contract still has (none since W6 replays a move).</summary>
     [Fact]
     public void EveryHeldTraceIsStillInTheContract() =>
         NamedGapLedger.StillNamed(NamedGapLedger.UndoTraces, Traces().Select(row => (string)row[0]));

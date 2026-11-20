@@ -14,8 +14,9 @@ namespace Plantoir.Tests;
 /// (<see cref="UndoDoor.Recover"/>, the app's recovery). A file in use during
 /// recovery is a REAL holder (<c>FileShare.ReadWrite</c>, no delete: the
 /// re-read succeeds, the put-back's rename is refused 32). The rows of U2b's
-/// kinds (a move, a tree, a preference, who recovers) are W6's and held on the
-/// ledger; each must still stop at the key it is held for.
+/// kinds (a move, a tree, a preference, who recovers) run through the door for
+/// ops since W6, with their markers, folders, preference, re-derivations and
+/// trail lines checked.
 /// </summary>
 public sealed class UndoRecoveryContractTests
 {
@@ -46,7 +47,7 @@ public sealed class UndoRecoveryContractTests
         Assert.Equal(UndoContract.Undo.GetProperty("recoveryCases").GetArrayLength(), Cases().Count());
     }
 
-    /// <summary>Every case held open by name (U2b's kinds, W6) is a case the contract still has.</summary>
+    /// <summary>Every case held open by name is a case the contract still has (none since W6).</summary>
     [Fact]
     public void EveryHeldRecoveryCaseIsStillInTheContract() =>
         NamedGapLedger.StillNamed(NamedGapLedger.UndoRecoveryCases, Cases().Select(row => (string)row[0]));
