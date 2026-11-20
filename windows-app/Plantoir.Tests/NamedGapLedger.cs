@@ -413,6 +413,7 @@ internal static class NamedGapLedger
     private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
     private const string Reason899W6 = "the six op kinds the mac's U2b defines (replaceText, editJSON, move, createTree, removeTree, external) and recompute run are Windows' W6 for #899, still to come (plans/899-plan.md, W6 to W11b); until it lands this app's reader takes each for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
+    private const string Reason899W4c = "the mac's U3c for #899 (2026-11-20; Russell's ruling of 15:20): recovery and an Undo or Redo put a page back from the step's own kept original (-orig, or -<n>-orig) when its hash matches the journal's record, every tidy keeps a kept original that is the only copy of what it holds (its bytes neither its page's nor what the list gives for its page), a swap never removes or reuses a kept original's name, an Undo or Redo of a newest step recovery has just left answers that refusal, and three trail lines say what was kept or refused; Windows' W4c, kept-original recovery, builds it (UndoRecovery.Settle, UndoDoor.AnswerARefusal, UndoSwap, UndoTrail.ToTheActivityTrail); until it lands this replay does not know the calls and keys those cases use, and this app writes none of those lines";
     private const string Reason899W6Traces = Reason899W6 + ". COVERAGE LOST, for W6 to restore: until U2b's contract put a move in them, W1 replayed all 20 traces call by call to their final hashes; held, each of these 15 is asserted only up to its first move and must stop exactly there, and trace-002, trace-012 and trace-020 open with a move, so they check nothing at all here until W6 replays them whole";
     private const string Reason1009 = "stopping a running preview, deploy or plan share from the keyboard, with the two stop questions, their Don't ask again boxes and Settings > Deploying > Stopping (the mac's #988), is #1009's piece of v2.0.0; until it lands Windows asks no stop question and has no setting for one, so it has no change to record";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
@@ -555,6 +556,10 @@ internal static class NamedGapLedger
              "files for the site downloaded", "files for the site could not be downloaded"),
         Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back", "undo found a folder set aside"),
         Owed(ActivityTrailEvents, 1009, V200, Reason1009, "stop question setting changed"),
+        Owed(ActivityTrailEvents, 899, V200, Reason899W4c,
+             "undo could not put back a change that stopped",
+             "undo kept what a page held",
+             "undo refused for a change left part way"),
         // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
         // recompute run. This reader takes them for kinds it does not know
         // until W6 (the Windows plan, plans/899-plan.md: W1 reads the
@@ -649,6 +654,10 @@ internal static class NamedGapLedger
              "U2, createTree: an Undo whose content the list no longer holds is refused and the folder kept (the list is cleared, as for any content missing)",
              "U2, removeTree: a Redo whose content the list no longer holds is refused, the folder kept, only the redo dropped",
              "U2: the folder a page was moved out of, replaced since by a link to outside the working folder: Undo moves nothing out, refuses as changed since, and clears the list"),
+        Owed(UndoStackCases, 899, V200, Reason899W4c,
+             "U3c: an Undo whose content is missing, with the page's kept original matching what the journal recorded, is undone from it and leaves nothing beside the page (Russell's ruling of 2026-11-20, 15:20)",
+             "U3c: the same with the kept original no longer matching: refused once with its reason, the list cleared, and the kept original left beside the page",
+             "U3c: a kept original another Mac or an earlier list left under the very name the next step's swap would use is never removed or reused: the step keeps its own original under the next free name and goes in (the third review of U3a, LOW 6: step numbers are not unique across two Macs syncing one folder, or after a list is started again)"),
         Owed(UndoTraces, 899, V200, Reason899W6Traces,
              "trace-002",
              "trace-003",
