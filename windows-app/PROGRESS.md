@@ -22,12 +22,21 @@ Branch `issue/1016-win-timed-polls`. Lenovo 20QES70500 (i5-8365U, 16 GB, Windows
 - Every timed wait in `Plantoir` and `Plantoir.Core` was inventoried with a verdict (47 rows: 31 kept, 3 replaced here, 13 owed, the ContentDialog slot nine of them). The owed list and the reasons: documentation/12, "What the preview's wait waits on (#1016, the mac's #998)".
 - Measured (throwaway test, this PC): the old look cost 0.04 to 0.47 ms a second (300 to 4,000 lines); the new wake on the launch line, median 0.027 ms where the old loop resumed up to 1 s later. Unit suite `1016-full1`: 4,659 tests, exactly the six known failures. Sabotage run `1016-sab1` (the watch woken by any property, `WaitUntilFinished` polling again, the view searching the transcript): 4 of the 11 fail, each sabotage caught.
 - Tests: `PreviewWaitWakesOnTheRunTests` (11). No `mac` issue: the mac already has the same design (#998); nothing shared changed.
+- UI tests in the desktop session (the console, 1280 x 720): `PreviewStartPageUiTests` 4 of 4 (4 m 3 s), `PublishToFolderUiTests` 1 of 1, `WizardToPreviewUiTests` 1 of 1, `ReturningToASectionMidDeployUiTests` 1 of 1.
+
+## 2026-11-20 — a dimmed Fix with button's reason reaches a mouse user (#1017)
+
+Branch `issue/1017-win-fixwith-tooltip-and-test`. Lenovo 20QES70500: unit suite over SSH, UI tests in the desktop session.
+
+- The tooltip on a dimmed Fix with button never showed: WinUI 3 has no `ShowOnDisabled`, and a disabled control handles no input itself. Each button now sits in a `Border` of exactly its box that owns the tooltip; `HelpText` stays on the button. Measured with a real pointer: before, the sidebar's + showed its tooltip and the dimmed Fix with Codex… none; after, "Not set up on this PC." shows above it, on screen and to UI Automation.
+- `FixWithButtonsUiTests`: the Codex door's six `-c` pairs checked by name (it expected 12 arguments; #884 made it 14 on purpose), and a new test of a Codex this PC lacks: drawn, dimmed, its help text, and the tooltip on hover. `ReviseWithPresenceTests`: `ApplyMenuEnablement` dims a missing door and never hides it. `SectionProblemsSourceTests`: the tooltip stays on the frame.
+- Details: documentation/12, "Revise With: dimmed in the menu bar, hidden in a row's menu (#990)".
 
 ## 2026-11-19 — a missing assistant dimmed in the menu bar and on Fix with (#990, the mac's D11 and Q14)
 
 Branch `issue/990-menus-windows`, on the mac's `issue/990-menus`. Lenovo 20QES70500 over SSH.
 
-- Fix with Claude… / Codex…: both drawn on every live course, each enabled only when its assistant is installed and a row is handed over (`buttonCases`' `claudeEnabled`/`codexEnabled`); a missing one says "Not set up on this PC." to Narrator and as its tooltip. The contract's second sentence (Settings ▸ Other Assistants) is held by name against #903, which builds that page.
+- Fix with Claude… / Codex…: both drawn on every live course, each enabled only when its assistant is installed and a row is handed over (`buttonCases`' `claudeEnabled`/`codexEnabled`); a missing one says "Not set up on this PC." to Narrator (its `HelpText`) and, since #1017, as a tooltip on the button's frame, seen on the PC's screen with the pointer resting on the dimmed button (a tooltip on the disabled button itself never showed). The contract's second sentence (Settings ▸ Other Assistants) is held by name against #903, which builds that page.
 - Course ▸ and Section ▸ Revise With ▸ Claude… and Codex…: always drawn, dimmed when not installed (`SubjectMenuRules.EnabledInTheMenuBar`, re-read on `OutsideAssistantPresence.Changed` and at the click). A row's context menu still hides them.
 - Course ▸ Rename's grey reason line is gone (ruling Q14); the row's context menu keeps its notes.
 - Not on Windows, so nothing done: Set Up an Assistant… (no set-up until #903, so no Help item to remove), the deployed folder's context-menu group (#889).

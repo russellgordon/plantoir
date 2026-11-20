@@ -408,59 +408,20 @@ struct AssistWindowView: View {
     /// stops growing at four).
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Ask about this section…", text: $typing, axis: .vertical)
-                .borderedTextField()
-                .lineLimit(1...4)
-                .onSubmit {
+            AssistComposerField(
+                typing: $typing,
+                history: $history,
+                lastRecalled: $lastRecalled,
+                isFocused: $isComposerFocused,
+                canAcceptTyping: session.canAcceptTyping,
+                onSubmit: {
                     // Ignored while the assistant is mid-run: it does one
                     // thing at a time, and a second request would interleave
                     // with the first one's tool calls. During the warm-up it
                     // is held rather than ignored — see `sendOrHold()`.
                     sendOrHold()
                 }
-                // Up and Down walk what has been asked before, the way a
-                // Terminal does.
-                //
-                // Handed back as `.ignored` in two cases, so the keys keep
-                // doing their ordinary job when history is not what is
-                // wanted: when the box holds more than one line, where the
-                // arrows have to move the caret between those lines, and
-                // when there is nowhere further to walk — a key that silently
-                // does nothing reads as a dropped keystroke, while one that
-                // is passed on lets the field answer it.
-                .onKeyPress(.upArrow) {
-                    if typing.contains("\n") {
-                        return .ignored
-                    }
-                    guard let recalled = history.earlier(startingFrom: typing) else {
-                        return .ignored
-                    }
-                    show(recalled)
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    if typing.contains("\n") {
-                        return .ignored
-                    }
-                    guard let recalled = history.later() else {
-                        return .ignored
-                    }
-                    show(recalled)
-                    return .handled
-                }
-                // Editing a recalled line makes it a new line, so Down must
-                // not come along afterwards and replace what was typed. The
-                // walk writes through `show(_:)`, which records what it put
-                // there — so anything ELSE that changes the box came from the
-                // keyboard, and ends the walk.
-                .onChange(of: typing) { _, current in
-                    if history.isBrowsing && current != lastRecalled {
-                        history.stopBrowsing()
-                    }
-                }
-                .focused($isComposerFocused)
-                .disabled(!session.canAcceptTyping)
-                .accessibilityIdentifier("assistInputField")
+            )
 
             Button {
                 sendOrHold()
@@ -605,6 +566,94 @@ struct AssistWindowView: View {
         // that.
         isComposerFocused = true
         await session.agent?.say(message)
+    }
+}
+
+/// The composer's box: the bordered field every field in Plantoir wears,
+/// growing to four lines, with Up and Down walking what has been asked
+/// before. Its own view (#1012) so a test can host the real field and read
+/// the name VoiceOver is given, without opening an assistant window, which
+/// starts the assistant.
+struct AssistComposerField: View {
+
+    // MARK: - Stored properties
+
+    @Binding var typing: String
+    @Binding var history: AssistPromptHistory
+
+    /// What the last walk through the history put in the box, so an edit
+    /// made afterwards can be told apart from the walk.
+    @Binding var lastRecalled: String?
+
+    var isFocused: FocusState<Bool>.Binding
+    let canAcceptTyping: Bool
+    let onSubmit: () -> Void
+
+    // MARK: - Body
+
+    var body: some View {
+        TextField("Ask about this section…", text: $typing, axis: .vertical)
+            .borderedTextField()
+            .lineLimit(1...4)
+            .onSubmit {
+                onSubmit()
+            }
+            // Up and Down walk what has been asked before, the way a
+            // Terminal does.
+            //
+            // Handed back as `.ignored` in two cases, so the keys keep
+            // doing their ordinary job when history is not what is
+            // wanted: when the box holds more than one line, where the
+            // arrows have to move the caret between those lines, and
+            // when there is nowhere further to walk — a key that silently
+            // does nothing reads as a dropped keystroke, while one that
+            // is passed on lets the field answer it.
+            .onKeyPress(.upArrow) {
+                if typing.contains("\n") {
+                    return .ignored
+                }
+                guard let recalled = history.earlier(startingFrom: typing) else {
+                    return .ignored
+                }
+                show(recalled)
+                return .handled
+            }
+            .onKeyPress(.downArrow) {
+                if typing.contains("\n") {
+                    return .ignored
+                }
+                guard let recalled = history.later() else {
+                    return .ignored
+                }
+                show(recalled)
+                return .handled
+            }
+            // Editing a recalled line makes it a new line, so Down must
+            // not come along afterwards and replace what was typed. The
+            // walk writes through `show(_:)`, which records what it put
+            // there — so anything ELSE that changes the box came from the
+            // keyboard, and ends the walk.
+            .onChange(of: typing) { _, current in
+                if history.isBrowsing && current != lastRecalled {
+                    history.stopBrowsing()
+                }
+            }
+            .focused(isFocused)
+            .disabled(!canAcceptTyping)
+            // Named in words of its own (#1012): the placeholder is a hint
+            // that goes as soon as a teacher types, and assistive apps do
+            // not read it as the box's name.
+            .accessibilityLabel(Text(AccessibilityNames.askAboutThisSection))
+            .accessibilityIdentifier("assistInputField")
+    }
+
+    // MARK: - Functions
+
+    /// Puts a line from the history in the box, and records that the walk
+    /// put it there.
+    private func show(_ recalled: String) {
+        lastRecalled = recalled
+        typing = recalled
     }
 }
 

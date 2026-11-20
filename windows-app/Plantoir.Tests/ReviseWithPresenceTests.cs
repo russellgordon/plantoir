@@ -98,6 +98,42 @@ public class ReviseWithPresenceTests
         Assert.Contains("if (CodexLauncher.IsAvailable)", items);
     }
 
+    /// <summary>
+    /// #1017: <c>ApplyMenuEnablement</c>, which re-runs whenever presence
+    /// changes, only DIMS the ruled items: the one line that touches them
+    /// sets <c>IsEnabled</c> through the rule, and nothing in it collapses a
+    /// view, a Revise With door included. The one <c>Visibility</c> it sets is
+    /// Preview's alternate (hidden while Stop Preview shows), which no
+    /// assistant decides. A change that hid a missing assistant's item there
+    /// (a <c>Visibility</c> on <c>view</c>, or <c>IsInstalledHere</c> deciding
+    /// anything but <c>IsEnabled</c>) turns this red.
+    /// </summary>
+    [Fact]
+    public void ApplyMenuEnablementDimsAMissingDoorAndNeverHidesIt()
+    {
+        string menus = Source("Plantoir", "MainWindow.Menus.cs");
+        var method = Regex.Match(menus, @"internal void ApplyMenuEnablement\(\)(?<body>.*?)\n    \}", RegexOptions.Singleline);
+        Assert.True(method.Success, "ApplyMenuEnablement was not found in MainWindow.Menus.cs.");
+        string body = method.Groups["body"].Value;
+        Assert.Contains("foreach (var (item, view) in _ruled) view.IsEnabled = SubjectMenuRules.EnabledInTheMenuBar(item, enabled, IsInstalledHere);", body);
+
+        var visibilityLines = new List<string>();
+        var presenceLines = new List<string>();
+        foreach (string line in body.Split('\n'))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("//", StringComparison.Ordinal)) continue;
+            if (trimmed.Contains("Visibility", StringComparison.Ordinal)) visibilityLines.Add(trimmed);
+            if (trimmed.Contains("IsInstalledHere", StringComparison.Ordinal) || trimmed.Contains("IsAvailable", StringComparison.Ordinal)
+                || trimmed.Contains("OutsideAssistantPresence", StringComparison.Ordinal)) presenceLines.Add(trimmed);
+        }
+        Assert.Equal(new[] { "alternate.Visibility = stops ? Visibility.Collapsed : Visibility.Visible;" }, visibilityLines);
+        Assert.Equal(new[] { "foreach (var (item, view) in _ruled) view.IsEnabled = SubjectMenuRules.EnabledInTheMenuBar(item, enabled, IsInstalledHere);" },
+                     presenceLines);
+        Assert.DoesNotContain("_ruled.Remove", body);
+        Assert.DoesNotContain("Items.Remove", body);
+    }
+
     /// <summary>No grey line of explanation in the Course or Section menu since #990 (the mac's ruling Q14).</summary>
     [Fact]
     public void TheMenuBarHoldsNoGreyTextRows()

@@ -56,6 +56,25 @@ nonisolated enum AccessibilityNames {
     /// The Class Dates sheet's typing area (D41).
     static let classDates: String = "Class dates"
 
+    /// The assistant's composer (#1012): its placeholder's words, without
+    /// the ellipsis, as the sidebar's Filter field is named by its own.
+    static let askAboutThisSection: String = "Ask about this section"
+
+    /// Class Dates' Google Sheet link (#1012), whose placeholder is an
+    /// address rather than words: the words of the sentence above it ("Paste
+    /// the sheet's address") and of the route it sits under ("A Google
+    /// Sheet").
+    static let googleSheetAddress: String = "Google Sheet address"
+
+    /// The console's answer box and the question alert's field (#1012): the
+    /// words of the alert's own placeholder, which the console's placeholder
+    /// ends with ("type your answer here").
+    static let yourAnswer: String = "Your answer"
+
+    /// The console's spinner while a task runs (#1012), the state that
+    /// "Finished" replaces in the same place.
+    static let running: String = "Running"
+
     /// Publish Pages, Hide Pages and the other page pickers: the table of
     /// pages to tick (D41).
     static let pagesTable: String = "Pages"

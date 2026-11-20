@@ -24,13 +24,17 @@ final class AboutWindowLinksTests: XCTestCase {
 
     /// Each link's identifier and the words VoiceOver must read for it,
     /// top to bottom, as the window draws them.
-    let expectedLinks: [(identifier: String, words: String)] = [
-        (identifier: "aboutWebsiteLink", words: "https://plantoir.app"),
-        (identifier: "aboutEmailLink", words: "support@plantoir.app"),
-        (identifier: "aboutQuartzLink", words: "Quartz"),
-        (identifier: "aboutSponsorLink", words: "Sponsor Jacky Zhao on GitHub"),
-        (identifier: "aboutIconCreditLink", words: "Phosphor Icons"),
-        (identifier: "aboutDesignCreditLink", words: "Russell Gordon"),
+    /// The address each press must open is written out here rather than
+    /// read from `AboutView`, so a link pointed at the wrong page fails
+    /// (#1012); these are the addresses the window's links have always had
+    /// (checked by hand against the inline links they replaced, 993b).
+    let expectedLinks: [(identifier: String, words: String, address: String)] = [
+        (identifier: "aboutWebsiteLink", words: "https://plantoir.app", address: "https://plantoir.app"),
+        (identifier: "aboutEmailLink", words: "support@plantoir.app", address: "mailto:support@plantoir.app"),
+        (identifier: "aboutQuartzLink", words: "Quartz", address: "https://quartz.jzhao.xyz"),
+        (identifier: "aboutSponsorLink", words: "Sponsor Jacky Zhao on GitHub", address: "https://github.com/sponsors/jackyzha0"),
+        (identifier: "aboutIconCreditLink", words: "Phosphor Icons", address: "https://phosphoricons.com"),
+        (identifier: "aboutDesignCreditLink", words: "Russell Gordon", address: "https://www.russellgordon.ca"),
     ]
 
     /// The About window's size when drawn, with room to spare.
@@ -139,25 +143,46 @@ final class AboutWindowLinksTests: XCTestCase {
     }
 
     /// Every link can be pressed by an assistive app, whether Keyboard
-    /// Navigation is on or off. With it off, macOS moves Tab only between
-    /// text fields and lists in every app, so a person who cannot use the
-    /// pointer reaches a link the way the HIG gives them: VoiceOver, whose
-    /// rotor lists the window's links ("Support the VoiceOver rotor"), or
-    /// Full Keyboard Access ("navigate and activate windows, menus,
-    /// controls, and system features using only the keyboard"). Both
-    /// activate a link through its press action, which this reads; it does
-    /// not skip with Keyboard Navigation off.
-    func testEveryAboutLinkCanBePressedByAnAssistiveApp() throws {
-        let hosted = try hostTheAboutView()
+    /// Navigation is on or off, and the press opens that link's own page.
+    /// With it off, macOS moves Tab only between text fields and lists in
+    /// every app, so a person who cannot use the pointer reaches a link the
+    /// way the HIG gives them: VoiceOver, whose rotor lists the window's
+    /// links ("Support the VoiceOver rotor"), or Full Keyboard Access
+    /// ("navigate and activate windows, menus, controls, and system
+    /// features using only the keyboard"). Both activate a link through its
+    /// press action, which this performs on each link in turn (#1012, the
+    /// 993b review: reading that the action is offered did not show that
+    /// pressing it opens anything). The view is given an `OpenURLAction`
+    /// that records what it is asked to open instead of opening it, and
+    /// each press must open exactly the address written here, so a link
+    /// pointed at the wrong page fails. It does not skip with Keyboard
+    /// Navigation off.
+    func testEveryAboutLinkCanBePressedByAnAssistiveAppAndOpensItsOwnPage() throws {
+        let recorder: OpenedAddresses = OpenedAddresses()
+        let recording: some View = AboutView()
+            .environment(\.openURL, OpenURLAction { address in
+                recorder.record(address)
+                return .handled
+            })
+        let host: TableHost = TableHost(recording, size: windowSize)
         defer {
-            hosted.host.close()
+            host.close()
         }
-        let read: AccessibilityTree = AccessibilityTree(ofWindowTitled: hosted.title)
+        let title: String = "about-links-\(UUID().uuidString)"
+        host.window.title = title
+        host.pump(0.4)
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(host.window)
+        let read: AccessibilityTree = AccessibilityTree(ofWindowTitled: title)
         for expected in expectedLinks {
             guard let link = read.element(identifiedAs: expected.identifier) else {
                 continue
             }
             XCTAssertTrue(link.actions.contains("AXPress"), "an assistive app cannot press \(expected.words): its actions are \(link.actions)")
+            recorder.clear()
+            let presses: [AXError] = AccessibilityTree.press(identifiedAs: expected.identifier, inWindowTitled: title)
+            XCTAssertEqual(presses, [.success], "pressing \(expected.words) through the accessibility API was not accepted")
+            host.pump(0.2)
+            XCTAssertEqual(recorder.addresses(), [expected.address], "pressing \(expected.words) did not open its own page")
         }
     }
 
@@ -221,5 +246,36 @@ final class AboutWindowLinksTests: XCTestCase {
                 window.sendEvent(event)
             }
         }
+    }
+}
+
+/// What an `OpenURLAction` was asked to open, in order (#1012). Locked,
+/// because SwiftUI does not promise which thread calls the action.
+final class OpenedAddresses: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    private let lock: NSLock = NSLock()
+    private var opened: [String] = []
+
+    // MARK: - Functions
+
+    func record(_ address: URL) {
+        lock.lock()
+        opened.append(address.absoluteString)
+        lock.unlock()
+    }
+
+    func clear() {
+        lock.lock()
+        opened = []
+        lock.unlock()
+    }
+
+    func addresses() -> [String] {
+        lock.lock()
+        let copy: [String] = opened
+        lock.unlock()
+        return copy
     }
 }
