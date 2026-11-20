@@ -234,6 +234,31 @@ public class PreviewWaitWakesOnTheRunTests : IDisposable
         Assert.Equal(-1, runner.LastExitCode);
     }
 
+    /// <summary>
+    /// A run that could not start (no launcher in the folder) raises
+    /// LaunchProblem, which is a standing property, so the preview's wait is
+    /// woken; the view then reads it as over (pinned by the source rule below).
+    /// </summary>
+    [Fact]
+    public void ARunThatCouldNotStartWakesTheWatch()
+    {
+        string emptyFolder = Path.Combine(Path.GetTempPath(), $"plantoir-1016-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(emptyFolder);
+        try
+        {
+            var runner = new ScriptRunner();
+            using var watch = runner.WatchTheStanding();
+            runner.Run("preview.ps1", new[] { "ICS3U", "1" }, emptyFolder);
+            Assert.True(watch.HasChanged.IsCompleted, "a launch that failed did not wake the wait");
+            Assert.NotNull(runner.LaunchProblem);
+            Assert.False(runner.IsRunning);
+        }
+        finally
+        {
+            try { Directory.Delete(emptyFolder, true); } catch { }
+        }
+    }
+
     [Fact]
     public async Task WaitingForARunThatIsNotRunningReturnsAtOnce()
     {
@@ -360,6 +385,8 @@ public class PreviewWaitWakesOnTheRunTests : IDisposable
         Assert.Contains("UntilItChangesAsync(", body);
         Assert.Contains("HasAnnouncedQuartzLaunch", body);
         Assert.Contains("ServerStartedAt", body);
+        // A run that could not start ends the wait (documentation 12).
+        Assert.Contains("_previewRunner.LaunchProblem is not null", body);
         Assert.DoesNotContain("DisplayText", body);
         Assert.DoesNotContain("\"Launching Quartz preview\"", body);
     }

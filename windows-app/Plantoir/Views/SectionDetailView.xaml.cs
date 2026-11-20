@@ -1867,8 +1867,14 @@ public sealed partial class SectionDetailView : UserControl
                 // Watched BEFORE the state is read (#1016), so a change that
                 // lands between the reading and the wait below is not lost.
                 using var watch = _previewRunner.WatchTheStanding();
+                // A run that never started is over too (#1016 review): a
+                // missing preview.ps1 or a pseudo console that would not open
+                // sets LaunchProblem and leaves LastExitCode null, and the
+                // wait, woken by LaunchProblem, would otherwise wait on for a
+                // process that does not exist, holding the port lease.
                 bool runIsOver = _previewRunner.WasStoppedByUser ||
-                                 (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null);
+                                 (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null) ||
+                                 (!_previewRunner.IsRunning && _previewRunner.LaunchProblem is not null);
                 // Both lines are collected by the runner as they arrive
                 // (#1016): never searched for in the whole transcript.
                 DateTime? serverStartedAt = _previewRunner.ServerStartedAt;
