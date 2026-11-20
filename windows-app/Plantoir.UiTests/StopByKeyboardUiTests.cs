@@ -296,24 +296,55 @@ public class StopByKeyboardUiTests
         AssertStopped(app, "Escape");
     }
 
+    /// <summary>
+    /// While an editable text box has the focus, Escape is the box's; a UI
+    /// Automation Invoke on Cancel still reaches the stop (for a deploy, its
+    /// question, and Stop Deploy then stops it). Run on a deploy held by the
+    /// test (<see cref="HeldDestination"/>), where no site is ever drawn
+    /// (#1009's fourth review). It used to run on a preview, and failed in
+    /// the VM: measured there (2026-11-20, scratch test), the answer box kept
+    /// the focus when the preview's site was drawn (no focus taken from it),
+    /// but the site drew about 35 s after the start, inside the test's
+    /// presses, so a press could land after it: the site then covers the
+    /// console (Escape there is never Cancel's, so the box rule went
+    /// untested), and a stop of a serving preview ends without the "stopped by
+    /// the teacher" line the test waited for (the build's preview.ps1 had
+    /// already finished "succeeded"). A deploy held on its destination cannot
+    /// end, or draw anything, until the test stops it.
+    /// </summary>
     [UiFact]
     public void EscapeInAFocusedTextBoxIsTheBoxs_AndInvokeOnCancelStillStops()
     {
-        using var app = StartAPreview();
+        string published = "";
+        HeldDestination? held = null;
+        using var app = new DrivenApp(courses =>
+        {
+            held = new HeldDestination(PublishedFolder(courses));
+            WriteCourse(courses, out published, out _, padded: false);
+        });
+        using var release = held!;
+        app.SelectSection(Code, 1);
+        StartDeploy(app, 1);
+        // The deploy itself has begun, and cannot finish while the folder is held.
+        Assert.True(Retry.WhileFalse(() => DeployStarts(app) >= 1, TimeSpan.FromMinutes(10), TimeSpan.FromMilliseconds(200)).Result,
+                    $"the deploy never reached its destination (phase \"{Phase(app)}\")");
         app.Find("taskDetailsDisclosure", "Show details").AsButton().Invoke();
         var answerBox = app.Find("consoleInputField", "the console's answer box");
         app.ClickMiddleOf(answerBox);
-        Thread.Sleep(400);
-        Assert.True(answerBox.Properties.HasKeyboardFocus.ValueOrDefault, "the console's answer box did not take the focus");
-        Assert.True(PreviewRuns(app) && CancelShows(app), $"the preview ended by itself before Escape (phase \"{Phase(app)}\")");
+        Assert.True(Retry.WhileFalse(() => answerBox.Properties.HasKeyboardFocus.ValueOrDefault, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(100)).Result,
+                    "the console's answer box did not take the focus");
+        Assert.True(CancelShows(app), $"the deploy is not shown running before Escape (phase \"{Phase(app)}\")");
         Press(app, VirtualKeyShort.ESCAPE);
-        Thread.Sleep(1500);
-        Assert.True(PreviewRuns(app) && CancelShows(app), $"Escape in a focused text box stopped the preview (phase \"{Phase(app)}\")");
+        AssertStillDeploying(app, "Escape in a focused text box");
         Assert.Null(app.OpenDialog());
 
         Assert.True(answerBox.Properties.HasKeyboardFocus.ValueOrDefault, "the answer box lost the focus before the Invoke");
         app.Find("taskCancelButton", "the panel's Cancel").AsButton().Invoke();
-        AssertStopped(app, "Invoke on Cancel with a text box focused");
+        Asked(app, "Invoke on Cancel with a text box focused")
+            .FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
+        AssertGone(app, "Stop Deploy after Invoke on Cancel");
+        AssertCancelled(app, "Invoke on Cancel with a text box focused, then Stop Deploy");
+        Assert.Equal(HeldDestination.LeftByAnEarlierDeploy, held!.HeldPage());
     }
 
     // ---- #1009's first review: every route asks, one "under way" rule, a held Escape ----
