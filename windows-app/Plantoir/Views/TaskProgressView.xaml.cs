@@ -820,7 +820,7 @@ public sealed partial class TaskProgressView : UserControl
         var dontAskAgain = new CheckBox { Content = StopQuestionWording.DontAskAgain, IsChecked = false, Margin = new Thickness(0, 12, 0, 0) };
         AutomationProperties.SetAutomationId(dontAskAgain, "stopQuestionDontAskAgain");
         var content = new StackPanel();
-        content.Children.Add(new TextBlock { Text = StopQuestionWording.Message(question), TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(FormBuilders.DialogExplanation(StopQuestionWording.Message(question)));
         content.Children.Add(dontAskAgain);
         var dialog = new ContentDialog
         {
