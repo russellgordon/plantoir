@@ -437,7 +437,7 @@ public class SectionVerbsTests : IDisposable
     [Fact]
     public void ACancelAtThePlanSaysSo()
     {
-        SectionVerbs.NoteCancelled("Section ▸ Hide Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "2 pages ticked");
+        SectionVerbs.NoteCancelled("Section ▸ Hide Pages…", "ICS3U", 1, "2 pages ticked");
         Assert.Contains("ICS3U/1 · Section ▸ Hide Pages… — cancelled at the plan, 2 pages ticked", File.ReadAllText(_trail));
     }
 
