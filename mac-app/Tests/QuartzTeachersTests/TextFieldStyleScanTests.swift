@@ -9,13 +9,24 @@ import XCTest
 /// read-only values, not fields — so this makes the rule STRUCTURAL: one
 /// modifier, `.borderedTextField()`, and a scan that fails on drift.
 ///
-/// A field passes when its modifier chain carries `.borderedTextField()`,
-/// and there is NO allow-list (#457, Russell: "no exemptions"). Until v1.5.0
+/// A field passes when its modifier chain carries `.borderedTextField()`.
+/// There is ONE named exception, `alertAnswerField` below (#1019), and no
+/// other (#457, Russell: "no exemptions"). Until v1.5.0
 /// three fields were listed here by identifier — the sidebar's rename card,
 /// the assistant's composer and the alert's answer field — each `.plain` or
 /// unstyled with a reason; they wear the bordered style now. A field that
 /// chooses any style of its own — even alongside `.borderedTextField()`,
 /// where the style nearest the view wins and draws it borderless — fails.
+///
+/// The exception, #1019 (option A, 2026-11-20): the "Input required" alert's
+/// answer field. A field inside a SwiftUI `.alert` that carries a style of
+/// its own is left OUT of the alert panel (measured: with
+/// `.borderedTextField()` or `.textFieldStyle(.roundedBorder)` the panel held
+/// no field, so Send sent an empty line), and the alert draws its own
+/// bordered field. So that one field must carry NO style, and the scan holds
+/// it to exactly that: the file and identifier below, nothing else, and a
+/// test fails if the exception stops matching exactly one field.
+/// `InputRequiredAlertTests` proves the field is drawn and answers the task.
 @MainActor
 final class TextFieldStyleScanTests: XCTestCase {
 
@@ -30,6 +41,13 @@ final class TextFieldStyleScanTests: XCTestCase {
         "BorderedTextField.swift": 1,
     ]
 
+    /// The one field that must NOT carry a style (#1019): it sits inside an
+    /// `.alert`, which draws its own field and drops a styled one.
+    static let alertAnswerField: (file: String, identifier: String) = (
+        file: "TaskProgressView.swift",
+        identifier: ".accessibilityIdentifier(\"taskAnswerField\")"
+    )
+
     // MARK: - Tests
 
     func testEveryTextFieldIsBordered() throws {
@@ -37,6 +55,12 @@ final class TextFieldStyleScanTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(fields.count, 29, "The scan found only \(fields.count) fields; its pattern has stopped matching")
         var problems: [String] = []
         for field in fields {
+            if TextFieldStyleScanTests.isTheAlertAnswerField(field) {
+                if field.chain.contains(".borderedTextField()") || field.chain.contains(".textFieldStyle(") {
+                    problems.append(field.location + " is inside an .alert, which leaves a styled field out of the alert altogether (#1019); it carries no style")
+                }
+                continue
+            }
             if field.chain.contains(".textFieldStyle(") {
                 problems.append(field.location + " chooses its own style; the one nearest the field wins, so it is not bordered")
                 continue
@@ -45,7 +69,20 @@ final class TextFieldStyleScanTests: XCTestCase {
                 problems.append(field.location + " has no .borderedTextField()")
             }
         }
-        XCTAssertEqual(problems, [], "Every text field wears .borderedTextField() (#374), with no exemptions (#457)")
+        XCTAssertEqual(problems, [], "Every text field wears .borderedTextField() (#374), with one named exception inside an alert (#1019)")
+    }
+
+    /// The exception covers exactly one field: if the alert's field is
+    /// renamed, moved or copied, this fails rather than letting the
+    /// exception quietly cover nothing, or more than one field.
+    func testTheAlertExceptionCoversExactlyOneField() throws {
+        var matching: [String] = []
+        for field in try TextFieldStyleScanTests.allFields() {
+            if TextFieldStyleScanTests.isTheAlertAnswerField(field) {
+                matching.append(field.location)
+            }
+        }
+        XCTAssertEqual(matching.count, 1, "the #1019 exception names one field, the Input required alert's; found: \(matching)")
     }
 
     func testOnlyTheSharedModifierAndTheChromesChooseAStyle() throws {
@@ -93,6 +130,13 @@ final class TextFieldStyleScanTests: XCTestCase {
     struct Field {
         var location: String
         var chain: String
+    }
+
+    /// Whether `field` is the Input required alert's answer field, the one
+    /// named exception (#1019).
+    static func isTheAlertAnswerField(_ field: Field) -> Bool {
+        let fileName: String = alertAnswerField.file + ":"
+        return field.location.hasPrefix(fileName) && field.chain.contains(alertAnswerField.identifier)
     }
 
     static func viewsURL() -> URL {

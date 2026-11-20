@@ -601,13 +601,16 @@ struct TaskProgressView: View {
         // Neutral wording: a task may ask several questions in a row, so
         // the title must not promise how many are coming.
         .alert("Input required", isPresented: awaitingInputBinding) {
+            // NO style modifier, deliberately (#1019): the alert draws its
+            // own bordered field, and a field that carries a style of its
+            // own (`.borderedTextField()` or any `.textFieldStyle`) is left
+            // OUT of the alert altogether, measured, so the teacher had
+            // nowhere to type and Send sent an empty line. This is the one
+            // named exception in `TextFieldStyleScanTests`; a field that
+            // ever moves out of the alert must wear `.borderedTextField()`.
+            // The alert also ignores the identifier and any accessibility
+            // label; VoiceOver reads the placeholder (documentation 09).
             TextField("Your answer", text: $answer)
-                // Inside an .alert AppKit draws the field and ignores
-                // SwiftUI's styles, so this changes nothing on screen. It is
-                // here so the rule has no exemptions (#457): a field that
-                // ever moves out of the alert is bordered without anybody
-                // having to remember.
-                .borderedTextField()
                 .accessibilityIdentifier("taskAnswerField")
             Button("Send") {
                 runner.send(line: answer)
