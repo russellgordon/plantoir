@@ -54,12 +54,23 @@ internal static class UndoTrail
 
     private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
 
-    /// <summary>Writes a line to the real activity trail: <c>course/section · words</c>.</summary>
+    /// <summary>
+    /// Writes a line to the real activity trail, <c>course/section · words</c>:
+    /// the sink the app's start-up (W4) gives the door. Each event Undo
+    /// writes is named here, so the trail's wiring scan sees its writer.
+    /// </summary>
     internal static void ToTheActivityTrail(UndoTrailLine line)
     {
-        if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(line.Event, line.Words);
-        else if (line.Section is { } section and >= int.MinValue and <= int.MaxValue) ActivityTrail.Note(line.Event, line.Words, line.Course, (int)section);
-        else ActivityTrail.Note(line.Event, line.Course + " · " + line.Words);
+        switch (line.Event)
+        {
+            case ActivityTrail.Event.UndoRolledBack:
+                if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(ActivityTrail.Event.UndoRolledBack, line.Words);
+                else if (line.Section is { } section and >= 0 and <= int.MaxValue) ActivityTrail.Note(ActivityTrail.Event.UndoRolledBack, line.Words, line.Course, (int)section);
+                else ActivityTrail.Note(ActivityTrail.Event.UndoRolledBack, line.Course + " · " + line.Words);
+                break;
+            default:
+                throw new ArgumentException("An event Undo does not write: " + line.Event, nameof(line));
+        }
     }
 }
 

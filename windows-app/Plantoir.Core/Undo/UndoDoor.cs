@@ -257,7 +257,7 @@ internal sealed class UndoDoor
         if (draft.WorkingFolder is null) return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: new UndoRefusal(UndoRefusalKind.NotReadable));
 
         // 1. Read back as a reader of this version reads it.
-        JsonObject trial = BeginLine(1, header, draft.WorkingFolder is null ? null : new JsonObject
+        JsonObject trial = BeginLine(1, header, new JsonObject
         {
             ["id"] = "00000000-0000-0000-0000-000000000000", ["pathAtTheTime"] = draft.WorkingFolder,
         }, (JsonArray)draft.Ops.DeepClone());
@@ -273,7 +273,7 @@ internal sealed class UndoDoor
         // 2. Every path inside the working folder, its links resolved.
         foreach (string path in step.Paths)
         {
-            if (draft.WorkingFolder is null || !UndoPlaces.StaysInside(draft.WorkingFolder, path))
+            if (!UndoPlaces.StaysInside(draft.WorkingFolder, path))
                 return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: new UndoRefusal(UndoRefusalKind.NotReadable));
         }
         // 3. Every blob it names, given or already held, hashing to its name.
@@ -363,8 +363,9 @@ internal sealed class UndoDoor
                 // true by a rule, which recovery could not settle, waits for
                 // one that can (a runner, a file let go). Not available, never
                 // "under way" for ever (the mac's third hard review of U2b, LOW 2).
-                bool waits = answer.Kind == UndoAnswerKind.AnotherChangeIsUnderWay
-                             && UndoRecovery.DeadStepThatKeepsAFileTrue(writer, _journal, course: null) is not null;
+                UndoFoldedStep? newest = offered.Offered.LastOrDefault(step => step.State != UndoStepState.Undone);
+                bool waits = answer.Kind == UndoAnswerKind.AnotherChangeIsUnderWay && newest is { IsInFlight: true }
+                             && UndoRecovery.KeepsAFileTrue(newest.Step) && UndoRecovery.MaySettle(newest, _journal);
                 return (answer, waits, run);
             }, inShadow: !Live);
         }
