@@ -300,12 +300,21 @@ public class StopByKeyboardUiTests
         app.SelectSection(Code, 1);
         StartDeploy(app, 1);
         CopyAPageEscapeUiTests.Front(app);
+        // A held key, as the keyboard sends it: one press, then after the
+        // repeat delay a key-down about every 33 ms with no key-up between
+        // (SendInput of a key already down is a repeat: its previous-state
+        // bit is set). Holding the key with one SendInput sends no repeats.
         Keyboard.Press(VirtualKeyShort.ESCAPE);
-        Thread.Sleep(2000);   // the key held: Windows repeats it after about half a second
+        Thread.Sleep(500);
+        for (int repeat = 0; repeat < 30; repeat++)
+        {
+            Keyboard.Press(VirtualKeyShort.ESCAPE);
+            Thread.Sleep(33);
+        }
         Keyboard.Release(VirtualKeyShort.ESCAPE);
         Thread.Sleep(700);
         bool open = OpenStopQuestion(app) is not null;
-        Measured($"a held Escape (2 s): question {(open ? "still open" : "gone")}, phase \"{Phase(app)}\"");
+        Measured($"a held Escape (one press, 30 repeats): question {(open ? "still open" : "gone")}, phase \"{Phase(app)}\"");
         Assert.True(open, "a held Escape opened the question and its repeats closed it");
         AssertStillDeploying(app, "a held Escape");
         // A fresh Escape, after the release, is the question's Cancel as before.
@@ -343,5 +352,79 @@ public class StopByKeyboardUiTests
         AssertGone(app, "Stop Deploy across the change");
         AssertCancelled(app, "Stop Deploy across the change");
         AssertNotPublished(published, "Stop Deploy across the change");
+    }
+
+    private static bool AMenuIsOpen(DrivenApp app)
+    {
+        try { return app.Window.FindFirstDescendant(cf => cf.ByControlType(ControlType.Menu)) is { IsOffscreen: false }; }
+        catch (System.Runtime.InteropServices.COMException) { return false; }
+    }
+
+    /// <summary>
+    /// Measured for documentation 12: Escape with the menu bar's File menu
+    /// open, with a sidebar row's context menu open, and with a ComboBox
+    /// focused (the main window has one only in a course's settings, which
+    /// replace the section's panel). Each control keeps its own Escape; none
+    /// asks or stops the deploy.
+    /// </summary>
+    [UiFact]
+    public void EscapeWithAMenuOpenOrAComboBoxFocusedIsTheirs()
+    {
+        string published = "";
+        using var app = new DrivenApp(courses => WriteCourse(courses, out published));
+        app.SelectSection(Code, 1);
+        StartDeploy(app, 1);
+
+        // The File menu, open.
+        var file = app.Find("appMenuBar", "the menu bar").FindFirstDescendant(cf => cf.ByName("File"));
+        Assert.True(file is not null, "the menu bar has no File");
+        app.ClickMiddleOf(file!);
+        Assert.True(Retry.WhileFalse(() => AMenuIsOpen(app), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result, "File did not open");
+        Press(app, VirtualKeyShort.ESCAPE);
+        bool menuOpen = AMenuIsOpen(app);
+        bool asked = OpenStopQuestion(app) is not null;
+        Measured($"Escape with File open: menu {(menuOpen ? "still open" : "closed")}, question {(asked ? "opened" : "not asked")}, phase \"{Phase(app)}\"");
+        Assert.False(asked, "Escape with the File menu open asked to stop the deploy");
+        AssertStillDeploying(app, "Escape with the File menu open");
+        if (menuOpen) Press(app, VirtualKeyShort.ESCAPE);
+
+        // A sidebar row's context menu, open.
+        var row = app.Find($"sidebar-{Code}-section1", "the section's sidebar row");
+        app.RightClickMiddleOf(row);
+        Assert.True(Retry.WhileFalse(() => AMenuIsOpen(app), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result, "the row's menu did not open");
+        Press(app, VirtualKeyShort.ESCAPE);
+        menuOpen = AMenuIsOpen(app);
+        asked = OpenStopQuestion(app) is not null;
+        Measured($"Escape with a row's context menu open: menu {(menuOpen ? "still open" : "closed")}, question {(asked ? "opened" : "not asked")}");
+        Assert.False(asked, "Escape with a row's context menu open asked to stop the deploy");
+        AssertStillDeploying(app, "Escape with a row's context menu open");
+        if (menuOpen) Press(app, VirtualKeyShort.ESCAPE);
+
+        // A ComboBox focused, then open: only a course's settings have one.
+        app.SelectCourse(Code);
+        var combo = Retry.WhileNull(() => app.Window.FindFirstDescendant(cf => cf.ByControlType(ControlType.ComboBox)),
+                                    TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250)).Result;
+        if (combo is null)
+        {
+            Measured("no ComboBox in the course's settings to focus");
+        }
+        else
+        {
+            combo.Focus();
+            Thread.Sleep(400);
+            Press(app, VirtualKeyShort.ESCAPE);
+            Measured($"Escape with a ComboBox focused (\"{combo.Name}\"): question {(OpenStopQuestion(app) is null ? "not asked" : "opened")}");
+            Assert.Null(OpenStopQuestion(app));
+            try { combo.Patterns.ExpandCollapse.Pattern.Expand(); } catch { }
+            Thread.Sleep(600);
+            bool expanded = combo.Patterns.ExpandCollapse.PatternOrDefault?.ExpandCollapseState.ValueOrDefault == ExpandCollapseState.Expanded;
+            Press(app, VirtualKeyShort.ESCAPE);
+            bool stillExpanded = combo.Patterns.ExpandCollapse.PatternOrDefault?.ExpandCollapseState.ValueOrDefault == ExpandCollapseState.Expanded;
+            Measured($"Escape with a ComboBox open (opened: {expanded}): {(stillExpanded ? "still open" : "closed")}, question {(OpenStopQuestion(app) is null ? "not asked" : "opened")}");
+            Assert.Null(OpenStopQuestion(app));
+        }
+        app.SelectSection(Code, 1);
+        Assert.Null(OpenStopQuestion(app));
+        Measured($"back on the section after the ComboBox: phase \"{Phase(app)}\"");
     }
 }
