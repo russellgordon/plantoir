@@ -364,24 +364,27 @@ final class DeployedFolderOfferTests: XCTestCase {
         XCTAssertTrue(opened)
         let firstPort: Int = try XCTUnwrap(shows.shows.first).port
 
-        // The framework's queue is held back, so the old listener is
-        // certain to still hold the address when Open is pressed (the
-        // same way as the test above; it defers no work of its own).
+        // The framework's queue is held back, so the Stop is certain to
+        // be still waiting for the old listener's word when Open is
+        // pressed (the same way as the test above; it defers no work of
+        // its own).
         deliveryQueue.suspend()
         queueIsHeld = true
         let stopIsWaiting: Task<String, Never> = DeployedFolderOfferTests.whenAStopIsWaiting(shows)
         let stopping: Task<Void, Never> = Task { @MainActor in
             await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
         }
-        _ = await stopIsWaiting.value
-        XCTAssertTrue(RawHTTP.canConnect(address: "127.0.0.1", port: firstPort), "the old listener had already let go")
+        let folder: String = await stopIsWaiting.value
         let reopening: Task<Bool, Never> = Task { @MainActor in
             return await shows.open(
                 sectionFolder: section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
                 from: .sectionMenu, defaults: defaults, openInBrowser: { _ in true }
             )
         }
+        // The main actor runs its work in order: one yield lets the Open
+        // run up to its first wait.
         await Task.yield()
+        XCTAssertFalse(shows.isStartingForTests(folder), "Open started a listener while the old one was still letting go")
         deliveryQueue.resume()
         queueIsHeld = false
         await stopping.value

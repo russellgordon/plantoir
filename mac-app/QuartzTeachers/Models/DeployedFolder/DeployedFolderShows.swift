@@ -130,6 +130,11 @@ final class DeployedFolderShows {
         )
     }
 
+    /// Tests only: whether a start is under way for a folder.
+    func isStartingForTests(_ canonicalRoot: String) -> Bool {
+        return startsUnderWay[canonicalRoot] != nil
+    }
+
     static func key(courseCode: String, sectionNumber: Int, workingFolderPath: String) -> String {
         return "\(courseCode)/\(sectionNumber)/\(FolderIdentity.canonicalPath(workingFolderPath))"
     }
