@@ -67,6 +67,21 @@ internal enum Settling
     NoRecentLook,
 }
 
+/// <summary>What the driver read of the Licence Agreement page's two choices as it opened (#1010).</summary>
+internal enum LicenceOpening
+{
+    /// <summary>Both choices were found and both read clear: the page opened as ruled.</summary>
+    NeitherChosen,
+    /// <summary>A choice was read as made: PRODUCT STOPPED.</summary>
+    AChoiceMade,
+    /// <summary>
+    /// A choice could not be found or its state could not be read: the driver
+    /// did not look, so it cannot say the page opened with neither chosen
+    /// (DRIVER PROBLEM, never "not chosen").
+    /// </summary>
+    CouldNotLook,
+}
+
 internal readonly record struct Judgement(Verdict Verdict, string Kind)
 {
     public static Judgement Of(Verdict verdict, string kind = "") => new(verdict, kind);
@@ -285,6 +300,106 @@ internal static class WindowRules
         window.Class == "#32770" && (Is(window.Process, "PickerHost") || Is(window.Process, "Plantoir"))
         && window.ControlName("1152") is not null && window.ControlName("1") is { } select
         && select.Replace("&", "").Equals("Select Folder", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The installer's Licence Agreement page (#1010), by its heading:
+    /// installer.iss sets it to "Licence Agreement" (Russell, 2026-11-19,
+    /// ruling 4); Inno's own "License Agreement" is recognised too, so an
+    /// installer that lost the override still has its page answered, and the
+    /// spelling is held by the source tests, not here. An older installer
+    /// (1.9.3 and before) has no such page and nothing changes for it.
+    /// </summary>
+    public static bool IsLicencePage(string pageTitle) =>
+        Is(pageTitle.Trim(), "Licence Agreement") || Is(pageTitle.Trim(), "License Agreement");
+
+    /// <summary>The choice step 2 makes on the Licence Agreement page, by its UI Automation name.</summary>
+    public const string LicenceAcceptName = "I accept the agreement";
+
+    /// <summary>The other choice on the page, read only to say what the page opened with.</summary>
+    public const string LicenceRefuseName = "I do not accept the agreement";
+
+    /// <summary>
+    /// Whether a control's UI Automation name is the named choice. Win32
+    /// controls usually give their caption without its access-key ampersand
+    /// ("I &amp;accept the agreement" reads "I accept the agreement"); it is
+    /// taken out here too, so either reading matches, and nothing else does.
+    /// </summary>
+    public static bool IsChoiceNamed(string controlName, string choice) =>
+        controlName.Replace("&", "").Trim().Equals(choice, StringComparison.Ordinal);
+
+    /// <summary>
+    /// How long after "I accept the agreement" was chosen Next may stay
+    /// disabled before the run stops on it: Inno enables Next in the choice's
+    /// own click handler, so on a working page it is enabled at the next look;
+    /// thirty seconds is the same allowance the wizard's other pages get
+    /// before a press is repeated.
+    /// </summary>
+    public static readonly TimeSpan LicenceNextLimit = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// What a Win32 button's BM_GETCHECK answer says about a choice: 1
+    /// (BST_CHECKED) is chosen, 0 (BST_UNCHECKED) is not, and anything else
+    /// (2 is BST_INDETERMINATE, which a radio button never is) is a state
+    /// this driver cannot read, null. The #1010 review: a choice whose state
+    /// could not be read is not "not chosen", or a page that opened with a
+    /// choice made would pass unseen; the caller stops with DRIVER PROBLEM.
+    /// </summary>
+    public static bool? CheckStateMeans(long answer) => answer switch
+    {
+        1 => true,
+        0 => false,
+        _ => null,
+    };
+
+    /// <summary>
+    /// What the page's two choices say about how it opened. The second
+    /// review of #1010: a refusal that cannot be found is no more "not
+    /// chosen" than a state that cannot be read, so either is <see
+    /// cref="LicenceOpening.CouldNotLook"/>; a choice read as made is <see
+    /// cref="LicenceOpening.AChoiceMade"/> even when the other could not be
+    /// read; only two choices found and both read clear is <see
+    /// cref="LicenceOpening.NeitherChosen"/>.
+    /// </summary>
+    public static LicenceOpening ReadLicenceOpening(bool refuseFound, bool? acceptChosen, bool? refuseChosen)
+    {
+        if (acceptChosen == true || (refuseFound && refuseChosen == true)) return LicenceOpening.AChoiceMade;
+        if (!refuseFound || acceptChosen is null || refuseChosen is null) return LicenceOpening.CouldNotLook;
+        return LicenceOpening.NeitherChosen;
+    }
+
+    /// <summary>
+    /// The first Plantoir whose installer shows the Licence Agreement page
+    /// (#1010, Russell's rulings of 2026-11-19). An installer of this version
+    /// or later that never showed the page has lost it, and the run stops.
+    /// </summary>
+    public static readonly Version FirstVersionWithLicencePage = new(2, 0, 0);
+
+    /// <summary>
+    /// Whether the installer of the installed version must have shown the
+    /// Licence Agreement page: true from <see
+    /// cref="FirstVersionWithLicencePage"/> on, false before it (1.9.3 has
+    /// none), and null when the version cannot be read, which the caller
+    /// treats as a DRIVER PROBLEM rather than guess. The product version
+    /// may carry a suffix ("2.0.0+1ba4ceaf6", "2.0.0-beta"); the numbers
+    /// before it are read.
+    /// </summary>
+    public static bool? LicencePageRequiredFor(string? productVersion)
+    {
+        if (string.IsNullOrWhiteSpace(productVersion)) return null;
+        var numbers = Regex.Match(productVersion.Trim(), @"^(\d+)\.(\d+)(?:\.(\d+))?");
+        if (!numbers.Success) return null;
+        int build = numbers.Groups[3].Success ? int.Parse(numbers.Groups[3].Value) : 0;
+        var version = new Version(int.Parse(numbers.Groups[1].Value), int.Parse(numbers.Groups[2].Value), build);
+        return version >= FirstVersionWithLicencePage;
+    }
+
+    /// <summary>Whether any page the installer showed was the Licence Agreement page.</summary>
+    public static bool LicencePageWasSeen(IEnumerable<string> pagesSeen)
+    {
+        foreach (string page in pagesSeen)
+            if (IsLicencePage(page)) return true;
+        return false;
+    }
 
     /// <summary>The first of <see cref="BlockWords"/> the text holds, or null.</summary>
     public static string? BlockWordIn(string text)
