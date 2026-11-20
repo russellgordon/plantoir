@@ -720,7 +720,7 @@ public sealed partial class TaskProgressView : UserControl
     public void GiveCancelTheEscapeKey()
     {
         var escape = new KeyboardAccelerator { Key = VirtualKey.Escape };
-        escape.Invoked += (_, args) =>
+        escape.Invoked += (pressed, args) =>
         {
             args.Handled = true;
             bool goesToCancel = StopKey.GoesToCancel(
