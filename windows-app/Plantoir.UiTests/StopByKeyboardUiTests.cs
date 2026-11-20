@@ -299,29 +299,38 @@ public class StopByKeyboardUiTests
         using var app = new DrivenApp(courses => WriteCourse(courses, out published));
         app.SelectSection(Code, 1);
         StartDeploy(app, 1);
-        CopyAPageEscapeUiTests.Front(app);
         // A held key, as the keyboard sends it: one press, then after the
         // repeat delay a key-down about every 33 ms with no key-up between
         // (SendInput of a key already down is a repeat: its previous-state
         // bit is set). Holding the key with one SendInput sends no repeats.
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
-        Thread.Sleep(500);
-        bool openBeforeTheRepeats = OpenStopQuestion(app) is not null;
-        for (int repeat = 0; repeat < 90; repeat++)
+        // Measured: a repeat closed the question in 1 run of 3 at first, so
+        // the hold is tried with four repeat delays, each from a fresh press.
+        var closedBy = new List<int>();
+        foreach (int delay in new[] { 250, 400, 500, 650 })
         {
+            CopyAPageEscapeUiTests.Front(app);
             Keyboard.Press(VirtualKeyShort.ESCAPE);
-            Thread.Sleep(33);
+            Thread.Sleep(delay);
+            bool openBeforeTheRepeats = OpenStopQuestion(app) is not null;
+            for (int repeat = 0; repeat < 45; repeat++)
+            {
+                Keyboard.Press(VirtualKeyShort.ESCAPE);
+                Thread.Sleep(33);
+            }
+            Keyboard.Release(VirtualKeyShort.ESCAPE);
+            Thread.Sleep(700);
+            bool open = OpenStopQuestion(app) is not null;
+            Measured($"a held Escape (repeats after {delay} ms, 45 of them): question {(openBeforeTheRepeats ? "open" : "not yet open")} before the repeats, {(open ? "still open" : "gone")} after, phase \"{Phase(app)}\"");
+            if (!open) closedBy.Add(delay);
+            AssertStillDeploying(app, $"a held Escape (repeats after {delay} ms)");
+            if (open)
+            {
+                // A fresh Escape, after the release, is the question's Cancel as before.
+                Press(app, VirtualKeyShort.ESCAPE);
+                AssertGone(app, "Escape after a held Escape");
+            }
         }
-        Keyboard.Release(VirtualKeyShort.ESCAPE);
-        Thread.Sleep(700);
-        bool open = OpenStopQuestion(app) is not null;
-        Measured($"a held Escape (one press, 90 repeats): question {(openBeforeTheRepeats ? "open" : "not yet open")} before the repeats, {(open ? "still open" : "gone")} after, phase \"{Phase(app)}\"");
-        Assert.True(open, "a held Escape opened the question and its repeats closed it");
-        AssertStillDeploying(app, "a held Escape");
-        // A fresh Escape, after the release, is the question's Cancel as before.
-        Press(app, VirtualKeyShort.ESCAPE);
-        AssertGone(app, "Escape after a held Escape");
-        AssertStillDeploying(app, "Escape after a held Escape");
+        Assert.True(closedBy.Count == 0, $"a held Escape opened the question and its repeats closed it (repeats after {string.Join(", ", closedBy)} ms)");
         Press(app, VirtualKeyShort.ESCAPE);
         Press(app, VirtualKeyShort.RETURN);
         AssertCancelled(app, "Enter (Stop Deploy) after a held Escape");
