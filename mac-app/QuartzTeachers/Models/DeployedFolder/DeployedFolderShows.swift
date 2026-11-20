@@ -98,6 +98,10 @@ final class DeployedFolderShows {
     /// it still held and moving.
     private var stopsUnderWay: [String: Task<Void, Never>] = [:]
 
+    /// Tests only: told, with the folder's canonical path, when a Stop has
+    /// asked its listener to cancel and is waiting for it to let go.
+    var stopIsWaitingForTests: ((String) -> Void)? = nil
+
     // MARK: - Functions: looking
 
     /// The show for a section, if one is running.
@@ -249,13 +253,13 @@ final class DeployedFolderShows {
         let root: URL = URL(fileURLWithPath: canonicalRoot)
         let started: (server: DeployedFolderServer, firstWasTaken: Bool)
         do {
-            started = try await DeployedFolderServer.start(root: root, candidates: candidates, onFolderGone: {
+            started = try await DeployedFolderServer.start(root: root, candidates: candidates, onFolderGone: { server in
                 Task { @MainActor in
-                    await DeployedFolderShows.shared.theFolderWentAway(canonicalRoot: canonicalRoot)
+                    await DeployedFolderShows.shared.theFolderWentAway(server: server)
                 }
-            }, onEnded: {
+            }, onEnded: { server in
                 Task { @MainActor in
-                    await DeployedFolderShows.shared.theListenerEnded(canonicalRoot: canonicalRoot)
+                    await DeployedFolderShows.shared.theListenerEnded(server: server)
                 }
             })
         } catch {
@@ -366,6 +370,7 @@ final class DeployedFolderShows {
             DeployedFolderShows.noteStopped(reason, counts: counts, courseCode: courseCode, sectionNumber: sectionNumber)
         }
         stopsUnderWay[show.id] = stopping
+        stopIsWaitingForTests?(show.id)
         await stopping.value
         // A later show of the same folder may have started its own Stop.
         if let current = stopsUnderWay[show.id], current == stopping {
@@ -420,17 +425,19 @@ final class DeployedFolderShows {
         }
     }
 
-    /// The listener ended without being asked. Our own Stop removes the
-    /// show first, so this finds nothing then.
-    func theListenerEnded(canonicalRoot: String) async {
-        for show in shows where show.id == canonicalRoot {
+    /// A listener ended without being asked. Our own Stop removes the
+    /// show first, so this finds nothing then. Matched on the server, not
+    /// the folder: a late word from an old listener of the folder must not
+    /// stop a newer show of it (#1013's review).
+    func theListenerEnded(server: DeployedFolderServer) async {
+        for show in shows where show.server === server {
             await stop(show, reason: .endedOnItsOwn)
         }
     }
 
-    /// The server found its folder gone.
-    func theFolderWentAway(canonicalRoot: String) async {
-        for show in shows where show.id == canonicalRoot {
+    /// A server found its folder gone; matched on the server, as above.
+    func theFolderWentAway(server: DeployedFolderServer) async {
+        for show in shows where show.server === server {
             await stop(show, reason: .folderGone)
         }
     }
@@ -452,5 +459,6 @@ final class DeployedFolderShows {
         stoppedBecauseTheFolderWentAway = []
         stopsAskedForWhileStarting = []
         stopsUnderWay = [:]
+        stopIsWaitingForTests = nil
     }
 }

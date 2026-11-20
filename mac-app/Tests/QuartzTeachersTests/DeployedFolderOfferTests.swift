@@ -310,15 +310,15 @@ final class DeployedFolderOfferTests: XCTestCase {
         queueIsHeld = true
         var stopFinished: Bool = false
         var listeningWhenStopFinished: Bool = false
+        let stopIsWaiting: Task<String, Never> = DeployedFolderOfferTests.whenAStopIsWaiting(shows)
         let stopping: Task<Void, Never> = Task { @MainActor in
             await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
             listeningWhenStopFinished = RawHTTP.canConnect(address: "127.0.0.1", port: port)
             stopFinished = true
         }
-        // Let the Stop run as far as it can on the main actor.
-        for _ in 0..<50 {
-            await Task.yield()
-        }
+        // The Stop says when it has asked the listener to cancel and is
+        // waiting for it to let go.
+        _ = await stopIsWaiting.value
         XCTAssertTrue(shows.shows.isEmpty, "the show was not taken off the list at once")
         let listeningWhileHeld: Bool = RawHTTP.canConnect(address: "127.0.0.1", port: port)
         if stopFinished {
@@ -344,7 +344,12 @@ final class DeployedFolderOfferTests: XCTestCase {
         ActivityTrail.store = ProblemReportStore(folderURL: made.trail)
         let shows: DeployedFolderShows = DeployedFolderShows.shared
         shows.resetForTests()
+        let deliveryQueue: DispatchQueue = DeployedFolderServer.deliveryQueue
+        var queueIsHeld: Bool = false
         defer {
+            if queueIsHeld {
+                deliveryQueue.resume()
+            }
             shows.resetForTests()
             ActivityTrail.store = previousTrail
             try? FileManager.default.removeItem(at: made.top)
@@ -358,15 +363,27 @@ final class DeployedFolderOfferTests: XCTestCase {
         )
         XCTAssertTrue(opened)
         let firstPort: Int = try XCTUnwrap(shows.shows.first).port
+
+        // The framework's queue is held back, so the old listener is
+        // certain to still hold the address when Open is pressed (the
+        // same way as the test above; it defers no work of its own).
+        deliveryQueue.suspend()
+        queueIsHeld = true
+        let stopIsWaiting: Task<String, Never> = DeployedFolderOfferTests.whenAStopIsWaiting(shows)
         let stopping: Task<Void, Never> = Task { @MainActor in
             await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
         }
+        _ = await stopIsWaiting.value
+        XCTAssertTrue(RawHTTP.canConnect(address: "127.0.0.1", port: firstPort), "the old listener had already let go")
         let reopening: Task<Bool, Never> = Task { @MainActor in
             return await shows.open(
                 sectionFolder: section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
                 from: .sectionMenu, defaults: defaults, openInBrowser: { _ in true }
             )
         }
+        await Task.yield()
+        deliveryQueue.resume()
+        queueIsHeld = false
         await stopping.value
         let reopened: Bool = await reopening.value
         XCTAssertTrue(reopened)
@@ -377,6 +394,58 @@ final class DeployedFolderOfferTests: XCTestCase {
                        "the trail says the usual address was taken")
         await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
         XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: firstPort), "still listening after Stop")
+    }
+
+    /// #1013's review: a late "ended" from an old listener of a folder must
+    /// not stop a newer show of the same folder.
+    func testAnOldListenerEndingDoesNotStopANewerShowOfTheFolder() async throws {
+        let made: (section: URL, top: URL, trail: URL) = try makeASection(named: "late")
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.trail)
+        let shows: DeployedFolderShows = DeployedFolderShows.shared
+        shows.resetForTests()
+        defer {
+            shows.resetForTests()
+            ActivityTrail.store = previousTrail
+            try? FileManager.default.removeItem(at: made.top)
+        }
+        let defaults: UserDefaults = TestDefaults.make()
+        let workingFolder: String = made.top.path
+        let opened: Bool = await shows.open(
+            sectionFolder: made.section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+            from: .toolbar, defaults: defaults, openInBrowser: { _ in true }
+        )
+        XCTAssertTrue(opened)
+        let oldServer: DeployedFolderServer = try XCTUnwrap(shows.shows.first).server
+        await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+        let reopened: Bool = await shows.open(
+            sectionFolder: made.section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+            from: .toolbar, defaults: defaults, openInBrowser: { _ in true }
+        )
+        XCTAssertTrue(reopened)
+        let newer: DeployedFolderShows.Show = try XCTUnwrap(shows.shows.first)
+        XCTAssertFalse(newer.server === oldServer)
+        await shows.theListenerEnded(server: oldServer)
+        await shows.theFolderWentAway(server: oldServer)
+        XCTAssertEqual(shows.shows.count, 1, "the old listener's late word stopped the newer show")
+        await shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+    }
+
+    /// A task that finishes, with the folder's path, when a Stop has asked
+    /// its listener to cancel and is waiting for it to let go.
+    static func whenAStopIsWaiting(_ shows: DeployedFolderShows) -> Task<String, Never> {
+        let announced: AsyncStream<String>.Continuation
+        let stream: AsyncStream<String>
+        (stream, announced) = AsyncStream<String>.makeStream()
+        shows.stopIsWaitingForTests = { folder in
+            announced.yield(folder)
+        }
+        return Task { @MainActor in
+            for await folder in stream {
+                return folder
+            }
+            return ""
+        }
     }
 
     /// Stop on a section ends every show of it (the review's L5): one

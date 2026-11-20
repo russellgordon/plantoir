@@ -98,8 +98,9 @@ actor DeployedFolderServer {
     /// Told when the listener has let its address go (#1013).
     nonisolated let listenerClosed: ListenerClosed = ListenerClosed()
 
-    /// Called once, the first time a request finds the folder gone.
-    private let onFolderGone: @Sendable () -> Void
+    /// Called once, the first time a request finds the folder gone, with
+    /// this server, so the show it belongs to is the one stopped.
+    private let onFolderGone: @Sendable (DeployedFolderServer) -> Void
 
     private var connections: [Int: ConnectionState] = [:]
     private var nextConnectionID: Int = 0
@@ -113,7 +114,7 @@ actor DeployedFolderServer {
 
     // MARK: - Initializer
 
-    init(root: URL, port: Int, listener: NWListener, onFolderGone: @escaping @Sendable () -> Void) {
+    init(root: URL, port: Int, listener: NWListener, onFolderGone: @escaping @Sendable (DeployedFolderServer) -> Void) {
         self.root = root
         self.port = port
         self.listener = listener
@@ -126,8 +127,8 @@ actor DeployedFolderServer {
     /// `firstWasTaken` says whether the usual address was held, for the
     /// trail.
     static func start(
-        root: URL, candidates: [Int], onFolderGone: @escaping @Sendable () -> Void,
-        onEnded: @escaping @Sendable () -> Void = {}
+        root: URL, candidates: [Int], onFolderGone: @escaping @Sendable (DeployedFolderServer) -> Void,
+        onEnded: @escaping @Sendable (DeployedFolderServer) -> Void = { _ in }
     ) async throws -> (server: DeployedFolderServer, firstWasTaken: Bool) {
         var tried: Int = 0
         for candidate in candidates {
@@ -154,7 +155,9 @@ actor DeployedFolderServer {
                 }
             }
             let started: Bool = await DeployedFolderServer.waitUntilListening(
-                listener, closed: server.listenerClosed, onEnded: onEnded
+                listener, closed: server.listenerClosed, onEnded: {
+                    onEnded(server)
+                }
             )
             if started {
                 return (server: server, firstWasTaken: tried > 0)
@@ -473,7 +476,7 @@ actor DeployedFolderServer {
         requestTally.add(1, ordering: .relaxed)
         if !DeployedFolderResolver.isFolder(root) && !folderGoneReported {
             folderGoneReported = true
-            onFolderGone()
+            onFolderGone(self)
         }
         var answer: DeployedFolderResolver.Answer = DeployedFolderResolver.answer(
             to: request.request, root: root, port: port
