@@ -93,6 +93,9 @@ struct UnitWordRenameSheet: View {
             LabeledContent(UnitWordRenameWording.fieldLabel) {
                 TextField("", text: $proposedWord, prompt: Text(ClassPageTerm.standard))
                     .borderedTextField()
+                    // Named by the question printed beside it (#1012): a
+                    // `LabeledContent` outside a `Form` links no label.
+                    .accessibilityLabel(Text(UnitWordRenameWording.fieldLabel))
                     .accessibilityIdentifier("unitWordRenameField")
                     .disabled(isRenaming)
                     .onChange(of: proposedWord) {

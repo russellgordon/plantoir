@@ -38,6 +38,12 @@ struct AccessibilityTree {
         /// where it does not.
         let enabled: String
 
+        /// The words of the element AppKit names as this one's title
+        /// (`AXTitleUIElement`): a printed label a `Form` row links to its
+        /// control, which VoiceOver reads as the control's name (#1012).
+        /// Empty where none is linked.
+        let titleElementWords: String
+
         /// The role of the element this one sits in.
         let parentRole: String
 
@@ -50,7 +56,11 @@ struct AccessibilityTree {
 
         /// Every name the element carries, in the order VoiceOver speaks
         /// them: its description (the label), then its title. Both are
-        /// kept rather than merged, so a name said twice shows.
+        /// kept rather than merged, so a name said twice shows. With
+        /// neither, the words of a linked title element: a `Form` row's
+        /// printed label, which names its field (measured 2026-11-20: Course
+        /// Settings' "Folder" and "School name" fields carry no label or
+        /// title of their own and are linked to their row's label).
         var names: [String] {
             var spoken: [String] = []
             if !label.isEmpty {
@@ -58,6 +68,9 @@ struct AccessibilityTree {
             }
             if !title.isEmpty {
                 spoken.append(title)
+            }
+            if spoken.isEmpty && !titleElementWords.isEmpty {
+                spoken.append(titleElementWords)
             }
             return spoken
         }
@@ -179,7 +192,7 @@ struct AccessibilityTree {
     func described() -> String {
         var lines: [String] = []
         for element in elements {
-            lines.append("\(element.role) id=[\(element.identifier)] title=[\(element.title)] label=[\(element.label)] value=[\(element.value)] enabled=[\(element.enabled)]")
+            lines.append("\(element.role) id=[\(element.identifier)] title=[\(element.title)] label=[\(element.label)] titleElement=[\(element.titleElementWords)] value=[\(element.value)] enabled=[\(element.enabled)]")
         }
         return lines.joined(separator: "\n")
     }
@@ -196,12 +209,35 @@ struct AccessibilityTree {
             label: text(of: node, attribute: kAXDescriptionAttribute),
             value: text(of: node, attribute: kAXValueAttribute),
             enabled: text(of: node, attribute: kAXEnabledAttribute),
+            titleElementWords: titleElementWords(of: node),
             parentRole: parentRole,
             actions: actionNames(of: node)
         ))
         for child in elementList(of: node, attribute: kAXChildrenAttribute) {
             collect(child, parentRole: role, into: &found, depth: depth + 1)
         }
+    }
+
+    /// The value (or title) of the element linked as `element`'s title, or
+    /// empty where none is.
+    static func titleElementWords(of element: AXUIElement) -> String {
+        var linked: CFTypeRef?
+        let result: AXError = AXUIElementCopyAttributeValue(element, kAXTitleUIElementAttribute as CFString, &linked)
+        if result != .success {
+            return ""
+        }
+        guard let linked else {
+            return ""
+        }
+        if CFGetTypeID(linked) != AXUIElementGetTypeID() {
+            return ""
+        }
+        let titleElement: AXUIElement = linked as! AXUIElement
+        let value: String = text(of: titleElement, attribute: kAXValueAttribute)
+        if !value.isEmpty {
+            return value
+        }
+        return text(of: titleElement, attribute: kAXTitleAttribute)
     }
 
     static func actionNames(of element: AXUIElement) -> [String] {
