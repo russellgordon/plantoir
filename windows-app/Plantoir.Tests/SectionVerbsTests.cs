@@ -457,7 +457,7 @@ public class SectionVerbsTests : IDisposable
             };
             var (answer, handed) = await runner.Run(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1, Day 1" }, plan: false), default);
             Assert.True(handed);
-            Assert.Equal(AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1"), answer.Summary);
+            Assert.Equal(AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1", ClassNoun.Class), answer.Summary);
             Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
 
             // A read is never held back.
@@ -549,7 +549,7 @@ public class SectionVerbsTests : IDisposable
         };
 
         var refused = await agent.Say("rebuild the preview", CancellationToken.None);
-        Assert.Contains(refused, line => line.Text == AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1"));
+        Assert.Contains(refused, line => line.Text == AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1", ClassNoun.Class));
         Assert.Equal(0, rebuilt);
 
         await agent.Say("preview", CancellationToken.None);

@@ -247,8 +247,9 @@ struct SectionMenu: Commands {
 
     var body: some Commands {
         // The title follows the selected course: Classes, or Meetings in a
-        // club (#990, Russell, 2026-11-20 evening), as the items follow it.
-        CommandMenu(SubjectMenuLayout.title(of: layout, noun: situation.classNoun)) {
+        // club (#990, Russell, 2026-11-20 evening), as the items follow it;
+        // Classes with no window in front.
+        CommandMenu(SubjectMenuLayout.title(of: layout, noun: sidebar?.classNoun ?? .class)) {
             let current: SubjectMenuRules.Situation = situation
             let enabled: Set<SubjectMenuRules.Item> = SubjectMenuRules.enabledItems(current)
 

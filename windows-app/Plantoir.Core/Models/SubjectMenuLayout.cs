@@ -1,4 +1,5 @@
 using Plantoir.Core.Assist;
+using Plantoir.Core.Catalogs;
 using Item = Plantoir.Core.Models.SubjectMenuRules.Item;
 
 namespace Plantoir.Core.Models;
@@ -74,12 +75,38 @@ public static class SubjectMenuLayout
         _ => ClassesGroups,
     };
 
-    /// <summary>The menu's title in the menu bar.</summary>
-    public static string Title(Menu menu) => menu switch
+    /// <summary>
+    /// The menu's title in the menu bar, for a course whose class pages are
+    /// called <paramref name="noun"/>. Section is Section everywhere; Classes
+    /// is titled Meetings in a course whose pages are meetings, a club
+    /// (Russell's ruling on #990, 2026-11-20 evening: "in a club the menu
+    /// itself is titled Meetings, on both platforms, so no sentence a club's
+    /// teacher reads says 'class'"; <c>subjectMenus.layout</c> →
+    /// <c>titleForAMeeting</c>). The noun, not the club code, decides it,
+    /// because the noun is what every club sentence is chosen by, so a
+    /// sentence that names the menu names the one on the screen. No default:
+    /// a caller says which course's menu it means.
+    /// </summary>
+    public static string Title(Menu menu, ClassNoun noun) => menu switch
     {
         Menu.Section => "Section",
-        _ => "Classes",
+        _ => noun == ClassNoun.Meeting ? "Meetings" : "Classes",
     };
+
+    /// <summary>
+    /// What the course with <paramref name="code"/> calls its class pages, for
+    /// a sentence about one of its backups: the course's own noun, or, for a
+    /// backup of a course no longer in the folder, a club's code read as
+    /// meetings (<see cref="ClubCodeRule"/>). The mac's
+    /// <c>WorkspaceModel.classNoun(ofCourse:)</c>.
+    /// </summary>
+    public static ClassNoun NounOfCourse(string code, IEnumerable<Course> courses, CourseNameCatalog catalog)
+    {
+        foreach (var course in courses)
+            if (string.Equals(course.Code, code, StringComparison.OrdinalIgnoreCase))
+                return course.Configuration.ClassNoun;
+        return ClubCodeRule.IsClub(code, catalog) ? ClassNoun.Meeting : ClassNoun.Class;
+    }
 
     /// <summary>The submenu's title.</summary>
     public static string Title(Submenu submenu) => "Revise With";
@@ -179,16 +206,22 @@ public static class SubjectMenuLayout
     }
 
     /// <summary>
-    /// "Section or Classes": the two menus' titles in the layout's order, for a
-    /// sentence that covers a change from either (#990, Russell's ruling "name
-    /// the real menu").
+    /// "Section or Classes" ("Section or Meetings" in a club): the two menus'
+    /// titles in the layout's order, for a sentence that covers a change from
+    /// either (#990, Russell's ruling "name the real menu").
     /// </summary>
-    public static string EitherMenu => string.Join(" or ", Enum.GetValues<Menu>().Select(Title));
+    public static string EitherMenu(ClassNoun noun) =>
+        string.Join(" or ", Enum.GetValues<Menu>().Select(menu => Title(menu, noun)));
+
+    /// <summary>"Section and Classes" ("Section and Meetings" in a club), for the Backups list's sentence on what the two keep.</summary>
+    public static string BothMenus(ClassNoun noun) =>
+        string.Join(" and ", Enum.GetValues<Menu>().Select(menu => Title(menu, noun)));
 
     /// <summary>
-    /// Where an item is, the way the trail says it: "Classes ▸ Class Dates…".
-    /// The menu's title comes from the layout, so the path moves with the item.
+    /// Where an item is, the way the trail says it: "Classes ▸ Class Dates…"
+    /// ("Meetings ▸ Class Dates…" in a club). The menu's title comes from the
+    /// layout, so the path moves with the item.
     /// </summary>
-    public static string Path(Item item, string title) =>
-        MenuContaining(item) is { } menu ? $"{Title(menu)} ▸ {title}" : title;
+    public static string Path(Item item, string title, ClassNoun noun) =>
+        MenuContaining(item) is { } menu ? $"{Title(menu, noun)} ▸ {title}" : title;
 }

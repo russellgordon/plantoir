@@ -16,13 +16,13 @@ public abstract record BackupMaker
 {
     public sealed record Teacher : BackupMaker
     {
-        public override string Description => "made by you";
+        public override string DescriptionFor(ClassNoun noun) => "made by you";
         public override string NameSuffix => "";
     }
 
     public sealed record Assistant(int SectionNumber) : BackupMaker
     {
-        public override string Description => $"before an assistant chat about Section {SectionNumber}";
+        public override string DescriptionFor(ClassNoun noun) => $"before an assistant chat about Section {SectionNumber}";
         public override string NameSuffix => $"_assistant-section{SectionNumber}";
     }
 
@@ -46,7 +46,8 @@ public abstract record BackupMaker
     /// </remarks>
     public sealed record Menu(int SectionNumber, SubjectMenuLayout.Menu InMenu) : BackupMaker
     {
-        public override string Description => $"before a change from the {SubjectMenuLayout.Title(InMenu)} menu to Section {SectionNumber}";
+        public override string DescriptionFor(ClassNoun noun) =>
+            $"before a change from the {SubjectMenuLayout.Title(InMenu, noun)} menu to Section {SectionNumber}";
         public override string NameSuffix => $"_{NamePrefix(InMenu)}{SectionNumber}";
 
         /// <summary>The piece before the section number: "menu-section" for Section, "classes-section" for Classes.</summary>
@@ -54,7 +55,13 @@ public abstract record BackupMaker
             inMenu == SubjectMenuLayout.Menu.Section ? "menu-section" : "classes-section";
     }
 
-    public abstract string Description { get; }
+    /// <summary>
+    /// The end of the sentence a teacher reads in the Backups list.
+    /// <paramref name="noun"/> is what the backup's course calls its class
+    /// pages, so a menu copy names the menu as that course's menu bar titles
+    /// it (Meetings in a club, #990; <see cref="SubjectMenuLayout.NounOfCourse"/>).
+    /// </summary>
+    public abstract string DescriptionFor(ClassNoun noun);
     public abstract string NameSuffix { get; }
 
     public static readonly BackupMaker DefaultTeacher = new Teacher();
@@ -96,12 +103,14 @@ public sealed record BackupItem(string CourseCode, DateTime BackedUpAt, string F
     public string WhenDescription =>
         BackedUpAt.ToString("d MMMM yyyy 'at' h:mm tt", CultureInfo.CurrentCulture);
 
-    public string Subtitle => $"Backed up {WhenDescription} · {Maker.Description}";
+    /// <summary>"Backed up … · made by you"; <paramref name="noun"/> as in <see cref="BackupMaker.DescriptionFor"/>.</summary>
+    public string SubtitleFor(ClassNoun noun) => $"Backed up {WhenDescription} · {Maker.DescriptionFor(noun)}";
 
-    public string KeptDescription => Maker switch
+    /// <summary>What happens to this copy over time; in a club the menus are Section and Meetings (#990).</summary>
+    public string KeptDescriptionFor(ClassNoun noun) => Maker switch
     {
         BackupMaker.Assistant => "The assistant made this one; its five most recent are kept.",
-        BackupMaker.Menu m => $"The {SubjectMenuLayout.Title(m.InMenu)} menu made this one before a change; the five most recent the Section and Classes menus made are kept.",
+        BackupMaker.Menu m => $"The {SubjectMenuLayout.Title(m.InMenu, noun)} menu made this one before a change; the five most recent the {SubjectMenuLayout.BothMenus(noun)} menus made are kept.",
         _ => "You made this one, so it is kept until you delete it.",
     };
 

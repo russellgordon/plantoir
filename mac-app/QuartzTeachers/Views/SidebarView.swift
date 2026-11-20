@@ -2094,7 +2094,6 @@ struct SidebarView: View {
         }
         if let course = workspace.selectedCourse {
             situation.keptForReference = course.isKeptForReference
-            situation.classNoun = course.configuration.classNoun
             situation.structuralHold = structuralHoldReason(for: course) != nil
             situation.busy = busyReason(for: course) != nil
             situation.copying = workspace.isBeingCopied(course.code)
@@ -2128,6 +2127,7 @@ struct SidebarView: View {
         return SidebarMenuCommands(
             situation: situation,
             scheduledFor: scheduledFor,
+            classNoun: workspace.selectedCourse?.configuration.classNoun ?? .class,
             perform: performMenuItem
         )
     }

@@ -57,7 +57,9 @@ public class SubjectMenuLayoutContractTests
         foreach (var menu in menus)
         {
             var here = Enum.GetValues<SubjectMenuLayout.Menu>().Single(m => SubjectMenuLayout.ContractName(m) == menu["menu"]!.ToString());
-            Assert.Equal(menu["title"]!.ToString(), SubjectMenuLayout.Title(here));
+            Assert.Equal(menu["title"]!.ToString(), SubjectMenuLayout.Title(here, ClassNoun.Class));
+            // #990, Russell, 2026-11-20 evening: Meetings in a club.
+            Assert.Equal(menu["titleForAMeeting"]!.ToString(), SubjectMenuLayout.Title(here, ClassNoun.Meeting));
             var expected = ExpectedHere(menu);
             var actual = Here(here);
             Assert.True(expected.Count == actual.Count && expected.Zip(actual).All(pair => pair.First.SequenceEqual(pair.Second)),
@@ -136,19 +138,23 @@ public class SubjectMenuLayoutContractTests
     {
         var events = ContractLoader.LoadJson("shared-rules.json")["activityTrail"]!["mustRecord"]!.AsArray();
         var cases = events.Single(e => e!["event"]!.ToString() == "section menu backed up a course")!["lineCases"]!.AsArray();
-        Assert.Equal(4, cases.Count);
+        Assert.Equal(6, cases.Count);
         foreach (var c in cases)
         {
             var menu = AssistWorkspace.MenuNamed(c!["menu"]!.ToString());
             Assert.Equal(c["menu"]!.ToString(), SubjectMenuLayout.ContractName(menu));
+            // A club's line names the Meetings menu (#990, 2026-11-20 evening).
+            var noun = ClassPageSchemes.NounReading(c["noun"]?.ToString());
             if (c["file"]?.ToString() is { } file)
-                Assert.StartsWith(c["startsWith"]!.ToString(), AssistWorkspace.MenuBackedUpLine(menu, file, 1.0, 2.0));
+                Assert.StartsWith(c["startsWith"]!.ToString(), AssistWorkspace.MenuBackedUpLine(menu, noun, file, 1.0, 2.0));
             else
-                Assert.Equal(c["line"]!.ToString(), AssistWorkspace.MenuCouldNotBackUpLine(menu, c["reason"]!.ToString()));
+                Assert.Equal(c["line"]!.ToString(), AssistWorkspace.MenuCouldNotBackUpLine(menu, noun, c["reason"]!.ToString()));
         }
-        Assert.Equal("Section or Classes", SubjectMenuLayout.EitherMenu);
+        Assert.Equal("Section or Classes", SubjectMenuLayout.EitherMenu(ClassNoun.Class));
+        Assert.Equal("Section or Meetings", SubjectMenuLayout.EitherMenu(ClassNoun.Meeting));
         Assert.Contains("the Section or Classes menu", AssistWording.NothingToUndoFromTheMenu);
-        Assert.Contains("the Section or Classes menu", AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1"));
+        Assert.Contains("the Section or Classes menu", AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1", ClassNoun.Class));
+        Assert.Contains("the Section or Meetings menu", AssistWording.SectionIsChangingFromTheMenu("CODING", "1", ClassNoun.Meeting));
     }
 
     /// <summary>Windows' menu bar order is the contract's, Classes after Section.</summary>
@@ -168,10 +174,13 @@ public class SubjectMenuLayoutContractTests
     [Fact]
     public void MenuPathsNameTheMenuTheItemIsIn()
     {
-        Assert.Equal("Classes ▸ Class Dates…", SubjectMenuLayout.Path(Item.ClassDates, "Class Dates…"));
-        Assert.Equal("Classes ▸ Add Next Class", SubjectMenuLayout.Path(Item.AddNextClass, "Add Next Class"));
-        Assert.Equal("Section ▸ Publish Pages…", SubjectMenuLayout.Path(Item.PublishPages, "Publish Pages…"));
-        Assert.Equal("Rename", SubjectMenuLayout.Path(Item.Rename, "Rename"));
+        Assert.Equal("Classes ▸ Class Dates…", SubjectMenuLayout.Path(Item.ClassDates, "Class Dates…", ClassNoun.Class));
+        Assert.Equal("Classes ▸ Add Next Class", SubjectMenuLayout.Path(Item.AddNextClass, "Add Next Class", ClassNoun.Class));
+        Assert.Equal("Section ▸ Publish Pages…", SubjectMenuLayout.Path(Item.PublishPages, "Publish Pages…", ClassNoun.Class));
+        Assert.Equal("Rename", SubjectMenuLayout.Path(Item.Rename, "Rename", ClassNoun.Class));
+        // A club's trail names its menus as its menu bar does (#990, 2026-11-20 evening).
+        Assert.Equal("Meetings ▸ Class Dates…", SubjectMenuLayout.Path(Item.ClassDates, "Class Dates…", ClassNoun.Meeting));
+        Assert.Equal("Section ▸ Publish Pages…", SubjectMenuLayout.Path(Item.PublishPages, "Publish Pages…", ClassNoun.Meeting));
     }
 
     private static string Describe(List<List<string>> groups) => string.Join(" | ", groups.Select(g => string.Join(", ", g)));

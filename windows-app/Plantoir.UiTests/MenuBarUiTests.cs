@@ -288,16 +288,16 @@ public class SectionAndClassesUiTests
     /// <summary>
     /// Open a menu and read its lines in order: each item's AutomationId, and
     /// a separator as "----". A <c>MenuFlyoutSeparator</c> has no UI Automation
-    /// element at all, so the separator cannot be read as structure: measured
+    /// element at all, so the separator cannot be read as an element: measured
     /// in the VM on 2026-11-20 (#990 review), the RAW view under the open
-    /// flyout's <c>MenuFlyout</c> and its <c>Popup</c> holds the five
+    /// flyout's <c>MenuFlyout</c> and its <c>Popup</c> holds the
     /// <c>MenuFlyoutItem</c>s and their text and nothing else (WinUI gives the
-    /// separator no automation peer). So it is read where it is drawn: a gap
-    /// between two items' rectangles more than 1 pixel larger than the
-    /// smallest gap in the menu, which is the gap between two items of one
-    /// group. Measured at 100%: 4 or 5 pixels within a group, 7 or 8 across a
-    /// separator (<see cref="LastGaps"/> says what was measured when it
-    /// fails). The groups themselves are pinned without pixels by
+    /// separator no automation peer). So it is read where it is drawn, from
+    /// the gaps between items compared with EACH OTHER, never with a number of
+    /// pixels (<see cref="SeparatorGaps"/>): at any scaling every gap inside a
+    /// group is the same drawn spacing and every gap across a separator is that
+    /// spacing plus the separator, so the gaps fall into two sets. The groups
+    /// themselves are pinned without pixels by
     /// <c>SubjectMenuLayoutContractTests</c>, against the lists the window
     /// draws from.
     /// </summary>
@@ -315,15 +315,45 @@ public class SectionAndClassesUiTests
         items.Sort((one, other) => one.Box.Top.CompareTo(other.Box.Top));
         var gaps = new List<int>();
         for (int index = 1; index < items.Count; index++) gaps.Add(items[index].Box.Top - items[index - 1].Box.Bottom);
-        int between = gaps.Count > 0 ? gaps.Min() : 0;   // two items of one group
         LastGaps = string.Join(", ", gaps);
+        var across = SeparatorGaps(gaps);
         var lines = new List<(string, AutomationElement?)>();
         for (int index = 0; index < items.Count; index++)
         {
-            if (index > 0 && gaps[index - 1] > between + 1) lines.Add((Separator, null));
+            if (index > 0 && across.Contains(index - 1)) lines.Add((Separator, null));
             lines.Add((items[index].Id, items[index].Element));
         }
         return lines;
+    }
+
+    /// <summary>
+    /// Which gaps hold a separator, read from the gaps alone, at any scaling.
+    /// Sorted, the gaps are split where two neighbouring values differ the
+    /// most: below that jump are the gaps inside a group, above it the gaps
+    /// across a separator. The split counts only when it is unambiguous: the
+    /// jump must be wider than the spread inside either set (the spread being
+    /// the device-pixel rounding of one drawn spacing), or the test fails
+    /// saying it cannot tell the two apart, rather than guess. All gaps equal:
+    /// no separator. A missing or extra separator then shows as a line out of
+    /// place against the layout, which is the assertion that fails.
+    /// </summary>
+    internal static HashSet<int> SeparatorGaps(IReadOnlyList<int> gaps)
+    {
+        var across = new HashSet<int>();
+        var sorted = gaps.Distinct().OrderBy(gap => gap).ToList();
+        if (sorted.Count < 2) return across;
+        int widest = 0, splitAbove = 0;
+        for (int index = 1; index < sorted.Count; index++)
+            if (sorted[index] - sorted[index - 1] > widest) { widest = sorted[index] - sorted[index - 1]; splitAbove = sorted[index - 1]; }
+        var inside = gaps.Where(gap => gap <= splitAbove).ToList();
+        var between = gaps.Where(gap => gap > splitAbove).ToList();
+        int spread = Math.Max(inside.Max() - inside.Min(), between.Max() - between.Min());
+        if (widest <= spread)
+            throw new Xunit.Sdk.XunitException(
+                $"the menu's gaps do not fall into two clear sets, so its separators cannot be read: {string.Join(", ", gaps)}");
+        for (int index = 0; index < gaps.Count; index++)
+            if (gaps[index] > splitAbove) across.Add(index);
+        return across;
     }
 
     /// <summary>
@@ -337,6 +367,45 @@ public class SectionAndClassesUiTests
         MenuBar.Open(app, menu, anyItemId);
         FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(folder, fileName));
         MenuBar.Close();
+    }
+
+    /// <summary>The app's own menu bar's titles, in order (not the title bar's System menu).</summary>
+    private static string MenuBarTitles(DrivenApp app) =>
+        string.Join(", ", app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))
+            .Where(e => e.Parent?.ControlType == ControlType.MenuBar && e.Name != "System").Select(e => e.Name));
+
+    /// <summary>Whether the menu bar comes to read <paramref name="expected"/>, waited for as every element here is.</summary>
+    private static bool MenuBarComesToRead(DrivenApp app, string expected) =>
+        Retry.WhileFalse(() => MenuBarTitles(app) == expected, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result;
+
+    /// <summary>
+    /// Russell's ruling on #990 (2026-11-20 evening): "in a club the menu
+    /// itself is titled Meetings, on both platforms, so no sentence a club's
+    /// teacher reads says 'class'." The title follows the selected course
+    /// live (<c>subjectMenus.layout.titleForAMeeting</c>): a course reads
+    /// Classes, a club (its pages called meetings) reads Meetings with the
+    /// same items, and back. MUST FAIL with the title set once when the menu
+    /// is built.
+    /// </summary>
+    [UiFact]
+    public void TheClassesMenuIsTitledMeetingsWhileAClubIsSelected()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBothAndAClub);
+        const string ForACourse = "File, Course, Section, Classes, View, Help";
+        const string ForAClub = "File, Course, Section, Meetings, View, Help";
+
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
+        Assert.True(MenuBarComesToRead(app, ForACourse), $"a course's menu bar reads {MenuBarTitles(app)}");
+
+        app.ClickMiddleOf(app.Find("sidebar-" + CourseFixtures.Club, "the club's row"));
+        Assert.True(MenuBarComesToRead(app, ForAClub), $"a club's menu bar reads {MenuBarTitles(app)}");
+        var meetings = MenuBar.Open(app, "Meetings", "classesClassDates");
+        Assert.Equal(Expected(Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes).Where(line => line != Separator).OrderBy(id => id),
+                     meetings.Keys.OrderBy(id => id));
+        MenuBar.Close();
+
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
+        Assert.True(MenuBarComesToRead(app, ForACourse), $"back on a course the menu bar reads {MenuBarTitles(app)}");
     }
 
     [UiFact]

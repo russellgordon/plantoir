@@ -461,7 +461,7 @@ public sealed partial class SidebarPane : UserControl
                 {
                     Title = item.Title,
                     Glyph = RestoreGlyph,
-                    Tooltip = item.Subtitle,
+                    Tooltip = item.SubtitleFor(Workspace.ClassNounOf(item.CourseCode)),
                     Selection = new SidebarSelection.BackupEntry(item.Id),
                     AutomationId = $"backup-{Path.GetFileName(item.FilePath)}",
                 };
@@ -497,7 +497,7 @@ public sealed partial class SidebarPane : UserControl
                     group.Tooltip = BackupsSummarySentence(summary);
                     foreach (var (item, bytes) in task.Result)
                         if (rows.FirstOrDefault(r => r.Selection is SidebarSelection.BackupEntry(var id) && id == item.Id) is { } row)
-                            row.Tooltip = $"{item.Subtitle} · " +
+                            row.Tooltip = $"{item.SubtitleFor(Workspace.ClassNounOf(item.CourseCode))} · " +
                                 (bytes is { } b ? BackupSizes.Describe(b) : AssistWording.BackupSizeCouldNotBeRead);
                 });
             });
@@ -578,7 +578,7 @@ public sealed partial class SidebarPane : UserControl
             string who = item.Maker switch
             {
                 BackupMaker.Assistant a => $"Assistant, Section {a.SectionNumber}",
-                BackupMaker.Menu m => $"{SubjectMenuLayout.Title(m.InMenu)} menu, Section {m.SectionNumber}",
+                BackupMaker.Menu m => $"{SubjectMenuLayout.Title(m.InMenu, Workspace.ClassNounOf(item.CourseCode))} menu, Section {m.SectionNumber}",
                 _ => "You",
             };
             string[] cells = { item.CourseCode, item.WhenDescription, who,

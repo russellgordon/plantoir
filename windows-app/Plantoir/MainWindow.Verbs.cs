@@ -107,7 +107,7 @@ public sealed partial class MainWindow
         // Its "ran from a menu" line names Hide Pages…, whose call it is, and
         // says where it came from, as the mac's does.
         var answer = await verbs.Perform(SectionVerbs.HidePages(code, section, places, plan: false),
-                                         SectionVerbDialog.MenuPath(Item.HidePages), code, section,
+                                         SectionVerbDialog.MenuPath(Item.HidePages, Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun ?? ClassNoun.Class), code, section,
                                          SubjectMenuLayout.MenuContaining(Item.HidePages),
                                          ClassesDatedLater.UntickedAtDeployCounts(places.Count),
                                          previewFollows: false);
@@ -170,7 +170,7 @@ public sealed partial class MainWindow
                     break;
                 case Item.RebuildPreview:
                     var rebuilt = await verbs.Perform(SectionVerbs.RebuildPreview(code, number),
-                                                      SectionVerbDialog.MenuPath(item), code, number,
+                                                      SectionVerbDialog.MenuPath(item, course.Configuration.ClassNoun), code, number,
                                                       SubjectMenuLayout.MenuContaining(item));
                     // Rebuilding is watched happening; only a refusal is said.
                     if (rebuilt.Summary != AssistWording.PreviewIsRebuilding(code, number.ToString()))
@@ -195,7 +195,7 @@ public sealed partial class MainWindow
                     await SectionVerbDialog.ChooseWhereToMakeRoom(root, verbs, course, number);
                     break;
                 case Item.ClassDates:
-                    SectionVerbs.NoteOpened(SectionVerbDialog.MenuPath(item), code, number);
+                    SectionVerbs.NoteOpened(SectionVerbDialog.MenuPath(item, course.Configuration.ClassNoun), code, number);
                     await ShowClassDates(folder, course, number, root, reason: "");
                     break;
             }

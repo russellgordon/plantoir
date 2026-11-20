@@ -210,7 +210,9 @@ public sealed partial class MainWindow
     /// </summary>
     private void BuildLayoutMenu(MenuBarItem menu, SubjectMenuLayout.Menu layout)
     {
-        menu.Title = SubjectMenuLayout.Title(layout);
+        // The title follows the selected course (ApplyMenuEnablement): an
+        // ordinary course's until the first refresh.
+        menu.Title = SubjectMenuLayout.Title(layout, ClassNoun.Class);
         var into = menu.Items;
         bool first = true;
         foreach (var group in SubjectMenuLayout.Groups(layout))
@@ -542,12 +544,32 @@ public sealed partial class MainWindow
             alternate.Visibility = stops ? Visibility.Collapsed : Visibility.Visible;
         }
 
+        // Classes ▸ is titled Meetings while a club is selected (#990,
+        // Russell, 2026-11-20 evening: "in a club the menu itself is titled
+        // Meetings, on both platforms"), Classes otherwise; it greys nothing.
+        var noun = SelectedCourseNoun();
+        SectionMenu.Title = SubjectMenuLayout.Title(SubjectMenuLayout.Menu.Section, noun);
+        ClassesMenu.Title = SubjectMenuLayout.Title(SubjectMenuLayout.Menu.Classes, noun);
+
         // Ctrl+Shift+O sits on the ONE Open in Obsidian item that can be live.
         bool onSection = situation.Row == Row.Section;
         MoveKey(_courseObsidianKey, (MenuFlyoutItem)_ruled[Item.CourseOpenInObsidian], !onSection);
         MoveKey(_sectionObsidianKey, (MenuFlyoutItem)_ruled[Item.SectionOpenInObsidian], onSection);
 
         _openRecentMenu.IsEnabled = enabled.Contains(Item.OpenRecent);
+    }
+
+    /// <summary>What the selected course (or the selected section's course) calls its class pages; Class with nothing selected.</summary>
+    private ClassNoun SelectedCourseNoun()
+    {
+        string? code = Workspace.Selection switch
+        {
+            SidebarSelection.CourseItem(var c) => c,
+            SidebarSelection.SectionItem(var c, _) => c,
+            _ => null,
+        };
+        var course = code is null ? null : Workspace.Courses.FirstOrDefault(c => c.Code == code);
+        return course?.Configuration.ClassNoun ?? ClassNoun.Class;
     }
 
     private static void MoveKey(KeyboardAccelerator key, MenuFlyoutItem item, bool belongsHere)

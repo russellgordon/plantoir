@@ -3312,13 +3312,13 @@ public sealed partial class AssistWorkspace
         catch (Exception error)
         {
             ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
-                MenuCouldNotBackUpLine(MenuOfTheChange, error.Message), course.Code, sectionNumber);
+                MenuCouldNotBackUpLine(MenuOfTheChange, course.Configuration.ClassNoun, error.Message), course.Code, sectionNumber);
             throw;
         }
         double megabytes = 0;
         try { megabytes = new FileInfo(made).Length / (1024.0 * 1024.0); } catch { }
         ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
-            MenuBackedUpLine(MenuOfTheChange, Path.GetFileName(made), megabytes, clock.Elapsed.TotalSeconds),
+            MenuBackedUpLine(MenuOfTheChange, course.Configuration.ClassNoun, Path.GetFileName(made), megabytes, clock.Elapsed.TotalSeconds),
             course.Code, sectionNumber);
         return made;
     }
@@ -3339,15 +3339,18 @@ public sealed partial class AssistWorkspace
     public static SubjectMenuLayout.Menu MenuNamed(string? contractName) =>
         Enum.GetValues<SubjectMenuLayout.Menu>().FirstOrDefault(menu => SubjectMenuLayout.ContractName(menu) == contractName);
 
-    /// <summary>"the Classes menu backed up the course as …" (<c>activityTrail.mustRecord</c> → <c>lineCases</c>).</summary>
-    public static string MenuBackedUpLine(SubjectMenuLayout.Menu menu, string fileName, double megabytes, double seconds) =>
-        $"the {SubjectMenuLayout.Title(menu)} menu backed up the course as {fileName} " +
+    /// <summary>
+    /// "the Classes menu backed up the course as …" (<c>activityTrail.mustRecord</c> → <c>lineCases</c>):
+    /// the menu by the title the course's menu bar gives it, "the Meetings menu" in a club (#990).
+    /// </summary>
+    public static string MenuBackedUpLine(SubjectMenuLayout.Menu menu, ClassNoun noun, string fileName, double megabytes, double seconds) =>
+        $"the {SubjectMenuLayout.Title(menu, noun)} menu backed up the course as {fileName} " +
         $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
         $"{seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)";
 
     /// <summary>"the Classes menu could not back up the course: …".</summary>
-    public static string MenuCouldNotBackUpLine(SubjectMenuLayout.Menu menu, string reason) =>
-        $"the {SubjectMenuLayout.Title(menu)} menu could not back up the course: {reason}";
+    public static string MenuCouldNotBackUpLine(SubjectMenuLayout.Menu menu, ClassNoun noun, string reason) =>
+        $"the {SubjectMenuLayout.Title(menu, noun)} menu could not back up the course: {reason}";
 
     /// <summary>
     /// The one door every assistant zip goes through — the conversation's first

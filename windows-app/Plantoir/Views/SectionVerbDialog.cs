@@ -124,18 +124,19 @@ internal sealed class SectionVerbDialog
             // Closed at the plan, by Cancel or by Escape: nothing ran, and
             // the trail says so.
             if (_stage is Stage.Plan)
-                SectionVerbs.NoteCancelled(MenuPath(_item), _course.Code, _section, Counts());
+                SectionVerbs.NoteCancelled(MenuPath(_item, _course.Configuration.ClassNoun), _course.Code, _section, Counts());
         };
     }
 
     /// <summary>
     /// Where an item is in the menus, the way the trail says it: the menu that
     /// holds it, from <see cref="SubjectMenuLayout"/> (#990: Section or
-    /// Classes), and the words it is drawn with there.
+    /// Classes), under the title the course's menu bar gives it (Meetings ▸
+    /// in a club), and the words it is drawn with there.
     /// </summary>
-    internal static string MenuPath(Item item) =>
+    internal static string MenuPath(Item item, ClassNoun noun) =>
         SubjectMenuLayout.MenuContaining(item) is not null && SubjectMenuLayout.TitleHere(item) is { } title
-            ? SubjectMenuLayout.Path(item, title)
+            ? SubjectMenuLayout.Path(item, title, noun)
             : item.ToString();
 
     // ---- Opening it, per item ---------------------------------------------------
@@ -815,7 +816,7 @@ internal sealed class SectionVerbDialog
     private async Task RunPlan(JsonObject planCall)
     {
         ShowWorking(AssistWording.MenuWorking);
-        var answer = await _verbs.Perform(planCall, MenuPath(_item), _course.Code, _section,
+        var answer = await _verbs.Perform(planCall, MenuPath(_item, _course.Configuration.ClassNoun), _course.Code, _section,
                                           SubjectMenuLayout.MenuContaining(_item), Counts());
         if (answer.IsPlan)
         {
@@ -826,7 +827,7 @@ internal sealed class SectionVerbDialog
             return;
         }
         // A plan twin that refused: its sentence and OK, nothing to approve.
-        SectionVerbs.NoteRan(MenuPath(_item), "changed nothing", _course.Code, _section, Counts());
+        SectionVerbs.NoteRan(MenuPath(_item, _course.Configuration.ClassNoun), "changed nothing", _course.Code, _section, Counts());
         ShowResult(answer.Summary);
     }
 
@@ -840,7 +841,7 @@ internal sealed class SectionVerbDialog
     {
         ShowWorking(AssistWording.MenuWorking);
         string savingACopy = AssistWording.MenuSavingACopy(_course.Code);
-        var answer = await _verbs.Perform(call, MenuPath(_item), _course.Code, _section,
+        var answer = await _verbs.Perform(call, MenuPath(_item, _course.Configuration.ClassNoun), _course.Code, _section,
             SubjectMenuLayout.MenuContaining(_item), Counts(),
             progress: note => _dialog.DispatcherQueue?.TryEnqueue(() =>
             {

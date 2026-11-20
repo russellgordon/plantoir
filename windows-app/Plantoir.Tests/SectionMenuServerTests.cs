@@ -122,7 +122,7 @@ public class SectionMenuServerTests : IDisposable
         Assert.Empty(MenuBackups());
         var maker = Assert.IsType<BackupMaker.Menu>(BackupItem.From(copies[0], "ICS3U")!.Maker);
         Assert.Equal(SubjectMenuLayout.Menu.Classes, maker.InMenu);
-        Assert.Contains("the Classes menu", maker.Description);
+        Assert.Contains("the Classes menu", maker.DescriptionFor(ClassNoun.Class));
         Assert.Contains("ICS3U/1 · the Classes menu backed up the course as ", File.ReadAllText(_trail));
         Assert.Equal(SubjectMenuLayout.Menu.Classes, AssistWorkspace.MenuNamed("classes"));
         Assert.Equal(SubjectMenuLayout.Menu.Section, AssistWorkspace.MenuNamed(null));
