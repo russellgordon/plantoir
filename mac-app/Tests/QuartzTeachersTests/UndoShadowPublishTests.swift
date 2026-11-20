@@ -194,4 +194,31 @@ final class UndoShadowPublishTests: XCTestCase {
             "ICS3U/1 · the undo list put back 2 files left part way by a change that stopped, found 1 file changed by hand since, and cleared the list"
         )
     }
+
+    /// U3c's two lines are exactly the examples the contract's
+    /// `activityTrail.mustRecord` rows give for them (read, never retyped).
+    func testTheKeptOriginalAndLeftNewestLinesAreTheContractsExamples() throws {
+        let rules: [String: Any] = try UndoContractReplay.contract("shared-rules.json")
+        let trail: [String: Any] = rules["activityTrail"] as? [String: Any] ?? [:]
+        var examples: [String: String] = [:]
+        for row in trail["mustRecord"] as? [[String: Any]] ?? [] {
+            if let event = row["event"] as? String, let line = row["line"] as? String {
+                examples[event] = line
+            }
+        }
+        XCTAssertEqual(
+            UndoTrail.couldNotPutBackLine(
+                course: "ICS3U", section: 1, phase: .begin, leftPartWay: 1,
+                keptOriginals: [".A.md.plantoir-undo-4-apply-orig"]
+            ),
+            examples[ActivityTrail.Event.undoCouldNotPutBack.rawValue]
+        )
+        XCTAssertEqual(
+            UndoTrail.leftNewestLine(
+                course: "ICS3U", section: 1, isUndo: true,
+                refusal: .fileIsInUse(path: "courses/ICS3U/Section 1/Classes/A.md")
+            ),
+            examples[ActivityTrail.Event.undoRefusedForAChangeLeftPartWay.rawValue]
+        )
+    }
 }

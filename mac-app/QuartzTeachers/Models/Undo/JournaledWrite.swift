@@ -1167,6 +1167,19 @@ nonisolated enum UndoTrailHook {
     /// back and how many were in the way. The list was cleared.
     nonisolated(unsafe) static var interruptedLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ putBack: Int, _ inTheWay: Int) -> Void)?
 
+    /// Recovery could not put back a step left part way, because content it
+    /// needs is gone from the list and no kept original beside its page
+    /// matches: the course and section, what it ended, how many files were
+    /// left part way, and the hidden name of every kept original still
+    /// beside its page (never removed: the only copy of what it held). The
+    /// list was cleared.
+    nonisolated(unsafe) static var couldNotPutBackLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ leftPartWay: Int, _ keptOriginals: [String]) -> Void)?
+
+    /// An Undo (`isUndo`) or a Redo was refused because the newest step is
+    /// a gone process's that recovery has just tried and left: the course
+    /// and section, and the refusal, which names the file. The list is kept.
+    nonisolated(unsafe) static var leftNewestLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ refusal: UndoRefusal) -> Void)?
+
     /// Recovery found a teacher's folder set aside by a dead process and is
     /// about to put it back in its place though it changed while aside
     /// (with what changed; `keptAs` nil), or to keep it under the visible

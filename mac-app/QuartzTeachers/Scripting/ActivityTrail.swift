@@ -1263,6 +1263,20 @@ nonisolated enum ActivityTrail {
         /// place because something else holds that place, both named.
         /// Written just before the rename. Never page text.
         case undoFoundAFolderSetAside = "undo found a folder set aside"
+        /// Recovery could not put back a step left part way (#899, U3c):
+        /// content it needs is gone from the list and no kept original beside
+        /// its page matches what the journal recorded. The course and
+        /// section, which of a change, an undo or a redo stopped, how many
+        /// files were left part way, that the list was cleared, and the
+        /// hidden name of each kept original left beside its page. Never
+        /// page text.
+        case undoCouldNotPutBack = "undo could not put back a change that stopped"
+        /// An Undo or a Redo was refused because the newest step is one a
+        /// change that stopped left part way, and recovery has just tried to
+        /// put it back and could not yet (#899, U3c): a file in use, or one
+        /// it cannot read now. The course and section, Undo or Redo, and the
+        /// file and why. The list is kept. Never page text.
+        case undoRefusedForAChangeLeftPartWay = "undo refused for a change left part way"
         /// Setting up an outside assistant was opened (#855): from where (the
         /// Settings pane, the Help menu, Revise With), so a report shows how
         /// the teacher got there.

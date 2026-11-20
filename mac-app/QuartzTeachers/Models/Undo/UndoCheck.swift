@@ -176,6 +176,13 @@ nonisolated enum UndoCheck {
     /// in the way is a blob missing from the list reported, as
     /// `contentMissing`.
     ///
+    /// `keptOriginal`, given a page's path and the hash of the whole content
+    /// a `writeFile` op wants there, answers that content from a kept
+    /// original the step's own swap left beside the page (`-orig`) when its
+    /// hash matches, for a blob the list no longer holds (Russell's ruling
+    /// of 2026-11-20, 15:20, `undo.rule.recovery`): the page is put back
+    /// from it instead of being refused `contentMissing`.
+    ///
     /// Ops on one file are applied to that file's text in turn (in reverse
     /// for an undo), so several lines on one page make one staged file. A
     /// move, a tree or an external op is judged on its own against what is
@@ -185,7 +192,8 @@ nonisolated enum UndoCheck {
         direction: UndoDirection,
         root: URL,
         journal: UndoJournal,
-        places: UndoExternalPlaces = UndoAppPreferences()
+        places: UndoExternalPlaces = UndoAppPreferences(),
+        keptOriginal: ((_ path: String, _ sha: String) -> Data?)? = nil
     ) -> UndoPlan {
         var ordered: [UndoOp] = ops
         if direction == .backward {
@@ -320,8 +328,15 @@ nonisolated enum UndoCheck {
                     }
                     continue
                 }
-                // A blob the list no longer holds. The check goes on, so
-                // every page in the way is reported first.
+                // A blob the list no longer holds: put back from the kept
+                // original beside the page when its hash is the one wanted.
+                let wanted: String? = direction == .backward ? op.beforeSha : op.afterSha
+                if let wanted, let kept = keptOriginal?(path, wanted) {
+                    working[path] = .file(kept)
+                    continue
+                }
+                // None matches. The check goes on, so every page in the way
+                // is reported first.
                 if missingContentPath == nil {
                     missingContentPath = path
                 }
@@ -1454,14 +1469,29 @@ nonisolated extension UndoJournal {
     ) -> UndoOutcome {
         // 1. Find the step, inside the lock, with recovery run first.
         let found: UndoAvailability
+        var leftNewest: UndoRefusal? = nil
         do {
-            found = try withLock { writer -> UndoAvailability in
+            (found, leftNewest) = try withLock { writer -> (UndoAvailability, UndoRefusal?) in
                 UndoRecovery.run(writer, mode: .live, resolveRoot: resolveRoot, places: places)
                 let offer: UndoOffer = writer.fold.offer(now: now())
-                return direction == .backward ? offer.undo : offer.redo
+                let answer: UndoAvailability = direction == .backward ? offer.undo : offer.redo
+                var left: UndoRefusal? = nil
+                if case .anotherChangeIsUnderWay(let busy) = answer {
+                    left = writer.leftByRecovery[busy.step.seq]
+                }
+                return (answer, left)
             }
         } catch {
             return .listUnavailable
+        }
+        // The newest step is a gone process's, and recovery has just tried
+        // it at once and left it (a file in use, a page it cannot read now):
+        // nothing is under way, so the answer is that refusal, naming the
+        // file, with the list kept and tried again at the next Undo or Redo,
+        // and one trail line (the W3 review's LOW 4, matched from Windows).
+        if case .anotherChangeIsUnderWay(let busy) = found, let leftNewest {
+            UndoTrailHook.leftNewestLine?(busy.step.course ?? "", busy.step.section, direction == .backward, leftNewest)
+            return .refused(leftNewest, clearedTheList: false)
         }
         let record: UndoStepRecord
         switch found {
@@ -1499,8 +1529,21 @@ nonisolated extension UndoJournal {
             return .notAvailable
         }
 
-        // 2. Check every op, writing nothing.
-        let plan: UndoPlan = UndoCheck.plan(record.step.ops, direction: direction, root: root, journal: self, places: places)
+        // 2. Check every op, writing nothing. Content the list no longer
+        // holds is taken from a kept original of the step's own whose hash
+        // matches, as recovery does (`undo.rule.recovery`).
+        let keptOriginal: (String, String) -> Data? = UndoRecovery.keptOriginal(of: record.step, root: root)
+        var usedAKeptOriginal: Bool = false
+        let plan: UndoPlan = UndoCheck.plan(
+            record.step.ops, direction: direction, root: root, journal: self, places: places,
+            keptOriginal: { path, sha in
+                let kept: Data? = keptOriginal(path, sha)
+                if kept != nil {
+                    usedAKeptOriginal = true
+                }
+                return kept
+            }
+        )
         if UndoKillPoints.stopsHere(.afterTheCheck) {
             return .stoppedByATest
         }
@@ -1562,6 +1605,11 @@ nonisolated extension UndoJournal {
         // this answers, outside the lock and off this thread
         // (`undoNewestAndRederive`, `UndoMaintainers`).
         _ = recomputes
+        if usedAKeptOriginal {
+            // The kept original it was put back from is now a copy of its
+            // page: nothing of the step's is left beside it.
+            UndoRecovery.tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true)
+        }
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
         return direction == .backward ? .undone(seq: seq) : .redone(seq: seq)
     }

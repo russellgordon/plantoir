@@ -85,6 +85,84 @@ nonisolated enum UndoTrail {
                 UndoTrail.rolledBackLine(course: course, section: section, phase: phase, files: files)
             )
         }
+        UndoTrailHook.couldNotPutBackLine = { course, section, phase, leftPartWay, keptOriginals in
+            ActivityTrail.note(
+                .undoCouldNotPutBack,
+                UndoTrail.couldNotPutBackLine(course: course, section: section, phase: phase, leftPartWay: leftPartWay, keptOriginals: keptOriginals)
+            )
+        }
+        UndoTrailHook.leftNewestLine = { course, section, isUndo, refusal in
+            ActivityTrail.note(
+                .undoRefusedForAChangeLeftPartWay,
+                UndoTrail.leftNewestLine(course: course, section: section, isUndo: isUndo, refusal: refusal)
+            )
+        }
+    }
+
+    /// `ICS3U/1 · the undo list could not put back 2 files left part way by
+    /// a change that stopped, because what it needs to put them back is no
+    /// longer in the list, and cleared the list. What “A.md” held before is
+    /// kept beside it as the hidden file “.A.md.plantoir-undo-4-apply-orig”.`
+    /// One sentence per kept original; none when nothing is kept.
+    static func couldNotPutBackLine(course: String, section: Int?, phase: UndoPhase, leftPartWay: Int, keptOriginals: [String]) -> String {
+        var line: String = UndoTrail.prefix(course: course, section: section)
+        let counted: String = leftPartWay == 1 ? "1 file" : "\(leftPartWay) files"
+        line += "the undo list could not put back \(counted) left part way by \(UndoTrail.what(phase)) that stopped, "
+        line += "because what it needs to put \(leftPartWay == 1 ? "it" : "them") back is no longer in the list, and cleared the list."
+        for kept in keptOriginals {
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”."
+        }
+        return line
+    }
+
+    /// `ICS3U/1 · Undo was refused: a change that stopped part way could not
+    /// be put back yet, because courses/ICS3U/Section 1/Classes/A.md is in
+    /// use by another program. The list is kept, and the next Undo tries
+    /// again.`
+    static func leftNewestLine(course: String, section: Int?, isUndo: Bool, refusal: UndoRefusal) -> String {
+        let which: String = isUndo ? "Undo" : "Redo"
+        var why: String
+        switch refusal {
+        case .fileIsInUse(let path):
+            why = "\(path) is in use by another program"
+        case .cannotTellNow(let path):
+            why = "\(path) could not be read just now"
+        case .couldNotWrite(let path):
+            why = "nothing could be written beside \(path) (the disk may be full)"
+        case .changedSince(let path, _):
+            why = "\(path) changed while it was being put back"
+        case .contentMissing(let path):
+            why = "what it needs for \(path) is no longer in the list"
+        case .notReadable:
+            why = "it holds something this version cannot read"
+        }
+        return UndoTrail.prefix(course: course, section: section)
+            + "\(which) was refused: a change that stopped part way could not be put back yet, because \(why). "
+            + "The list is kept, and the next \(which) tries again."
+    }
+
+    /// `ICS3U/1 · `, `ICS3U · `, or nothing when there is no course.
+    static func prefix(course: String, section: Int?) -> String {
+        if course.isEmpty {
+            return ""
+        }
+        var line: String = course
+        if let section {
+            line += "/\(section)"
+        }
+        return line + " · "
+    }
+
+    /// "a change", "an undo" or "a redo": the work that stopped.
+    static func what(_ phase: UndoPhase) -> String {
+        switch phase {
+        case .begin:
+            return "a change"
+        case .undoing:
+            return "an undo"
+        case .redoing:
+            return "a redo"
+        }
     }
 
     /// `ICS3U/1 · the undo list could not record publishPages: the list was
