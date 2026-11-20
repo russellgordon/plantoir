@@ -46,10 +46,11 @@ final class RebuildPreviewKeyUITests: XCTestCase {
         }
         stubPreviewPIDFileURL = nil
         if stickiesWasRunningBeforeTheKey == false && RebuildPreviewKeyUITests.stickiesIsRunning() {
-            // The test caused this copy: quit it, through XCTest (the
-            // sandboxed runner may not signal another app itself).
-            let stickies: XCUIApplication = XCUIApplication(bundleIdentifier: RebuildPreviewKeyUITests.stickiesBundleIdentifier)
-            stickies.terminate()
+            // The test caused this copy: quit it. Never an XCUIApplication
+            // here (UITestLaunchTripwireTests keeps that word to the one
+            // door), so through AppKit: Quit, then, if it is still running
+            // ten seconds later, Force Quit.
+            RebuildPreviewKeyUITests.quitStickies()
             XCTFail("Stickies started during the test and was quit")
         }
         stickiesWasRunningBeforeTheKey = nil
@@ -162,6 +163,22 @@ final class RebuildPreviewKeyUITests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// Quits every running Stickies; only called for a copy this test
+    /// caused, since the test skips while one is already running.
+    static func quitStickies() {
+        let copies: [NSRunningApplication] = NSRunningApplication.runningApplications(withBundleIdentifier: stickiesBundleIdentifier)
+        for copy in copies {
+            copy.terminate()
+        }
+        let deadline: Date = Date().addingTimeInterval(10)
+        while stickiesIsRunning() && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        for copy in copies where !copy.isTerminated {
+            copy.forceTerminate()
+        }
+    }
 
     static func stickiesIsRunning() -> Bool {
         return !NSRunningApplication.runningApplications(withBundleIdentifier: stickiesBundleIdentifier).isEmpty
