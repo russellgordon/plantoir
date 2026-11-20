@@ -14294,11 +14294,19 @@ no panel asks the share's question, and its row stands beside the deploy's.
 of the 600-page test course ended 30.8 s after the question opened during
 it, and the question stayed up across the change; Stop Deploy then ended
 the deploy "Cancelled" with nothing published. **A held Escape** (one
-press, then 30 key-downs 33 ms apart with no key-up, as a keyboard repeats;
-one `SendInput` held down sends no repeats, so a test must send them):
-the question opened and stayed open, the deploy ran on, and the next fresh
-Escape was its Cancel as before. The repeats do not answer the question, so
-nothing was added for them. **Escape where another control owns it**: with
+press, then key-downs 33 ms apart with no key-up, as a keyboard repeats;
+one `SendInput` held down sends no repeats, so a test must send them): the
+press opened the question, and a repeat then pressed its Cancel, in 1 run of
+3 with the repeats starting at 500 ms and in 4 holds of 4 (repeats from 250,
+400, 500 and 650 ms) in the next run, so a held Escape asked and took the
+question down before the teacher could read it. Fixed on the question
+itself, structurally: its `PreviewKeyDown` marks an Escape whose
+`KeyStatus.WasKeyDown` is set (a repeat) handled, as `TickTable` swallows a
+held Space's repeats; a fresh Escape, and every other key, is the dialog's
+as before. With it, 4 holds of 4 left the question open, and the next fresh
+Escape was its Cancel. Rejected: a timed delay before the question takes
+keys (a guess at the repeat delay, which a teacher sets), and refusing a
+close while Escape is down (a fresh press is down too). **Escape where another control owns it**: with
 the menu bar's File menu open, it closed the menu; with a sidebar row's
 context menu open, it closed the menu; neither asked or stopped the deploy
 (the accelerator is reached only by a key that bubbled to the root
@@ -14335,12 +14343,13 @@ removed (the text-box test), Cancel reading the box (the deploy test).
 Since the review: the console's Stop on a deploy asks and Stop Deploy ends
 it "Cancelled"; the question opened during the build stays across the
 change to the deploy and Stop Deploy stops it; a held Escape's repeats do
-not answer the question; Escape with a menu open or a ComboBox focused is
+not answer the question (four holds); Escape with a menu open or a ComboBox focused is
 theirs (a measurement). Sabotaged in the VM, each red: the console's Stop
 back to `Terminate` (its test: "asked nothing"), the question taken down on
 `IsRunning` alone (its test: "taken down when the build finished");
 `IsUnderWay` as `IsRunning` alone and the announcement removed (their two
-unit tests).
+unit tests), the repeat filter taken off (the held-Escape test, 4 holds of 4
+closed).
 
 ## The lap cap on Windows (#720, the mac's #689)
 
