@@ -193,10 +193,13 @@ final class JournaledStepTests: XCTestCase {
 
     /// A step written plainly, killed between its two swaps: the staged
     /// files are left beside the pages, as a process that died there leaves
-    /// them. The next recovery, once that process is gone, removes them and
-    /// writes nothing of the teacher's: the pages stay as the process left
-    /// them. MUST FAIL with `UndoShadowStaging.tidyLeftovers` taken out of
-    /// recovery (U3a's first round never tidied a `shadow` swap's files).
+    /// them. The next recovery, once that process is gone, removes the
+    /// staged new content and writes nothing of the teacher's: the pages
+    /// stay as the process left them. The first page's kept original is
+    /// the only copy of what it held and stays beside it (the second review
+    /// of U3a, MEDIUM c). MUST FAIL with `UndoShadowStaging.tidyLeftovers`
+    /// taken out of recovery (U3a's first round never tidied a `shadow`
+    /// swap's files), and with the kept original tidied away.
     func testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery() throws {
         let made = try course(inAWorkingFolder: false)
         let day1Text: String = try String(contentsOf: made.day1, encoding: .utf8)
@@ -222,7 +225,11 @@ final class JournaledStepTests: XCTestCase {
         try later.withLock(waitingAtMost: 2, inShadow: true) { writer in
             UndoRecovery.run(writer, mode: .shadow, trySwapsNow: true, resolveRoot: { _ in nil })
         }
-        XCTAssertEqual(stagedNames(under: made.course), [], "a staged file was left in the course")
+        let left: [String] = stagedNames(under: made.course)
+        XCTAssertEqual(left.count, 1, "the staged new content was left, or the original tidied away: \(left)")
+        XCTAssertTrue((left.first ?? "").hasSuffix("-orig"), "\(left)")
+        let keptURL: URL = made.course.appendingPathComponent(left.first ?? "?")
+        XCTAssertEqual(try String(contentsOf: keptURL, encoding: .utf8), day1Text, "the kept original is not what the page held")
         XCTAssertEqual(
             [try String(contentsOf: made.day1, encoding: .utf8), try String(contentsOf: made.day2, encoding: .utf8)],
             leftByTheProcess, "recovery wrote into the course"
@@ -281,7 +288,9 @@ final class JournaledStepTests: XCTestCase {
     /// `failed`: the first page is new with its original beside it, and
     /// only recovery, once this process is gone, can settle that from the
     /// content (the Windows W3 review's finding, matched on the Mac; no new
-    /// refusal word). Recovery then puts the page back and closes the step
+    /// refusal word). It is refused PART WAY (`leftPartWay`, the second
+    /// review of U3a, MEDIUM a), never as a plain refusal that says nothing
+    /// was changed. Recovery then puts the page back and closes the step
     /// rolled back, with nothing staged left. MUST FAIL on the swap before,
     /// which ignored `reverse()` and closed the step `failed`, so recovery
     /// never looked at it and the page stayed new.
@@ -296,8 +305,8 @@ final class JournaledStepTests: XCTestCase {
         UndoKillPoints.fileInUseAtSwap = { index in index == 1 }
         UndoKillPoints.putBackFailsAt = { index in index == 0 }
         XCTAssertThrowsError(try step.make()) { error in
-            guard case JournaledStepError.refused(.fileIsInUse, _) = error else {
-                return XCTFail("not refused as in use: \(error)")
+            guard case JournaledStepError.leftPartWay(.fileIsInUse, _, _) = error else {
+                return XCTFail("not refused part way, as in use: \(error)")
             }
         }
         UndoKillPoints.fileInUseAtSwap = nil
@@ -313,5 +322,179 @@ final class JournaledStepTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: made.day2, encoding: .utf8), day2Text)
         XCTAssertEqual(stagedNames(under: made.course), [])
         XCTAssertEqual(try later.read().records[1]?.phase, .rolledBack)
+    }
+
+    // MARK: - Tests: a reversal that cannot complete, in SHADOW
+
+    /// Every teacher today runs in shadow. A reversal that cannot complete
+    /// there (the second review of U3a, MEDIUM): the step is refused PART
+    /// WAY, naming the kept original; the first page holds the new content
+    /// and its earlier content is kept beside it. At the next recovery, once
+    /// this process is gone, shadow closes the step `interrupted`, removes
+    /// the staged NEW content, and KEEPS the original, the only copy of what
+    /// the page held. MUST FAIL with `tidyClosedSteps` tidying every staged
+    /// name (the second round's code deleted the original).
+    func testInShadowAReversalThatCannotCompleteKeepsTheOriginal() throws {
+        let made = try course(inAWorkingFolder: true)
+        let day1Text: String = try String(contentsOf: made.day1, encoding: .utf8)
+        let day2Text: String = try String(contentsOf: made.day2, encoding: .utf8)
+        let step: JournaledStep = step(for: made.course)
+        step.write(published(day1Text), to: made.day1)
+        step.write(published(day2Text), to: made.day2)
+        UndoKillPoints.fileInUseAtSwap = { index in index == 1 }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        var kept: [String] = []
+        XCTAssertThrowsError(try step.make()) { error in
+            guard case JournaledStepError.leftPartWay(.fileIsInUse, _, let keptOriginals) = error else {
+                return XCTFail("not refused part way: \(error)")
+            }
+            kept = keptOriginals
+            XCTAssertTrue(error.localizedDescription.contains(keptOriginals.first ?? "?"), error.localizedDescription)
+        }
+        UndoKillPoints.fileInUseAtSwap = nil
+        UndoKillPoints.putBackFailsAt = nil
+        XCTAssertEqual(kept.count, 1)
+        let keptURL: URL = made.day1.deletingLastPathComponent().appendingPathComponent(kept.first ?? "?")
+        XCTAssertEqual(try String(contentsOf: made.day1, encoding: .utf8), published(day1Text))
+        XCTAssertEqual(try String(contentsOf: keptURL, encoding: .utf8), day1Text)
+        XCTAssertEqual(try UndoJournal(folderURL: made.list).read().records[1]?.phase, .begun)
+
+        let root: URL = made.course.deletingLastPathComponent().deletingLastPathComponent()
+        let later: UndoJournal = UndoJournal(folderURL: made.list, processIsAlive: { _ in false })
+        try later.withLock(waitingAtMost: 2, inShadow: true) { writer in
+            UndoRecovery.run(writer, mode: .shadow, trySwapsNow: true, resolveRoot: { _ in root })
+        }
+        XCTAssertEqual(try later.read().records[1]?.phase, .interrupted)
+        XCTAssertEqual(try String(contentsOf: keptURL, encoding: .utf8), day1Text, "the only copy of the page's earlier content was tidied away")
+        XCTAssertEqual(stagedNames(under: made.course).count, 1, "\(stagedNames(under: made.course))")
+        XCTAssertEqual(try String(contentsOf: made.day1, encoding: .utf8), published(day1Text), "shadow recovery wrote into the course")
+        XCTAssertEqual(try String(contentsOf: made.day2, encoding: .utf8), day2Text)
+    }
+
+    /// The same without the list (a step that cannot be named): the swap's
+    /// note is KEPT (MEDIUM c), so once this process is gone the next tidy
+    /// finds the staged new content and removes it, and keeps the original.
+    /// MUST FAIL with the note dropped on `notPutBack` (the staged new
+    /// content is then never found).
+    func testInShadowWithoutTheListAReversalThatCannotCompleteKeepsItsNote() throws {
+        let made = try course(inAWorkingFolder: false)
+        let day1Text: String = try String(contentsOf: made.day1, encoding: .utf8)
+        let day2Text: String = try String(contentsOf: made.day2, encoding: .utf8)
+        let step: JournaledStep = step(for: made.course)
+        step.write(published(day1Text), to: made.day1)
+        step.write(published(day2Text), to: made.day2)
+        UndoKillPoints.fileInUseAtSwap = { index in index == 1 }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        var kept: [String] = []
+        XCTAssertThrowsError(try step.make()) { error in
+            guard case JournaledStepError.leftPartWay(_, _, let keptOriginals) = error else {
+                return XCTFail("not refused part way: \(error)")
+            }
+            kept = keptOriginals
+        }
+        UndoKillPoints.fileInUseAtSwap = nil
+        UndoKillPoints.putBackFailsAt = nil
+        XCTAssertEqual(stagedNames(under: made.course).count, 2, "the new content of the second page was not left staged")
+        let removed: Int = UndoShadowStaging.tidyLeftovers(of: UndoJournal(folderURL: made.list, processIsAlive: { _ in false }))
+        XCTAssertEqual(removed, 1)
+        let keptURL: URL = made.day1.deletingLastPathComponent().appendingPathComponent(kept.first ?? "?")
+        XCTAssertEqual(try String(contentsOf: keptURL, encoding: .utf8), day1Text, "the original was tidied away")
+        XCTAssertEqual(stagedNames(under: made.course), ["section1/All Classes/" + (kept.first ?? "?")])
+        XCTAssertEqual(try String(contentsOf: made.day2, encoding: .utf8), day2Text)
+    }
+
+    // MARK: - Tests: recovery and pruning keep what has not settled
+
+    /// A live step killed between its swaps whose content the list no
+    /// longer holds: recovery's first tidy, before it knows whether the
+    /// step can be settled, leaves the kept original of the page that was
+    /// swapped, the only copy of what it held (the Windows recovery
+    /// review's 15). Seen at the kill point just after that tidy. What the
+    /// closing does with it is the two `recoveryCases` rows on missing
+    /// content. MUST FAIL with the first tidy removing every staged name,
+    /// as before.
+    func testRecoveryTidiesNoOnlyCopyBeforeItKnowsTheStepSettles() throws {
+        let made = try course(inAWorkingFolder: true)
+        JournaledStep.modeOverride = .live
+        let day1Text: String = try String(contentsOf: made.day1, encoding: .utf8)
+        let day2Text: String = try String(contentsOf: made.day2, encoding: .utf8)
+        let step: JournaledStep = step(for: made.course)
+        step.write("Rewritten whole.\n", to: made.day1)
+        step.write("Rewritten whole too.\n", to: made.day2)
+        UndoKillPoints.hook = { point in point == .beforeSwap(1) }
+        XCTAssertThrowsError(try step.make())
+        UndoKillPoints.hook = nil
+        JournaledStep.modeOverride = nil
+        XCTAssertEqual(try String(contentsOf: made.day1, encoding: .utf8), "Rewritten whole.\n")
+        try FileManager.default.removeItem(at: made.list.appendingPathComponent("content", isDirectory: true))
+
+        let root: URL = made.course.deletingLastPathComponent().deletingLastPathComponent()
+        let later: UndoJournal = UndoJournal(folderURL: made.list, processIsAlive: { _ in false })
+        UndoKillPoints.hook = { point in point == .afterRecoveryTidied }
+        try later.withLock(waitingAtMost: 2, inShadow: false) { writer in
+            UndoRecovery.run(writer, mode: .live, trySwapsNow: true, resolveRoot: { _ in root })
+        }
+        UndoKillPoints.hook = nil
+        XCTAssertEqual(try later.read().records[1]?.phase, .begun, "recovery went past the tidy, so this proves nothing")
+        var originals: [String] = []
+        for name in stagedNames(under: made.course) where name.hasSuffix("-orig") {
+            originals.append(name)
+        }
+        XCTAssertEqual(originals.count, 1, "\(stagedNames(under: made.course))")
+        let keptURL: URL = made.course.appendingPathComponent(originals.first ?? "?")
+        XCTAssertEqual(try String(contentsOf: keptURL, encoding: .utf8), day1Text)
+        XCTAssertEqual(try String(contentsOf: made.day2, encoding: .utf8), day2Text)
+    }
+
+    /// Pruning never runs in a hold where recovery did not (the Windows
+    /// recovery review's 14): a dead step past the limits would be closed
+    /// `unsettled` and its original and content deleted, though recovery
+    /// could still settle it. MUST FAIL without the guard in `prune`.
+    func testPruningRefusesWithoutRecoveryInTheSameHold() throws {
+        let made = try course(inAWorkingFolder: true)
+        JournaledStep.modeOverride = .live
+        let day1Text: String = try String(contentsOf: made.day1, encoding: .utf8)
+        let first: JournaledStep = step(for: made.course)
+        first.write(published(day1Text), to: made.day1)
+        UndoKillPoints.hook = { point in point == .beforeSwap(0) }
+        XCTAssertThrowsError(try first.make())
+        UndoKillPoints.hook = nil
+        let day2: URL = made.day2
+        var text: String = try String(contentsOf: day2, encoding: .utf8)
+        for count in 1...(UndoSwitch.stepsKept + 1) {
+            let next: JournaledStep = step(for: made.course)
+            text += "Line \(count).\n"
+            next.write(text, to: day2)
+            try next.make()
+        }
+        JournaledStep.modeOverride = nil
+        let later: UndoJournal = UndoJournal(folderURL: made.list, processIsAlive: { _ in false })
+        XCTAssertEqual(try later.read().records[1]?.phase, .begun)
+        try later.withLock(waitingAtMost: 2, inShadow: false) { writer in
+            UndoPruning.prune(writer, mode: .live, resolveRoot: { _ in nil })
+        }
+        XCTAssertEqual(try later.read().records[1]?.phase, .begun, "pruned without a recovery in the same hold")
+    }
+
+    /// A dead process's note never removes what another swap staged beside
+    /// the same page: every shadow swap has a label of its own (the second
+    /// review of U3a, LOW 2; one label shared by every process let a dead
+    /// note's tidy take a running swap's staged file). MUST FAIL with every
+    /// swap labelled `shadow`.
+    func testADeadProcesssNoteLeavesAnotherSwapsStagedFiles() throws {
+        let made = try course(inAWorkingFolder: false)
+        let journal: UndoJournal = UndoJournal(folderURL: made.list)
+        let target: UndoSwapTarget = UndoSwapTarget(
+            url: made.day1, relativePath: made.day1.lastPathComponent, expected: nil, replacement: Data("new".utf8)
+        )
+        let deadLabel: String = UndoShadowStaging.newLabel(for: journal)
+        XCTAssertNotNil(UndoShadowStaging.writeNote(for: [target], label: deadLabel, in: journal))
+        let runningLabel: String = UndoShadowStaging.newLabel(for: journal)
+        let running: URL = UndoSwap.besideURL(for: made.day1, label: runningLabel, role: "new")
+        try Data("staged by a swap still running".utf8).write(to: running)
+
+        let removed: Int = UndoShadowStaging.tidyLeftovers(of: UndoJournal(folderURL: made.list, processIsAlive: { _ in false }))
+        XCTAssertEqual(removed, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: running.path), "the dead note's tidy removed another swap's staged file")
     }
 }

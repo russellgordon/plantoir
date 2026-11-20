@@ -17,9 +17,13 @@ import Foundation
 ///
 /// launchd is reached through the runner the action was given
 /// (`LaunchControlRunning`, which is the main actor's), so a write made off
-/// the main thread is refused (`write` answers false, which the door reads
-/// as a change that could not be made, nothing changed) rather than
-/// guessed at. Every action that makes such a step runs on the main actor.
+/// the main thread is refused (`write` answers false) rather than guessed
+/// at. Making a step reads that as a change that could not be made, nothing
+/// changed; an Undo or a Redo leaves the schedule as it is and names it as
+/// left apart, as it does a launchd refusal, and moves the rest of the step
+/// (`UndoSwap.swap`'s `leaveApart`), so a label that stays loaded never
+/// blocks its step for good. Every action that makes such a step runs on
+/// the main actor.
 nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable {
 
     // MARK: - Stored properties
@@ -84,9 +88,12 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
     }
 
     /// A job can be registered again only while the moment it was set for
-    /// is still ahead (seam 2): one whose moment has gone by would either
-    /// never fire or fire at once, late, for a section a teacher has since
-    /// moved on. Removing one is always possible.
+    /// is KNOWN to be still ahead (seam 2): one whose moment has gone by
+    /// would either never fire or fire at once, late, for a section a
+    /// teacher has since moved on. A plist that does not say its moment
+    /// (`PLANTOIR_SCHEDULED_FOR`, which older jobs lack) is never set again:
+    /// its calendar entry carries no year, so it would fire on that day
+    /// NEXT year (the review of U3b, LOW 2). Removing one is always possible.
     func canSet(_ target: String, _ value: UndoJSON?) -> Bool {
         guard let value else {
             return true
@@ -95,7 +102,7 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
             return false
         }
         guard let moment = UndoScheduledDeploys.scheduledFor(plist: files.plist) else {
-            return true
+            return false
         }
         return moment > now()
     }

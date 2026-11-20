@@ -92,6 +92,10 @@ where owed, its own note for the other platform. Look for batches when
 opening a run and whenever follow-up issues pile up, and stack reviewed
 pieces at the gate, several to a run.
 
+A batch is a way of working, never a way of filing (Russell, 2026-11-20):
+the issues stay distinct and specific, and are never folded into one
+running list issue, which cannot be closed cleanly and hides what is done.
+
 ## The common brief
 
 Keep one file that every agent reads first, so each prompt names only the
@@ -114,6 +118,27 @@ agent's own brief. It carries:
   comment. The director posts them, not the agent.
 - The gates the implementer runs, reported word for word, and run again
   after the last edit.
+- **An implementer runs only its own test classes and the build**, on
+  either platform. The whole suite runs once per batch, on the merged tree
+  at the gate (Russell, 2026-11-20).
+- **Each piece writes its notes for the files every piece edits**
+  (`windows-app/PROGRESS.md`, the platform's `documentation/` page) into a
+  notes file of its own, `<platform app folder>/notes/<issue>-<slug>.md`,
+  and the director folds the notes into those files once per merge window.
+  Every piece editing the same two files conflicted at every merge. The
+  write-up is still made as the work goes; only where it first lands
+  changes.
+- **A reviewer's low finding is fixed in the branch**, in that round, with
+  a test. Only what truly cannot be done in the piece is reported, one line
+  each, with the reason (see Limits).
+- **The implementer's report ends with a self-check, item by item** (Russell,
+  2026-11-20, from what reviews caught again and again): each fix was
+  broken in a scratch copy and its test seen to fail, with the failing line
+  named; no timed wait stands where an event exists to wait on; every
+  sentence a teacher or the assistant hears on a failure path is true of
+  what is then on disk and on screen; `origin/dev` was merged in before
+  anything was proven; no threshold, margin or count was tuned until a test
+  passed; contract cases run from the JSON.
 - Agents never merge, never touch `dev` or `main`, never write to GitHub,
   never spawn agents. An agent that is denied a permission says so; nobody
   does the denied thing on its behalf.
@@ -123,11 +148,18 @@ agent's own brief. It carries:
 - One implementer per working copy. Reviewers and planners are read-only
   and read `origin/<ref>`, so they overlap freely with an implementer; that
   overlap is where the speed comes from.
-- At most three agents at once unless Russell has said otherwise for the
-  day: two that build, one that reads.
-- **The gate sets the pace.** No new implementation starts while reviewed
-  pieces wait to be merged. Keep stacks short: a piece starts from `dev`
-  unless it truly needs an unmerged one.
+- **One lane of implementation per machine that can prove the work**, and
+  each lane works on a different area of the code, so lanes do not collide.
+  Without a second machine that is at most three agents at once unless
+  Russell has said otherwise for the day: two that build, one that reads.
+  Reviews need no machine and overlap freely.
+- **Merge windows set the pace** (Russell, 2026-11-20): everything reviewed
+  clean is merged together every two to three hours, on one tree with one
+  gate, not piece by piece. Keep stacks short: a piece starts from `dev`
+  unless it truly needs an unmerged one. The exception is a long chain of
+  pieces on the same code (Undo's): each is built on the previous one's
+  unmerged branch so the chain never waits for a merge, and reviews and
+  merges follow behind.
 - Only one working copy runs a full suite at a time (on the Mac the suite's
   test host is the app, and `verify.sh` refuses a second run). Each Windows
   working copy needs both fetch scripts run before it builds.
@@ -159,6 +191,21 @@ In a working copy of the director's own, never one an agent is using:
 A change to documents alone needs no gate unless a test reads the document
 (grep `scripts/test_*.py` for the file); say so in the closing comment.
 
+**Which gate a change owes** (Russell, 2026-11-20; it is the table in
+`CLAUDE.md` read by what the change touches, `git diff --name-only
+origin/dev <tree>`): a change to `windows-app/` and documents alone is
+gated by the Windows suite on the merged tree and owes no mac gate; a
+change to `mac-app/` and documents alone is gated on the mac and owes no
+Windows run; anything in `contracts/`, `scripts/`, the launchers, the image
+or shared wording owes both sides.
+
+**A red gate whose only failure is explained and plainly unrelated to the
+change is merged on, not run again** (Russell, 2026-11-20). Explained means
+read from the log, in code the change does not touch (the case that day: a
+browser check lost a font download when the gate machine's network
+changed). Record the cause in the closing comment. An unexplained failure,
+or one near the change, is still fixed or run again.
+
 ## What differs by platform
 
 | | Mac | Windows |
@@ -183,7 +230,19 @@ changing them.
   decision taken on his behalf unless he has said to. Record each ruling as
   a dated comment on the issue that owns it, the moment it is given.
 - **Status is terse**: what finished, what it measured, what is running,
-  what waits on him. Detail goes in the issue's closing comment.
+  what waits on him. Detail goes in the issue's closing comment. When he
+  asks for progress as numbers, give the milestone for each platform
+  separately, both as issues closed of total and weighted by size, because
+  one Undo is not one title fix.
+- **Before a run he will not be watching, find his questions first**
+  (Russell, 2026-11-20): once the run's batches are chosen, have their
+  issues read for anything only he can decide, and put those to him in one
+  sitting before he leaves. A piece parked on a question overnight is the
+  most expensive thing in the run. Before asking anything, look for what
+  already settles it elsewhere in the milestone.
+- He can type to a running agent directly. An instruction that reaches the
+  director only through an agent's report is confirmed with him before it
+  is acted on.
 - When he reports a fault from hand-testing, reproduce or measure it before
   explaining it.
 - When he is at the computer, nothing takes the screen, the keyboard focus
@@ -193,8 +252,14 @@ changing them.
 
 ## Limits
 
-- A new finding becomes an issue with a milestone recommendation; it does
-  not ride along in the piece that found it.
+- A new finding about OTHER code becomes an issue with a milestone
+  recommendation; it does not ride along in the piece that found it. A
+  finding about the piece itself is fixed in the piece: closing an issue
+  and opening another for what it left moves the release's finish line
+  back by one at every merge (43 opened against 20 closed in three days of
+  November 2026). A new issue is for real work that could not be done in
+  the piece, a real fault found elsewhere, or a decision that is his, each
+  with its own specific title.
 - End only processes the run started; his other sessions are his. The one
   exception is in `CLAUDE.md` → "Setting up on a new machine": on Windows a
   running Plantoir may be closed before a build. Say that you closed it,

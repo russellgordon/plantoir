@@ -543,8 +543,9 @@ enum LinksChecklistPublisher {
     /// step, all or none), and each is said with the words already used for
     /// it: a page changed since it was checked is
     /// `linksChecklist.wording.pageChangedSince`, named as the sheet names a
-    /// page; a file that could not be read just now is the unreadable-page
-    /// sentence, as before; anything else (a full disk, a file in use, a
+    /// page; a file that really cannot be read just now is the
+    /// unreadable-page sentence, as before; a file that could not be put
+    /// back is said as part way; anything else (a full disk, a file in use, a
     /// list that could not take the step while Undo is live) is the
     /// runner's "Nothing was changed: …" with Foundation's could-not-be-saved
     /// sentence for the file (`JournaledStepError`), as a re-date says it.
@@ -552,6 +553,12 @@ enum LinksChecklistPublisher {
         forRefused error: Error, of step: JournaledStep, graph: AssistSectionGraph,
         offer: LinksChecklistOffer, in course: Course
     ) -> String {
+        if case JournaledStepError.leftPartWay = error {
+            // A file could not be put back: some of the press went in, and
+            // the earlier content is kept beside its page (the second review
+            // of U3a, MEDIUM a).
+            return AssistWording.publishStoppedPartWay(what: "the pages you ticked", problem: error.localizedDescription)
+        }
         guard case JournaledStepError.refused(let refusal, _) = error else {
             return "Nothing was changed: \(error.localizedDescription)"
         }
@@ -560,8 +567,14 @@ enum LinksChecklistPublisher {
             if let name = pageName(atStepPath: firstPath, of: step, graph: graph, offer: offer, in: course) {
                 return LinksChecklistWording.pageChangedSince(name: name)
             }
-        case .cannotTellNow:
-            return AssistToolRefusal.unreadablePage(offer.course).message
+        case .cannotTellNow(let path):
+            // "Could not be read" only for a file that really cannot be read
+            // now; a page that is a link, or a folder, cannot be checked and
+            // so is not written, which the could-not-be-saved sentence says
+            // (the second review of U3a, LOW 3).
+            if UndoItem.read(at: stepURL(atStepPath: path, of: step)) == .unreadable {
+                return AssistToolRefusal.unreadablePage(offer.course).message
+            }
         case .fileIsInUse, .couldNotWrite, .contentMissing, .notReadable:
             break
         }
@@ -576,10 +589,7 @@ enum LinksChecklistPublisher {
         atStepPath path: String, of step: JournaledStep, graph: AssistSectionGraph,
         offer: LinksChecklistOffer, in course: Course
     ) -> String? {
-        var fileURL: URL = URL(fileURLWithPath: path)
-        if !path.hasPrefix("/"), let root = step.workingFolderURL {
-            fileURL = root.appendingPathComponent(path)
-        }
+        let fileURL: URL = stepURL(atStepPath: path, of: step)
         let wanted: String = UndoFolderPlaces.canonicalPath(of: fileURL)
         let pages: [String: AssistSectionPage] = pagesByPlace(graph, in: course)
         for (place, page) in pages where UndoFolderPlaces.canonicalPath(of: page.fileURL) == wanted {
@@ -590,6 +600,15 @@ enum LinksChecklistPublisher {
             return naming.name(ofPlace: place)
         }
         return nil
+    }
+
+    /// The file at a path the door named: inside the working folder, or the
+    /// whole path for a step that cannot be named.
+    static func stepURL(atStepPath path: String, of step: JournaledStep) -> URL {
+        if !path.hasPrefix("/"), let root = step.workingFolderURL {
+            return root.appendingPathComponent(path)
+        }
+        return URL(fileURLWithPath: path)
     }
 
     /// A class the teacher published from this checklist is a class they

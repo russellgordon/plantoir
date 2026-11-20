@@ -569,6 +569,10 @@ nonisolated final class UndoJournalWriter {
     /// every event this writer appends.
     private(set) var fold: UndoFold
 
+    /// Whether recovery ran in this hold. Pruning refuses without it
+    /// (`UndoPruning.prune`).
+    var recoveredInThisHold: Bool = false
+
     /// The segment being appended to, open for the lock's length.
     private var openSegment: (number: Int, handle: FileHandle, lines: Int)?
 

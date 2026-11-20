@@ -31,6 +31,8 @@ final class PublishStoppedPartWayTests: XCTestCase {
     }
 
     override func tearDown() async throws {
+        UndoKillPoints.fileInUseAtSwap = nil
+        UndoKillPoints.putBackFailsAt = nil
         if let lockedFolder {
             try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: lockedFolder.path)
         }
@@ -108,6 +110,37 @@ final class PublishStoppedPartWayTests: XCTestCase {
         )
         XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
         XCTAssertFalse(outcome.detail.contains("Restore Section"), outcome.detail)
+    }
+
+    /// A page that went in and could not be put back after the publish was
+    /// refused (in shadow, every teacher today): a page DOES hold the new
+    /// content, so the publish is said as part way, `publishStoppedPartWay`,
+    /// which is true there, naming where the page's earlier content is kept
+    /// (the second review of U3a, MEDIUM a). MUST FAIL with
+    /// `saidWhenTheStepStopped` saying "Nothing was changed" for it.
+    func testAPublishThatCannotBePutBackIsSaidAsPartWay() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(surface: .local)
+        root = made.root
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "false", body: "Two.", in: made.course)
+        UndoKillPoints.fileInUseAtSwap = { index in index == 1 }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        let outcome: AssistToolOutcome = await AssistFixture.run(
+            "publish_pages", with: ["pages": ["Unit 1, Day 1", "Unit 1, Day 2"]], on: made.runner
+        )
+        UndoKillPoints.fileInUseAtSwap = nil
+        UndoKillPoints.putBackFailsAt = nil
+        XCTAssertTrue(outcome.detail.hasPrefix(prefixForPages), outcome.detail)
+        XCTAssertTrue(outcome.detail.contains(UndoSwap.stagedMarker), "where the earlier content is kept is not said: \(outcome.detail)")
+        var published: Int = 0
+        for title in ["Unit 1, Day 1", "Unit 1, Day 2"] {
+            let text: String = try String(contentsOf: AssistFixture.pageURL(of: title, in: made.course), encoding: .utf8)
+            if text.contains("publish: true") {
+                published += 1
+            }
+        }
+        XCTAssertEqual(published, 1, "the fixture did not leave one page part way, so this proves nothing")
     }
 
     /// The pointer names the banner's own button.

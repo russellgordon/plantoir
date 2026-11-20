@@ -187,6 +187,12 @@ nonisolated enum UndoCheck {
     /// back now, is then LEFT where it is and named in `leftApart` instead
     /// of refusing the step, and the rest goes ahead (Russell's ruling of
     /// 2026-11-19 on Q3; #959; #897 piece B, seams 2 and 4).
+    ///
+    /// The step's `moveApart` ops (a section's website records) move as a
+    /// GROUP (the director's decision of 2026-11-20, on #899): when any one
+    /// of them is changed since (one host's deploy filled its place and
+    /// another's did not), every one is left apart, so a section is never
+    /// split across two websites (`groupStaysApart`).
     static func plan(
         _ ops: [UndoOp],
         direction: UndoDirection,
@@ -218,6 +224,9 @@ nonisolated enum UndoCheck {
         var wholeTargets: [UndoSwapTarget] = []
         var cannotTellPath: String? = nil
         var leftApart: [String] = []
+        let groupStaysApart: Bool = leavesApart && UndoCheck.aWebsiteRecordIsChangedSince(
+            ordered, direction: direction, root: root, places: places
+        )
 
         for op in ordered {
             guard let kind = op.knownKind else {
@@ -255,6 +264,10 @@ nonisolated enum UndoCheck {
                     if cannotTellPath == nil {
                         cannotTellPath = op.placeName
                     }
+                    continue
+                }
+                if groupStaysApart && kind == .moveApart {
+                    leftApart.append(op.placeName)
                     continue
                 }
                 var cannotGoBack: Bool = verdict == .changedSince
@@ -377,6 +390,28 @@ nonisolated enum UndoCheck {
             targets.append(target)
         }
         return .ready(targets: targets, recomputes: recomputes, leftApart: leftApart)
+    }
+
+    /// Whether any `moveApart` op of a step (a website record) is changed
+    /// since, judged as `plan` judges it: the one test that leaves the whole
+    /// group apart.
+    static func aWebsiteRecordIsChangedSince(
+        _ ops: [UndoOp], direction: UndoDirection, root: URL, places: UndoExternalPlaces
+    ) -> Bool {
+        for op in ops where op.knownKind == .moveApart {
+            var leavesTheFolder: Bool = false
+            for place in op.pathsNamed where !UndoPlaces.staysInside(root, place) {
+                leavesTheFolder = true
+            }
+            if leavesTheFolder {
+                continue
+            }
+            let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: places)
+            if UndoCheck.verdict(for: state, direction: direction) == .changedSince {
+                return true
+            }
+        }
+        return false
     }
 
     /// The content after moving one op one way, or nil when a blob it needs
@@ -546,7 +581,10 @@ nonisolated enum UndoSwapResult: Equatable, Sendable {
     /// FLIGHT, so recovery settles it from the content once this process is
     /// gone (`undo.rule.recovery`; the Windows W3 review's finding, matched
     /// here). The refusal is the one that stopped the swap; no new word.
-    case notPutBack(UndoRefusal)
+    /// `keptOriginals` names each kept original left beside its page (its
+    /// staged name, in the page's own folder): the only copy of what that
+    /// page held, which no tidy removes while it differs from the page.
+    case notPutBack(UndoRefusal, keptOriginals: [String])
     /// A test stopped it at a kill point, leaving everything as it was.
     case stoppedByATest
 }
@@ -577,15 +615,66 @@ nonisolated enum UndoSwap {
 
     // MARK: - Functions
 
+    ///
+    /// `leaveApart` is given by an Undo or a Redo only (never by making a
+    /// step, nor by recovery): an external target that stands apart (a
+    /// deploy set for later) and that cannot be set at the swap, because
+    /// launchd refused it, the write was off the main thread, or it no
+    /// longer holds what the check saw, is then LEFT as it is and handed to
+    /// `leaveApart`, and the rest of the swap goes on, exactly as a marker
+    /// is left apart (the review of U3b, LOW 3): one label that stays
+    /// loaded must never block its step, and every step under it, for good.
     static func swap(
         _ targets: [UndoSwapTarget],
         label: String,
         places: UndoExternalPlaces = UndoAppPreferences(),
-        root: URL? = nil
+        root: URL? = nil,
+        leaveApart: ((String) -> Void)? = nil
     ) -> UndoSwapResult {
         var staged: [URL?] = []
         var originals: [URL?] = []
         var swapsMade: Int = 0
+        // The externals left apart at the swap: nothing of theirs to reverse.
+        var leftApartAt: Set<Int> = []
+        // Each folder this swap made for a place that had none (a moved
+        // record's kept folder, a new page's folder), deepest last: removed
+        // again, when empty, by a swap that is refused (the review of U3b,
+        // LOW 4: a refused step left an empty kept folder behind).
+        var foldersMade: [URL] = []
+
+        /// Makes the folder a place goes in, noting each level it made.
+        func makeTheFolder(for url: URL) {
+            var missing: [URL] = []
+            var folder: URL = url.deletingLastPathComponent()
+            while folder.path != "/" && !FileManager.default.fileExists(atPath: folder.path) {
+                missing.append(folder)
+                folder = folder.deletingLastPathComponent()
+            }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var index: Int = missing.count - 1
+            while index >= 0 {
+                if FileManager.default.fileExists(atPath: missing[index].path) {
+                    foldersMade.append(missing[index])
+                }
+                index -= 1
+            }
+        }
+
+        /// Removes every folder `makeTheFolder` made that is still empty,
+        /// deepest first. `rmdir` never removes a folder with anything in it.
+        func removeTheFoldersMade() {
+            var index: Int = foldersMade.count - 1
+            while index >= 0 {
+                _ = foldersMade[index].withUnsafeFileSystemRepresentation { path in
+                    guard let path else {
+                        return Int32(-1)
+                    }
+                    return rmdir(path)
+                }
+                index -= 1
+            }
+            foldersMade = []
+        }
 
         /// True when a test stopped it while a folder taken out was being
         /// removed, as a process that died there would stop.
@@ -615,6 +704,20 @@ nonisolated enum UndoSwap {
             return false
         }
 
+        /// The kept originals of files still swapped: what a reversal that
+        /// could not complete leaves beside its pages.
+        func originalsLeft() -> [String] {
+            var names: [String] = []
+            var index: Int = 0
+            while index < targets.count && index < originals.count {
+                if case .file = targets[index].change, let original = originals[index] {
+                    names.append(original.lastPathComponent)
+                }
+                index += 1
+            }
+            return names
+        }
+
         /// Puts back every swap already made, newest first. False when any
         /// could not be put back (the result was ignored until the Windows
         /// W3 review: the step was then closed `failed` with a page left new
@@ -625,6 +728,10 @@ nonisolated enum UndoSwap {
             while index >= 0 {
                 let target: UndoSwapTarget = targets[index]
                 let failsHere: Bool = UndoKillPoints.putBackFailsAt?(index) == true
+                if leftApartAt.contains(index) {
+                    index -= 1
+                    continue
+                }
                 switch target.change {
                 case .file:
                     if let original = originals[index] {
@@ -678,9 +785,10 @@ nonisolated enum UndoSwap {
         /// recovery to settle.
         func refusedAfterSwapping(_ refusal: UndoRefusal) -> UndoSwapResult {
             if !reverse() {
-                return .notPutBack(refusal)
+                return .notPutBack(refusal, keptOriginals: originalsLeft())
             }
             tidy()
+            removeTheFoldersMade()
             return .refused(refusal)
         }
 
@@ -695,19 +803,19 @@ nonisolated enum UndoSwap {
             if let root, !UndoSwap.staysInside(target, root: root) {
                 staged.append(nil)
                 tidy()
+                removeTheFoldersMade()
                 return .refused(.changedSince(firstPath: target.relativePath, others: 0))
             }
             if case .makeTree(let listing, let contents) = target.change {
                 let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
-                try? FileManager.default.createDirectory(
-                    at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
-                )
+                makeTheFolder(for: target.url)
                 _ = UndoSwap.removeStaged(stagedURL)
                 let failsHere: Bool = UndoKillPoints.stagingWriteFailsAt?(targetIndex) == true
                 if failsHere || !UndoTreeReading.make(listing, contents: contents, at: stagedURL) {
                     _ = UndoSwap.removeStaged(stagedURL)
                     staged.append(nil)
                     tidy()
+                    removeTheFoldersMade()
                     return .refused(.couldNotWrite(path: target.relativePath))
                 }
                 staged.append(stagedURL)
@@ -730,6 +838,7 @@ nonisolated enum UndoSwap {
                 mode = information.st_mode & 0o7777
             }
             do {
+                makeTheFolder(for: target.url)
                 try FileManager.default.createDirectory(
                     at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
                 )
@@ -752,6 +861,7 @@ nonisolated enum UndoSwap {
                 _ = UndoSwap.removeStaged(stagedURL)
                 staged.append(nil)
                 tidy()
+                removeTheFoldersMade()
                 return .refused(.couldNotWrite(path: target.relativePath))
             }
         }
@@ -786,7 +896,7 @@ nonisolated enum UndoSwap {
                     // This file's own swap could not be put back: nothing
                     // more is reversed or tidied, recovery settles it.
                     _ = reverse()
-                    return .notPutBack(fileRefusal)
+                    return .notPutBack(fileRefusal, keptOriginals: originalsLeft())
                 }
             case .moveHere(let from, _, let op):
                 // The pair once more, just before the rename: the content at
@@ -798,9 +908,7 @@ nonisolated enum UndoSwap {
                 } else if atFrom != .holdsTheContent || atTarget != .free {
                     refusal = .changedSince(firstPath: target.relativePath, others: 0)
                 } else {
-                    try? FileManager.default.createDirectory(
-                        at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
-                    )
+                    makeTheFolder(for: target.url)
                     if !UndoSwap.renameExclusively(from, onto: target.url) {
                         refusal = .fileIsInUse(path: target.relativePath)
                     }
@@ -847,6 +955,13 @@ nonisolated enum UndoSwap {
                     refusal = .changedSince(firstPath: target.relativePath, others: 0)
                 } else if !places.write(externalTarget, value) {
                     refusal = .couldNotWrite(path: target.relativePath)
+                }
+                if refusal != nil, let leaveApart, externalTarget.hasPrefix(UndoOp.scheduledDeployFamily + ":") {
+                    // Left as it is and named, the rest goes on: an Undo or
+                    // a Redo only (see `leaveApart`).
+                    leaveApart(target.relativePath)
+                    leftApartAt.insert(index)
+                    refusal = nil
                 }
             }
             if let refusal {
@@ -1100,6 +1215,22 @@ nonisolated enum UndoSwap {
         return copied
     }
 
+    /// Whether a kept original is NOT the only copy of what it holds: its
+    /// place holds a file with the same bytes (the original was kept and the
+    /// new content never went in, or recovery put it back). A kept original
+    /// that differs from its place, or whose place is gone, is the only copy
+    /// of what the page held before, and of an edit that raced the swap
+    /// (the second review of U3a, MEDIUM b).
+    static func isACopyOfItsPlace(_ keptURL: URL, place: URL) -> Bool {
+        guard case .file(let kept) = UndoItem.read(at: keptURL) else {
+            return false
+        }
+        guard case .file(let there) = UndoItem.read(at: place) else {
+            return false
+        }
+        return kept == there
+    }
+
     /// Removes one of the swap's OWN staged files. A kept original copied
     /// from a file marked immutable carries the mark (copyfile keeps it:
     /// measured in U1's third round, the copy was `uchg` and could not be
@@ -1196,7 +1327,9 @@ nonisolated enum UndoSwap {
         beside urls: [URL],
         asideListings: [String: String] = [:],
         onAside: ((UndoAsideFolder) -> Void)? = nil,
-        root: URL? = nil
+        root: URL? = nil,
+        keepingOnlyCopies: Bool = false,
+        unlessTheListCanPutBack listCanPutBack: ((URL) -> Bool)? = nil
     ) -> Bool {
         var allGone: Bool = true
         var folders: [URL] = []
@@ -1253,6 +1386,21 @@ nonisolated enum UndoSwap {
                         allGone = false
                     }
                     continue
+                }
+                // A step that did not settle keeps a kept original that is
+                // the only copy of what its page held (the second review of
+                // U3a, MEDIUM b, and the Windows recovery review's 15): never
+                // tidied away, left beside its page under its staged name.
+                // With `listCanPutBack`, a kept original of a page the list
+                // holds every piece of content for is not the only copy:
+                // recovery can put the page back from the list, so it is
+                // tidied as before.
+                if keepingOnlyCopies && name.hasSuffix("-orig"), let place = UndoSwap.placeOfStagedName(name) {
+                    let placeURL: URL = folder.appendingPathComponent(place)
+                    let theListCanPutItBack: Bool = listCanPutBack?(placeURL) ?? false
+                    if !UndoSwap.isACopyOfItsPlace(stagedURL, place: placeURL) && !theListCanPutItBack {
+                        continue
+                    }
                 }
                 if !UndoSwap.removeStaged(stagedURL) {
                     allGone = false
@@ -1515,13 +1663,22 @@ nonisolated extension UndoJournal {
 
         // 4. Swap, then re-derive the files kept true by a rule.
         let label: String = "\(seq)-" + (direction == .backward ? "undo" : "redo")
-        switch UndoSwap.swap(targets, label: label, places: places, root: root) {
+        // What the check left apart, then what the swap could not set and
+        // left apart (a deploy set for later launchd refused).
+        var everyPlaceLeftApart: [String] = leftApart
+        let swapped: UndoSwapResult = UndoSwap.swap(
+            targets, label: label, places: places, root: root,
+            leaveApart: { place in
+                everyPlaceLeftApart.append(place)
+            }
+        )
+        switch swapped {
         case .refused(let refusal):
             JournaledWrite.finish(seq: seq, with: .failed, phase: phase, reason: "refused", in: self, mode: .live)
             // Caught at the swap rather than the check: the same hand edit,
             // so the same answer (rulings 13 and 20; the core review's M2).
             return .refused(refusal, clearedTheList: answerARefusal(refusal, of: seq, direction: direction))
-        case .notPutBack(let refusal):
+        case .notPutBack(let refusal, _):
             // Left IN FLIGHT (`undoing` or `redoing` with no closing event),
             // never `failed` and never a clearing: recovery settles it from
             // the content once this process is gone (`undo.rule.recovery`).
@@ -1539,7 +1696,10 @@ nonisolated extension UndoJournal {
         // (`undoNewestAndRederive`, `UndoMaintainers`).
         _ = recomputes
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
-        return direction == .backward ? .undone(seq: seq, leftApart: leftApart) : .redone(seq: seq, leftApart: leftApart)
+        if direction == .backward {
+            return .undone(seq: seq, leftApart: everyPlaceLeftApart)
+        }
+        return .redone(seq: seq, leftApart: everyPlaceLeftApart)
     }
 
     /// What a refusal that can never succeed does to the list. The page was
@@ -1589,6 +1749,7 @@ nonisolated extension UndoJournal {
                 return false
             }
             try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: reason.rawValue))
+            UndoRecovery.run(writer, mode: .live, trySwapsNow: false, resolveRoot: UndoReach.root)
             UndoPruning.prune(writer)
             return true
         }
@@ -1607,6 +1768,7 @@ nonisolated extension UndoJournal {
                 return false
             }
             try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: UndoClearing.wentLive.rawValue))
+            UndoRecovery.run(writer, mode: .live, trySwapsNow: false, resolveRoot: UndoReach.root)
             UndoPruning.prune(writer)
             return true
         }

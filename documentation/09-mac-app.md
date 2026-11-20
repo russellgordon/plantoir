@@ -20885,7 +20885,8 @@ In shadow those files are written with one trail line by
 like the door (the first review of U3a, LOW 3: it wrote file by file, so a
 failure part way left half an action while the reply said "Nothing was
 changed"). It stages every file beside its target and swaps them in
-together (`UndoSwap`, label `shadow`), each still holding what it held when
+together (`UndoSwap`, under a label of its own, `shadow-<pid>-<id>`, since
+the third round), each still holding what it held when
 it was planned and a page that was absent still absent. A target that was
 a link, a folder or a file that could not be read when it was planned is
 refused before anything is written, as a live step refuses it: its content
@@ -20917,13 +20918,17 @@ first, by `JournaledStep.readTheListAhead()`. The runner calls it before
 every tool, Get Ready for the Start of the Year before its write, and,
 since U3a's second round (the first review, LOW 6), every sheet that makes
 a step on the main actor while the teacher reads it: the links checklist
-(`.task`), today's class and Not Today (when the question goes up), the
-classes dated later at Deploy (`SectionVerbSheetModel.ask`), the class
+(`.task`), today's class and Not Today (when the question is put, inside
+`TodaysClassOnTheFrontPage.offer`, so every place that asks it reads ahead),
+the classes dated later at Deploy (`SectionVerbSheetModel.ask`), the class
 dates sheet and Course Settings (for Start the How I Teach Page…), each a
 `.task` or an unawaited `Task`, so nothing waits for the read and the order
-of effects is unchanged. `UndoActionStepsTests.testEverySheetThatMakesAStepReadsTheListAhead`
-pins the list. The step reads on from there (the director's ruling 8 on
-U1's third round).
+of effects is unchanged. `UndoReadAheadTests` pins all seven places as they
+really run (each sheet shown in a window off the screen, each question put,
+a tool of the runner, Get Ready), seen through `JournaledStep.readAheadHook`
+and an expectation, never a timed wait; it replaced a search of the source
+text (the second review of U3a, LOW 4). The step reads on from there (the
+director's ruling 8 on U1's third round).
 
 **For U7, to settle before the switch (the first review of U3a, LOW 9).**
 In shadow the main actor waits at most 0.05 s for the lock to begin a step
@@ -21003,6 +21008,12 @@ cannot go in reverses the swaps already made. The error is Foundation's
   `assist-cases` case pins this path. `PublishStoppedPartWayTests` pins the
   page list, the whole unit and an outside assistant; no Restore Section
   pointer is added, since there is nothing to put back.
+- The one exception is a step left PART WAY: a swap refused after some
+  files went in whose reversal could not put one back. A page then holds
+  the new content, so "Nothing was …" would be false. The door throws
+  `JournaledStepError.leftPartWay`, and every caller says only part was
+  changed, naming where each page's earlier content is kept ("The third
+  round", below).
 
 #### The second round (the first review of U3a)
 
@@ -21047,6 +21058,9 @@ cannot go in reverses the swaps already made. The error is Foundation's
   replaced by the next shadow swap of the same file. A swap that answered
   `notPutBack` drops its note, since what it left may be a page's only
   original. `testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery`.
+  (Changed in the third round, below: each swap has its own label, the note
+  is kept on `notPutBack`, and a kept original that differs from its page
+  is never tidied.)
 - **The links checklist says what is true for each refusal (LOW 7).** A
   page the plan cannot read: the unreadable-page sentence, as before. A
   page changed since it was checked: `linksChecklist.wording.pageChangedSince`,
@@ -21089,6 +21103,106 @@ cannot go in reverses the swaps already made. The error is Foundation's
   leaves the same files. No timed wait was added. The assertion now names
   every file that differs and both texts, so a failure says which.
 
+#### The third round (the second review of U3a, and the Windows recovery review)
+
+The second review found one MEDIUM in three parts: a reversal that could
+not complete, in shadow (every teacher today), was said as "Nothing was
+changed", and recovery then deleted the only copy of what the page held.
+
+- **(a) A step left part way says so.** `UndoSwapResult.notPutBack` now
+  carries `keptOriginals`, the hidden name of each kept original left beside
+  a page still swapped. The door answers `JournaledWriteOutcome.leftPartWay`
+  and `JournaledStep.make()` throws `JournaledStepError.leftPartWay(refusal,
+  fileName:, keptOriginals:)`, whose description is Foundation's
+  could-not-be-saved sentence followed by "What “<page>” held before is kept
+  beside it as the hidden file “<name>”." The runner's eleven "Nothing was
+  …: …" catches go through `saidWhenTheStepStopped`, which says
+  `publishStoppedPartWay` for this case only (true there) and counts it in
+  `writesWithNoNewUndoEntry`, so the Section menu's trail does not say
+  "changed nothing". The links checklist says the same. Today's class reads
+  the front page back instead of answering "could not save": the page does
+  name the class. No new wording and no contract row: the sentence is the
+  existing key. Tests: `PublishStoppedPartWayTests.testAPublishThatCannotBePutBackIsSaidAsPartWay`,
+  `JournaledStepTests.testAReversalThatCannotCompleteLeavesTheStepForRecovery`,
+  `UndoActionStepsTests.testAChecklistPressLeftPartWaySaysOnlyPartWasChanged`
+  and `testTodaysClassLeftPartWayIsAnsweredByWhatThePageShows`.
+- **(b) A kept original that is the only copy is never tidied away.** A
+  `-orig` is a copy only when its page holds the same bytes
+  (`UndoSwap.isACopyOfItsPlace`). `UndoSwap.tidyLeftovers(keepingOnlyCopies:
+  unlessTheListCanPutBack:)` keeps every other one, except where the list
+  holds every piece of content the step's ops on that page need
+  (`UndoRecovery.listCanPutBack`: a line or a key needs none, a whole file
+  its blobs), since recovery can then put the page back from the list. It is
+  used by recovery's first tidy, before the plan (the Windows recovery
+  review's 15); by `tidyClosedSteps` (in shadow a differing original is
+  always kept, since shadow never puts a page back; live, unless the list
+  can put it back); and by pruning's tidy of a step closed unsettled (kept,
+  since pruning then deletes its content). A step that settles (completed,
+  nothing took effect, rolled back) is tidied fully. Tests:
+  `JournaledStepTests.testInShadowAReversalThatCannotCompleteKeepsTheOriginal`
+  and `testRecoveryTidiesNoOnlyCopyBeforeItKnowsTheStepSettles`; the
+  `recoveryCases` row "and on the ordinary path it is not tried again before
+  its time" pins the list check (a file in use, its content in the list:
+  nothing staged is left).
+  - **One place still removes an only copy, as the contract says today.** A
+    live step whose put-back cannot even be planned (content it needs is
+    missing) is closed `interrupted`, reason `couldNotPutBack`, and its
+    staged files are removed at that closing, as the two `recoveryCases`
+    rows on missing content and `rule.recovery` ("leaves nothing of the
+    journal's in a course") pin. Russell's ruling of 2026-11-20, 15:20,
+    replaces it: a kept original whose hash matches what the journal
+    recorded puts the page back and the step is rolled back. That changes
+    those two rows and the rule's sentence on staged files, so it is a
+    contract change and its own piece (Mac first, then Windows' W4 from the
+    same rows), not this round. The first tidy already leaves the original
+    in place for it.
+- **(c) A shadow swap without the list keeps what it must.** Each such swap
+  has a label of its own, `shadow-<pid>-<id>` (`UndoShadowStaging.newLabel`,
+  stored in its note as `Note.label`; LOW 2: one label shared by every
+  process let a dead process's note remove a running swap's staged files for
+  the same page). The note is kept when the swap answers `notPutBack`, so
+  its staged new content is found once the process is gone, and the tidy
+  keeps a kept original that differs from its page. The note goes once its
+  files are tidied; a kept original then stays beside its page under its
+  hidden name for good, which is the price of never deleting the only copy.
+  A note written before the label was stored does not decode and is left as
+  it is (no release ever wrote one). Tests:
+  `testInShadowWithoutTheListAReversalThatCannotCompleteKeepsItsNote`,
+  `testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery`
+  (now: the new content tidied, the original kept) and
+  `testADeadProcesssNoteLeavesAnotherSwapsStagedFiles`.
+- **Recovery before every prune (the Windows recovery review's 14).**
+  `UndoJournalWriter.recoveredInThisHold` is set by `UndoRecovery.run`, and
+  `UndoPruning.prune` returns at once without it. `JournaledWrite.finish`,
+  `clearAfterARefusal` and `clearTheListAsTheSwitchGoesLive` now run
+  recovery (`trySwapsNow: false`, so the ordinary path pays nothing for a
+  refused put-back) before they prune. Before, a dead step past the limits
+  could be closed `unsettled`, its original tidied and its content deleted,
+  though a recovery in the same hold could still have settled it.
+  `testPruningRefusesWithoutRecoveryInTheSameHold`.
+- **The checklist's "could not be read" (LOW 3)** is said for
+  `cannotTellNow` only when the file really cannot be read now
+  (`UndoItem.read` is `unreadable`); a place that is a folder or a link
+  cannot be checked and so is not written, which the could-not-be-saved
+  sentence says.
+  `testAPressThatCannotBeCheckedSaysUnreadableOnlyForAFileThatCannotBeRead`.
+- **The flaky test's cause (LOW 1).** `AssistFixture` wrote
+  `course_config.json` without `.sortedKeys`, so two fixture courses could
+  hold their keys in different orders (a dictionary's order is not fixed
+  from one run to the next) and a test comparing the two courses' files
+  failed now and then. Sorted now; `testTheFixtureWritesItsSettingsInOneOrder`
+  fails without it (measured: the keys came out unsorted).
+- **The window left between a read and the write (LOW 5).** The befores are
+  the plan's (second round), so what is left is two narrow windows. Between
+  a planner's own read of a page and `plan()`'s first read of it: the same
+  main-actor turn, with no `await` between, so another program can only
+  slip in during those microseconds, and then its file is the before and is
+  replaced as it would have been a moment earlier. Between the swap's
+  re-read and its rename: covered by the read-back of the kept original
+  after the rename on a volume with hard links (second round); on a volume
+  without them the original is a copy that the race never reaches, so such
+  an edit is not seen there.
+
 #### If the app dies part way: what is on disk
 
 Every action has the same five places to die, because every action is one
@@ -21109,9 +21223,13 @@ Places 2 and 3 are put back to before the step: `failed`, or `rolledBack`
 with one trail line. Place 4 is completed (`done`). Nothing staged is left.
 
 In SHADOW (today), recovery never writes into a working folder. A step left
-at place 3 is recorded `interrupted` and the list cleared. Its staged files
-are removed, and the pages stay as the process left them. That is the same
-on-disk state an action that died between two writes left before U3.
+at place 3 is recorded `interrupted` and the list cleared. Its staged new
+content is removed, and the pages stay as the process left them. That is
+the same on-disk state an action that died between two writes left before
+U3, with one addition since the third round: the kept original of each page
+that was swapped (`-orig`) differs from its page and is the only copy of
+what the page held that a teacher can reach (shadow never puts a page back
+from the list), so it stays beside the page under its hidden name.
 
 The files per action are those in the table above. The largest step a
 daily action makes is Make Room's: the renames (two files each), the links,
