@@ -1694,16 +1694,37 @@ about stopping is open, the panel's window is the key window
 key window then), and nobody is typing in a box there
 (`KeyWindowTextEditing`, which watches the key window's `firstResponder` by
 key-value observing and reports whether it is `NSText`, the field editor
-every text field and search field edits through). Measured on the main
-Mac with that last condition taken out (`988-r4-sabotage-text`): sent
-through `NSApp.sendEvent`, as a real key is, Escape and Command-Period typed
-in a text field still went to the field and the task kept running, because
+every text field and search field edits through). The fourth round
+measured, with that condition taken out (`988-r4-sabotage-text`), Escape and
+Command-Period typed in a text field going to the field, and wrote that
 AppKit offers a key without Command to the first responder before any
-button. (The first #988 shape's failure, Escape in a field stopping the
-deploy, was measured by calling `performKeyEquivalent` on the window
-directly, which a real key does not do.) The condition stays, as the second
-guard for a field and the only one for a text view that has no use for
-Escape and would pass it on. Command-Period reaches the same button.
+button. That is NOT safe to rely on: in run `988-n2` (Keyboard Navigation
+on), whenever Cancel still held `.cancelAction` with the Filter field
+focused, Escape reached Cancel and stopped the task, and an Escape handed to
+the field editor directly came back to Cancel through `cancelOperation`. So
+the condition is the guard, not a second one. Command-Period reaches the
+same button.
+
+Russell's ruling on #988 (2026-11-19, evening): left as built. While any box
+has the focus (with Keyboard Navigation on, AppKit focuses the sidebar's
+Filter field when the window becomes key), Escape and Command-Period are
+both the box's; a click on Cancel still stops the task.
+
+**The press reads the box too.** SwiftUI applies a change to Cancel's
+shortcut only when it next updates the view. Measured on the main Mac (run
+`988-n2`, Keyboard Navigation on): a click in the Filter field and Escape
+already waiting together in the event queue, which is what a teacher's
+input becomes when the app is busy for longer than the gap between them,
+were handed out with no update between, and Escape stopped the task. So
+`pressCancel` asks `TaskProgressView.pressIsAKeyTypedInABox` about the event
+that pressed it, reading the key window's first responder at that moment,
+and a key typed in a box stops nothing; a click always stops the task. The
+box misses that one key (Escape does not clear it); the next press is the
+box's as usual. Rejected: passing the key on to the box, measured to come
+straight back to Cancel (the field editor's `cancelOperation` reaches the
+window's cancel button) without end. The opposite gap (focus has just left a
+box, and Cancel does not hold the key yet) loses one press and does nothing
+wrong.
 
 **Rejected, in order:** `CancelKeyCatcher` (round one), an invisible view
 that took the keys: the kind of hidden key-carrying control Russell rejected
@@ -1793,7 +1814,8 @@ inside a split view with a Filter box, appearing after the window is up,
 the window made the key window of the active app, and the key sent through
 `NSApp.sendEvent`. Escape and Command-Period stop a preview once; a held key
 stops it once; typed in the Filter box, Escape clears the box and neither key
-stops the task, and once focus leaves the box Escape stops it; behind a sheet
+stops the task, a click in the box with Escape or Command-Period already
+queued behind it stops nothing, and once focus leaves the box Escape stops it; behind a sheet
 (one whose Cancel holds Escape, and one with no use for it) and behind an
 alert neither key stops it; with the site covering the panel neither does;
 on a deploy either key asks, Escape or Command-Period in the question is
@@ -1828,10 +1850,11 @@ stopped the task, and Escape after focus left the box did nothing; a gap no
 teacher can press a key inside). Measured on the main Mac with Keyboard
 Navigation on and off (`AppleKeyboardUIMode` 3 and 0), the same results. Source checks: the key
 is on the visible Cancel, and nothing in `Views/Console` is a representable
-or a responder. Only the rule's own test
-(`testCancelHoldsTheKeysOnlyWhenNothingElseWantsThem`) fails when the
-typing condition is taken out; the pressed-key test passes either way, as
-above.
+or a responder. With the typing condition taken out, the rule's own test
+(`testCancelHoldsTheKeysOnlyWhenNothingElseWantsThem`) fails; what the
+pressed-key tests do then is not settled (above). The press-time check
+has its own test (`testAKeyTypedInABoxNeverPressesCancel`), and the two
+queued-click tests fail without it (run `988-n2`).
 
 `StopQuestionTests` (in every suite) holds the rest without a key. The
 question's open state and its box are a small `@Observable` model,

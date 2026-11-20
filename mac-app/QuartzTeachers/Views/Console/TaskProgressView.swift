@@ -278,11 +278,32 @@ struct TaskProgressView: View {
         return true
     }
 
+    /// Whether a press of Cancel came from a key typed in a box, which is
+    /// the box's and stops nothing (#988). Cancel lets go of its key while
+    /// a box is being typed in (`cancelKeysAreLive`), but SwiftUI applies
+    /// that to the button only when it next updates the view. Measured on
+    /// the main Mac (run `988-n2`, Keyboard Navigation on): a click in the
+    /// Filter field and Escape already waiting together in the event queue,
+    /// which is what a teacher's input becomes when the app is busy for
+    /// longer than the gap between them, were handed out with no update
+    /// between, and Escape stopped the task. So the press reads the key
+    /// window as it is at that moment. Rejected: passing the key on to the
+    /// box, measured to come straight back to Cancel (the field editor's
+    /// `cancelOperation` reaches the window's cancel button) without end.
+    static func pressIsAKeyTypedInABox(isKeyDown: Bool, textIsBeingEdited: Bool) -> Bool {
+        return isKeyDown && textIsBeingEdited
+    }
+
     /// Cancel, clicked or pressed from the keyboard: once per run. A plan
     /// share's cancel never sets `wasCancelled`, so without this the button
     /// stayed live, and a held Escape repeating within one frame ran Cancel
     /// three times (#988 review).
     func pressCancel() {
+        let pressIsAKey: Bool = NSApp.currentEvent?.type == .keyDown
+        let textIsBeingEdited: Bool = KeyWindowTextEditing.isEditingText(in: NSApp.keyWindow)
+        if TaskProgressView.pressIsAKeyTypedInABox(isKeyDown: pressIsAKey, textIsBeingEdited: textIsBeingEdited) {
+            return
+        }
         let taskCanStillBeStopped: Bool = runIsUnderWay && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt)
         let stopsNow: Bool = asking.pressCancel(taskCanStillBeStopped: taskCanStillBeStopped)
         if stopsNow {

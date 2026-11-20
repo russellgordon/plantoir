@@ -313,6 +313,11 @@ final class ProgressCancelKeysTests: XCTestCase {
         guard let target = NSApp.keyWindow else {
             throw XCTSkip("No key window when the key was pressed: another app took the front midway (#846).")
         }
+        NSApp.sendEvent(try keyEvent(key, in: target, isARepeat: isARepeat))
+    }
+
+    /// The key-down the keyboard sends for `key`, addressed to `target`.
+    func keyEvent(_ key: Key, in target: NSWindow, isARepeat: Bool = false) throws -> NSEvent {
         let characters: String
         let code: UInt16
         var modifiers: NSEvent.ModifierFlags = []
@@ -328,14 +333,13 @@ final class ProgressCancelKeysTests: XCTestCase {
             characters = "\r"
             code = 36
         }
-        let event: NSEvent = try XCTUnwrap(NSEvent.keyEvent(
+        return try XCTUnwrap(NSEvent.keyEvent(
             with: .keyDown, location: .zero, modifierFlags: modifiers,
             timestamp: ProcessInfo.processInfo.systemUptime,
             windowNumber: target.windowNumber, context: nil,
             characters: characters, charactersIgnoringModifiers: characters,
             isARepeat: isARepeat, keyCode: code
         ))
-        NSApp.sendEvent(event)
     }
 
     func findTextField(in view: NSView) -> NSTextField? {
@@ -452,8 +456,9 @@ final class ProgressCancelKeysTests: XCTestCase {
     /// the focus when the window becomes key (the app's own sidebar Filter
     /// field, `SidebarView`), so Escape is the box's and the running task
     /// keeps running until the teacher clicks somewhere else. Russell's
-    /// ruling on #988 (2026-11-19): it is left as it is; Command-Period and
-    /// the Cancel button still stop the task.
+    /// ruling on #988 (2026-11-19, evening): left as built. While a box has
+    /// the focus, Escape and Command-Period are both the box's; a click on
+    /// Cancel still stops the task.
     func testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst() throws {
         if !NSApp.isFullKeyboardAccessEnabled {
             throw XCTSkip("Keyboard Navigation is off (System Settings > Keyboard), so AppKit gives no box the focus when the window becomes key.")
@@ -473,6 +478,55 @@ final class ProgressCancelKeysTests: XCTestCase {
         applyPendingViewUpdates(in: window)
         try press(.escape)
         XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "after the click, Escape stops the task")
+    }
+
+    /// The fastest a teacher's own input can come: a click in the Filter
+    /// field and then a key, both already waiting in the event queue before
+    /// the app handles either (the app busy for longer than the gap between
+    /// them). Each event is handed out by the app's own event loop, as a
+    /// real one is. Measured failing on the main Mac before the press
+    /// checked the box itself (run `988-n2`, Keyboard Navigation on):
+    /// SwiftUI had not yet taken the key off Cancel, and Escape stopped the
+    /// task. A key that reaches Cancel while a box is being typed in now
+    /// stops nothing.
+    func checkAKeyRightAfterAClickInTheFieldStopsNothing(_ key: Key) throws {
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner)
+        let contentView: NSView = try XCTUnwrap(window.contentView)
+        let field: NSTextField = try XCTUnwrap(findTextField(in: contentView), "the Filter field")
+        XCTAssertFalse(window.firstResponder is NSText, "no box has the focus before the click")
+        let middle: NSPoint = field.convert(NSPoint(x: field.bounds.midX, y: field.bounds.midY), to: nil)
+        for eventType in [NSEvent.EventType.leftMouseDown, NSEvent.EventType.leftMouseUp] {
+            let click: NSEvent = try XCTUnwrap(NSEvent.mouseEvent(
+                with: eventType, location: middle, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 1
+            ))
+            NSApp.postEvent(click, atStart: false)
+        }
+        NSApp.postEvent(try keyEvent(key, in: window), atStart: false)
+        _ = runUntil(timeout: 3) { ledger.cancelCount > 0 }
+        XCTAssertTrue(window.firstResponder is NSText, "the click put the focus in the field")
+        XCTAssertEqual(ledger.cancelCount, 0, "\(key) straight after a click in the field stopped the running task")
+        // The next press, once the panel has caught up, is the box's as
+        // ever: Escape clears it.
+        applyPendingViewUpdates(in: window)
+        if key == .escape {
+            try press(.escape)
+            XCTAssertTrue(runUntil(timeout: 3) { ledger.fieldEscapeCount > 0 }, "Escape again was the field's")
+            XCTAssertEqual(ledger.cancelCount, 0)
+        }
+        // A click on Cancel still stops the task while the box has the focus.
+    }
+
+    func testEscapeRightAfterAClickInTheFieldStopsNothing() throws {
+        try checkAKeyRightAfterAClickInTheFieldStopsNothing(.escape)
+    }
+
+    func testCommandPeriodRightAfterAClickInTheFieldStopsNothing() throws {
+        try checkAKeyRightAfterAClickInTheFieldStopsNothing(.commandPeriod)
     }
 
     /// A sheet in front: Escape is the sheet's, and a sheet that has no use
@@ -696,6 +750,16 @@ final class ProgressCancelKeysTests: XCTestCase {
         XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: true, runIsUnderWay: true, isAskingToStop: true, windowIsKey: true, textIsBeingEdited: false), "the question is open")
         XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: true, runIsUnderWay: true, isAskingToStop: false, windowIsKey: false, textIsBeingEdited: false), "something else is in front")
         XCTAssertFalse(TaskProgressView.cancelHoldsTheKeys(takesTheCancelKeys: true, cancelIsShowing: true, runIsUnderWay: true, isAskingToStop: false, windowIsKey: true, textIsBeingEdited: true), "a box is being typed in")
+    }
+
+    /// A key that reached Cancel while a box is being typed in stops
+    /// nothing, even before SwiftUI has taken the key off the button (run
+    /// `988-n2`); a click always stops the task.
+    func testAKeyTypedInABoxNeverPressesCancel() {
+        XCTAssertTrue(TaskProgressView.pressIsAKeyTypedInABox(isKeyDown: true, textIsBeingEdited: true), "Escape or Command-Period typed in a box")
+        XCTAssertFalse(TaskProgressView.pressIsAKeyTypedInABox(isKeyDown: true, textIsBeingEdited: false), "a key with no box being typed in")
+        XCTAssertFalse(TaskProgressView.pressIsAKeyTypedInABox(isKeyDown: false, textIsBeingEdited: true), "a click on Cancel, a box or not")
+        XCTAssertFalse(TaskProgressView.pressIsAKeyTypedInABox(isKeyDown: false, textIsBeingEdited: false), "a click on Cancel")
     }
 
     /// The key is on the visible Cancel, and the console draws no helper
