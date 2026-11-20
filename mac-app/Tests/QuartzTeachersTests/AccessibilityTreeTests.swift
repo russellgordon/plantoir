@@ -174,6 +174,9 @@ final class AccessibilityTreeTests: XCTestCase {
     /// The help tags in a sidebar `width` points wide (228, the sidebar's
     /// default) holding one course code's label.
     func helpTags(ofCourseCode code: String, width: CGFloat = 228) throws -> (helps: [String], described: String) {
+        // A plain row: inside the sidebar's folding course row the label is
+        // merged into one heading and its help tag is not in the tree
+        // (measured 2026-11-20), so the label is read on its own.
         let row: some View = List {
             CourseCodeLabel(code: code)
         }
@@ -190,7 +193,7 @@ final class AccessibilityTreeTests: XCTestCase {
 
     /// A course code cut short in its row carries its whole code as a help
     /// tag (D44), so it can still be read: a 12-character code, the most a
-    /// code may have, in a sidebar narrowed to 140 points.
+    /// code may have, in a row 140 points wide, where it is cut short.
     func testATruncatedCourseCodeShowsItsWholeCodeOnHover() throws {
         let code: String = "WWWWWWWWWWWW"
         let read = try helpTags(ofCourseCode: code, width: 140)

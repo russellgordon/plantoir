@@ -134,40 +134,57 @@ final class ClassDatesBoxKeyTests: XCTestCase {
     }
 
     /// The identifier of the control that has the focus, as VoiceOver is
-    /// told it, or a description of what has it when that has none.
-    func focusedControl() -> String {
+    /// told it. A text field being typed in reports the field editor AppKit
+    /// lends it, and a segmented picker the segment, neither of which
+    /// carries the control's identifier; so where the focused element has
+    /// none, the control is the innermost element of the window's tree,
+    /// with an identifier, that holds the focused element's middle.
+    func focusedControl(inWindowTitled title: String) -> String {
         guard let focused = AccessibilityTree.focusedElement() else {
             return "nothing"
         }
-        if focused.identifier.isEmpty {
-            return "\(focused.role) [\(focused.label)] [\(focused.title)]"
+        if !focused.identifier.isEmpty {
+            return focused.identifier
         }
-        return focused.identifier
+        if !focused.frame.isNull {
+            let middle: CGPoint = CGPoint(x: focused.frame.midX, y: focused.frame.midY)
+            let read: AccessibilityTree = AccessibilityTree(ofWindowTitled: title)
+            var innermost: String = ""
+            for element in read.elements {
+                if !element.identifier.isEmpty && !element.frame.isNull && element.frame.contains(middle) {
+                    innermost = element.identifier
+                }
+            }
+            if !innermost.isEmpty {
+                return innermost
+            }
+        }
+        return "\(focused.role) [\(focused.label)] [\(focused.title)]"
     }
 
     /// The order the keys take around the box in whichever sheet holds it.
     /// With Keyboard Navigation on, Tab goes on to "Where these came from"
     /// and Shift-Tab back to the route picker; with it off, both go to
     /// "Where these came from", the only other text box.
-    func assertTabAndShiftTabNameTheirControls(in window: NSWindow, box: NSTextView) throws {
+    func assertTabAndShiftTabNameTheirControls(in window: NSWindow, box: NSTextView, treeTitle: String) throws {
         let isOn: Bool = NSApp.isFullKeyboardAccessEnabled
         print("ClassDatesBoxKeyTests: Keyboard Navigation \(isOn ? "on" : "off"); window key \(window.isKeyWindow)")
         XCTAssertTrue(window.isKeyWindow, "the window holding the box is not key")
         XCTAssertTrue(window.firstResponder === box, "the box does not have the focus as the sheet opens")
-        XCTAssertEqual(focusedControl(), "sectionScheduleTypedField", "VoiceOver is not told the box has the focus")
+        XCTAssertEqual(focusedControl(inWindowTitled: treeTitle), "sectionScheduleTypedField", "VoiceOver is not told the box has the focus")
         box.insertText("2026-09-08", replacementRange: NSRange(location: NSNotFound, length: 0))
 
         try pressTab(shifted: false)
-        let afterTab: String = focusedControl()
+        let afterTab: String = focusedControl(inWindowTitled: treeTitle)
         print("ClassDatesBoxKeyTests: Tab from the box went to \(afterTab)")
         XCTAssertEqual(afterTab, "sectionScheduleSourceField", "Tab from the box (Keyboard Navigation \(isOn ? "on" : "off"))")
         XCTAssertEqual(box.string, "2026-09-08", "Tab typed into the box")
 
         try pressTab(shifted: true)
-        XCTAssertEqual(focusedControl(), "sectionScheduleTypedField", "Shift-Tab from Where these came from did not come back to the box")
+        XCTAssertEqual(focusedControl(inWindowTitled: treeTitle), "sectionScheduleTypedField", "Shift-Tab from Where these came from did not come back to the box")
 
         try pressTab(shifted: true)
-        let afterShiftTab: String = focusedControl()
+        let afterShiftTab: String = focusedControl(inWindowTitled: treeTitle)
         print("ClassDatesBoxKeyTests: Shift-Tab from the box went to \(afterShiftTab)")
         if isOn {
             XCTAssertEqual(afterShiftTab, "sectionScheduleRoutePicker", "Shift-Tab from the box, Keyboard Navigation on")
@@ -188,7 +205,7 @@ final class ClassDatesBoxKeyTests: XCTestCase {
         )
         let content: NSView = try XCTUnwrap(window.contentView)
         let box: NSTextView = try XCTUnwrap(LayoutAndSmallBehaviourTests.textViews(in: content).first, "no dates box")
-        try assertTabAndShiftTabNameTheirControls(in: window, box: box)
+        try assertTabAndShiftTabNameTheirControls(in: window, box: box, treeTitle: window.title)
     }
 
     /// The same box where Add Class, Make Room and Roll Over show it: the
@@ -215,6 +232,6 @@ final class ClassDatesBoxKeyTests: XCTestCase {
         let box: NSTextView = try XCTUnwrap(
             LayoutAndSmallBehaviourTests.textViews(in: try XCTUnwrap(sheet.contentView)).first, "no dates box in the verb sheet"
         )
-        try assertTabAndShiftTabNameTheirControls(in: sheet, box: box)
+        try assertTabAndShiftTabNameTheirControls(in: sheet, box: box, treeTitle: window.title)
     }
 }

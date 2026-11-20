@@ -4614,18 +4614,53 @@ brought to match in stage 3.
   Tab went to "Where these came from" and then Cancel, and Shift-Tab came
   back the same way; with it off, Tab and Shift-Tab moved between the box
   and "Where these came from". The box held only what was typed.
+
+  After the first review (2026-11-20): the box takes the focus only when
+  the sheet opens on it (`takesTheFocusWhenShown`, false once the teacher
+  has changed the route, `SectionScheduleSheet.hasChangedRoute`), so
+  arrowing the route picker from Upload back to Typed leaves the keyboard
+  in the picker; before, the new box took the focus as it was drawn. The
+  binding now follows the text storage (`NSTextStorageDelegate`,
+  `didProcessEditing`) rather than the text view's did-change notice:
+  `testUndoAndRedoInTheDatesBoxReachTheBinding` found that Undo and Redo
+  changed the box without that notice, so the sheet went on holding the
+  undone text. The tests now name the control the keys reach, in a key
+  window of the active app (`ClassDatesBoxKeyTests`, opt-in with
+  `PLANTOIR_KEY_TESTS=1` because it takes the front, and run by the gate's
+  pressed-key step): VoiceOver's focused element is the box as the sheet
+  opens; Tab goes to "Where these came from" (`sectionScheduleSourceField`)
+  in either Keyboard Navigation mode; Shift-Tab from the box goes to the
+  route picker with Keyboard Navigation on and to "Where these came from"
+  with it off. The same is asserted in `SectionVerbSheet`'s Class Dates
+  stage, which is what Add Class, Make Room and Roll Over open when the
+  section has no dates (`askForDatesFirst`). `LayoutAndSmallBehaviourTests`
+  adds a paste of several lines (from a pasteboard of the test's own, so
+  the person's clipboard is untouched) and Undo and Redo reaching the
+  binding.
 - **No sideways scroll bar under the Publish Pages picker (D48).** The
-  picker's table carries `.scrollIndicators(.never, axes: .horizontal)`.
-  Measured in `PageTablesSheetTests` with the scroll bars a mouse shows:
-  when the rows arrive after the table is drawn, it spreads the width over
-  Page, Folder and Date in half points (146.5, 134.5, 174.5) and the
-  columns end at 501.5 in a table that shows 501, so AppKit put a sideways
-  scroll bar under the rows. The columns are meant to fit the sheet, so
-  there is nothing to scroll to but that half point. HIG, Lists and
-  tables: "Consider ways to preserve readability of text that might
-  otherwise get clipped or truncated." NOT done: rounding the columns
-  down to whole points, because SwiftUI's `Table` chooses their widths and
-  gives no hold on its `NSTableView`.
+  picker's Folder and Date columns have set widths, 135 and 175 pt
+  (`SectionVerbSheet.pickerFolderColumnWidth`, `pickerDateColumnWidth`),
+  the widths they came to at the sheet's opening size, so Page is the one
+  column that takes the table's width as it changes. With all three
+  flexible (Page from 90, Folder 80 to 140, Date 120 to 180), measured in
+  `PageTablesSheetTests` with the scroll bars a mouse shows: when the rows
+  arrive after the table is drawn, as they do in the app, the table shared
+  the change between the three in half points (146.5, 134.5, 174.5) and
+  the columns ended at 501.5 in a table that shows 501, so AppKit put a
+  sideways scroll bar under the rows; with the set widths they come to 145,
+  135 and 175 and end at 501.0 both at open and after the rows arrive.
+  Folder and Date could be dragged 5 pt wider at most before, so a teacher
+  loses almost nothing; Page, which holds the long titles, still resizes.
+  HIG, Lists and tables: "Consider ways to preserve readability of text
+  that might otherwise get clipped or truncated." REJECTED, from the first
+  version: hiding the sideways scroll indicator
+  (`.scrollIndicators(.never, axes: .horizontal)`), which hid the symptom
+  and left the half point; and setting the ideal widths to 145, 135 and
+  175, which changed nothing (the half points came from sharing the
+  change, not from the ideals). `testThePickerShowsNoSidewaysScrollBar`
+  checks both moments with no tolerance (the first version allowed half a
+  point, which was the fault, so it passed either way) and that the
+  sideways scroll bar is still on, and fails with the widths put back.
 - **D12 (the empty Planning tab with no assistant installed) cannot be
   reached.** The Planning tab is absent unless an assistant is installed
   (`unitPlanning.tab.tabCases`, `PlanningTab.isShown`, read from the same
