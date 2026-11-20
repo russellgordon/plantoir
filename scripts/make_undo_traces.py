@@ -1442,7 +1442,7 @@ def action_trace(rng, recorded, number):
     while len(calls) < length and attempts < length * 20:
         attempts += 1
         roll = rng.random()
-        if apart and roll >= 0.90 and roll < 0.95:
+        if apart and roll >= 0.65 and roll < 0.75:
             # U3b: a deploy writes a new marker in the place a rollover's
             # marker left (when it is free), and nothing to the list.
             place = apart[0]["from"]

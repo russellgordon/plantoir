@@ -1195,7 +1195,7 @@ nonisolated protocol UndoExternalPlaces: Sendable {
     func canSet(_ target: String, _ value: UndoJSON?) -> Bool
 }
 
-extension UndoExternalPlaces {
+nonisolated extension UndoExternalPlaces {
 
     // MARK: - Functions
 

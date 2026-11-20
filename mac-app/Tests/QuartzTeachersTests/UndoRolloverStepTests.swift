@@ -37,11 +37,20 @@ final class UndoRolloverStepTests: XCTestCase {
 
     // MARK: - Setting up
 
-    override func setUp() async throws {
-        previousTrail = ActivityTrail.store
+    /// Every list folder a test used, removed when it ends.
+    var listFolders: [URL] = []
+
+    /// Points the list at an empty folder of its own.
+    func freshList() {
         listFolder = FileManager.default.temporaryDirectory
             .appendingPathComponent("undo-rollover-\(UUID().uuidString)", isDirectory: true)
+        listFolders.append(listFolder)
         UndoJournalLocation.folderOverride = listFolder
+    }
+
+    override func setUp() async throws {
+        previousTrail = ActivityTrail.store
+        freshList()
         JournaledStep.modeOverride = .live
         UndoContractReplay.registerTheFrontPageMaintainer()
     }
@@ -51,7 +60,10 @@ final class UndoRolloverStepTests: XCTestCase {
         JournaledStep.modeOverride = nil
         UndoKillPoints.hook = nil
         ActivityTrail.store = previousTrail
-        try? FileManager.default.removeItem(at: listFolder)
+        for folder in listFolders {
+            try? FileManager.default.removeItem(at: folder)
+        }
+        listFolders = []
         SectionMenuActivity.reset()
     }
 
@@ -62,6 +74,9 @@ final class UndoRolloverStepTests: XCTestCase {
     /// the copy of the course saved first.
     func section(surface: AssistToolRunner.Surface) throws -> AssistFixture.Made {
         let made: AssistFixture.Made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: surface, for: self)
+        // The fixture's own class dates are a step of their own: the list
+        // starts empty after it, so the rollover's step is the first.
+        freshList()
         ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
         _ = RollOverFromTheMenuTests.countCopies(of: made)
         try UndoRolloverStepTests.lastYear.write(to: made.root.appendingPathComponent(UndoRolloverStepTests.markerPath), atomically: true, encoding: .utf8)
