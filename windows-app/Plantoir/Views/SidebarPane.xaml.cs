@@ -1524,8 +1524,10 @@ public sealed partial class SidebarPane : UserControl
             items.Add(MenuItem(ClaudeCodeLauncher.MenuItemTitle, Glyphs.Star,
                 Selecting(row, () => ReviseWithClaude(course))));
 
-        // Hidden independently when Codex is not installed
-        // (outsideAgents.hiddenWhenNotInstalled, #210).
+        // Hidden independently when Codex is not installed (#210). A row's
+        // context menu still HIDES a missing assistant after #990, where the
+        // menu bar dims it: outsideAgents.hiddenInContextMenusWhenNotInstalled
+        // (HIG, Context menus: "Hide unavailable menu items, don't dim them").
         if (CodexLauncher.IsAvailable)
             items.Add(MenuItem(CodexLauncher.MenuItemTitle, Glyphs.Star,
                 Selecting(row, () => ReviseWithCodex(course))));

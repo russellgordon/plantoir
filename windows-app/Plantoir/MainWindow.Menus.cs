@@ -26,9 +26,12 @@ namespace Plantoir;
 /// <para><b>Greyed, never hidden.</b> Which items can be used is
 /// <see cref="SubjectMenuRules.Enabled"/> — the contract's rule
 /// (<c>shared-rules.json</c> → <c>subjectMenus</c>), fed by
-/// <see cref="CurrentSituation"/>. The one exception is presence: the Revise
-/// With items for Claude and Codex are LEFT OUT when they are not installed,
-/// decided when the menu is built (<c>outsideAgents.*.hiddenWhenNotInstalled</c>).</para>
+/// <see cref="CurrentSituation"/>. Since #990 that includes presence: the
+/// Revise With items for Claude and Codex are drawn on every PC and DIMMED
+/// when not installed (<c>outsideAgents.hiddenWhenNotInstalled</c> false),
+/// where until then they were left out. No grey line of explanation sits in
+/// the Course or Section menu since #990 either (the mac's ruling Q14): a
+/// menu holds commands.</para>
 ///
 /// <para><b>WinUI's MenuBarItem has no Opening event</b>, so enablement is
 /// applied ahead of time (<see cref="ApplyMenuEnablement"/>) on every change the
@@ -56,7 +59,6 @@ public sealed partial class MainWindow
     private readonly Dictionary<Item, MenuFlyoutItemBase> _ruled = new();
 
     private MenuFlyoutSubItem _openRecentMenu = null!;
-    private MenuFlyoutItem _renameReason = null!;
     private MenuFlyoutItem _checkForUpdatesItem = null!;
     private KeyboardAccelerator _courseObsidianKey = null!;
     private KeyboardAccelerator _sectionObsidianKey = null!;
@@ -98,11 +100,10 @@ public sealed partial class MainWindow
         // "Rename": no "Course", no ellipsis (mac #491 item 8). It opens a
         // dialog here, but the name is the command's, and a second word for it
         // would be a second command to learn.
+        // Dimmed alone since #990 (the mac's ruling Q14: no grey text rows in
+        // the menus). Until then a dimmed line under it said what held a
+        // rename back (#458/#468); the row's context menu still says it.
         Add(course, "Rename", "courseRename", Item.Rename, Key(VirtualKey.F2, VirtualKeyModifiers.None, "F2"));
-        // Dimmed WITH its reason: what holds a rename back (#458/#468).
-        _renameReason = new MenuFlyoutItem { IsEnabled = false, Visibility = Visibility.Collapsed };
-        AutomationProperties.SetAutomationId(_renameReason, "courseRenameReason");
-        course.Add(_renameReason);
         Add(course, ReferenceCourse.SetSchoolYearMenuItem, "courseSetSchoolYear", Item.SetSchoolYear);
         Add(course, ReferenceCourse.KeepACopyMenuItem, "courseKeepACopy", Item.KeepACopyForReference);
         course.Add(new MenuFlyoutSeparator());
@@ -215,6 +216,9 @@ public sealed partial class MainWindow
 
         RebuildOpenRecent();
         OpenRecentList.Changed += OpenRecentChanged;
+        // #990: a missing assistant's Revise items are dimmed, so an answer
+        // that arrives after the window is built greys or ungreys them.
+        OutsideAssistantPresence.Changed += AssistantPresenceChanged;
     }
 
     /// <summary>A key for an item: its key, modifiers and the name the #191 record writes.</summary>
@@ -265,24 +269,50 @@ public sealed partial class MainWindow
         if (SelectedSectionDetail() is { } detail && !detail.PressPreview(opposite: true)) ApplyMenuEnablement();
     }
 
-    /// <summary>
-    /// Revise With ▸ Claude… / Codex… / Local AI Assistant… (mac #491 item 8's
-    /// titles). Claude and Codex are LEFT OUT when not installed — a fact about
-    /// this computer, decided now, never greyed (subjectMenus.rule); the local
-    /// assistant is always drawn and greyed where it does not apply.
-    /// </summary>
     /// <summary>The local assistant's title inside Revise With ▸ — the menu bar's and every row's.</summary>
     internal const string LocalAssistantMenuItemTitle = "Local AI Assistant…";
 
+    /// <summary>
+    /// Revise With ▸ Claude… / Codex… / Local AI Assistant… (mac #491 item 8's
+    /// titles). Since #990 (the mac's D11, Russell's ruling Q9) every item is
+    /// DRAWN on every PC, and one whose assistant this PC does not have is
+    /// DIMMED, not left out: HIG, The menu bar, "Always show the same set of
+    /// menu items… If a menu bar item isn't actionable, disable the action
+    /// instead of hiding it from the menu." Enabled means installed
+    /// (<see cref="IsInstalledHere"/>) AND allowed by the rule, applied in
+    /// <see cref="ApplyMenuEnablement"/>. A row's context menu still HIDES a
+    /// missing assistant (HIG, Context menus: "Hide unavailable menu items,
+    /// don't dim them"; <c>outsideAgents.hiddenInContextMenusWhenNotInstalled</c>).
+    /// Until #990 Claude and Codex were left out of this menu when not installed.
+    /// No Set Up an Assistant… after them: Windows has no set-up yet (#903).
+    /// </summary>
     private void AddReviseWith(IList<MenuFlyoutItemBase> into, string prefix, Item claude, Item codex, Item local)
     {
         var sub = new MenuFlyoutSubItem { Text = "Revise With" };
         AutomationProperties.SetAutomationId(sub, prefix + "ReviseWith");
-        if (ClaudeCodeLauncher.IsAvailable) Add(sub.Items, ClaudeCodeLauncher.MenuItemTitle, prefix + "ReviseWithClaude", claude);
-        if (CodexLauncher.IsAvailable) Add(sub.Items, CodexLauncher.MenuItemTitle, prefix + "ReviseWithCodex", codex);
+        Add(sub.Items, ClaudeCodeLauncher.MenuItemTitle, prefix + "ReviseWithClaude", claude);
+        Add(sub.Items, CodexLauncher.MenuItemTitle, prefix + "ReviseWithCodex", codex);
         Add(sub.Items, LocalAssistantMenuItemTitle, prefix + "ReviseWithLocalAssistant", local);
         into.Add(sub);
     }
+
+    /// <summary>
+    /// Whether the outside door a Revise With item opens is on this PC, read
+    /// from <see cref="OutsideAssistantPresence"/> (asked at launch and when a
+    /// window comes to the front, never while a menu draws). True for every
+    /// other item. The local assistant is Plantoir's own and runs on every PC
+    /// this app runs on, so it is never dimmed for presence.
+    /// </summary>
+    internal static bool IsInstalledHere(SubjectMenuRules.ReviseTarget door) => door switch
+    {
+        SubjectMenuRules.ReviseTarget.Claude => OutsideAssistantPresence.ClaudeIsInstalled,
+        SubjectMenuRules.ReviseTarget.Codex => OutsideAssistantPresence.CodexIsInstalled,
+        _ => true,
+    };
+
+    /// <summary>What a presence refresh found differs: grey or ungrey the Revise items (raised off the interface thread).</summary>
+    private void AssistantPresenceChanged() =>
+        DispatcherQueue.TryEnqueue(() => { if (!IsClosed) ApplyMenuEnablement(); });
 
     // ---- Running ------------------------------------------------------------
 
@@ -307,7 +337,10 @@ public sealed partial class MainWindow
         // mac's key on a disabled item is — see 12-windows-app.md (L5).
         if (keyName == "F2" && root is not null &&
             FocusManager.GetFocusedElement(root) is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
-        if (item is { } ruled && !SubjectMenuRules.Enabled(CurrentSituation()).Contains(ruled))
+        // #990: an outside door this PC does not have is dimmed in the menu
+        // bar, and asked again here like the rule.
+        if (item is { } ruled && (!SubjectMenuRules.Enabled(CurrentSituation()).Contains(ruled)
+                                  || SubjectMenuRules.OutsideDoorOf(ruled) is { } door && !IsInstalledHere(door)))
         {
             ApplyMenuEnablement();
             return;
@@ -455,7 +488,7 @@ public sealed partial class MainWindow
             return;
         }
         var enabled = SubjectMenuRules.Enabled(situation);
-        foreach (var (item, view) in _ruled) view.IsEnabled = enabled.Contains(item);
+        foreach (var (item, view) in _ruled) view.IsEnabled = SubjectMenuRules.EnabledInTheMenuBar(item, enabled, IsInstalledHere);
         // The sidebar's − follows the same rule (#491 item 5).
         Sidebar.RefreshMinusButton(situation);
 
@@ -478,13 +511,6 @@ public sealed partial class MainWindow
         bool onSection = situation.Row == Row.Section;
         MoveKey(_courseObsidianKey, (MenuFlyoutItem)_ruled[Item.CourseOpenInObsidian], !onSection);
         MoveKey(_sectionObsidianKey, (MenuFlyoutItem)_ruled[Item.SectionOpenInObsidian], onSection);
-
-        // What holds a rename back, said under it.
-        string? reason = situation.Row is Row.Course or Row.Section && !situation.KeptForReference && situation.StructuralHold
-                         && Workspace.WorkspacePath is { } folder && Workspace.SelectedCourse is { } course
-            ? CourseActivity.BusyReason(folder, course.Code) : null;
-        _renameReason.Text = reason ?? "";
-        _renameReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
 
         _openRecentMenu.IsEnabled = enabled.Contains(Item.OpenRecent);
     }

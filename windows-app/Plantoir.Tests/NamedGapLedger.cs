@@ -195,6 +195,16 @@ internal static class NamedGapLedger
     internal const string FixWithGreetingCases = "app-rules.json → outsideAgents.fixWith.greetingCases";
 
     /// <summary>
+    /// <c>app-rules.json</c> → <c>outsideAgents.fixWith</c>, by key: a sentence of
+    /// the Fix with… buttons this app says only in part, because the rest names
+    /// something it does not have yet (<c>FixWithAssistantContractTests.PiecesAndBoundsAreTheContracts</c>).
+    /// A held sentence must still differ from the contract's (Windows' machine
+    /// word filled in), and must be exactly its first sentence. Wired in by
+    /// #990's Windows half (2026-11-19) for <c>notInstalledHelp</c>.
+    /// </summary>
+    internal const string FixWithWordsSaidDifferently = "app-rules.json → outsideAgents.fixWith (said in part here)";
+
+    /// <summary>
     /// <c>windows-app/test_launcher_rules.ps1</c>'s rows, by <c>"&lt;list&gt;\t&lt;name&gt;"</c>,
     /// the list spelled as the runner's <c>Report</c> names it (per launcher:
     /// <c>deployWhileItsSectionDeploys/deploy.ps1</c>, …). Handed to the runner by
@@ -383,6 +393,7 @@ internal static class NamedGapLedger
     // #868's held-by-name piece (2026-11-13): the mac's #835 part 3 and #855 merged into dev.
     private const string Reason868Sections = "a build, preview or deploy holding only its own section (a work lease's sixth line, the mac's #835 part 3) is #868's piece of v2.0.0; until it lands every Windows lease holds the whole course and a lease's sixth line is read as course-wide, so no hold here is ever on one section and the course-wide sentence is the true one";
     private const string Reason903 = "setting up Claude Code, Codex or GitHub Copilot from Settings (the mac's #855) is #903's piece of v2.0.0; Windows has no set-up yet, so none can be under way, recorded or quit through";
+    private const string Reason903SetUpItem = "a Fix with… button dimmed because its assistant is missing names Revise With ▸ Set Up an Assistant… in its second sentence (the mac's #990); that item and the set-up behind it are #903's piece of v2.0.0, so until it lands Windows says the first sentence alone rather than send a teacher looking for an item that is not there";
 
     // #911's held-by-name piece (2026-11-14): the mac's #897 C and #785a merged into dev.
     private const string Reason911 = "a one-section restore staged so that a failure part way moves everything back, and says when moving back failed too (the mac's #897 C), is #911's piece of v2.0.0; until it lands Windows' section restore is not staged, so it has no 'stopped part way' outcome to record, and its trail lines are unchanged";
@@ -516,6 +527,8 @@ internal static class NamedGapLedger
              "outside assistant set up", "outside assistant could not be set up", "outside assistant set-up settled",
              "outside assistant sign-in opened", "outside assistant sign-in checked", "outside assistant removed"),
         Owed(QuitCases, 903, V200, Reason903, "an outside assistant is being set up"),
+        // #990's Windows half (2026-11-19): the dimmed button's help text.
+        Owed(FixWithWordsSaidDifferently, 903, V200, Reason903SetUpItem, "notInstalledHelp"),
 
         // ---- #911's held-by-name piece (2026-11-14): what the mac's #897 C
         // (Restore from Backup… puts back one section, staged) and #785a (the

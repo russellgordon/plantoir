@@ -48,6 +48,18 @@ public class FixWithAssistantContractTests
         Assert.Equal(expect["claudeShown"]!.GetValue<bool>(), buttons.ClaudeShown);
         Assert.Equal(expect["codexShown"]!.GetValue<bool>(), buttons.CodexShown);
         Assert.Equal(expect["enabled"]!.GetValue<bool>(), buttons.Enabled);
+        // #990: each button separately, its assistant installed AND a row handed over.
+        Assert.Equal(expect["claudeEnabled"]!.GetValue<bool>(), buttons.ClaudeEnabled);
+        Assert.Equal(expect["codexEnabled"]!.GetValue<bool>(), buttons.CodexEnabled);
+        Assert.Equal(expect["claudeEnabled"]!.GetValue<bool>(), buttons.CanPress(FixWithAssistant.Assistant.Claude));
+        Assert.Equal(expect["codexEnabled"]!.GetValue<bool>(), buttons.CanPress(FixWithAssistant.Assistant.Codex));
+        // The help text says why a button cannot be pressed: not set up
+        // outranks nothing ticked, and a button that can be pressed says nothing.
+        bool claudeInstalled = testCase["claudeInstalled"]!.GetValue<bool>();
+        string claudeHelp = FixWithAssistant.HelpFor(FixWithAssistant.Assistant.Claude, claudeInstalled, buttons);
+        if (!claudeInstalled) Assert.Equal(FixWithAssistant.NotInstalledHelp, claudeHelp);
+        else if (buttons.ClaudeEnabled) Assert.Equal("", claudeHelp);
+        else Assert.Equal(FixWithAssistant.NotEnabledHelp, claudeHelp);
         Assert.Equal(expect["handedOver"]!.GetValue<int>(), handover.Rows.Count);
         Assert.Equal(expect["unticked"]!.GetValue<int>(), handover.Unticked);
         Assert.Equal(expect["fixedInTheSource"]!.GetValue<int>(), handover.FixedInTheSource);
@@ -92,6 +104,33 @@ public class FixWithAssistantContractTests
         NamedGapLedger.StillNamed(NamedGapLedger.FixWithGreetingCases,
             FixWith()["greetingCases"]!.AsArray().Select(c => c!["name"]!.ToString()));
 
+    /// <summary>
+    /// <c>fixWith.notInstalledHelp</c> (#990), said with Windows' word for the
+    /// computer (<c>specialNames.platformWording.machine</c>: PC for Mac). While
+    /// <see cref="NamedGapLedger.FixWithWordsSaidDifferently"/> holds it (#903:
+    /// no Set Up an Assistant… here yet), this app says exactly the contract's
+    /// FIRST sentence and must not say the whole; the day the hold goes, the
+    /// whole sentence is asserted.
+    /// </summary>
+    private static void AssertNotInstalledHelpIsTheContracts(string contractWords)
+    {
+        string machine = ContractLoader.LoadJson("shared-rules.json")["specialNames"]!["platformWording"]!["machine"]!["windows"]!.ToString();
+        string ours = contractWords.Replace("this Mac", "this " + machine, StringComparison.Ordinal);
+        Assert.DoesNotContain("Mac", FixWithAssistant.NotInstalledHelp, StringComparison.Ordinal);
+        NamedGapLedger.StillNamed(NamedGapLedger.FixWithWordsSaidDifferently,
+            FixWith().AsObject().Select(member => member.Key));
+        if (NamedGapLedger.Holding(NamedGapLedger.FixWithWordsSaidDifferently, "notInstalledHelp") is { } owed)
+        {
+            Assert.False(ours == FixWithAssistant.NotInstalledHelp, NamedGapLedger.ClosedMessage(owed));
+            int firstStop = ours.IndexOf(". ", StringComparison.Ordinal);
+            Assert.True(firstStop > 0, "notInstalledHelp no longer has a second sentence to hold: " + NamedGapLedger.ClosedMessage(owed));
+            Assert.Equal(ours[..(firstStop + 1)], FixWithAssistant.NotInstalledHelp);
+            Assert.Contains("Set Up an Assistant", ours[(firstStop + 1)..], StringComparison.Ordinal);
+        }
+        else
+            Assert.Equal(ours, FixWithAssistant.NotInstalledHelp);
+    }
+
     internal static IReadOnlyList<SectionProblemRow> RowsOf(JsonNode testCase)
     {
         if (testCase["manyRows"] is { } many)
@@ -130,6 +169,7 @@ public class FixWithAssistantContractTests
         Assert.Equal(FixWithAssistant.ClaudeButtonTitle, buttons[0]!["title"]!.ToString());
         Assert.Equal(FixWithAssistant.CodexButtonTitle, buttons[1]!["title"]!.ToString());
         Assert.Equal(fixWith["notEnabledHelp"]!.ToString(), FixWithAssistant.NotEnabledHelp);
+        AssertNotInstalledHelpIsTheContracts(fixWith["notInstalledHelp"]!.ToString());
 
         var pieces = fixWith["fixGreeting"]!.AsObject().ToDictionary(p => p.Key, p => p.Value!.ToString());
         var ours = new Dictionary<string, string>

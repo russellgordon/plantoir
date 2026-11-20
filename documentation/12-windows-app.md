@@ -1037,10 +1037,25 @@ contract's message in place of the plain greeting. `FixWithAssistant` (Core) is
 the mac's `FixWithAssistant.swift` function for function: `HandoverOf`,
 `Buttons`, `GreetingFor`, `TrailLine`, every word a constant pinned key by key
 (`FixWithAssistantContractTests`, which runs the 8 `buttonCases` and 10
-`greetingCases`). A button is HIDDEN when its assistant is not on this PC or
-the course is kept for reference, and GREYED when nothing ticked is handed
-over, with `fixWith.notEnabledHelp` as its help text so Narrator says why
-(proposed from Windows; the mac gives the same as an accessibility hint since #776).
+`greetingCases`). Both buttons are HIDDEN only on a course kept for
+reference. Since #990 (the mac's D11, Russell's ruling Q9) a button whose
+assistant is not on this PC is DIMMED rather than hidden, as Revise With ▸ in
+the menu bar dims it, with `FixWithAssistant.NotInstalledHelp` as its help
+text; until #990 it was hidden. A button is also GREYED when nothing ticked is
+handed over, with `fixWith.notEnabledHelp` as its help text so Narrator says
+why (proposed from Windows; the mac gives the same as an accessibility hint
+since #776). Not set up outranks nothing ticked (`FixWithAssistant.HelpFor`).
+`ButtonState` carries `ClaudeEnabled` and `CodexEnabled` beside `Enabled`
+(a row is handed over), and `buttonCases`' `claudeEnabled`/`codexEnabled` are
+run against them. **The help text is the contract's first sentence only**,
+"This assistant is not set up on this PC." (the contract's "Mac" said as
+`platformWording.machine`'s "PC"): its second sentence names Revise With ▸
+Set Up an Assistant…, which Windows does not have until #903 builds the
+set-up, so it is held open by name (`NamedGapLedger.FixWithWordsSaidDifferently`,
+`notInstalledHelp`, #903, v2.0.0) and comes back whole, asserted by
+`FixWithAssistantContractTests.PiecesAndBoundsAreTheContracts`, the day that
+entry goes. REJECTED: saying the whole sentence now, which sends a teacher
+looking for a menu item that is not there.
 Whether each door exists is `OutsideAssistantPresence`, asked at launch and on
 `MainWindow.Activated` off the interface thread — never while the tab draws,
 and false until the first answer, so a tab that draws first shows its buttons
@@ -7991,7 +8006,7 @@ when they land.
 | Menu | Items (Windows key) |
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
-| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
+| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
 | Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
@@ -8007,10 +8022,12 @@ port of the mac's `SubjectMenuRules.enabledItems`, run by
 cases, 51 items, 24 situation keys; the names map both ways by camel-casing
 the enum, so "Finder" and "NewTerminalAtFolder" in two names are the mac's
 neutral words for Show in File Explorer and Open in Terminal). Items GREY,
-never hide — except Revise With ▸ Claude… and Codex…, LEFT OUT when not
-installed (`ClaudeCodeLauncher.IsAvailable`, `CodexLauncher.IsAvailable`,
-decided when the window is built: a fact about the PC, not the selection).
-Local AI Assistant… is always drawn, greyed on a course row.
+never hide, Revise With ▸ Claude… and Codex… included since #990: drawn on
+every PC and DIMMED when not installed (`SubjectMenuRules.EnabledInTheMenuBar`,
+fed by `OutsideAssistantPresence`; "Revise With: dimmed in the menu bar, hidden
+in a row's menu (#990)" below). Until #990 they were LEFT OUT when not
+installed, decided when the window was built. Local AI Assistant… is always
+drawn, greyed on a course row.
 
 **What the rule is fed** is `MainWindow.CurrentSituation()`, read from the
 owner that already decides each fact, so the menu and the button cannot
@@ -8086,9 +8103,10 @@ silent too** — F2 on a course whose Rename the rule greys (a reference
 course, a section row, a course being copied) does nothing and says nothing,
 which is what the mac's key on a disabled menu item does. Before #488 F2 opened
 the rename dialog and let it explain the refusal; do not restore that route:
-the reason is on the greyed Course ▸ Rename's own reason line, and a key that
-opens a dialog the menu says cannot be used is the disagreement the one rule
-exists to prevent.
+the reason is in the row's own context menu, under Add Section… (until #990
+it was also a grey line under Course ▸ Rename, which the mac's ruling Q14 took
+out of the menu bar), and a key that opens a dialog the menu says cannot be
+used is the disagreement the one rule exists to prevent.
 
 **Ctrl+Shift+O sits on ONE Open in Obsidian item** — Course's unless a section
 row is selected, then Section's; `ApplyMenuEnablement` moves the accelerator
@@ -8106,6 +8124,62 @@ for Copy a Page: it is the browser's inspect-element key and a teacher who has
 used one expects that; Copy a Page has no key. **Settings… lost its "Ctrl+,"
 label**: it was drawn with nothing behind it, and a comma key measured above
 does not fire. Ctrl+Shift+B was kept free for 2B's Rebuild Preview, which has it now.
+
+### Revise With: dimmed in the menu bar, hidden in a row's menu (#990)
+
+The mac's #990 (the HIG review's D11, D24, D25, D43 and Russell's rulings Q8,
+Q9, Q10 and Q14, 2026-11-18) changed four things a Windows teacher sees, and
+the Windows half (branch `issue/990-menus-windows`, 2026-11-19) brings them
+here where Windows has the same thing:
+
+- **A missing assistant is DIMMED in the menu bar** (Course ▸ and Section ▸
+  Revise With ▸ Claude…, Codex…), never left out: HIG, The menu bar, "Always
+  show the same set of menu items… If a menu bar item isn't actionable,
+  disable the action instead of hiding it from the menu"
+  (`outsideAgents.hiddenWhenNotInstalled`, false since #990). The rule is
+  `SubjectMenuRules.EnabledInTheMenuBar`: the contract's rule AND, for an item
+  that opens an outside door (`OutsideDoorOf`), that door's assistant
+  installed. Presence is `OutsideAssistantPresence`, asked at launch and on
+  activation off the interface thread; its `Changed` re-runs
+  `ApplyMenuEnablement`, and `Invoke` asks presence again at the click.
+  `ReviseWithPresenceTests` holds the rule, the two contract keys and the
+  source (no installed test around the menu bar's `Add`). A dimmed Revise
+  item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
+  shows no tooltip, and the ruling Q14 rules out a grey text row.
+- **A row's context menu still HIDES a missing assistant**
+  (`hiddenInContextMenusWhenNotInstalled`): HIG, Context menus, "Hide
+  unavailable menu items, don't dim them." Nothing changed in
+  `SidebarPane.ReviseItems`. Its grouping already matches the mac's D43 rule
+  (HIG, Menus: "provide icons for all menu items in a group, or none of
+  them"): Revise With ▸ and every item in it carry the star glyph, and the
+  four assistant functions, the one group without icons, sit between dividers.
+  The mac's other D43 change, the deployed folder's items in a group of their
+  own, has no Windows counterpart until #889 builds those items.
+- **No grey text rows in the Course or Section menu** (Q14): Course ▸
+  Rename's reason line (`courseRenameReason`) is gone. The row's context
+  menus keep their lines (the ruling named the two menus): the busy note under
+  Add Section… and the Revise hold under Revise With ▸. Windows never drew the
+  mac's other grey rows (Revert on Planning, Open in Browser's reason,
+  "Available once deploy completed", the Revise notes in the menu bar).
+- **Set Up an Assistant… only under Revise With ▸** (Q10): Windows has neither
+  item (the set-up is #903), so there was no Help-menu item to take out and
+  nothing is drawn under Revise With; #903 adds it there and only there.
+
+**Shortcuts: none changed on Windows tonight.** The mac moved Preview / Stop
+Preview from ⇧⌘P to ⌘Y (the HIG keeps ⇧⌘P for Page Setup), its Option
+alternate to ⌥⌘Y, and Copy a Page from This Course… from ⇧⌘C to ⇧⌘K (Show
+Colors); Rebuild Preview was ruled ⇧⌘Y. Nothing in `contracts/` pins a key
+(the mac's keys are its golden's, and `subjectMenus` names items only), and
+this page's rule is only that Ctrl+Shift letters "follow the mac's ⇧⌘
+letters" where Windows has no convention of its own. Ctrl+Y is Windows' Redo
+(Microsoft Learn, Keyboard accelerators → Common keyboard accelerators), and
+this app's own Undo plan gives it Edit ▸ Redo (W11b), so Preview cannot follow
+the mac to Ctrl+Y. Ctrl+Shift+P is not a Windows reserved key (the reason the
+mac moved, Page Setup, is a macOS convention). Whether Windows moves Preview,
+Rebuild Preview, or gives Copy a Page a key (it has none: Ctrl+Shift+C is the
+browser's inspect-element key) is Russell's question, asked on #990's
+hand-back; until he rules, Preview stays Ctrl+Shift+P, Rebuild Preview
+Ctrl+Shift+B and Copy a Page keyless.
 
 ### What does NOT exist here: File with no window
 
