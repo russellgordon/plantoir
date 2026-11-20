@@ -14318,6 +14318,332 @@ no Obsidian, and no UI test drives these dialogs. Whether Obsidian for Windows
 writes its list in time for the reopen to find the course is #581's
 measurement, unchanged.
 
+## Escape stops a running preview or deploy, and the stop questions (#1009, the mac's #988)
+
+The mac's side, and every reason behind the rulings, is
+`documentation/09-mac-app.md` → "Escape and Command-Period stop a running
+preview, deploy or plan share (#988)"; this is what Windows did with it.
+
+**What a teacher sees.** The console's Cancel (`TaskProgressView`,
+`taskCancelButton`) answers Escape while a preview builds or a deploy runs.
+A preview stops at once. A deploy asks first, by click, by UI Automation
+Invoke or by key: "Stop the deploy?", "The website may be left partly
+updated until you deploy again.", a "Don't ask again" box, **Stop Deploy**
+(the default: the accent button, and Enter) and **Cancel** (WinUI's Close
+button, rightmost, which Escape presses). Ticked with Stop Deploy, the box
+turns the deploy's question off, and Escape and Cancel then stop a deploy at
+once; ticked with Cancel, nothing is remembered and the next question opens
+unticked. File ▸ Settings ▸ Deploying opens with a **Stopping** section, two
+checkboxes ("Ask before stopping a deploy", "Ask before stopping a share of
+unit plans") and the footer "When one is off, Cancel stops that task at
+once, and so does the Escape key." Each change, from the box or the pane,
+writes one `stop question setting changed` line, the mac's words
+(`StopQuestionWording.TrailLine`); `NamedGapLedger` no longer holds it.
+
+**The words are in the contract now** (`shared-rules.json` →
+`stopQuestions`, added from Windows): on the mac they lived only in Swift,
+so this piece moved them where both apps read one copy, with fourteen
+`cases` for what each answer stops and remembers (played through
+`StopQuestionAsking` in `StopQuestionsContractTests`). The mac runs the same
+section in a class of the same name (#1009's mac side): its Swift constants
+pinned to it, and every case through its own `StopQuestionAsking`.
+
+**Windows has no Command-Period, and no counterpart was found.** Nothing in
+`contracts/` names one; Microsoft's "Dialog controls" page lists what closes
+a dialog through its Close button: the button, the system back button,
+Escape and Gamepad B. So Windows names Escape alone, and its footer is
+`stopQuestions.windowsWording.footer`, the precedent of
+`obsidianAddOnsForFigures.windowsWording` (Enter for Return).
+
+**Where the key lives: a `KeyboardAccelerator` on the visible Cancel**
+(`TaskProgressView.GiveCancelTheEscapeKey`, called by the section's view
+only). No hidden control, and no key handler gives Escape its action: the
+panel's one other key handler is the console answer box's own `KeyDown`
+(Enter sends the typed line; Escape is not looked at), and the section and
+the window add none for it.
+WinUI shows the key in the button's own tooltip, "Cancel (Esc)". (The
+one key filter since the first review is on the stop question itself, and
+it is a filter, not a key catcher: see "A held Escape" below.) Microsoft,
+"Keyboard accelerators", Resolving accelerators: an accelerator with no
+`ScopeOwner` is looked for only after the key has bubbled from the focused
+element to the root unhandled, so a control that uses Escape itself (an
+open flyout, a drop-down, a dialog) has it first. The key is decided as it
+arrives (`StopKey.GoesToCancel`, Core, unit-tested): Cancel is on screen
+(it and every parent visible), the task runs, no ContentDialog is up
+(`DialogGate.IsOpen`), the preview's site is not drawn over the console
+(`IsCovered`, set where the web view is shown: the mac's
+`progressPanelTakesTheCancelKeys`), and no editable text box has the focus
+(`FocusManager.GetFocusedElement`: a `TextBox` that is not read-only, a
+`PasswordBox`, a `RichEditBox` that is not read-only; an `AutoSuggestBox` or
+`NumberBox` focuses its inner `TextBox`). The console's output is a
+selectable `TextBlock`, not a box. The handler sets `Handled` whatever it
+decides: Microsoft's "Invoke a keyboard accelerator" says an unhandled one
+goes on to press the button through its Invoke pattern, which would stop the
+task from inside a box. A click and an Invoke reach `PressCancelAsync` with no
+focus check, so they always stop (or ask). A run is stopped once
+(`_stopSentTo`, the runner and its start): Microsoft says an accelerator
+auto-repeats while held "and this behavior cannot be modified".
+
+**Measured in the VM** (Windows 11 Pro ARM64 in Parallels, the x64 app under
+emulation, 2026-11-20): the question's first focus is the "Don't ask again"
+box (WinUI's first focus is the first focusable control in the content,
+then the default button), and Enter there presses Stop Deploy, the default,
+as Return does on the mac; Space there ticks the box. With the focus moved to
+Cancel, Enter and Space both press Cancel. A second preview started straight
+after a stopped one ended on its own with "Something went wrong" in this VM,
+so each UI test runs one preview; not looked into (it is not this piece's).
+
+**Rejected.** A `KeyDown` or `PreviewKeyDown` on the window or the panel: a
+hidden key catcher. Initial focus moved to Cancel as #979's
+`AskWithNoDefault` does: this question has a default, ruled for the mac
+(Stop Deploy, Return), and a focused Cancel would take Enter from it, the
+"looks like the default and is not" fault #979's review found. A destructive
+style on Stop Deploy: ruled plain. Leaving `Handled` false when the key is
+the box's: the button would then be invoked.
+
+**Not built here, and why.** Windows has no share of unit plans yet (#824),
+so no panel asks "Stop this share?"; the words, the setting and its
+Settings row are in place for it, as the mac shows both rows.
+
+**The first review's fixes (2026-11-20).** *Every route asks.* The console's
+own "Stop" beside the answer box (`consoleStopButton`; the mac has no such
+button) used to kill the launcher (`Terminate`) with no question, skipping
+the section's `CancelDeploy` sweep and never setting `WasCancelled`, so the
+deploy read "Something went wrong". Ruled: stopping a deploy asks first by
+every route. It now goes through `PressCancelAsync`, as Cancel does: a
+deploy asks, is swept and ends "Cancelled"; a preview stops at once; the
+button stays. *One "under way" rule.* A deploy that builds first runs both
+scripts on one runner, and between them `IsRunning` is false until
+`RunAsync`'s wait on `WaitUntilFinished` resumes (`IsBetweenPhases`, row
+318b): up to 100 ms when this was written, a turn of the window's thread since
+#1016 made the wait a `TaskCompletionSource` that the run's ending completes.
+The stopping code read `IsRunning` alone, so a "Stop the deploy?" open when
+the build ended was taken down while the deploy went on, and a press in the
+gap asked nothing. Now `ScriptRunner.IsUnderWay` (running, or between
+phases: the mac's rule) is the one rule: the key, a click, the console's
+Stop, Stop Deploy, taking the question down, Cancel's row staying on screen
+(`TaskIsUnderWay`), and `MultiDestinationDeployRunner.Cancel`, which now
+marks a runner cancelled in the gap so `RunAsync` stops before the deploy
+starts. `ScriptRunner.Run` clears `IsBetweenPhases` only once the next
+script is running (or has failed to start): cleared first, its own
+notification read as the run having ended. *Settings follows the box.* An
+open File ▸ Settings ▸ Deploying shows the change at once when the
+question's "Don't ask again" turns it off (`AppSettings.StopQuestionSettingChanged`,
+listened to while the row is loaded; setting the row to the stored value
+writes no second trail line). *The contract.* `stopQuestions.knownLimits[1]`
+pointed at a closing comment that does not exist; it now says what is true:
+no panel asks the share's question, and its row stands beside the deploy's.
+
+**Measured in the VM, after the fixes** (same machine, 2026-11-20): a build
+of the 600-page test course ended 30.8 s after the question opened during
+it, and the question stayed up across the change; Stop Deploy then ended
+the deploy "Cancelled" with nothing published. **A held Escape** (one
+press, then key-downs 33 ms apart with no key-up, as a keyboard repeats;
+one `SendInput` held down sends no repeats, so a test must send them): the
+press opened the question, and a repeat then pressed its Cancel, in 1 run of
+3 with the repeats starting at 500 ms and in 4 holds of 4 (repeats from 250,
+400, 500 and 650 ms) in the next run, so a held Escape asked and took the
+question down before the teacher could read it. Fixed on the question
+itself, structurally: its `PreviewKeyDown` marks an Escape whose
+`KeyStatus.WasKeyDown` is set (a repeat) handled, as `TickTable` swallows a
+held Space's repeats; a fresh Escape, and every other key, is the dialog's
+as before. Why this is a filter and not a key catcher: it sits on the
+visible question, the control whose key Escape is; it gives no key an
+action (nothing is pressed, stopped or answered from it); and it only drops
+key-downs whose previous-state flag is set. The repeats cannot be stopped
+where they start (Microsoft, "Keyboard accelerators": an accelerator
+auto-repeats while held, "and this behavior cannot be modified"), and
+`ContentDialog` closes on an Escape key-down, so the question is the only
+place a repeat can be told from a press. With it, 4 holds of 4 left the question open, and the next fresh
+Escape was its Cancel. Rejected: a timed delay before the question takes
+keys (a guess at the repeat delay, which a teacher sets), and refusing a
+close while Escape is down (a fresh press is down too). **Escape where another control owns it**: with
+the menu bar's File menu open, it closed the menu; with a sidebar row's
+context menu open, it closed the menu; neither asked or stopped the deploy
+(the accelerator is reached only by a key that bubbled to the root
+unhandled). The main window has no ComboBox while a section's panel shows:
+the only one is in a course's settings ("Language and region"), which
+replace the panel; there, Escape with it focused, and with it open (it
+closed), asked nothing, and the deploy was still running on return.
+
+**Left as they are, for Russell or a later issue.** The question's first
+focus is the "Don't ask again" box (WinUI's rule, above), so Space ticks it
+and Enter is Stop Deploy; whether the first focus should be a button is a
+design question. Settings ▸ Deploying ▸ Stopping uses checkboxes, as the
+pane's other setting does, where the mac uses switches; whether Windows
+should use toggle switches there is the same kind of question.
+
+**Tests.** `StopQuestionsContractTests` (unit): every word against the
+contract, every case, the trail lines and the `mustRecord` example, the
+setting kept, the key rule, and by source the accelerator on the visible
+Cancel, no key handler on the panel (the question's repeat filter is
+above), the question's words with Stop Deploy as default, the
+box read only before Stop, and Stopping first in Settings ▸ Deploying; since
+the review, a run between its phases is under way and a press there asks, a
+cancel in the gap marks the run cancelled, every stop decision reads
+`TaskIsUnderWay`, the console's Stop goes through `PressCancelAsync`, and a
+changed question is announced once per change.
+`StopByKeyboardUiTests` (opt-in, `[UiFact]`, real keys in the VM): Escape
+stops a running preview; Escape on a running deploy asks, Enter and Space on
+the focused Cancel and Escape on the question keep it running and remember
+nothing, Enter with the first focus is Stop Deploy, Stop Deploy with the box
+ticked turns the question off (setting and trail line), and the next Escape
+stops a deploy at once; Escape in the console's focused answer box stops
+nothing and an Invoke on Cancel then stops the preview. Sabotaged in the VM,
+each red: no accelerator (the preview and deploy tests), the box check
+removed (the text-box test), Cancel reading the box (the deploy test).
+Since the review: the console's Stop on a deploy asks and Stop Deploy ends
+it "Cancelled"; the question opened during the build stays across the
+change to the deploy and Stop Deploy stops it; a held Escape's repeats do
+not answer the question (four holds); Escape with a menu open or a ComboBox focused is
+theirs (a measurement). Sabotaged in the VM, each red: the console's Stop
+back to `Terminate` (its test: "asked nothing"), the question taken down on
+`IsRunning` alone (its test: "taken down when the build finished");
+`IsUnderWay` as `IsRunning` alone and the announcement removed (their two
+unit tests), the repeat filter taken off (the held-Escape test, 4 holds of 4
+closed).
+
+**The second review's fixes (2026-11-20).** *Between two destinations.* A
+course that deploys to two or more places runs a leg each, and when leg 1's
+runner stops, `RunAsync` moves to leg 2 only once its wait resumes (up to
+100 ms then; since #1016, the post queued behind the runner's own ending) and
+`CurrentLegIndex` changes; only then does the section show leg
+2's runner. In that gap the panel's runner was leg 1's and not under way, so
+a "Stop the deploy?" open when destination 1 finished was taken down while
+the deploy went on, Cancel's row hid, and Escape did nothing. The panel's
+one rule now counts the whole run: `MultiDestinationDeployRunner.ShownTaskIsUnderWay`
+(the shown runner under way and not cancelled, or the run running and not
+cancelled), read by `TaskIsUnderWay` everywhere the panel decides, and the
+question is taken down by it on a runner's change and when the section
+shows the panel again (`TakeDownTheStopQuestionIfTheTaskEnded`; the whole
+run ending reaches the panel only that way). A cancel in the gap reaches no
+leg's runner, so `RunAsync` checks the run's own `WasCancelled` before each
+leg and starts no later one, and the panel's badge reads "Cancelled" from
+the run's mark too. *No stuck mark.* `IsBetweenPhases` is no longer cleared
+on entry to `Run` (the first review), so an exception after the build and
+before the deploy's `Run` would leave it set for good, and the panel would
+ask about a run that had ended. `RunAsync`'s `finally` now clears it on
+every leg, before the run's `IsRunning` goes false. *The console's Stop in
+the New Course wizard.* Since the first review it goes through
+`PressCancelAsync`; the wizard's panel has no question and no `OnCancel`,
+so it now ends the work with `ScriptRunner.CancelByUser` (Control-C, then
+the process ended after two seconds), the teacher's stop, which reads
+"Cancelled". It used to be `Terminate`, which read "Something went wrong".
+**Measured in the VM** (2026-11-20): the 600-page course deploying to a
+folder and then to Netlify reached destination 2 53 to 104 s after the
+question opened during its build, and the question was still up; Stop
+Deploy then ended it "Cancelled" with no third start of `deploy.ps1`. The
+wizard's console Stop, pressed at "Step 1 of 7", ended the work "Cancelled".
+**Tests.** `StopQuestionsContractTests`: the rule holds between two
+destinations and a press there asks (state set by hand); a real
+`RunAsync` over three stand-in destinations on a one-thread context,
+cancelled from the first leg's own ending (the gap, before the run's wait
+resumes), asks there and runs `deploy.ps1` once; an exception thrown
+between a real build and the deploy's `Run` leaves no leg between phases.
+`StopByKeyboardUiTests`: the question across the change of destination, and
+the wizard's console Stop. Sabotaged in the VM, each red: the rule without
+the whole run (both gap unit tests, "read as ended"; the UI test, "taken
+down when destination 1 finished"), no `WasCancelled` check before a leg
+(three deploys, not one), no clearing in `finally` (the leg "still marked
+between the build and the deploy"), the wizard's Stop back to `Terminate`
+("Something went wrong").
+
+**The third review's fixes (2026-11-20).** *A stopped deploy is never
+every destination deployed.* A stop between two destinations reached no
+leg's runner, the run never started leg 2, and `CurrentOutcome` counted
+finished legs only, so the outcome was `AllSucceeded`: `RecordWhatWentOut`
+stamped the section published (its " — Edited" went away) and the window
+and the assistant were told "deployed to all 2 destinations". A destination
+a stop kept the run from reaching now counts as not deployed, as the one a
+stop lands in does: the case is `shared-rules.json` → `stopQuestions` →
+`aStoppedDeploy`, added from here and played by both suites through their
+own runner's outcome and `MultiDestinationDeployRunner.Result` (the mac's
+`outcome` and `result`, changed the same way). The sentence for a stop
+between two is `deployPartiallySucceeded` naming the unreached
+destinations, the one the mac says for a stop during the second of two;
+the mac's Cancel answers only while the shown leg runs, so it has no gap
+case of its own. A leg not reached because the shared BUILD failed is still
+not counted (the build's own answer is said). *A stop after the last leg
+stops nothing.* Once the last leg's runner has ended, `IsRunning` stays
+true until `RunAsync`'s wait resumes (a post queued behind the leg's own
+ending since #1016's `TaskCompletionSource`, so a key or click already queued
+on the window's thread can land there); the panel's rule read that as under way,
+so a press there asked, and Stop Deploy marked the run cancelled: the badge
+read "Cancelled" over a deploy that had gone out everywhere. The run's half
+of the rule is now `CanStillBeStopped`: running, not cancelled, and its
+current leg under way, or announced and not yet started, or a later leg
+still to start; `Cancel()` marks nothing when it is false, and a question
+open at that moment comes down. The "not yet started" clause was found in
+the VM: `RunAsync` announces the new `CurrentLegIndex`, and the section
+shows that leg's runner, a moment before the leg's `Run`, and without it a
+question open across the change of destination came down there (the
+two-folder UI test, red: "taken down when destination 1 finished").
+*No outcome badge beside Cancel.* In the gap between two destinations
+`Render` drew leg 1's ending ("Done", or "Something went wrong" since no leg
+had yet been marked finished) beside a Cancel that still stopped the
+deploy; it now draws the working state by
+`MultiDestinationDeployRunner.ShownTaskShowsAsWorking`. *A throw in the
+ending.* `RunAsync`'s `finally` stamped, cleared the marks and set
+`IsRunning` false in sequence, so a throw from the stamp or from a listener
+skipped the rest and left the run going for good; each step now runs in a
+`finally` of the one before. *No real account from the UI class.*
+`StopByKeyboardUiTests` deployed its two-destination course to a folder and
+then Netlify, and `deploy.ps1` reads the machine's own Netlify credential
+from Windows Credential Manager, so on a PC with one it could publish for
+real; every destination in the class is now a folder in the test's own temp
+tree.
+
+**The fourth review's fixes (2026-11-20).** *After #1016.* `dev`'s #1016
+replaced `WaitUntilFinished`'s 100 ms look with a `TaskCompletionSource`
+that the run's ending completes after it has announced the ending, and the
+await in `RunAsync` resumes in a post to the window's thread. Every gap this
+piece handles (between a leg's build and its deploy, between two
+destinations, after the last leg) still exists, one turn of the window's
+thread long instead of up to 100 ms: a key or a click already queued there
+lands in it. Each gap path was re-read against the new wait and every gap
+test re-run (they cancel from inside the runner's own ending, which still
+runs before the post that resumes `RunAsync`). *A leg announced and not yet
+started.* `CanStillBeStopped` counts that leg (the third review), so a
+cancel landing there marks the run cancelled and refuses a second Stop, but
+nothing read the mark before that leg's `Run`, so the leg started anyway.
+`RunAsync` now checks `WasCancelled` immediately before each `Run` (the
+build's and the deploy's), so a leg announced after a cancel can never start.
+*The mac says one new sentence.* With three destinations stopped during the
+second, the mac's `deployPartiallySucceeded` named only the second as not
+deployed and now names the second and the third (the third review's rule
+changed the mac's `outcome` too); the contract case "stopped during the
+second of three" holds it on both platforms, and documentation 09 says so.
+*The text-box test.* `EscapeInAFocusedTextBoxIsTheBoxs_AndInvokeOnCancelStillStops`
+failed in the VM. Measured there (scratch test, unpadded course): the
+answer box kept the focus when the preview's site was drawn, so the site
+takes no focus from a box a teacher is typing in and the product was not at
+fault; but the site drew about 35 s after the start, inside the test's
+presses, and a press after it lands on a console the site covers (Escape is
+then never Cancel's, so the box rule is not tested), and stopping a serving
+preview ends without the "stopped by the teacher" line the test waited for,
+since the build's `preview.ps1` had already ended "succeeded". The test now
+runs on a deploy, where no site is drawn, held by the test (below), and an
+Invoke on Cancel asks, and Stop Deploy ends it "Cancelled". *Held
+destinations, not padding.* The two-folder test kept destination 2 going
+with 20,000 stale files for `robocopy /MIR` to remove, a guess at how long
+is long enough. A destination is now held by the test instead
+(`HeldDestination`): its section's `index.html`, "left by an earlier
+deploy", open with no sharing, so robocopy cannot replace it and retries for
+as long as the test holds it. The multi-destination test deploys to three
+folders, opens the question while destination 1 is held, lets destination 1
+go (destination 2 began 4.1 s later in the VM), and stops while destination
+2 is held: it waits on events only (a leg's start on the trail, the run's
+end shown by Deploy being offered again), and with three legs "no later leg
+started" can fail (sabotaged with every `WasCancelled` check removed:
+"destination 3 started after Stop Deploy (2 deploys started at the stop, 3
+after)"). Its no-stamp check cannot fail on the third review's outcome rule
+(sabotaged, it passed): a stop during a destination keeps the stamp off
+through the stopped leg itself, so that rule is held by the unit tests
+(`EveryStoppedDeployCaseHolds`, the two `RunAsync` gap tests), which go red
+under the same sabotage.
+**Tests.** `StopQuestionsContractTests.ACancelOnceALegIsAnnouncedKeepsThatLegFromStarting`
+(the first leg's build, the second leg's deploy; red with the checks removed).
+
 ## The lap cap on Windows (#720, the mac's #689)
 
 One teacher action asks the model at most `shared-rules.json` →
