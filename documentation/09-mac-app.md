@@ -1818,8 +1818,15 @@ say so. With Keyboard Navigation on, AppKit puts the focus in the Filter
 box when the window becomes key, so the box owns Escape until the teacher
 clicks elsewhere; the tests start with focus in no box, and
 `testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst` records that case
-as it is (skipped with Keyboard Navigation off). Measured on the main Mac with Keyboard Navigation on and off
-(`AppleKeyboardUIMode` 3 and unset), the same results. Source checks: the key
+as it is (skipped with Keyboard Navigation off); Russell ruled on 2026-11-19
+that it stays so. A test that moves the focus has the window's SwiftUI
+content update before the next key (`applyPendingViewUpdates`): the watch
+flips inside `makeFirstResponder`, but Cancel takes up or lets go of its key
+only at SwiftUI's next update, and a key sent inside that gap met the button
+as it was (run `988-n2`, Keyboard Navigation on: Escape in the Filter box
+stopped the task, and Escape after focus left the box did nothing; a gap no
+teacher can press a key inside). Measured on the main Mac with Keyboard
+Navigation on and off (`AppleKeyboardUIMode` 3 and 0), the same results. Source checks: the key
 is on the visible Cancel, and nothing in `Views/Console` is a representable
 or a responder. Only the rule's own test
 (`testCancelHoldsTheKeysOnlyWhenNothingElseWantsThem`) fails when the

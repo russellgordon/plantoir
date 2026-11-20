@@ -209,6 +209,21 @@ final class ProgressCancelKeysTests: XCTestCase {
         return runUntil(timeout: timeout) { NSApp.isActive }
     }
 
+    /// Has the window's SwiftUI content apply what changed since it was
+    /// last drawn, before the next key. The watch on the first responder
+    /// flips at once, inside `makeFirstResponder`, but the panel's Cancel
+    /// takes up or lets go of its key only when SwiftUI next updates the
+    /// view, which waits for a turn of the run loop; a key sent before then
+    /// meets the button as it was. Measured on the main Mac on 2026-11-19
+    /// (`988-n2`, Keyboard Navigation on): pressed with no update between,
+    /// Escape in the Filter field stopped the task, and Escape after focus
+    /// left the box did nothing. A teacher cannot press a key inside that
+    /// gap; the test could.
+    private func applyPendingViewUpdates(in window: NSWindow) {
+        window.contentView?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+    }
+
     private func settle(_ seconds: TimeInterval) {
         _ = runUntil(timeout: seconds) { false }
     }
@@ -415,6 +430,7 @@ final class ProgressCancelKeysTests: XCTestCase {
             throw XCTSkip("Another app took the front while the field took focus (#846), so the window was no longer key.")
         }
         XCTAssertTrue(KeyWindowTextEditing.shared.isEditingText, "the watch saw the field being edited")
+        applyPendingViewUpdates(in: window)
         try press(.escape)
         settle(0.7)
         XCTAssertEqual(ledger.cancelCount, 0, "Escape in the field stopped the running task")
@@ -426,7 +442,7 @@ final class ProgressCancelKeysTests: XCTestCase {
         // Focus leaves the field: the key is Cancel's again.
         _ = window.makeFirstResponder(nil)
         XCTAssertTrue(runUntil(timeout: 3) { !KeyWindowTextEditing.shared.isEditingText }, "the watch saw the editing end")
-        settle(0.3)
+        applyPendingViewUpdates(in: window)
         try press(.escape)
         XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Escape stops the task again once no box is being typed in")
     }
@@ -435,8 +451,9 @@ final class ProgressCancelKeysTests: XCTestCase {
     /// (the fourth #988 review): AppKit gives the window's first text box
     /// the focus when the window becomes key (the app's own sidebar Filter
     /// field, `SidebarView`), so Escape is the box's and the running task
-    /// keeps running until the teacher clicks somewhere else. This records
-    /// the behaviour; whether it should change is Russell's question.
+    /// keeps running until the teacher clicks somewhere else. Russell's
+    /// ruling on #988 (2026-11-19): it is left as it is; Command-Period and
+    /// the Cancel button still stop the task.
     func testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst() throws {
         if !NSApp.isFullKeyboardAccessEnabled {
             throw XCTSkip("Keyboard Navigation is off (System Settings > Keyboard), so AppKit gives no box the focus when the window becomes key.")
@@ -453,6 +470,7 @@ final class ProgressCancelKeysTests: XCTestCase {
         // A click elsewhere (focus in no box) gives the key back to Cancel.
         _ = window.makeFirstResponder(nil)
         XCTAssertTrue(runUntil(timeout: 3) { !KeyWindowTextEditing.shared.isEditingText })
+        applyPendingViewUpdates(in: window)
         try press(.escape)
         XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "after the click, Escape stops the task")
     }
