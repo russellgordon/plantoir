@@ -62,56 +62,15 @@ public sealed class UndoTraceContractTests
     [MemberData(nameof(Traces))]
     public void EveryCallOfEveryTrace(string name) => ReplayAsTheLedgerSays(name, NamedGapLedger.All, () => ReplayTheTrace(name));
 
-    /// <summary>
-    /// One trace, replayed by <paramref name="replay"/>, held or not as
-    /// <paramref name="entries"/> say. <see cref="EveryCallOfEveryTrace"/>
-    /// passes the real replay; <see cref="TheDayAHeldTracePlaysThroughItFails"/>
-    /// passes W6's, to prove that a held trace does not outlive its gap.
-    /// </summary>
+    /// <summary>One trace, replayed by <paramref name="replay"/>, held or not as <paramref name="entries"/> say (none is held since W6 replays a move).</summary>
     private static void ReplayAsTheLedgerSays(string name, IEnumerable<NamedGapLedger.Entry> entries, Action replay)
     {
         if (NamedGapLedger.Holding(NamedGapLedger.UndoTraces, name, entries) is { } held)
         {
-            // It must stop exactly at its first move: every call before that is asserted in full.
-            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, replay, $"{name}, call {FirstMoveOf(name)} (move): a call this replay does not know");
+            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, replay, $"{name}: a call this replay does not know");
             return;
         }
         replay();
-    }
-
-    /// <summary>The 1-based number of the trace's first <c>move</c> call, the call a held trace stops at.</summary>
-    private static int FirstMoveOf(string name)
-    {
-        JsonElement trace = UndoContract.Traces.RootElement.GetProperty("traces").EnumerateArray()
-            .Single(candidate => candidate.GetProperty("name").GetString() == name);
-        int number = 0;
-        foreach (JsonElement call in trace.GetProperty("calls").EnumerateArray())
-        {
-            number++;
-            if (call.GetProperty("call").GetString() == "move") return number;
-        }
-        Assert.Fail($"\"{name}\" is held for its move, and it has none: the gap it was held for is gone");
-        return 0;
-    }
-
-    /// <summary>
-    /// Proves, on a real held trace, that a held trace does not outlive its
-    /// gap: as it stands it is asserted call by call to its first
-    /// <c>move</c> and stops there; replayed to the end (as W6's replay will)
-    /// it fails as the gap closing; stopped by anything else (a call before
-    /// the move that comes out wrong) it fails as a real failure.
-    /// </summary>
-    [Fact]
-    public void TheDayAHeldTracePlaysThroughItFails()
-    {
-        const string name = "trace-003";
-        Assert.NotNull(NamedGapLedger.Holding(NamedGapLedger.UndoTraces, name));
-
-        ReplayAsTheLedgerSays(name, NamedGapLedger.All, () => ReplayTheTrace(name));
-        var playedThrough = Assert.ThrowsAny<Exception>(() => ReplayAsTheLedgerSays(name, NamedGapLedger.All, () => { }));
-        Assert.Contains("now EXISTS on this side", playedThrough.Message);
-        var otherReason = Assert.ThrowsAny<Exception>(() => ReplayAsTheLedgerSays(name, NamedGapLedger.All, () => Assert.Fail("trace-003, call 9 (undo): head 3, expected 2")));
-        Assert.Contains("failed for another reason", otherReason.Message);
     }
 
     private static void ReplayTheTrace(string name)
@@ -172,13 +131,27 @@ public sealed class UndoTraceContractTests
                     }
                     break;
                 }
+                case "move":
+                {
+                    // U2: the page moved aside as one move, through the door
+                    // that plans a step's ops forward.
+                    string from = paths[call.GetProperty("page").GetString()!];
+                    byte[] content = scribe.Page("A", from) ?? [];
+                    UndoOutcome moved = scribe.Door().Perform(scribe.OpsDraft("A",
+                        new System.Text.Json.Nodes.JsonArray(UndoKindsForTheCases.MoveFile(from, call.GetProperty("to").GetString()!, content)), [], "movePage"));
+                    Assert.True(call.GetProperty("expect").GetString() == moved.Word, $"{where}: came to {moved.Word}");
+                    if (call.TryGetProperty("seq", out JsonElement movedSeq)) Assert.True(movedSeq.GetInt64() == moved.Seq, where);
+                    break;
+                }
                 case "handEdit":
                 {
                     string path = paths[call.GetProperty("page").GetString()!];
                     string kind = call.GetProperty("kind").GetString()!;
+                    // A hand edit naming a page that is not at its path (moved
+                    // aside) leaves it alone (the traces' note).
+                    if (scribe.Page("A", path) is null) break;
                     if (kind == "deletePage")
                     {
-                        Assert.NotNull(scribe.Page("A", path));
                         scribe.WritePage("A", path, null);
                         break;
                     }
@@ -203,6 +176,7 @@ public sealed class UndoTraceContractTests
             if (index == lastUndoOfTheClosingRun) afterUndoingAll = Hashes(scribe, fixture);
         }
 
+        Assert.Empty(scribe.StagedLeftovers("A"));
         Assert.NotNull(afterUndoingAll);
         AssertHashes(trace.GetProperty("afterUndoingAll"), afterUndoingAll!, name + " afterUndoingAll");
         AssertHashes(trace.GetProperty("final"), Hashes(scribe, fixture), name + " final");

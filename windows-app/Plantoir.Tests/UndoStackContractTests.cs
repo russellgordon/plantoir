@@ -20,6 +20,7 @@ public sealed class UndoStackContractTests
     {
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList", "expectLast", "cleared",
         "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned", "blobKept", "interrupted",
+        "markers", "folderKept", "rederived", "nothingMovedOutside",
     };
 
     public static IEnumerable<object[]> Cases() =>
@@ -51,7 +52,7 @@ public sealed class UndoStackContractTests
     /// <summary>
     /// One case, walked by <paramref name="walk"/>, held or not as
     /// <paramref name="entries"/> say. <see cref="EveryStackCase"/> passes the
-    /// real walk; <see cref="TheDayAHeldStackCasePlaysThroughItFails"/> passes
+    /// real walk (and a later piece's held cases would be proved against
     /// W6's, to prove that a held case does not outlive its gap.
     /// </summary>
     private static void RunAsTheLedgerSays(string name, IEnumerable<NamedGapLedger.Entry> entries, Action walk)
@@ -62,25 +63,6 @@ public sealed class UndoStackContractTests
             return;
         }
         walk();
-    }
-
-    /// <summary>
-    /// Proves, on a real held row, that a held stack case does not outlive its
-    /// gap: as it stands it stops at the call it is held for; walked through
-    /// to the end (as W6's replay will) it fails as the gap closing; stopped
-    /// by anything else it fails as a real failure.
-    /// </summary>
-    [Fact]
-    public void TheDayAHeldStackCasePlaysThroughItFails()
-    {
-        const string name = "U2, move: a rollover's marker moved aside is moved back by Undo";
-        Assert.NotNull(NamedGapLedger.Holding(NamedGapLedger.UndoStackCases, name));
-
-        RunAsTheLedgerSays(name, NamedGapLedger.All, () => WalkTheCase(name));
-        var playedThrough = Assert.ThrowsAny<Exception>(() => RunAsTheLedgerSays(name, NamedGapLedger.All, () => { }));
-        Assert.Contains("now EXISTS on this side", playedThrough.Message);
-        var otherReason = Assert.ThrowsAny<Exception>(() => RunAsTheLedgerSays(name, NamedGapLedger.All, () => Assert.Fail("head 3, expected 2")));
-        Assert.Contains("failed for another reason", otherReason.Message);
     }
 
     private static void WalkTheCase(string name)
@@ -125,6 +107,16 @@ public sealed class UndoStackContractTests
             Assert.NotNull(replay.ForeignBlob);
             Assert.Equal(blobKept.GetBoolean(), scribe.BlobIsThere(replay.ForeignBlob!));
         }
+        if (stackCase.TryGetProperty("markers", out JsonElement markers))
+            Assert.Equal(markers.GetString(), UndoKindsForTheCases.Markers(scribe));
+        if (stackCase.TryGetProperty("folderKept", out JsonElement folderKept))
+            Assert.Equal(folderKept.GetBoolean(), UndoKindsForTheCases.FolderIsThere(scribe));
+        if (stackCase.TryGetProperty("rederived", out JsonElement rederived))
+            Assert.Equal(rederived.GetInt32(), scribe.Maintainers.Rederived);
+        if (stackCase.TryGetProperty("nothingMovedOutside", out JsonElement nothingMoved) && nothingMoved.GetBoolean())
+            Assert.Empty(Directory.EnumerateFileSystemEntries(replay.Outside));
+        // No case leaves a staged file anywhere in the working folder (stackCasesHow).
+        Assert.Empty(scribe.StagedLeftovers("A"));
     }
 
     private static long? NullableSeq(JsonElement element, string key) =>
@@ -151,6 +143,9 @@ public sealed class UndoStackContractTests
         }
 
         internal string? Last { get; private set; }
+
+        /// <summary>Where <c>linkItsOldFolderOutside</c> points: a folder beside the working folder.</summary>
+        internal string Outside => _scribe.FullPath("A", "").TrimEnd(Path.DirectorySeparatorChar) + "-outside";
         internal List<(string Reason, long Seq)> Clearings { get; } = [];
         internal int? LinesWrittenByTheDeploy { get; private set; }
         internal string? ForeignBlob { get; private set; }
@@ -215,7 +210,7 @@ public sealed class UndoStackContractTests
                     ForeignBlob = _scribe.PutBlob(Encoding.UTF8.GetBytes("a listing a newer version kept\n"));
                     var ops = new JsonArray(new JsonObject
                     {
-                        ["kind"] = "move", ["from"] = "courses/TST1O/a.md", ["to"] = "courses/TST1O/b.md",
+                        ["kind"] = "aKindNobodyKnows", ["from"] = "courses/TST1O/a.md", ["to"] = "courses/TST1O/b.md",
                         ["blobs"] = new JsonArray(ForeignBlob),
                     });
                     _scribe.Append(_scribe.BeginLine(seq, ops, "A"));
@@ -263,6 +258,104 @@ public sealed class UndoStackContractTests
                     if (outcome.Cleared is { } reason) Clearings.Add((reason, outcome.ClearedSeq!.Value));
                     return;
                 }
+                case "moveTheMarker":
+                {
+                    if (_scribe.Page("A", UndoKindsForTheCases.MarkerFrom) is null && _scribe.Page("A", UndoKindsForTheCases.MarkerTo) is null)
+                        _scribe.WritePage("A", UndoKindsForTheCases.MarkerFrom, Encoding.UTF8.GetBytes(UndoKindsForTheCases.OldMarker));
+                    byte[] content = _scribe.Page("A", UndoKindsForTheCases.MarkerFrom) ?? [];
+                    Ops(new JsonArray(UndoKindsForTheCases.MoveFile(UndoKindsForTheCases.MarkerFrom, UndoKindsForTheCases.MarkerTo, content)), []);
+                    return;
+                }
+                case "deployANewMarker":
+                    // What a deploy after a rollover onto a new website does: a
+                    // new marker in the place the rollover emptied, nothing in the list.
+                    _scribe.WritePage("A", UndoKindsForTheCases.MarkerFrom, Encoding.UTF8.GetBytes(UndoKindsForTheCases.NewMarker));
+                    return;
+                case "makeAFolder":
+                {
+                    (UndoTreeListing listing, List<byte[]> contents) = UndoKindsForTheCases.ExtraListing();
+                    (JsonObject op, List<byte[]> blobs) = UndoKindsForTheCases.Tree("createTree", UndoKindsForTheCases.ExtraFolder, listing, contents);
+                    Ops(new JsonArray(op), blobs, "newFolder");
+                    return;
+                }
+                case "addAFileToTheFolder":
+                    _scribe.WritePage("A", UndoKindsForTheCases.ExtraFolder + "/c.md", "C\n"u8.ToArray());
+                    return;
+                case "removeTheFolder":
+                {
+                    if (UndoTreeReading.Read(_scribe.FullPath("A", UndoKindsForTheCases.ExtraFolder), keepingContents: true) is not UndoTreeReading.Tree tree)
+                    {
+                        Last = "noFolderToRemove";
+                        return;
+                    }
+                    (JsonObject op, List<byte[]> blobs) = UndoKindsForTheCases.Tree("removeTree", UndoKindsForTheCases.ExtraFolder, tree.Listing, tree.Contents.Values);
+                    Ops(new JsonArray(op), blobs, "removeFolder");
+                    return;
+                }
+                case "editTheSettings":
+                {
+                    if (_scribe.Page("A", UndoKindsForTheCases.Settings) is null)
+                        _scribe.WritePage("A", UndoKindsForTheCases.Settings, "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"u8.ToArray());
+                    UndoJsonMember.Reading reading = UndoJsonMember.ReadingOf(["school_year"], _scribe.Page("A", UndoKindsForTheCases.Settings)!);
+                    var op = new JsonObject { ["kind"] = "editJSON", ["path"] = UndoKindsForTheCases.Settings, ["keyPath"] = new JsonArray("school_year") };
+                    string after = "2026-2027";
+                    if (reading.Value is UndoJson.Text text)
+                    {
+                        op["before"] = text.Value;
+                        if (text.Value == "2026-2027") after = "2025-2026";
+                    }
+                    op["after"] = after;
+                    Ops(new JsonArray(op), [], "setSchoolYear");
+                    return;
+                }
+                case "editTheSettingsByHand":
+                    _scribe.WritePage("A", UndoKindsForTheCases.Settings, "{\"course_name\": \"Test\", \"school_year\": \"2030-2031\"}\n"u8.ToArray());
+                    return;
+                case "editAHunk":
+                {
+                    if (_scribe.Page("A", UndoKindsForTheCases.Notes) is null)
+                        _scribe.WritePage("A", UndoKindsForTheCases.Notes, "Intro.\nLine one: old.\nEnd.\n"u8.ToArray());
+                    bool isNew = UndoKindsForTheCases.Text(_scribe.Page("A", UndoKindsForTheCases.Notes))!.Contains("Line one: new.", StringComparison.Ordinal);
+                    var op = new JsonObject
+                    {
+                        ["kind"] = "replaceText", ["path"] = UndoKindsForTheCases.Notes, ["before"] = isNew ? "new" : "old", ["after"] = isNew ? "old" : "new",
+                        ["contextBefore"] = "Line one: ", ["contextAfter"] = ".\n",
+                    };
+                    Ops(new JsonArray(op), [], "editPage");
+                    return;
+                }
+                case "setAPreference":
+                {
+                    UndoExternalReading now = _scribe.Places.Read(UndoKindsForTheCases.Preference);
+                    JsonObject op = now.Value is UndoJson.Text text
+                        ? UndoKindsForTheCases.External(UndoKindsForTheCases.Preference, text.Value, text.Value == "b" ? "a" : "b")
+                        : UndoKindsForTheCases.External(UndoKindsForTheCases.Preference, null, "b", hasBefore: false);
+                    Last = _scribe.Door().Perform(_scribe.OpsDraft(null, new JsonArray(op), [], "setPreference")).Word;
+                    return;
+                }
+                case "changeThePreferenceByHand":
+                    _scribe.Places.Write(UndoKindsForTheCases.Preference, new UndoJson.Text("z"));
+                    return;
+                case "forgetTheMaintainer":
+                    _scribe.Maintainers.Forgotten = true;
+                    return;
+                case "moveThePageAside":
+                {
+                    if (_scribe.Page("A", UndoKindsForTheCases.AsidePage) is null)
+                        _scribe.WritePage("A", UndoKindsForTheCases.AsidePage, "page\n"u8.ToArray());
+                    Ops(new JsonArray(UndoKindsForTheCases.MoveFile(UndoKindsForTheCases.AsidePage, UndoKindsForTheCases.AsidePageMoved, "page\n"u8.ToArray())), []);
+                    return;
+                }
+                case "linkItsOldFolderOutside":
+                {
+                    // The folder the page was moved out of, replaced by a
+                    // junction to a folder outside the working folder.
+                    string old = _scribe.FullPath("A", "courses/TST1O/old");
+                    if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
+                    Directory.CreateDirectory(Outside);
+                    UndoKindsForTheCases.MakeAJunction(old, Outside);
+                    return;
+                }
                 case "begin:dead@B":
                 {
                     byte[] after = Flipped("B", _p1);
@@ -305,6 +398,10 @@ public sealed class UndoStackContractTests
             Assert.Fail("a call this replay does not know: " + call);
         }
 
+        /// <summary>A step given as its ops, through the door that plans it forward as a Redo would (<c>Perform(UndoOpsDraft)</c>).</summary>
+        private void Ops(JsonArray ops, IReadOnlyList<byte[]> blobs, string action = "rollOver") =>
+            Last = _scribe.Door().Perform(_scribe.OpsDraft("A", ops, blobs, action)).Word;
+
         private void BeginHeld()
         {
             byte[] after = Flipped("A", _p1);
@@ -337,6 +434,15 @@ public sealed class UndoStackContractTests
                                  UndoMadeBy.Split(step["madeBy"]!.GetValue<string>()));
                     break;
                 case "aKeyOnAKnownOp": ops[0]!["onlyWhen"] = "aConditionNobodyKnows"; break;
+                case "twoWholeOpsOnOnePlace":
+                {
+                    // Breaks opKinds.wholeOps: a folder made inside another
+                    // folder the same step makes.
+                    var empty = new UndoTreeListing([], []);
+                    foreach (string path in new[] { "courses/TST1O/made", "courses/TST1O/made/inner" })
+                        ops.Add(new JsonObject { ["kind"] = "createTree", ["path"] = path, ["listingSha"] = empty.Sha, ["blobs"] = new JsonArray(empty.Sha) });
+                    break;
+                }
                 default: Assert.Fail("a variant this replay does not know: " + variant); break;
             }
             _scribe.Append(begin);

@@ -71,7 +71,7 @@ internal sealed record UndoOutcome(UndoOutcomeKind Kind, long? Seq = null, UndoR
 
 /// <summary>
 /// The runners of the maintainers a <c>recompute</c> names
-/// (<c>opKinds.recompute</c>). W6 supplies the app's; until a step's
+/// (<c>opKinds.recompute</c>). The app's is <see cref="UndoSectionFrontPage"/>; until a step's
 /// maintainer has a runner, its step is not available (never undone or redone
 /// with its re-derivation skipped).
 /// </summary>
@@ -257,8 +257,8 @@ internal sealed class UndoDoor
     /// is on the disk exactly as a Redo plans it, so a step is made by the same
     /// check and the same swap that later undoes and redoes it. Nothing changes
     /// until the step is one every reader of this version can undo: it reads
-    /// back readable (an op of a kind this version does not read yet, U2b's
-    /// six until W6, is refused <c>notReadable</c> here), every path stays
+    /// back readable (an op of a kind this version does not read yet, U5's
+    /// reserved two, is refused <c>notReadable</c> here), every path stays
     /// inside the working folder through its links, and every blob it names is
     /// given or already held (the mac's <c>vet</c>, the hard review of U2b, HIGH 1).
     /// </summary>

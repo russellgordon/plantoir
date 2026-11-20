@@ -45,98 +45,130 @@ public sealed class UndoCheckContractTests : IDisposable
     private static JsonElement CaseNamed(string name) =>
         UndoContract.Undo.GetProperty("checkCases").EnumerateArray().Single(c => c.GetProperty("name").GetString() == name);
 
-    /// <summary>The case's op as the journal would hold it: writeFile's texts become the SHA-256s they hash to.</summary>
+    /// <summary>
+    /// The case's op as the journal would hold it (<c>checkCasesHow</c>):
+    /// writeFile's texts become the SHA-256s they hash to, a move's
+    /// <c>contentText</c> its <c>sha</c>, a folder's <c>listing</c> its
+    /// <c>listingSha</c> (and, for a tree, its blobs: the listing's hash and
+    /// every file's). A JSON null is a value for editJSON and external and
+    /// absent for every other kind.
+    /// </summary>
     internal static UndoOp OpOf(JsonElement checkCase)
     {
         var op = JsonNode.Parse(checkCase.GetProperty("op").GetRawText())!.AsObject();
-        if (op["kind"]?.GetValue<string>() == "writeFile")
+        string? kind = op["kind"] is JsonValue kindValue && kindValue.TryGetValue(out string? named) ? named : null;
+        if (kind == "writeFile")
         {
+            var names = new JsonArray();
             foreach ((string text, string sha) in new[] { ("beforeText", "beforeSha"), ("afterText", "afterSha") })
             {
                 JsonNode? value = op[text];
                 op.Remove(text);
-                if (value is not null) op[sha] = UndoCheck.Sha(Encoding.UTF8.GetBytes(value.GetValue<string>()));
+                if (value is null) continue;
+                string hash = UndoCheck.Sha(Encoding.UTF8.GetBytes(value.GetValue<string>()));
+                op[sha] = hash;
+                names.Add(hash);
             }
+            op["blobs"] = names;
+        }
+        if (op["contentText"] is { } content)
+        {
+            op.Remove("contentText");
+            op["sha"] = UndoCheck.Sha(Encoding.UTF8.GetBytes(content.GetValue<string>()));
+        }
+        if (op["listing"] is JsonObject tree)
+        {
+            op.Remove("listing");
+            UndoTreeListing listing = ListingOf(tree);
+            op["listingSha"] = listing.Sha;
+            if (kind is "createTree" or "removeTree")
+            {
+                var names = new JsonArray(listing.Sha);
+                foreach ((_, string sha) in listing.Files)
+                {
+                    if (!names.Any(name => name!.GetValue<string>() == sha)) names.Add(sha);
+                }
+                op["blobs"] = names;
+            }
+        }
+        if (kind is not ("editJSON" or "external"))
+        {
+            foreach (string key in op.Where(pair => pair.Value is null).Select(pair => pair.Key).ToList()) op.Remove(key);
         }
         using JsonDocument document = JsonDocument.Parse(op.ToJsonString());
         return UndoFormat.ReadOp(document.RootElement);
     }
 
-    /// <summary>
-    /// The case's <c>current</c> as this test can place it: one place
-    /// holding text, bytes, an empty folder or nothing. A move's two sides
-    /// (<c>atFrom</c>, <c>atTo</c>), a <c>tree</c> and an external op's
-    /// <c>preference</c> are U2's shapes, placed once W6 reads their kinds.
-    /// </summary>
-    private static bool CanBePlacedHere(JsonElement checkCase)
+    /// <summary>A case's <c>listing</c> (or <c>tree</c>) as the listing this version makes: <c>.DS_Store</c> passed over at any depth.</summary>
+    internal static UndoTreeListing ListingOf(JsonNode tree)
     {
-        JsonElement current = checkCase.GetProperty("current");
-        foreach (string shape in new[] { "text", "bytesHex", "folder", "absent" })
+        var files = new List<(string, string)>();
+        if (tree["files"] is JsonObject named)
         {
-            if (current.TryGetProperty(shape, out _)) return true;
+            foreach ((string path, JsonNode? text) in named)
+            {
+                if (Path.GetFileName(path) == UndoTreeListing.IgnoredName) continue;
+                files.Add((path, UndoCheck.Sha(Encoding.UTF8.GetBytes(text!.GetValue<string>()))));
+            }
         }
-        return false;
-    }
-
-    /// <summary>Puts the case's <c>current</c> on the disk at the op's path and returns the full path.</summary>
-    private string Place(JsonElement checkCase)
-    {
-        string path = Path.Combine(_folder, Guid.NewGuid().ToString("N"), "page.md");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        JsonElement current = checkCase.GetProperty("current");
-        if (current.TryGetProperty("text", out JsonElement text)) File.WriteAllBytes(path, Encoding.UTF8.GetBytes(text.GetString()!));
-        else if (current.TryGetProperty("bytesHex", out JsonElement hex)) File.WriteAllBytes(path, Convert.FromHexString(hex.GetString()!));
-        else if (current.TryGetProperty("folder", out _)) Directory.CreateDirectory(path);
-        else Assert.True(current.GetProperty("absent").GetBoolean());
-        return path;
+        var folders = new List<string>();
+        if (tree["folders"] is JsonArray list)
+        {
+            foreach (JsonNode? folder in list) folders.Add(folder!.GetValue<string>());
+        }
+        return new UndoTreeListing(folders, files);
     }
 
     /// <summary>
-    /// What a reader of the disk sees at the case's place. <c>cannotBeRead</c>
-    /// (on the mac and in Python, the permissions taken away) is the open
-    /// refused with access denied, as <c>FileStream</c> throws it
-    /// (<see cref="UnauthorizedAccessException"/>, 0x80070005), through
-    /// <see cref="UndoCurrent.Read"/>'s seam, so every case runs under any
-    /// token. A real ACL that denies reading is
-    /// <see cref="APageWhoseReadingIsDeniedCannotTellAndIsRefusedCannotTellNow"/>,
-    /// which runs over SSH on the PC too (a deny on reading a file stops the
-    /// administrator's token there, where a deny on listing a folder does
-    /// not) and skips, saying why, on any token that reads past it.
+    /// Puts what a case's <c>current</c> (or one side of a move's) describes
+    /// at a full path: text, raw bytes, an empty folder, a tree (with any
+    /// links inside), a link, or nothing. Returns whether the place is to be
+    /// read as one that cannot be read just now (<c>cannotBeRead</c>).
     /// </summary>
-    private static UndoCurrent ReadAsTheCaseHasIt(JsonElement checkCase, string path)
+    private bool PlaceAt(JsonElement current, string full)
     {
-        bool cannotBeRead = checkCase.GetProperty("current").TryGetProperty("cannotBeRead", out JsonElement flag) && flag.GetBoolean();
-        if (!cannotBeRead) return UndoCurrent.Read(path);
-        Assert.True(File.Exists(path), "a place that cannot be read is one that is there");
-        return UndoCurrent.Read(path, _ => throw new UnauthorizedAccessException("denied, as the case has it") { HResult = unchecked((int)0x80070005) });
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        if (current.TryGetProperty("text", out JsonElement text)) File.WriteAllBytes(full, Encoding.UTF8.GetBytes(text.GetString()!));
+        else if (current.TryGetProperty("bytesHex", out JsonElement hex)) File.WriteAllBytes(full, Convert.FromHexString(hex.GetString()!));
+        else if (current.TryGetProperty("folder", out _)) Directory.CreateDirectory(full);
+        else if (current.TryGetProperty("link", out _)) UndoKindsForTheCases.MakeALink(full, _folder);
+        else if (current.TryGetProperty("tree", out JsonElement tree))
+        {
+            Directory.CreateDirectory(full);
+            foreach (JsonElement folder in tree.GetProperty("folders").EnumerateArray())
+                Directory.CreateDirectory(UndoTreeReading.Under(full, folder.GetString()!));
+            foreach (JsonProperty file in tree.GetProperty("files").EnumerateObject())
+            {
+                string path = UndoTreeReading.Under(full, file.Name);
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllBytes(path, Encoding.UTF8.GetBytes(file.Value.GetString()!));
+            }
+            if (tree.TryGetProperty("links", out JsonElement links))
+            {
+                foreach (JsonProperty link in links.EnumerateObject()) UndoKindsForTheCases.MakeALink(UndoTreeReading.Under(full, link.Name), _folder);
+            }
+        }
+        return current.TryGetProperty("cannotBeRead", out JsonElement flag) && flag.GetBoolean();
     }
 
-    /// <summary>Every case held open by name (an op of U2's kinds, which W6 brings) is a case the contract still has.</summary>
+    /// <summary>Every case held open by name is a case the contract still has (none since W6).</summary>
     [Fact]
     public void EveryHeldCheckCaseIsStillInTheContract() =>
         NamedGapLedger.StillNamed(NamedGapLedger.UndoCheckCases, Cases().Select(row => (string)row[0]));
 
     /// <summary>
     /// Every case, its undo and redo verdicts exactly as the contract gives
-    /// them. A case the ledger holds open (its op is one of U2's kinds, which
-    /// this reader does not know until W6) must still be answered
-    /// <c>notReadable</c> both ways, the contract's rule for a kind a reader
-    /// does not know (never guessed at, never a reason to clear), and must
-    /// still differ from the contract; it goes from the ledger the day it is
-    /// answered as the contract says.
+    /// them, on the disk: every op kind U2 defines, a move's two sides, a
+    /// tree (links inside included), a link, a preference (W6). A case the
+    /// ledger holds open must still be answered <c>notReadable</c> both ways
+    /// and still differ from the contract.
     /// </summary>
     [Theory]
     [MemberData(nameof(Cases))]
     public void EveryCheckCase(string name) =>
         JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, JudgeOnTheDisk);
 
-    /// <summary>
-    /// One case, judged by <paramref name="judge"/> on the op
-    /// <paramref name="readOp"/> reads, and held or not as
-    /// <paramref name="entries"/> say. <see cref="EveryCheckCase"/> passes this
-    /// app's reader and the disk; <c>TheDayAHeldCheckCaseIsAnsweredAsTheContractSaysItFails</c>
-    /// passes W6's answers, to prove that a held case does not outlive its gap.
-    /// </summary>
+    /// <summary>One case, judged by <paramref name="judge"/> on the op <paramref name="readOp"/> reads, and held or not as <paramref name="entries"/> say.</summary>
     internal static void JudgeAsTheLedgerSays(string name, IEnumerable<NamedGapLedger.Entry> entries,
                                               Func<JsonElement, UndoOp> readOp,
                                               Func<string, JsonElement, UndoOp, (string Undo, string Redo)> judge)
@@ -144,11 +176,7 @@ public sealed class UndoCheckContractTests : IDisposable
         JsonElement checkCase = CaseNamed(name);
         UndoOp op = readOp(checkCase);
         NamedGapLedger.Entry? held = NamedGapLedger.Holding(NamedGapLedger.UndoCheckCases, name, entries);
-        if (held is not null)
-        {
-            // The op of a held case must still be one this reader does not know.
-            Assert.False(op.Readable, NamedGapLedger.ClosedMessage(held));
-        }
+        if (held is not null) Assert.False(op.Readable, NamedGapLedger.ClosedMessage(held));
         (string undo, string redo) = judge(name, checkCase, op);
         string expectedUndo = checkCase.GetProperty("undo").GetString()!;
         string expectedRedo = checkCase.GetProperty("redo").GetString()!;
@@ -156,8 +184,7 @@ public sealed class UndoCheckContractTests : IDisposable
         {
             Assert.False(undo == expectedUndo && redo == expectedRedo, NamedGapLedger.ClosedMessage(held));
             Assert.True(undo == "notReadable" && redo == "notReadable",
-                $"\"{name}\" is held open (#{held.Issue}) because its op's kind is not read here yet, so it must be " +
-                $"answered notReadable both ways, never guessed at; it was answered {undo} and {redo}");
+                $"\"{name}\" is held open (#{held.Issue}), so it must be answered notReadable both ways, never guessed at; it was answered {undo} and {redo}");
             return;
         }
         Assert.Equal(expectedUndo, undo);
@@ -165,67 +192,67 @@ public sealed class UndoCheckContractTests : IDisposable
     }
 
     /// <summary>
-    /// The case's undo and redo verdicts, its <c>current</c> on the disk and
-    /// read back. A <c>current</c> this test cannot place yet (a move's
-    /// <c>atFrom</c>/<c>atTo</c>, a <c>tree</c>, a <c>preference</c>: U2's
-    /// shapes, which W6 places) is judged on a placeholder, and only for an op
-    /// this reader cannot read: such an op is settled before anything at its
-    /// path is read (<see cref="UndoCheck.StateOf"/>), which two placeholders
-    /// that a readable op would tell apart (nothing there, a folder) must
-    /// agree on. An op it CAN read with such a <c>current</c> fails here,
-    /// naming the shape, until this test places it (the 2026-11-19 review's
-    /// MEDIUM: a held case is never passed over for its shape).
+    /// The case's verdicts: its <c>current</c> placed on the disk and read
+    /// back (a move's sides at its <c>from</c> and <c>to</c>; an external op's
+    /// preference in a place of the case's own), then judged as the door
+    /// judges it, a whole op against the disk as a whole.
     /// </summary>
     private (string Undo, string Redo) JudgeOnTheDisk(string name, JsonElement checkCase, UndoOp op)
     {
-        if (CanBePlacedHere(checkCase))
+        JsonElement current = checkCase.GetProperty("current");
+        JsonElement given = checkCase.GetProperty("op");
+        string kind = given.TryGetProperty("kind", out JsonElement kindElement) && kindElement.ValueKind == JsonValueKind.String ? kindElement.GetString()! : "";
+        string root = Path.Combine(_folder, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var unreadable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string relative = given.TryGetProperty("path", out JsonElement pathElement) && pathElement.ValueKind == JsonValueKind.String
+                          && UndoPath.IsWithinTheRules(pathElement.GetString()) ? pathElement.GetString()! : "page.md";
+        string full = UndoTreeReading.Under(root, relative);
+        if (kind == "move")
         {
-            UndoOpState state = UndoCheck.StateOf(op, ReadAsTheCaseHasIt(checkCase, Place(checkCase)));
-            return (UndoContract.Spelled(UndoCheck.UndoVerdictOf(state)), UndoContract.Spelled(UndoCheck.RedoVerdictOf(state)));
+            string? from = given.TryGetProperty("from", out JsonElement f) && f.ValueKind == JsonValueKind.String ? f.GetString() : null;
+            string? to = given.TryGetProperty("to", out JsonElement t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
+            if (UndoPath.IsWithinTheRules(from) && current.TryGetProperty("atFrom", out JsonElement atFrom))
+            {
+                string place = UndoTreeReading.Under(root, from!);
+                if (PlaceAt(atFrom, place)) unreadable.Add(place);
+            }
+            if (UndoPath.IsWithinTheRules(to) && to != from && current.TryGetProperty("atTo", out JsonElement atTo))
+            {
+                string place = UndoTreeReading.Under(root, to!);
+                if (UndoLinks.Look(place) == UndoLinks.What.Nothing && PlaceAt(atTo, place)) unreadable.Add(place);
+            }
         }
-        Assert.False(op.Readable,
-            $"\"{name}\" has a current of a shape this test does not place yet ({ShapesOf(checkCase)}), and its op is now " +
-            "one this reader reads: place that shape in Place before the case can be judged");
-        UndoOpState onNothing = UndoCheck.StateOf(op, new UndoCurrent.Absent());
-        UndoOpState onAFolder = UndoCheck.StateOf(op, new UndoCurrent.Folder());
-        Assert.Equal(onNothing, onAFolder);
-        return (UndoContract.Spelled(UndoCheck.UndoVerdictOf(onNothing)), UndoContract.Spelled(UndoCheck.RedoVerdictOf(onNothing)));
+        else if (kind != "external")
+        {
+            if (PlaceAt(current, full)) unreadable.Add(full);
+        }
+        var reading = UndoExternalReading.Unset;
+        if (current.TryGetProperty("unreadable", out JsonElement flag) && flag.GetBoolean()) reading = UndoExternalReading.Unknown;
+        else if (current.TryGetProperty("preference", out JsonElement preference)) reading = UndoExternalReading.Holding(UndoJson.From(preference)!);
+        var caseOwn = new OneValuePlaces(reading);
+
+        if (!op.Readable) return ("notReadable", "notReadable");
+        UndoOpState state;
+        if (op.IsWhole)
+        {
+            state = UndoCheck.WholeStateOf(op, root, caseOwn, path => unreadable.Contains(path));
+        }
+        else
+        {
+            UndoCurrent read = unreadable.Contains(full)
+                ? UndoCurrent.Read(full, _ => throw new UnauthorizedAccessException("denied, as the case has it") { HResult = unchecked((int)0x80070005) })
+                : UndoCurrent.Read(full);
+            state = UndoCheck.StateOf(op, read);
+        }
+        return (UndoContract.Spelled(UndoCheck.UndoVerdictOf(state)), UndoContract.Spelled(UndoCheck.RedoVerdictOf(state)));
     }
 
-    private static string ShapesOf(JsonElement checkCase)
+    /// <summary>An external place holding one value, for a case.</summary>
+    private sealed class OneValuePlaces(UndoExternalReading reading) : IUndoExternalPlaces
     {
-        var shapes = new List<string>();
-        foreach (JsonProperty shape in checkCase.GetProperty("current").EnumerateObject()) shapes.Add(shape.Name);
-        return string.Join(", ", shapes);
-    }
-
-    /// <summary>
-    /// Proves a held check case does not outlive its gap, on real held rows:
-    /// one whose <c>current</c> this test places and one whose <c>current</c>
-    /// it cannot place yet. Given W6's answers (the op read, the contract's
-    /// verdicts), each fails as the gap closing; given the contract's verdicts
-    /// with the op still unread, each fails the same way; answered anything
-    /// but <c>notReadable</c> while held, each fails as a real failure.
-    /// </summary>
-    [Theory]
-    [InlineData("replaceText: the hunk as the step left it")]
-    [InlineData("move: back where it was, the other place free")]
-    public void TheDayAHeldCheckCaseIsAnsweredAsTheContractSaysItFails(string name)
-    {
-        Assert.NotNull(NamedGapLedger.Holding(NamedGapLedger.UndoCheckCases, name));
-        (string, string) TheContractsAnswer(string _, JsonElement checkCase, UndoOp __) =>
-            (checkCase.GetProperty("undo").GetString()!, checkCase.GetProperty("redo").GetString()!);
-        UndoOp ReadAsW6Will(JsonElement checkCase) => OpOf(checkCase) with { Readable = true };
-
-        // As it stands today: held, and passing because it still fails for its gap.
-        JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, JudgeOnTheDisk);
-
-        var opRead = Assert.ThrowsAny<Exception>(() => JudgeAsTheLedgerSays(name, NamedGapLedger.All, ReadAsW6Will, TheContractsAnswer));
-        Assert.Contains("now EXISTS on this side", opRead.Message);
-        var answered = Assert.ThrowsAny<Exception>(() => JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, TheContractsAnswer));
-        Assert.Contains("now EXISTS on this side", answered.Message);
-        var guessed = Assert.ThrowsAny<Exception>(() => JudgeAsTheLedgerSays(name, NamedGapLedger.All, OpOf, (_, _, _) => ("fileIsInUse", "fileIsInUse")));
-        Assert.Contains("never guessed at", guessed.Message);
+        public UndoExternalReading Read(string target) => reading;
+        public bool Write(string target, UndoJson? value) => false;
     }
 
     /// <summary>
@@ -240,15 +267,25 @@ public sealed class UndoCheckContractTests : IDisposable
         JsonElement checkCase = CaseNamed(name);
         if (checkCase.GetProperty("undo").GetString() != "canUndo") return;
         UndoOp op = OpOf(checkCase);
-        if (op.Kind != UndoOp.EditLine) return;   // writeFile needs its blob, recompute has no check
-        string path = Place(checkCase);
+        if (op.Kind is not (UndoOp.EditLine or UndoOp.ReplaceText or UndoOp.EditJson)) return;   // writeFile needs its blob, recompute has no check, whole ops are the stack cases
+        string path = Path.Combine(_folder, Guid.NewGuid().ToString("N"), "page.md");
+        PlaceAt(checkCase.GetProperty("current"), path);
         byte[] before = File.ReadAllBytes(path);
         var plan = UndoCheck.Plan([op], backward: true, _ => UndoCurrent.Read(path), _ => null);
         var ready = Assert.IsType<UndoCheck.PlanResult.Ready>(plan);
         byte[] undone = Assert.Single(ready.Changes).Value!;
         Assert.Equal(UndoOpState.Before, UndoCheck.StateOf(op, new UndoCurrent.Bytes(undone)));
         var back = UndoCheck.Plan([op], backward: false, _ => new UndoCurrent.Bytes(undone), _ => null);
-        Assert.Equal(before, Assert.Single(Assert.IsType<UndoCheck.PlanResult.Ready>(back).Changes).Value);
+        byte[] redone = Assert.Single(Assert.IsType<UndoCheck.PlanResult.Ready>(back).Changes).Value!;
+        if (op.Kind == UndoOp.EditJson)
+        {
+            // The member comes back as the same JSON value, newly spelled
+            // compactly (2.0 comes back as 2); every other byte stays.
+            Assert.Equal(UndoOpState.After, UndoCheck.StateOf(op, new UndoCurrent.Bytes(redone)));
+            Assert.True(UndoJson.Same(UndoJsonMember.TopLevel(before), UndoJsonMember.TopLevel(redone)));
+            return;
+        }
+        Assert.Equal(before, redone);
     }
 
     // ---- PROPOSED: Windows' read failures (D1, amended) --------------------------
@@ -257,7 +294,8 @@ public sealed class UndoCheckContractTests : IDisposable
 
     private string ThePageAsTheStepLeftIt()
     {
-        string path = Place(CaseNamed("the line as the step left it"));
+        string path = Path.Combine(_folder, Guid.NewGuid().ToString("N"), "page.md");
+        PlaceAt(CaseNamed("the line as the step left it").GetProperty("current"), path);
         Assert.Equal(UndoOpState.After, UndoCheck.StateOf(ThePublishLineOp(), UndoCurrent.Read(path)));
         return path;
     }

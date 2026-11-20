@@ -24,6 +24,10 @@ public sealed class UndoRecoveryContractTests
         "name", "work", "mode", "stopAt", "processAlive", "handEdit", "files", "phase", "head", "cleared", "pathsNamed",
         "undo", "moveFolderBeforeRecovery", "wholeFile", "contentRemovedBeforeRecovery", "fileInUseDuringRecovery",
         "anotherStepInFlight", "stepInFlight", "afterAnOrdinaryStep", "why",
+        // U2b's (W6)
+        "withAMove", "deployBeforeRecovery", "markers", "rederived", "withATree", "withAPreference", "folderKept", "preference",
+        "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace", "nextWrite", "ordinaryWriteOn",
+        "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
     };
 
     private const string First = "courses/TST1O/Section 1/Classes/first.md";
@@ -109,17 +113,54 @@ public sealed class UndoRecoveryContractTests
             : (stopAt, -1);
         var stopping = new UndoSeams { StopsHere = (at, where) => at == point && (index < 0 || where == index) };
         UndoStepDraft draft = scribe.Draft("A", [(First, After(First)), (Second, After(Second))]);
+
+        // U2b (W6): the same two pages, plus a rollover's marker moved aside
+        // and the front page kept by its rule, or a folder removed and the
+        // marker moved, or a preference set: one step through the door for ops.
+        bool withAMove = Flag(recoveryCase, "withAMove");
+        bool withATree = Flag(recoveryCase, "withATree");
+        bool withAPreference = Flag(recoveryCase, "withAPreference");
+        bool byOps = withAMove || withATree || withAPreference;
+        scribe.Places.Write(UndoKindsForTheCases.Preference, new UndoJson.Text("a"));
+        JsonArray? ops = null;
+        var blobs = new List<byte[]>();
+        if (byOps)
+        {
+            ops = new JsonArray();
+            foreach (string path in new[] { First, Second })
+            {
+                foreach (JsonNode? op in scribe.OpsFor(path, Before(path), After(path))) ops.Add(op!.DeepClone());
+            }
+            if (withAPreference) ops.Add(UndoKindsForTheCases.External(UndoKindsForTheCases.Preference, "a", "b"));
+            if (withATree)
+            {
+                foreach ((string path, string text) in UndoKindsForTheCases.ExtraFiles)
+                    scribe.WritePage("A", UndoKindsForTheCases.ExtraFolder + "/" + path, Encoding.UTF8.GetBytes(text));
+                var tree = (UndoTreeReading.Tree)UndoTreeReading.Read(scribe.FullPath("A", UndoKindsForTheCases.ExtraFolder), keepingContents: true);
+                (JsonObject treeOp, List<byte[]> treeBlobs) = UndoKindsForTheCases.Tree("removeTree", UndoKindsForTheCases.ExtraFolder, tree.Listing, tree.Contents.Values);
+                ops.Add(treeOp);
+                blobs.AddRange(treeBlobs);
+            }
+            if (withAMove || withATree)
+            {
+                scribe.WritePage("A", UndoKindsForTheCases.MarkerFrom, Encoding.UTF8.GetBytes(UndoKindsForTheCases.OldMarker));
+                ops.Add(UndoKindsForTheCases.MoveFile(UndoKindsForTheCases.MarkerFrom, UndoKindsForTheCases.MarkerTo, Encoding.UTF8.GetBytes(UndoKindsForTheCases.OldMarker)));
+            }
+            if (withAMove) ops.Add(UndoKindsForTheCases.FrontPageRecompute());
+        }
+        UndoOutcome MakeTheStep(UndoDoor door) => byOps ? door.Perform(scribe.OpsDraft("A", (JsonArray)ops!.DeepClone(), blobs)) : door.Perform(draft);
+
         UndoOutcome stopped;
         long seq;
         if (work == "step")
         {
-            stopped = scribe.Door(stopping, workPid, undoMode).Perform(draft);
+            stopped = MakeTheStep(scribe.Door(stopping, workPid, undoMode));
             seq = scribe.Fold().Steps.Keys.Max();
         }
         else
         {
             Assert.True(work is "undo" or "redo", "a work this replay does not know: " + work);
-            Assert.Equal(UndoOutcomeKind.Applied, scribe.Door(mode: undoMode).Perform(draft).Kind);
+            Assert.Equal(UndoOutcomeKind.Applied, MakeTheStep(scribe.Door(mode: undoMode)).Kind);
             seq = scribe.Fold().Steps.Keys.Max();
             if (work == "redo") Assert.Equal(UndoOutcomeKind.Undone, scribe.Door(mode: undoMode).Undo().Kind);
             stopped = work == "undo" ? scribe.Door(stopping, workPid, undoMode).Undo() : scribe.Door(stopping, workPid, undoMode).Redo();
@@ -139,10 +180,34 @@ public sealed class UndoRecoveryContractTests
         if (Flag(recoveryCase, "contentRemovedBeforeRecovery")) scribe.RemoveContent();
         bool away = Flag(recoveryCase, "moveFolderBeforeRecovery");
         if (away) scribe.MoveFolderAway("A");
+        if (Flag(recoveryCase, "changeTheFolderSetAside"))
+        {
+            // A file saved into the teacher's folder while the stopped work had it set aside.
+            string aside = UndoSwap.BesidePath(scribe.FullPath("A", UndoKindsForTheCases.ExtraFolder), $"{seq}-apply", "orig");
+            File.WriteAllText(Path.Combine(aside, "new.md"), "saved while it was aside\n");
+        }
+        if (Flag(recoveryCase, "somethingInItsPlace"))
+            scribe.WritePage("A", UndoKindsForTheCases.ExtraFolder + "/other.md", "someone else's\n"u8.ToArray());
+        if (Flag(recoveryCase, "halfDeleteTheGoneFolder"))
+        {
+            // As a delete that died part way leaves the folder it renamed to its -gone name: one of its files already gone.
+            string parent = Path.GetDirectoryName(scribe.FullPath("A", UndoKindsForTheCases.ExtraFolder))!;
+            string gone = Assert.Single(Directory.EnumerateDirectories(parent).Where(folder => folder.EndsWith("-gone", StringComparison.Ordinal)));
+            File.Delete(Path.Combine(gone, "a.md"));
+        }
+        if (Flag(recoveryCase, "visibleNameTaken"))
+            scribe.WritePage("A", UndoKindsForTheCases.ExtraFolder + " (kept by Undo)/earlier.md", "earlier\n"u8.ToArray());
+        if (Flag(recoveryCase, "deployBeforeRecovery"))
+            scribe.WritePage("A", UndoKindsForTheCases.MarkerFrom, Encoding.UTF8.GetBytes(UndoKindsForTheCases.NewMarker));
+        scribe.Maintainers.Take();
+        lock (scribe.TrailLines) scribe.TrailLines.Clear();
 
-        // Recovery, by this process, which sees the work's process as gone.
+        // Recovery, by this process, which sees the work's process as gone:
+        // the app's recovery (the default), the next write through the door
+        // for ops, or a write through the plain door (recoveredBy).
+        string recoveredBy = recoveryCase.TryGetProperty("recoveredBy", out JsonElement by) ? by.GetString()! : "recovery";
         var holders = new List<FileStream>();
-        UndoRecoveryRun run;
+        UndoRecoveryRun? run = null;
         try
         {
             if (Flag(recoveryCase, "fileInUseDuringRecovery"))
@@ -153,13 +218,62 @@ public sealed class UndoRecoveryContractTests
                 foreach (string path in new[] { First, Second })
                     holders.Add(new FileStream(scribe.FullPath("A", path), FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
             }
-            run = scribe.Door(mode: undoMode).Recover();
+            if (recoveredBy == "theNextWrite")
+            {
+                scribe.WritePage("A", Third, Before(Third));
+                var next = new JsonArray(UndoKindsForTheCases.MoveFile(Third, Third + ".moved", Before(Third)));
+                scribe.Door(mode: undoMode).Perform(scribe.OpsDraft("A", next, []));
+            }
+            else if (recoveredBy == "anOrdinaryWrite")
+            {
+                string onPage = recoveryCase.TryGetProperty("ordinaryWriteOn", out JsonElement on) && on.GetString() == "first" ? First : Third;
+                if (onPage == Third) scribe.WritePage("A", Third, Before(Third));
+                string text = UndoCheck.DecodeStrictly(scribe.Page("A", onPage)!)!;
+                byte[] written = Encoding.UTF8.GetBytes(JournaledSetting.SettingEntry("title", "title: Written over", text)!);
+                UndoOutcome wrote = scribe.Door(mode: undoMode).Perform(scribe.Draft("A", [(onPage, written)]));
+                if (recoveryCase.TryGetProperty("nextWrite", out JsonElement nextWrite)) Assert.Equal(nextWrite.GetString(), wrote.Word);
+            }
+            else
+            {
+                Assert.Equal("recovery", recoveredBy);
+                if (Flag(recoveryCase, "recoveryStopsAfterTheTidy"))
+                {
+                    // A recovery that dies once it has tidied, before it writes to the list; then the next one.
+                    UndoRecoveryRun first = scribe.Door(new UndoSeams { StopsHere = (at, _) => at == "afterRecoveryTidied" }, mode: undoMode).Recover();
+                    Assert.True(first.StoppedByATest);
+                    Assert.NotEqual(UndoStepState.Interrupted, scribe.Fold().Steps[seq].State);
+                }
+                run = scribe.Door(mode: undoMode).Recover();
+            }
         }
         finally
         {
             foreach (FileStream holder in holders) holder.Dispose();
         }
-        Assert.False(run.StoppedByATest);
+        if (run is not null) Assert.False(run.StoppedByATest);
+
+        // U2b's keys.
+        if (recoveryCase.TryGetProperty("rederived", out JsonElement rederived))
+            Assert.Equal(rederived.GetInt32(), scribe.Maintainers.Take());
+        if (recoveryCase.TryGetProperty("markers", out JsonElement markers))
+            Assert.Equal(markers.GetString(), UndoKindsForTheCases.Markers(scribe));
+        if (recoveryCase.TryGetProperty("folderKept", out JsonElement folderKept))
+            Assert.Equal(folderKept.GetBoolean(), UndoKindsForTheCases.FolderIsThere(scribe));
+        if (recoveryCase.TryGetProperty("preference", out JsonElement preference))
+            Assert.True(scribe.Places.Read(UndoKindsForTheCases.Preference).Matches(new UndoJson.Text(preference.GetString()!)));
+        if (recoveryCase.TryGetProperty("keptVisibleAs", out JsonElement keptVisibleAs))
+            Assert.True(File.Exists(Path.Combine(scribe.FullPath("A", keptVisibleAs.GetString()!), "a.md")), "the folder is not kept as " + keptVisibleAs.GetString());
+        if (recoveryCase.TryGetProperty("folderLines", out JsonElement folderLines))
+        {
+            int said;
+            lock (scribe.TrailLines) said = scribe.TrailLines.Count(line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoFoundAFolderSetAside);
+            Assert.Equal(folderLines.GetInt32(), said);
+        }
+        List<string> leftovers = scribe.StagedLeftovers("A");
+        if (recoveryCase.TryGetProperty("keptAside", out JsonElement keptAside))
+            Assert.True(keptAside.GetBoolean() == leftovers.Count > 0, "a folder kept aside: " + string.Join(", ", leftovers));
+        else if (withATree)
+            Assert.Empty(leftovers);
 
         // stepInFlight: the running process finishes its step after recovery.
         if (otherSeq is { } finishing)
@@ -218,7 +332,7 @@ public sealed class UndoRecoveryContractTests
 
         // Nothing of the journal's is left in a course once the step is
         // closed (in shadow recovery never writes into a working folder).
-        if (!folded.Steps[seq].IsInFlight && !shadow && !away)
+        if (!folded.Steps[seq].IsInFlight && !shadow && !away && !recoveryCase.TryGetProperty("keptAside", out _))
             Assert.Empty(UndoStepContractTests.StagedFilesUnder(scribe.FullPath("A", "")));
 
         if (recoveryCase.TryGetProperty("undo", out JsonElement undo))

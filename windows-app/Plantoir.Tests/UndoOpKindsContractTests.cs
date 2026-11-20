@@ -1,0 +1,198 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Plantoir.Core.Undo;
+
+namespace Plantoir.Tests;
+
+/// <summary>
+/// #899 W6: <c>shared-rules.json</c> → <c>undo.listingCases</c> (a folder's
+/// listing, byte for byte) and <c>undo.editJSONCases</c> (an editJSON move on
+/// a file's bytes, byte for byte), every case from the JSON; and the Windows
+/// points the contract leaves to the platform: a move that changes only case,
+/// a folder another program holds open, a tree made inside OneDrive's
+/// attributes, an external target that cannot be set.
+/// </summary>
+public sealed class UndoOpKindsContractTests : IDisposable
+{
+    private readonly string _folder = RunOwnedTempFolders.Create("plantoir-undo-kinds-");
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_folder, recursive: true); } catch { }
+    }
+
+    public static IEnumerable<object[]> ListingCases() =>
+        UndoContract.Undo.GetProperty("listingCases").EnumerateArray().Select(row => new object[] { row.GetProperty("name").GetString()! });
+
+    public static IEnumerable<object[]> EditJsonCases() =>
+        UndoContract.Undo.GetProperty("editJSONCases").EnumerateArray().Select(row => new object[] { row.GetProperty("name").GetString()! });
+
+    private static JsonElement Named(string list, string name) =>
+        UndoContract.Undo.GetProperty(list).EnumerateArray().Single(row => row.GetProperty("name").GetString() == name);
+
+    private static void OnlyKeys(JsonElement row, params string[] keys)
+    {
+        foreach (JsonProperty key in row.EnumerateObject()) Assert.True(keys.Contains(key.Name), "a key this replay does not check: " + key.Name);
+    }
+
+    [Fact]
+    public void TheContractHoldsTheListingAndEditJsonCases()
+    {
+        Assert.True(UndoContract.Undo.GetProperty("listingCases").GetArrayLength() >= 5);
+        Assert.True(UndoContract.Undo.GetProperty("editJSONCases").GetArrayLength() >= 8);
+    }
+
+    /// <summary>The listing made from the case's tree is the case's text and hash, and reads back as itself; and the same folder made on the disk lists the same.</summary>
+    [Theory]
+    [MemberData(nameof(ListingCases))]
+    public void EveryListingCase(string name)
+    {
+        JsonElement row = Named("listingCases", name);
+        OnlyKeys(row, "name", "tree", "listing", "listingSha", "why");
+        UndoTreeListing made = UndoCheckContractTests.ListingOf(JsonNode.Parse(row.GetProperty("tree").GetRawText())!);
+        Assert.Equal(row.GetProperty("listing").GetString(), made.Text);
+        Assert.Equal(row.GetProperty("listingSha").GetString(), made.Sha);
+        Assert.Equal(made.Text, UndoTreeListing.Parse(made.Bytes)!.Text);
+
+        // On the disk: the folder made from the tree, read back by the reader.
+        string root = Path.Combine(_folder, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        JsonElement tree = row.GetProperty("tree");
+        foreach (JsonElement folder in tree.GetProperty("folders").EnumerateArray()) Directory.CreateDirectory(UndoTreeReading.Under(root, folder.GetString()!));
+        foreach (JsonProperty file in tree.GetProperty("files").EnumerateObject())
+        {
+            string path = UndoTreeReading.Under(root, file.Name);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, Encoding.UTF8.GetBytes(file.Value.GetString()!));
+        }
+        Assert.Equal(row.GetProperty("listingSha").GetString(), UndoTreeReading.Read(root).ListingSha);
+    }
+
+    /// <summary>The file's exact bytes after the move, or a refusal (null) where the case says so.</summary>
+    [Theory]
+    [MemberData(nameof(EditJsonCases))]
+    public void EveryEditJsonCase(string name)
+    {
+        JsonElement row = Named("editJSONCases", name);
+        OnlyKeys(row, "name", "file", "op", "direction", "result");
+        UndoOp op = UndoFormat.ReadOp(row.GetProperty("op"));
+        bool backward = row.GetProperty("direction").GetString() == "undo";
+        byte[]? moved = UndoJsonMember.Moved(op, Encoding.UTF8.GetBytes(row.GetProperty("file").GetString()!), backward);
+        JsonElement result = row.GetProperty("result");
+        if (result.ValueKind == JsonValueKind.Null) Assert.Null(moved);
+        else Assert.Equal(result.GetString(), moved is null ? null : Encoding.UTF8.GetString(moved));
+    }
+
+    /// <summary>
+    /// NTFS takes <c>a.json</c> and <c>A.json</c> for one place: a move that
+    /// changes only case is a step this version cannot read (a barrier), never
+    /// a rename that could be read as both places free or both full.
+    /// </summary>
+    [Fact]
+    public void AMoveThatChangesOnlyCaseIsNotReadable()
+    {
+        var op = new JsonObject { ["kind"] = "move", ["from"] = "courses/TST1O/a.json", ["to"] = "courses/TST1O/A.json", ["sha"] = new string('a', 64) };
+        using JsonDocument document = JsonDocument.Parse(op.ToJsonString());
+        Assert.False(UndoFormat.ReadOp(document.RootElement).Readable);
+        op["to"] = "courses/TST1O/b.json";
+        using JsonDocument other = JsonDocument.Parse(op.ToJsonString());
+        Assert.True(UndoFormat.ReadOp(other.RootElement).Readable);
+    }
+
+    /// <summary>
+    /// A folder whose file another program holds open cannot be renamed on
+    /// Windows: taking it out is refused as a file in use, the folder left
+    /// whole in its place and nothing on the list cleared; once let go, the
+    /// same Undo takes it out.
+    /// </summary>
+    [Fact]
+    public void AFolderHeldOpenIsNotTakenOutAndIsTakenOutOnceLetGo()
+    {
+        using var scribe = new UndoScribe();
+        (UndoTreeListing listing, List<byte[]> contents) = UndoKindsForTheCases.ExtraListing();
+        (JsonObject op, List<byte[]> blobs) = UndoKindsForTheCases.Tree("createTree", UndoKindsForTheCases.ExtraFolder, listing, contents);
+        Assert.Equal(UndoOutcomeKind.Applied, scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(op), blobs)).Kind);
+        string held = UndoTreeReading.Under(scribe.FullPath("A", UndoKindsForTheCases.ExtraFolder), "a.md");
+        UndoOutcome refused;
+        using (new FileStream(held, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            refused = scribe.Door().Undo();
+        }
+        Assert.Equal(UndoRefusalKind.FileIsInUse, refused.Refusal?.Kind);
+        Assert.False(refused.ClearedTheList);
+        Assert.True(UndoKindsForTheCases.FolderIsThere(scribe));
+        Assert.Empty(scribe.StagedLeftovers("A"));
+        Assert.Equal(UndoOutcomeKind.Undone, scribe.Door().Undo().Kind);
+        Assert.False(UndoKindsForTheCases.FolderIsThere(scribe));
+        Assert.Empty(scribe.StagedLeftovers("A"));
+    }
+
+    /// <summary>
+    /// An external target that cannot be set (the store refuses) is refused
+    /// <c>couldNotWrite</c>, and the pages the same step had already swapped
+    /// are put back: all or nothing, the external op included.
+    /// </summary>
+    [Fact]
+    public void AnExternalTargetThatCannotBeSetPutsTheStepsPagesBack()
+    {
+        using var scribe = new UndoScribe();
+        const string page = "courses/TST1O/Section 1/Classes/first.md";
+        byte[] before = "---\ntitle: first\npublish: false\n---\n"u8.ToArray();
+        byte[] after = "---\ntitle: first\npublish: true\n---\n"u8.ToArray();
+        scribe.WritePage("A", page, before);
+        JsonArray ops = scribe.OpsFor(page, before, after);
+        ops.Add(UndoKindsForTheCases.External(UndoKindsForTheCases.Preference, null, "b", hasBefore: false));
+        var refusing = new RefusingPlaces();
+        var door = new UndoDoor(scribe.Journal, UndoMode.Live, scribe.Maintainers, places: refusing);
+        UndoOutcome outcome = door.Perform(scribe.OpsDraft("A", ops, []));
+        Assert.Equal(UndoRefusalKind.CouldNotWrite, outcome.Refusal?.Kind);
+        Assert.Equal(before, scribe.Page("A", page));
+        Assert.Empty(scribe.StagedLeftovers("A"));
+    }
+
+    private sealed class RefusingPlaces : IUndoExternalPlaces
+    {
+        public UndoExternalReading Read(string target) => UndoExternalReading.Unset;
+        public bool Write(string target, UndoJson? value) => false;
+    }
+
+    /// <summary>
+    /// A step of external ops alone has no working folder: it is recorded
+    /// without one, undone and redone through the door (the stack case
+    /// <c>setAPreference</c> is the contract's; this pins that its begin
+    /// line names no folder).
+    /// </summary>
+    [Fact]
+    public void AStepOfAPreferenceAloneNamesNoWorkingFolder()
+    {
+        using var scribe = new UndoScribe();
+        var ops = new JsonArray(UndoKindsForTheCases.External(UndoKindsForTheCases.Preference, null, "b", hasBefore: false));
+        UndoOutcome made = scribe.Door().Perform(scribe.OpsDraft(null, ops, []));
+        Assert.Equal(UndoOutcomeKind.Applied, made.Kind);
+        Assert.Null(scribe.Fold().Steps[made.Seq!.Value].Step.WorkingFolder);
+        Assert.Equal(UndoOutcomeKind.Undone, scribe.Door().Undo().Kind);
+        Assert.True(scribe.Places.Read(UndoKindsForTheCases.Preference).NotSet);
+    }
+
+    /// <summary>The compact spelling: keys sorted, a whole number without a point, the shortest double, and a whole number beyond 2^53 refused.</summary>
+    [Fact]
+    public void ANewValueIsSpelledCompactlyAndNeverApproximately()
+    {
+        using JsonDocument document = JsonDocument.Parse("{\"z\": [1.0, 0.1, \"a/b\\n\"], \"a\": null, \"m\": {\"y\": true, \"b\": false}}");
+        Assert.Equal("{\"a\":null,\"m\":{\"b\":false,\"y\":true},\"z\":[1,0.1,\"a/b\\n\"]}", UndoJson.From(document.RootElement)!.Spelled());
+        using JsonDocument big = JsonDocument.Parse("9007199254740993");
+        Assert.Null(UndoJson.From(big.RootElement)!.Spelled());
+    }
+
+    /// <summary>The app's settings store as an external place: a name it does not have cannot tell, and "not set" cannot be written to a typed setting.</summary>
+    [Fact]
+    public void TheAppsSettingsStoreReadsOnlyNamesItHas()
+    {
+        var places = new UndoAppSettingsPlaces();
+        Assert.True(places.Read("preference:aSettingNobodyHas").CannotTell);
+        Assert.False(places.Write("preference:aSettingNobodyHas", new UndoJson.Text("x")));
+        Assert.False(places.Write("preference:PreviewOpensAt", null));
+        Assert.True(places.Read("other:PreviewOpensAt").CannotTell);
+    }
+}
