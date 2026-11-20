@@ -505,6 +505,7 @@ internal static class UndoKindsForTheCases
     /// <summary>A junction (a mount point: no privilege needed) from <paramref name="place"/> to <paramref name="target"/>.</summary>
     internal static void MakeAJunction(string place, string target)
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(place)!);
         var start = new System.Diagnostics.ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (string argument in new[] { "/c", "mklink", "/J", place, target }) start.ArgumentList.Add(argument);
         using var made = System.Diagnostics.Process.Start(start)!;
