@@ -16858,7 +16858,52 @@ are carried by the attribute copy (they stick on any NTFS file, measured).
 JSON: 20 run through the real door, swap and recovery, `fileInUseDuringRecovery`
 a real `FileShare.ReadWrite` holder; the 21 rows of U2b's kinds held on the
 ledger for W6, each still stopping at its key), `UndoRecoveryTests` (14 methods, 16 cases),
-six new `UndoSwapTests`. RESULTS_PLACEHOLDER
+six new `UndoSwapTests`. MUSTFAIL_AND_SUITE_PLACEHOLDER
+
+**The kill harness** (`Plantoir.UndoHarness recovery-kill`, Release, the PC
+above, `vm-tools/guest/899-w3-pc-run.ps1 -Mode recovery`, run `w3-r1`), outside
+OneDrive (`C:\vm-setup\…\scratch`) and in a scratch folder made inside the PC's
+signed-in OneDrive and removed after (nothing else there touched). A CHILD
+process made a 233-page step (or undid it, or redid it) through the door and
+was killed with `Process.Kill` at each of 14 points: after the begin, before
+the 1st, the 117th and the 233rd swap, before `applied`, and at the moment its
+first page was seen changed (a race, no seam); after `undoing`, before the
+117th swap, before `undone`, at random; the same four for a redo. A SECOND
+process then ran the app's recovery (`UndoDoor.Recover`). Each point twice:
+(A) that recovery ran to its end; (B) it was itself killed at its 58th
+put-back swap (where it had that many to make: 5 of the 14 points) and a THIRD
+process recovered again.
+
+| | Outside OneDrive | Inside OneDrive |
+|---|---|---|
+| Runs, every page then wholly old or wholly new, ALL one way, the way the journal says the step stands, the step not in flight, nothing staged left | 28 of 28 | 28 of 28 |
+| Points whose two runs (A, and B with the recovery killed and run again) came to the same pages and the same list | 11 of 11 (the three at-random points are not compared) | 11 of 11 |
+| Recovery that found nothing to put back (killed after the begin, before the 1st swap, after `undoing`/`redoing`), the whole process | 212 to 245 ms | 388 to 675 ms |
+| Recovery completing a step whose swaps were all in (before `applied`, `undone`, `redone`) | 221 to 227 ms | 418 to 899 ms |
+| Recovery putting back 116 pages (killed before the 117th swap), `rolledBack` | 748 to 767 ms | 1,457 to 1,839 ms |
+| Recovery putting back 232 pages (killed before the 233rd swap) | 1,173 ms | 2,650 ms |
+
+Outcomes, the same in both places: killed after the begin or before the 1st
+swap, `failed`, every page old; part way through, `rolledBack`, every page
+old; after the last swap, `applied`, every page new (and the step on the
+list); an undo part way, put forward again, the step `done`; an undo after its
+last swap, `undone`; a redo part way, put back, `undone`; a redo after its
+last swap, `done`. A recovery killed part way left its own `-recover` files,
+which the next recovery removed before it judged the step.
+
+Read from it:
+
+- **Recovery holds the lock while it puts pages back**, as the contract says
+  (the one exception to never changing a page under the lock: two processes
+  cannot repair one step at once). A 232-page put-back held it 1.2 s outside
+  OneDrive and 2.7 s inside it, so a live process waiting its 2 s for the
+  lock at that moment would be refused (`lockBusy`, nothing changed) and the
+  teacher would try again. Only after a crash, once; recorded for W4 and
+  W11a, which call `Recover` at launch: running it before the window takes
+  its first action keeps that wait off the teacher's first click.
+- **A recovery killed part way is no worse than the first death**: every one
+  of the ten killed recoveries (five in each place) was finished by the next with the same pages
+  and the same list.
 
 ### The pieces still owed for #899 on Windows, and what each waits for
 
