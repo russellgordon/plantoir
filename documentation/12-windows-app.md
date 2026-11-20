@@ -14244,8 +14244,13 @@ Escape and Gamepad B. So Windows names Escape alone, and its footer is
 
 **Where the key lives: a `KeyboardAccelerator` on the visible Cancel**
 (`TaskProgressView.GiveCancelTheEscapeKey`, called by the section's view
-only). No hidden control, no `PreviewKeyDown` or `KeyDown` handler; WinUI
-shows the key in the button's own tooltip, "Cancel (Esc)". Microsoft,
+only). No hidden control, and no key handler gives Escape its action: the
+panel's one other key handler is the console answer box's own `KeyDown`
+(Enter sends the typed line; Escape is not looked at), and the section and
+the window add none for it.
+WinUI shows the key in the button's own tooltip, "Cancel (Esc)". (The
+one key filter since the first review is on the stop question itself, and
+it is a filter, not a key catcher: see "A held Escape" below.) Microsoft,
 "Keyboard accelerators", Resolving accelerators: an accelerator with no
 `ScopeOwner` is looked for only after the key has bubbled from the focused
 element to the root unhandled, so a control that uses Escape itself (an
@@ -14327,7 +14332,14 @@ question down before the teacher could read it. Fixed on the question
 itself, structurally: its `PreviewKeyDown` marks an Escape whose
 `KeyStatus.WasKeyDown` is set (a repeat) handled, as `TickTable` swallows a
 held Space's repeats; a fresh Escape, and every other key, is the dialog's
-as before. With it, 4 holds of 4 left the question open, and the next fresh
+as before. Why this is a filter and not a key catcher: it sits on the
+visible question, the control whose key Escape is; it gives no key an
+action (nothing is pressed, stopped or answered from it); and it only drops
+key-downs whose previous-state flag is set. The repeats cannot be stopped
+where they start (Microsoft, "Keyboard accelerators": an accelerator
+auto-repeats while held, "and this behavior cannot be modified"), and
+`ContentDialog` closes on an Escape key-down, so the question is the only
+place a repeat can be told from a press. With it, 4 holds of 4 left the question open, and the next fresh
 Escape was its Cancel. Rejected: a timed delay before the question takes
 keys (a guess at the repeat delay, which a teacher sets), and refusing a
 close while Escape is down (a fresh press is down too). **Escape where another control owns it**: with
@@ -14349,7 +14361,8 @@ should use toggle switches there is the same kind of question.
 **Tests.** `StopQuestionsContractTests` (unit): every word against the
 contract, every case, the trail lines and the `mustRecord` example, the
 setting kept, the key rule, and by source the accelerator on the visible
-Cancel, no key handler, the question's words with Stop Deploy as default, the
+Cancel, no key handler on the panel (the question's repeat filter is
+above), the question's words with Stop Deploy as default, the
 box read only before Stop, and Stopping first in Settings ▸ Deploying; since
 the review, a run between its phases is under way and a press there asks, a
 cancel in the gap marks the run cancelled, every stop decision reads
@@ -14374,6 +14387,32 @@ back to `Terminate` (its test: "asked nothing"), the question taken down on
 `IsUnderWay` as `IsRunning` alone and the announcement removed (their two
 unit tests), the repeat filter taken off (the held-Escape test, 4 holds of 4
 closed).
+
+**The second review's fixes (2026-11-20).** *Between two destinations.* A
+course that deploys to two or more places runs a leg each, and when leg 1's
+runner stops, `RunAsync` moves to leg 2 only after its next poll (up to
+100 ms) and `CurrentLegIndex` changes; only then does the section show leg
+2's runner. In that gap the panel's runner was leg 1's and not under way, so
+a "Stop the deploy?" open when destination 1 finished was taken down while
+the deploy went on, Cancel's row hid, and Escape did nothing. The panel's
+one rule now counts the whole run: `MultiDestinationDeployRunner.ShownTaskIsUnderWay`
+(the shown runner under way and not cancelled, or the run running and not
+cancelled), read by `TaskIsUnderWay` everywhere the panel decides, and the
+question is taken down by it on a runner's change and when the section
+shows the panel again (`TakeDownTheStopQuestionIfTheTaskEnded`; the whole
+run ending reaches the panel only that way). A cancel in the gap reaches no
+leg's runner, so `RunAsync` checks the run's own `WasCancelled` before each
+leg and starts no later one, and the panel's badge reads "Cancelled" from
+the run's mark too. *No stuck mark.* `IsBetweenPhases` is no longer cleared
+on entry to `Run` (the first review), so an exception after the build and
+before the deploy's `Run` would leave it set for good, and the panel would
+ask about a run that had ended. `RunAsync`'s `finally` now clears it on
+every leg, before the run's `IsRunning` goes false. *The console's Stop in
+the New Course wizard.* Since the first review it goes through
+`PressCancelAsync`; the wizard's panel has no question and no `OnCancel`,
+so it now ends the work with `ScriptRunner.CancelByUser` (Control-C, then
+the process ended after two seconds), the teacher's stop, which reads
+"Cancelled". It used to be `Terminate`, which read "Something went wrong".
 
 ## The lap cap on Windows (#720, the mac's #689)
 
