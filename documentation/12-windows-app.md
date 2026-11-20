@@ -8148,7 +8148,8 @@ here where Windows has the same thing:
   tag, shown when the pointer rests on them, and the shared Help page says
   "Hold the pointer over the button to read why". Windows gives the reason
   to Narrator only (`AutomationProperties.HelpText`): a disabled WinUI
-  control takes no pointer input, so a tooltip on it never shows. Not built
+  control takes no pointer input, so a tooltip on it is not expected to show
+  (WinUI's documented behaviour, not measured on this PC). Not built
   tonight; the Windows Help book (886b onward) must not copy that sentence
   as it stands. A dimmed Revise
   item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
