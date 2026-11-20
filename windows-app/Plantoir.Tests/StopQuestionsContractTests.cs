@@ -542,6 +542,7 @@ public sealed class StopQuestionsContractTests : IDisposable
         using var context = new SingleThreadContext();
         var run = new MultiDestinationDeployRunner(context);
         bool hooked = false;
+        bool thrownBetween = false;
         run.PropertyChanged += (_, changed) =>
         {
             if (hooked || changed.PropertyName != nameof(MultiDestinationDeployRunner.IsRunning) || !run.IsRunning) return;
@@ -551,9 +552,12 @@ public sealed class StopQuestionsContractTests : IDisposable
             {
                 // Between the build and the deploy: the run goes to its ending with the mark set.
                 if (legChanged.PropertyName == nameof(ScriptRunner.IsRunning) && leg.IsBetweenPhases && leg.LastExitCode is null)
+                {
+                    thrownBetween = true;
                     throw new InvalidOperationException("thrown between the build and the deploy");
-                // The ending clearing the mark: a listener that throws there.
-                if (legChanged.PropertyName == nameof(ScriptRunner.IsBetweenPhases) && !leg.IsBetweenPhases)
+                }
+                // The ending clearing the mark, after that: a listener that throws there.
+                if (thrownBetween && legChanged.PropertyName == nameof(ScriptRunner.IsBetweenPhases) && !leg.IsBetweenPhases)
                     throw new InvalidOperationException("thrown in the run's ending");
             };
         };
