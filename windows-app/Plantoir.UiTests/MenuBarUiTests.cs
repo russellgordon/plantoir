@@ -321,6 +321,19 @@ public class SectionAndClassesUiTests
         return lines;
     }
 
+    /// <summary>
+    /// With <c>PLANTOIR_UI_CAPTURE_DIR</c> set, a picture of the screen with the
+    /// menu open, for the hand-back (#990's captures); otherwise nothing.
+    /// </summary>
+    private static void CaptureIfAsked(DrivenApp app, string menu, string anyItemId, string fileName)
+    {
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") is not { Length: > 0 } folder) return;
+        Directory.CreateDirectory(folder);
+        MenuBar.Open(app, menu, anyItemId);
+        FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(folder, fileName));
+        MenuBar.Close();
+    }
+
     [UiFact]
     public void TheMenusDrawTheLayout_EveryItemDrawnAndDimmedWhereTheRuleGreysIt()
     {
@@ -363,6 +376,8 @@ public class SectionAndClassesUiTests
         // A SECTION row selected: the Classes items come live, and Remove
         // Section reads without an ellipsis.
         app.SelectSection("ICS3U", 1);
+        CaptureIfAsked(app, "Section", "sectionPublishPages", "windows-section-menu.png");
+        CaptureIfAsked(app, "Classes", "classesClassDates", "windows-classes-menu.png");
         var classes = MenuBar.Open(app, "Classes", "classesClassDates");
         Assert.True(classes["classesClassDates"].IsEnabled, "Classes > Class Dates… was greyed on a live section");
         Assert.True(classes["classesReDateClasses"].IsEnabled, "Classes > Re-date Classes… was greyed on a live section");
