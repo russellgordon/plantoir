@@ -195,4 +195,30 @@ public sealed class UndoOpKindsContractTests : IDisposable
         Assert.False(places.Write("preference:PreviewOpensAt", null));
         Assert.True(places.Read("other:PreviewOpensAt").CannotTell);
     }
+
+    /// <summary>
+    /// A junction is never followed, even when the folder it leads to holds
+    /// exactly what the step moved: a folder's move whose destination is now a
+    /// junction to a copy of the moved folder is changed since, never "as the
+    /// step left it" (the contract's link rows lead to content that differs,
+    /// so they would pass a reader that followed links; this one would not).
+    /// </summary>
+    [Fact]
+    public void AJunctionToTheVeryContentIsStillNeverFollowed()
+    {
+        string root = Path.Combine(_folder, Guid.NewGuid().ToString("N"));
+        string copy = Path.Combine(_folder, "copy-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(copy);
+        File.WriteAllText(Path.Combine(copy, "20261101T080000Z-netlify.json"), "{\"places\": []}\n");
+        UndoTreeListing listing = new([], [("20261101T080000Z-netlify.json", UndoCheck.Sha("{\"places\": []}\n"u8.ToArray()))]);
+        Assert.Equal(listing.Sha, UndoTreeReading.Read(copy).ListingSha);
+        string to = UndoTreeReading.Under(root, "courses/TST1O/record.previous");
+        UndoKindsForTheCases.MakeAJunction(to, copy);
+        var op = new JsonObject { ["kind"] = "move", ["from"] = "courses/TST1O/record", ["to"] = "courses/TST1O/record.previous", ["listingSha"] = listing.Sha };
+        using JsonDocument document = JsonDocument.Parse(op.ToJsonString());
+        UndoOp read = UndoFormat.ReadOp(document.RootElement);
+        Assert.True(read.Readable);
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(to));
+        Assert.Equal(UndoOpState.Neither, UndoCheck.WholeStateOf(read, root, new UndoMemoryPlaces()));
+    }
 }

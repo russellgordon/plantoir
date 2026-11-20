@@ -85,6 +85,6 @@ put-back swap (42 of the 66 were killed there) and a third recovering:
 | `C:\vm-setup\…\scratch` | 66 | 66 | 66 | 33 of 33 |
 | `%OneDrive%\plantoir-w6-scratch-…` (OneDrive running) | 66 | 66 | 66 | 33 of 33 |
 
-Settled as: Done 52, Undone 44, RolledBack 28, Failed 8 (per place). A run's
+Settled as, in each place: done 26, undone 22, rolled back 14, failed 4 (no step was left in flight or interrupted). A run's
 three processes took 0.5 to 1.3 s end to end. The scratch folders were
 removed after the run.
