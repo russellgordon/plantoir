@@ -292,6 +292,7 @@ public sealed partial class MainWindow : Window
             SectionProblems.Changed -= ProblemsChanged;
             SectionProblems.MarkerArrived -= ProblemsMarkerArrived;
             OpenRecentList.Changed -= OpenRecentChanged;   // static too (#488)
+            OutsideAssistantPresence.Changed -= AssistantPresenceChanged;   // static too (#990)
             Workspace.UnregisterWindow();
         };
 

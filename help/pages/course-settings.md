@@ -92,6 +92,8 @@ Type the new name in the {{control:courseSettingsCourseName}} field and save. Th
 
 To drop changes you have not saved, press {{control:courseSettingsRevertButton}}, or choose {{menu:revertCourseSettings}}. The form goes back to what was last saved.
 
+On the {{control:courseDetailPlanningTab}} tab, {{menu:revertCourseSettings}} is dimmed, because the changes it would drop are not on screen. Click {{control:courseDetailSettingsTab}} first. Hold the pointer over the dimmed item to read the same reason.
+
 A saved change reaches students at each section's next deploy.
 
 ## Changes that do not wait for Save

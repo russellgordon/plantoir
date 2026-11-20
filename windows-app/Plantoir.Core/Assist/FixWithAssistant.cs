@@ -45,8 +45,20 @@ public static class FixWithAssistant
     /// <summary>The message, and how many of the handed rows it names.</summary>
     public sealed record Greeting(string Text, int RowsNamed, int RowsNotNamed);
 
-    /// <summary>Whether each button shows, and whether they can be pressed (they are enabled together).</summary>
-    public sealed record ButtonState(bool ClaudeShown, bool CodexShown, bool Enabled);
+    /// <summary>
+    /// Whether each button shows, whether a row is handed over
+    /// (<paramref name="Enabled"/>, <c>buttonCases</c>' <c>expect.enabled</c>),
+    /// and whether each can be pressed: its assistant is installed AND a row
+    /// is handed over (<c>claudeEnabled</c>, <c>codexEnabled</c>, #990).
+    /// </summary>
+    public sealed record ButtonState(bool ClaudeShown, bool CodexShown, bool Enabled, bool ClaudeEnabled, bool CodexEnabled)
+    {
+        /// <summary>Whether <paramref name="assistant"/>'s button can be pressed.</summary>
+        public bool CanPress(Assistant assistant) => assistant == Assistant.Claude ? ClaudeEnabled : CodexEnabled;
+
+        /// <summary>Nothing drawn and nothing pressable: no record shown yet.</summary>
+        public static ButtonState None { get; } = new(false, false, false, false, false);
+    }
 
     // ---- The contract's words and bounds (fixWith) --------------------------
 
@@ -59,6 +71,26 @@ public static class FixWithAssistant
     /// greyed button alone tells a Narrator user nothing.
     /// </summary>
     public const string NotEnabledHelp = "Tick a problem this section still has to hand it over.";
+
+    /// <summary>
+    /// What a button dimmed because its assistant is not on this PC says to
+    /// assistive technology, in place of <see cref="NotEnabledHelp"/>
+    /// (<c>fixWith.notInstalledHelp</c>, #990): the contract's first sentence,
+    /// with Windows' word for the computer (<c>specialNames.platformWording.machine</c>:
+    /// "PC" where the mac says "Mac"). Its second sentence, which points at
+    /// Settings ▸ Other Assistants (where the mac's Revise With ▸ Set Up an
+    /// Assistant… goes), is held open by name in <c>NamedGapLedger</c> against
+    /// #903: this app has no set-up and no such Settings page yet, and saying
+    /// it would send a teacher looking for something that is not there.
+    /// </summary>
+    public const string NotInstalledHelp = "Not set up on this PC.";
+
+    /// <summary>The help text a button carries: why it cannot be pressed, or nothing when it can.</summary>
+    public static string HelpFor(Assistant assistant, bool installed, ButtonState state)
+    {
+        if (!installed) return NotInstalledHelp;
+        return state.CanPress(assistant) ? "" : NotEnabledHelp;
+    }
     public const int MostRowsInThePrompt = 10;
     public const int GreetingMaxCharacters = 6500;
     public const int PagePlaceMaxCharacters = 300;
@@ -140,13 +172,20 @@ public static class FixWithAssistant
         HandoverOf(record.Rows, isTicked, row => SectionProblemsRules.State(row, record, others));
 
     /// <summary>
-    /// <c>fixWith.buttonCases</c>: a button shows while its assistant is
-    /// installed (hidden, never greyed, <c>hiddenWhenNotInstalled</c>) and
-    /// never on a course kept for reference; both are enabled while a row is
-    /// handed over.
+    /// <c>fixWith.buttonCases</c>: every button shows on a course not kept
+    /// for reference, whatever this PC has; one whose assistant is not
+    /// installed is DIMMED, not left out (#990, the mac's D11, Russell's
+    /// ruling Q9: HIG, The menu bar, "disable the action instead of hiding
+    /// it"; until #990 it was hidden). Each can be pressed while its assistant
+    /// is installed and a row is handed over.
     /// </summary>
-    public static ButtonState Buttons(bool claudeInstalled, bool codexInstalled, bool keptForReference, Handover handover) =>
-        new(claudeInstalled && !keptForReference, codexInstalled && !keptForReference, handover.HasRows);
+    public static ButtonState Buttons(bool claudeInstalled, bool codexInstalled, bool keptForReference, Handover handover)
+    {
+        bool shown = !keptForReference;
+        bool handsSomethingOver = handover.HasRows;
+        return new ButtonState(shown, shown, handsSomethingOver,
+                               claudeInstalled && handsSomethingOver, codexInstalled && handsSomethingOver);
+    }
 
     // ---- The message -------------------------------------------------------------
 

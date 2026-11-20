@@ -142,9 +142,11 @@ struct QuartzTeachersApp: App {
             // Beside Plantoir Help, because "something has gone wrong and I
             // need a person" is the same errand as looking for help — and it
             // is the menu somebody opens when they have run out of ideas.
+            //
+            // No Set Up an Assistant… here since #990 (Russell's ruling Q10,
+            // 2026-11-18): it is in Revise With ▸ only, so the menu bar does
+            // not carry the same words twice (#457 item 4).
             CommandGroup(after: .help) {
-                // #855, ruling 3: opens Settings ▸ Other Assistants.
-                SetUpAnotherAssistantButton(title: AssistantSetUpWording.helpMenuItem, from: .helpMenu)
                 PublishingAndDeployingCommand()
                 ProblemReportCommands()
             }

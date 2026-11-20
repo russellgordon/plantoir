@@ -979,10 +979,10 @@
      "question": "How do I see the site exactly as students will?",
      "about": "Previewing a section: the preview window, Stop Preview, Rebuild Preview, the Option start page and Settings > Preview.",
      "steps": [
-      "Select the section and press Preview (⇧⌘P); the button becomes Stop Preview while it runs",
+      "Select the section and press Preview (⌘Y); the button becomes Stop Preview while it runs",
       "Read the site in the window; Back, Forward and Reload work as in a browser",
       "Open in Browser shows the running preview in your web browser",
-      "After editing, Section > Rebuild Preview (⇧⌘B) builds it again",
+      "After editing, Section > Rebuild Preview (⇧⌘Y) builds it again",
       "Hold Option to open the other start page (front page or last page viewed); Settings > Preview chooses which is normal"
      ],
      "pictures": [
@@ -3927,7 +3927,7 @@
      "about": "Course > Copy a Page from This Course: one page, and the pages it links to, into another course, arriving hidden.",
      "steps": [
       "Select the course you are copying FROM",
-      "Course ▸ Copy a Page from This Course… (⇧⌘C)",
+      "Course ▸ Copy a Page from This Course… (⇧⌘K)",
       "Choose the page and the course it goes to",
       "Choose which linked pages come too",
       "It arrives hidden; publish it and deploy"
@@ -4671,7 +4671,7 @@
      "question": "How do I get Claude Code, Codex or GitHub Copilot working with Plantoir?",
      "about": "Setting up Claude Code, Codex or GitHub Copilot's command-line tool from inside Plantoir (#855).",
      "steps": [
-      "Where it is offered: Settings, the Help menu, and Revise With > Set Up an Assistant...",
+      "Where it is offered: Settings, and Revise With > Set Up an Assistant... (not the Help menu since #990)",
       "Choose the assistant; Plantoir runs its maker's installer and checks it",
       "Sign in, in the browser",
       "Plantoir confirms it works",
@@ -4695,7 +4695,7 @@
      "opensFrom": [
       "sheet: the set-up sheet (#855)",
       "settings: the assistants pane (#855)",
-      "menu: the Help menu item (#855)"
+      "menu: Course or Section > Revise With > Set Up an Assistant… (#855; in the Help menu too until #990)"
      ],
      "assistant": true,
      "needsPictures": true,

@@ -27,11 +27,9 @@ nonisolated enum AssistantSetUpWording {
     /// Revise With ▸, last, after a divider (ruling 3). "Set Up an
     /// Assistant…", always (Russell, 2026-11-13 evening): "Another" read
     /// wrongly when none is set up, and a title that changes with the state
-    /// was rejected. The same words as the Help menu's item.
+    /// was rejected. The only menu item that opens the pane since #990
+    /// (Russell's ruling Q10): the Help menu's copy of it is gone.
     static let menuItem: String = "Set Up an Assistant…"
-
-    /// Help ▸, beside Plantoir Help (ruling 3).
-    static let helpMenuItem: String = "Set Up an Assistant…"
 
     static let setUpButton: String = "Set Up…"
     static let tryAgainButton: String = "Try Again"
@@ -166,7 +164,6 @@ nonisolated enum AssistantSetUpWording {
             "paneTitle": paneTitle,
             "paneIntro": paneIntro,
             "menuItem": menuItem,
-            "helpMenuItem": helpMenuItem,
             "setUpButton": setUpButton,
             "tryAgainButton": tryAgainButton,
             "showMeHowButton": showMeHowButton,

@@ -59,22 +59,6 @@ extension SectionDetailView {
         }
     }
 
-    /// The reason line under Section ▸ Open in Browser, when the deployed
-    /// folder is what it would open and it is greyed for a reason.
-    var deployedFolderMenuReason: String? {
-        if previewURL != nil {
-            return nil
-        }
-        guard let lookup = deployedFolderLookup, case .greyed(let reasonKey) = lookup.decision, let reasonKey else {
-            return nil
-        }
-        // While a deploy runs the Section menu already says it once.
-        if reasonKey == "deployIsRunning" {
-            return nil
-        }
-        return DeployedFolderOffer.sentence(forReasonKey: reasonKey)
-    }
-
     // MARK: - Functions
 
     /// Reads the facts again. Called on events, never on a clock: the
