@@ -16766,6 +16766,100 @@ through that handle AFTER the rename writes into the old file, which the tidy
 then removes (Obsidian writes by opening the path afresh, so this is the
 L4-shaped race the hash catches only before the rename).
 
+### What Windows has built: W3, recovery (#899, #949)
+
+Piece W3 (branch `issue/899-w3-recovery`, on W2b, 2026-11-20) settles a step
+whose work stopped part way, by `undo.rule.recovery`. Nothing a teacher sees
+changed and nothing in the app calls it: the switch stays off, the built-in
+assistant's surface did not move. The plan is
+`vm-tools/reference/899-w3-plan.md`.
+
+- **`UndoRecovery.Run`**, inside the lock (the mac's `UndoRecovery.run` and
+  `settle`). For each step in flight, oldest first, whose process can be
+  identified (a pid of 1 to 2^31-1: a pid of 0 or less is never read as a
+  known process, the W1 review's low) and is gone, or that THIS process gave
+  up on (below): readable, its folder reachable (ruling 10, else left), every
+  `recompute` with a runner. Live, every staged file of its number is removed
+  first (its `-orig` files too: the list holds the content to put back).
+  Then each file is judged by CONTENT (`UndoCurrent.Read`, `UndoCheck.StateOf`;
+  a place that now leads outside the folder is in the way): all where the work
+  started, `failed` (`nothingTookEffect`); all where it was going, completed
+  (`applied` with the redo branch dropped, `undone`, `redone`); some of each,
+  what took effect put back by `UndoCheck.Plan` the other way and `UndoSwap`
+  (label `<seq>-<work>-recover`), `rolledBack` (`partlyTookEffect`); any in
+  the way, the verified ones put back, `interrupted` (`changedByHand`, the
+  paths) and `cleared` (`interrupted`); a put-back that cannot be planned
+  (content missing), `interrupted` (`couldNotPutBack`) and cleared. A file in
+  use or that cannot be read now, a refused put-back, or the list unreadable:
+  left, to be tried again. In shadow nothing is written into a folder; a step
+  that partly took effect is `interrupted` (`partlyTookEffect`) and cleared.
+  Then, live, every step closed `interrupted` has its staged files removed
+  once per process when its folder can be reached
+  (`knownLimits.stagedFilesOfAFolderAway`).
+- **The schedule** (in `UndoProcessMemory`, per process, never a static):
+  at once at an Undo, a Redo and `UndoDoor.Recover()`; on the ordinary path
+  at the process's first lock, then one minute after a refusal, doubling, at
+  most an hour. A step that pruning would close in this hold is tried at once
+  whatever the schedule, so a step is never closed `unsettled` while one more
+  try could settle it.
+- **Where it runs.** The begin hold (on the schedule; a plain write on the
+  course of a gone process's step that keeps a file true is refused
+  `anotherChangeIsUnderWay`, the mac's U2b LOW 1); `Perform(UndoOpsDraft)`
+  recovers and re-derives first; the hold that finds what Undo or Redo acts
+  on (at once, re-deriving; a gone step that keeps a file true and could not be
+  settled makes Undo and Redo not available, never "under way" for ever);
+  `UndoDoor.Recover()` (W11a's launch call); and **before every prune**:
+  `UndoJournal.Prune` throws in a hold where recovery has not run
+  (`UndoJournalWriter.RecoveredThisHold`), and the door prunes only through
+  `RecoverThenPrune` (W2b's review, LOW 7: a reachable dead step that died
+  mid-swap is put back whole, never closed `unsettled` with its originals
+  removed). Re-derivation runs after the hold that settled, outside the lock,
+  whichever way the step was settled; never in shadow.
+- **A step this process gave up on** (W2b's review, LOW 1). `UndoSwap`
+  reports a reversal that did not go in (`Refused.LeftPartWay`: a page still
+  holds the step's content, its original left under its staged name). The
+  door then writes NO closing, never `failed` for a half-applied step, and
+  notes the step abandoned in the process's memory; so does a closing that
+  could neither be written nor kept. Recovery settles an abandoned step of
+  this process by content at the next lock although the process is alive; no
+  other process does while it lives. No new refusal word, no contract change.
+- **The trail.** `ActivityTrail.Event.UndoRolledBack` (`undo rolled back`),
+  in the mac's words: `ICS3U/1 · the undo list put back 2 files left part way
+  by a change that stopped`, and `…, found 1 file changed by hand since, and
+  cleared the list`. The door is given a sink (`trail:`); W4's start-up passes
+  `UndoTrail.ToTheActivityTrail`. Written only live. The ledger entry is gone.
+
+**W2b's review LOWs, fixed here, each with a test that fails without it.**
+(1) above. (2) While a swap is under way every staged new content holds an
+attributes-only handle (no sharing check, so no program is kept from it), and
+the original of a page the step removes holds one from the keep to the
+delete: Windows will not rename or move a folder with a file open below it
+(measured: access denied), so a page's folder cannot be replaced by a junction
+between its re-read and its rename at all, and a staged file is removed by its
+handle, never through a name that leads elsewhere; a kept original holds no
+handle (it IS the page, and a handle on it would refuse an editor's save by
+replace) and is removed by name only while the name is still that file. The
+cost: a teacher renaming or moving a page's folder in the milliseconds of its
+swap is told by Windows that it is in use. (3) The containment check and the
+attribute copy come before the keep, and just before the rename the page's
+file identity (volume and file index) must still be the kept link's: an editor
+that saved by REPLACING the page in that window is changed since and its save
+kept. What remains: the microseconds between that check and the rename; and
+on a volume with no hard links (the original a copy) there is no identity to
+compare, so a save by replace after the re-read is not seen. (4) A kept
+original, and any leftover the tidy removes, is deleted with
+`FileDispositionInfoEx` and IGNORE_READONLY, never by clearing read-only on a
+link that shares the live page's attributes. (5) A blob an ops step names as
+held is asked for again inside the begin hold. (6) An ops step with no working
+folder is refused `notReadable`. (7) above. (8) OneDrive's Pinned and Unpinned
+are carried by the attribute copy (they stick on any NTFS file, measured).
+
+**Tests:** `UndoRecoveryContractTests` (every `recoveryCases` row from the
+JSON: 20 run through the real door, swap and recovery, `fileInUseDuringRecovery`
+a real `FileShare.ReadWrite` holder; the 21 rows of U2b's kinds held on the
+ledger for W6, each still stopping at its key), `UndoRecoveryTests` (14 methods, 16 cases),
+six new `UndoSwapTests`. RESULTS_PLACEHOLDER
+
 ### The pieces still owed for #899 on Windows, and what each waits for
 
 The plan (`plans/899-plan.md` of the v2.0.0 Windows run) as amended by its
@@ -16777,7 +16871,7 @@ recording and the trail event `undo could not record a step` move to W7.
 |---|---|---|
 | W2a | BUILT (2026-11-20, above): `UndoLock` (`LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY` on a `CreateFileW` overlapped handle .NET never binds), the store in `UndoJournal.WithLock` and `UndoJournalWriter` (segments, the LF-only append, the torn line cut inside the lock, reading on, blobs by a no-overwrite rename), pruning and deletion carried out, `UndoJournalLocation` | W1 merged |
 | W2b | BUILT (2026-11-20, above): `UndoSwap` (staged, then the POSIX-semantics rename, `MoveFileEx` only on 87/50; re-read, read-only refused, attributes and creation time kept, the kept original read back; staged files removed on every failure path, F1), `UndoPlaces` (containment by a handle's final path), `UndoDoor` (step, undo, redo, refusals, clearing, dropping; blobs and begin in one hold), `JournaledSetting`; `stepCases`, the stack cases and traces through the real door; pruning's tidy of an unsettled step's staged files | W2a merged |
-| W3 | recovery (run inside the door's begin hold and before every undo and redo: W2b marks the places), the refused-swap schedule, `interrupted` closed and its staged files tidied, the staged files of a step pruning closed `unsettled` while its folder was away; `recoveryCases`; the kill harness outside the gate; the ledger entry for `undo rolled back` out | W2b merged |
+| W3 | BUILT (2026-11-20, above): `UndoRecovery` (settle by content, put back, `rolledBack`, `interrupted` and cleared, shadow), the refused-swap schedule, recovery before every prune, the abandoned own step, the closed-step tidy, re-derivation on settle, `undo rolled back`; `recoveryCases` (20 run, 21 held for W6); the kill harness; W2b's review LOWs | W2b merged |
 | W4 | doc 12's step 7 and the scaffolding: where the list lives (following `--state-dir`), `madeBy` from `AssistWorkspace.Surface` (L1), the writer scan | W2a merged; no longer after W3 |
 | W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
 | W6 | the reserved op kinds and running `recompute` | the mac's U2 |
