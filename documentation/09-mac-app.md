@@ -2562,6 +2562,49 @@ not reopened` (the reason key and the path). `working folder opened` stays
 the teacher's choice only. A window opened beside another (⌘N) writes
 nothing — neither a choice nor a reopen.
 
+### When a restored window looks for its folder (#998)
+
+A window looks for its remembered folder by its frame once, when the frame
+is final, and gives up to the next folder by order only after every sibling
+restored with it has looked (`WindowClaimRound`). Until #998 it tried every
+150 ms, seven times, because "a reopened window's frame settles a moment
+after the window exists", and gave up after about a second, during which it
+showed its quiet spinner.
+
+Measured with a probe app (a SwiftUI `WindowGroup`, macOS 26.7.3,
+2026-11-19), the order at launch is: `applicationWillFinishLaunching`; AppKit
+moves every restored window to its remembered frame;
+`NSApplication.didFinishRestoringWindowsNotification` (posted on EVERY
+launch, with two windows restored, with none, and with no saved state);
+`applicationDidFinishLaunching`; then each window's content joins it, every
+restored window in the same pass of the main actor and each with its frame
+already final. So:
+
+- **The frame is final at hand-over.** `LaunchRestoration` records the
+  notification from `applicationWillFinishLaunching` (before any window
+  exists); a window handed over before it, which was not seen, would wait
+  for it. `applicationDidFinishLaunching` marks it too, so a system that
+  never posts it cannot leave a window waiting.
+- **The give-up waits for the siblings, not a clock.** A window whose frame
+  matches nothing must not take the next entry by order while a sibling
+  whose frame matches that entry has not looked, or the two swap folders
+  (`WindowClaimRoundTests.testAWindowGivesUpByOrderOnlyAfterItsSiblingsHaveTriedTheirFrames`).
+  The give-up is enqueued on the main actor after the pass that hands the
+  restored windows over.
+- **`WindowRootView`'s `onReceive` for the notification is gone.** SwiftUI
+  subscribes when the view appears, which the probe shows is after the
+  notification, so it could never fire at launch.
+
+What a teacher sees: a restored window shows its folder at once rather than
+after about a second of spinner (HIG, Launching: "Launch instantly", and
+"display windows in the same state and location in which people left
+them"). Unmeasured: macOS 15, and a log-in restore.
+
+`WindowAccessor` lost its own timer at the same time: a fifty-millisecond
+GCD poll stood behind `viewDidMoveToWindow` for "anything installed into a
+view hierarchy that is not yet in a window", and AppKit tells such a view
+when its hierarchy joins a window (`WindowAccessorTests`).
+
 ### Rejected
 
 In the contract's `rejected`: a security-scoped bookmark instead of a plain
@@ -3926,6 +3969,46 @@ every forward failed; the tell is the `failed to set up forwarding` warning,
 and on a healthy Mac that warning appears too — but only for the duplicate
 `[::]` attempt after the `0.0.0.0` one has already succeeded. A host listener,
 or an actual connection, is the only signal that decides.
+
+### What the wait waits ON, and what it still reads once a second (#998)
+
+The wait used to sleep a second at a time in all three phases. Since #998
+it waits on whatever it can be told about, and reads again after a second
+only what cannot tell it anything:
+
+| What the wait needs | Where it comes from | How it waits |
+|---|---|---|
+| The run has ended, could not start, or was stopped | `ScriptRunner` (`@Observable`) | Woken by the change (`ScriptRunnerWait`) |
+| The address | the launcher's line, collected as it arrives (#235) | Woken by the change |
+| "Launching Quartz preview" (phase 1) | `build_site.py`'s line, collected as it arrives (`ScriptRunner.hasAnnouncedQuartzLaunch`) | Woken by the change |
+| The build has written the site (phase 2) | the section's built `index.html`, written from inside the builder | Read again after a second |
+| The server answers (phase 3), the page last viewed (#504) | an HTTP request | Asked again after a second |
+| The quiet bound (#225) | the clock | Read with the file or the request |
+
+`ScriptRunnerWait.untilTheRunChanges(_:orAfter:)` registers with
+Observation for the runner's standing (running, exit code, launch problem,
+address, launch line, stopped, start time) and returns on the first change
+or at the bound. It does not read the transcript: that would wake it for
+every chunk of build output, which is why the launch line is collected as
+lines arrive, as the address already was, instead of being searched for in
+`displayText` once a second. Phase 1's ten minutes are wall-clock time from
+the start of the phase; phases 2 and 3 still count their one-second turns.
+
+**The late reload.** When phase 2's two minutes ran out (or the run went
+quiet) before the build was seen to land, the page shown may be the build
+before, and the view reloaded it once, 900 ms later: a guess, which a
+build landing later than that missed. It now reloads once WHEN the build
+lands, `index.html` changing from what it was before the run
+(`PreviewLateBuild.waitForTheBuildToLand`), and not at all if the run ends,
+is stopped or is replaced first, or after ten minutes.
+
+**Rejected, for now:** watching `index.html` with a file-system event. It is
+written by the builder's own mirror thread, through the virtual machine's
+shared folder, and whether macOS reports such a write to a watcher has not
+been measured; the APIs that deliver the events are also GCD-based. The
+toolchain printing a line when the mirrored site has landed would let
+phase 2 wait on the run as phase 1 does; it changes `build_site.py`, so it
+is shared with Windows and was left as a question (#998's report).
 
 ## Which folders Plantoir uses
 

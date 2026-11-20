@@ -5886,8 +5886,8 @@ it says. For ANY unsaved setting, not only a changed destination — the whole
 site is built from the saved file. **The trap:** a preview ending runs
 `releasePreviewLease()`, which used to clear the banner whatever it said — and
 it is reached not only from the stop `deployAndWait` awaits but from the
-preview's own wait loops, which poll once a second and can wake after the
-deploy has set its sentence. Setting the sentence after the stop only made the
+preview's own wait loops, which wake when the run changes or a second
+has passed (#998) and can do so after the deploy has set its sentence. Setting the sentence after the stop only made the
 right order likely (the implementation review's F3). So the banner has an OWNER
 (`unsavedSettingsNoticeOwner`, `.preview` or `.deploy`) and a preview's end
 clears only the preview's own sentence
