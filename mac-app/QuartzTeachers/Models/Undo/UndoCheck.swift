@@ -925,8 +925,23 @@ nonisolated enum UndoSwap {
             return .changedSince(firstPath: target.relativePath, others: 0)
         }
         if now != .absent {
-            let originalURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "orig")
-            try? FileManager.default.removeItem(at: originalURL)
+            // A name nothing holds. One that is taken is not this swap's own
+            // (it has kept nothing yet), so it is never removed: it may be
+            // the only copy of what the page once held, kept by an earlier
+            // undo of this same step whose edit raced it, by another Mac
+            // syncing this folder, or by a list since started again, whose
+            // step numbers can be the same as this one's (the third review
+            // of U3a, LOW 6). The next free name, `-2-orig`, `-3-orig` and
+            // on, still reads as this label's kept original.
+            var originalURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "orig")
+            var number: Int = 2
+            while UndoSwap.somethingIsAt(originalURL) {
+                if number > 1000 {
+                    return .couldNotWrite(path: target.relativePath)
+                }
+                originalURL = UndoSwap.besideURL(for: target.url, label: label, role: "\(number)-orig")
+                number += 1
+            }
             var keptFailure: Int32? = UndoKillPoints.keepingTheOriginalFails?(index)
             if keptFailure == nil {
                 keptFailure = UndoSwap.keep(target.url, as: originalURL)
@@ -1040,6 +1055,19 @@ nonisolated enum UndoSwap {
         }
         _ = UndoSwap.removeStaged(goneURL)
         return false
+    }
+
+    /// Whether anything (a file, a folder, a link, even a broken one) holds
+    /// this name.
+    static func somethingIsAt(_ url: URL) -> Bool {
+        var information: stat = stat()
+        let found: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &information)
+        }
+        return found == 0
     }
 
     /// Whether a staged item is a folder kept aside as an original (`-orig`):
@@ -1226,7 +1254,7 @@ nonisolated enum UndoSwap {
         onAside: ((UndoAsideFolder) -> Void)? = nil,
         root: URL? = nil,
         keepingOnlyCopies: Bool = false,
-        unlessTheListCanPutBack listCanPutBack: ((URL) -> Bool)? = nil
+        unlessTheListHolds listHolds: ((_ kept: URL, _ place: URL) -> Bool)? = nil
     ) -> Bool {
         var allGone: Bool = true
         var folders: [URL] = []
@@ -1288,14 +1316,16 @@ nonisolated enum UndoSwap {
                 // the only copy of what its page held (the second review of
                 // U3a, MEDIUM b, and the Windows recovery review's 15): never
                 // tidied away, left beside its page under its staged name.
-                // With `listCanPutBack`, a kept original of a page the list
-                // holds every piece of content for is not the only copy:
-                // recovery can put the page back from the list, so it is
-                // tidied as before.
+                // With `listHolds`, a kept original whose bytes are exactly
+                // what the list gives for its page (by the recorded hash, or
+                // derived from what the page holds now) is not the only copy,
+                // so it is tidied; one that holds anything else (an edit that
+                // raced the swap, a hand edit) is kept (the third review of
+                // U3a, LOW 1).
                 if keepingOnlyCopies && name.hasSuffix("-orig"), let place = UndoSwap.placeOfStagedName(name) {
                     let placeURL: URL = folder.appendingPathComponent(place)
-                    let theListCanPutItBack: Bool = listCanPutBack?(placeURL) ?? false
-                    if !UndoSwap.isACopyOfItsPlace(stagedURL, place: placeURL) && !theListCanPutItBack {
+                    let theListHoldsIt: Bool = listHolds?(stagedURL, placeURL) ?? false
+                    if !UndoSwap.isACopyOfItsPlace(stagedURL, place: placeURL) && !theListHoldsIt {
                         continue
                     }
                 }

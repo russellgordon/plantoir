@@ -497,6 +497,14 @@ struct SectionScheduleSheet: View {
     func remember(_ plan: RememberTimetablePlan) {
         do {
             try SectionTimetableStore.applyRememberTimetable(plan)
+        } catch JournaledStepError.leftPartWay(_, _, let keptOriginals) {
+            // The dates are in the file: said as remembered, naming where
+            // what it held just before is kept (the third review of U3a,
+            // LOW 2). The sheet stays open so the sentence is read.
+            failure = SectionTimetableStore.Problem.savedWithWhatItHeldKept(
+                plan.courseCode, plan.sectionNumber, keptOriginals
+            ).localizedDescription
+            return
         } catch {
             failure = error.localizedDescription
             return

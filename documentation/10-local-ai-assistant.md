@@ -4476,8 +4476,16 @@ names (the second review of U3a, MEDIUM a; documentation 09, "The third
 round"). Every action's "Nothing was …" catch says it through the runner's
 `saidWhenTheStepStopped`, which also counts the write as one with no new
 undo entry. `AssistWording` is unchanged; Windows still writes page by
-page. Nor is the Restore Section pointer added: there is nothing to put
-back. `SectionVerbsEndingTests`' three tests for these paths pin
+page. Where nothing was written ("Nothing was …") no Restore Section
+pointer is added: there is nothing to put back. On the part-way answer it
+IS added, as for any `publishStoppedPartWay` (in the in-app assistant when
+this conversation saved a copy; the menu's backup sentence on the menu),
+because the copy does put the section's pages back, except for the How I
+Teach page: it belongs to the course and is saved under a stand-in
+section, and Restore Section does not put it back, so its part-way answer
+is the sentence alone (`aSectionsCopyPutsItBack: false`; the third review
+of U3a, LOW 4; `PublishStoppedPartWayTests.testHowITeachLeftPartWayAddsNoRestorePointer`).
+`SectionVerbsEndingTests`' three tests for these paths pin
 this (`testAPublishThatCannotWriteEveryPageWritesNone`,
 `testAWholeUnitThatCannotWriteEveryPageWritesNone`,
 `testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`), and

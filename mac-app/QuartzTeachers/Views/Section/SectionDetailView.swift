@@ -2057,7 +2057,9 @@ struct SectionDetailView: View {
         )
         ActivityTrail.note(line.event, line.what, course: course.code, section: sectionNumber)
         switch outcome {
-        case .shown:
+        case .shown, .shownKeepingWhatItHeld:
+            // A kept file is named on the trail line above; what the window
+            // should show of it waits on the HIG question in the U3c report.
             refreshEditedMarker()
             // The teacher has just asked to change the FRONT page, so that
             // is what they are shown, even when they asked for the page last

@@ -163,9 +163,9 @@ nonisolated enum UndoRecovery {
     /// tidied once per process, a few folder listings for the rare step that
     /// was closed; one whose file could not be removed (held, or made
     /// immutable) is looked for again at the next lock. A kept original
-    /// that differs from its page is kept: in shadow always, since shadow
-    /// recovery never puts a page back; live, only while the list does not
-    /// hold its bytes (`UndoSwap.tidyLeftovers`).
+    /// that differs from its page is kept, live and in shadow: the step is
+    /// closed, so nothing will put its page back from the list, whose
+    /// content for it is pruned with it (the third review of U3a, LOW 1).
     static func tidyClosedSteps(
         _ writer: UndoJournalWriter,
         resolveRoot: (UndoWorkingFolder) -> URL?,
@@ -192,8 +192,7 @@ nonisolated enum UndoRecovery {
             // Closed `interrupted`: the step did not settle, so a kept
             // original that is the only copy of its page's earlier content
             // stays beside the page (the second review of U3a, MEDIUM b).
-            let list: UndoJournal? = mode == .live ? writer.journal : nil
-            if !tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true, unlessTheListCanPutBackFrom: list) {
+            if !tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true) {
                 // Something held or locked: looked for again at the next lock.
                 continue
             }
@@ -224,7 +223,7 @@ nonisolated enum UndoRecovery {
     /// page is left where it is (`UndoSwap.isACopyOfItsPlace`).
     @discardableResult
     static func tidyStagedFiles(
-        of step: UndoStep, root: URL, keepingOnlyCopies: Bool = false, unlessTheListCanPutBackFrom journal: UndoJournal? = nil
+        of step: UndoStep, root: URL, keepingOnlyCopies: Bool = false, unlessTheListHoldsFrom journal: UndoJournal? = nil
     ) -> Bool {
         var urls: [URL] = []
         for op in step.ops {
@@ -232,9 +231,9 @@ nonisolated enum UndoRecovery {
                 urls.append(root.appendingPathComponent(path))
             }
         }
-        var listCanPutBack: ((URL) -> Bool)? = nil
+        var listHolds: ((URL, URL) -> Bool)? = nil
         if let journal {
-            listCanPutBack = UndoRecovery.listCanPutBack(step, root: root, from: journal)
+            listHolds = UndoRecovery.listHolds(step, root: root, from: journal)
         }
         var allGone: Bool = true
         for work in ["apply", "undo", "redo"] {
@@ -242,7 +241,7 @@ nonisolated enum UndoRecovery {
                 label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) },
                 root: root, keepingOnlyCopies: keepingOnlyCopies,
-                unlessTheListCanPutBack: listCanPutBack
+                unlessTheListHolds: listHolds
             ) {
                 allGone = false
             }
@@ -250,27 +249,40 @@ nonisolated enum UndoRecovery {
         return allGone
     }
 
-    /// Whether the list holds every piece of content the step's ops on a
-    /// place need (`UndoOp.blobs`, each whole and hashing to its name), so
-    /// recovery can put that place back from the list and a kept original
-    /// of it is not the only copy of what it held. An op that needs no
-    /// blob (a line, a key) needs nothing from the list's content.
-    static func listCanPutBack(_ step: UndoStep, root: URL, from journal: UndoJournal) -> (URL) -> Bool {
-        return { place in
+    /// Whether a kept original's bytes are exactly what the list gives for
+    /// its page, so it is not the only copy of what it holds: what the
+    /// step's ops on that page come to, undone or redone, from what the page
+    /// holds now (a whole file by its recorded hash, whose content the list
+    /// must still hold; a line, a hunk or a member derived from the page).
+    /// Never true for a kept original that holds anything else, such as an
+    /// in-place edit that raced the swap into the original's inode (the
+    /// third review of U3a, LOW 1: the old test only asked whether the
+    /// step's blobs were there, and a key edit needs none).
+    static func listHolds(_ step: UndoStep, root: URL, from journal: UndoJournal) -> (_ kept: URL, _ place: URL) -> Bool {
+        return { keptURL, place in
+            guard case .file(let kept) = UndoItem.read(at: keptURL) else {
+                return false
+            }
             let wanted: String = place.standardizedFileURL.path
-            for op in step.ops {
-                var namesThePlace: Bool = false
-                for path in op.pathsNamed where root.appendingPathComponent(path).standardizedFileURL.path == wanted {
-                    namesThePlace = true
-                }
-                if !namesThePlace {
-                    continue
-                }
-                for blob in op.blobs ?? [] where journal.readBlob(sha: blob) == nil {
-                    return false
+            var opsOnThePlace: [UndoOp] = []
+            for op in step.ops where op.knownKind != .recompute && !op.isWhole {
+                if let path = op.path, root.appendingPathComponent(path).standardizedFileURL.path == wanted {
+                    opsOnThePlace.append(op)
                 }
             }
-            return true
+            if opsOnThePlace.isEmpty {
+                return false
+            }
+            for direction in [UndoDirection.backward, UndoDirection.forward] {
+                let plan: UndoPlan = UndoCheck.plan(opsOnThePlace, direction: direction, root: root, journal: journal)
+                guard case .ready(let targets, _) = plan else {
+                    continue
+                }
+                for target in targets where target.url.standardizedFileURL.path == wanted && target.replacement == kept {
+                    return true
+                }
+            }
+            return false
         }
     }
 
@@ -580,7 +592,7 @@ nonisolated enum UndoRecovery {
                 label: label, beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) },
                 root: root, keepingOnlyCopies: true,
-                unlessTheListCanPutBack: UndoRecovery.listCanPutBack(step, root: root, from: writer.journal)
+                unlessTheListHolds: UndoRecovery.listHolds(step, root: root, from: writer.journal)
             )
             if UndoKillPoints.stopsHere(.afterRecoveryTidied) {
                 return nil
@@ -763,8 +775,17 @@ nonisolated enum UndoRecovery {
         switch outcome {
         case .completed, .nothingTookEffect, .rolledBack:
             if mode == .live {
-                UndoSwap.tidyLeftovers(label: label, beside: urls, root: root)
-                UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root)
+                // Except a kept original whose bytes the list does not hold
+                // (an edit that raced the swap): the only copy of it, kept
+                // beside its page and named on the trail (the third review
+                // of U3a, LOW 1).
+                let listHolds: (URL, URL) -> Bool = UndoRecovery.listHolds(step, root: root, from: writer.journal)
+                UndoSwap.tidyLeftovers(label: label, beside: urls, root: root, keepingOnlyCopies: true, unlessTheListHolds: listHolds)
+                UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true, unlessTheListHolds: listHolds)
+                let kept: [String] = UndoRecovery.keptOriginalsLeft(of: step, root: root)
+                if !kept.isEmpty {
+                    UndoTrailHook.keptAnOriginalLine?(step.course ?? "", step.section, phase, kept)
+                }
             }
         case .interrupted, .leftAlone:
             break

@@ -1271,6 +1271,12 @@ nonisolated enum ActivityTrail {
         /// hidden name of each kept original left beside its page. Never
         /// page text.
         case undoCouldNotPutBack = "undo could not put back a change that stopped"
+        /// Recovery settled a step left part way and kept a kept original
+        /// beside its page that differs from what the list recorded, such as
+        /// an edit another program made as the change went in (#899, U3c):
+        /// the course and section, which work stopped, and each kept
+        /// original's hidden name with its page's. Never page text.
+        case undoKeptAnOriginal = "undo kept what a page held"
         /// An Undo or a Redo was refused because the newest step is one a
         /// change that stopped left part way, and recovery has just tried to
         /// put it back and could not yet (#899, U3c): a file in use, or one

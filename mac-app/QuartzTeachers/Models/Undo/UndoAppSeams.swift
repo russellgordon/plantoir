@@ -91,6 +91,12 @@ nonisolated enum UndoTrail {
                 UndoTrail.couldNotPutBackLine(course: course, section: section, phase: phase, leftPartWay: leftPartWay, keptOriginals: keptOriginals)
             )
         }
+        UndoTrailHook.keptAnOriginalLine = { course, section, phase, keptOriginals in
+            ActivityTrail.note(
+                .undoKeptAnOriginal,
+                UndoTrail.keptAnOriginalLine(course: course, section: section, phase: phase, keptOriginals: keptOriginals)
+            )
+        }
         UndoTrailHook.leftNewestLine = { course, section, isUndo, refusal in
             ActivityTrail.note(
                 .undoRefusedForAChangeLeftPartWay,
@@ -111,6 +117,19 @@ nonisolated enum UndoTrail {
         line += "because what it needs to put \(leftPartWay == 1 ? "it" : "them") back is no longer in the list, and cleared the list."
         for kept in keptOriginals {
             line += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”."
+        }
+        return line
+    }
+
+    /// `ICS3U/1 · the undo list settled a change that stopped. What “A.md”
+    /// held before is kept beside it as the hidden file
+    /// “.A.md.plantoir-undo-4-apply-orig”, because it differs from what the
+    /// list recorded.`
+    static func keptAnOriginalLine(course: String, section: Int?, phase: UndoPhase, keptOriginals: [String]) -> String {
+        var line: String = UndoTrail.prefix(course: course, section: section)
+        line += "the undo list settled \(UndoTrail.what(phase)) that stopped."
+        for kept in keptOriginals {
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”, because it differs from what the list recorded."
         }
         return line
     }

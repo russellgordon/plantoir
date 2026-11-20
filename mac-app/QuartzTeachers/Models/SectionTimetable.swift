@@ -127,6 +127,11 @@ enum SectionTimetableStore {
         case halfRemembered(String, Int, [String])
         case cannotBeClassDates(String, Int, [String])
         case couldNotWrite(String, Int, String)
+        /// The dates went in, but what the file held just before could not
+        /// be put back over them after a check, so it is kept beside it
+        /// under each hidden name (`JournaledStepError.leftPartWay`; the
+        /// third review of U3a, LOW 2). The dates ARE remembered.
+        case savedWithWhatItHeldKept(String, Int, [String])
 
         var errorDescription: String? {
             switch self {
@@ -140,6 +145,12 @@ enum SectionTimetableStore {
                 return "\(SectionTimetableStore.list(offenders)) \(offenders.count == 1 ? "is too far from today to be a class date" : "are too far from today to be class dates"), so nothing was remembered for \(code) Section \(number). A half-remembered timetable would date the wrong classes, so the whole list is refused — send it again with \(offenders.count == 1 ? "that date" : "those dates") corrected."
             case .couldNotWrite(let code, let number, let reason):
                 return "The class dates for \(code) Section \(number) could not be saved, so they are NOT remembered: \(reason)"
+            case .savedWithWhatItHeldKept(let code, let number, let keptOriginals):
+                var said: String = "The class dates for \(code) Section \(number) are remembered, but another program may have changed their file as they were saved."
+                for kept in keptOriginals {
+                    said += " What \(JournaledStepError.placeName(ofKept: kept)) held just before is kept beside it as the hidden file “\(kept)”."
+                }
+                return said
             }
         }
     }
@@ -415,6 +426,14 @@ enum SectionTimetableStore {
             )
             step.write(data, to: plan.fileURL)
             try step.make()
+        } catch JournaledStepError.leftPartWay(let refusal, let fileName, let keptOriginals) {
+            // The dates went in and what the file held could not be put
+            // back over them: carried through as it is, so every caller says
+            // what is true, never "NOT remembered" (the third review of U3a,
+            // LOW 2). The assistant says it as part way
+            // (`saidWhenTheStepStopped`); the sheet as remembered
+            // (`Problem.savedWithWhatItHeldKept`).
+            throw JournaledStepError.leftPartWay(refusal, fileName: fileName, keptOriginals: keptOriginals)
         } catch {
             throw Problem.couldNotWrite(plan.courseCode, plan.sectionNumber, error.localizedDescription)
         }

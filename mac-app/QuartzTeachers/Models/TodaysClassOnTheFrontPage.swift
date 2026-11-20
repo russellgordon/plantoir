@@ -68,6 +68,12 @@ enum TodaysClassOnTheFrontPage {
     enum Outcome: Equatable {
         /// The line now names today's class.
         case shown(from: String, to: String)
+        /// The line names today's class, but the change went in part way:
+        /// what the front page held just before (an edit another program
+        /// made as it was saved) could not be put back over it and is kept
+        /// beside it under each hidden name in `keptOriginals` (the third
+        /// review of U3a, LOW 3). Said on the trail, naming the kept file.
+        case shownKeepingWhatItHeld(from: String, to: String, keptOriginals: [String])
         /// The page already shows today's class — the teacher changed it
         /// while the question was up. Nothing was written.
         case alreadyRight
@@ -307,11 +313,14 @@ enum TodaysClassOnTheFrontPage {
             course: course, section: offer.sectionNumber, maker: UndoStepMaker.sheet("showTodaysClassOnTheFrontPage")
         )
         step.write(result.text, to: indexURL)
+        var keptOriginals: [String]? = nil
         do {
             try step.make()
-        } catch JournaledStepError.leftPartWay {
+        } catch JournaledStepError.leftPartWay(_, _, let kept) {
             // The page went in and could not be put back: the read-back
-            // below says what it shows now, which is what is true.
+            // below says what it shows now, which is what is true, and
+            // where what it held just before is kept is said with it.
+            keptOriginals = kept
         } catch {
             return .couldNotSave
         }
@@ -320,6 +329,9 @@ enum TodaysClassOnTheFrontPage {
               let line = SectionIndexPointer.classLine(in: after, classTitles: classTitles),
               line.name == page.title else {
             return .couldNotSave
+        }
+        if let keptOriginals {
+            return .shownKeepingWhatItHeld(from: decision.shown, to: page.title, keptOriginals: keptOriginals)
         }
         return .shown(from: decision.shown, to: page.title)
     }
@@ -350,6 +362,12 @@ enum TodaysClassOnTheFrontPage {
         switch outcome {
         case .shown(let from, let to):
             return (.putTodaysClassOnTheFrontPage, "put today's class on the front page — \(to) in place of \(from)")
+        case .shownKeepingWhatItHeld(let from, let to, let keptOriginals):
+            var line: String = "put today's class on the front page — \(to) in place of \(from)"
+            for kept in keptOriginals {
+                line += ". What \(JournaledStepError.placeName(ofKept: kept)) held just before is kept beside it as the hidden file “\(kept)”"
+            }
+            return (.putTodaysClassOnTheFrontPage, line)
         case .alreadyRight:
             return (.frontPageLeftAsItWas, leftAsItWasLine(reason: "already showed today's class", offer: offer))
         case .noLongerOffered:

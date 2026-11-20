@@ -676,7 +676,7 @@ nonisolated enum UndoContractReplay {
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-        "keptOriginalLeft",
+        "keptOriginalLeft", "foreignKeptOriginalUntouched",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -742,6 +742,7 @@ nonisolated enum UndoContractReplay {
             var linesAfterTheDeploy: Int = -1
             let held: HeldStep = HeldStep()
             var foreignBlob: String? = nil
+            var foreignKept: (url: URL, bytes: Data)? = nil
             let folderOfB: String = rootB.path
             let places: UndoMemoryPlaces = UndoMemoryPlaces()
             registerTheFrontPageMaintainer()
@@ -986,6 +987,14 @@ nonisolated enum UndoContractReplay {
                     if !keptOne {
                         failures.append("stackCases '\(name)': no whole-file step to keep the original of")
                     }
+                } else if value == "foreignKeptOriginal" {
+                    // A kept original left under the next step's own label by
+                    // another Mac or an earlier list.
+                    let next: Int = try journal().read().highestSeq + 1
+                    let foreignURL: URL = UndoSwap.besideURL(for: root.appendingPathComponent(pagePath), label: "\(next)-apply", role: "orig")
+                    let foreignBytes: Data = Data("What another Mac's list kept.\n".utf8)
+                    try foreignBytes.write(to: foreignURL)
+                    foreignKept = (url: foreignURL, bytes: foreignBytes)
                 } else if value == "changeTheKeptOriginal" {
                     for staged in UndoContractKinds.stagedLeftovers(in: root) where staged.hasSuffix("-orig") {
                         let keptURL: URL = root.appendingPathComponent(staged)
@@ -1085,6 +1094,13 @@ nonisolated enum UndoContractReplay {
             }
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("stackCases '\(name)': the folder is there: \(!kept)")
+            }
+            if testCase["foreignKeptOriginalUntouched"] as? Bool == true {
+                if let foreignKept, UndoItem.read(at: foreignKept.url) != .file(foreignKept.bytes) {
+                    failures.append("stackCases '\(name)': the other list's kept original was changed or removed")
+                } else if foreignKept == nil {
+                    failures.append("stackCases '\(name)': no other list's kept original was made")
+                }
             }
             if let kept = testCase["keptOriginalLeft"] as? Bool {
                 var beside: Bool = false
@@ -1214,7 +1230,7 @@ nonisolated enum UndoContractReplay {
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
         "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace", "nextWrite", "ordinaryWriteOn",
         "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
-        "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines",
+        "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1346,7 +1362,33 @@ nonisolated enum UndoContractReplay {
                 try write(UndoContractKinds.oldMarker, to: UndoContractKinds.markerFrom, in: root)
             }
 
-            if work == "step" {
+            let racedPage: String? = string(testCase["editRacesTheSwap"])
+            if work == "step", let racedPage {
+                // Another program edits the page IN PLACE between the swap's
+                // re-read and its rename (into the inode the kept original
+                // is a link to), and putting the original back fails: the
+                // step answers part way and is left in flight.
+                let racedName: String = ((pathOf[racedPage] ?? racedPage) as NSString).lastPathComponent
+                UndoKillPoints.beforeTheRename = { _, url in
+                    guard url.lastPathComponent == racedName, let handle = try? FileHandle(forWritingTo: url) else {
+                        return
+                    }
+                    _ = try? handle.seekToEnd()
+                    try? handle.write(contentsOf: Data("Edited in Obsidian.\n".utf8))
+                    try? handle.close()
+                }
+                UndoKillPoints.putBackFailsAt = { index in index == 0 }
+                let outcome: JournaledWriteOutcome = makeTheStep()
+                UndoKillPoints.beforeTheRename = nil
+                UndoKillPoints.putBackFailsAt = nil
+                guard case .leftPartWay = outcome else {
+                    failures.append("recoveryCases '\(name)': the step was not left part way (\(outcome))")
+                    continue
+                }
+                for change in stepDraft.changes {
+                    afterHashes.append(UndoHash.sha256(ofOptional: change.after))
+                }
+            } else if work == "step" {
                 UndoKillPoints.hook = { point in point == stopAt }
                 let outcome: JournaledWriteOutcome = makeTheStep()
                 UndoKillPoints.hook = nil
@@ -1438,6 +1480,11 @@ nonisolated enum UndoContractReplay {
                 couldNotPutBackLines += 1
                 keptNamedOnTheTrail += keptOriginals
             }
+            let keptAnOriginalHookBefore = UndoTrailHook.keptAnOriginalLine
+            UndoTrailHook.keptAnOriginalLine = { _, _, _, keptOriginals in
+                couldNotPutBackLines += 1
+                keptNamedOnTheTrail += keptOriginals
+            }
             var leftLines: Int = 0
             let leftHookBefore = UndoTrailHook.leftNewestLine
             UndoTrailHook.leftNewestLine = { _, _, _, _ in
@@ -1446,6 +1493,7 @@ nonisolated enum UndoContractReplay {
             defer {
                 UndoTrailHook.foundAFolderSetAsideLine = trailHookBefore
                 UndoTrailHook.couldNotPutBackLine = couldNotPutBackHookBefore
+                UndoTrailHook.keptAnOriginalLine = keptAnOriginalHookBefore
                 UndoTrailHook.leftNewestLine = leftHookBefore
             }
 
@@ -1548,7 +1596,7 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': kept beside \(foundPages), not \(wantedFolders) (\(leftovers))")
                 }
                 if couldNotPutBackLines != 1 || keptNamedOnTheTrail.sorted() != foundNames.sorted() {
-                    failures.append("recoveryCases '\(name)': the could-not-put-back line named \(keptNamedOnTheTrail) in \(couldNotPutBackLines) lines, on the disk \(foundNames)")
+                    failures.append("recoveryCases '\(name)': the trail line naming kept originals named \(keptNamedOnTheTrail) in \(couldNotPutBackLines) lines, on the disk \(foundNames)")
                 }
             }
             if let wanted = testCase["keptAside"] as? Bool {

@@ -1175,6 +1175,13 @@ nonisolated enum UndoTrailHook {
     /// list was cleared.
     nonisolated(unsafe) static var couldNotPutBackLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ leftPartWay: Int, _ keptOriginals: [String]) -> Void)?
 
+    /// Recovery settled a step left part way (made, nothing taken effect, or
+    /// put back) and kept beside a page a kept original that the list does
+    /// not hold, such as an edit another program made as the swap went in:
+    /// the course and section, what it ended, and each kept original's
+    /// hidden name. Never removed: the only copy of what it holds.
+    nonisolated(unsafe) static var keptAnOriginalLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ keptOriginals: [String]) -> Void)?
+
     /// An Undo (`isUndo`) or a Redo was refused because the newest step is
     /// a gone process's that recovery has just tried and left: the course
     /// and section, and the refusal, which names the file. The list is kept.

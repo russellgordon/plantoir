@@ -21155,7 +21155,7 @@ changed", and recovery then deleted the only copy of what the page held.
     those two rows and the rule's sentence on staged files, so it is a
     contract change and its own piece (Mac first, then Windows' W4 from the
     same rows), not this round. The first tidy already leaves the original
-    in place for it.
+    in place for it. (Built in U3c, below: no tidy removes an only copy now.)
 - **(c) A shadow swap without the list keeps what it must.** Each such swap
   has a label of its own, `shadow-<pid>-<id>` (`UndoShadowStaging.newLabel`,
   stored in its note as `Note.label`; LOW 2: one label shared by every
@@ -21203,6 +21203,81 @@ changed", and recovery then deleted the only copy of what the page held.
   without them the original is a copy that the race never reaches, so such
   an edit is not seen there.
 
+#### U3c: a kept original puts a page back; nothing that is an only copy is deleted
+
+Russell's ruling of 2026-11-20, 15:20, and the third review of U3a's six
+lows. The contract is `undo.rule.recovery` (its "WHAT STAYS FOR GOOD"
+sentence and the kept-original sentences), `file-formats.json` →
+`undoJournal.stagedFiles`, the `recoveryCases` and `stackCases` rows marked
+U3c, and three `activityTrail.mustRecord` events.
+
+- **A kept original puts the page back.** `UndoCheck.plan(keptOriginal:)`
+  asks, for a `writeFile` whose blob the list no longer holds, for a kept
+  original of the step's own beside that page (`UndoRecovery.keptOriginal`:
+  any of the step's labels, `-orig` or `-<n>-orig`) whose bytes hash to
+  exactly the sha the op wants. Recovery passes it, so a step that died part
+  way with its content gone is rolled back (or an undo or redo ends where
+  it began) and its staged files, the kept original now a copy of its page
+  included, are removed. The door's Undo and Redo pass it too, and tidy the
+  one used once the swap went in. A kept original that does not match is
+  never used. Rejected: trusting a kept original by its name alone; a file
+  someone edited is then put back as if it were the record.
+- **Nothing that is an only copy is deleted.** A kept original FILE is
+  removed only when its bytes are its page's (`UndoSwap.isACopyOfItsPlace`)
+  or exactly what the list gives for its page, undone or redone from what
+  the page holds now (`UndoRecovery.listHolds`, which plans the step's ops on
+  that page both ways; a whole file needs its blob, a line, a hunk or a
+  member is derived from the page). It replaced `listCanPutBack`, which only
+  asked whether the step's blobs were there: a key edit needs none, so a
+  racing edit's only copy was tidied away when the step settled (LOW 1;
+  `recoveryCases` "a step whose first page was edited in place by another
+  program as the swap went in…"). Every tidy keeps such a file: recovery's
+  before it plans, after a step settles, at a `couldNotPutBack` closing, of
+  a step already closed (live too now, since nothing will put a closed
+  step's page back and its content is pruned with it), and pruning's.
+- **What the trail says.** `couldNotPutBack` writes "undo could not put back
+  a change that stopped" (no longer the "changed by hand since" line, which
+  was untrue there), naming each kept original left, read after the tidy. A
+  step that settles with one left writes "undo kept what a page held". Both
+  give the page and the hidden name, never page text.
+- **An Undo or Redo refused for a step left part way (W3's LOW 4, from
+  W4).** When the newest step is a gone process's that recovery, run at once
+  by the Undo, tried and left (a file in use, a page it cannot read now),
+  `UndoJournal.move` answers that refusal from
+  `UndoJournalWriter.leftByRecovery`, never "another change is under way",
+  writes nothing to the list, and writes "undo refused for a change left
+  part way" through `UndoTrailHook.leftNewestLine`.
+- **A kept original's name is never reused (LOW 6).** Step numbers are not
+  unique across two Macs syncing one folder or after a list is started
+  again, and an earlier undo of the same step can leave its kept original
+  for good. `swapAFile` no longer removes whatever holds the `-orig` name:
+  it keeps its original under the next free `-<n>-orig`. Rejected: a label
+  carrying a machine and list identity (it changes the staged-name format
+  both platforms parse, for a case the next free name settles); refusing
+  (a step whose undo once kept an edit could then never be undone again).
+- **Class dates and today's class left part way (LOWs 2 and 3).**
+  `SectionTimetableStore.applyRememberTimetable` passes
+  `JournaledStepError.leftPartWay` through; the class-dates sheet says the
+  dates ARE remembered and names the kept file
+  (`Problem.savedWithWhatItHeldKept`), the assistant says it as part way.
+  Today's class answers `.shownKeepingWhatItHeld`, and its trail line names
+  the kept file. What the Section window shows of that is held on a HIG
+  question (the HIG page could not be read that evening), so the window
+  behaves as for `.shown`.
+- **How I Teach (LOW 4)** is said as part way with no pointer at a copy of a
+  section (documentation 10).
+
+**What stays on the disk for good, and what a teacher sees of it.** Two
+kinds of leftover are never removed, by design: a kept original that is the
+only copy of what it holds (above), and, in shadow, the staged files of a
+swap without the list whose note could not be written (nothing records that
+they are Plantoir's to remove, `UndoShadowStaging`). Both are dot files
+beside the page, `.<page name>.plantoir-undo-…`: Obsidian, the Finder and
+the website builder pass over them, so a teacher sees nothing of them unless
+they show hidden files. The way to one is its trail line (each kept
+original is named there, with its page), and a problem report carries the
+trail. Removing one by hand loses only what it holds.
+
 #### If the app dies part way: what is on disk
 
 Every action has the same five places to die, because every action is one
@@ -21220,7 +21295,8 @@ step through the same door:
 
 Live (U7), recovery puts places 2 to 4 right once the process is gone.
 Places 2 and 3 are put back to before the step: `failed`, or `rolledBack`
-with one trail line. Place 4 is completed (`done`). Nothing staged is left.
+with one trail line. Place 4 is completed (`done`). Nothing staged is left,
+except a kept original that is the only copy of what it holds (U3c, below).
 
 In SHADOW (today), recovery never writes into a working folder. A step left
 at place 3 is recorded `interrupted` and the list cleared. Its staged new
