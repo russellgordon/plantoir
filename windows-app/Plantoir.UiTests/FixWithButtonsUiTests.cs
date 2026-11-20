@@ -207,7 +207,7 @@ public class FixWithButtonsUiTests
             }
             catch (Exception failure) { seen.Add($"top-level search failed: {failure.Message}"); }
             string picture = Path.ChangeExtension(into, null) + "-" + pictureNumber++ + ".png";
-            try { FlaUI.Core.Capturing.Capture.Rectangle(app.Window.BoundingRectangle).ToFile(picture); }
+            try { FlaUI.Core.Capturing.Capture.Screen().ToFile(picture); }
             catch (Exception failure) { seen.Add($"picture failed: {failure.Message}"); }
             lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.HelpText}\", pointer {DrivenApp.MiddleOf(element)}, picture {picture}): "
                       + (seen.Count == 0 ? "no tooltip seen in 4 s" : string.Join("; ", seen)));
