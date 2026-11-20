@@ -1,0 +1,398 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
+using Plantoir.Core.Undo;
+
+namespace Plantoir.Tests;
+
+/// <summary>
+/// The store (#899 W2a): the append, the torn-line cut, segments, blobs,
+/// reading on and the refusals, one test per sentence of
+/// <c>undoJournal.line</c>, <c>undoJournal.files</c> and <c>rule.readers</c>
+/// it proves. Every journal here has its own folder, clock and process
+/// memory (the plan review's H1).
+/// </summary>
+public sealed class UndoStoreTests : IDisposable
+{
+    private readonly string _folder = RunOwnedTempFolders.Create("plantoir-undo-store-");
+    private readonly UndoTestClock _clock = new(new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
+    private readonly UndoProcessMemory _memory = new();
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_folder, recursive: true); } catch { }
+    }
+
+    private UndoJournal Journal(long segmentBytes = UndoJournal.SegmentBytesInTheApp, UndoProcessMemory? memory = null) =>
+        new(_folder, _clock, _ => true, _ => true, isLive: false, readRetry: TimeSpan.Zero,
+            memory: memory ?? _memory, segmentBytes: segmentBytes);
+
+    private string Segment(int number) => Path.Combine(_folder, $"journal-{number:D6}.jsonl");
+
+    private static JsonObject Begin(long seq) => new()
+    {
+        ["seq"] = seq,
+        ["event"] = "begin",
+        ["process"] = new JsonObject { ["host"] = "h", ["pid"] = 1, ["name"] = "n", ["started"] = "s" },
+        ["step"] = new JsonObject { ["seq"] = seq, ["madeAt"] = "2026-11-14T12:00:00Z", ["ops"] = new JsonArray() },
+    };
+
+    private static JsonObject Event(long seq, string name) => new() { ["seq"] = seq, ["event"] = name };
+
+    private static void Step(UndoJournalWriter writer, long seq)
+    {
+        writer.Append(Begin(seq));
+        writer.Append(Event(seq, "applied"));
+    }
+
+    private static string Sentence(string key) => UndoContract.Journal.GetProperty(key).GetString()!;
+
+    private static string FilesSentence(string key) => UndoContract.Journal.GetProperty("files").GetProperty(key).GetString()!;
+
+    // ---- undoJournal.line ----------------------------------------------------
+
+    [Fact]
+    public void ALineIsOneObjectInUtf8WithNoByteOrderMarkEndingInALineFeedNeverCrLf()
+    {
+        Assert.Contains("ending in a line feed (\\n, never \\r\\n)", Sentence("line"));
+        Journal().WithLock(writer => Step(writer, 1));
+        byte[] bytes = File.ReadAllBytes(Segment(1));
+        Assert.Equal((byte)'{', bytes[0]);
+        Assert.DoesNotContain((byte)'\r', bytes);
+        Assert.Equal((byte)'\n', bytes[^1]);
+        string[] lines = new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes).Split('\n');
+        Assert.Equal(3, lines.Length);   // two lines and nothing after the last line feed
+        foreach (string line in lines[..2])
+        {
+            using JsonDocument document = JsonDocument.Parse(line);
+            Assert.Equal(1, document.RootElement.GetProperty("v").GetInt32());
+            Assert.Equal("2026-11-14T12:00:00Z", document.RootElement.GetProperty("at").GetString());
+            var keys = document.RootElement.EnumerateObject().Select(property => property.Name).ToList();
+            Assert.Equal(keys.OrderBy(key => key, StringComparer.Ordinal).ToList(), keys);   // sorted, as the mac writes
+        }
+    }
+
+    [Fact]
+    public void ATornLineIsNotCountedByAReaderAndIsCutByTheNextWriterLeavingTheLinesBeforeIt()
+    {
+        Assert.Contains("left for the next writer to cut off inside the lock", Sentence("line"));
+        UndoJournal journal = Journal();
+        journal.WithLock(writer => Step(writer, 1));
+        byte[] whole = File.ReadAllBytes(Segment(1));
+        using (var append = new FileStream(Segment(1), FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+            append.Write(Encoding.UTF8.GetBytes("{\"v\":1,\"seq\":2,\"event\":\"beg"));
+
+        UndoReading reading = Journal().Read();
+        Assert.True(reading.TornBytes > 0);
+        Assert.Equal(1, reading.Folded.Highest);
+        Assert.Empty(reading.Folded.Barriers);
+
+        journal.WithLock(writer => Step(writer, 2));
+        byte[] after = File.ReadAllBytes(Segment(1));
+        Assert.Equal(whole, after[..whole.Length]);
+        Assert.Equal((byte)'{', after[whole.Length]);
+        UndoFolded folded = Journal().Read().Folded;
+        Assert.Equal(UndoStepState.Done, folded.Steps[2].State);
+        Assert.Empty(folded.Barriers);
+    }
+
+    // ---- undoJournal.files: segments ------------------------------------------
+
+    [Fact]
+    public void ANewSegmentStartsOnceTheNewestPassesTheSizeTheContractNames()
+    {
+        Match size = Regex.Match(FilesSentence("journal-NNNNNN.jsonl"), @"once the newest passes (\d+) MiB");
+        Assert.True(size.Success);
+        Assert.Equal(long.Parse(size.Groups[1].Value) * 1024 * 1024, UndoJournal.SegmentBytesInTheApp);
+
+        UndoJournal journal = Journal(segmentBytes: 600);
+        for (long seq = 1; seq <= 12; seq++) journal.WithLock(writer => Step(writer, seq));
+        UndoReading reading = Journal().Read();
+        Assert.True(reading.SegmentsOnDisk.Count > 2);
+        Assert.Equal(Enumerable.Range(1, reading.SegmentsOnDisk.Count).ToList(), reading.SegmentsOnDisk);
+        foreach (int number in reading.SegmentsOnDisk.Take(reading.SegmentsOnDisk.Count - 1))
+            Assert.True(new FileInfo(Segment(number)).Length >= 600);
+        Assert.Equal(12, reading.Folded.Highest);
+        Assert.All(reading.Folded.Steps.Values, step => Assert.Equal(UndoStepState.Done, step.State));
+        Assert.Equal(Enumerable.Range(1, 12).Select(seq => (long)seq), reading.Folded.Steps.Keys);
+    }
+
+    /// <summary>
+    /// <c>rule.readers</c>: a reader shares delete, so a pruner can delete the
+    /// segment a reader has open. Opened the product's way (the must-fail
+    /// proof takes the delete sharing out of that one open).
+    /// </summary>
+    [Fact]
+    public void ASegmentAReaderHasOpenCanStillBeAppendedToAndDeleted()
+    {
+        UndoJournal journal = Journal();
+        journal.WithLock(writer => Step(writer, 1));
+        using (FileStream reader = UndoJournal.OpenSegmentToRead(Segment(1)))
+        {
+            journal.WithLock(writer => Step(writer, 2));
+            File.Delete(Segment(1));
+            Assert.True(reader.Length > 0);
+        }
+        Assert.False(File.Exists(Segment(1)));
+    }
+
+    /// <summary>A reader in another journal reads on while a writer appends: never unreadable, never going back.</summary>
+    [Fact]
+    public void AReaderReadsOnWhileAWriterAppends()
+    {
+        UndoJournal writerJournal = Journal(segmentBytes: 4096);
+        UndoJournal readerJournal = Journal();
+        using var stop = new CancellationTokenSource();
+        Task<(int Reads, string? Fault)> reader = Task.Run(() =>
+        {
+            long highest = 0;
+            int reads = 0;
+            while (!stop.IsCancellationRequested)
+            {
+                UndoReading reading = readerJournal.Read();
+                reads++;
+                if (!reading.IsFresh) return (reads, "a reading was not fresh");
+                if (reading.Folded.Highest < highest) return (reads, "a reading went back");
+                if (reading.Folded.Barriers.Count > 0) return (reads, "a reading saw a barrier");
+                highest = reading.Folded.Highest;
+            }
+            return (reads, null);
+        });
+        for (long seq = 1; seq <= 150; seq++) writerJournal.WithLock(writer => Step(writer, seq));
+        stop.Cancel();
+        (int reads, string? fault) = reader.Result;
+        Assert.Null(fault);
+        Assert.True(reads > 0);
+        UndoReading last = readerJournal.Read();
+        Assert.Equal(150, last.Folded.Highest);
+        Assert.Equal(150, last.Folded.Steps.Values.Count(step => step.State == UndoStepState.Done));
+    }
+
+    // ---- reading on -----------------------------------------------------------
+
+    [Fact]
+    public void AReaderReadsOnFromWhereItStopped()
+    {
+        UndoJournal journal = Journal();
+        journal.WithLock(writer => Step(writer, 1));
+        UndoJournal reader = Journal();
+        UndoReading first = reader.Read();
+        Assert.True(reader.LastReadWasWhole);
+        journal.WithLock(writer => Step(writer, 2));
+        UndoReading second = reader.Read();
+        Assert.False(reader.LastReadWasWhole, "NTFS: the second read reads on");
+        Assert.Equal(2, second.Folded.Highest);
+        Assert.Equal(1, first.Folded.Highest);   // a reading held is never changed under its holder
+        Assert.Single(first.Folded.Steps);
+    }
+
+    [Fact]
+    public void AFileReplacedUnderTheSameNameIsReadWhole()
+    {
+        UndoJournal journal = Journal();
+        journal.WithLock(writer => Step(writer, 1));
+        UndoJournal reader = Journal();
+        reader.Read();
+        byte[] bytes = File.ReadAllBytes(Segment(1));
+        string replacement = Path.Combine(_folder, "replacement");
+        File.WriteAllBytes(replacement, [.. bytes, .. UndoJournalWriter.Encode(Begin(2)), (byte)'\n']);
+        File.Move(replacement, Segment(1), overwrite: true);
+        UndoReading reading = reader.Read();
+        Assert.True(reader.LastReadWasWhole);
+        Assert.Equal(UndoStepState.Begun, reading.Folded.Steps[2].State);
+    }
+
+    [Fact]
+    public void AShorterFileIsReadWhole()
+    {
+        UndoJournal journal = Journal();
+        journal.WithLock(writer => Step(writer, 1));
+        UndoJournal reader = Journal();
+        reader.Read();
+        byte[] bytes = File.ReadAllBytes(Segment(1));
+        int firstLine = Array.IndexOf(bytes, (byte)'\n') + 1;
+        using (var stream = new FileStream(Segment(1), FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+            stream.SetLength(firstLine);
+        UndoReading reading = reader.Read();
+        Assert.True(reader.LastReadWasWhole);
+        Assert.Equal(UndoStepState.Begun, reading.Folded.Steps[1].State);
+    }
+
+    /// <summary>
+    /// The same file, as long or longer, rewritten in place: the 64 bytes before
+    /// where reading stopped have changed, so it is read whole (the must-fail
+    /// proof: without the tail check the fold keeps a line no longer there).
+    /// </summary>
+    [Fact]
+    public void AFileRewrittenInPlaceIsReadWhole()
+    {
+        UndoJournal journal = Journal();
+        journal.WithLock(writer =>
+        {
+            Step(writer, 1);
+            writer.Append(Event(1, "undoing"));
+        });
+        UndoJournal reader = Journal();
+        Assert.Equal(UndoStepState.Undoing, reader.Read().Folded.Steps[1].State);
+
+        byte[] bytes = File.ReadAllBytes(Segment(1));
+        string text = Encoding.UTF8.GetString(bytes);
+        string rewritten = text.Replace("\"event\":\"undoing\"", "\"event\":\"xndoing\"", StringComparison.Ordinal);
+        Assert.NotEqual(text, rewritten);
+        using (var stream = new FileStream(Segment(1), FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+            stream.Write(Encoding.UTF8.GetBytes(rewritten));
+
+        UndoReading reading = reader.Read();
+        Assert.True(reader.LastReadWasWhole);
+        Assert.Equal(UndoStepState.Done, reading.Folded.Steps[1].State);
+        Assert.Single(reading.Folded.Barriers);   // the line it cannot read now
+    }
+
+    [Fact]
+    public void ASegmentAppearingBelowTheNewestReadIsReadWhole()
+    {
+        UndoJournal journal = Journal();
+        journal.WithLock(writer => Step(writer, 1));
+        File.Move(Segment(1), Segment(2));
+        UndoJournal reader = Journal();
+        reader.Read();
+        File.WriteAllBytes(Segment(1), [.. UndoJournalWriter.Encode(Begin(5)), (byte)'\n']);
+        UndoReading reading = reader.Read();
+        Assert.True(reader.LastReadWasWhole);
+        Assert.Equal([1, 2], reading.SegmentsOnDisk);
+        Assert.Equal(UndoStepState.Begun, reading.Folded.Steps[5].State);
+    }
+
+    /// <summary><c>undoJournal.files</c>: "A reader that has folded a deleted segment forgets the barriers it held."</summary>
+    [Fact]
+    public void AnOldestSegmentDeletedIsForgottenWithItsBarriersAndTheRestIsReadOn()
+    {
+        Assert.Contains("A reader that has folded a deleted segment forgets the barriers it held", FilesSentence("journal-NNNNNN.jsonl"));
+        UndoJournal journal = Journal(segmentBytes: 1);
+        journal.WithLock(writer => writer.AppendRaw("{\"v\":2,\"seq\":1,\"event\":\"somethingNew\",\"at\":\"2026-11-14T12:00:00Z\"}"));
+        journal.WithLock(writer => Step(writer, 2));
+        UndoJournal reader = Journal();
+        UndoReading before = reader.Read();
+        Assert.Single(before.Folded.Barriers);
+        Assert.True(before.SegmentsOnDisk.Count >= 2);
+
+        File.Delete(Segment(1));
+        UndoReading after = reader.Read();
+        Assert.False(reader.LastReadWasWhole);
+        Assert.Empty(after.Folded.Barriers);
+        Assert.Equal(UndoStepState.Done, after.Folded.Steps[2].State);
+        Assert.Single(before.Folded.Barriers);   // the reading held before is unchanged
+    }
+
+    // ---- blobs -----------------------------------------------------------------
+
+    [Fact]
+    public void ABlobIsWrittenUnderItsHashAndNeverReplaced()
+    {
+        Assert.Contains("renamed onto the name with a rename that FAILS if the name exists (never replacing)", FilesSentence("content/<aa>/<sha256>"));
+        UndoJournal journal = Journal();
+        byte[] content = Encoding.UTF8.GetBytes("a page as it was\n");
+        string name = journal.WithLock(writer => writer.WriteBlob(content));
+        Assert.Equal(UndoCheck.Sha(content), name);
+        string path = journal.BlobPath(name);
+        Assert.Equal(content, File.ReadAllBytes(path));
+        DateTime written = File.GetLastWriteTimeUtc(path);
+        File.SetLastWriteTimeUtc(path, written.AddHours(-1));
+        Assert.Equal(name, journal.WithLock(writer => writer.WriteBlob(content)));
+        Assert.Equal(written.AddHours(-1), File.GetLastWriteTimeUtc(path));   // left as it was
+        Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, ".tmp-*"));
+    }
+
+    [Fact]
+    public void ABlobWhoseBytesDoNotHashToItsNameIsWrittenAgain()
+    {
+        Assert.Contains("A blob whose bytes do not hash to its name is treated as missing, and a writer that needs it writes it again", FilesSentence("content/<aa>/<sha256>"));
+        UndoJournal journal = Journal();
+        byte[] content = Encoding.UTF8.GetBytes("the whole page\n");
+        string path = journal.BlobPath(UndoCheck.Sha(content));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllBytes(path, Encoding.UTF8.GetBytes("the whole pa"));   // torn
+        journal.WithLock(writer => writer.WriteBlob(content));
+        Assert.Equal(content, File.ReadAllBytes(path));
+        Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, ".tmp-*"));
+    }
+
+    [Fact]
+    public void ABlobThatCannotBeStoredLeavesNothingOfItBehind()
+    {
+        UndoJournal journal = Journal();
+        byte[] content = Encoding.UTF8.GetBytes("content that has nowhere to go\n");
+        string path = journal.BlobPath(UndoCheck.Sha(content));
+        Directory.CreateDirectory(path);   // the name is taken by something that is not a blob
+        Exception? failure = Record.Exception(() => journal.WithLock(writer => writer.WriteBlob(content)));
+        Assert.True(failure is UndoJournalException or UndoListUnreadableException, failure?.ToString());
+        Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, ".tmp-*"));
+    }
+
+    // ---- closings kept, refusals ------------------------------------------------
+
+    /// <summary>A closing that cannot get the lock is kept by the PROCESS and written first at its next hold, dropping the redo branch then.</summary>
+    [Fact]
+    public void AClosingThatCannotGetTheLockIsWrittenAtTheNextHold()
+    {
+        UndoJournal journal = Journal();
+        journal.WithLock(writer =>
+        {
+            Step(writer, 1);
+            writer.Append(Event(1, "undoing"));
+            writer.Append(Event(1, "undone"));
+            writer.Append(Begin(2));
+        });
+        UndoJournal other = Journal(memory: new UndoProcessMemory());
+        other.WithLock(_ =>
+        {
+            Assert.False(journal.WriteClosingOrKeep(Event(2, "applied"), TimeSpan.FromMilliseconds(50)));
+        });
+        Assert.Equal(1, _memory.PendingClosingsFor(_folder));
+        Assert.Equal(UndoStepState.Begun, Journal().Read().Folded.Steps[2].State);
+
+        journal.WithLock(_ => { });
+        UndoFolded folded = Journal().Read().Folded;
+        Assert.Equal(UndoStepState.Done, folded.Steps[2].State);
+        Assert.Equal(UndoStepState.Dropped, folded.Steps[1].State);
+        Assert.Equal(0, _memory.PendingClosingsFor(_folder));
+    }
+
+    /// <summary>
+    /// The W1 review's M2, inside the lock: a reading that is not fresh refuses
+    /// the hold. The body never runs, nothing is written, nothing is deleted.
+    /// </summary>
+    [Fact]
+    public void AReadingThatIsNotFreshInsideTheLockRefusesTheHoldAndDeletesNothing()
+    {
+        UndoJournal journal = Journal(segmentBytes: 1);
+        journal.WithLock(writer => Step(writer, 1));
+        journal.WithLock(writer => Step(writer, 2));
+        string unneeded = journal.WithLock(writer => writer.WriteBlob(Encoding.UTF8.GetBytes("nobody names this\n")));
+        var segments = Directory.GetFiles(_folder, "journal-*.jsonl").Order().ToList();
+        var before = segments.Select(File.ReadAllBytes).ToList();
+        bool ran = false;
+        using (new FileStream(Segment(1), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            Assert.Equal(UndoJournalFailure.ListNotReadable, Assert.IsType<UndoJournalException>(Record.Exception(() =>
+                journal.WithLock(writer =>
+                {
+                    ran = true;
+                    writer.Append(Event(2, "undoing"));
+                    journal.Prune(writer);
+                }))).Failure);
+        }
+        Assert.False(ran);
+        Assert.Equal(segments, Directory.GetFiles(_folder, "journal-*.jsonl").Order().ToList());
+        Assert.Equal(before, segments.Select(File.ReadAllBytes).ToList());
+        Assert.True(File.Exists(journal.BlobPath(unneeded)));
+    }
+
+    [Fact]
+    public void TheListLivesInTheAppsStateFolderNeverAWorkingFolder()
+    {
+        Assert.Contains("%LOCALAPPDATA%\\Plantoir\\undo\\ on Windows", UndoContract.Journal.GetProperty("directory").GetString());
+        Assert.Equal(Path.Combine(Plantoir.Core.Models.AppDataRoot.Current, "undo"), UndoJournalLocation.Folder);
+    }
+}

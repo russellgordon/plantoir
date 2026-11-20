@@ -83,7 +83,8 @@ internal sealed class UndoScribe : IDisposable
     private readonly Dictionary<string, string> _folders = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _folderIds = new(StringComparer.Ordinal);
 
-    internal UndoScribe()
+    /// <param name="segmentBytes">Where a new segment starts: 4 MiB as in the app, smaller where a test needs segments.</param>
+    internal UndoScribe(long segmentBytes = UndoJournal.SegmentBytesInTheApp)
     {
         _root = RunOwnedTempFolders.Create(FolderPrefix);
         Clock = new UndoTestClock(new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
@@ -99,7 +100,7 @@ internal sealed class UndoScribe : IDisposable
         }
         Journal = new UndoJournal(JournalFolder, Clock, process => process is not null && _alive.Contains(process.Pid),
                                   step => UndoJournalChecks.FolderIsReachable(step, Clock), isLive: true, readRetry: TimeSpan.Zero,
-                                  memory: new UndoProcessMemory());
+                                  memory: new UndoProcessMemory(), segmentBytes: segmentBytes);
     }
 
     internal UndoTestClock Clock { get; }

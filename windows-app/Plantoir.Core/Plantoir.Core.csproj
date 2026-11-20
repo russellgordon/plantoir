@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Plantoir.Tests" />
+    <!-- #899 W2a: the measurement harness, in no solution. -->
+    <InternalsVisibleTo Include="Plantoir.UndoHarness" />
   </ItemGroup>
 
   <ItemGroup>

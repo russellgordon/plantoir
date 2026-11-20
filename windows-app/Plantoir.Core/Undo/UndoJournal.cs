@@ -559,6 +559,14 @@ internal sealed class UndoJournal
     /// <summary>Forces whole reads (a test's seam for the must-fail proofs, and the harness's comparison).</summary>
     internal void ReadWholeEveryTime() => _canReadOn = false;
 
+    /// <summary>
+    /// How every segment is opened to read: read, write AND delete sharing
+    /// (<c>rule.readers</c>), so a reader never stands in the way of a writer's
+    /// append or a pruner deleting the segment it has open.
+    /// </summary>
+    internal static FileStream OpenSegmentToRead(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
     /// <summary>Opens a segment to read with read, write and delete sharing, retrying a sharing violation for the read retry.</summary>
     private Stream? OpenShared(string path, out bool gone)
     {
@@ -568,9 +576,7 @@ internal sealed class UndoJournal
         {
             try
             {
-                return _open is null
-                    ? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)
-                    : _open(path);
+                return _open is null ? OpenSegmentToRead(path) : _open(path);
             }
             catch (Exception missing) when (missing is FileNotFoundException or DirectoryNotFoundException)
             {
