@@ -168,4 +168,78 @@ final class AccessibilityTreeTests: XCTestCase {
         let wordsWidth: CGFloat = NSHostingView(rootView: Text(words).fixedSize()).fittingSize.width
         XCTAssertGreaterThan(sentenceWidth, wordsWidth + 8, "no symbol is drawn before the words")
     }
+
+    // MARK: - The sidebar (#997)
+
+    /// A course's row carries its whole code as a help tag (D44), so a code
+    /// cut short at the sidebar's default width can still be read.
+    func testACourseRowShowsItsWholeCodeOnHover() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let row: some View = List {
+            CourseRowLabel(course: made.course, isBeingRenamed: false)
+        }
+        .listStyle(.sidebar)
+        let read: AccessibilityTree = try tree(of: row, size: NSSize(width: 228, height: 200))
+        var helps: [String] = []
+        for element in read.elements {
+            if !element.help.isEmpty {
+                helps.append(element.help)
+            }
+        }
+        XCTAssertTrue(
+            helps.contains(made.course.displayCode),
+            "no help tag carries the code \(made.course.displayCode); help tags: \(helps)\n\(read.described())"
+        )
+    }
+
+    /// The Backups heading's total keeps the sidebar's margin on its
+    /// trailing side (D45). The heading's row, read off the tree, runs to
+    /// within a point or two of the sidebar's trailing edge, and the total
+    /// is pushed to its end, so the room the total has is the row's own
+    /// trailing room plus the margin the heading keeps; that is at least the
+    /// room the heading's name has on its leading side. Without the margin
+    /// it sat about 2 pt from the divider.
+    func testTheBackupsTotalKeepsTheSidebarsMargin() throws {
+        let sidebar: some View = List {
+            Section(isExpanded: .constant(true)) {
+                Label("All Backups", systemImage: "square.stack.3d.up")
+            } header: {
+                BackupsSectionHeader(total: "271 KB")
+            }
+        }
+        .listStyle(.sidebar)
+        let read: AccessibilityTree = try tree(of: sidebar, size: NSSize(width: 228, height: 200))
+        let heading: AccessibilityTree.Element = try XCTUnwrap(read.element(identifiedAs: "backupsTotal"))
+        var list: AccessibilityTree.Element?
+        for element in read.elements {
+            if list == nil && element.role == "AXOutline" {
+                list = element
+            }
+        }
+        let column: CGRect = try XCTUnwrap(list, "no sidebar list in the tree:\n\(read.described())").frame
+        XCTAssertFalse(column.isNull || heading.frame.isNull, "a frame was not read")
+        let leadingRoom: CGFloat = heading.frame.minX - column.minX
+        let rowTrailingRoom: CGFloat = column.maxX - heading.frame.maxX
+
+        // The margin is really drawn: the heading asks for that much more
+        // width than the same heading without it.
+        let withMargin: CGFloat = NSHostingView(rootView: BackupsSectionHeader(total: "271 KB").fixedSize()).fittingSize.width
+        let without: CGFloat = NSHostingView(rootView: HStack {
+            Text("Backups")
+            Spacer()
+            Text("271 KB")
+        }.fixedSize()).fittingSize.width
+        let drawnMargin: CGFloat = withMargin - without
+        let totalsRoom: CGFloat = rowTrailingRoom + drawnMargin
+        print("AccessibilityTreeTests: Backups heading \(heading.frame) in \(column); name's room \(leadingRoom), "
+              + "row's trailing room \(rowTrailingRoom), margin drawn \(drawnMargin)")
+        XCTAssertEqual(drawnMargin, BackupsSectionHeader.trailingMargin, accuracy: 0.5)
+        XCTAssertGreaterThanOrEqual(
+            totalsRoom, leadingRoom - 1,
+            "the total sits \(totalsRoom) pt from the sidebar's edge; the heading's name has \(leadingRoom) pt"
+        )
+    }
 }

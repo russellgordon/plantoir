@@ -235,22 +235,11 @@ struct SidebarView: View {
                         // The total beside the name, once every backup has
                         // been measured — the space is what a teacher could
                         // not see before (#242).
-                        HStack {
-                            Text("Backups")
-                            Spacer()
-                            if workspace.backupSpace.isComplete {
-                                Text(BackupSizes.description(ofBytes: workspace.backupSpace.totalBytes))
-                                    .foregroundStyle(.secondary)
-                                    .accessibilityIdentifier("backupsTotal")
-                            }
-                        }
-                        // `.contain` (#353). A List section's header is merged into ONE
-                        // static text, so two identifiers cannot both reach the tree:
-                        // with an identifier on the header as well, the text read
-                        // "backupsGroup-backupsGroup" and `backupsTotal` was dead (read
-                        // off the real tree, 2026-09-26). The header's own was dropped;
-                        // nothing read it.
-                        .accessibilityElement(children: .contain)
+                        BackupsSectionHeader(
+                            total: workspace.backupSpace.isComplete
+                                ? BackupSizes.description(ofBytes: workspace.backupSpace.totalBytes)
+                                : nil
+                        )
                     }
                 }
 
@@ -2480,6 +2469,46 @@ struct RemovalRequest: Identifiable {
 /// from the window's model here, because a row inside a `List` cannot be
 /// relied on to observe that model — see the note at the sidebar's own body,
 /// where the read happens instead.
+/// The Backups section's heading in the sidebar: the name, and the space
+/// every backup takes once all have been measured (#242).
+///
+/// The total keeps the sidebar's margin on its trailing side (#997, D45):
+/// drawn against the column's edge it sat about 2 pt from the divider while
+/// every row above it, and the heading's own name, sit inset. The HIG's
+/// Layout page: "make it easy to apply standard margins around content".
+struct BackupsSectionHeader: View {
+
+    // MARK: - Stored properties
+
+    /// "271 KB", or nil until every backup has been measured.
+    let total: String?
+
+    /// The room kept between the total and the sidebar's trailing edge.
+    static let trailingMargin: CGFloat = 10
+
+    // MARK: - Body
+
+    var body: some View {
+        HStack {
+            Text("Backups")
+            Spacer()
+            if let total {
+                Text(total)
+                    .foregroundStyle(.secondary)
+                    .padding(.trailing, BackupsSectionHeader.trailingMargin)
+                    .accessibilityIdentifier("backupsTotal")
+            }
+        }
+        // `.contain` (#353). A List section's header is merged into ONE
+        // static text, so two identifiers cannot both reach the tree:
+        // with an identifier on the header as well, the text read
+        // "backupsGroup-backupsGroup" and `backupsTotal` was dead (read
+        // off the real tree, 2026-09-26). The header's own was dropped;
+        // nothing read it.
+        .accessibilityElement(children: .contain)
+    }
+}
+
 struct CourseRowLabel: View {
 
     // MARK: - Stored properties
@@ -2505,6 +2534,12 @@ struct CourseRowLabel: View {
             // well as wrong.
             HStack(spacing: 6) {
                 Label(course.displayCode, systemImage: "books.vertical")
+                    // The whole code on hover (#997, D44): a 12-character
+                    // code, the most a code may have, is cut short at the
+                    // sidebar's default width. The HIG's Text fields page:
+                    // "Consider using an expansion tooltip to show the full
+                    // version of clipped or truncated text."
+                    .help(course.displayCode)
                 // A copy of the course is being zipped (#351) — a backup, or
                 // the archive before a restore or removal. The row says so
                 // rather than the window going quiet for the minute it takes.

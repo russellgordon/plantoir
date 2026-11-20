@@ -212,12 +212,16 @@ struct SectionScheduleSheet: View {
                 Text("One date per line. A heading row and blank lines are fine.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $typed)
-                    .font(.body.monospaced())
-                    .frame(minHeight: 150)
-                    .border(Color.secondary.opacity(0.3))
-                    .accessibilityLabel(Text(AccessibilityNames.classDates))
-                    .accessibilityIdentifier("sectionScheduleTypedField")
+                // Tab moves on rather than typing a tab (#997, ruling Q-C).
+                // Named (#993, D41) on the text area itself, where VoiceOver
+                // lands, rather than on the scroll view around it.
+                ClassDatesTextBox(
+                    text: $typed,
+                    accessibilityName: AccessibilityNames.classDates,
+                    identifier: "sectionScheduleTypedField"
+                )
+                .frame(minHeight: 150)
+                .border(Color.secondary.opacity(0.3))
             }
 
         case .file:

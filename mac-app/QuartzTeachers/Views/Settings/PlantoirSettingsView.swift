@@ -34,11 +34,15 @@ struct PlantoirSettingsView: View {
     @AppStorage(SettingsPane.storageKey, store: PlantoirDefaults.shared)
     var pane: String = SettingsPane.assistant.rawValue
 
+    /// Every pane's width.
+    static let paneWidth: CGFloat = 560
+
     // MARK: - Computed properties
 
     var body: some View {
         TabView(selection: $pane) {
             AssistantSettingsView()
+                .settingsPaneFitsItsContent()
                 .tabItem {
                     Label("Assistant", systemImage: "sparkles")
                 }
@@ -47,7 +51,7 @@ struct PlantoirSettingsView: View {
             // were here, because it is neither about the assistant nor about
             // deploying (decision 504-5).
             PreviewSettingsView()
-                .frame(minHeight: 200)
+                .settingsPaneFitsItsContent()
                 .tabItem {
                     Label(PreviewStartPageWording.paneTitle, systemImage: "play.rectangle")
                 }
@@ -55,13 +59,13 @@ struct PlantoirSettingsView: View {
             // Obsidian's add-ons for diagrams and graphs (#495): after
             // Preview, the one way back from "Don't ask again".
             ObsidianSettingsView()
-                .frame(minHeight: 220)
+                .settingsPaneFitsItsContent()
                 .tabItem {
                     Label(ObsidianFigureAddOnsWording.paneTitle, systemImage: "square.and.pencil")
                 }
                 .tag(SettingsPane.obsidian.rawValue)
             DeployingSettingsView()
-                .frame(minHeight: 240)
+                .settingsPaneFitsItsContent()
                 .tabItem {
                     Label("Deploying", systemImage: "paperplane")
                 }
@@ -69,7 +73,7 @@ struct PlantoirSettingsView: View {
             // The outside assistants Plantoir can set up (#855, ruling 3):
             // last, because Plantoir works without any of them.
             OtherAssistantsSettingsView()
-                .frame(minHeight: 420)
+                .settingsPaneFitsItsContent()
                 .tabItem {
                     Label(AssistantSetUpWording.paneTitle, systemImage: "person.2")
                 }
@@ -78,10 +82,27 @@ struct PlantoirSettingsView: View {
         // Fixed width, the way macOS settings windows are: the panel is a
         // column of sentences, and a resizable one lets the explanations
         // stretch into single lines that are far harder to read.
-        .frame(width: 560)
+        .frame(width: PlantoirSettingsView.paneWidth)
         // `.contain` BEFORE the identifier (#353): without it SwiftUI puts
         // the container's identifier on every element inside it.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("plantoirSettings")
+    }
+}
+
+extension View {
+
+    // MARK: - Functions
+
+    /// A Settings pane as tall as what it holds (#997, D42), so the window
+    /// takes each pane's own height as its tab is chosen. Until then every
+    /// pane opened at 560 × 648: Preview and Obsidian were mostly empty
+    /// space, and Assistant, held at 560, scrolled. The HIG's Settings page:
+    /// "a settings window accommodates the size of the current pane, people
+    /// don't need to expand the window to see more."
+    func settingsPaneFitsItsContent() -> some View {
+        return self
+            .frame(width: PlantoirSettingsView.paneWidth)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

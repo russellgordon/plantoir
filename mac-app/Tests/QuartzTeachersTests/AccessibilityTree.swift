@@ -34,6 +34,15 @@ struct AccessibilityTree {
         let label: String
         let value: String
 
+        /// The help tag a pointer shows (`.help`), as VoiceOver reads it
+        /// after the name (#997).
+        let help: String
+
+        /// Where the element is, in screen points with the origin at the
+        /// top left, as an assistive app is told (#997); `.null` where it
+        /// does not say.
+        let frame: CGRect
+
         /// "1" or "0" where the element says whether it is enabled; empty
         /// where it does not.
         let enabled: String
@@ -195,6 +204,8 @@ struct AccessibilityTree {
             title: text(of: node, attribute: kAXTitleAttribute),
             label: text(of: node, attribute: kAXDescriptionAttribute),
             value: text(of: node, attribute: kAXValueAttribute),
+            help: text(of: node, attribute: kAXHelpAttribute),
+            frame: frame(of: node),
             enabled: text(of: node, attribute: kAXEnabledAttribute),
             parentRole: parentRole,
             actions: actionNames(of: node)
@@ -202,6 +213,32 @@ struct AccessibilityTree {
         for child in elementList(of: node, attribute: kAXChildrenAttribute) {
             collect(child, parentRole: role, into: &found, depth: depth + 1)
         }
+    }
+
+    /// The element's position and size, or `.null` when either is missing.
+    static func frame(of element: AXUIElement) -> CGRect {
+        var positionValue: CFTypeRef?
+        var sizeValue: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) != .success {
+            return CGRect.null
+        }
+        if AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) != .success {
+            return CGRect.null
+        }
+        guard let positionValue, let sizeValue else {
+            return CGRect.null
+        }
+        if CFGetTypeID(positionValue) != AXValueGetTypeID() || CFGetTypeID(sizeValue) != AXValueGetTypeID() {
+            return CGRect.null
+        }
+        var position: CGPoint = CGPoint.zero
+        var size: CGSize = CGSize.zero
+        let positionAXValue: AXValue = positionValue as! AXValue
+        let sizeAXValue: AXValue = sizeValue as! AXValue
+        if !AXValueGetValue(positionAXValue, .cgPoint, &position) || !AXValueGetValue(sizeAXValue, .cgSize, &size) {
+            return CGRect.null
+        }
+        return CGRect(origin: position, size: size)
     }
 
     static func actionNames(of element: AXUIElement) -> [String] {
