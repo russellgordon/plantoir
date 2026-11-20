@@ -216,7 +216,7 @@ public class FixWithButtonsUiTests
                 under = $"{at?.ControlType} '{at?.AutomationId}' '{at?.Name}'";
             }
             catch (Exception failure) { under = "unknown: " + failure.Message; }
-            lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.HelpText}\", element at {element.BoundingRectangle}, pointer {Mouse.Position}, under the pointer {under}, picture {picture}): "
+            lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.Properties.HelpText.ValueOrDefault}\", element at {element.BoundingRectangle}, pointer {Mouse.Position}, under the pointer {under}, picture {picture}): "
                       + (seen.Count == 0 ? "no tooltip seen in 4 s" : string.Join("; ", seen)));
         }
         Rest(Wait(app, "fixWithClaudeButton"), "Fix with Claude…, dimmed");
