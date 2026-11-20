@@ -451,18 +451,20 @@ final class UndoActionStepsTests: XCTestCase {
         XCTAssertEqual(try later.read().records[1]?.phase, .rolledBack)
     }
 
-    /// The same kill in SHADOW (the switch off, today): recovery never
-    /// writes into a working folder, so the files stay as the process left
-    /// them, the step is recorded interrupted and the list cleared; nothing
-    /// staged is left in the course.
+    /// A kill in SHADOW (the switch off, today), Add Classes between its two
+    /// new pages: recovery never writes the teacher's files, so they stay as
+    /// the process left them, the step is recorded interrupted and the list
+    /// cleared, and the journal's own staged files are removed (U3's change
+    /// to `rule.recovery`). MUST FAIL on the recovery before U3, which left
+    /// the dot-files in the course until a live recovery.
     func testAShadowStepKilledPartWayLeavesNothingOfTheJournalsInTheCourse() async throws {
         let made: AssistFixture.Made = try section(surface: .local)
         let list: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("undo-killed-shadow-\(UUID().uuidString)", isDirectory: true)
         listFolders.append(list)
         UndoJournalLocation.folderOverride = list
-        UndoKillPoints.hook = { point in point == .beforeSwap(2) }
-        _ = await AssistFixture.run("make_room_for_classes", with: ["unit": 1, "atDay": 2], on: made.runner)
+        UndoKillPoints.hook = { point in point == .beforeSwap(1) }
+        _ = await AssistFixture.run("add_classes", with: ["unit": 2, "howMany": 2], on: made.runner)
         UndoKillPoints.hook = nil
         var left: [String: Data] = [:]
         var stagedBeforeRecovery: Int = 0

@@ -20714,8 +20714,17 @@ proves it. It runs the step live (`JournaledStep.modeOverride`), kills it at
 `beforeSwap(2)` and runs recovery as another process would. Every page is
 back as it was, nothing staged is left, and the step reads `rolledBack`.
 `testAShadowStepKilledPartWayLeavesNothingOfTheJournalsInTheCourse` is the
-shadow half: recovery writes nothing into the course, the step reads
-`interrupted`, and nothing staged is left.
+shadow half (Add Classes, killed between its two pages). Recovery writes
+none of the teacher's files, the step reads `interrupted`, and the
+journal's own staged files are removed.
+
+That last part is new in U3. U1's `rule.recovery` said shadow recovery
+never writes into a working folder, and in U1 a shadow step staged nothing.
+Since U3 a shadow step is staged like a live one, so recovery's tidy of a
+closed step's staged files runs in shadow too. It runs only for a step whose
+every op changes a file in place; a step that moves or makes a folder is
+left for a live recovery. Measured red before the change: the dot-files
+stayed in the course.
 
 #### The action traces: through the real action code
 
