@@ -392,9 +392,10 @@ final class SectionProblemsTests: XCTestCase {
     /// #731 (implementation review H1): the add-ons offer's "Don't ask
     /// again" is presented from a view of its own, so it never reaches the
     /// Problems alert — where ticking it silently turned the offer off.
-    /// There is ONE suppression toggle in the app's views, inside the offer's
-    /// own host, and none in the section's view.
-    func testOnlyTheAddOnsOfferCarriesASuppressionToggle() throws {
+    /// There is ONE suppression toggle for it in the app's views, inside the
+    /// offer's own host, and none in the section's view (the stop questions'
+    /// box, #988, is the only other).
+    func testEachSuppressionToggleIsTheAddOnsOffersOrTheStopQuestions() throws {
         let main: String = try readSource("QuartzTeachers/Views/MainWindowView.swift")
         let offer: String = try body(of: "private struct ObsidianAddOnsOfferDialog: ViewModifier {", in: main)
         let host: String = try body(of: "private var offerHost: some View {", in: offer)
@@ -404,6 +405,7 @@ final class SectionProblemsTests: XCTestCase {
         XCTAssertFalse(presenting.contains("dialogSuppressionToggle"), "never on the window's content")
         XCTAssertTrue(presenting.contains("content.background {"))
         var toggles: Int = 0
+        var stopQuestionToggles: Int = 0
         let views: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("QuartzTeachers/Views")
@@ -414,8 +416,15 @@ final class SectionProblemsTests: XCTestCase {
             }
             let text: String = try String(contentsOf: file, encoding: .utf8)
             toggles += text.components(separatedBy: ".dialogSuppressionToggle(").count - 1
+            if file.lastPathComponent == "TaskProgressView.swift" {
+                stopQuestionToggles += text.components(separatedBy: ".dialogSuppressionToggle(").count - 1
+            }
         }
-        XCTAssertEqual(toggles, 1, "one suppression toggle in the app's views: the add-ons offer's")
+        // #988 added the second: the stop questions' "Don't ask again", on
+        // the panel's Cancel button alone, so it reaches only the question
+        // that button presents (`StopQuestionTests`).
+        XCTAssertEqual(stopQuestionToggles, 1, "the stop questions' box is on the progress panel's Cancel")
+        XCTAssertEqual(toggles, 2, "two suppression toggles in the app's views: the add-ons offer's and the stop questions'")
         let section: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
         XCTAssertFalse(section.contains("dialogSuppressionToggle"))
     }

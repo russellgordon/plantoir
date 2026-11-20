@@ -1165,6 +1165,12 @@
         "why": "#495. The toggle is the only way back from \"Don't ask again\" and changes what happens in every course, on the 'preview start page chosen in Settings' precedent."
       },
       {
+        "event": "stop question setting changed",
+        "carries": "which question (\"Ask before stopping a deploy\" or \"Ask before stopping a share of unit plans\"), on or off, and where: the question's own Don't ask again box, ticked with Stop Deploy or Stop Share (Cancel remembers nothing and writes nothing), or Settings > Deploying > Stopping. One line per change; opening the pane writes nothing.",
+        "line": "Ask before stopping a deploy off, from Don't ask again in “Stop the deploy?”",
+        "why": "#988. While a question is off, Cancel, Escape and Command-Period stop that task at once, so \"Escape stopped my deploy without asking\" is answered by when, and where, the question was turned off. Windows owes it with the questions themselves (#1009), held there in NamedGapLedger until then."
+      },
+      {
         "event": "asked to close Obsidian to open a course",
         "carries": "the course's code and what the answer to obsidianNeverClosedUnasked's question came to: opened after closing Obsidian, Cancel, nothing to close by then, Obsidian did not close, or it closed and the course could not be added to its list. The exact words are obsidianNeverClosedUnasked.trail.",
         "line": "MPM2D · closed Obsidian to add the course to its list, and opened it",

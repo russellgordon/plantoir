@@ -4,6 +4,10 @@ checked: 2.0.0
 covers:
 - mac-app/QuartzTeachers/Views/Planning/PlanShareBar.swift
 - mac-app/QuartzTeachers/Views/Planning/PlanShareListsSheet.swift
+- mac-app/QuartzTeachers/Views/Planning/PlanShareConsoleSheet.swift
+- mac-app/QuartzTeachers/Views/Console/TaskCancelButton.swift
+- mac-app/QuartzTeachers/Models/StopQuestion.swift
+- mac-app/QuartzTeachers/Views/Settings/StopQuestionSettingsSection.swift
 - mac-app/QuartzTeachers/Models/PlanShareTables.swift
 - mac-app/QuartzTeachers/Models/PlanSharing.swift
 - mac-app/QuartzTeachers/Models/PlanningTab.swift
@@ -83,6 +87,16 @@ The share bar says how the plans are shared: with a username and password, or op
 - {{control:sharePlanStopSharing}}.
 
 There is one such website for each school year. The school year changes on 1 August and is written like 2026-27. An earlier year's plans keep the password they were shared with.
+
+## Stop a share that is still running
+
+While the plans are being shared, {{control:cancel}} in the sheet stops the share.
+
+{{mac}}
+Plantoir asks first, because a share stopped part way can leave the plans partly shared: choose {{control:stopShare}} to stop it, or {{control:cancel}} to let it finish. The Escape key and Command-Period press {{control:cancel}} in the sheet as well. In the question they choose {{control:cancel}}, and the Return key chooses {{control:stopShare}}.
+
+To stop shares without being asked, tick {{control:stopQuestionDontAskAgain}} in the question and choose {{control:stopShare}}. Ticking it and choosing {{control:cancel}} changes nothing. From then on, {{control:cancel}}, the Escape key and Command-Period stop a share at once. To be asked again, choose {{menu:settings}}, open the {{control:plantoirSettingsDeployingPane}} pane, and turn on {{control:asksBeforeStoppingAShare}} under {{control:stopQuestionSection}}. The question about deploys has a setting of its own there.
+{{/mac}}
 
 ## Stop sharing
 

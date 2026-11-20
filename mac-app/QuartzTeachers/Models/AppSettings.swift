@@ -175,6 +175,36 @@ class AppSettings {
         }
     }
 
+    /// The key holding whether "Stop the deploy?" is asked (#988).
+    static let asksBeforeStoppingADeployKey: String = "asksBeforeStoppingADeploy"
+
+    /// Whether stopping a running deploy asks "Stop the deploy?" first
+    /// (#988). On by default; turned off by the question's "Don't ask
+    /// again" ticked with Stop Deploy, and back on in Settings ▸ Deploying.
+    /// While it is off, Cancel, Escape and Command-Period stop a deploy at
+    /// once. App-wide: it is how this teacher works, not a fact about a class.
+    var asksBeforeStoppingADeploy: Bool {
+        didSet {
+            if canRemember {
+                defaults.set(asksBeforeStoppingADeploy, forKey: AppSettings.asksBeforeStoppingADeployKey)
+            }
+        }
+    }
+
+    /// The key holding whether "Stop this share?" is asked (#988).
+    static let asksBeforeStoppingAShareKey: String = "asksBeforeStoppingAShareOfUnitPlans"
+
+    /// Whether stopping a running share of unit plans asks "Stop this
+    /// share?" first (#988). Its own setting, apart from the deploy's
+    /// (ruling 2), so silencing one question never silences the other.
+    var asksBeforeStoppingAShare: Bool {
+        didSet {
+            if canRemember {
+                defaults.set(asksBeforeStoppingAShare, forKey: AppSettings.asksBeforeStoppingAShareKey)
+            }
+        }
+    }
+
     // MARK: - Computed properties
 
     /// False while the hosted tests drive the real app, so a test run
@@ -205,6 +235,18 @@ class AppSettings {
 
         self.plansAccepted = defaults.integer(forKey: AppSettings.plansAcceptedKey)
         self.hasBeenToldAboutTheSetting = defaults.bool(forKey: AppSettings.toldAboutTheSettingKey)
+
+        // Both stop questions are asked until the teacher says otherwise.
+        if defaults.object(forKey: AppSettings.asksBeforeStoppingADeployKey) != nil {
+            self.asksBeforeStoppingADeploy = defaults.bool(forKey: AppSettings.asksBeforeStoppingADeployKey)
+        } else {
+            self.asksBeforeStoppingADeploy = true
+        }
+        if defaults.object(forKey: AppSettings.asksBeforeStoppingAShareKey) != nil {
+            self.asksBeforeStoppingAShare = defaults.bool(forKey: AppSettings.asksBeforeStoppingAShareKey)
+        } else {
+            self.asksBeforeStoppingAShare = true
+        }
 
         // On unless the teacher has said otherwise — including through the
         // retired key, which recorded the same answer the other way round.

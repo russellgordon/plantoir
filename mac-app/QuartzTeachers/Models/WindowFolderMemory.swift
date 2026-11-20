@@ -148,15 +148,23 @@ enum WindowFolderMemory {
 
     /// The next remembered window, in order — a gone folder included, so
     /// its window can say what happened to it (#311).
-    static func claimNextEntry(defaults: UserDefaults = PlantoirDefaults.shared) -> Entry? {
+    ///
+    /// `skippingFrames`: frames of other open windows. An entry remembered at
+    /// one of them is left for that window (#998).
+    static func claimNextEntry(skippingFrames reservedFrames: [String] = [],
+                               defaults: UserDefaults = PlantoirDefaults.shared) -> Entry? {
         if Date() > claimsOpenUntil {
             return nil
         }
         loadIfNeeded(defaults: defaults)
-        if unclaimed.isEmpty {
-            return nil
+        for (index, entry) in unclaimed.enumerated() {
+            if !entry.frame.isEmpty && reservedFrames.contains(entry.frame) {
+                continue
+            }
+            unclaimed.remove(at: index)
+            return entry
         }
-        return unclaimed.removeFirst()
+        return nil
     }
 
     /// Records the open windows as folder-and-frame pairs, in order.

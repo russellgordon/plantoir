@@ -33,6 +33,32 @@ struct TaskProgressView: View {
     let allLegs: [MultiDestinationDeployRunner.Leg]?
     let onCancel: (() -> Void)?
 
+    /// True while this panel is the thing in front, so Escape and
+    /// Command-Period press its Cancel (#988, the HIG review's D6).
+    /// Keyboards: "Esc: Cancel the current action or process";
+    /// "Command-Period: Cancel an operation." Progress indicators: "When
+    /// it's feasible, let people halt processing."
+    ///
+    /// False where something else covers the panel: the section window's
+    /// preview draws its site OVER this panel while the preview serves, and
+    /// there Escape belongs to the web page (a page's own Escape, a video
+    /// leaving full screen), never to stopping the preview underneath it.
+    /// `SectionDetailView.progressPanelTakesTheCancelKeys` decides it there;
+    /// everywhere else the panel is in front whenever it shows.
+    let takesTheCancelKeys: Bool
+
+    /// The question stopping this task asks first, by click or by key
+    /// (Russell's rulings on #988, 2026-11-19): "Stop the deploy?" for a
+    /// section's deploy, "Stop this share?" for a share of unit plans, each
+    /// because a task stopped part way can leave things partly done. `nil`
+    /// for a preview, which stops at once.
+    let stopQuestion: StopQuestion?
+
+    /// Where whether `stopQuestion` is still asked is read and remembered.
+    /// The app's own settings; a test passes its own, so ticking "Don't ask
+    /// again" there never reaches the teacher's.
+    let settings: AppSettings
+
     /// TESTS ONLY: told the height the folder publish's render note was
     /// actually drawn at, so a test can say whether it kept every line
     /// (#213). Nothing else can: the accessibility tree does not reach a
@@ -55,6 +81,9 @@ struct TaskProgressView: View {
         title: String,
         showingDetailsForTesting: Bool = false,
         canCancel: Bool = true,
+        takesTheCancelKeys: Bool = true,
+        stopQuestion: StopQuestion? = nil,
+        settings: AppSettings = AppSettings.shared,
         hidesSiteLink: Bool = false,
         allLegs: [MultiDestinationDeployRunner.Leg]? = nil,
         onCancel: (() -> Void)? = nil,
@@ -64,6 +93,10 @@ struct TaskProgressView: View {
         self.runner = runner
         self.title = title
         self.canCancel = canCancel
+        self.takesTheCancelKeys = takesTheCancelKeys
+        self.stopQuestion = stopQuestion
+        self.settings = settings
+        self._asking = State(initialValue: StopQuestionAsking(question: stopQuestion, settings: settings))
         self.hidesSiteLink = hidesSiteLink
         self.allLegs = allLegs
         self.onCancel = onCancel
@@ -83,7 +116,70 @@ struct TaskProgressView: View {
     /// the body, which spins the main thread forever.
     @State var refreshTracker: RefreshTracker = RefreshTracker()
 
+    /// Makes Cancel act once per run, however it is pressed (#988 review).
+    @State var cancelOnce: CancelOncePerRun = CancelOncePerRun()
+
+    /// The stop question while it is asked: whether it is showing, and its
+    /// "Don't ask again" box, unticked each time it opens and read only when
+    /// the teacher chooses to stop (ruling 3). A model of its own so what
+    /// each of the question's buttons remembers is tested in every suite
+    /// (`StopQuestionTests`, the fourth #988 review).
+    @State var asking: StopQuestionAsking
+
+    /// Whether this panel's window is the key window. A sheet or an alert
+    /// in front of it (one of its own questions included) is the key window
+    /// then, so Escape there is the sheet's and never stops the task behind
+    /// it.
+    @Environment(\.controlActiveState) var controlActiveState
+
     // MARK: - Computed properties
+
+    /// Whether stopping this task asks first now: it has a question, and
+    /// the teacher has not turned that question off. While it is off,
+    /// Cancel, Escape and Command-Period stop the task at once, as a
+    /// preview's do.
+    var asksBeforeStopping: Bool {
+        return asking.asksBeforeStopping
+    }
+
+    /// The question the alert shows. Only ever presented when
+    /// `asksBeforeStopping`, so `stopQuestion` is set then; the deploy's
+    /// words stand in otherwise, never shown.
+    var questionShown: StopQuestion {
+        if let stopQuestion {
+            return stopQuestion
+        }
+        return StopQuestion.deploy
+    }
+
+    /// Whether the task is still under way, as the header reads it.
+    var runIsUnderWay: Bool {
+        return runner.isRunning || runner.isBetweenPhases
+    }
+
+    /// Whether the Cancel button is showing.
+    var cancelIsShowing: Bool {
+        if !canCancel || runner.wasCancelled {
+            return false
+        }
+        return !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt)
+    }
+
+    /// Whether the visible Cancel holds Escape and Command-Period now
+    /// (#988): while it shows, the run is under way, nothing covers the
+    /// panel, no question about stopping is open, and the panel's window is
+    /// the key window. Whether a box is being typed in is read by the
+    /// button itself when a key arrives (`CancelKeyNSButton`), so it is
+    /// never out of date.
+    var cancelKeysAreLive: Bool {
+        return TaskProgressView.cancelHoldsTheKeys(
+            takesTheCancelKeys: takesTheCancelKeys,
+            cancelIsShowing: cancelIsShowing,
+            runIsUnderWay: runIsUnderWay,
+            isAskingToStop: asking.isAsking,
+            windowIsKey: controlActiveState == .key
+        )
+    }
 
     /// Drives the question alert without writing state during a body.
     ///
@@ -161,6 +257,67 @@ struct TaskProgressView: View {
 
     // MARK: - Functions
 
+    /// The rule `cancelKeysAreLive` reads, on its own so a test can read
+    /// every case of it without drawing the panel.
+    static func cancelHoldsTheKeys(
+        takesTheCancelKeys: Bool,
+        cancelIsShowing: Bool,
+        runIsUnderWay: Bool,
+        isAskingToStop: Bool,
+        windowIsKey: Bool
+    ) -> Bool {
+        if !takesTheCancelKeys || !cancelIsShowing || !runIsUnderWay {
+            return false
+        }
+        if isAskingToStop || !windowIsKey {
+            return false
+        }
+        return true
+    }
+
+    /// Cancel, clicked or pressed from the keyboard: once per run. A plan
+    /// share's cancel never sets `wasCancelled`, so without this the button
+    /// stayed live, and a held Escape repeating within one frame ran Cancel
+    /// three times (#988 review).
+    ///
+    /// Nothing here asks what pressed the button: a key typed in a box never
+    /// reaches it (`CancelKeyNSButton.performKeyEquivalent` refuses it when
+    /// it arrives), and a click or an accessibility press always stops the
+    /// task. (The fifth #988 review: reading `NSApp.currentEvent` here took
+    /// a VoiceOver press after a typed key for that key.)
+    func pressCancel() {
+        let taskCanStillBeStopped: Bool = runIsUnderWay && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt)
+        let stopsNow: Bool = asking.pressCancel(taskCanStillBeStopped: taskCanStillBeStopped)
+        if stopsNow {
+            stopTheTask()
+        }
+    }
+
+    /// The stopping button in the question: a ticked "Don't ask again"
+    /// turns this question off (only now, never on Cancel), then the task
+    /// stops.
+    func chooseStop() {
+        asking.chooseStop()
+        stopTheTask()
+    }
+
+    /// Stops the task: what Cancel does for a preview, and what Stop Deploy
+    /// or Stop Share does in its question. Once per run, and never for a run that
+    /// has already ended while the question was open.
+    func stopTheTask() {
+        if !runIsUnderWay {
+            return
+        }
+        if !cancelOnce.pressOnce(forRunStartedAt: runner.startedAt) {
+            return
+        }
+        if let onCancel {
+            onCancel()
+        } else {
+            runner.cancelByUser()
+        }
+    }
+
     /// Records each refresh; a long gap means the interface was stalled.
     /// Also reports window geometry, because a blank window with a
     /// RESPONSIVE app means the content is being laid out somewhere
@@ -231,16 +388,50 @@ struct TaskProgressView: View {
 
                             Spacer()
 
-                            if canCancel && !runner.wasCancelled {
-                                Button("Cancel") {
-                                    if let onCancel {
-                                        onCancel()
-                                    } else {
-                                        runner.cancelByUser()
+                            if cancelIsShowing {
+                                // The visible button holds Escape and
+                                // Command-Period itself (#988), and lets go
+                                // of them whenever something else has a use
+                                // for them: `cancelKeysAreLive`, and a box
+                                // being typed in, read when the key arrives.
+                                TaskCancelButton(
+                                    title: "Cancel",
+                                    accessibilityIdentifier: "taskCancelButton",
+                                    holdsTheCancelKeys: cancelKeysAreLive,
+                                    action: {
+                                        pressCancel()
                                     }
+                                )
+                                // Stopping a deploy or a share asks first (Russell's rulings on
+                                // #988, 2026-11-19). Stop Deploy and Stop Share are plain buttons
+                                // and the default, so Return stops the task; Alerts: "Always place
+                                // the default button on the trailing side of a row or at the top
+                                // of a stack", and the destructive style is for "a destructive
+                                // action people didn't deliberately choose", which this is not.
+                                // The other button is Cancel ("Always use 'Cancel' to title a
+                                // button that cancels the alert's action"), with Escape and
+                                // Command-Period.
+                                .alert(questionShown.title, isPresented: $asking.isAsking) {
+                                    Button(questionShown.stopButton) {
+                                        chooseStop()
+                                    }
+                                    .keyboardShortcut(.defaultAction)
+                                    .accessibilityIdentifier(questionShown.stopButtonIdentifier)
+                                    // Cancel remembers nothing, the box included (ruling 3).
+                                    Button(questionShown.cancelButton, role: .cancel) {
+                                        asking.chooseCancel()
+                                    }
+                                    .keyboardShortcut(.cancelAction)
+                                    .accessibilityIdentifier(questionShown.cancelButtonIdentifier)
+                                } message: {
+                                    Text(questionShown.message)
                                 }
-                                .buttonStyle(.bordered)
-                                .accessibilityIdentifier("taskCancelButton")
+                                // "macOS alerts can add a suppression checkbox" (Alerts). On
+                                // this button, so it reaches this question and no other: a
+                                // suppression toggle applies to every dialog presented within
+                                // the view it is on (#731), and the panel's other questions are
+                                // presented from the panel as a whole.
+                                .dialogSuppressionToggle(StopQuestionSettingsWording.dontAskAgain, isSuppressed: $asking.dontAskAgain)
                             }
                         }
                     } else if let exitCode = runner.lastExitCode {
@@ -464,6 +655,13 @@ struct TaskProgressView: View {
                     runner.send(line: "n")
                 }
             )
+        }
+        .onChange(of: runIsUnderWay) {
+            // A deploy that ends while its question is open has nothing
+            // left to stop: the question goes.
+            if !runIsUnderWay {
+                asking.taskEnded()
+            }
         }
         .onChange(of: runner.isAwaitingInput) {
             // Start from the answer the task would have used anyway, so
