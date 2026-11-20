@@ -192,7 +192,16 @@ internal static class UndoCheck
         private PlanResult() { }
 
         /// <summary>Every op can be moved: the new content of each file it touches (null: no file).</summary>
-        internal sealed record Ready(IReadOnlyDictionary<string, byte[]?> Changes) : PlanResult;
+        internal sealed record Ready(IReadOnlyDictionary<string, byte[]?> Changes) : PlanResult
+        {
+            /// <summary>
+            /// The same changes in the order the check MET their files (an undo
+            /// meets its ops in reverse), each with what the file held when it
+            /// was checked (null: no file): what the staged swap re-reads before
+            /// each rename (W2b).
+            /// </summary>
+            internal IReadOnlyList<(string Path, byte[]? Expected, byte[]? Replacement)> InOrder { get; init; } = [];
+        }
 
         /// <summary>Something it changed was changed since: the first met is named, with how many others.</summary>
         internal sealed record ChangedSince(string First, int Others) : PlanResult;
@@ -249,6 +258,7 @@ internal static class UndoCheck
 
         var ordered = backward ? ops.Reverse().ToList() : ops.ToList();
         var original = new Dictionary<string, UndoCurrent>(StringComparer.Ordinal);
+        var met = new List<string>();
         var working = new Dictionary<string, UndoCurrent>(StringComparer.Ordinal);
         var inTheWay = new List<string>();
         string? missing = null;
@@ -263,6 +273,7 @@ internal static class UndoCheck
             {
                 original[path] = read(path);
                 working[path] = original[path];
+                met.Add(path);
             }
             UndoOpState state = StateOf(op, working[path]);
             if (state == UndoOpState.InUse) { inUse ??= path; continue; }
@@ -323,12 +334,17 @@ internal static class UndoCheck
         if (inUse is not null) return new PlanResult.FileIsInUse(inUse);
 
         var changes = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
-        foreach ((string path, UndoCurrent was) in original)
+        var inOrder = new List<(string, byte[]?, byte[]?)>();
+        foreach (string path in met)
         {
+            UndoCurrent was = original[path];
             UndoCurrent now = working[path];
-            if (!SameContent(was, now)) changes[path] = now is UndoCurrent.Bytes bytes ? bytes.Content : null;
+            if (SameContent(was, now)) continue;
+            byte[]? replacement = now is UndoCurrent.Bytes bytes ? bytes.Content : null;
+            changes[path] = replacement;
+            inOrder.Add((path, was is UndoCurrent.Bytes before ? before.Content : null, replacement));
         }
-        return new PlanResult.Ready(changes);
+        return new PlanResult.Ready(changes) { InOrder = inOrder };
     }
 
     private static bool SameContent(UndoCurrent a, UndoCurrent b) => (a, b) switch

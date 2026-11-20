@@ -38,7 +38,6 @@ struct AssistantSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 560)
         .onAppear {
             library.refresh()
             ActivityTrail.note(

@@ -4546,6 +4546,240 @@ test, and choosing it over a hosted-view geometry check was the same call
 `Form` renders lazily on macOS, so walking the view tree means fighting the
 layout for an answer the source already gives.
 
+## Layout and small behaviour after the HIG review (#997)
+
+Part of the Mac's review against Apple's Human Interface Guidelines (#975,
+stage 2). Each change names the HIG sentence it follows; the Windows app is
+brought to match in stage 3.
+
+- **Settings panes fit what they hold, up to what the screen shows (D42).**
+  Every pane goes through `settingsPaneFitsItsContent(tallest:)`
+  (`PlantoirSettingsView.swift`): the window's 560-point width, then
+  `.frame(maxHeight:)` with the cap `SettingsPaneHeight` gives, then
+  `.fixedSize(horizontal: false, vertical: true)`. Asked for its ideal
+  height, the capped frame answers the content's own height or the cap,
+  whichever is less, and the grouped form inside, given that height,
+  scrolls the rest. The cap is the visible height of the Settings
+  window's OWN screen (without the menu bar and the Dock) less the window's title bar and pane buttons
+  (`windowChrome`, 88 pt, measured on the running window: 648 pt around
+  a pane held at 560) and 20 pt above and below, and never under 240 pt. Measured in the unit host on 2026-11-20, each pane's own height:
+  Assistant 674 pt, Deploying 532 pt (with its Stopping section, #988),
+  Other Assistants 428 pt, Obsidian 167 pt, Preview 159 pt. The cap is
+  577 pt on a 1280 x 800 screen with the Dock (about 705 pt visible) and
+  432 pt on a scaled 1024 x 640 one (about 560 pt), so on either the
+  Assistant pane scrolls to its last download's button (Download or
+  Remove…) instead of running off the bottom of the screen; on this Mac's
+  1512 x 982 it is 820 pt and nothing scrolls. The first version of #997
+  used `fixedSize` alone, and its review found the 674 pt pane could not
+  be scrolled to its bottom on a short screen. Its second version took the
+  cap once, when the pane was drawn, from the KEY window's screen; the
+  second review found that when Settings first opens that is the main
+  window's screen, so Settings left on an 800 pt laptop beside a tall
+  display opened the Assistant pane 762 pt tall where about 705 show, and
+  nothing recomputed it on a move or a Dock change. Now
+  `SettingsWindowPlacement` is handed the Settings window itself
+  (`WindowAccessor`, the moment the pane joins it) and works the cap out
+  again, from the screen that holds most of that window (how AppKit's
+  `NSWindow.screen` decides), on the notifications AppKit posts when
+  something it depends on has changed: `NSWindow.didChangeScreenNotification`,
+  `didBecomeKeyNotification` (Settings reopened), `didResizeNotification`,
+  and `NSApplication.didChangeScreenParametersNotification` (screens
+  rearranged, the Dock shown, hidden or moved); no timed delay. Before it
+  has a window the cap is the SHORTEST screen's, the one cap never too
+  tall for wherever Settings opens (the second version read
+  `NSScreen.main`). The placement is handed the displays
+  (`SettingsScreenArea` values, `NSScreen.screens` in the app), so a test
+  gives it a laptop beside a tall display and checks the choice of screen
+  itself: the third review found the second version's test passed with
+  the screen read from the key window, because its injected visible frame
+  skipped that choice.
+
+  **When the window is moved.** A taller pane grows the window down from
+  its top edge, so a window that sat on its screen with a short pane runs
+  past the bottom (past the Dock) with a tall one. It is moved ONLY after
+  a resize that grew it and left its bottom in no display's visible area,
+  judged from the frame before and after that resize
+  (`SettingsPaneHeight.originAfterResize` and `bottomIsShown`; the frame
+  before is kept on every resize and every move): up just far enough to
+  undo what the growth hid, to the visible bottom, or, when the person had
+  left the bottom lower than that, back to where they left it, never so
+  far the title bar leaves the top. What it was lifted by is remembered
+  (`SettingsWindowLift`) and given back when a shorter pane shrinks it
+  again, so the same pane lands in the same place every time; the fourth
+  review measured the version before this one: Short at y = 30, Tall,
+  Short ended 451 pt higher than placed, and a window left low at -120
+  went to -120 the first time the tall pane was chosen and to 0 the
+  second. A move that kept the window's size is the person's
+  (`isThePersonsMove`; the placement's own `setFrameOrigin` is not
+  counted), and it clears what is owed: where they put it is theirs. A
+  focus change, a screen change or a person's own drag of an edge
+  (`inLiveResize`) never moves it, so a window left partly below the
+  screen stays where it was put, and one on the upper of two stacked
+  displays whose bottom hangs onto the lower display's visible area is
+  not lifted when a taller pane grows it (the fourth review found a
+  300 pt jump there, with nothing hidden). HIG, Windows:
+  people "can reposition them", and "the system remembers window size and
+  placement". The second version moved it on every one of those
+  notifications, and the third review found it snapped back on every
+  click. (AppKit's own `constrainFrameRect(_:to:)` keeps only the top edge
+  on screen, so it does not cover the bottom.) `LayoutAndSmallBehaviourTests`
+  shows a window (beyond the displays, as the unit host keeps every
+  window, with a pretend display laid around it; the window records the
+  origins it is asked to move to, since the host pins every frame) and
+  resizes it through AppKit: a growing resize past the bottom moves it
+  once, to the visible bottom; a window left low is not moved on becoming
+  key, on a screen change or on a resize that did not grow it. On injected
+  frames and displays it also checks Short, Tall, Short, Tall landing in
+  the same places (placed at 30 and left low at -120), a person's move
+  clearing what was lifted, and a bottom on the display below left alone.
+
+  NOT proven: a real second display (this Mac has one screen), and so the
+  cap changing while a person drags Settings across to a display of
+  another height (the pane would resize mid-drag; left as it is, since it
+  cannot be checked here); and `windowChrome` on macOS 15 (88 pt
+  measured on 26 only; owed). MEASURED, 2026-11-20, on the real Settings
+  window opened in the unit host through `openSettings` (macOS 26): a
+  pane change resizes the window in ONE step, one `didResizeNotification`
+  per change (Preview 247 pt to Assistant 762 pt, Assistant to Obsidian
+  255 pt), posted from SwiftUI's `NSHostingView.updateAnimatedWindowSize`
+  through `NSWindow._setFrameCommon`, with `inLiveResize` false; so the
+  window is moved once per pane change, and nothing waits for an
+  animation's end (`windowDidEndLiveResize` is for a person's drag only).
+  The same run measured the chrome again: 88 pt, the frame less
+  `contentLayoutRect`. Not measured on a window on a display, where AppKit
+  might step an animation; were it to, the rule above would move the
+  window on each step that grew it past the bottom, ending in the same
+  place. Until #997 every pane opened
+  at 560 x 648: the Assistant pane was held at `.frame(height: 560)` and
+  scrolled, and Preview and Obsidian were mostly empty space (the
+  inventory's captures). HIG, Settings: "a settings window accommodates
+  the size of the current pane, people don't need to expand the window to
+  see more." `LayoutAndSmallBehaviourTests` measures every pane, holds the
+  Assistant pane to 400 pt and scrolls its form to the end, where the last
+  download's button must be inside the window (read off the accessibility
+  tree), and checks the cap on the two short screens.
+- **A course's whole code on hover, when it is cut short (D44).** The row's
+  code is `CourseCodeLabel`, a `ViewThatFits` of the plain label and the
+  same label with `.help(code)`: the plain one shows when the whole code
+  fits, the tagged one, cut short, when it does not. So a 12-character
+  code, cut short at the sidebar's default 228-point width, can still be
+  read, and a code that fits is not repeated in a tag over itself (the
+  first version tagged every row, and its review pointed out that the
+  HIG's expansion tooltip is for clipped or truncated text). Middle
+  truncation was not taken: a code is short and read from its start. HIG,
+  Text fields: "Consider using an expansion tooltip to show the full
+  version of clipped or truncated text." `AccessibilityTreeTests` reads the
+  help tags off the tree (`AccessibilityTree.Element.help`): one on a
+  12-character code in a 140-point sidebar, none on EXC2O at 228. That
+  test reads the label in a plain row, because this reader does not find
+  the tag inside the sidebar's folding course row, where the label is
+  merged into one heading. The real row was proven by the second review
+  of #997 (2026-11-20): the folding row's heading carries the help text
+  for a truncated code, a real hover drew the tooltip, and a code that
+  fits has none; `ViewThatFits` decides truncation at layout time and
+  again on every resize.
+- **The Backups total keeps a margin (D45).** `BackupsSectionHeader` puts
+  `trailingMargin` (10 pt) after the total; it was drawn about 2 pt from
+  the divider while the heading's name sits about 14 pt in. HIG, Layout:
+  "make it easy to apply standard margins around content." The tree gives
+  the heading's row and the sidebar's frames (`Element.frame`, new), not
+  the total's own, because a section header reaches it as one heading
+  ("Backups, 271 KB"); the test adds the margin it measures the heading
+  drawing (with against without) to the row's own trailing room.
+- **Tab leaves the class-dates box (ruling Q-C on #975).** The Class Dates
+  sheet's box (also reached from Add Class, Make Room and Roll Over) is
+  `ClassDatesTextBox`, AppKit's own text view in a representable, whose
+  delegate answers `insertTab:` and `insertBacktab:` by moving along the
+  window's key view loop (from the scroll view, then from the text view if
+  that left the focus where it was), and types nothing. Return still makes
+  a new line, and typing, undo, pasting and VoiceOver are the text view's.
+  A SwiftUI `TextEditor` typed a tab and kept the focus, as a text view
+  does (Keyboards lists Control-Tab for moving on); the box only holds
+  dates, so Russell ruled Tab moves on. HIG, Text fields: "Ensure that
+  tabbing between multiple fields flows as people expect." REJECTED:
+  `.onKeyPress(.tab)` on the `TextEditor` (whether SwiftUI sees the key
+  before the text view inserts it is not documented), and making the text
+  view a field editor (Return would end editing instead of starting a new
+  line). The box's VoiceOver name (D41) moved onto the text view itself,
+  where VoiceOver lands: SwiftUI's `.accessibilityLabel` on a representable
+  names the scroll view around it, and the tree then had two elements
+  called `sectionScheduleTypedField`. The text view
+  (`ClassDatesTextView`) takes the focus when it is put in the sheet's
+  window, as the `TextEditor` did: without that, measured in the running
+  app on 2026-11-20 with Keyboard Navigation on, the sheet opened with the
+  focus on the route picker. It takes it once (`hasTakenTheFocus`) and
+  by `makeFirstResponder` alone: setting the window's
+  `initialFirstResponder` as well was tried and REJECTED, because in the
+  running app Tab then stayed in the box and Shift-Tab went to the sheet
+  itself (the unit test, in a window that is never key, did not see it).
+  Driven in that app on 2026-11-20 (an isolated copy with `--state-dir`):
+  with Keyboard Navigation on, the sheet opened with the focus in the box,
+  Tab went to "Where these came from" and then Cancel, and Shift-Tab came
+  back the same way; with it off, Tab and Shift-Tab moved between the box
+  and "Where these came from". The box held only what was typed.
+
+  After the first review (2026-11-20): the box takes the focus only when
+  the sheet opens on it (`takesTheFocusWhenShown`, false once the teacher
+  has changed the route, `SectionScheduleSheet.hasChangedRoute`), so
+  arrowing the route picker from Upload back to Typed leaves the keyboard
+  in the picker; before, the new box took the focus as it was drawn. The
+  binding now follows the text storage (`NSTextStorageDelegate`,
+  `didProcessEditing`) rather than the text view's did-change notice:
+  `testUndoAndRedoInTheDatesBoxReachTheBinding` found that Undo and Redo
+  changed the box without that notice, so the sheet went on holding the
+  undone text. The tests now name the control the keys reach, in a key
+  window of the active app (`ClassDatesBoxKeyTests`, opt-in with
+  `PLANTOIR_KEY_TESTS=1` because it takes the front, and run by the gate's
+  pressed-key step): VoiceOver's focused element is the box as the sheet
+  opens; Tab goes to "Where these came from" (`sectionScheduleSourceField`)
+  in either Keyboard Navigation mode; Shift-Tab from the box goes to the
+  route picker with Keyboard Navigation on and to "Where these came from"
+  with it off. The same is asserted in `SectionVerbSheet`'s Class Dates
+  stage, which is what Add Class, Make Room and Roll Over open when the
+  section has no dates (`askForDatesFirst`). `LayoutAndSmallBehaviourTests`
+  adds a paste of several lines (from a pasteboard of the test's own, so
+  the person's clipboard is untouched) and Undo and Redo reaching the
+  binding.
+- **No sideways scroll bar under the Publish Pages picker (D48).** The
+  picker's Folder and Date columns have set widths, 135 and 175 pt
+  (`SectionVerbSheet.pickerFolderColumnWidth`, `pickerDateColumnWidth`),
+  the widths they came to at the sheet's opening size, so Page is the one
+  column that takes the table's width as it changes. With all three
+  flexible (Page from 90, Folder 80 to 140, Date 120 to 180), measured in
+  `PageTablesSheetTests` with the scroll bars a mouse shows: when the rows
+  arrive after the table is drawn, as they do in the app, the table shared
+  the change between the three in half points (146.5, 134.5, 174.5) and
+  the columns ended at 501.5 in a table that shows 501, so AppKit put a
+  sideways scroll bar under the rows; with the set widths they come to 145,
+  135 and 175 and end at 501.0 both at open and after the rows arrive.
+  Folder and Date could be dragged 5 pt wider at most before, so a teacher
+  loses almost nothing; Page, which holds the long titles, still resizes.
+  HIG, Lists and tables: "Consider ways to preserve readability of text
+  that might otherwise get clipped or truncated." REJECTED, from the first
+  version: hiding the sideways scroll indicator
+  (`.scrollIndicators(.never, axes: .horizontal)`), which hid the symptom
+  and left the half point; and setting the ideal widths to 145, 135 and
+  175, which changed nothing (the half points came from sharing the
+  change, not from the ideals). Also tried, after the second review
+  (2026-11-20), so a teacher could drag Folder and Date wider to read a
+  long folder name: `.width(min: 135, ideal: 135, max: 400)` and
+  `.width(min: 175, ideal: 175, max: 400)`, with Page's ideal at 130 and
+  then at 2000. Both came out the same: Folder and Date grew to 153.5 and
+  193.0 at open and the columns ended at 501.5 in 501 once the rows
+  arrived, so the sideways bar came back; SwiftUI's `TableColumn` gives
+  no way to make a column resizable by a person without also sharing the
+  table's own changes with it. Still owed: a way to let them be widened
+  that keeps them at 501; until then a long folder name is read from its
+  help tag. `testThePickerShowsNoSidewaysScrollBar`
+  checks both moments with no tolerance (the first version allowed half a
+  point, which was the fault, so it passed either way) and that the
+  sideways scroll bar is still on, and fails with the widths put back.
+- **D12 (the empty Planning tab with no assistant installed) cannot be
+  reached.** The Planning tab is absent unless an assistant is installed
+  (`unitPlanning.tab.tabCases`, `PlanningTab.isShown`, read from the same
+  `OutsideAssistantPresence` as the empty tab's buttons), so the empty tab
+  is never drawn with no button under it. Nothing was changed for it.
+
 ## Course Settings lists are tables, and why
 
 Issue #266, 2026-09-24. Every list of folders or files in Course Settings and
