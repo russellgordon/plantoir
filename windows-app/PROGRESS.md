@@ -72,6 +72,14 @@ Branch `issue/979-windows-question-dialogs`. Proven on the Windows VM (Windows 1
 - Ruled by Russell (2026-11-19): keep Windows' own button order, go-ahead left and Cancel right; on a question with no default the focus starts on Cancel and Enter or Space cancels. `documentation/12-windows-app.md` → "The question dialogs' keys (#979)".
 - **After the review (NOT CLEAN, two MEDIUM, four LOW), 8e099e291:** the wizard's `LayoutRoot` Escape catcher is gone: while the course is made Cancel is the Secondary button and `Closing` refuses a close with no answer (measured on the VM: Escape does nothing then, a click on Cancel stops it, Escape closes afterwards). Create Course is plain (`PrimaryKind.NotTheDefaultYet`, no default, no accent) until it is the default. The update offer's Escape catcher is deleted (Escape still closes it, `UpdateOfferUiTests`). Undo Getting Ready is greyed when nothing would go back. `AskWithNoDefault` keeps the go-ahead out of the tab order until the dialog is open, so it never holds the first focus. The scan sees `new() { }` dialogs.
 
+## 2026-11-20 — Undo and Redo, W2b: the staged swap and the door (#899, #949)
+
+Branch `issue/899-w2b-staged-swap-door` (on W2a, `dev` 8f3f64349 merged). Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200) over SSH. Core only: nothing calls it, nothing a teacher sees changed, no trail line, the built-in assistant's surface did not move; the switch stays off.
+
+- `Plantoir.Core/Undo/`: `UndoSwap` (staged beside each page, then one POSIX-semantics rename each, MoveFileEx only on 87/50; re-read, read-only refused `couldNotWrite`, attributes and creation time kept, the hard-linked original read back after the rename; reversed on any refusal; nothing staged left), `UndoPlaces` (containment and the volume by a handle's final path), `UndoDoor` (step from files or from ops, undo, redo, clearing, dropping, the flip's clearing; blobs and begin in one hold that never prunes), `UndoLineOps`/`JournaledSetting` moved into the product, pruning's tidy of an unsettled step's staged files. The test scribe now goes through the door; `stepCases` run with a real holder.
+- W2a's six review LOWs fixed, each with a test that fails without it. Sixteen must-fail proofs on the PC (`vm-tools/guest/899-w2b-mustfail.json`).
+- Measured outside and inside OneDrive, and the two-process kill test (233 pages, six kill points, every page whole): `documentation/12-windows-app.md` → "What Windows has built: W2b, the staged swap and the door".
+
 ## 2026-11-20 — Undo and Redo, W2a: the lock, the store, blobs, reading on, pruning carried out (#899, #949)
 
 Branch `issue/899-w2a-lock-store-pruning`. Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200) over SSH. Core only: nothing calls it, nothing a teacher sees changed, no trail line, the built-in assistant's surface did not move; the switch stays off.
