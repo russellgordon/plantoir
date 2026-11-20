@@ -23,6 +23,10 @@ public class PreviewCouldNotStartUiTests
         string launcher = Path.Combine(app.WorkspacePath, "preview.ps1");
         Assert.True(File.Exists(launcher), "the fixture folder has no preview.ps1 to remove");
         File.Delete(launcher);
+        // The folder's watcher may redraw the window for the change; the
+        // section is chosen again afterwards so the press reaches a live view.
+        Thread.Sleep(3000);
+        app.SelectSection(CourseFixtures.NeverAsked, 1);
 
         app.Find("previewButton", "the Preview button").AsButton().Invoke();
 
@@ -31,7 +35,7 @@ public class PreviewCouldNotStartUiTests
         bool shown = app.WaitAnsweringDialogs(() => SentenceShown(app, "(preview.ps1)"), TimeSpan.FromSeconds(60));
         Assert.True(shown, "the window never said why the preview could not start. It shows: "
                            + string.Join(" | ", DrivenApp.TextsUnder(app.Window)) + app.AnsweredSoFar
-                           + " Trail: " + MenuBar.Trail(app));
+                           + " Trail: " + MenuBar.Trail(app) + " Log: " + DiagnosticLog(app));
 
         // Still there a few seconds on: nothing collapses it again.
         Thread.Sleep(3000);
@@ -48,6 +52,18 @@ public class PreviewCouldNotStartUiTests
             var held = WorkLease.HeldBy(app.WorkspacePath, CourseFixtures.NeverAsked);
             return !held.Contains(WorkLease.Previewing) && !held.Contains(WorkLease.Building);
         }, TimeSpan.FromSeconds(10)).Result, "the preview's leases were left behind");
+    }
+
+    private static string DiagnosticLog(DrivenApp app)
+    {
+        try
+        {
+            string path = Path.Combine(app.StateDirectory, "startup.log");
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            string text = new StreamReader(stream).ReadToEnd();
+            return text.Length > 3000 ? text[^3000..] : text;
+        }
+        catch (Exception error) { return "(no startup.log: " + error.Message + ")"; }
     }
 
     private static bool SentenceShown(DrivenApp app, string part)
