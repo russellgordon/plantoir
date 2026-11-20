@@ -167,15 +167,30 @@ public sealed class UndoForThisProcessTests : IDisposable
         Assert.Equal(UndoTrail.RolledBackWords(UndoPhase.Begin, 1), line.Words);
     }
 
-    /// <summary>A list that cannot be had at launch (its folder cannot be made) changes nothing and reaches nobody as an exception.</summary>
+    /// <summary>
+    /// A list that cannot be had at launch (its folder cannot be made), or a
+    /// failure nobody foresaw (here the clock itself throws), changes nothing
+    /// and reaches nobody as an exception; the second is said in the startup
+    /// log's diagnostic.
+    /// </summary>
     [Fact]
     public void RecoveryAtLaunchNeverThrows()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ListFolder)!);
         File.WriteAllText(ListFolder, "not a folder");
-        var said = new List<string>();
-        UndoRecoveryRun? run = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null).RecoverAtLaunch(said.Add);
+        UndoRecoveryRun? run = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null).RecoverAtLaunch();
         Assert.True(run is null || run.Settled.Count == 0);
+
+        var said = new List<string>();
+        UndoRecoveryRun? unforeseen = new UndoForThisProcess(Path.Combine(_root, "state", "undo2"), UndoMode.Shadow, null, new AClockThatFails())
+            .RecoverAtLaunch(said.Add);
+        Assert.Null(unforeseen);
+        Assert.Contains(said, line => line.StartsWith("undo recovery at launch did not run: InvalidOperationException", StringComparison.Ordinal));
+    }
+
+    private sealed class AClockThatFails : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => throw new InvalidOperationException("No clock today.");
     }
 
     /// <summary>
