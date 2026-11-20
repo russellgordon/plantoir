@@ -52,6 +52,20 @@ internal static class UndoTrail
         return $"the undo list put back {Files(files)} left part way by {what} that stopped";
     }
 
+    /// <summary>
+    /// <c>the undo list keeps the folder courses/ICS3U/made, set aside by a
+    /// change that stopped, as courses/ICS3U/made (kept by Undo), because
+    /// something else now holds courses/ICS3U/made</c>, or <c>the undo list
+    /// puts the folder courses/ICS3U/made back in its place; it changed while
+    /// a change that stopped had set it aside (1 file added)</c> (the mac's
+    /// <c>foundAFolderSetAsideLine</c>). Written just before the rename, so it
+    /// says what is being done.
+    /// </summary>
+    internal static string FoundAFolderSetAsideWords(string place, string? keptAs, string changes) =>
+        keptAs is not null
+            ? $"the undo list keeps the folder {place}, set aside by a change that stopped, as {keptAs}, because something else now holds {place}"
+            : $"the undo list puts the folder {place} back in its place; it changed while a change that stopped had set it aside ({changes})";
+
     /// <summary><c>… , found 1 file changed by hand since, and cleared the list</c>.</summary>
     internal static string InterruptedWords(UndoPhase phase, int putBack, int inTheWay) =>
         RolledBackWords(phase, putBack) + $", found {Files(inTheWay)} changed by hand since, and cleared the list";
@@ -68,9 +82,10 @@ internal static class UndoTrail
         switch (line.Event)
         {
             case ActivityTrail.Event.UndoRolledBack:
-                if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(ActivityTrail.Event.UndoRolledBack, line.Words);
-                else if (line.Section is { } section and >= 0 and <= int.MaxValue) ActivityTrail.Note(ActivityTrail.Event.UndoRolledBack, line.Words, line.Course, (int)section);
-                else ActivityTrail.Note(ActivityTrail.Event.UndoRolledBack, line.Course + " · " + line.Words);
+            case ActivityTrail.Event.UndoFoundAFolderSetAside:
+                if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(line.Event, line.Words);
+                else if (line.Section is { } section and >= 0 and <= int.MaxValue) ActivityTrail.Note(line.Event, line.Words, line.Course, (int)section);
+                else ActivityTrail.Note(line.Event, line.Course + " · " + line.Words);
                 break;
             default:
                 throw new ArgumentException("An event Undo does not write: " + line.Event, nameof(line));
@@ -124,9 +139,10 @@ internal static class UndoRecovery
     /// </summary>
     internal static UndoRecoveryRun Run(UndoJournalWriter writer, UndoJournal journal, UndoMode mode, bool trySwapsNow,
                                         bool leavingStepsThatRederive, IUndoMaintainers? maintainers,
-                                        Action<UndoTrailLine>? trail, UndoSeams? seams)
+                                        Action<UndoTrailLine>? trail, UndoSeams? seams, IUndoExternalPlaces? places = null)
     {
         writer.RecoveredThisHold = true;
+        IUndoExternalPlaces theirPlaces = places ?? new UndoAppSettingsPlaces();
         var settled = new List<UndoRecoveryResult>();
         var left = new Dictionary<long, UndoRefusal>();
         DateTimeOffset now = journal.Now;
@@ -155,7 +171,7 @@ internal static class UndoRecovery
                 pruningWouldClose ??= ClosedByPruningNow(writer, journal);
                 if (!pruningWouldClose.Contains(record.Seq)) continue;
             }
-            SettleAnswer answer = Settle(record, root, writer, journal, mode, trail, seams);
+            SettleAnswer answer = Settle(record, root, writer, journal, mode, trail, seams, theirPlaces);
             if (answer.Stopped) return new UndoRecoveryRun(settled, StoppedByATest: true, left);
             if (answer.Result is { } result)
             {
@@ -169,7 +185,7 @@ internal static class UndoRecovery
                 journal.Memory.NoteARefusedSwap(key, now);
             }
         }
-        if (mode == UndoMode.Live) TidyClosedSteps(writer, journal);
+        if (mode == UndoMode.Live) TidyClosedSteps(writer, journal, trail);
         return new UndoRecoveryRun(settled, StoppedByATest: false, left);
     }
 
@@ -231,8 +247,119 @@ internal static class UndoRecovery
         return true;
     }
 
-    private static string? RootOf(UndoStep step, UndoJournal journal) =>
-        step.WorkingFolder?.PathAtTheTime is { Length: > 0 } path && journal.CanReach(step) ? path : null;
+    /// <summary>
+    /// The folder a step's paths are under, or null when it cannot be reached.
+    /// A step none of whose ops names a path (an external op alone,
+    /// <c>opKinds.wholeOps</c>) needs no folder: its root is empty, which no op
+    /// of it reads.
+    /// </summary>
+    internal static string? RootOf(UndoStep step, UndoJournal journal)
+    {
+        if (!step.Ops.Any(op => op.PathsNamed.Any())) return "";
+        return step.WorkingFolder?.PathAtTheTime is { Length: > 0 } path && journal.CanReach(step) ? path : null;
+    }
+
+    /// <summary>The listing each tree op of a step recorded, by its folder's full path: what a folder set aside must still be for recovery to put it back as the step's.</summary>
+    internal static IReadOnlyDictionary<string, string> AsideListings(UndoStep step, string root)
+    {
+        var listings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (UndoOp op in step.Ops)
+        {
+            if (op.Kind is UndoOp.CreateTree or UndoOp.RemoveTree && op.Path is { } path && op.ListingSha is { } sha)
+                listings[Path.GetFullPath(UndoDoor.FullPath(root, path))] = sha;
+        }
+        return listings;
+    }
+
+    /// <summary>
+    /// Every tree op's folder of this step that a staged <c>-orig</c> name still
+    /// holds beside it (its place could not be read, or a rename failed): a
+    /// folder still aside is IN THE WAY, never settled as if it were gone (the
+    /// mac's second hard review of U2b, MEDIUM 3).
+    /// </summary>
+    internal static HashSet<string> FoldersKeptAside(UndoStep step, string root)
+    {
+        var kept = new HashSet<string>(StringComparer.Ordinal);
+        foreach (UndoOp op in step.Ops)
+        {
+            if (op.Kind is not (UndoOp.CreateTree or UndoOp.RemoveTree) || op.Path is not { } path) continue;
+            string place = UndoDoor.FullPath(root, path);
+            string? folder = Path.GetDirectoryName(place);
+            if (folder is null || !Directory.Exists(folder)) continue;
+            string prefix = "." + Path.GetFileName(place) + UndoSwap.StagedMarker + step.Seq + "-";
+            IEnumerable<string> names;
+            try { names = Directory.EnumerateDirectories(folder, prefix + "*").Select(Path.GetFileName).ToList()!; }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { continue; }
+            foreach (string name in names)
+            {
+                if (string.Equals(UndoSwap.PlaceOfStagedName(name), Path.GetFileName(place), StringComparison.OrdinalIgnoreCase)
+                    && UndoSwap.IsAFolderSetAside(Path.Combine(folder, name)))
+                    kept.Add(path);
+            }
+        }
+        return kept;
+    }
+
+    /// <summary>
+    /// The trail line for a teacher's folder found set aside (the mac's
+    /// <c>noteAnAsideFolder</c>), said before it is renamed: put back though
+    /// it changed while aside (what changed, counted against the step's
+    /// record when the list still holds it), or kept under a visible name
+    /// because something else holds its place. A folder put back as recorded
+    /// needs no line.
+    /// </summary>
+    internal static void NoteAnAsideFolder(UndoAsideFolder found, UndoStep step, string root, UndoJournal? journal, Action<UndoTrailLine>? trail)
+    {
+        if (trail is null || (found.PutBack && found.Matched)) return;
+        string place = InsideTheFolder(found.Place, root);
+        string? keptAs = found.KeptAs is { } kept ? InsideTheFolder(kept, root) : null;
+        string changes = found.PutBack ? WhatChanged(found.FoundAt, step, place, journal) : "";
+        trail(new UndoTrailLine(ActivityTrail.Event.UndoFoundAFolderSetAside, step.Course, step.Section,
+                                UndoTrail.FoundAFolderSetAsideWords(place, keptAs, changes)));
+    }
+
+    /// <summary>A place's path inside the working folder, forward slashes, or its last name when it is not inside it.</summary>
+    private static string InsideTheFolder(string full, string root)
+    {
+        string rootPath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        string fullPath = Path.GetFullPath(full);
+        return fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase)
+            ? fullPath[rootPath.Length..].Replace(Path.DirectorySeparatorChar, '/')
+            : Path.GetFileName(fullPath);
+    }
+
+    /// <summary><c>1 file added, 2 changed</c> against the step's recorded listing, or <c>changed</c> when the list no longer holds it.</summary>
+    private static string WhatChanged(string folder, UndoStep step, string place, UndoJournal? journal)
+    {
+        string? recordedSha = null;
+        foreach (UndoOp op in step.Ops)
+        {
+            if (string.Equals(op.Path, place, StringComparison.Ordinal)) recordedSha = op.ListingSha;
+        }
+        UndoTreeListing? recorded = null;
+        try
+        {
+            if (journal is not null && recordedSha is not null && journal.Blob(recordedSha) is { } bytes) recorded = UndoTreeListing.Parse(bytes);
+        }
+        catch (UndoListUnreadableException) { }
+        if (recorded is null || UndoTreeReading.Read(folder) is not UndoTreeReading.Tree now) return "changed";
+        var before = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach ((string path, string sha) in recorded.Files) before[path] = sha;
+        int added = 0, changed = 0;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach ((string path, string sha) in now.Listing.Files)
+        {
+            seen.Add(path);
+            if (before.TryGetValue(path, out string? was)) { if (was != sha) changed++; }
+            else added++;
+        }
+        int removed = before.Keys.Count(path => !seen.Contains(path));
+        var parts = new List<string>();
+        if (added > 0) parts.Add(added == 1 ? "1 file added" : $"{added} files added");
+        if (changed > 0) parts.Add(changed == 1 ? "1 changed" : $"{changed} changed");
+        if (removed > 0) parts.Add(removed == 1 ? "1 removed" : $"{removed} removed");
+        return parts.Count == 0 ? "changed" : string.Join(", ", parts);
+    }
 
     private static HashSet<long> ClosedByPruningNow(UndoJournalWriter writer, UndoJournal journal)
     {
@@ -255,7 +382,7 @@ internal static class UndoRecovery
     /// the director's ruling 6 on U1's third round). Once per process; one
     /// whose file could not be removed is looked for again at the next lock.
     /// </summary>
-    internal static void TidyClosedSteps(UndoJournalWriter writer, UndoJournal journal)
+    internal static void TidyClosedSteps(UndoJournalWriter writer, UndoJournal journal, Action<UndoTrailLine>? trail = null)
     {
         foreach (UndoFoldedStep record in writer.Folded.Steps.Values)
         {
@@ -264,7 +391,12 @@ internal static class UndoRecovery
             if (journal.Memory.HasTidied(key)) continue;
             if (RootOf(record.Step, journal) is not { } root) continue;
             bool allGone;
-            try { allGone = UndoSwap.TidyLeftovers(record.Seq, record.Step.Paths, root); }
+            UndoStep closedStep = record.Step;
+            try
+            {
+                allGone = UndoSwap.TidyLeftovers(record.Seq, closedStep.Paths, root, AsideListings(closedStep, root),
+                                                 found => NoteAnAsideFolder(found, closedStep, root, journal, trail));
+            }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { allGone = false; }
             if (allGone) journal.Memory.NoteTidied(key);
         }
@@ -281,13 +413,25 @@ internal static class UndoRecovery
     }
 
     /// <summary>Where each file of a step stands now, by content, in the order its ops name them.</summary>
-    internal static IReadOnlyList<(string Path, UndoOpState State)> FileStates(UndoStep step, string root)
+    internal static IReadOnlyList<(string Path, UndoOpState State)> FileStates(UndoStep step, string root, IUndoExternalPlaces? places = null)
     {
         var order = new List<string>();
         var states = new Dictionary<string, UndoOpState>(StringComparer.Ordinal);
         var currents = new Dictionary<string, UndoCurrent?>(StringComparer.Ordinal);
         foreach (UndoOp op in step.Ops)
         {
+            if (op.IsWhole)
+            {
+                // A move, a tree or an external op is one place of its own,
+                // judged whole (a move by its pair, never by one side); a place
+                // that now leads outside the folder is in the way.
+                string place = op.PlaceName;
+                if (!states.ContainsKey(place)) order.Add(place);
+                states[place] = op.PathsNamed.Any(named => !UndoPlaces.StaysInside(root, named))
+                    ? UndoOpState.Neither
+                    : UndoCheck.WholeStateOf(op, root, places ?? new UndoAppSettingsPlaces());
+                continue;
+            }
             if (op.Kind == UndoOp.Recompute || op.Path is not { } path) continue;
             if (!currents.ContainsKey(path))
             {
@@ -316,7 +460,7 @@ internal static class UndoRecovery
     }
 
     private static SettleAnswer Settle(UndoFoldedStep record, string root, UndoJournalWriter writer, UndoJournal journal,
-                                       UndoMode mode, Action<UndoTrailLine>? trail, UndoSeams? seams)
+                                       UndoMode mode, Action<UndoTrailLine>? trail, UndoSeams? seams, IUndoExternalPlaces places)
     {
         UndoStep step = record.Step;
         (UndoPhase phase, string work) = record.State switch
@@ -335,14 +479,39 @@ internal static class UndoRecovery
             // Everything the stopped work staged goes first: its new contents,
             // and the kept originals, whose content the list holds to put back
             // (a step whose content is missing is closed as it stands).
-            try { UndoSwap.TidyLeftovers(step.Seq, step.Paths, root); }
+            // A teacher's folder it set aside is put back in its place, or
+            // kept under a visible name beside it, never deleted (W6).
+            try
+            {
+                UndoSwap.TidyLeftovers(step.Seq, step.Paths, root, AsideListings(step, root),
+                                       found => NoteAnAsideFolder(found, step, root, journal, trail));
+            }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
             if (seams?.Stops("afterRecoveryTidied") == true) return SettleAnswer.Halted;
         }
 
         bool startedFromBefore = phase is UndoPhase.Begin or UndoPhase.Redoing;
         UndoOpState startState = startedFromBefore ? UndoOpState.Before : UndoOpState.After;
-        IReadOnlyList<(string Path, UndoOpState State)> files = FileStates(step, root);
+        IReadOnlyList<(string Path, UndoOpState State)> files = FileStates(step, root, places);
+        // A teacher's folder still set aside after the tidying is IN THE WAY,
+        // never settled as if it were gone; one whose place cannot be read stays
+        // cannot tell, tried again.
+        HashSet<string> keptAside = FoldersKeptAside(step, root);
+        if (keptAside.Count > 0)
+        {
+            var judged = new List<(string, UndoOpState)>();
+            foreach ((string path, UndoOpState state) in files)
+                judged.Add(keptAside.Contains(path) && state is not (UndoOpState.CannotTell or UndoOpState.InUse) ? (path, UndoOpState.Neither) : (path, state));
+            files = judged;
+        }
+        // An interrupted line names files inside the working folder: an
+        // external op's target is no path, so it is never named there.
+        var targets = new HashSet<string>(StringComparer.Ordinal);
+        foreach (UndoOp op in step.Ops)
+        {
+            if (op.Kind == UndoOp.External && op.Target is { } target) targets.Add(target);
+        }
+        List<string> PathsOnly(IEnumerable<string> places) => places.Where(place => !targets.Contains(place)).ToList();
         // A file that could not be read now is never judged changed by hand:
         // tried again on the schedule, as for a file in use (ruling 4).
         foreach ((string path, UndoOpState state) in files)
@@ -386,12 +555,13 @@ internal static class UndoRecovery
         {
             if (live && endPaths.Count > 0)
             {
-                var opsToPutBack = step.Ops.Where(op => op.Kind != UndoOp.Recompute && op.Path is { } path && endPaths.Contains(path)).ToList();
+                var opsToPutBack = step.Ops.Where(op => op.Kind != UndoOp.Recompute && endPaths.Contains(op.PlaceName)).ToList();
                 UndoCheck.PlanResult plan;
                 try
                 {
                     plan = UndoCheck.Plan(opsToPutBack, backward: startedFromBefore,
-                                          relative => UndoCurrent.Read(UndoDoor.FullPath(root, relative)), journal.Blob);
+                                          relative => UndoCurrent.Read(UndoDoor.FullPath(root, relative)), journal.Blob,
+                                          whole: new UndoWholeReads(root, places));
                 }
                 catch (UndoListUnreadableException)
                 {
@@ -404,18 +574,19 @@ internal static class UndoRecovery
                         return SettleAnswer.AgainFor(UndoDoor.RefusalOf(plan));
                     case UndoCheck.PlanResult.Ready ready:
                     {
-                        var targets = ready.InOrder.Select(change => new UndoSwapTarget(UndoDoor.FullPath(root, change.Path), change.Path,
-                                                                                         change.Expected, change.Replacement)).ToList();
+                        var putBackTargets = ready.InOrder.Select(change => new UndoSwapTarget(UndoDoor.FullPath(root, change.Path), change.Path,
+                                                                                                change.Expected, change.Replacement)).ToList();
+                        putBackTargets.AddRange(ready.Whole);
                         UndoSeams? recoverySeams = seams is null ? null : new UndoSeams
                         {
                             StopsHere = (point, index) => seams.Stops(point == "beforeSwap" ? "recoveryBeforeSwap" : point, index),
                         };
-                        switch (UndoSwap.Swap(targets, label + "-recover", root, recoverySeams))
+                        switch (UndoSwap.Swap(putBackTargets, label + "-recover", root.Length == 0 ? null : root, recoverySeams, places))
                         {
                             case UndoSwapResult.StoppedByATest: return SettleAnswer.Halted;
                             case UndoSwapResult.Refused refused: return SettleAnswer.AgainFor(refused.Refusal);   // a file in use: tried again on the schedule
                         }
-                        putBack = targets.Count;
+                        putBack = putBackTargets.Count;
                         break;
                     }
                     default:
@@ -427,7 +598,7 @@ internal static class UndoRecovery
                         {
                             if (!leftPartWay.Contains(path)) leftPartWay.Add(path);
                         }
-                        events.Add(Interrupted(step.Seq, phaseWord, "couldNotPutBack", leftPartWay));
+                        events.Add(Interrupted(step.Seq, phaseWord, "couldNotPutBack", PathsOnly(leftPartWay)));
                         events.Add(new JsonObject { ["event"] = "cleared", ["reason"] = "interrupted" });
                         if (seams?.Stops("recoveryBeforeWriting") == true) return SettleAnswer.Halted;
                         if (!Write(events, step, writer)) return SettleAnswer.Nothing;
@@ -447,13 +618,13 @@ internal static class UndoRecovery
             {
                 // Shadow: recorded, never repaired.
                 outcome = UndoRecoveryOutcome.LeftAlone;
-                events.Add(Interrupted(step.Seq, phaseWord, "partlyTookEffect", endPaths.OrderBy(path => path, StringComparer.Ordinal).ToList()));
+                events.Add(Interrupted(step.Seq, phaseWord, "partlyTookEffect", PathsOnly(endPaths.OrderBy(path => path, StringComparer.Ordinal))));
                 events.Add(new JsonObject { ["event"] = "cleared", ["reason"] = "interrupted" });
             }
             else
             {
                 outcome = UndoRecoveryOutcome.Interrupted;
-                events.Add(Interrupted(step.Seq, phaseWord, "changedByHand", inTheWay));
+                events.Add(Interrupted(step.Seq, phaseWord, "changedByHand", PathsOnly(inTheWay)));
                 events.Add(new JsonObject { ["event"] = "cleared", ["reason"] = "interrupted" });
                 // In shadow nothing was put back and nothing offered was
                 // cleared: the journal holds the outcome, the trail does not.

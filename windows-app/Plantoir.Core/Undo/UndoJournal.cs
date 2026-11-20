@@ -346,7 +346,9 @@ internal sealed class UndoJournal
         if (!writer.Folded.Steps.TryGetValue(seq, out UndoFoldedStep? closed)) return;
         UndoStep step = closed.Step;
         if (step.WorkingFolder?.PathAtTheTime is not { } root || !CanReach(step)) return;
-        try { UndoSwap.TidyLeftovers(seq, step.Paths, root); }
+        // A teacher's folder set aside is put back or kept visibly, never deleted
+        // (W6); this hold has no trail sink, so no line is written for it here.
+        try { UndoSwap.TidyLeftovers(seq, step.Paths, root, UndoRecovery.AsideListings(step, root)); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
