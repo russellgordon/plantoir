@@ -7936,12 +7936,39 @@ together, five between them (`course-management.json` → `backups.pruneCases`,
 `zipNames`). A sentence that covers both menus says "the Section or Classes
 menu" (`SubjectMenuLayout.eitherMenu`): `nothingToUndoFromTheMenu`,
 `sectionIsChangingFromTheMenu` and the Help pages' Undo and greyed-item
-lines. The club's two sentences name "the Classes menu" too: a club's menu
-bar says Classes as well, and `ClubNounTests` takes a menu's own title out
-before it looks for "class". A released app before #990 does not know the
+lines. A released app before #990 does not know the
 `classes-section` piece and leaves such a copy unlisted, as `zipNames` does
 with any maker it does not know. Get Ready for the Start of the Year… saves
 the teacher's own kind of copy ("made by you"), as before.
+
+**In a club the menu is titled Meetings** (Russell, 2026-11-20 evening, on
+#990: "in a club the menu itself is titled Meetings, on both platforms, so
+no sentence a club's teacher reads says 'class'"). `SubjectMenuLayout.title(of:noun:)`
+takes the course's class noun (`class_noun`) with no default: Classes for
+`.class`, Meetings for `.meeting`; Section never changes
+(`subjectMenus.layout` → `titleForAMeeting`). The NOUN decides it, not the
+club code, because the noun is what every club sentence is chosen by (the
+`…ForAMeeting` keys), so a sentence that names the menu always names the one
+on the screen. The title follows the selection live: the sidebar publishes the
+selected course's noun in `SidebarMenuCommands.classNoun` (beside the
+situation, not in it, since it greys nothing), and `SectionMenu`'s
+`CommandMenu` title reads it, Classes with no window in front. Every sentence
+that names the menu for a club follows: the two club sentences ("Add them
+from the Meetings menu"), `sectionIsChangingFromTheMeetingsMenu` ("the
+Section or Meetings menu"), the trail's backup lines and "ran from a menu"
+paths ("Meetings ▸ Make Room for Classes…"), and the Backups list's
+sentences, which read the noun of the backup's course when drawn
+(`WorkspaceModel.classNoun(ofCourse:)`; a backup of a course no longer in
+the folder is read by its code, a club's code meaning meetings). The file
+name does not change. `ClubNounTests` checks every club sentence for "class"
+with no exception for menu titles. `nothingToUndoFromTheMenu` keeps "the
+Section or Classes menu": with nothing to undo there is no course to read a
+noun from, and the item leaves with #899 U7. The HIG has no sentence on a
+menu title that follows the selection; the nearest, Menus, has an item's
+"changeable label that describes an item's current state", and The menu
+bar's "Always show the same set of menu items" is kept: only the title
+changes. `SectionAndClassesMenusUITests.testTheClassesMenuIsTitledMeetingsWhileAClubIsSelected`
+proves it live in the real menu bar.
 
 ### The shape: one focused value per OWNER of the state
 
