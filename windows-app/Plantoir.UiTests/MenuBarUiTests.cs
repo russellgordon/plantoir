@@ -290,9 +290,11 @@ public class SectionAndClassesUiTests
     /// a separator as "----". A <c>MenuFlyoutSeparator</c> has no element in
     /// UI Automation (measured on the VM, 2026-11-20: the flyout's children
     /// are its items only), so a separator is read where it is drawn: as a
-    /// gap between two items' rectangles more than 4 pixels larger than the
+    /// gap between two items' rectangles more than 2 pixels larger than the
     /// smallest gap in the menu, which is the gap between two items of one
-    /// group (<see cref="LastGaps"/> says what was measured when it fails).
+    /// group. Measured in the VM at 100%: 4 or 5 pixels between items of one
+    /// group, 7 or 8 across a separator (<see cref="LastGaps"/> says what was
+    /// measured when it fails).
     /// </summary>
     private static List<(string Line, AutomationElement? Element)> Read(DrivenApp app, string menu, string anyItemId)
     {
@@ -313,7 +315,7 @@ public class SectionAndClassesUiTests
         var lines = new List<(string, AutomationElement?)>();
         for (int index = 0; index < items.Count; index++)
         {
-            if (index > 0 && gaps[index - 1] > between + 4) lines.Add((Separator, null));
+            if (index > 0 && gaps[index - 1] > between + 2) lines.Add((Separator, null));
             lines.Add((items[index].Id, items[index].Element));
         }
         return lines;
