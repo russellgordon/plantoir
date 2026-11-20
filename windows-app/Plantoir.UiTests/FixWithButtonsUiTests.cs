@@ -115,7 +115,6 @@ public class FixWithButtonsUiTests
             Assert.Equal(FixWithAssistant.NotEnabledHelp, Wait(app, "fixWithClaudeButton").HelpText);
             Assert.Equal(FixWithAssistant.NotEnabledHelp, Wait(app, "fixWithCodexButton").HelpText);
             Assert.True(Showing(app, "fixWithClaudeButton"), "greyed, never hidden, when nothing is ticked");
-            MeasureTheTooltipOnADisabledButton(app);
 
             // Tick both again and press each door.
             app.Find("problemTick-pageSettingsUnreadable|Unit 1/Lesson 1", "the first tick").AsCheckBox().Toggle();
@@ -153,78 +152,6 @@ public class FixWithButtonsUiTests
     }
 
     // ---- Helpers ------------------------------------------------------------------
-
-    /// <summary>
-    /// #990's second review asked whether WinUI shows a tooltip on a DISABLED
-    /// control. Measured only when <c>PLANTOIR_MEASURE_TOOLTIPS</c> names a file:
-    /// the pointer rests on the dimmed Fix with Claude… (its tooltip is
-    /// <see cref="FixWithAssistant.NotEnabledHelp"/>) and, as the control, on
-    /// an ENABLED control that carries a tooltip (the sidebar's + button, whose
-    /// tooltip is in its XAML), and what UI Automation finds on screen after each
-    /// rest is written to the file. A measurement, not a check: the result is
-    /// written up in documentation 12, and nothing here asserts it.
-    /// </summary>
-    private static void MeasureTheTooltipOnADisabledButton(DrivenApp app)
-    {
-        string? into = Environment.GetEnvironmentVariable("PLANTOIR_MEASURE_TOOLTIPS");
-        if (string.IsNullOrEmpty(into)) return;
-        var lines = new List<string>();
-        int pictureNumber = 1;
-        void Rest(AutomationElement element, string describedAs)
-        {
-            Mouse.MoveTo(DrivenApp.MiddleOf(app.Window));
-            Thread.Sleep(800);
-            Mouse.MoveTo(DrivenApp.MiddleOf(element));
-            var seen = new List<string>();
-            var clock = Stopwatch.StartNew();
-            while (clock.ElapsedMilliseconds < 4000)
-            {
-                Thread.Sleep(250);
-                // The desktop's CHILDREN only (a whole-desktop descendant
-                // search timed out, measured), then the window's own tree,
-                // where WinUI's popups live.
-                var tips = new List<AutomationElement>();
-                try { tips.AddRange(app.Desktop.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip))); }
-                catch (Exception failure) { seen.Add($"desktop search failed: {failure.Message}"); }
-                try { tips.AddRange(app.Window.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolTip))); }
-                catch (Exception failure) { seen.Add($"window search failed: {failure.Message}"); }
-                foreach (var tip in tips)
-                {
-                    string said = $"{clock.ElapsedMilliseconds} ms: \"{tip.Name}\"";
-                    if (!seen.Exists(line => line.EndsWith($"\"{tip.Name}\"", StringComparison.Ordinal))) seen.Add(said);
-                }
-            }
-            // Anything at the top of the desktop that is not an ordinary
-            // window, and a picture of the window with the pointer still
-            // resting: UI Automation may not expose a WinUI tooltip at all,
-            // and the picture is the evidence either way.
-            try
-            {
-                foreach (var top in app.Desktop.FindAllChildren())
-                    if (top.ClassName is { } name && (name.Contains("Popup", StringComparison.OrdinalIgnoreCase)
-                        || name.Contains("ToolTip", StringComparison.OrdinalIgnoreCase) || name.Contains("tooltips", StringComparison.OrdinalIgnoreCase)))
-                        seen.Add($"top-level {name} \"{top.Name}\" at {top.BoundingRectangle}");
-            }
-            catch (Exception failure) { seen.Add($"top-level search failed: {failure.Message}"); }
-            string picture = Path.ChangeExtension(into, null) + "-" + pictureNumber++ + ".png";
-            try { FlaUI.Core.Capturing.Capture.Screen().ToFile(picture); }
-            catch (Exception failure) { seen.Add($"picture failed: {failure.Message}"); }
-            string under;
-            try
-            {
-                var at = app.Window.Automation.FromPoint(Mouse.Position);
-                under = $"{at?.ControlType} '{at?.AutomationId}' '{at?.Name}'";
-            }
-            catch (Exception failure) { under = "unknown: " + failure.Message; }
-            lines.Add($"{describedAs} (enabled {element.IsEnabled}, help \"{element.Properties.HelpText.ValueOrDefault}\", element at {element.BoundingRectangle}, pointer {Mouse.Position}, under the pointer {under}, picture {picture}): "
-                      + (seen.Count == 0 ? "no tooltip seen in 4 s" : string.Join("; ", seen)));
-        }
-        Rest(Wait(app, "fixWithClaudeButton"), "Fix with Claude…, dimmed");
-        // The control: an ENABLED button whose tooltip is in its XAML.
-        Rest(app.Find("addCourseButton", "the sidebar's + button"), "the sidebar's + button, enabled, tooltip \"Add a course or club\"");
-        File.WriteAllLines(into, lines);
-        Mouse.MoveTo(DrivenApp.MiddleOf(app.Window));
-    }
 
     private static void OpenTheProblemsTab(DrivenApp app)
     {

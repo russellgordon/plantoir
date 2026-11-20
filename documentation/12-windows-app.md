@@ -8146,18 +8146,34 @@ here where Windows has the same thing:
   source (no installed test around the menu bar's `Add`). The mac's dimmed
   Fix with buttons (and Revert on Planning) also carry the reason as a help
   tag, shown when the pointer rests on them, and the shared Help page says
-  "Hold the pointer over the button to read why". Windows gives the reason
-  to Narrator only (`AutomationProperties.HelpText`): a disabled WinUI
-  control takes no pointer input, so a tooltip on it is not expected to show
-  (WinUI's documented behaviour, not measured on this PC). Not built
-  tonight; the Windows Help book (886b onward) must not copy that sentence
-  as it stands, and `help/pages/fix-with.md` was left as the mac wrote it
+  "Hold the pointer over the button to read why". Since #990's second review
+  Windows gives a dimmed Fix with button its reason twice:
+  `AutomationProperties.HelpText` for Narrator AND `ToolTipService.ToolTip`
+  (`SectionProblemsView.ShowTheFixButtons`; no tooltip while it can be
+  pressed). **Whether WinUI SHOWS that tooltip on a disabled button is not
+  known.** Tried on this PC on 2026-11-19 (Lenovo i5-8365U, Windows 11 Pro
+  26200, the desktop session through Task Scheduler): `FixWithButtonsUiTests`
+  rested the real pointer on the dimmed Fix with Claude… (UI Automation
+  confirmed the pointer was over `fixWithClaudeButton`) and, as the control,
+  on the sidebar's enabled + button, whose XAML tooltip is "Add a course or
+  club", and polled UI Automation for 4 s for a ToolTip element in the
+  window and among the desktop's top-level windows. Neither showed one, the
+  control included, so the probe cannot see a WinUI tooltip at all and says
+  nothing about disabled ones; a screen picture was tried too and came back
+  as a 1280 x 720 crop of the scaled screen, missing both controls. The probe
+  was taken out again rather than left in a test that asserts nothing. Until
+  someone looks at the screen, no Windows Help page may say "Hold the pointer
+  over the button": the Windows Help book (886b onward) must not copy the
+  mac's sentence, and `help/pages/fix-with.md` was left as the mac wrote it
   (help/README.md rule 7: no `{{windows}}` runs yet). Revert on the Planning
   tab, the mac's other new help tag (`unitPlanning.tab.saveOnPlanning.rule`),
   has no Windows counterpart until #801 builds the Planning tab; when it
-  does, `PlanningTab.RevertOnPlanning` is that item's reason, and a dimmed
-  WinUI `MenuFlyoutItem` is expected to show no tooltip either, so the
-  question of where Windows says it goes with #801. A dimmed Revise
+  does, `PlanningTab.RevertOnPlanning` is that item's reason, given as the
+  dimmed menu item's `ToolTipService.ToolTip` and `HelpText` as the review
+  asks, and the same tooltip question applies to a dimmed `MenuFlyoutItem`.
+  The same run also failed `FixWithButtonsUiTests` later, at the Codex door's
+  argument count (12 expected, 14 sent), before any #990 change is reached;
+  that test is in no gate and the count is not this piece's. A dimmed Revise
   item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
   shows no tooltip, and the ruling Q14 rules out a grey text row.
 - **A row's context menu still HIDES a missing assistant**
