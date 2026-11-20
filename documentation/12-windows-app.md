@@ -13762,6 +13762,104 @@ no Obsidian, and no UI test drives these dialogs. Whether Obsidian for Windows
 writes its list in time for the reopen to find the course is #581's
 measurement, unchanged.
 
+## Escape stops a running preview or deploy, and the stop questions (#1009, the mac's #988)
+
+The mac's side, and every reason behind the rulings, is
+`documentation/09-mac-app.md` → "Escape and Command-Period stop a running
+preview, deploy or plan share (#988)"; this is what Windows did with it.
+
+**What a teacher sees.** The console's Cancel (`TaskProgressView`,
+`taskCancelButton`) answers Escape while a preview builds or a deploy runs.
+A preview stops at once. A deploy asks first, by click, by UI Automation
+Invoke or by key: "Stop the deploy?", "The website may be left partly
+updated until you deploy again.", a "Don't ask again" box, **Stop Deploy**
+(the default: the accent button, and Enter) and **Cancel** (WinUI's Close
+button, rightmost, which Escape presses). Ticked with Stop Deploy, the box
+turns the deploy's question off, and Escape and Cancel then stop a deploy at
+once; ticked with Cancel, nothing is remembered and the next question opens
+unticked. File ▸ Settings ▸ Deploying opens with a **Stopping** section, two
+checkboxes ("Ask before stopping a deploy", "Ask before stopping a share of
+unit plans") and the footer "When one is off, Cancel stops that task at
+once, and so does the Escape key." Each change, from the box or the pane,
+writes one `stop question setting changed` line, the mac's words
+(`StopQuestionWording.TrailLine`); `NamedGapLedger` no longer holds it.
+
+**The words are in the contract now** (`shared-rules.json` →
+`stopQuestions`, added from Windows): on the mac they lived only in Swift,
+so this piece moved them where both apps read one copy, with fourteen
+`cases` for what each answer stops and remembers (played through
+`StopQuestionAsking` in `StopQuestionsContractTests`). The mac owes a test
+pinning its Swift constants to it and a runner for the cases.
+
+**Windows has no Command-Period, and no counterpart was found.** Nothing in
+`contracts/` names one; Microsoft's "Dialog controls" page lists what closes
+a dialog through its Close button: the button, the system back button,
+Escape and Gamepad B. So Windows names Escape alone, and its footer is
+`stopQuestions.windowsWording.footer`, the precedent of
+`obsidianAddOnsForFigures.windowsWording` (Enter for Return).
+
+**Where the key lives: a `KeyboardAccelerator` on the visible Cancel**
+(`TaskProgressView.GiveCancelTheEscapeKey`, called by the section's view
+only). No hidden control, no `PreviewKeyDown` or `KeyDown` handler; WinUI
+shows the key in the button's own tooltip, "Cancel (Esc)". Microsoft,
+"Keyboard accelerators", Resolving accelerators: an accelerator with no
+`ScopeOwner` is looked for only after the key has bubbled from the focused
+element to the root unhandled, so a control that uses Escape itself (an
+open flyout, a drop-down, a dialog) has it first. The key is decided as it
+arrives (`StopKey.GoesToCancel`, Core, unit-tested): Cancel is on screen
+(it and every parent visible), the task runs, no ContentDialog is up
+(`DialogGate.IsOpen`), the preview's site is not drawn over the console
+(`IsCovered`, set where the web view is shown: the mac's
+`progressPanelTakesTheCancelKeys`), and no editable text box has the focus
+(`FocusManager.GetFocusedElement`: a `TextBox` that is not read-only, a
+`PasswordBox`, a `RichEditBox` that is not read-only; an `AutoSuggestBox` or
+`NumberBox` focuses its inner `TextBox`). The console's output is a
+selectable `TextBlock`, not a box. The handler sets `Handled` whatever it
+decides: Microsoft's "Invoke a keyboard accelerator" says an unhandled one
+goes on to press the button through its Invoke pattern, which would stop the
+task from inside a box. A click and an Invoke reach `PressCancelAsync` with no
+focus check, so they always stop (or ask). A run is stopped once
+(`_stopSentTo`, the runner and its start): Microsoft says an accelerator
+auto-repeats while held "and this behavior cannot be modified".
+
+**Measured in the VM** (Windows 11 Pro ARM64 in Parallels, the x64 app under
+emulation, 2026-11-20): the question's first focus is the "Don't ask again"
+box (WinUI's first focus is the first focusable control in the content,
+then the default button), and Enter there presses Stop Deploy, the default,
+as Return does on the mac; Space there ticks the box. With the focus moved to
+Cancel, Enter and Space both press Cancel. A second preview started straight
+after a stopped one ended on its own with "Something went wrong" in this VM,
+so each UI test runs one preview; not looked into (it is not this piece's).
+
+**Rejected.** A `KeyDown` or `PreviewKeyDown` on the window or the panel: a
+hidden key catcher. Initial focus moved to Cancel as #979's
+`AskWithNoDefault` does: this question has a default, ruled for the mac
+(Stop Deploy, Return), and a focused Cancel would take Enter from it, the
+"looks like the default and is not" fault #979's review found. A destructive
+style on Stop Deploy: ruled plain. Leaving `Handled` false when the key is
+the box's: the button would then be invoked.
+
+**Not built here, and why.** Windows has no share of unit plans yet (#824),
+so no panel asks "Stop this share?"; the words, the setting and its
+Settings row are in place for it, as the mac shows both rows. The console's
+own "Stop" button beside the answer box (`ConsoleStop_Click`, `Terminate`)
+still stops a deploy without asking, as before; the mac has no such button.
+
+**Tests.** `StopQuestionsContractTests` (unit): every word against the
+contract, every case, the trail lines and the `mustRecord` example, the
+setting kept, the key rule, and by source the accelerator on the visible
+Cancel, no key handler, the question's words with Stop Deploy as default, the
+box read only before Stop, and Stopping first in Settings ▸ Deploying.
+`StopByKeyboardUiTests` (opt-in, `[UiFact]`, real keys in the VM): Escape
+stops a running preview; Escape on a running deploy asks, Enter and Space on
+the focused Cancel and Escape on the question keep it running and remember
+nothing, Enter with the first focus is Stop Deploy, Stop Deploy with the box
+ticked turns the question off (setting and trail line), and the next Escape
+stops a deploy at once; Escape in the console's focused answer box stops
+nothing and an Invoke on Cancel then stops the preview. Sabotaged in the VM,
+each red: no accelerator (the preview and deploy tests), the box check
+removed (the text-box test), Cancel reading the box (the deploy test).
+
 ## The lap cap on Windows (#720, the mac's #689)
 
 One teacher action asks the model at most `shared-rules.json` →
