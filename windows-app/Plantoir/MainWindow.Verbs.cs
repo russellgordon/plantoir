@@ -108,6 +108,7 @@ public sealed partial class MainWindow
         // says where it came from, as the mac's does.
         var answer = await verbs.Perform(SectionVerbs.HidePages(code, section, places, plan: false),
                                          SectionVerbDialog.MenuPath(Item.HidePages), code, section,
+                                         SubjectMenuLayout.MenuContaining(Item.HidePages),
                                          ClassesDatedLater.UntickedAtDeployCounts(places.Count),
                                          previewFollows: false);
         ApplyMenuEnablement();
@@ -169,7 +170,8 @@ public sealed partial class MainWindow
                     break;
                 case Item.RebuildPreview:
                     var rebuilt = await verbs.Perform(SectionVerbs.RebuildPreview(code, number),
-                                                      SectionVerbDialog.MenuPath(item), code, number);
+                                                      SectionVerbDialog.MenuPath(item), code, number,
+                                                      SubjectMenuLayout.MenuContaining(item));
                     // Rebuilding is watched happening; only a refusal is said.
                     if (rebuilt.Summary != AssistWording.PreviewIsRebuilding(code, number.ToString()))
                         await SectionVerbDialog.ShowAnswer(root, verbs, course, number, item,

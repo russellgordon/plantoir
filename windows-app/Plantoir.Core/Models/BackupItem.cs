@@ -41,9 +41,10 @@ public abstract record BackupMaker
     /// ruling "name the real menu"; <c>subjectMenus.layout</c>): a Section copy
     /// is named <c>_menu-section&lt;N&gt;</c>, as every menu copy was before
     /// the split, a Classes copy <c>_classes-section&lt;N&gt;</c>
-    /// (<c>course-management.json</c> → <c>zipNames</c>).
+    /// (<c>course-management.json</c> → <c>zipNames</c>). The menu has no
+    /// default: a caller that forgets to name it does not compile.
     /// </remarks>
-    public sealed record Menu(int SectionNumber, SubjectMenuLayout.Menu InMenu = SubjectMenuLayout.Menu.Section) : BackupMaker
+    public sealed record Menu(int SectionNumber, SubjectMenuLayout.Menu InMenu) : BackupMaker
     {
         public override string Description => $"before a change from the {SubjectMenuLayout.Title(InMenu)} menu to Section {SectionNumber}";
         public override string NameSuffix => $"_{NamePrefix(InMenu)}{SectionNumber}";

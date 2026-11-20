@@ -19,21 +19,26 @@ final class OneSectionRestoreContractTests: XCTestCase {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let makerName: String = try XCTUnwrap(testCase["maker"] as? String)
             let makerSection: Int? = testCase["makerSection"] as? Int
-            var maker: BackupMaker = .teacher
+            // A menu copy is offered the same way whichever menu made it
+            // (#990), so a "menu" case runs once for each.
+            var makers: [BackupMaker] = [.teacher]
             if makerName == "menu" {
-                maker = .menu(sectionNumber: try XCTUnwrap(makerSection, name))
+                let number: Int = try XCTUnwrap(makerSection, name)
+                makers = [.menu(sectionNumber: number, inMenu: .section), .menu(sectionNumber: number, inMenu: .classes)]
             } else if makerName == "assistant" {
-                maker = .assistant(sectionNumber: try XCTUnwrap(makerSection, name))
+                makers = [.assistant(sectionNumber: try XCTUnwrap(makerSection, name))]
             }
-            let offered: Int? = OneSectionRestore.offeredSection(
-                maker: maker,
-                sectionExistsNow: try XCTUnwrap(testCase["sectionExistsNow"] as? Bool, name),
-                keptForReference: try XCTUnwrap(testCase["keptForReference"] as? Bool, name),
-                renameUnfinished: try XCTUnwrap(testCase["renameUnfinished"] as? Bool, name),
-                backupHasTheSection: try XCTUnwrap(testCase["backupHasTheSection"] as? Bool, name),
-                namingSameAsNow: try XCTUnwrap(testCase["namingSameAsNow"] as? Bool, name)
-            )
-            XCTAssertEqual(offered, testCase["offered"] as? Int, name)
+            for maker in makers {
+                let offered: Int? = OneSectionRestore.offeredSection(
+                    maker: maker,
+                    sectionExistsNow: try XCTUnwrap(testCase["sectionExistsNow"] as? Bool, name),
+                    keptForReference: try XCTUnwrap(testCase["keptForReference"] as? Bool, name),
+                    renameUnfinished: try XCTUnwrap(testCase["renameUnfinished"] as? Bool, name),
+                    backupHasTheSection: try XCTUnwrap(testCase["backupHasTheSection"] as? Bool, name),
+                    namingSameAsNow: try XCTUnwrap(testCase["namingSameAsNow"] as? Bool, name)
+                )
+                XCTAssertEqual(offered, testCase["offered"] as? Int, "\(name), \(maker.nameSuffix)")
+            }
         }
     }
 
@@ -89,7 +94,7 @@ final class OneSectionRestoreContractTests: XCTestCase {
         let block: [String: Any] = try OneSectionRestoreContractTests.block()
         let wording: [String: Any] = try XCTUnwrap(block["wording"] as? [String: Any])
         let when: String = "November 13, 2026 at 8:15 PM"
-        let madeBy: String = BackupMaker.menu(sectionNumber: 2).description
+        let madeBy: String = BackupMaker.menu(sectionNumber: 2, inMenu: .section).description
         let keptAt: String = "courses/_backups/ICS3U/Section 2 before a restore 2026-11-13_201500"
         func filled(_ key: String, count: Int = 0, reason: String = "") throws -> String {
             let template: String = try XCTUnwrap(wording[key] as? String, key)

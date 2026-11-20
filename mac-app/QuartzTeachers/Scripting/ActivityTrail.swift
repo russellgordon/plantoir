@@ -1839,7 +1839,7 @@ nonisolated enum ActivityTrail {
     /// menu the item is in (#990, "name the real menu"). The event keeps its
     /// name from before the split.
     static func sectionMenuBackedUpLine(
-        fileName: String, bytes: Int64, seconds: Double, inMenu: SubjectMenuLayout.Menu = .section
+        fileName: String, bytes: Int64, seconds: Double, inMenu: SubjectMenuLayout.Menu
     ) -> String {
         let megabytes: String = String(format: "%.1f", Double(bytes) / 1_000_000)
         let took: String = String(format: "%.1f", seconds)
@@ -1848,7 +1848,7 @@ nonisolated enum ActivityTrail {
     }
 
     /// The words for a menu backup that could not be made.
-    static func sectionMenuCouldNotBackUpLine(reason: String, inMenu: SubjectMenuLayout.Menu = .section) -> String {
+    static func sectionMenuCouldNotBackUpLine(reason: String, inMenu: SubjectMenuLayout.Menu) -> String {
         return "the \(SubjectMenuLayout.title(of: inMenu)) menu could not back up the course: \(reason)"
     }
 

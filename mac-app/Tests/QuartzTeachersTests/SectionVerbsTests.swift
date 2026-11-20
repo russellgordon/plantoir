@@ -135,7 +135,7 @@ final class SectionVerbsTests: XCTestCase {
             if name.hasSuffix("_menu-section1.zip") {
                 menuCopies.append(name)
                 let item: BackupItem? = BackupItem.from(fileURL: backups.appendingPathComponent(name), courseCode: "ICS3U")
-                XCTAssertEqual(item?.maker, .menu(sectionNumber: 1))
+                XCTAssertEqual(item?.maker, .menu(sectionNumber: 1, inMenu: .section))
                 XCTAssertFalse(item?.subtitle.contains("assistant") ?? true)
             }
         }
@@ -505,7 +505,7 @@ final class SectionVerbsFixesTests: XCTestCase {
         )
         XCTAssertEqual(second, "ICS3U_backup_2026-08-11_221530-2_menu-section1.zip")
         let read: BackupItem? = BackupItem.from(fileURL: folder.appendingPathComponent(second), courseCode: "ICS3U")
-        XCTAssertEqual(read?.maker, .menu(sectionNumber: 1))
+        XCTAssertEqual(read?.maker, .menu(sectionNumber: 1, inMenu: .section))
         XCTAssertEqual(
             read?.backedUpAt,
             BackupItem.from(fileURL: folder.appendingPathComponent(first), courseCode: "ICS3U")?.backedUpAt

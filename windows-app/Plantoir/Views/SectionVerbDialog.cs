@@ -815,8 +815,8 @@ internal sealed class SectionVerbDialog
     private async Task RunPlan(JsonObject planCall)
     {
         ShowWorking(AssistWording.MenuWorking);
-        var answer = await _verbs.Perform(planCall, MenuPath(_item), _course.Code, _section, Counts(),
-                                          menu: SubjectMenuLayout.MenuContaining(_item));
+        var answer = await _verbs.Perform(planCall, MenuPath(_item), _course.Code, _section,
+                                          SubjectMenuLayout.MenuContaining(_item), Counts());
         if (answer.IsPlan)
         {
             // The table when the menu's server sent one (#548); the text card
@@ -840,8 +840,8 @@ internal sealed class SectionVerbDialog
     {
         ShowWorking(AssistWording.MenuWorking);
         string savingACopy = AssistWording.MenuSavingACopy(_course.Code);
-        var answer = await _verbs.Perform(call, MenuPath(_item), _course.Code, _section, Counts(),
-            menu: SubjectMenuLayout.MenuContaining(_item),
+        var answer = await _verbs.Perform(call, MenuPath(_item), _course.Code, _section,
+            SubjectMenuLayout.MenuContaining(_item), Counts(),
             progress: note => _dialog.DispatcherQueue?.TryEnqueue(() =>
             {
                 if (_stage == Stage.Working && _workingWords is not null)

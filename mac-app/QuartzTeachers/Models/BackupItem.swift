@@ -25,8 +25,9 @@ enum BackupMaker: Hashable {
     /// assistant's. `inMenu` is the menu the item is in
     /// (`SubjectMenuLayout`, #990, Russell's ruling "name the real menu"):
     /// a Section copy is named `_menu-section<N>`, as every menu copy was
-    /// until #990, and a Classes copy `_classes-section<N>`.
-    case menu(sectionNumber: Int, inMenu: SubjectMenuLayout.Menu = .section)
+    /// until #990, and a Classes copy `_classes-section<N>`. The menu has no
+    /// default: a caller that forgets to name it does not compile.
+    case menu(sectionNumber: Int, inMenu: SubjectMenuLayout.Menu)
 
     // MARK: - Computed properties
 
