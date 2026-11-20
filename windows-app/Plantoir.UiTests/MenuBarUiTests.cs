@@ -282,21 +282,32 @@ public class SectionAndClassesUiTests
         return lines;
     }
 
-    /// <summary>Open a menu and read its lines in order: each item's AutomationId, and a separator as "----".</summary>
+    /// <summary>
+    /// Open a menu and read its lines in order: each item's AutomationId, and
+    /// a separator as "----". A <c>MenuFlyoutSeparator</c> has no element in
+    /// UI Automation (measured on the VM, 2026-11-20: the flyout's children
+    /// are its items only), so a separator is read where it is drawn: as a
+    /// gap between two items' rectangles larger than the gap between items
+    /// of one group (zero, measured, since an item's rectangle includes its
+    /// padding; a separator adds several pixels).
+    /// </summary>
     private static List<(string Line, AutomationElement? Element)> Read(DrivenApp app, string menu, string anyItemId)
     {
         MenuBar.Open(app, menu, anyItemId);
         var first = app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId(anyItemId))!;
-        var lines = new List<(string, AutomationElement?)>();
-        foreach (var child in first.Parent.FindAllChildren())
+        var items = new List<(string Id, AutomationElement Element, System.Drawing.Rectangle Box)>();
+        foreach (var child in first.Parent.FindAllChildren(cf => cf.ByControlType(ControlType.MenuItem)))
         {
-            ControlType type;
-            try { type = child.ControlType; } catch { continue; }
-            if (type == ControlType.Separator) { lines.Add((Separator, null)); continue; }
-            if (type != ControlType.MenuItem) continue;
             string id;
             try { id = child.AutomationId; } catch { continue; }
-            lines.Add((id, child));
+            items.Add((id, child, child.BoundingRectangle));
+        }
+        items.Sort((one, other) => one.Box.Top.CompareTo(other.Box.Top));
+        var lines = new List<(string, AutomationElement?)>();
+        for (int index = 0; index < items.Count; index++)
+        {
+            if (index > 0 && items[index].Box.Top - items[index - 1].Box.Bottom > 3) lines.Add((Separator, null));
+            lines.Add((items[index].Id, items[index].Element));
         }
         return lines;
     }
