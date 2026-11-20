@@ -8143,7 +8143,14 @@ here where Windows has the same thing:
   activation off the interface thread; its `Changed` re-runs
   `ApplyMenuEnablement`, and `Invoke` asks presence again at the click.
   `ReviseWithPresenceTests` holds the rule, the two contract keys and the
-  source (no installed test around the menu bar's `Add`). A dimmed Revise
+  source (no installed test around the menu bar's `Add`). The mac's dimmed
+  Fix with buttons (and Revert on Planning) also carry the reason as a help
+  tag, shown when the pointer rests on them, and the shared Help page says
+  "Hold the pointer over the button to read why". Windows gives the reason
+  to Narrator only (`AutomationProperties.HelpText`): a disabled WinUI
+  control takes no pointer input, so a tooltip on it never shows. Not built
+  tonight; the Windows Help book (886b onward) must not copy that sentence
+  as it stands. A dimmed Revise
   item says nothing about why: a WinUI `MenuFlyoutItem` that is disabled
   shows no tooltip, and the ruling Q14 rules out a grey text row.
 - **A row's context menu still HIDES a missing assistant**
@@ -8168,7 +8175,8 @@ here where Windows has the same thing:
 **Shortcuts: none changed on Windows tonight.** The mac moved Preview / Stop
 Preview from ⇧⌘P to ⌘Y (the HIG keeps ⇧⌘P for Page Setup), its Option
 alternate to ⌥⌘Y, and Copy a Page from This Course… from ⇧⌘C to ⇧⌘K (Show
-Colors); Rebuild Preview was ruled ⇧⌘Y. Nothing in `contracts/` pins a key
+Colors), and Rebuild Preview from ⇧⌘B to ⇧⌘Y (the review fixes, 7fb03c5f6).
+Nothing in `contracts/` pins a key
 (the mac's keys are its golden's, and `subjectMenus` names items only), and
 this page's rule is only that Ctrl+Shift letters "follow the mac's ⇧⌘
 letters" where Windows has no convention of its own. Ctrl+Y is Windows' Redo
