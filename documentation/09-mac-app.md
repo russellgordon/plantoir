@@ -4534,15 +4534,14 @@ stage 2). Each change names the HIG sentence it follows; the Windows app is
 brought to match in stage 3.
 
 - **Settings panes fit what they hold, up to what the screen shows (D42).**
-  Every pane goes through `settingsPaneFitsItsContent()`
+  Every pane goes through `settingsPaneFitsItsContent(tallest:)`
   (`PlantoirSettingsView.swift`): the window's 560-point width, then
   `.frame(maxHeight:)` with the cap `SettingsPaneHeight` gives, then
   `.fixedSize(horizontal: false, vertical: true)`. Asked for its ideal
   height, the capped frame answers the content's own height or the cap,
   whichever is less, and the grouped form inside, given that height,
-  scrolls the rest. The cap is the visible height of the screen the window
-  opens on (the key window's, else the main one, without the menu bar and
-  the Dock) less the window's title bar and pane buttons
+  scrolls the rest. The cap is the visible height of the Settings
+  window's OWN screen (without the menu bar and the Dock) less the window's title bar and pane buttons
   (`windowChrome`, 88 pt, measured on the running window: 648 pt around
   a pane held at 560) and 20 pt above and below, and never under 240 pt. Measured in the unit host on 2026-11-20, each pane's own height:
   Assistant 674 pt, Deploying 532 pt (with its Stopping section, #988),
@@ -4553,7 +4552,31 @@ brought to match in stage 3.
   Remove…) instead of running off the bottom of the screen; on this Mac's
   1512 x 982 it is 820 pt and nothing scrolls. The first version of #997
   used `fixedSize` alone, and its review found the 674 pt pane could not
-  be scrolled to its bottom on a short screen. Until #997 every pane opened
+  be scrolled to its bottom on a short screen. Its second version took the
+  cap once, when the pane was drawn, from the KEY window's screen; the
+  second review found that when Settings first opens that is the main
+  window's screen, so Settings left on an 800 pt laptop beside a tall
+  display opened the Assistant pane 762 pt tall where about 705 show, and
+  nothing recomputed it on a move or a Dock change. Now
+  `SettingsWindowPlacement` is handed the Settings window itself
+  (`WindowAccessor`, the moment the pane joins it) and works the cap out
+  again from that window's screen on the notifications AppKit posts when
+  something it depends on has changed: `NSWindow.didChangeScreenNotification`,
+  `didBecomeKeyNotification` (Settings reopened), `didResizeNotification`,
+  and `NSApplication.didChangeScreenParametersNotification` (screens
+  rearranged, the Dock shown, hidden or moved); no timed delay. A taller
+  pane grows the window down from its top edge, so a window left low on
+  its screen would run past the bottom: on each of those notifications
+  `SettingsPaneHeight.originKeepingOnScreen` moves it up just far enough to
+  sit on the visible area, never so far its title bar leaves the top
+  (AppKit's own `constrainFrameRect(_:to:)` keeps only the top edge on
+  screen, so it does not cover this). `LayoutAndSmallBehaviourTests`
+  injects the screen's visible frame: the cap for a 705 pt laptop is
+  smaller than a tall display's, it follows a screen change and a Dock
+  change, another window's move does not change it, and the origin rule
+  keeps the window on screen. NOT proven: a real second display (this Mac
+  has one screen), and the move during SwiftUI's animated resize between
+  panes, which was not driven in the running window. Until #997 every pane opened
   at 560 x 648: the Assistant pane was held at `.frame(height: 560)` and
   scrolled, and Preview and Obsidian were mostly empty space (the
   inventory's captures). HIG, Settings: "a settings window accommodates

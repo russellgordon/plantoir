@@ -35,6 +35,10 @@ struct PlantoirSettingsView: View {
     @AppStorage(SettingsPane.storageKey, store: PlantoirDefaults.shared)
     var pane: String = SettingsPane.assistant.rawValue
 
+    /// The screen the Settings window is on, and how tall a pane may be
+    /// there (#997, D42).
+    @State var placement: SettingsWindowPlacement = SettingsWindowPlacement()
+
     /// Every pane's width.
     static let paneWidth: CGFloat = 560
 
@@ -43,7 +47,7 @@ struct PlantoirSettingsView: View {
     var body: some View {
         TabView(selection: $pane) {
             AssistantSettingsView()
-                .settingsPaneFitsItsContent()
+                .settingsPaneFitsItsContent(tallest: placement.tallest)
                 .tabItem {
                     Label("Assistant", systemImage: "sparkles")
                 }
@@ -52,7 +56,7 @@ struct PlantoirSettingsView: View {
             // were here, because it is neither about the assistant nor about
             // deploying (decision 504-5).
             PreviewSettingsView()
-                .settingsPaneFitsItsContent()
+                .settingsPaneFitsItsContent(tallest: placement.tallest)
                 .tabItem {
                     Label(PreviewStartPageWording.paneTitle, systemImage: "play.rectangle")
                 }
@@ -60,13 +64,13 @@ struct PlantoirSettingsView: View {
             // Obsidian's add-ons for diagrams and graphs (#495): after
             // Preview, the one way back from "Don't ask again".
             ObsidianSettingsView()
-                .settingsPaneFitsItsContent()
+                .settingsPaneFitsItsContent(tallest: placement.tallest)
                 .tabItem {
                     Label(ObsidianFigureAddOnsWording.paneTitle, systemImage: "square.and.pencil")
                 }
                 .tag(SettingsPane.obsidian.rawValue)
             DeployingSettingsView()
-                .settingsPaneFitsItsContent()
+                .settingsPaneFitsItsContent(tallest: placement.tallest)
                 .tabItem {
                     Label("Deploying", systemImage: "paperplane")
                 }
@@ -74,7 +78,7 @@ struct PlantoirSettingsView: View {
             // The outside assistants Plantoir can set up (#855, ruling 3):
             // last, because Plantoir works without any of them.
             OtherAssistantsSettingsView()
-                .settingsPaneFitsItsContent()
+                .settingsPaneFitsItsContent(tallest: placement.tallest)
                 .tabItem {
                     Label(AssistantSetUpWording.paneTitle, systemImage: "person.2")
                 }
@@ -84,6 +88,13 @@ struct PlantoirSettingsView: View {
         // column of sentences, and a resizable one lets the explanations
         // stretch into single lines that are far harder to read.
         .frame(width: PlantoirSettingsView.paneWidth)
+        // The Settings window itself, the moment the pane is put in it, so
+        // the cap follows the window's OWN screen rather than whichever
+        // window was key when Settings opened (the same accessor the
+        // assistant's window uses to put itself back where it was left).
+        .background(WindowAccessor { window in
+            placement.watch(window)
+        })
         // `.contain` BEFORE the identifier (#353): without it SwiftUI puts
         // the container's identifier on every element inside it.
         .accessibilityElement(children: .contain)
@@ -126,17 +137,146 @@ enum SettingsPaneHeight {
         return room
     }
 
-    /// The tallest a pane may be on the screen the Settings window opens
-    /// on: the key window's screen, else the main screen.
-    static func tallestOnThisScreen() -> CGFloat {
-        var screen: NSScreen? = NSApp.keyWindow?.screen
-        if screen == nil {
-            screen = NSScreen.main
-        }
-        guard let screen else {
+    /// The tallest a pane may be on the main screen, for a Settings window
+    /// not yet in a window of its own.
+    static func tallestOnTheMainScreen() -> CGFloat {
+        guard let screen = NSScreen.main else {
             return tallest(onScreenShowing: 800)
         }
         return tallest(onScreenShowing: screen.visibleFrame.height)
+    }
+
+    /// Where a window of `frame` must move to stay on a screen whose
+    /// visible area is `visible`, or nil when it already does. A taller
+    /// pane grows the Settings window downward from its top edge, so a
+    /// window left low on the screen would run past the bottom (past the
+    /// Dock) with its last controls out of reach; it is moved up just far
+    /// enough, and never so far that its title bar leaves the top.
+    static func originKeepingOnScreen(_ frame: NSRect, visible: NSRect) -> NSPoint? {
+        if frame.minY >= visible.minY - 0.5 {
+            return nil
+        }
+        var bottom: CGFloat = visible.minY
+        if bottom + frame.height > visible.maxY {
+            bottom = visible.maxY - frame.height
+        }
+        return NSPoint(x: frame.minX, y: bottom)
+    }
+}
+
+/// The Settings window's own screen, followed as it changes (#997, D42).
+///
+/// The first version worked the cap out once, when the pane was drawn,
+/// from the key window's screen. When Settings first opens that is the
+/// MAIN window's screen, and Settings reopens where it was left, so with
+/// the main window on a tall display and Settings left on an 800 pt laptop
+/// screen the Assistant pane opened 762 pt tall where about 705 show. This
+/// is told the Settings window itself (`WindowAccessor`) and works the cap
+/// out again from that window's screen whenever AppKit says something it
+/// depends on changed: the window moved to another screen
+/// (`NSWindow.didChangeScreenNotification`), it became key again (Settings
+/// reopened), or a screen's arrangement or visible area changed
+/// (`NSApplication.didChangeScreenParametersNotification`, which is posted
+/// when the Dock is shown, hidden or moved). No timed delay: each is a
+/// notification AppKit posts when the thing has happened.
+@MainActor
+@Observable
+final class SettingsWindowPlacement {
+
+    // MARK: - Stored properties
+
+    /// The tallest a pane may be on the Settings window's screen.
+    private(set) var tallest: CGFloat
+
+    /// The Settings window, once it has been put in one.
+    @ObservationIgnored weak var window: NSWindow?
+
+    /// For tests: the visible frame to use instead of the window's screen's.
+    @ObservationIgnored var visibleFrameOverride: NSRect?
+
+    @ObservationIgnored let center: NotificationCenter
+
+    @ObservationIgnored var observers: [NSObjectProtocol] = []
+
+    // MARK: - Initializer
+
+    init(center: NotificationCenter = .default, visibleFrame: NSRect? = nil) {
+        self.center = center
+        self.visibleFrameOverride = visibleFrame
+        if let visibleFrame {
+            self.tallest = SettingsPaneHeight.tallest(onScreenShowing: visibleFrame.height)
+        } else {
+            self.tallest = SettingsPaneHeight.tallestOnTheMainScreen()
+        }
+    }
+
+    isolated deinit {
+        for observer in observers {
+            center.removeObserver(observer)
+        }
+    }
+
+    // MARK: - Functions
+
+    /// Starts following `window`: its screen, and the screens' visible
+    /// areas. Called once, the moment the pane joins the window.
+    func watch(_ window: NSWindow) {
+        self.window = window
+        for observer in observers {
+            center.removeObserver(observer)
+        }
+        observers = []
+        let windowNames: [Notification.Name] = [
+            NSWindow.didChangeScreenNotification,
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didResizeNotification,
+        ]
+        for name in windowNames {
+            let observer: NSObjectProtocol = center.addObserver(forName: name, object: window, queue: nil) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.refresh()
+                }
+            }
+            observers.append(observer)
+        }
+        let screens: NSObjectProtocol = center.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: nil
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.refresh()
+            }
+        }
+        observers.append(screens)
+        refresh()
+    }
+
+    /// The visible area of the screen the Settings window is on.
+    func visibleFrame() -> NSRect? {
+        if let visibleFrameOverride {
+            return visibleFrameOverride
+        }
+        if let screen = window?.screen {
+            return screen.visibleFrame
+        }
+        return NSScreen.main?.visibleFrame
+    }
+
+    /// Works the cap out again for the window's screen, and keeps the
+    /// window's bottom on that screen.
+    func refresh() {
+        guard let visible = visibleFrame() else {
+            return
+        }
+        let cap: CGFloat = SettingsPaneHeight.tallest(onScreenShowing: visible.height)
+        if cap != tallest {
+            tallest = cap
+        }
+        guard let window, window.isVisible else {
+            return
+        }
+        if let origin = SettingsPaneHeight.originKeepingOnScreen(window.frame, visible: visible) {
+            window.setFrameOrigin(origin)
+        }
     }
 }
 
@@ -158,16 +298,10 @@ extension View {
     /// less, and the form inside, given that height, scrolls the rest.
     /// `fixedSize` alone (the first version) let a 674 pt pane run past a
     /// 640 pt screen with no way to its bottom.
-    func settingsPaneFitsItsContent(tallest: CGFloat? = nil) -> some View {
-        var cap: CGFloat = 0
-        if let tallest {
-            cap = tallest
-        } else {
-            cap = SettingsPaneHeight.tallestOnThisScreen()
-        }
+    func settingsPaneFitsItsContent(tallest: CGFloat) -> some View {
         return self
             .frame(width: PlantoirSettingsView.paneWidth)
-            .frame(maxHeight: cap)
+            .frame(maxHeight: tallest)
             .fixedSize(horizontal: false, vertical: true)
     }
 }
