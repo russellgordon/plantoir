@@ -41,6 +41,11 @@ struct AccessibilityTree {
         /// The role of the element this one sits in.
         let parentRole: String
 
+        /// The actions an assistive app can perform on the element
+        /// ("AXPress" and the like): what VoiceOver and Full Keyboard
+        /// Access use to activate it, with Keyboard Navigation on or off.
+        let actions: [String]
+
         // MARK: - Computed properties
 
         /// Every name the element carries, in the order VoiceOver speaks
@@ -191,11 +196,24 @@ struct AccessibilityTree {
             label: text(of: node, attribute: kAXDescriptionAttribute),
             value: text(of: node, attribute: kAXValueAttribute),
             enabled: text(of: node, attribute: kAXEnabledAttribute),
-            parentRole: parentRole
+            parentRole: parentRole,
+            actions: actionNames(of: node)
         ))
         for child in elementList(of: node, attribute: kAXChildrenAttribute) {
             collect(child, parentRole: role, into: &found, depth: depth + 1)
         }
+    }
+
+    static func actionNames(of element: AXUIElement) -> [String] {
+        var names: CFArray?
+        let result: AXError = AXUIElementCopyActionNames(element, &names)
+        if result != .success {
+            return []
+        }
+        if let list = names as? [String] {
+            return list
+        }
+        return []
     }
 
     static func elementList(of element: AXUIElement, attribute: String) -> [AXUIElement] {

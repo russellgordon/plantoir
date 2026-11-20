@@ -115,6 +115,9 @@ final class AccessibilityNamesTests: XCTestCase {
         XCTAssertTrue(AccessibilityNamesTests.modifier(".accessibilityLabel(Text(\"Sidebar Visibility\"))", comesJustBefore: "sidebarVisibilityTable", in: sidebar))
         let settings: String = try AccessibilityNamesTests.source("Views/CourseSettings/CourseSettingsView.swift")
         XCTAssertTrue(AccessibilityNamesTests.modifier(".accessibilityLabel(Text(\"Course name\"))", comesJustBefore: "courseNameField", in: settings))
+        // The club short-label field showed its title only as a
+        // placeholder, which is not a name (the second review of #993).
+        XCTAssertTrue(AccessibilityNamesTests.modifier(".accessibilityLabel(Text(\"Short label beside emoji\"))", comesJustBefore: "customShortNameField", in: settings))
     }
 
     /// An information icon beside a sentence is hidden from VoiceOver (D20),

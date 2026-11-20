@@ -13580,6 +13580,61 @@ refusal answers. And, as the mac's runner since #610, a scripted `modelReply`
 answers the FIRST request only and plain text after it — unless
 `given.modelReplyAnswers` is `everyRequest` (#720, below).
 
+## The About panel's links (#993, the mac's D46)
+
+Written 2026-11-19 for [#993](https://github.com/russellgordon/plantoir/issues/993).
+The design, the ruling (option A of `vm-tools/reference/993-about-window-design.md`)
+and the reasons are the mac's: `09-mac-app.md` → "The About window's links
+(D46, #993's second piece)". This section says where Windows does it.
+
+**What was there, and why it changed.** `AboutDialog.cs` built "Quartz",
+"sponsoring him on GitHub", "Phosphor Icons" and "Russell Gordon" as inline
+`Hyperlink`s inside a `TextBlock`'s sentences. Unlike the mac's inline
+Markdown links, these were NOT broken for a screen reader or a keyboard:
+measured on the Windows VM on 2026-11-19 with the old panel put back in a
+scratch copy, UI Automation gave all six links as enabled, keyboard-focusable
+Hyperlink elements with their own words, and Tab from Website reached Email,
+Quartz, "sponsoring him on GitHub", Phosphor Icons, Russell Gordon, Close and
+round again. The change on Windows is the ruling's last line, "the Windows
+About panel follows": the same layout and words as the mac, not a fix of a
+Windows fault. An inline `Hyperlink` takes no AutomationId (asking UI
+Automation for one throws `PropertyNotSupportedException`), which is the one
+thing the old panel could not give a test to find each link by.
+
+**Where it is now.** All six links are `HyperlinkButton`s of their own, made
+by one helper, `Link(uri, words, automationId)`, which gives each an
+AutomationId (`aboutWebsiteLink`, `aboutEmailLink`, `aboutQuartzLink`,
+`aboutSponsorLink`, `aboutIconCreditLink`, `aboutDesignCreditLink`). The
+sponsor sentence is one plain `TextBlock`, whole, with "Quartz" and "Sponsor
+Jacky Zhao on GitHub" on one line beneath it inside the callout; the credits
+are label-and-value rows (Icon, Phosphor Icons (MIT); Design, Russell Gordon;
+Made with, Claude) in the shape of the Website and Email rows. No key
+catcher, no invisible control: each key reaches a visible link. "Quartz"
+stays a constant, `QuartzName`, so the label scan's one exception (the bare
+credit name, `CourseSettingsSaveTests`) still covers it.
+
+**What pins it.** `AboutDialogLinksSourceTests` (unit, plain facts) pins the
+source: no inline `Hyperlink` and no `Inlines.Add`, six `Link(` calls each
+with its own words and AutomationId and no seventh, the credits as rows, the
+sentence whole. `AboutDialogLinksUiTests` (`[UiFact]`, opt-in) opens Help ▸
+About Plantoir through the menu bar and reads the dialog as UI Automation
+gives it to a screen reader: exactly six elements of control type Hyperlink,
+each with its own words, enabled, keyboard-focusable and on screen, then
+presses Tab from the dialog's first stop until every one of the six has held
+the focus. Measured on the Windows VM (Parallels, Windows 11 Pro ARM64, the
+app win-x64 under emulation), 2026-11-19: 1 of 1 passed, 17 s. Against the
+old panel (put back in a scratch copy on the VM, 2026-11-19) the four source
+tests fail ("a link is built inside a sentence (new Hyperlink)", "no link of
+its own reads "https://plantoir.app" (aboutWebsiteLink)", and the rows and
+the sentence not found), and the UI test fails with "the About panel has no
+aboutWebsiteLink". Read that UI failure for what it is: on the old panel only
+the test's count of six Hyperlink elements can pass; its enabled, focusable
+and Tab checks find each link by AutomationId, which an inline Hyperlink
+cannot carry, so they never get to look. That the old links were enabled,
+focusable and reached by Tab comes from a separate manual probe (above), not
+from this test. Nothing is
+pressed, so no browser or mail program opens.
+
 ## Windows never closes Obsidian unasked (#1003, the mac's #995)
 
 Written 2026-11-19 for [#1003](https://github.com/russellgordon/plantoir/issues/1003).
