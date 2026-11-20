@@ -153,12 +153,17 @@ public sealed class UndoStoreTests : IDisposable
         UndoJournal writerJournal = Journal(segmentBytes: 4096);
         UndoJournal readerJournal = Journal();
         using var stop = new CancellationTokenSource();
-        Task<(int Reads, string? Fault)> reader = Task.Run<(int Reads, string? Fault)>(() =>
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // Its own thread, and the writing waits until it has read once: on a
+        // busy PC (the whole suite) a pool task could start after the writer
+        // had finished, and the test would prove nothing.
+        Task<(int Reads, string? Fault)> reader = Task.Factory.StartNew<(int Reads, string? Fault)>(() =>
         {
             long highest = 0;
             int reads = 0;
-            while (!stop.IsCancellationRequested)
+            do
             {
+                if (reads == 1) started.TrySetResult();
                 UndoReading reading = readerJournal.Read();
                 reads++;
                 if (!reading.IsFresh) return (reads, "a reading was not fresh");
@@ -166,13 +171,15 @@ public sealed class UndoStoreTests : IDisposable
                 if (reading.Folded.Barriers.Count > 0) return (reads, "a reading saw a barrier");
                 highest = reading.Folded.Highest;
             }
+            while (!stop.IsCancellationRequested || reads < 2);
             return (reads, null);
-        });
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        await Task.WhenAny(started.Task, reader);
         for (long seq = 1; seq <= 150; seq++) writerJournal.WithLock(writer => Step(writer, seq));
         stop.Cancel();
         (int reads, string? fault) = await reader;
         Assert.Null(fault);
-        Assert.True(reads > 0);
+        Assert.True(reads >= 2);
         UndoReading last = readerJournal.Read();
         Assert.Equal(150, last.Folded.Highest);
         Assert.Equal(150, last.Folded.Steps.Values.Count(step => step.State == UndoStepState.Done));
