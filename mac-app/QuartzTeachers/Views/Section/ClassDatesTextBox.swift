@@ -135,14 +135,20 @@ struct ClassDatesTextBox: NSViewRepresentable {
 /// 2026-11-20, and a teacher who pastes straight away pasted nowhere.
 final class ClassDatesTextView: NSTextView {
 
+    // MARK: - Stored properties
+
+    /// Once only: a view moved again (as SwiftUI may) must not take the
+    /// focus back from wherever Tab has put it since.
+    var hasTakenTheFocus: Bool = false
+
     // MARK: - Functions
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard let window else {
+        guard let window, !hasTakenTheFocus else {
             return
         }
-        window.initialFirstResponder = self
+        hasTakenTheFocus = true
         window.makeFirstResponder(self)
     }
 }

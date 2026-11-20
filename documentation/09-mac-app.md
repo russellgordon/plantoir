@@ -4574,11 +4574,16 @@ brought to match in stage 3.
   (`ClassDatesTextView`) takes the focus when it is put in the sheet's
   window, as the `TextEditor` did: without that, measured in the running
   app on 2026-11-20 with Keyboard Navigation on, the sheet opened with the
-  focus on the route picker. Driven in that app (an isolated copy with
-  `--state-dir`, Keyboard Navigation on): Tab from the picker entered the
-  box, Tab from the box went to "Where these came from", Shift-Tab came
-  back and Shift-Tab again reached the picker, and the box held only what
-  was typed.
+  focus on the route picker. It takes it once (`hasTakenTheFocus`) and
+  by `makeFirstResponder` alone: setting the window's
+  `initialFirstResponder` as well was tried and REJECTED, because in the
+  running app Tab then stayed in the box and Shift-Tab went to the sheet
+  itself (the unit test, in a window that is never key, did not see it).
+  Driven in that app on 2026-11-20 (an isolated copy with `--state-dir`):
+  with Keyboard Navigation on, the sheet opened with the focus in the box,
+  Tab went to "Where these came from" and then Cancel, and Shift-Tab came
+  back the same way; with it off, Tab and Shift-Tab moved between the box
+  and "Where these came from". The box held only what was typed.
 - **No sideways scroll bar under the Publish Pages picker (D48).** The
   picker's table carries `.scrollIndicators(.never, axes: .horizontal)`.
   Measured in `PageTablesSheetTests` with the scroll bars a mouse shows:
