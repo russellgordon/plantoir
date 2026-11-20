@@ -14620,8 +14620,7 @@ takes no focus from a box a teacher is typing in and the product was not at
 fault; but the site drew about 35 s after the start, inside the test's
 presses, and a press after it lands on a console the site covers (Escape is
 then never Cancel's, so the box rule is not tested), and stopping a serving
-preview ends without the "stopped by the teacher" line the test waited for,
-since the build's `preview.ps1` had already ended "succeeded". The test now
+preview then ended without the "stopped by the teacher" line the test waited for: `preview.ps1` exits 0 on Control-C and the outcome was read from the exit code first, so the line said "succeeded" (fixed in the fifth review's round: a stop is recorded as a stop). The test now
 runs on a deploy, where no site is drawn, held by the test (below), and an
 Invoke on Cancel asks, and Stop Deploy ends it "Cancelled". *Held
 destinations, not padding.* The two-folder test kept destination 2 going
@@ -14643,6 +14642,8 @@ through the stopped leg itself, so that rule is held by the unit tests
 under the same sabotage.
 **Tests.** `StopQuestionsContractTests.ACancelOnceALegIsAnnouncedKeepsThatLegFromStarting`
 (the first leg's build, the second leg's deploy; red with the checks removed).
+
+**A stop is recorded as a stop.** The "task finished" line's outcome is decided in the mac's order: "stopped by the teacher" when the teacher stopped the task (Escape, Cancel, the console's Stop, or Stop Deploy at the question), then "closed for a deploy", then "backed out at a question", and only then the exit code. The order matters on Windows because a preview stopped with Control-C exits 0: read by exit code first, a stop was written as "succeeded", and a problem report could not tell a teacher's stop from a preview that ended on its own. `ScriptRunner.FinishedOutcome` is the one place the order lives; the run's saved transcript carries the same words. The order is not data in `shared-rules.json` (`activityTrail` gives only why the outcome must tell a stop from a failure), so the cases are in the test.
 
 ## The lap cap on Windows (#720, the mac's #689)
 
