@@ -322,8 +322,10 @@ public class StopByKeyboardUiTests
     /// presses, so a press could land after it: the site then covers the
     /// console (Escape there is never Cancel's, so the box rule went
     /// untested), and a stop of a serving preview ends without the "stopped by
-    /// the teacher" line the test waited for (the build's preview.ps1 had
-    /// already finished "succeeded"). A deploy held on its destination cannot
+    /// the teacher" line the test waited for (the run's line then read
+    /// "succeeded", because preview.ps1 exits 0 on Control-C; since the fifth
+    /// review the outcome is "stopped by the teacher" whatever the exit code,
+    /// ScriptRunner.FinishedOutcome). A deploy held on its destination cannot
     /// end, or draw anything, until the test stops it.
     /// </summary>
     [UiFact]
