@@ -322,9 +322,10 @@ enum DeployCommand {
     }
 
     /// Why a rollover could not bring the legacy Netlify marker into the
-    /// working folder (`moveTheLegacyMarkerIn`): the rollover is refused
-    /// before anything of it is changed, and this is what is said after
-    /// "Nothing was changed:".
+    /// working folder (`moveTheLegacyMarkerIn`): it could not be read,
+    /// written in its new place or removed from the old one. The rollover
+    /// is refused before anything of it is changed, and this is what is
+    /// said after "Nothing was changed:".
     struct LegacyMarkerNotMovedIn: Error, LocalizedError, Equatable {
 
         // MARK: - Stored properties
@@ -332,91 +333,171 @@ enum DeployCommand {
         /// The legacy marker, as a teacher would find it.
         let legacyName: String
 
-        /// The marker's current place, as a teacher would find it.
-        let currentName: String
-
-        /// Whether the current place already holds a different record.
-        let currentPlaceHoldsAnother: Bool
+        /// Where it was to go, as a teacher would find it.
+        let placeName: String
 
         // MARK: - Computed properties
 
         var errorDescription: String? {
-            if currentPlaceHoldsAnother {
-                return "the website record “\(legacyName)” could not be moved to “\(currentName)”, "
-                    + "which already holds a different record. Neither was changed."
-            }
-            return "the website record “\(legacyName)” could not be moved to “\(currentName)”."
+            return "the website record “\(legacyName)” could not be moved to “\(placeName)”."
         }
     }
 
-    /// Brings the LEGACY Netlify marker into the working folder in the
-    /// current format, before a rollover's step is planned (#899 U3b,
-    /// Russell's ruling of 2026-11-20): exactly what `deploy.py` does on its
-    /// next deploy (`load_netlify_marker`, `scripts/deploy.py`), so the
-    /// step can name it like any other marker and an Undo puts it back
-    /// whole. The legacy marker lives in the built output (`.merged_output`,
-    /// a link out of the working folder), where no step can name it.
-    ///
-    /// deploy.py's rule, reused: a current marker (`.netlify_sites/
-    /// section<N>.json`) is the one read, and only when there is none is a
-    /// legacy marker that reads as JSON written there (mode 0600) and then
-    /// removed. Two rulings at the edges, both refusing rather than guessing,
-    /// so nothing is changed and the sentence is true:
-    /// - a legacy marker that is not JSON, or that cannot be written to the
-    ///   current place or removed, refuses (the current place written by
-    ///   this call is removed again first, so the folder is as it was);
-    /// - a current marker AND a legacy one: when they hold the same bytes
-    ///   the legacy one is what a migration that died before its removal
-    ///   leaves, and it is removed (the migration finished); when they
-    ///   differ, refused, since deploy.py would read the current one now but
-    ///   the legacy one once the rollover had moved the current one aside.
-    ///
-    /// A crash between the write and the removal leaves both, the same
-    /// bytes: deploy.py reads the current one, and the next rollover
-    /// finishes the removal. Nil when there is no legacy marker or it was
-    /// brought in.
-    static func moveTheLegacyMarkerIn(forSection sectionNumber: Int, in course: Course) -> LegacyMarkerNotMovedIn? {
-        let legacyURL: URL = legacyMarkerURL(forSection: sectionNumber, in: course)
-        let currentURL: URL = course.directoryURL
+    /// What `moveTheLegacyMarkerIn` did, so a rollover whose step is then
+    /// refused can put it back and "Nothing was changed" stays true
+    /// (`putBack`), or, when that cannot be done, say what moved.
+    nonisolated struct LegacyMarkerBroughtIn: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        /// Where the legacy marker was, in the built output.
+        let legacyURL: URL
+
+        /// Where its bytes are now, in `.netlify_sites`.
+        let placeURL: URL
+
+        /// Its bytes.
+        let bytes: Data
+
+        /// True when the place already held these same bytes, so the legacy
+        /// marker was only removed (a migration that stopped before its
+        /// removal, finished).
+        let removedADuplicate: Bool
+
+        // MARK: - Computed properties
+
+        /// The legacy marker, as a teacher would find it.
+        var legacyName: String {
+            return ".merged_output/" + DeployCommand.nameForTeacher(legacyURL)
+        }
+
+        /// Its place now, as a teacher would find it.
+        var placeName: String {
+            return DeployCommand.nameForTeacher(placeURL)
+        }
+
+        // MARK: - Functions
+
+        /// Puts the legacy marker back in the built output, for a step that
+        /// was then REFUSED (nothing of it made). Never over anything, and
+        /// only while its new place still holds exactly these bytes. False
+        /// when it could not be put back.
+        func putBack() -> Bool {
+            if FileManager.default.fileExists(atPath: legacyURL.path) {
+                return false
+            }
+            do {
+                try FileManager.default.createDirectory(
+                    at: legacyURL.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try bytes.write(to: legacyURL, options: .withoutOverwriting)
+            } catch {
+                return false
+            }
+            if removedADuplicate {
+                return true
+            }
+            guard let there = try? Data(contentsOf: placeURL), there == bytes,
+                  (try? FileManager.default.removeItem(at: placeURL)) != nil else {
+                try? FileManager.default.removeItem(at: legacyURL)
+                return false
+            }
+            return true
+        }
+    }
+
+    /// Where a stale legacy marker is brought in: beside the current
+    /// record, `.netlify_sites/section<N>.from-built-output.json`, a name
+    /// deploy.py never reads.
+    static func broughtInLeftoverURL(forSection sectionNumber: Int, in course: Course) -> URL {
+        return course.directoryURL
             .appendingPathComponent(".netlify_sites")
-            .appendingPathComponent("section\(sectionNumber).json")
+            .appendingPathComponent("section\(sectionNumber).from-built-output.json")
+    }
+
+    /// Brings the LEGACY Netlify marker out of the built output into the
+    /// working folder, before a rollover's step is planned (#899 U3b,
+    /// Russell's rulings of 2026-11-20), so the step can name it like any
+    /// other marker and an Undo puts it back whole. The legacy marker lives
+    /// in the built output (`.merged_output`, a link out of the working
+    /// folder), where no step can name it.
+    ///
+    /// deploy.py's rule, reused (`load_netlify_marker`, `scripts/deploy.py`):
+    /// a current marker (`.netlify_sites/section<N>.json`) is the one read,
+    /// and only when there is none is a legacy marker that reads as JSON
+    /// written there (mode 0600) and then removed. Then:
+    /// - a legacy marker a deploy would NOT read (a current one is there and
+    ///   holds other bytes, or it is not JSON) is a stale leftover, and the
+    ///   rollover is never stopped by it (Russell, 2026-11-20, evening): it
+    ///   is brought in beside the current record
+    ///   (`broughtInLeftoverURL`), which `planSiteRelease` then sets aside
+    ///   in the step, so a later deploy cannot migrate it back in;
+    /// - beside a place that already holds the SAME bytes, it is what a
+    ///   migration that stopped before its removal leaves, and it is only
+    ///   removed (the migration finished).
+    ///
+    /// Refused only when it cannot be read, written or removed: the place
+    /// this call wrote is removed again first, so the folder is as it was.
+    /// A crash between the write and the removal leaves the same bytes in
+    /// both places: a deploy reads the current record, and the next
+    /// rollover finishes the removal. Nil when there is no legacy marker.
+    static func moveTheLegacyMarkerIn(
+        forSection sectionNumber: Int, in course: Course
+    ) throws(LegacyMarkerNotMovedIn) -> LegacyMarkerBroughtIn? {
+        let legacyURL: URL = legacyMarkerURL(forSection: sectionNumber, in: course)
         guard FileManager.default.fileExists(atPath: legacyURL.path) else {
             return nil
         }
-        let refusal: LegacyMarkerNotMovedIn = LegacyMarkerNotMovedIn(
-            legacyName: ".merged_output/" + nameForTeacher(legacyURL),
-            currentName: nameForTeacher(currentURL),
-            currentPlaceHoldsAnother: false
-        )
-        guard let legacyData = try? Data(contentsOf: legacyURL),
-              (try? JSONSerialization.jsonObject(with: legacyData)) != nil else {
-            return refusal
+        let currentURL: URL = course.directoryURL
+            .appendingPathComponent(".netlify_sites")
+            .appendingPathComponent("section\(sectionNumber).json")
+        let legacyName: String = ".merged_output/" + nameForTeacher(legacyURL)
+        guard let legacyData = try? Data(contentsOf: legacyURL) else {
+            throw LegacyMarkerNotMovedIn(legacyName: legacyName, placeName: nameForTeacher(currentURL))
         }
-        if FileManager.default.fileExists(atPath: currentURL.path) {
-            guard let currentData = try? Data(contentsOf: currentURL), currentData == legacyData else {
-                return LegacyMarkerNotMovedIn(
-                    legacyName: refusal.legacyName, currentName: refusal.currentName, currentPlaceHoldsAnother: true
-                )
+        let readsAsJSON: Bool = (try? JSONSerialization.jsonObject(with: legacyData)) != nil
+        var placeURL: URL = currentURL
+        if FileManager.default.fileExists(atPath: currentURL.path) || !readsAsJSON {
+            placeURL = broughtInLeftoverURL(forSection: sectionNumber, in: course)
+            if let current = try? Data(contentsOf: currentURL), current == legacyData {
+                placeURL = currentURL
+            }
+        }
+        let refusal: LegacyMarkerNotMovedIn = LegacyMarkerNotMovedIn(legacyName: legacyName, placeName: nameForTeacher(placeURL))
+        if FileManager.default.fileExists(atPath: placeURL.path) {
+            guard let there = try? Data(contentsOf: placeURL), there == legacyData else {
+                throw refusal
             }
             if (try? FileManager.default.removeItem(at: legacyURL)) == nil {
-                return refusal
+                throw refusal
             }
-            return nil
+            return LegacyMarkerBroughtIn(legacyURL: legacyURL, placeURL: placeURL, bytes: legacyData, removedADuplicate: true)
         }
         do {
             try FileManager.default.createDirectory(
-                at: currentURL.deletingLastPathComponent(), withIntermediateDirectories: true
+                at: placeURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
-            try legacyData.write(to: currentURL, options: .withoutOverwriting)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: currentURL.path)
+            try legacyData.write(to: placeURL, options: .withoutOverwriting)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: placeURL.path)
         } catch {
-            return refusal
+            throw refusal
         }
         if (try? FileManager.default.removeItem(at: legacyURL)) == nil {
-            try? FileManager.default.removeItem(at: currentURL)
-            return refusal
+            try? FileManager.default.removeItem(at: placeURL)
+            throw refusal
         }
-        return nil
+        return LegacyMarkerBroughtIn(legacyURL: legacyURL, placeURL: placeURL, bytes: legacyData, removedADuplicate: false)
+    }
+
+    /// What a rollover's release of the website planned into its step, and
+    /// what was brought in from the built output before it.
+    struct PlannedRelease {
+
+        // MARK: - Stored properties
+
+        let release: SiteRelease
+
+        let broughtIn: LegacyMarkerBroughtIn?
     }
 
     /// `releaseSite`, PLANNED into the rollover's ONE step instead of
@@ -430,18 +511,18 @@ enum DeployCommand {
     ///
     /// The legacy marker in the built output is brought into the working
     /// folder first (`moveTheLegacyMarkerIn`), so it is planned here like
-    /// any other marker; when it cannot be, this throws that refusal and
-    /// nothing has been planned or changed. No marker is moved outside the
-    /// step (Russell's ruling of 2026-11-20).
+    /// any other marker, and a stale one brought in beside the current
+    /// record is set aside here too, as a `moveApart` (its kept name
+    /// `section<N>.from-built-output.previous-<stamp>.json`), one of the
+    /// section's records that move as a group. When it cannot be brought
+    /// in, this throws that refusal and nothing has been planned or changed.
     static func planSiteRelease(
         forSection sectionNumber: Int,
         in course: Course,
         at moment: Date = Date(),
         into step: JournaledStep
-    ) throws(LegacyMarkerNotMovedIn) -> SiteRelease {
-        if let refusal = moveTheLegacyMarkerIn(forSection: sectionNumber, in: course) {
-            throw refusal
-        }
+    ) throws(LegacyMarkerNotMovedIn) -> PlannedRelease {
+        let broughtIn: LegacyMarkerBroughtIn? = try moveTheLegacyMarkerIn(forSection: sectionNumber, in: course)
         var keptFiles: [String] = []
         var savedFiles: [AssistSavedFile] = []
         var stillPinned: [String] = []
@@ -471,7 +552,28 @@ enum DeployCommand {
             savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
         }
 
-        return SiteRelease(keptFiles: keptFiles, savedFiles: savedFiles, stillPinned: stillPinned)
+        // The stale leftover brought in beside the current record (now or
+        // by an earlier rollover that stopped before its step).
+        let leftoverURL: URL = broughtInLeftoverURL(forSection: sectionNumber, in: course)
+        if FileManager.default.fileExists(atPath: leftoverURL.path) {
+            let keptURL: URL = leftoverURL.deletingLastPathComponent()
+                .appendingPathComponent("section\(sectionNumber).from-built-output.previous-" + stamp(moment) + ".json")
+            if let data = try? Data(contentsOf: leftoverURL),
+               !FileManager.default.fileExists(atPath: keptURL.path),
+               step.move(leftoverURL, to: keptURL, standsApart: true) {
+                let contents: String = String(decoding: data, as: UTF8.self)
+                keptFiles.append(nameForTeacher(keptURL))
+                savedFiles.append(AssistSavedFile(fileURL: leftoverURL, before: contents, after: nil))
+                savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
+            } else {
+                stillPinned.append(nameForTeacher(leftoverURL))
+            }
+        }
+
+        return PlannedRelease(
+            release: SiteRelease(keptFiles: keptFiles, savedFiles: savedFiles, stillPinned: stillPinned),
+            broughtIn: broughtIn
+        )
     }
 
     /// The legacy Netlify marker `releaseSite` also moves: inside the BUILT
@@ -516,7 +618,7 @@ enum DeployCommand {
 
     /// A marker named the way a teacher would find it — the folder it sits in
     /// and the file, without the rest of the path.
-    private static func nameForTeacher(_ markerURL: URL) -> String {
+    nonisolated static func nameForTeacher(_ markerURL: URL) -> String {
         return markerURL.deletingLastPathComponent().lastPathComponent
              + "/" + markerURL.lastPathComponent
     }

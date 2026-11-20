@@ -187,14 +187,14 @@ final class RollOverFromTheMenuTests: XCTestCase {
     /// one Undo Last Change takes back whole (the dates and the markers).
     /// Red before #897 piece B: two entries, and one undo left the dates.
     ///
-    /// The legacy marker holds the Netlify record's own bytes, as a deploy's
-    /// migration that stopped before removing it leaves them: since #899
-    /// U3b's second round (Russell's ruling of 2026-11-20) a rollover brings
-    /// the legacy record into the working folder first, by deploy.py's rule,
-    /// so it is finished (removed) here, and the undo puts the Netlify record
-    /// back in its current place, never the legacy one in the built output.
-    /// A legacy record that DIFFERS refuses the rollover
-    /// (`UndoRolloverStepTests`).
+    /// The legacy marker DIFFERS from the Netlify record (Russell's ruling of
+    /// 2026-11-20, evening, on #899 U3b): a deploy reads only the current
+    /// record, so the stale leftover is never a reason to refuse. It is
+    /// brought out of the built output into `.netlify_sites` (as
+    /// `section1.from-built-output.json`) and set aside in the rollover's
+    /// own change, so a later deploy cannot migrate it back in; the one undo
+    /// puts it back byte for byte beside the current record, where no deploy
+    /// reads it, never into the built output.
     func testANewWebsiteFromTheMenuIsOneChange() async throws {
         let made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: .menu, for: self)
         defer {
@@ -202,9 +202,10 @@ final class RollOverFromTheMenuTests: XCTestCase {
         }
         let copies: CopiesSaved = RollOverFromTheMenuTests.countCopies(of: made)
         var markers: [URL] = try RollOverFromTheMenuTests.writeEveryMarker(in: made.course)
-        let legacy: URL = DeployCommand.legacyMarkerURL(forSection: 1, in: made.course)
-        try Data(contentsOf: markers[0]).write(to: legacy)
-        markers.removeLast()
+        let legacy: URL = markers.removeLast()
+        let legacyBytes: Data = try Data(contentsOf: legacy)
+        XCTAssertNotEqual(legacyBytes, try Data(contentsOf: markers[0]), "a current record and a DIFFERENT legacy one")
+        let broughtIn: URL = made.course.directoryURL.appendingPathComponent(".netlify_sites/section1.from-built-output.json")
         let plistURL: URL = ScheduledDeploy.plistURL(courseCode: made.course.code, sectionNumber: 1, inWorkingFolder: made.root)
         try RolloverWebsiteTests.writeAgent(
             courseCode: made.course.code, sectionNumber: 1, workingFolder: made.root, at: plistURL
@@ -221,7 +222,8 @@ final class RollOverFromTheMenuTests: XCTestCase {
         for marker in markers {
             XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path), marker.path)
         }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the legacy record was brought in")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the leftover is gone from the built output")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: broughtIn.path), "and set aside")
         XCTAssertFalse(FileManager.default.fileExists(atPath: plistURL.path), "the schedule must really be off")
         XCTAssertNotEqual(try String(contentsOf: page, encoding: .utf8), pageBefore, "the page was not re-dated")
         XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(outcome.summary), outcome.summary)
@@ -232,7 +234,8 @@ final class RollOverFromTheMenuTests: XCTestCase {
         for marker in markers {
             XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "one undo puts \(marker.lastPathComponent) back")
         }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the record stays in its current place")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "never back in the built output")
+        XCTAssertEqual(try Data(contentsOf: broughtIn), legacyBytes, "the leftover back byte for byte, beside the current record")
     }
 
     /// A new website from the menu on Cloudflare, rolled over from last

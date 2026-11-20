@@ -5037,7 +5037,7 @@ final class AssistToolRunner {
             schedule = try makeTheRolloverStep(step, planned)
         } catch {
             return AssistToolOutcome.refused(
-                saidWhenTheStepStopped(error, what: "the section's record and website", sectionNumber: located.sectionNumber)
+                saidWhenTheRolloverStopped(error, what: "the section's record and website", sectionNumber: located.sectionNumber)
             )
         }
         let settled: (said: String, files: [AssistSavedFile]) = finishTheWebsite(
@@ -5114,7 +5114,7 @@ final class AssistToolRunner {
                 do {
                     schedule = try makeTheRolloverStep(step, planned)
                 } catch {
-                    return AssistToolOutcome.refused(saidWhenTheStepStopped(
+                    return AssistToolOutcome.refused(saidWhenTheRolloverStopped(
                         error, what: "the section's record and website", sectionNumber: asked.located.sectionNumber
                     ))
                 }
@@ -5215,7 +5215,7 @@ final class AssistToolRunner {
                 ) + "\n\nThe pages already re-dated:\n" + listing(stopped.written))
             } catch {
                 return AssistToolOutcome.refused(
-                    saidWhenTheStepStopped(error, what: "the section's class dates", sectionNumber: asked.located.sectionNumber)
+                    saidWhenTheRolloverStopped(error, what: "the section's class dates", sectionNumber: asked.located.sectionNumber)
                 )
             }
             if rolling {
@@ -5433,6 +5433,10 @@ final class AssistToolRunner {
         /// (`DeployCommand.moveTheLegacyMarkerIn`), so nothing was changed.
         var refusedBeforeTheStep: DeployCommand.LegacyMarkerNotMovedIn? = nil
 
+        /// The legacy marker brought in from the built output before the
+        /// step, put back if the step is then refused.
+        var broughtIn: DeployCommand.LegacyMarkerBroughtIn? = nil
+
         /// The deploys set for later planned to be removed, as targets.
         var schedules: [String] = []
 
@@ -5449,6 +5453,48 @@ final class AssistToolRunner {
         return step
     }
 
+    /// A rollover's step refused after the legacy marker was brought in
+    /// from the built output, and the marker could not be put back: what
+    /// moved, said after "Nothing else was changed:".
+    struct RolloverStoppedAfterARecordMoved: Error, LocalizedError {
+
+        // MARK: - Stored properties
+
+        /// What the step was refused with, said first.
+        let underlyingSaid: String
+
+        /// The legacy marker, and its place now, as a teacher would find them.
+        let legacyName: String
+
+        let placeName: String
+
+        // MARK: - Initializer
+
+        init(underlying: Error, broughtIn: DeployCommand.LegacyMarkerBroughtIn) {
+            self.underlyingSaid = underlying.localizedDescription
+            self.legacyName = broughtIn.legacyName
+            self.placeName = broughtIn.placeName
+        }
+
+        // MARK: - Computed properties
+
+        var errorDescription: String? {
+            return underlyingSaid
+                + " The website record “\(legacyName)” is now at “\(placeName)”, "
+                + "where a deploy reads it; it names the same website."
+        }
+    }
+
+    /// What is said when a rollover's step did not go in: as any action's
+    /// (`saidWhenTheStepStopped`), except when a record brought in from the
+    /// built output could not be put back, which is then said.
+    private func saidWhenTheRolloverStopped(_ error: Error, what: String, sectionNumber: Int) -> String {
+        if error is RolloverStoppedAfterARecordMoved {
+            return "Nothing else was changed: \(error.localizedDescription)"
+        }
+        return saidWhenTheStepStopped(error, what: what, sectionNumber: sectionNumber)
+    }
+
     /// Makes a rollover's step. A deploy set for later that cannot be
     /// removed is taken out of the step and the rest made without it, said
     /// as not turned off (as before U3b; the failure is reported, never
@@ -5456,7 +5502,12 @@ final class AssistToolRunner {
     /// (`JournaledStepError.refused`, nothing changed); a step left part way
     /// (`leftPartWay`) is never tried again, and is thrown for the caller
     /// to say as part way (`saidWhenTheStepStopped`). A legacy marker that
-    /// could not be brought in refuses before anything is made.
+    /// could not be brought in refuses before anything is made. One that
+    /// WAS brought in is put back when the step is then refused, so
+    /// "Nothing was changed" is true; when it cannot be, the error says what
+    /// moved (`RolloverStoppedAfterARecordMoved`). A step left part way or
+    /// stopped by a kill leaves it where it is: the step's own `before`
+    /// names it there, and recovery settles the step from that.
     func makeTheRolloverStep(_ step: JournaledStep, _ planned: PlannedWebsite) throws -> ScheduledPublishOutcome {
         var outcome: ScheduledPublishOutcome = .noneWasSet
         if !planned.schedules.isEmpty {
@@ -5478,6 +5529,18 @@ final class AssistToolRunner {
                 where path.hasPrefix(UndoOp.scheduledDeployFamily + ":") && tries <= planned.schedules.count {
                 step.forgetExternal(path)
                 outcome = .couldNotTurnOff
+            } catch JournaledStepError.leftPartWay(let refusal, let fileName, let kept) {
+                throw JournaledStepError.leftPartWay(refusal, fileName: fileName, keptOriginals: kept)
+            } catch JournaledStepError.stoppedByATest {
+                throw JournaledStepError.stoppedByATest
+            } catch {
+                guard let broughtIn = planned.broughtIn else {
+                    throw error
+                }
+                if broughtIn.putBack() {
+                    throw error
+                }
+                throw RolloverStoppedAfterARecordMoved(underlying: error, broughtIn: broughtIn)
             }
         }
     }
@@ -5550,7 +5613,11 @@ final class AssistToolRunner {
 
         let release: DeployCommand.SiteRelease
         do {
-            release = try DeployCommand.planSiteRelease(forSection: sectionNumber, in: course, into: step)
+            let plannedRelease: DeployCommand.PlannedRelease = try DeployCommand.planSiteRelease(
+                forSection: sectionNumber, in: course, into: step
+            )
+            release = plannedRelease.release
+            planned.broughtIn = plannedRelease.broughtIn
         } catch {
             planned.refusedBeforeTheStep = error
             return planned

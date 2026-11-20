@@ -60,6 +60,7 @@ final class UndoRolloverStepTests: XCTestCase {
         JournaledStep.modeOverride = nil
         UndoKillPoints.hook = nil
         UndoKillPoints.putBackFailsAt = nil
+        UndoKillPoints.fileInUseAtSwap = nil
         ActivityTrail.store = previousTrail
         for folder in listFolders {
             try? FileManager.default.removeItem(at: folder)
@@ -493,24 +494,11 @@ final class UndoRolloverStepTests: XCTestCase {
         XCTAssertEqual(siteADeployReads(made), "last-year")
     }
 
-    /// A legacy record that cannot be brought in refuses the rollover
-    /// before anything is changed, and says so truly: one that differs from
-    /// the current record, and one whose folder will not let it go (the
-    /// current record this wrote is removed again). MUST FAIL with the
-    /// conversion's refusal ignored.
+    /// A legacy record that cannot be brought in (its folder will not let
+    /// it go) refuses the rollover before anything is changed, and says so
+    /// truly; the current record this wrote is removed again. MUST FAIL
+    /// with the conversion's refusal ignored.
     func testALegacyRecordThatCannotBeBroughtInRefusesTheRolloverBeforeAnythingChanges() async throws {
-        let differing: AssistFixture.Made = try section(surface: .menu)
-        try FileManager.default.createDirectory(at: legacyURL(differing).deletingLastPathComponent(), withIntermediateDirectories: true)
-        try UndoRolloverStepTests.thisYear.write(to: legacyURL(differing), atomically: true, encoding: .utf8)
-        let pagesBefore: [String: Data] = UndoActionStepsTests.pages(of: differing.course)
-        let saidDiffering: AssistToolOutcome = await rollOver(differing, surface: .menu)
-        XCTAssertTrue(saidDiffering.summary.hasPrefix("Nothing was changed: the website record"), saidDiffering.summary)
-        XCTAssertTrue(saidDiffering.summary.contains("already holds a different record"), saidDiffering.summary)
-        XCTAssertEqual(UndoActionStepsTests.pages(of: differing.course), pagesBefore)
-        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: differing), UndoRolloverStepTests.lastYear)
-        XCTAssertEqual(try String(contentsOf: legacyURL(differing), encoding: .utf8), UndoRolloverStepTests.thisYear)
-        XCTAssertEqual(try journal().read().records.count, 0)
-
         let held: AssistFixture.Made = try sectionWithOnlyTheLegacyRecord()
         let folder: URL = legacyURL(held).deletingLastPathComponent()
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
@@ -522,6 +510,150 @@ final class UndoRolloverStepTests: XCTestCase {
         XCTAssertNil(text(UndoRolloverStepTests.markerPath, in: held), "the current record written was removed again")
         XCTAssertTrue(FileManager.default.fileExists(atPath: legacyURL(held).path))
         XCTAssertEqual(siteADeployReads(held), "last-year")
+    }
+
+    // MARK: - A stale leftover beside the current record (Russell, 2026-11-20 evening)
+
+    /// Where a stale leftover is brought in: `.netlify_sites`, beside the
+    /// current record, where a deploy never reads it.
+    static let leftoverPath: String = "courses/ICS3U/.netlify_sites/section1.from-built-output.json"
+
+    static let leftover: String = "{\"site_id\": \"a-stale-leftover\"}"
+
+    /// A section on a Netlify website (its current record) with a DIFFERENT
+    /// old-format leftover in the built output.
+    func sectionWithADifferentLeftover() throws -> AssistFixture.Made {
+        let made: AssistFixture.Made = try section(surface: .menu)
+        try FileManager.default.createDirectory(at: legacyURL(made).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try UndoRolloverStepTests.leftover.write(to: legacyURL(made), atomically: true, encoding: .utf8)
+        return made
+    }
+
+    /// The kept copies of the leftover, by name.
+    func keptLeftovers(in made: AssistFixture.Made) -> [String] {
+        let folder: URL = made.course.directoryURL.appendingPathComponent(".netlify_sites")
+        let entries: [String] = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        var kept: [String] = []
+        for entry in entries where entry.hasPrefix("section1.from-built-output.previous-") {
+            kept.append(entry)
+        }
+        return kept
+    }
+
+    /// Russell's ruling: a current record and a DIFFERENT leftover never
+    /// refuse. The rollover goes on; the leftover is gone from the built
+    /// output (a later deploy cannot migrate it back in) and set aside in
+    /// the rollover's own step, a `moveApart` beside the current record's.
+    /// Undo puts both back byte for byte (the leftover where the step found
+    /// it, beside the current record); Redo sets both aside again. MUST FAIL
+    /// with the refusal of the fix round.
+    func testADifferentLeftoverIsSetAsideInTheStepAndUndoPutsBothBack() async throws {
+        let made: AssistFixture.Made = try sectionWithADifferentLeftover()
+        let pageBefore: String? = text(UndoRolloverStepTests.pagePath, in: made)
+        let said: AssistToolOutcome = await rollOver(made, surface: .menu)
+        XCTAssertFalse(said.summary.hasPrefix("Nothing was changed"), said.summary)
+        XCTAssertNotEqual(text(UndoRolloverStepTests.pagePath, in: made), pageBefore)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL(made).path), "gone from the built output")
+        XCTAssertNil(text(UndoRolloverStepTests.leftoverPath, in: made))
+        XCTAssertNil(siteADeployReads(made), "a deploy now starts the new website")
+        XCTAssertEqual(keptMarkers(in: made).count, 1)
+        XCTAssertEqual(keptLeftovers(in: made).count, 1)
+        var apart: [String] = []
+        for op in try journal().read().records[1]?.step.ops ?? [] where op.knownKind == .moveApart {
+            apart.append(op.from ?? "")
+        }
+        XCTAssertEqual(Set(apart), [UndoRolloverStepTests.markerPath, UndoRolloverStepTests.leftoverPath])
+
+        let list: UndoJournal = journal()
+        XCTAssertEqual(list.undoNewest(resolveRoot: { _ in made.root }), .undone(seq: 1, leftApart: []))
+        XCTAssertEqual(text(UndoRolloverStepTests.pagePath, in: made), pageBefore)
+        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: made), UndoRolloverStepTests.lastYear)
+        XCTAssertEqual(text(UndoRolloverStepTests.leftoverPath, in: made), UndoRolloverStepTests.leftover)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL(made).path))
+        XCTAssertEqual(siteADeployReads(made), "last-year")
+
+        XCTAssertEqual(list.redoNewest(resolveRoot: { _ in made.root }), .redone(seq: 1, leftApart: []))
+        XCTAssertNotEqual(text(UndoRolloverStepTests.pagePath, in: made), pageBefore)
+        XCTAssertNil(text(UndoRolloverStepTests.markerPath, in: made))
+        XCTAssertNil(text(UndoRolloverStepTests.leftoverPath, in: made))
+        XCTAssertEqual(keptLeftovers(in: made).count, 1)
+        XCTAssertFalse(UndoContractReplay.staysBeside(made.root))
+    }
+
+    /// A kill at each point, settled by recovery: after the leftover was
+    /// brought in and before the step began, between the step's swaps, and
+    /// after its last swap. Each leaves a folder a deploy reads correctly,
+    /// the leftover never back in the built output. MUST FAIL with the
+    /// refusal of the fix round (nothing brought in, no step to settle).
+    func testADifferentLeftoverKilledAtEachPointIsSettledByRecovery() async throws {
+        let points: [UndoKillPoint] = [.afterBegin, .beforeSwap(2), .beforeApplied]
+        for point in points {
+            freshList()
+            let made: AssistFixture.Made = try sectionWithADifferentLeftover()
+            UndoKillPoints.hook = { reached in reached == point }
+            _ = await rollOver(made, surface: .menu)
+            UndoKillPoints.hook = nil
+            let later: UndoJournal = journal(processIsAlive: false)
+            await UndoRecovery.recoverAndRederive(later, resolveRoot: { _ in made.root })
+            XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL(made).path), "\(point)")
+            XCTAssertFalse(UndoContractReplay.staysBeside(made.root), "\(point)")
+            if point == .beforeApplied {
+                XCTAssertEqual(try later.read().records[1]?.phase, .done, "\(point)")
+                XCTAssertNil(siteADeployReads(made), "\(point): whole in its new year")
+                XCTAssertEqual(keptLeftovers(in: made).count, 1, "\(point)")
+            } else {
+                // Nothing swapped yet closes `failed`; a swap made, `rolledBack`.
+                let settled: UndoStepPhase = point == .afterBegin ? .failed : .rolledBack
+                XCTAssertEqual(try later.read().records[1]?.phase, settled, "\(point)")
+                XCTAssertEqual(siteADeployReads(made), "last-year", "\(point): whole in its old year")
+                XCTAssertEqual(text(UndoRolloverStepTests.leftoverPath, in: made), UndoRolloverStepTests.leftover, "\(point)")
+            }
+        }
+    }
+
+    /// A step refused after the legacy record was brought in: the record
+    /// is put back where it was, so "Nothing was changed" is true. MUST FAIL
+    /// with no put-back (the record left in its current place while the
+    /// reply said nothing was changed).
+    func testARefusedStepPutsTheBroughtInRecordBackSoNothingWasChanged() async throws {
+        let made: AssistFixture.Made = try sectionWithOnlyTheLegacyRecord()
+        UndoKillPoints.fileInUseAtSwap = { index in index == 0 }
+        let said: AssistToolOutcome = await rollOver(made, surface: .menu)
+        UndoKillPoints.fileInUseAtSwap = nil
+        XCTAssertTrue(said.summary.hasPrefix("Nothing was changed"), said.summary)
+        XCTAssertEqual(try String(contentsOf: legacyURL(made), encoding: .utf8), UndoRolloverStepTests.lastYear)
+        XCTAssertNil(text(UndoRolloverStepTests.markerPath, in: made))
+
+        let different: AssistFixture.Made = try sectionWithADifferentLeftover()
+        UndoKillPoints.fileInUseAtSwap = { index in index == 0 }
+        let saidDifferent: AssistToolOutcome = await rollOver(different, surface: .menu)
+        UndoKillPoints.fileInUseAtSwap = nil
+        XCTAssertTrue(saidDifferent.summary.hasPrefix("Nothing was changed"), saidDifferent.summary)
+        XCTAssertEqual(try String(contentsOf: legacyURL(different), encoding: .utf8), UndoRolloverStepTests.leftover)
+        XCTAssertNil(text(UndoRolloverStepTests.leftoverPath, in: different))
+        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: different), UndoRolloverStepTests.lastYear)
+    }
+
+    /// A refused step whose brought-in record cannot be put back (its old
+    /// folder will no longer take it) never says "Nothing was changed": it
+    /// says what moved, and that it names the same website. MUST FAIL with
+    /// the plain "Nothing was changed".
+    func testARefusedStepThatCannotPutTheRecordBackSaysWhatMoved() async throws {
+        let made: AssistFixture.Made = try sectionWithOnlyTheLegacyRecord()
+        let folder: URL = legacyURL(made).deletingLastPathComponent()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        }
+        UndoKillPoints.fileInUseAtSwap = { index in
+            try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+            return index == 0
+        }
+        let said: AssistToolOutcome = await rollOver(made, surface: .menu)
+        UndoKillPoints.fileInUseAtSwap = nil
+        XCTAssertFalse(said.summary.hasPrefix("Nothing was changed"), said.summary)
+        XCTAssertTrue(said.summary.hasPrefix("Nothing else was changed"), said.summary)
+        XCTAssertTrue(said.summary.contains(".netlify_sites/section1.json"), said.summary)
+        XCTAssertEqual(siteADeployReads(made), "last-year")
     }
 
     // MARK: - Records as a group (the director's decision of 2026-11-20)
