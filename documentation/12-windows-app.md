@@ -8162,19 +8162,25 @@ here where Windows has the same thing:
   `HelpText` stays on the button. Measured on the PC on 2026-11-20 (Lenovo
   i5-8365U, Windows 11 Pro 26200, 1920 x 1080 at 150%, the desktop session
   through Task Scheduler) by `FixWithButtonsUiTests.ACodexThisPcLacks_IsDrawnDimmedWithItsReason`:
-  the real pointer placed on the button's middle and then nudged with
-  `mouse_event` (FlaUI's `Mouse.MoveTo` sets the cursor with `SetCursorPos`,
-  and without the nudge no tooltip showed, the control's included, both on
-  2026-11-19 and in this run's first try), then UI Automation polled for 3 s for a
-  ToolTip named with the reason, in the window and among the desktop's
-  top-level windows, and the screen captured in real pixels (the thread
-  made per-monitor DPI aware; the earlier 1280 x 720 crop was the
+  the real pointer glided onto the button's middle as input (absolute
+  `mouse_event` moves in 15 steps; FlaUI's `Mouse.MoveTo` sets the cursor
+  with `SetCursorPos`, and after it no tooltip showed, the control's
+  included, on 2026-11-19 and in this run's first try; a 2-pixel nudge after
+  it worked once and failed the next run), then UI Automation polled for
+  3 s for a ToolTip named with the reason, in the window and among the
+  desktop's top-level windows, up to three rests, and the screen captured in
+  real pixels each rest (the thread made per-monitor DPI aware; the earlier
+  1280 x 720 crop was the
   unaware capture). **Before** (tooltip on the button, `2c4ce92e0`): the
   control, the sidebar's enabled + ("Add a course or club"), showed its
   tooltip on screen and to UI Automation; the dimmed Fix with Codex…
   showed none, in either. **After** (`55e0f60e7`): "Not set up on this PC."
   showed above the dimmed button, on screen and to UI Automation. The test
-  now requires both. Only the not-installed reason was looked at on screen;
+  now requires both, and it was shown to fail: with the gliding probe
+  (`139621cb5`) and only the tooltip moved back onto the button, the
+  control's showed at the first rest and the dimmed button's at none of
+  three. The pictures are kept on the main Mac in
+  `vm-tools/runs/1017-tooltip/`. Only the not-installed reason was looked at on screen;
   the nothing-ticked reason ("Tick a problem this section still has to hand
   it over.") goes through the same frame and was not hovered. Keyboard: a
   dimmed button cannot take focus, so a keyboard user does not get the
