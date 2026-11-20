@@ -8401,6 +8401,12 @@ window, `SectionAndClassesUiTests` in `MenuBarUiTests.cs`: the bar's order,
 both menus line for line against the layout with every item drawn and
 dimmed on a course row, the Classes items live on a section row, Classes ▸
 Class Dates… opening and its trail line, and Copy a Page on Ctrl+Shift+K.
+A `MenuFlyoutSeparator` has no UI Automation element (measured in the VM,
+2026-11-20: a flyout's children are its items only), so the test reads a
+separator where it is drawn, as a gap between two items' rectangles: 4 or 5
+pixels between items of one group, 7 or 8 across a separator, at 100%. With
+`PLANTOIR_UI_CAPTURE_DIR` set it also saves a picture of each menu open on a
+section row.
 
 ### What does NOT exist here: File with no window
 
