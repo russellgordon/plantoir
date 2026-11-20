@@ -58,11 +58,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // AppKit restores windows before launch finishes, and says so first
-        // (measured on macOS 26.7.3, every launch). Should a system ever not
-        // say so, launch finishing is the same fact, so no window waits for
-        // a word that never comes (#998). Doing it twice does nothing.
-        LaunchRestoration.shared.restorationFinished()
         ActivityTrail.noteLaunch()
         OutsideAssistantPresence.shared.refresh()
         // The Preview button's title follows Option while it is held (#504).

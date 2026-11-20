@@ -4,29 +4,24 @@ import Foundation
 /// Whether macOS has finished putting this launch's windows back, and work
 /// that waits for it (#998).
 ///
-/// A restored window looks for its remembered folder by its frame
-/// (`WindowRootView.attemptClaim`), so it must not look before macOS has
-/// restored the frame. Until #998 it retried every 150 ms, seven times,
-/// because "a reopened window's frame settles a moment after the window
-/// exists". Measured on macOS 26.7.3 with a SwiftUI `WindowGroup` (a probe
-/// app; 2026-11-19), the order at launch is:
+/// A restored window gives up looking for its remembered folder by frame
+/// only once this has happened (`WindowClaimRound`). Measured with a probe
+/// app (a SwiftUI `WindowGroup`, 2026-11-19; documentation 09, "When a
+/// restored window looks for its folder"):
 ///
-/// 1. `applicationWillFinishLaunching`;
-/// 2. AppKit restores every window's frame (`NSWindow.didMoveNotification`
-///    for each, at its remembered place);
-/// 3. `NSApplication.didFinishRestoringWindowsNotification`, posted on
-///    every launch, with two windows restored, with none, and with no saved
-///    state at all;
-/// 4. `applicationDidFinishLaunching`;
-/// 5. each window's content joins it (`WindowAccessor`), every restored
-///    window in the same pass of the main actor, before a task enqueued by
-///    the first of them runs, and each with its frame already final.
+/// - `NSApplication.didFinishRestoringWindowsNotification` is posted on
+///   EVERY launch, on macOS 26.7.3 and 15.7.7 alike: two windows restored,
+///   none restored, and no saved state at all.
+/// - On 26.7.3 every frame is restored before it, and the windows' content
+///   joins them after it. On 15.7.7 the content joins each window before it,
+///   with the restored frame, and SwiftUI then moves and resizes the window,
+///   also before it.
 ///
-/// So the frame is final when the window is handed over, and the moment to
-/// wait for, if it ever comes later, is step 3. This records step 3 from
-/// before any window exists, and runs what waited for it then. It also
-/// explains why `WindowRootView`'s own `onReceive` for step 3 could never
-/// fire at launch: SwiftUI subscribes when the view appears, at step 5.
+/// So by this moment every restored window exists and has been handed its
+/// frame, on both. It is recorded from `applicationWillFinishLaunching`,
+/// before any window exists. Nothing else marks it: if it were ever not
+/// posted, a launching window would keep its quiet spinner rather than
+/// guess, and no launch measured has done that.
 @MainActor
 final class LaunchRestoration {
 

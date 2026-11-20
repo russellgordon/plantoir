@@ -2564,41 +2564,62 @@ nothing — neither a choice nor a reopen.
 
 ### When a restored window looks for its folder (#998)
 
-A window looks for its remembered folder by its frame once, when the frame
-is final, and gives up to the next folder by order only after every sibling
-restored with it has looked (`WindowClaimRound`). Until #998 it tried every
+Until #998 a window tried its frame against the remembered windows every
 150 ms, seven times, because "a reopened window's frame settles a moment
-after the window exists", and gave up after about a second, during which it
-showed its quiet spinner.
+after the window exists", and gave up to the next folder by order after
+about a second, showing its quiet spinner meanwhile. `WindowClaimRound` now
+waits on the events instead.
 
-Measured with a probe app (a SwiftUI `WindowGroup`, macOS 26.7.3,
-2026-11-19), the order at launch is: `applicationWillFinishLaunching`; AppKit
-moves every restored window to its remembered frame;
-`NSApplication.didFinishRestoringWindowsNotification` (posted on EVERY
-launch, with two windows restored, with none, and with no saved state);
-`applicationDidFinishLaunching`; then each window's content joins it, every
-restored window in the same pass of the main actor and each with its frame
-already final. So:
+**Measured** with a probe app (a SwiftUI `WindowGroup`, ad-hoc signed,
+2026-11-19), three launches on each system: no saved state, two windows
+restored, and saved state with none restored:
 
-- **The frame is final at hand-over.** `LaunchRestoration` records the
-  notification from `applicationWillFinishLaunching` (before any window
-  exists); a window handed over before it, which was not seen, would wait
-  for it. `applicationDidFinishLaunching` marks it too, so a system that
-  never posts it cannot leave a window waiting.
-- **The give-up waits for the siblings, not a clock.** A window whose frame
-  matches nothing must not take the next entry by order while a sibling
-  whose frame matches that entry has not looked, or the two swap folders
-  (`WindowClaimRoundTests.testAWindowGivesUpByOrderOnlyAfterItsSiblingsHaveTriedTheirFrames`).
-  The give-up is enqueued on the main actor after the pass that hands the
-  restored windows over.
+| Step | macOS 26.7.3 (this Mac) | macOS 15.7.7 (Tart guest) |
+|---|---|---|
+| Restored frames put back | before the notification | the window is handed over WITH its restored frame, then SwiftUI moves and resizes it to another frame, all before the notification |
+| `didFinishRestoringWindowsNotification` | posted in all three cases | posted in all three cases |
+| Windows' content joins them (`WindowAccessor`) | after the notification and after `applicationDidFinishLaunching`, frame already final | before the notification |
+| Restored windows handed over | all in one pass of the main actor, before a task the first enqueued | the same |
+
+(On 15.7.7 a stray word in the launch arguments, read as a file to open,
+made SwiftUI open no window at all; the probe's flags take a value for that
+reason.) So no one reading of the frame is right on both systems: on 15 the
+one at hand-over matches and a later one does not.
+
+**What a window does now:**
+
+- **It tries its frame at hand-over, at every move or resize of its own
+  window (`NSWindow.didMoveNotification`, `didResizeNotification`), and when
+  restoration is said to be finished** (`LaunchRestoration`, which records
+  the notification from `applicationWillFinishLaunching`).
+- **It gives up by order only after restoration has finished, one pass of
+  the main actor later** (a task enqueued then, no clock). By then every
+  restored window exists and has been handed its frame, on both systems.
+- **A give-up never takes an entry remembered at another open window's
+  current frame** (`WindowFolderMemory.claimNextEntry(skippingFrames:)`):
+  that entry is that window's, even if its content has not been handed
+  over yet, since AppKit has already made the window. When only such
+  entries are left, the window shows the picker.
+- **What closes claims:** for one window, claiming, giving up, or having
+  settled its folder otherwise; for the launch, the existing ten-second
+  deadline (`WindowFolderMemory.claimsOpenUntil`). The give-up cannot come
+  early because nothing triggers it before AppKit's notification, and
+  nothing but the notification marks restoration finished. If it were ever
+  not posted, a launching window would keep its spinner rather than guess;
+  no launch measured did that. The observers go when the round ends.
 - **`WindowRootView`'s `onReceive` for the notification is gone.** SwiftUI
-  subscribes when the view appears, which the probe shows is after the
-  notification, so it could never fire at launch.
+  subscribes when the view appears, which on 26 is after the notification,
+  so it could never fire at launch.
+
+Tests: `WindowClaimRoundTests` (a frame right only after a move, two windows
+in one pass, two in separate passes, entries left only for others, no
+give-up without the notification, a real window's move).
 
 What a teacher sees: a restored window shows its folder at once rather than
 after about a second of spinner (HIG, Launching: "Launch instantly", and
 "display windows in the same state and location in which people left
-them"). Unmeasured: macOS 15, and a log-in restore.
+them"). Not measured: a log-in restore, a full-screen window, a window on
+another display.
 
 `WindowAccessor` lost its own timer at the same time: a fifty-millisecond
 GCD poll stood behind `viewDidMoveToWindow` for "anything installed into a
@@ -3985,10 +4006,13 @@ only what cannot tell it anything:
 | The server answers (phase 3), the page last viewed (#504) | an HTTP request | Asked again after a second |
 | The quiet bound (#225) | the clock | Read with the file or the request |
 
-`ScriptRunnerWait.untilTheRunChanges(_:orAfter:)` registers with
-Observation for the runner's standing (running, exit code, launch problem,
-address, launch line, stopped, start time) and returns on the first change
-or at the bound. It does not read the transcript: that would wake it for
+`ScriptRunnerWait.untilTheRunChanges(orAfter:)` registers with Observation
+for the runner's standing (running, exit code, launch problem, address,
+launch line, stopped, start time) and returns on the first change or at the
+bound. A registration cannot be withdrawn on macOS 15 (`Observations`, which
+can, needs 26), so each wait holds ONE and a bounded wait leaves it for the
+next instead of adding another; the run's next change releases it, and every
+run ends with one. It does not read the transcript: that would wake it for
 every chunk of build output, which is why the launch line is collected as
 lines arrive, as the address already was, instead of being searched for in
 `displayText` once a second. Phase 1's ten minutes are wall-clock time from

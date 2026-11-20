@@ -50,7 +50,7 @@ final class PreviewWaitDependencyTests: XCTestCase {
         let runner: ScriptRunner = ScriptRunner()
         let woke: XCTestExpectation = expectation(description: "woke on the change")
         Task { @MainActor in
-            await ScriptRunnerWait.untilTheRunChanges(runner, orAfter: .seconds(60))
+            await ScriptRunnerWait(runner).untilTheRunChanges(orAfter: .seconds(60))
             woke.fulfill()
         }
         await Task.yield()
@@ -64,7 +64,7 @@ final class PreviewWaitDependencyTests: XCTestCase {
         runner.isRunning = true
         let woke: XCTestExpectation = expectation(description: "woke on the end")
         Task { @MainActor in
-            await ScriptRunnerWait.untilTheRunChanges(runner, orAfter: .seconds(60))
+            await ScriptRunnerWait(runner).untilTheRunChanges(orAfter: .seconds(60))
             woke.fulfill()
         }
         await Task.yield()
@@ -72,10 +72,71 @@ final class PreviewWaitDependencyTests: XCTestCase {
         await fulfillment(of: [woke], timeout: 5)
     }
 
+    /// Phase 1 decides on a launch problem (the run never started) and on
+    /// the teacher's Stop; each wakes it at once.
+    func testTheWaitWakesWhenTheRunCouldNotStart() async {
+        let runner: ScriptRunner = ScriptRunner()
+        let woke: XCTestExpectation = expectation(description: "woke on the launch problem")
+        Task { @MainActor in
+            await ScriptRunnerWait(runner).untilTheRunChanges(orAfter: .seconds(60))
+            woke.fulfill()
+        }
+        await Task.yield()
+        runner.launchProblem = "a launch problem invented for this test"
+        await fulfillment(of: [woke], timeout: 5)
+    }
+
+    func testTheWaitWakesWhenTheTeacherStopsIt() async {
+        let runner: ScriptRunner = ScriptRunner()
+        let woke: XCTestExpectation = expectation(description: "woke on Stop")
+        Task { @MainActor in
+            await ScriptRunnerWait(runner).untilTheRunChanges(orAfter: .seconds(60))
+            woke.fulfill()
+        }
+        await Task.yield()
+        runner.wasStoppedByUser = true
+        await fulfillment(of: [woke], timeout: 5)
+    }
+
+    /// A wait that ends at its bound keeps its one registration for the
+    /// next wait rather than adding another, and the run's next change
+    /// releases it.
+    func testBoundedWaitsShareOneRegistrationAndAChangeReleasesIt() async {
+        let runner: ScriptRunner = ScriptRunner()
+        let wait: ScriptRunnerWait = ScriptRunnerWait(runner)
+        await wait.untilTheRunChanges(orAfter: .milliseconds(10))
+        XCTAssertTrue(wait.registrationIsLive)
+        await wait.untilTheRunChanges(orAfter: .milliseconds(10))
+        XCTAssertTrue(wait.registrationIsLive, "still the one registration")
+        runner.launchProblem = "a change"
+        XCTAssertFalse(wait.registrationIsLive, "released by the change it was waiting for")
+        let began: Date = Date()
+        await wait.untilTheRunChanges(orAfter: .seconds(60))
+        XCTAssertLessThan(Date().timeIntervalSince(began), 5, "a change while nobody waited wakes the next wait at once")
+    }
+
+    /// Phase 1 waits through the watch, not a sleep.
+    func testPhaseOneWaitsOnTheRun() throws {
+        let source: String = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("QuartzTeachers/Views/Section/SectionDetailView.swift"),
+            encoding: .utf8
+        )
+        let first: Range<String.Index> = try XCTUnwrap(source.range(of: "// Phase 1:"))
+        let second: Range<String.Index> = try XCTUnwrap(source.range(of: "// Phase 2:"))
+        let phaseOne: Substring = source[first.upperBound..<second.lowerBound]
+        XCTAssertTrue(phaseOne.contains("await runChanges.untilTheRunChanges(orAfter:"))
+        XCTAssertTrue(phaseOne.contains("previewRunner.hasAnnouncedQuartzLaunch"))
+        XCTAssertFalse(phaseOne.contains("Task.sleep"))
+    }
+
     func testTheWaitEndsAtItsBoundWhenNothingChanges() async {
         let runner: ScriptRunner = ScriptRunner()
         let began: Date = Date()
-        await ScriptRunnerWait.untilTheRunChanges(runner, orAfter: .milliseconds(50))
+        await ScriptRunnerWait(runner).untilTheRunChanges(orAfter: .milliseconds(50))
         XCTAssertLessThan(Date().timeIntervalSince(began), 5)
     }
 

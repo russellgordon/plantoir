@@ -107,12 +107,13 @@ struct WindowRootView: View {
 
     // MARK: - Functions
 
-    /// Finds this window's folder by its frame, once macOS has finished
-    /// restoring windows, and gives up to the next remembered folder by
-    /// order only after every sibling restored with it has tried its own
-    /// frame (`WindowClaimRound`, #998: this used to retry every 150 ms).
-    /// The claimant claims at most once, and claims close shortly after
-    /// launch — a window opened mid-session inherits nothing.
+    /// Finds this window's folder by its frame, trying at hand-over, at
+    /// every move or resize, and when macOS has finished restoring windows;
+    /// gives up to the next remembered folder by order only after that, and
+    /// never to a folder remembered at another open window's frame
+    /// (`WindowClaimRound`, #998: this used to retry every 150 ms). The
+    /// claimant claims at most once, and claims close shortly after launch
+    /// — a window opened mid-session inherits nothing.
     ///
     /// A window that has already settled its folder — decided in onAppear
     /// — never claims, and never reaches the give-up: one decision per
@@ -121,13 +122,20 @@ struct WindowRootView: View {
     /// whose folder had gone onto a sibling's folder and wiping the
     /// sentence that said why.
     func attemptClaim(for window: NSWindow) {
-        WindowClaimRound.begin(
+        let round: WindowClaimRound = WindowClaimRound(
             claimant: claimant,
             frame: {
                 return NSStringFromRect(window.frame)
             },
             windowHasSettled: {
                 return workspace.hasSettledItsFolder
+            },
+            otherWindowFrames: {
+                var frames: [String] = []
+                for other in NSApp.windows where other !== window {
+                    frames.append(NSStringFromRect(other.frame))
+                }
+                return frames
             },
             adopt: { entry, how in
                 adopt(entry, how: how)
@@ -136,6 +144,7 @@ struct WindowRootView: View {
                 workspace.settleItsFolder()
             }
         )
+        round.begin(watching: window)
     }
 
     /// Takes a remembered window as this window's own.

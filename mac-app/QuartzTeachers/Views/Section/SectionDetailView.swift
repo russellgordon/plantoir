@@ -3314,6 +3314,7 @@ struct SectionDetailView: View {
         // the address is announced or the run ends, the wait moves on. The
         // ten minutes are wall-clock time from here.
         let phaseOneBegan: Date = Date()
+        let runChanges: ScriptRunnerWait = ScriptRunnerWait(previewRunner)
         var waitedSeconds: Int = 0
         while true {
             let standing: PreviewStartRecords.RunStanding = PreviewStartRecords.howTheRunStands(
@@ -3364,9 +3365,7 @@ struct SectionDetailView: View {
                 waitedSeconds = 600
                 break
             }
-            await ScriptRunnerWait.untilTheRunChanges(
-                previewRunner, orAfter: .seconds(600 - secondsSoFar)
-            )
+            await runChanges.untilTheRunChanges(orAfter: .seconds(600 - secondsSoFar))
             waitedSeconds = Int(Date().timeIntervalSince(phaseOneBegan))
         }
 
@@ -3428,7 +3427,7 @@ struct SectionDetailView: View {
             // says when, so it is read again after a second: a paced reading,
             // not a wait for something to settle (#998). The run ending wakes
             // the wait at once rather than a second later.
-            await ScriptRunnerWait.untilTheRunChanges(previewRunner, orAfter: .seconds(1))
+            await runChanges.untilTheRunChanges(orAfter: .seconds(1))
             waitedSeconds += 1
             waitedForBuild += 1
         }
@@ -3466,7 +3465,7 @@ struct SectionDetailView: View {
                 // Waiting for the address to be announced, which wakes this
                 // at once (#998), or for the silence bound, which is read
                 // again after a second.
-                await ScriptRunnerWait.untilTheRunChanges(previewRunner, orAfter: .seconds(1))
+                await runChanges.untilTheRunChanges(orAfter: .seconds(1))
                 waitedSeconds += 1
                 continue
             case .stopBecauseNothingWasAnnounced:
@@ -3567,6 +3566,7 @@ struct SectionDetailView: View {
                         // ended or been replaced by then.
                         if !buildFinished {
                             let runTheReloadIsFor: Date? = previewRunner.startedAt
+                            let lateRunChanges: ScriptRunnerWait = ScriptRunnerWait(previewRunner)
                             Task { @MainActor in
                                 let buildLanded: Bool = await PreviewLateBuild.waitForTheBuildToLand(
                                     siteAsItWas: siteAsItWas,
@@ -3586,9 +3586,7 @@ struct SectionDetailView: View {
                                         // A second between readings of the
                                         // file, or less when the run itself
                                         // changes (ends, is stopped).
-                                        await ScriptRunnerWait.untilTheRunChanges(
-                                            previewRunner, orAfter: .seconds(1)
-                                        )
+                                        await lateRunChanges.untilTheRunChanges(orAfter: .seconds(1))
                                     }
                                 )
                                 if buildLanded {
@@ -3621,7 +3619,7 @@ struct SectionDetailView: View {
             // A server says nothing when it starts answering, so it is asked
             // again after a second: a deliberately paced retry (#998). The
             // run ending or being stopped wakes the wait at once.
-            await ScriptRunnerWait.untilTheRunChanges(previewRunner, orAfter: .seconds(1))
+            await runChanges.untilTheRunChanges(orAfter: .seconds(1))
             waitedSeconds += 1
         }
         previewBuildWait.end()

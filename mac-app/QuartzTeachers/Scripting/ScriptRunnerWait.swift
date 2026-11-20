@@ -12,10 +12,39 @@ import Observation
 /// change has been made.
 ///
 /// What is NOT read here is the transcript. Reading it would wake the wait
-/// for every chunk of build output, and the old loop already paid for
-/// joining the transcript once a second; the one line the wait needs from
-/// it is collected as it arrives instead (`hasAnnouncedQuartzLaunch`).
-enum ScriptRunnerWait {
+/// for every chunk of build output; the one line the wait needs from it is
+/// collected as it arrives instead (`hasAnnouncedQuartzLaunch`).
+///
+/// **One registration at a time, per wait.** A registration made with
+/// `withObservationTracking` cannot be withdrawn (the `Observations`
+/// sequence that can be cancelled needs macOS 26, and Plantoir supports 15);
+/// it is released when it fires, at the runner's next change. So a wait that
+/// ends at its bound keeps its registration for the next wait rather than
+/// making another: a ten-minute wait read once a second holds one, not six
+/// hundred. Whatever is still registered is released when the run ends,
+/// which changes `isRunning` and `lastExitCode`.
+@MainActor
+final class ScriptRunnerWait {
+
+    // MARK: - Stored properties
+
+    let runner: ScriptRunner
+
+    /// True while a registration is waiting for the runner's next change.
+    private(set) var registrationIsLive: Bool = false
+
+    /// The wait in progress, if any, to be ended by a change.
+    private var currentWait: AsyncStream<Void>.Continuation?
+
+    /// A change that came while nothing was waiting: the next wait returns
+    /// at once, so the caller looks again.
+    private var changedWhileNotWaiting: Bool = false
+
+    // MARK: - Initializer
+
+    init(_ runner: ScriptRunner) {
+        self.runner = runner
+    }
 
     // MARK: - Functions
 
@@ -23,16 +52,25 @@ enum ScriptRunnerWait {
     /// running, ends with a code, could not start, announces its address,
     /// says its server is launching, or is stopped by the teacher), or when
     /// `limit` has passed with no change, whichever comes first. `limit` is
-    /// the caller's own bound on the whole wait (ten minutes for a first
-    /// build), never a guess at when the change will come.
-    ///
-    /// Also returns if the waiting task is cancelled.
-    static func untilTheRunChanges(_ runner: ScriptRunner, orAfter limit: Duration) async {
+    /// the caller's own bound or pace, never a guess at when the change will
+    /// come. Also returns if the waiting task is cancelled.
+    func untilTheRunChanges(orAfter limit: Duration) async {
+        if changedWhileNotWaiting {
+            changedWhileNotWaiting = false
+            return
+        }
         let (changes, continuation) = AsyncStream<Void>.makeStream()
-        withObservationTracking {
-            ScriptRunnerWait.readTheRunsStanding(runner)
-        } onChange: {
-            continuation.finish()
+        currentWait = continuation
+        if !registrationIsLive {
+            registrationIsLive = true
+            withObservationTracking {
+                ScriptRunnerWait.readTheRunsStanding(runner)
+            } onChange: { [weak self] in
+                // Called on the main actor, as the runner is about to change.
+                MainActor.assumeIsolated {
+                    self?.runnerIsChanging()
+                }
+            }
         }
         let bound: Task<Void, Never> = Task {
             try? await Task.sleep(for: limit)
@@ -41,6 +79,16 @@ enum ScriptRunnerWait {
         for await _ in changes {
         }
         bound.cancel()
+        currentWait = nil
+    }
+
+    private func runnerIsChanging() {
+        registrationIsLive = false
+        if let currentWait {
+            currentWait.finish()
+        } else {
+            changedWhileNotWaiting = true
+        }
     }
 
     /// Reads, and so observes, everything the preview's wait decides on.
