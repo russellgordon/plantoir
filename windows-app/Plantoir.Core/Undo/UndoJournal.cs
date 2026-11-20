@@ -80,15 +80,19 @@ internal sealed class UndoJournal
     /// <param name="open">A seam for tests: opens a file of the list to read (a disk or permission failure); the real open by default.
     /// A journal given one always reads whole.</param>
     /// <param name="memory">What this PROCESS remembers about the list (shadow try-once, pending closings): the
-    /// one the app's start-up makes for the process (W4); a journal of its own when none is given.</param>
+    /// one the app's start-up makes for the process (W4). Required.</param>
     /// <param name="segmentBytes">Where a new segment starts: 4 MiB in the app; a test's seam.</param>
     internal UndoJournal(string directory, TimeProvider clock, Func<UndoProcess?, bool> isAlive,
-                         Func<UndoStep, bool> canReach, bool isLive, TimeSpan? readRetry = null,
-                         Func<string, Stream>? open = null, UndoProcessMemory? memory = null,
+                         Func<UndoStep, bool> canReach, bool isLive, UndoProcessMemory memory,
+                         TimeSpan? readRetry = null, Func<string, Stream>? open = null,
                          long segmentBytes = SegmentBytesInTheApp)
     {
+        // Required, never made here: two journals of one process on one
+        // folder must share the process's memory, and a quiet fallback would
+        // give each its own (W2a's review, LOW 5).
+        ArgumentNullException.ThrowIfNull(memory);
         _open = open;
-        Memory = memory ?? new UndoProcessMemory();
+        Memory = memory;
         SegmentBytes = segmentBytes;
         Folder = directory;
         Clock = clock;
@@ -140,7 +144,9 @@ internal sealed class UndoJournal
         UndoReading reading = Read();
         if (!reading.IsFresh)
             throw new UndoJournalException(UndoJournalFailure.ListNotReadable, "The list could not be read inside the lock.");
-        using var writer = new UndoJournalWriter(this, reading.Folded);
+        // A copy: the reading's fold is also the last state read, which a
+        // not-fresh read on another thread hands out (W2a's review, LOW 1).
+        using var writer = new UndoJournalWriter(this, reading.Folded.Copy());
         WritePendingClosings(writer);
         T result = body(writer);
         writer.FinishTheHold();
@@ -161,11 +167,16 @@ internal sealed class UndoJournal
     /// door passes (10 seconds on the mac, <c>UndoSwitch</c>) is the door's, W2b.
     /// Returns whether it was written now.
     /// </summary>
-    internal bool WriteClosingOrKeep(System.Text.Json.Nodes.JsonObject line, TimeSpan wait, bool inShadow = false)
+    /// <param name="thenPrune">Prune in the same hold, after the closing (the door's closing hold: the ONLY hold of a step that prunes, W2a's review LOW 2).</param>
+    internal bool WriteClosingOrKeep(System.Text.Json.Nodes.JsonObject line, TimeSpan wait, bool inShadow = false, bool thenPrune = false)
     {
         try
         {
-            WithLock(writer => WriteClosing(writer, line), inShadow, wait);
+            WithLock(writer =>
+            {
+                WriteClosing(writer, line);
+                if (thenPrune) Prune(writer);
+            }, inShadow, wait);
             return true;
         }
         catch (UndoJournalException busy) when (busy.Failure == UndoJournalFailure.LockBusy)
@@ -286,6 +297,7 @@ internal sealed class UndoJournal
                             ["seq"] = closed.Seq, ["event"] = "interrupted",
                             ["phase"] = closed.Phase.ToString().ToLowerInvariant(), ["reason"] = "unsettled", ["paths"] = paths,
                         });
+                        TidyTheStagedFilesOf(writer, closed.Seq);
                         break;
                 }
             }
@@ -304,6 +316,24 @@ internal sealed class UndoJournal
         {
             // Never fails the caller; a later hold prunes again.
         }
+    }
+
+    /// <summary>
+    /// A step closed <c>unsettled</c> leaves nothing of the journal's in a
+    /// course (<c>rule.recovery</c>, <c>undoJournal.stagedFiles</c>, #899 W2b):
+    /// its staged files go now when its folder can be reached, and the journal
+    /// is live (in shadow nothing is written into a working folder). A folder
+    /// that cannot be reached keeps them for the first recovery that reaches it
+    /// (W3; <c>knownLimits.stagedFilesOfAFolderAway</c>). Never fails the caller.
+    /// </summary>
+    private void TidyTheStagedFilesOf(UndoJournalWriter writer, long seq)
+    {
+        if (!IsLive) return;
+        if (!writer.Folded.Steps.TryGetValue(seq, out UndoFoldedStep? closed)) return;
+        UndoStep step = closed.Step;
+        if (step.WorkingFolder?.PathAtTheTime is not { } root || !CanReach(step)) return;
+        try { UndoSwap.TidyLeftovers(seq, step.Paths, root); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
     private void DeleteLeftoverTemporaries()

@@ -157,29 +157,44 @@ public sealed class UndoStoreTests : IDisposable
         // Its own thread, and the writing waits until it has read once: on a
         // busy PC (the whole suite) a pool task could start after the writer
         // had finished, and the test would prove nothing.
-        Task<(int Reads, string? Fault)> reader = Task.Factory.StartNew<(int Reads, string? Fault)>(() =>
+        var midway = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<(int Reads, int ReadsMidway, int ReadsOn, string? Fault)> reader = Task.Factory.StartNew<(int, int, int, string?)>(() =>
         {
             long highest = 0;
             int reads = 0;
+            int readsMidway = 0;
+            int readsOn = 0;
             do
             {
                 if (reads == 1) started.TrySetResult();
                 UndoReading reading = readerJournal.Read();
                 reads++;
-                if (!reading.IsFresh) return (reads, "a reading was not fresh");
-                if (reading.Folded.Highest < highest) return (reads, "a reading went back");
-                if (reading.Folded.Barriers.Count > 0) return (reads, "a reading saw a barrier");
+                if (!reading.IsFresh) return (reads, readsMidway, readsOn, "a reading was not fresh");
+                if (reading.Folded.Highest < highest) return (reads, readsMidway, readsOn, "a reading went back");
+                if (reading.Folded.Barriers.Count > 0) return (reads, readsMidway, readsOn, "a reading saw a barrier");
+                // A reading taken while the writing was going on, and one that
+                // read on rather than whole (W2a's review, LOW 4).
+                if (reading.Folded.Highest is > 0 and < 150) { readsMidway++; midway.TrySetResult(); }
+                if (reading.Folded.Highest > 0 && !readerJournal.LastReadWasWhole) readsOn++;
                 highest = reading.Folded.Highest;
             }
             while (!stop.IsCancellationRequested || reads < 2);
-            return (reads, null);
+            return (reads, readsMidway, readsOn, null);
         }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         await Task.WhenAny(started.Task, reader);
-        for (long seq = 1; seq <= 150; seq++) writerJournal.WithLock(writer => Step(writer, seq));
+        for (long seq = 1; seq <= 150; seq++)
+        {
+            writerJournal.WithLock(writer => Step(writer, seq));
+            // Half way, the writing waits until the reader has seen part of it,
+            // so the test cannot pass with every read before or after.
+            if (seq == 75) await Task.WhenAny(midway.Task, reader, Task.Delay(TimeSpan.FromSeconds(30)));
+        }
         stop.Cancel();
-        (int reads, string? fault) = await reader;
+        (int reads, int readsMidway, int readsOn, string? fault) = await reader;
         Assert.Null(fault);
         Assert.True(reads >= 2);
+        Assert.True(readsMidway > 0, "no reading was taken while the writing was going on");
+        Assert.True(readsOn > 0, "no reading read on from where it stopped");
         UndoReading last = readerJournal.Read();
         Assert.Equal(150, last.Folded.Highest);
         Assert.Equal(150, last.Folded.Steps.Values.Count(step => step.State == UndoStepState.Done));

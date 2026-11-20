@@ -49,34 +49,24 @@ internal static class UndoContract
 }
 
 /// <summary>
-/// A test-only stand-in for the door (W2), so the READING side of #899 can be
-/// walked against the contract's stack cases and seeded traces in piece W1.
+/// The test's harness round the REAL door (#899 W1, W2a, W2b): a temporary
+/// folder of its own with a journal and two working folders (A and B), a clock
+/// a test moves by hand, and the liveness of the processes a case names.
 ///
-/// <para>It writes, into a temporary folder of its own, exactly the lines the
-/// contract says a door writes (begin, applied with the redo branch dropped,
-/// undoing/undone, redoing/redone, cleared, dropped, pruned, interrupted,
-/// note), and every decision in it is the PRODUCT's: what Undo and Redo act on
-/// (<see cref="UndoLimits.Offer"/>), whether a step can move
-/// (<see cref="UndoCheck.Plan"/>), what pruning writes
-/// (<see cref="UndoPruning.Decide"/>), what may be deleted
-/// (<see cref="UndoPruning.Deletable"/>), and the next number
-/// (<see cref="UndoFolded.NextSeq"/>). The journal is read back from the disk
-/// by <see cref="UndoJournal.Read"/> after every line, so the format reader is
-/// on every path.</para>
-///
-/// <para><b>Since W2a it writes through the real store</b>: every line, blob
-/// and pruning goes through <see cref="UndoJournal.WithLock{T}"/>, the
-/// <see cref="UndoJournalWriter"/> and <see cref="UndoJournal.Prune"/>, so every
-/// stack case and trace runs through the real lock, append, segments, blobs,
-/// reading on and deletion. What it still does NOT have is W2b's: no staged
-/// swap, no door. Pages are written whole with <see cref="File.WriteAllBytes"/>;
-/// W2b replaces the step logic here with the door.</para>
+/// <para><b>Since W2b every step, undo, redo and the clearing at the flip go
+/// through <see cref="UndoDoor"/></b>: the begin with its blobs in one hold, the
+/// staged swap, the closing with pruning, refusals that clear or drop, so every
+/// stack case and trace runs through the real door, lock, store and swap. Only
+/// the calls that stand for ANOTHER process or another version still write their
+/// lines raw, as the contract describes them (<c>begin:held</c>,
+/// <c>finish:held</c>, <c>begin:dead@B</c>, <c>foreign*</c>,
+/// <c>stepFromAnotherVersion:*</c>, <c>cleared:&lt;reason&gt;</c>, <c>note</c>),
+/// through the real writer under the lock.</para>
 /// </summary>
 internal sealed class UndoScribe : IDisposable
 {
     internal const string ThisCourse = "TST1O";
     private const string FolderPrefix = "plantoir-undo-w1-";
-
 
     private readonly string _root;
     private readonly HashSet<long> _alive = [];
@@ -225,45 +215,74 @@ internal sealed class UndoScribe : IDisposable
         Append(line);
     }
 
-    // ---- What a door does, from the product's decisions ---------------------
+    // ---- What a door does: the real door (W2b) ------------------------------
 
-    /// <summary>The ops of one file's change: one editLine per entry where the line model reproduces it both ways, else one writeFile.</summary>
+    /// <summary>The runner of the one maintainer U1 defines, standing in for the app's (W6): it re-derives nothing and counts.</summary>
+    internal sealed class FrontPageMaintainer : IUndoMaintainers
+    {
+        internal int Rederived { get; private set; }
+        public bool CanRun(string maintainer) => maintainer == UndoOp.SectionFrontPage;
+        public void Rederive(UndoOp op, string root) => Rederived++;
+    }
+
+    internal FrontPageMaintainer Maintainers { get; } = new();
+
+    /// <summary>The real door on this scribe's journal, live, as this process.</summary>
+    internal UndoDoor Door(UndoSeams? seams = null) =>
+        new(Journal, UndoMode.Live, Maintainers, seams, Process(Environment.ProcessId));
+
+    /// <summary>The ops of one file's change, as the door works them out, with any whole-file blobs stored (for the calls that write another process's or version's lines raw).</summary>
     internal JsonArray OpsFor(string relative, byte[]? before, byte[]? after)
     {
-        string? beforeText = before is null ? null : UndoCheck.DecodeStrictly(before);
-        string? afterText = after is null ? null : UndoCheck.DecodeStrictly(after);
-        if (beforeText is not null && afterText is not null && UndoLineOps.For(relative, beforeText, afterText) is { } lineOps)
-            return lineOps;
-        var op = new JsonObject { ["kind"] = "writeFile", ["path"] = relative };
-        var blobs = new JsonArray();
-        if (before is not null) { string name = PutBlob(before); op["beforeSha"] = name; blobs.Add(name); }
-        if (after is not null) { string name = PutBlob(after); op["afterSha"] = name; blobs.Add(name); }
-        op["blobs"] = blobs;
-        return new JsonArray(op);
+        JsonArray ops = UndoLineOps.ForAFile(relative, before, after);
+        bool whole = (string?)ops[0]!["kind"] == UndoOp.WriteFile;
+        if (whole && before is not null) PutBlob(before);
+        if (whole && after is not null) PutBlob(after);
+        return ops;
     }
 
-    /// <summary>A step: begin, the pages written, the redo branch dropped, applied, pruning. Returns its seq, or null for a change of nothing.</summary>
-    internal long? Step(string folder, IReadOnlyList<(string Path, byte[]? After)> changes, double daysAgo = 0,
-                        Action<JsonObject>? beforeWriting = null)
+    /// <summary>The draft of a step in a working folder: what an action would hand the door.</summary>
+    internal UndoStepDraft Draft(string folder, IReadOnlyList<(string Path, byte[]? After)> changes)
     {
-        var ops = new JsonArray();
-        foreach ((string path, byte[]? after) in changes.OrderBy(change => change.Path, StringComparer.Ordinal))
+        var files = new List<UndoFileChange>();
+        foreach ((string path, byte[]? after) in changes) files.Add(new UndoFileChange(path, Page(folder, path), after));
+        return new UndoStepDraft
         {
-            byte[]? before = Page(folder, path);
-            if (Same(before, after)) continue;
-            foreach (JsonNode? op in OpsFor(path, before, after)) ops.Add(op!.DeepClone());
-        }
-        if (ops.Count == 0) return null;
-        long seq = Fold().NextSeq;
-        JsonObject begin = BeginLine(seq, ops, folder, daysAgo);
-        beforeWriting?.Invoke(begin);
-        Append(begin);
-        foreach ((string path, byte[]? after) in changes) WritePage(folder, path, after);
-        Finish(seq);
-        return seq;
+            ActionKey = "publishPages",
+            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal) { ["pageCount"] = "1" },
+            MadeBy = "menu",
+            WorkingFolder = _folders[folder],
+            Course = ThisCourse,
+            Section = 1,
+            Holds = "section",
+            Changes = files,
+        };
     }
 
-    /// <summary>The applied of a step in flight: every undone step below it dropped first, then pruning.</summary>
+    /// <summary>
+    /// A step through the REAL door (begin, the staged swap, applied with the
+    /// redo branch dropped, pruning). Returns its seq, or null for a change of
+    /// nothing. <paramref name="daysAgo"/> sets the clock back for the step, as
+    /// a step made that long ago was made.
+    /// </summary>
+    internal long? Step(string folder, IReadOnlyList<(string Path, byte[]? After)> changes, double daysAgo = 0)
+    {
+        TimeSpan shift = TimeSpan.FromDays(daysAgo);
+        Clock.Advance(-shift);
+        try
+        {
+            UndoOutcome outcome = Door().Perform(Draft(folder, changes));
+            if (outcome.Kind == UndoOutcomeKind.ChangedNothing) return null;
+            Assert.True(outcome.Kind == UndoOutcomeKind.Applied, "the door came to " + outcome.Word);
+            return outcome.Seq;
+        }
+        finally
+        {
+            Clock.Advance(shift);
+        }
+    }
+
+    /// <summary>The applied of a step ANOTHER process has in flight (the stack cases' <c>finish:held</c>): every undone step below it dropped first, then pruning.</summary>
     internal void Finish(long seq) => Journal.WithLock(writer =>
     {
         writer.DropTheRedoBranch(below: seq);
@@ -274,114 +293,29 @@ internal sealed class UndoScribe : IDisposable
     /// <summary>What pruning and deletion decide, carried out by the product inside the lock.</summary>
     internal void Prune() => Journal.WithLock(writer => Journal.Prune(writer));
 
-    /// <summary>One `cleared` line with the highest seq, written only when something is on the list.</summary>
-    internal long? Clear(string reason)
-    {
-        UndoFolded folded = Fold();
-        if (!folded.Steps.Values.Any(step => step.IsOnTheList)) return null;
-        Event(folded.Highest, "cleared", new JsonObject { ["reason"] = reason });
-        return folded.Highest;
-    }
+    /// <summary>The one clearing at the flip, through the door; the seq it wrote, or null when nothing was on the list.</summary>
+    internal long? GoLive() => Door().ClearTheListAsTheSwitchGoesLive() ? Fold().LastClearing!.Value.Seq : null;
 
     internal sealed record Outcome(string Name, long? Seq = null, string? Page = null, int Others = 0, string? Cleared = null, long? ClearedSeq = null);
-
-    private UndoCheck.PlanResult PlanFor(UndoFoldedStep step, bool backward)
-    {
-        string folder = FolderOf(step.Step);
-        return UndoCheck.Plan(step.Step.Ops, backward,
-            relative => UndoCurrent.Read(FullPath(folder, relative)),
-            Journal.Blob);
-    }
 
     internal string FolderOf(UndoStep step) =>
         _folders.First(pair => string.Equals(pair.Value, step.WorkingFolder?.PathAtTheTime, StringComparison.Ordinal)).Key;
 
-    internal Outcome Undo(Action? afterTheCheck = null)
+    private Outcome OutcomeOf(UndoOutcome outcome)
     {
-        UndoOffered offered = Offer();
-        switch (offered.Undo.Kind)
+        if (outcome.ClearedTheList)
         {
-            case UndoAnswerKind.Nothing: return new Outcome("nothingToUndo");
-            case UndoAnswerKind.AnotherChangeIsUnderWay: return new Outcome("anotherChangeIsUnderWay");
-            case UndoAnswerKind.NotAvailable: return new Outcome("notAvailable");
+            var clearing = Fold().LastClearing!.Value;
+            return new Outcome(outcome.Word, outcome.Seq, outcome.Refusal?.Path, outcome.Refusal?.Others ?? 0, clearing.Reason, clearing.Seq);
         }
-        UndoFoldedStep step = offered.Undo.Step!;
-        UndoCheck.PlanResult plan = PlanFor(step, backward: true);
-        afterTheCheck?.Invoke();
-        switch (plan)
-        {
-            case UndoCheck.PlanResult.ChangedSince changed:
-            {
-                long? cleared = Clear("changedSince");
-                Prune();
-                return new Outcome("changedSince", step.Seq, changed.First, changed.Others, cleared is null ? null : "changedSince", cleared);
-            }
-            case UndoCheck.PlanResult.ContentMissing missing:
-            {
-                long? cleared = Clear("contentMissing");
-                Prune();
-                return new Outcome("contentMissing", step.Seq, missing.Path, 0, cleared is null ? null : "contentMissing", cleared);
-            }
-            case UndoCheck.PlanResult.FileIsInUse inUse:
-                return new Outcome("fileIsInUse", step.Seq, inUse.Path);
-            case UndoCheck.PlanResult.CannotTellNow cannotTell:
-                return new Outcome("cannotTellNow", step.Seq, cannotTell.Path);
-            case UndoCheck.PlanResult.Ready ready:
-            {
-                string folder = FolderOf(step.Step);
-                Event(step.Seq, "undoing", new JsonObject { ["process"] = Process(Environment.ProcessId) });
-                foreach ((string path, byte[]? bytes) in ready.Changes) WritePage(folder, path, bytes);
-                Event(step.Seq, "undone");
-                Prune();
-                return new Outcome("undone", step.Seq);
-            }
-            default:
-                return new Outcome("notAvailable");
-        }
+        return new Outcome(outcome.Word, outcome.Seq, outcome.Refusal?.Path, outcome.Refusal?.Others ?? 0);
     }
 
-    internal Outcome Redo()
-    {
-        UndoOffered offered = Offer();
-        switch (offered.Redo.Kind)
-        {
-            case UndoAnswerKind.Nothing: return new Outcome("nothingToRedo");
-            case UndoAnswerKind.AnotherChangeIsUnderWay: return new Outcome("anotherChangeIsUnderWay");
-            case UndoAnswerKind.NotAvailable: return new Outcome("notAvailable");
-        }
-        UndoFoldedStep step = offered.Redo.Step!;
-        UndoCheck.PlanResult plan = PlanFor(step, backward: false);
-        switch (plan)
-        {
-            case UndoCheck.PlanResult.ChangedSince or UndoCheck.PlanResult.ContentMissing:
-            {
-                // Ruling 20: refused once, then only the redo branch goes.
-                foreach (UndoFoldedStep other in Fold().Steps.Values)
-                {
-                    if (other.State == UndoStepState.Undone && other.Seq >= step.Seq)
-                        Event(other.Seq, "dropped", new JsonObject { ["reason"] = "redoRefused" });
-                }
-                return plan is UndoCheck.PlanResult.ChangedSince changed
-                    ? new Outcome("changedSince", step.Seq, changed.First, changed.Others)
-                    : new Outcome("contentMissing", step.Seq, ((UndoCheck.PlanResult.ContentMissing)plan).Path);
-            }
-            case UndoCheck.PlanResult.FileIsInUse inUse:
-                return new Outcome("fileIsInUse", step.Seq, inUse.Path);
-            case UndoCheck.PlanResult.CannotTellNow cannotTell:
-                return new Outcome("cannotTellNow", step.Seq, cannotTell.Path);
-            case UndoCheck.PlanResult.Ready ready:
-            {
-                string folder = FolderOf(step.Step);
-                Event(step.Seq, "redoing", new JsonObject { ["process"] = Process(Environment.ProcessId) });
-                foreach ((string path, byte[]? bytes) in ready.Changes) WritePage(folder, path, bytes);
-                Event(step.Seq, "redone");
-                Prune();
-                return new Outcome("redone", step.Seq);
-            }
-            default:
-                return new Outcome("notAvailable");
-        }
-    }
+    /// <summary>Undo through the real door; <paramref name="afterTheCheck"/> runs once it has checked its ops.</summary>
+    internal Outcome Undo(Action? afterTheCheck = null) => OutcomeOf(Door(new UndoSeams { AfterTheCheck = afterTheCheck }).Undo());
+
+    /// <summary>Redo through the real door.</summary>
+    internal Outcome Redo() => OutcomeOf(Door().Redo());
 
     internal void Note() => Event(Fold().Highest, "note", new JsonObject
     {
@@ -390,112 +324,15 @@ internal sealed class UndoScribe : IDisposable
         ["somethingNew"] = new JsonObject { ["nested"] = true },
     });
 
-    private static bool Same(byte[]? a, byte[]? b) =>
-        a is null ? b is null : b is not null && a.AsSpan().SequenceEqual(b);
 }
 
 /// <summary>
-/// The traces' writer and the line model's op derivation, in the test only
-/// (W2 moves the writer into the product as <c>JournaledSetting</c>): the rules
-/// of <c>scripts/make_undo_traces.py</c> (<c>setting_entry</c>,
-/// <c>line_ops</c>, <c>verified</c>, <c>hand_edit_path</c>), the reference
-/// both suites agree on. The ops are verified both ways through the PRODUCT's
-/// <see cref="UndoEntries.Move"/>, as the contract says an editLine is chosen.
+/// The traces' hand edits (<c>hand_edit_path</c> in <c>scripts/make_undo_traces.py</c>),
+/// in the test only. The traces' writer and the op derivation moved into the
+/// product in W2b (<see cref="JournaledSetting"/>, <see cref="UndoLineOps"/>).
 /// </summary>
-internal static class UndoLineOps
+internal static class UndoTraceEdits
 {
-    /// <summary>JournaledWrite.settingEntry's rule; null when the page is left alone (the key there twice).</summary>
-    internal static string? SettingEntry(string key, string line, string text)
-    {
-        if (text.StartsWith('﻿')) text = text[1..];
-        if (UndoEntries.LayoutOf(text) is not { } layout) return "---\n" + line + "\n---\n" + text;
-        var found = layout.EntriesFor(key).ToList();
-        if (found.Count > 1) return null;
-        var lines = layout.Lines.ToList();
-        if (found.Count == 1)
-        {
-            var entry = found[0];
-            string replacement = line;
-            if (lines[entry.Start].EndsWith('\r') && !line.EndsWith('\r')) replacement += "\r";
-            lines.RemoveRange(entry.Start, entry.End - entry.Start);
-            lines.Insert(entry.Start, replacement);
-            return string.Join("\n", lines);
-        }
-        string inserted = line;
-        if (lines[layout.Open].EndsWith('\r') && !line.EndsWith('\r')) inserted += "\r";
-        lines.Insert(layout.Open + 1, inserted);
-        return string.Join("\n", lines);
-    }
-
-    private static JsonObject EditLine(string path, string key, string? before, string? after, string? afterKey, bool created)
-    {
-        var op = new JsonObject { ["kind"] = "editLine", ["path"] = path, ["key"] = key, ["before"] = before, ["after"] = after, ["afterKey"] = afterKey };
-        if (created) op["createdTheBlock"] = true;
-        return op;
-    }
-
-    private static UndoOp Read(JsonObject op)
-    {
-        using JsonDocument document = JsonDocument.Parse(op.ToJsonString());
-        return UndoFormat.ReadOp(document.RootElement);
-    }
-
-    private static JsonArray? Verified(List<JsonObject> ops, string before, string after)
-    {
-        string? forward = before;
-        foreach (JsonObject op in ops)
-        {
-            UndoOp read = Read(op);
-            forward = UndoEntries.Move(read, read.Before, read.After, forward);
-            if (forward is null) return null;
-        }
-        if (!string.Equals(forward, after, StringComparison.Ordinal)) return null;
-        string? backward = after;
-        foreach (JsonObject op in Enumerable.Reverse(ops))
-        {
-            UndoOp read = Read(op);
-            backward = UndoEntries.Move(read, read.After, read.Before, backward);
-            if (backward is null) return null;
-        }
-        if (!string.Equals(backward, before, StringComparison.Ordinal)) return null;
-        return new JsonArray(ops.Select(op => (JsonNode)op).ToArray());
-    }
-
-    /// <summary>The line ops of one file's change, or null when the line model cannot reproduce it both ways.</summary>
-    internal static JsonArray? For(string path, string before, string after)
-    {
-        if (string.Equals(before, after, StringComparison.Ordinal)) return [];
-        if (UndoEntries.LayoutOf(after) is not { } afterLayout) return null;
-        var result = new List<JsonObject>();
-        if (UndoEntries.LayoutOf(before) is not { } beforeLayout)
-        {
-            if (afterLayout.Entries.Count != 1) return null;
-            var entry = afterLayout.Entries[0];
-            result.Add(EditLine(path, entry.Key, null, afterLayout.TextOf(entry), null, true));
-            return Verified(result, before, after);
-        }
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var entry in afterLayout.Entries)
-        {
-            if (!seen.Add(entry.Key)) return null;
-            var inBefore = beforeLayout.EntriesFor(entry.Key).ToList();
-            if (inBefore.Count > 1) return null;
-            string afterText = afterLayout.TextOf(entry);
-            string? beforeText = inBefore.Count == 1 ? beforeLayout.TextOf(inBefore[0]) : null;
-            if (string.Equals(beforeText, afterText, StringComparison.Ordinal)) continue;
-            result.Add(EditLine(path, entry.Key, beforeText, afterText, afterLayout.KeyBefore(entry), false));
-        }
-        foreach (var entry in beforeLayout.Entries)
-        {
-            if (seen.Contains(entry.Key)) continue;
-            if (beforeLayout.EntriesFor(entry.Key).Count() > 1) return null;
-            seen.Add(entry.Key);
-            result.Add(EditLine(path, entry.Key, beforeLayout.TextOf(entry), null, beforeLayout.KeyBefore(entry), false));
-        }
-        if (result.Count == 0) return null;
-        return Verified(result, before, after);
-    }
-
     /// <summary>The traces' hand edits (<c>hand_edit_path</c>); null when that edit cannot be made to this page.</summary>
     internal static string? HandEdit(string kind, string? text)
     {

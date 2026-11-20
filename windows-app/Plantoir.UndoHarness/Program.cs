@@ -31,6 +31,10 @@ internal static class Program
                 "read" => ReadSizes(folder),
                 "blobs" => Blobs(folder, Int(args[2]), 1) + Blobs(folder + "-p4", Int(args[2]), 4) + Blobs(folder + "-p8", Int(args[2]), 8) + BlobParts(folder + "-parts", Int(args[2])),
                 "onedrive" => OneDriveWatch(folder, Int(args[2])),
+                "door-kill" => DoorRuns.Kill(folder, Int(args[2])),
+                "child-door" => DoorRuns.ChildDoor(folder, Int(args[2]), args[3]),
+                "door-time" => DoorRuns.Time(folder, Int(args[2]), Int(args[3])),
+                "swap-cases" => DoorRuns.SwapCases(folder, args[2] == "1", Int(args[3])),
                 _ => Unknown(mode),
             };
         }
@@ -46,7 +50,10 @@ internal static class Program
     private static int Int(string text) => int.Parse(text, CultureInfo.InvariantCulture);
 
     private static UndoJournal Journal(string folder, UndoProcessMemory? memory = null, TimeSpan? readRetry = null) =>
-        new(folder, TimeProvider.System, _ => true, _ => true, isLive: false, readRetry: readRetry, memory: memory);
+        new(folder, TimeProvider.System, _ => true, _ => true, isLive: false, memory: memory ?? TheProcess, readRetry: readRetry);
+
+    /// <summary>This harness process's own memory of the list, shared by every journal it makes unless a run asks for its own.</summary>
+    private static readonly UndoProcessMemory TheProcess = new();
 
     private static string Exe => Environment.ProcessPath!;
 

@@ -171,7 +171,10 @@ internal sealed class UndoLock : IDisposable
     /// <see cref="UndoJournalException"/> with <see cref="UndoJournalFailure.LockBusy"/>
     /// when it is not granted.
     /// </summary>
-    internal static UndoLock Take(string lockPath, TimeSpan wait, bool inShadow, UndoProcessMemory memory)
+    /// <param name="whenQueued">Called once the request is queued by the system and waiting (a test's signal
+    /// that the waiter has asked, W2a's review LOW 3); never called for a grant at once or a refusal.</param>
+    internal static UndoLock Take(string lockPath, TimeSpan wait, bool inShadow, UndoProcessMemory memory,
+                                  Action? whenQueued = null)
     {
         string folder = Path.GetDirectoryName(Path.GetFullPath(lockPath))!;
         bool tryOnceOnly = inShadow && memory.ShadowHasGivenUp(folder);
@@ -203,6 +206,7 @@ internal sealed class UndoLock : IDisposable
                 if (error != ErrorIoPending)
                     throw new UndoJournalException(UndoJournalFailure.CouldNotOpenTheLock,
                         "The list's lock could not be requested.", new Win32Exception(error));
+                whenQueued?.Invoke();
                 granted = AwaitTheGrant(handle, overlapped, signal, wait);
                 if (!granted)
                 {

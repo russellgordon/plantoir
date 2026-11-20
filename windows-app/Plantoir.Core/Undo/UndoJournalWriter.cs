@@ -67,7 +67,7 @@ internal sealed class UndoJournalWriter : IDisposable
     internal void Refold()
     {
         UndoReading reading = _journal.Read();
-        if (reading.IsFresh) Folded = reading.Folded;
+        if (reading.IsFresh) Folded = reading.Folded.Copy();
     }
 
     /// <summary>The line's bytes as written: keys sorted at every level, compact, UTF-8 without a byte-order mark, no line feed.</summary>

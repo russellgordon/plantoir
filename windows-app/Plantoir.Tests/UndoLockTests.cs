@@ -83,13 +83,18 @@ public sealed class UndoLockTests : IDisposable
     {
         var memory = new UndoProcessMemory();
         UndoLock held = UndoLock.Take(LockPath, UndoJournal.LiveWait, false, memory);
+        // A real signal that the waiter's request is queued and waiting (W2a's
+        // review, LOW 3): before it was a 300 ms delay, which on a busy PC could
+        // pass with the waiter not yet started.
+        var queued = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Task<bool> waiter = Task.Run(() =>
         {
-            using UndoLock granted = UndoLock.Take(LockPath, TimeSpan.FromSeconds(20), false, memory);
+            using UndoLock granted = UndoLock.Take(LockPath, TimeSpan.FromSeconds(20), false, memory, whenQueued: queued.SetResult);
             return true;
         });
-        Task first = await Task.WhenAny(waiter, Task.Delay(TimeSpan.FromMilliseconds(300)));
-        Assert.False(first == waiter, "the waiter was answered while the lock was held: " + waiter.Exception?.InnerException?.Message);
+        Task first = await Task.WhenAny(queued.Task, waiter);
+        Assert.True(first == queued.Task, "the waiter was answered without being queued: " + waiter.Exception?.InnerException?.Message);
+        Assert.False(waiter.IsCompleted, "the waiter was answered while the lock was held");
         held.Dispose();
         Task second = await Task.WhenAny(waiter, Task.Delay(TimeSpan.FromSeconds(20)));
         Assert.True(second == waiter && await waiter, "the waiter was not woken by the release");

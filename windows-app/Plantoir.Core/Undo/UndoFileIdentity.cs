@@ -33,11 +33,12 @@ internal static class UndoFileIdentity
         {
             string full = Path.GetFullPath(folder);
             if (full.StartsWith(@"\\", StringComparison.Ordinal)) return false;
-            string? root = Path.GetPathRoot(full);
-            if (string.IsNullOrEmpty(root)) return false;
-            var drive = new DriveInfo(root);
-            if (drive.DriveType == DriveType.Network) return false;
-            string format = drive.DriveFormat;
+            // The volume the folder itself is on, junctions and mount points
+            // followed (W2a's review, LOW 6), not the drive letter's: a state
+            // folder reached through a junction onto an exFAT stick or a share
+            // must read whole.
+            string? format = UndoPlaces.FileSystemOf(full);
+            if (format is null) return false;
             return string.Equals(format, "NTFS", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(format, "ReFS", StringComparison.OrdinalIgnoreCase);
         }
