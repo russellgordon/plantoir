@@ -325,13 +325,40 @@ public class PreviewWaitWakesOnTheRunTests : IDisposable
     [Fact]
     public async Task TheBoundedWaitNeverEndsARunStartedAfterIt()
     {
+        // Deterministic (second review): the next run is started INSIDE the
+        // first run's finish, by a handler of its IsRunning change, so by the
+        // time the bounded wait resumes, whenever that is, the second run is
+        // already the current one.
         var runner = new ScriptRunner();
         runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "stopping\n");
         Task<bool> waiting = runner.WaitUntilFinishedOrKill(60_000);
+        bool startedTheNext = false;
+        runner.PropertyChanged += (sender, change) =>
+        {
+            if (change.PropertyName == nameof(ScriptRunner.IsRunning) && !runner.IsRunning && !startedTheNext)
+            {
+                startedTheNext = true;
+                runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "the next run\n");
+            }
+        };
+
         runner.FinishRunNumber(runner.CurrentRunNumber, 0);
-        runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "the next run\n");
+        Assert.True(startedTheNext);
         Assert.True(await waiting);
         Assert.True(runner.IsRunning, "the bounded wait for the first run force-finished the second");
+    }
+
+    [Fact]
+    public void AFinishClaimsItsRunOnceAndAFinishForNoRunDoesNothing()
+    {
+        var runner = new ScriptRunner();
+        runner.FinishRunNumber(0, 0);             // nothing ever ran
+        Assert.Null(runner.LastExitCode);
+        runner.StageAsRunningForCapture(Array.Empty<TaskMilestone>(), "building\n");
+        int run = runner.CurrentRunNumber;
+        runner.FinishRunNumber(run, 2);
+        runner.FinishRunNumber(run, 0);           // the second poster of the same run
+        Assert.Equal(2, runner.LastExitCode);
     }
 
     /// <summary>

@@ -21,12 +21,16 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     private ConPtyProcess? _process;
     private Thread? _readerThread;
     private Thread? _exitThread;
-    private int _finished;                 // 0 until FinishRun runs, guards against a double finish
     // Which run is current (#1016 review): bumped by every start, and carried
     // by each finish the reader and exit watcher post, so a finish that
     // arrives after the next run has started (a build's late second finish
     // landing on its deploy leg) finishes nothing.
     private int _runNumber;
+    // The run that is started and not yet finished, 0 when none. A finish
+    // claims it in ONE step (compare and exchange to 0), so "is this still the
+    // current run" and "has nobody finished it yet" cannot be split by a
+    // start in between (second review of #1016).
+    private int _unfinishedRun;
     // Completed by FinishRun with "succeeded" (#1016): what WaitUntilFinished
     // hands out, so a wait ends the moment the run does instead of at its
     // next 100 ms look. A new one for every run, made before IsRunning is set.
@@ -312,7 +316,6 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         int thisRun = BeginRunNumber();
         IsRunning = true;
         StartedAt = DateTime.UtcNow;
-        _finished = 0;
         // A new process, so a new stage - even for a keepTranscript leg. Its
         // first line starts with no text of its own, whatever the previous
         // leg left unfinished in Transcript.CurrentLine (#661).
@@ -368,7 +371,12 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     }
 
     /// <summary>Makes the next run the current one and returns its number.</summary>
-    private int BeginRunNumber() => Interlocked.Increment(ref _runNumber);
+    private int BeginRunNumber()
+    {
+        int number = Interlocked.Increment(ref _runNumber);
+        Volatile.Write(ref _unfinishedRun, number);
+        return number;
+    }
 
     /// <summary>The number of the current (or last) run; tests post stale finishes with an older one.</summary>
     internal int CurrentRunNumber => Volatile.Read(ref _runNumber);
@@ -381,11 +389,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// check it finished the deploy with the build's exit code, disposed the
     /// deploy's process and let its leg report success.
     /// </summary>
-    internal void FinishRunNumber(int runNumber, int exitCode)
-    {
-        if (runNumber != Volatile.Read(ref _runNumber)) return;
-        FinishRun(exitCode);
-    }
+    internal void FinishRunNumber(int runNumber, int exitCode) => FinishRun(runNumber, exitCode);
 
     /// <summary>Coalesces chunks so the interface never redraws per byte (0.15 s cadence).</summary>
     private void BufferOutput(string text)
@@ -463,7 +467,6 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         Milestones = milestones;
         _runEnded = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         BeginRunNumber();
-        _finished = 0;
         IsRunning = true;
         StartedAt = DateTime.UtcNow;
         ReceiveOutput(output);
@@ -607,11 +610,11 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         return LastExitCode == 0;
     }
 
-    private void FinishRun(int exitCode)
+    private void FinishRun(int runNumber, int exitCode)
     {
         // Either the reader (EOF) or the exit watcher can get here first;
-        // only the first one finishes.
-        if (Interlocked.Exchange(ref _finished, 1) != 0) return;
+        // only the first one finishes, and only while its run is current.
+        if (runNumber == 0 || Interlocked.CompareExchange(ref _unfinishedRun, 0, runNumber) != runNumber) return;
         _promptCheck?.Cancel();
         if (IsAwaitingInput) { IsAwaitingInput = false; Notify(nameof(IsAwaitingInput)); }
         FlushBufferedOutput();

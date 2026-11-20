@@ -627,7 +627,12 @@ public sealed partial class SectionDetailView : UserControl
         // ending already shown elsewhere leaves the section's ordinary state.
         bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || (showDeploy && deployRunner.HasAnyOutput)
                          || _previewRunner.Transcript.CurrentLine.Length > 0;
-        bool showConsole = _isWaitingForServer || _previewRunner.IsRunning || showDeploy || anyOutput;
+        // A preview that could not start says why until the teacher starts
+        // another run or leaves (second review of #1016): Run() has already
+        // emptied the transcript, so without this the console, and the
+        // sentence in it, collapsed back to the empty state.
+        bool previewCouldNotStart = !_previewRunner.IsRunning && _previewRunner.LaunchProblem is not null;
+        bool showConsole = _isWaitingForServer || _previewRunner.IsRunning || showDeploy || anyOutput || previewCouldNotStart;
         Progress.Visibility = showConsole ? Visibility.Visible : Visibility.Collapsed;
         NoPreviewState.Visibility = showConsole ? Visibility.Collapsed : Visibility.Visible;
         // #734: while the Problems tab shows, what is under it is COLLAPSED as
