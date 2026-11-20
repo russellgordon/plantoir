@@ -344,12 +344,36 @@ def module_library_places() -> list:
     return places
 
 
+def same_content(first: Path, second: Path) -> bool:
+    """
+    True when the two files hold the same bytes: the same size, then the
+    same SHA-256. Content, not identity (#1010): a mirror whose copy was
+    COPIED because a hardlink was refused holds the runtime's bytes under
+    another inode, and comparing inodes re-copied it on every build.
+    """
+    import hashlib
+    if first.stat().st_size != second.stat().st_size:
+        return False
+    digests = []
+    for path in (first, second):
+        digest = hashlib.sha256()
+        with open(path, "rb") as handle:
+            block = handle.read(1 << 16)
+            while block:
+                digest.update(block)
+                block = handle.read(1 << 16)
+        digests.append(digest.hexdigest())
+    return digests[0] == digests[1]
+
+
 def bring_module_libraries_into_mirror(mirror: Path, windows: bool = None) -> list:
     """
     Make each library the contract names beside a native module in
     QUARTZ_DIR/node_modules sit at the same place in `mirror` as a hardlink
     to the runtime's file (a copy when a link is refused), replacing a
-    different file of that name. Returns the paths added or replaced,
+    file of that name with other bytes (compared by size and SHA-256, not
+    by inode, so a copy made where a link was refused is left alone on the
+    next build, #1010). Returns the paths added or replaced,
     relative to the mirror with forward slashes. Touches nothing else: a
     runtime without the file, or a mirror without the module's folder, is
     left as it is. Off Windows it does nothing (the Mac and the container
@@ -373,9 +397,7 @@ def bring_module_libraries_into_mirror(mirror: Path, windows: bool = None) -> li
             if not source.is_file():
                 continue
             if target.exists():
-                source_stat = source.stat()
-                target_stat = target.stat()
-                if source_stat.st_ino and source_stat.st_ino == target_stat.st_ino and source_stat.st_dev == target_stat.st_dev:
+                if same_content(source, target):
                     continue
                 target.unlink()
             try:

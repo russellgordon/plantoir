@@ -46,6 +46,10 @@ windows-app/Vendor/llama/
 # wrangler), fetched by Vendor/fetch-runtime.ps1 — ~600 MB of pinned output.
 windows-app/Vendor/runtime/
 
+# The checked Visual C++ runtime file fetch-runtime.ps1 takes out of
+# Microsoft's redistributable and keeps between runs (#1010).
+windows-app/Vendor/vc-runtime/
+
 # What `dotnet test --blame` / `--blame-crash` writes when diagnosing a test
 # host that died: a small TestResults/<guid>/<guid>_Sequence.xml naming the
 # test that was running,
