@@ -1873,7 +1873,8 @@ struct SidebarView: View {
         Divider()
         folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber), row: row)
         Divider()
-        removeItem("Remove Section…", course: course, row: row)
+        // No ellipsis since #990: it only asks for a confirmation.
+        removeItem("Remove Section", course: course, row: row)
     }
 
     /// Open in Browser and Stop Showing Deployed Folder on a section row
@@ -2014,7 +2015,7 @@ struct SidebarView: View {
     /// its row and asks the question the − button and the menu bar ask —
     /// archiving, never deleting. Greyed while a copy of the course is being
     /// zipped, as the menu item is. A section of a course kept for reference
-    /// has no Remove Section… (`interface.whatIsWithheld`); its course keeps
+    /// has no Remove Section (`interface.whatIsWithheld`); its course keeps
     /// Remove Course….
     func removeItem(_ title: String, course: Course, row: SidebarSelection) -> some View {
         return Button(title, systemImage: "archivebox", role: .destructive) {
@@ -2294,7 +2295,7 @@ struct SidebarView: View {
     }
 
     /// Delete, pressed with a sidebar row selected: runs the item the menu
-    /// bar would — Remove Course…, Remove Section…, Delete Backup… or Delete
+    /// bar would — Remove Course…, Remove Section, Delete Backup… or Delete
     /// Archive… — through `performMenuItem`, which asks the same rule the
     /// menu greys by (so nothing on a reference section, nothing under a
     /// sheet: a beep, as for any greyed item) and then asks the same question.

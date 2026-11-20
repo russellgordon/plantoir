@@ -1,7 +1,7 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// Section ▸ Roll Over to a New Year… (#897 piece B): the rollover the
+/// Classes ▸ Roll Over to a New Year… (#897 piece B): the rollover the
 /// built-in assistant's window asks about in words, run from the Section
 /// menu through the same tool call, its website question asked in the sheet.
 ///
@@ -98,7 +98,7 @@ final class RollOverFromTheMenuTests: XCTestCase {
             checked += 1
         }
         XCTAssertGreaterThanOrEqual(checked, 20)
-        XCTAssertEqual(SectionVerbs.menuPath(of: .rollOverToANewYear), "Section ▸ Roll Over to a New Year…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .rollOverToANewYear), "Classes ▸ Roll Over to a New Year…")
     }
 
     // MARK: - The sheet

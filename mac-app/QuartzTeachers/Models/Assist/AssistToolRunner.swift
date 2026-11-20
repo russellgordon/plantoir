@@ -4516,7 +4516,7 @@ final class AssistToolRunner {
 
     // MARK: - Duplicating a class as the next one, from the menu (#897)
 
-    /// The argument Section ▸ Add Class…, as a copy of a class, names its
+    /// The argument Classes ▸ Add Class…, as a copy of a class, names its
     /// source by:
     /// the page's path inside the course folder, ".md" included
     /// (`SectionVerbs.coursePath(ofPageAt:in:)`).
@@ -4834,7 +4834,7 @@ final class AssistToolRunner {
                     + "last year's. Last year's details are kept, and any deploy set to happen "
                     + "on its own is turned off."
                     : "Keep deploying this section to the same website as last year."
-                // Section ▸ Roll Over to a New Year… (#897 piece B): the card
+                // Classes ▸ Roll Over to a New Year… (#897 piece B): the card
                 // also says the dates need nothing and what is set aside. What
                 // the model reads (`plan`) is the window's, byte for byte.
                 // On "new" the card says it as the other branch does ("It
@@ -4945,7 +4945,7 @@ final class AssistToolRunner {
     /// whole year at once rather than the website and not the dates.
     static let menuRolloverChange: String = "rolled the section over to a new year"
 
-    /// Section ▸ Roll Over to a New Year… on a section whose dates are
+    /// Classes ▸ Roll Over to a New Year… on a section whose dates are
     /// already right (#897 piece B). A copy of the course is saved first,
     /// which the window's path does not do here (the plan review's amendment
     /// 11: a teacher who ran Re-date Classes… first lands exactly here), and

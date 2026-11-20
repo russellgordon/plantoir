@@ -334,7 +334,7 @@ enum DeployCommand {
     /// section: one per destination type, and the legacy one. A marker that
     /// cannot be read still counts, since `releaseSite` reports it as still
     /// pinned (#897 piece B, the plan review's amendment 12). The ONE test
-    /// Section ▸ Roll Over to a New Year…'s sheet asks before offering the
+    /// Classes ▸ Roll Over to a New Year…'s sheet asks before offering the
     /// website question, over the same URLs the release walks, so the sheet
     /// and the release cannot disagree about whether there is a website to
     /// keep or leave.

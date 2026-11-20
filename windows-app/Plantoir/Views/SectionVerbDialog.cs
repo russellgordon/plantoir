@@ -128,20 +128,14 @@ internal sealed class SectionVerbDialog
         };
     }
 
-    /// <summary>Where an item is in the menus, the way the trail says it.</summary>
-    internal static string MenuPath(Item item) => item switch
-    {
-        Item.PublishPages => "Section ▸ Publish Pages…",
-        Item.HidePages => "Section ▸ Hide Pages…",
-        Item.PublishClassForADate => "Section ▸ Publish Class for a Date…",
-        Item.RebuildPreview => "Section ▸ Rebuild Preview",
-        Item.UndoLastChange => "Section ▸ Undo Last Change",
-        Item.AddNextClass => "Section ▸ Add Next Class",
-        Item.ReDateClasses => "Section ▸ Re-date Classes…",
-        Item.MakeRoomForClasses => "Section ▸ Make Room for Classes…",
-        Item.ClassDates => "Section ▸ Class Dates…",
-        _ => item.ToString(),
-    };
+    /// <summary>
+    /// Where an item is in the menus, the way the trail says it: the menu that
+    /// holds it, from <see cref="SubjectMenuLayout"/> (#990: Section or
+    /// Classes), and the words it is drawn with there.
+    /// </summary>
+    internal static string MenuPath(Item item) => SubjectMenuLayout.MenuContaining(item) is null
+        ? item.ToString()
+        : SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleHere(item));
 
     // ---- Opening it, per item ---------------------------------------------------
 

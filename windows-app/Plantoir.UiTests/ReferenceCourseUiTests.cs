@@ -239,7 +239,7 @@ public class ReferenceCourseUiTests
     }
 
     /// <summary>
-    /// A reference course's SECTION offers no Remove Section… (#491 item 6;
+    /// A reference course's SECTION offers no Remove Section (#491 item 6;
     /// <c>interface.whatIsWithheld</c> — "removing the whole course stays"),
     /// while the live course's section row offers it, last.
     /// </summary>
@@ -257,12 +257,12 @@ public class ReferenceCourseUiTests
         }
 
         var live = MenuOf("sidebar-ICS3U-section1");
-        Assert.NotNull(live("Remove Section…"));
+        Assert.NotNull(live("Remove Section"));
         Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
         Thread.Sleep(500);
 
         var reference = MenuOf($"sidebar-{Folder}-section1");
-        Assert.Null(reference("Remove Section…"));
+        Assert.Null(reference("Remove Section"));
         Assert.Null(reference("Remove Course…"));
         Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
     }

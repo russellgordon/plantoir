@@ -587,11 +587,12 @@ final class SectionVerbsEndingTests: XCTestCase {
         return (made, verbs)
     }
 
-    /// The last "ran from a menu" line on the trail.
+    /// The last "ran from a menu" line on the trail: from the Section menu
+    /// or, since #990, the Classes menu.
     private func lastMenuLine() -> String {
         var found: String = ""
         for line in ActivityTrail.store.activityText(includingPrompts: false).components(separatedBy: "\n") {
-            if line.contains("Section ▸ ") {
+            if line.contains("Section ▸ ") || line.contains("Classes ▸ ") {
                 found = line
             }
         }

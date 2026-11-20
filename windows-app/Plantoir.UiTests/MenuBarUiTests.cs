@@ -241,3 +241,129 @@ public class OpenRecentUiTests
         MenuBar.Close();
     }
 }
+
+/// <summary>
+/// #990 (Russell's ruling of 2026-11-20, grouping A) through the real window:
+/// the menu bar reads File · Course · Section · Classes · View · Help, and the
+/// Section and Classes menus draw <c>SubjectMenuLayout</c> (the contract's
+/// <c>subjectMenus.layout</c>) line for line, a separator between groups and
+/// nowhere else; every item is DRAWN and dimmed where the rule greys it,
+/// never hidden; and Copy a Page answers its ruled key, Ctrl+Shift+K.
+/// </summary>
+[Collection("drives the real app")]
+public class SectionAndClassesUiTests
+{
+    private const string Separator = "----";
+
+    /// <summary>What a menu should read, by AutomationId, from the layout.</summary>
+    private static List<string> Expected(Plantoir.Core.Models.SubjectMenuLayout.Menu menu)
+    {
+        var lines = new List<string>();
+        bool first = true;
+        foreach (var group in Plantoir.Core.Models.SubjectMenuLayout.Groups(menu))
+        {
+            if (!first) lines.Add(Separator);
+            first = false;
+            foreach (var entry in group)
+            {
+                switch (entry)
+                {
+                    case Plantoir.Core.Models.SubjectMenuLayout.Entry.OfSubmenu:
+                        lines.Add("sectionReviseWith");
+                        break;
+                    case Plantoir.Core.Models.SubjectMenuLayout.Entry.OfItem(var item):
+                        lines.Add(Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(menu, item));
+                        // #514's second visible Preview item, drawn under it while no preview runs.
+                        if (item == Plantoir.Core.Models.SubjectMenuRules.Item.Preview) lines.Add("sectionPreviewAlternate");
+                        break;
+                }
+            }
+        }
+        return lines;
+    }
+
+    /// <summary>Open a menu and read its lines in order: each item's AutomationId, and a separator as "----".</summary>
+    private static List<(string Line, AutomationElement? Element)> Read(DrivenApp app, string menu, string anyItemId)
+    {
+        MenuBar.Open(app, menu, anyItemId);
+        var first = app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId(anyItemId))!;
+        var lines = new List<(string, AutomationElement?)>();
+        foreach (var child in first.Parent.FindAllChildren())
+        {
+            ControlType type;
+            try { type = child.ControlType; } catch { continue; }
+            if (type == ControlType.Separator) { lines.Add((Separator, null)); continue; }
+            if (type != ControlType.MenuItem) continue;
+            string id;
+            try { id = child.AutomationId; } catch { continue; }
+            lines.Add((id, child));
+        }
+        return lines;
+    }
+
+    [UiFact]
+    public void TheMenusDrawTheLayout_EveryItemDrawnAndDimmedWhereTheRuleGreysIt()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+
+        // The menu bar's order, Classes after Section.
+        var titles = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))
+            .Where(e => e.Parent?.ControlType == ControlType.MenuBar).Select(e => e.Name).ToList();
+        Assert.Equal(new[] { "File", "Course", "Section", "Classes", "View", "Help" }, titles);
+
+        // A COURSE row selected: the rule greys every Section and Classes item,
+        // and every one is still drawn, in the layout's order and groups.
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
+        foreach (var (menu, title, anyId) in new[]
+                 {
+                     (Plantoir.Core.Models.SubjectMenuLayout.Menu.Section, "Section", "sectionPublishPages"),
+                     (Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes, "Classes", "classesClassDates"),
+                 })
+        {
+            var lines = Read(app, title, anyId);
+            Assert.Equal(Expected(menu), lines.Select(l => l.Line).ToList());
+            var live = lines.Where(l => l.Element is not null && l.Line != "sectionReviseWith" && l.Element.IsEnabled)
+                            .Select(l => l.Line).ToList();
+            Assert.True(live.Count == 0, $"{title} items live on a course row: {string.Join(", ", live)}");
+            foreach (var (line, element) in lines)
+            {
+                if (element is null || line is "sectionReviseWith" or "sectionPreview" or "sectionPreviewAlternate") continue;
+                var item = Enum.GetValues<Plantoir.Core.Models.SubjectMenuRules.Item>()
+                    .Single(i => Plantoir.Core.Models.SubjectMenuLayout.MenuContaining(i) == menu
+                                 && Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(menu, i) == line);
+                Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item), element.Name);
+            }
+            MenuBar.Close();
+        }
+
+        // A SECTION row selected: the Classes items come live, and Remove
+        // Section reads without an ellipsis.
+        app.SelectSection("ICS3U", 1);
+        var classes = MenuBar.Open(app, "Classes", "classesClassDates");
+        Assert.True(classes["classesClassDates"].IsEnabled, "Classes > Class Dates… was greyed on a live section");
+        Assert.True(classes["classesReDateClasses"].IsEnabled, "Classes > Re-date Classes… was greyed on a live section");
+        MenuBar.Close();
+        var section = MenuBar.Open(app, "Section", "sectionRemoveSection");
+        Assert.Equal("Remove Section", section["sectionRemoveSection"].Name);
+        Assert.Equal("Remove Scheduled Deploy", section["sectionCancelScheduledDeploy"].Name);
+        MenuBar.Close();
+
+        // Classes > Class Dates… opens the section's class dates, as the row's menu does.
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesClassDates");
+        Assert.NotNull(MenuBar.Dialog(app, "Classes > Class Dates…"));
+        MenuBar.CloseDialog(app);
+        Assert.Contains("Classes ▸ Class Dates…", MenuBar.Trail(app));
+    }
+
+    /// <summary>#990: Copy a Page from This Course… answers Ctrl+Shift+K (the mac's Shift-Command-K).</summary>
+    [UiFact]
+    public void CopyAPageAnswersCtrlShiftK()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
+        app.Window.Focus();
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_K);
+        Assert.NotNull(MenuBar.Dialog(app, "Ctrl+Shift+K"));
+        EndToEnd.CloseCopyAPage(app);
+    }
+}

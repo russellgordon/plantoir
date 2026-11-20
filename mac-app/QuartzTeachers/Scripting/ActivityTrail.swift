@@ -467,7 +467,7 @@ nonisolated enum ActivityTrail {
         /// Named for the OUTCOME rather than for today's single cause, the way
         /// `folderProblemNotRepaired` is: a second reason a copy is not made
         /// joins this line rather than earning a rename on both platforms.
-        /// The second arrived with #897: Section ▸ Add Class…, as a copy of a
+        /// The second arrived with #897: Classes ▸ Add Class…, as a copy of a
         /// class, reads its copy back before writing anything, and when the copy
         /// cannot be made certainly hidden it writes nothing and says so here.
         case classCopyNotMade = "class copy not made"

@@ -1,7 +1,7 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// Section ▸ Add Class… (#897), which replaced Add Next Class: its sheet adds
+/// Classes ▸ Add Class… (#897), which replaced Add Next Class: its sheet adds
 /// the next class in this unit, the first class of a new unit, or a copy of
 /// one of this section's classes. The last two were what only the built-in
 /// assistant's window could do.
@@ -522,7 +522,7 @@ final class DuplicateAsNextClassTests: XCTestCase {
     /// Each item is on the trail by where it is in the menus, never by its
     /// raw name (`menuPath`'s `default:` returns the raw value).
     func testTheTrailNamesTheItemByItsPlaceInTheMenus() {
-        XCTAssertEqual(SectionVerbs.menuPath(of: .addClass), "Section ▸ Add Class…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .addClass), "Classes ▸ Add Class…")
     }
 
     /// `subjectMenus.addClassSheet`: the ways in the contract's order are

@@ -127,7 +127,7 @@ public sealed partial class SidebarPane
 
     /// <summary>
     /// A reference course's SECTION: no assistant, no Schedule Deploy… and no
-    /// Remove Scheduled Deploy… — the row and the menu bar agree with
+    /// Remove Scheduled Deploy — the row and the menu bar agree with
     /// <c>subjectMenus</c>, which leaves cancelScheduledDeploy out for a
     /// course kept for reference (#527).
     /// </summary>
@@ -142,7 +142,7 @@ public sealed partial class SidebarPane
     /// refuses itself (<c>keptForReference</c>). That is the mac's arrangement
     /// (<c>ScheduledDeployCleanup</c>): its row has no Cancel either.</para>
     ///
-    /// <para>Until #527 this row kept Remove Scheduled Deploy… (then titled Cancel), written when
+    /// <para>Until #527 this row kept Remove Scheduled Deploy (then titled Cancel), written when
     /// Windows did not yet turn such a schedule off by itself. Since then the
     /// item could only find a task the last read had not removed: one whose
     /// cancel failed (retried on the next read), or one made outside Plantoir
@@ -159,7 +159,7 @@ public sealed partial class SidebarPane
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
-        // No Remove Section…, deliberately: interface.whatIsWithheld lists
+        // No Remove Section, deliberately: interface.whatIsWithheld lists
         // "Remove Section N (removing the whole course stays)", and the mac's
         // row offering it was a bug #457 fixed. The course's row removes it all.
         return menu;

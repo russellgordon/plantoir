@@ -150,11 +150,11 @@ public class SectionVerbsTests : IDisposable
         await using var verbs = Verbs(out _, history);
 
         await verbs.Perform(SectionVerbs.MakeRoomForClasses("ICS3U", 1, unit: 1, atDay: 2, howMany: 1, plan: false),
-                            "Section ▸ Make Room for Classes…", "ICS3U", 1, "room for 1");
+                            "Classes ▸ Make Room for Classes…", "ICS3U", 1, "room for 1");
 
         Assert.True(File.Exists(Page("Unit 1, Day 3")), "the class after the new one was renamed");
         Assert.Empty(history.Entries);
-        Assert.Contains("ICS3U/1 · Section ▸ Make Room for Classes… — carried out, room for 1", File.ReadAllText(_trail));
+        Assert.Contains("ICS3U/1 · Classes ▸ Make Room for Classes… — carried out, room for 1", File.ReadAllText(_trail));
     }
 
     /// <summary>
@@ -352,7 +352,7 @@ public class SectionVerbsTests : IDisposable
         AssistToolAnswer answer;
         using (HeldAgainstWriting(Page("Unit 1, Day 2")))
             answer = await verbs.Perform(SectionVerbs.ReDateClasses("ICS3U", 1, plan: false),
-                                         "Section ▸ Re-date Classes…", "ICS3U", 1);
+                                         "Classes ▸ Re-date Classes…", "ICS3U", 1);
 
         string said = answer.Summary + "\n" + answer.Detail;
         Assert.StartsWith(AssistWording.PublishStoppedPartWay("the section's class dates", ""), answer.Summary);
@@ -364,7 +364,7 @@ public class SectionVerbsTests : IDisposable
         Assert.DoesNotContain("couldn’t be read", said);
         Assert.DoesNotContain("Nothing was changed", said);
         Assert.Contains("2026-10-01", File.ReadAllText(Page("Unit 1, Day 1")));
-        Assert.Contains("ICS3U/1 · Section ▸ Re-date Classes… — carried out", File.ReadAllText(_trail));
+        Assert.Contains("ICS3U/1 · Classes ▸ Re-date Classes… — carried out", File.ReadAllText(_trail));
     }
 
     /// <summary>
@@ -380,11 +380,11 @@ public class SectionVerbsTests : IDisposable
         AssistToolAnswer answer;
         using (HeldAgainstWriting(Page("Unit 1, Day 1")))
             answer = await verbs.Perform(SectionVerbs.ReDateClasses("ICS3U", 1, plan: false),
-                                         "Section ▸ Re-date Classes…", "ICS3U", 1);
+                                         "Classes ▸ Re-date Classes…", "ICS3U", 1);
 
         Assert.StartsWith("Nothing was changed: ", answer.Summary);
         Assert.DoesNotContain("couldn’t be read", answer.Summary);
-        Assert.Contains("ICS3U/1 · Section ▸ Re-date Classes… — changed nothing", File.ReadAllText(_trail));
+        Assert.Contains("ICS3U/1 · Classes ▸ Re-date Classes… — changed nothing", File.ReadAllText(_trail));
     }
 
     /// <summary>Two meetings in October, so both class pages change date, Day 1 first.</summary>

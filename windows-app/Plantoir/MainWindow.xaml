@@ -34,6 +34,7 @@
             <MenuBarItem x:Name="FileMenu" Title="File" />
             <MenuBarItem x:Name="CourseMenu" Title="Course" />
             <MenuBarItem x:Name="SectionMenu" Title="Section" />
+            <MenuBarItem x:Name="ClassesMenu" Title="Classes" />
             <MenuBarItem x:Name="ViewMenu" Title="View" />
             <MenuBarItem x:Name="HelpMenu" Title="Help" />
         </MenuBar>

@@ -532,7 +532,7 @@
       "Each section's All Classes folder holds one page per class, named Unit 1, Day 1, Unit 1, Day 2 and so on",
       "The first word is the course's word for a unit, chosen in New Course (What do you call a unit?): Unit, or Module, or Thread",
       "Each section has its own copy of each class, dated for that section: in the example, Unit 1, Day 13 is 24 September in Section 1 and 25 September in Section 2",
-      "Section ▸ Add Class… makes the next one, numbered and dated",
+      "Classes ▸ Add Class… makes the next one, numbered and dated",
       "The front page shows Most Recent Class: the newest class students can see",
       "A page named another way (Field Trip, Exam Review) is kept as it is and never renumbered"
      ],
@@ -592,7 +592,7 @@
       "Its agenda links to shared pages: concepts, exercises, tasks",
       "Open a linked concept page: its backlinks list every class that used it (class pages show no backlinks)",
       "Fix a mistake on the concept page once and every section's site has the fix at its next deploy",
-      "To start a new reference page (a concept, an exercise, a task), duplicate the _DUPLICATE ME page in that folder; new class pages come from Section > Add Class…"
+      "To start a new reference page (a concept, an exercise, a task), duplicate the _DUPLICATE ME page in that folder; new class pages come from Classes > Add Class…"
      ],
      "pictures": [
       {
@@ -743,10 +743,10 @@
      "anchor": "add-next-class",
      "title": "Add a class",
      "question": "How do I add the next class, start a new unit, or copy a class?",
-     "about": "Section > Add Class…: the next class in this unit, in a new unit, or a copy of a class; the page made, numbered and dated, unpublished, backed up first, undoable.",
+     "about": "Classes > Add Class…: the next class in this unit, in a new unit, or a copy of a class; the page made, numbered and dated, unpublished, backed up first, undoable.",
      "steps": [
       "Select the section (it needs class dates on file: link class-dates)",
-      "Section > Add Class… (also in the section row's right-click menu)",
+      "Classes > Add Class… (also in the section row's right-click menu)",
       "Plantoir saves a copy of the course to Backups, then makes the page, numbered and dated from the class dates",
       "The new page arrives unpublished: open it in Obsidian and write it",
       "Publish it when it is written (Publish Pages… or Publish Class for a Date…); Section > Undo Last Change takes the new page away again"
@@ -1187,7 +1187,7 @@
       "In Schedule a deploy, set Deploy at (it starts at tomorrow, 6:30), then Schedule",
       "A clock appears beside the section in the sidebar; its hover text says when, and that this Mac must be on and awake",
       "A notification says how it went; click it to open that section",
-      "Section > Remove Scheduled Deploy… removes it, after asking",
+      "Section > Remove Scheduled Deploy removes it, after asking",
       "Course Settings' How late a scheduled deploy may still run"
      ],
      "pictures": [
@@ -1249,10 +1249,10 @@
      "anchor": "class-dates",
      "title": "Give Plantoir your class dates",
      "question": "How does Plantoir know which day each class falls on?",
-     "about": "Section > Class Dates: pasting dates, a file or a Google Sheet's address, Day First or Month First, Remember These Dates.",
+     "about": "Classes > Class Dates: pasting dates, a file or a Google Sheet's address, Day First or Month First, Remember These Dates.",
      "steps": [
       "Select the section",
-      "Section ▸ Class Dates…",
+      "Classes ▸ Class Dates…",
       "Paste the dates, choose a .csv or .ics file, or paste a shared Google Sheet's address",
       "Say where the dates came from, in your own words",
       "Answer Day First or Month First if asked",
@@ -1306,13 +1306,13 @@
      "anchor": "redate",
      "title": "Move classes when the schedule changes",
      "question": "A snow day moved everything: how do I shift the classes that follow?",
-     "about": "Section > Re-date Classes: every class in the section moved onto the class dates on file, after a plan.",
+     "about": "Classes > Re-date Classes: every class in the section moved onto the class dates on file, after a plan.",
      "steps": [
       "Select the section",
-      "Section > Re-date Classes… moves EVERY class in the section onto the class dates on file, in order; nothing is chosen",
+      "Classes > Re-date Classes… moves EVERY class in the section onto the class dates on file, in order; nothing is chosen",
       "Check the plan before you agree",
       "To put new classes in front of planned ones, use Make Room for Classes… instead (link make-room)",
-      "At the start of a new year, Section > Roll Over to a New Year… re-dates the same way and also settles the website: keep last year's address, or start a new one; it asks only when the section has a website, and not when a new website would get the address the section's website already has (a Cloudflare website started earlier the same calendar year)",
+      "At the start of a new year, Classes > Roll Over to a New Year… re-dates the same way and also settles the website: keep last year's address, or start a new one; it asks only when the section has a website, and not when a new website would get the address the section's website already has (a Cloudflare website started earlier the same calendar year)",
       "Preview, then deploy"
      ],
      "pictures": [
@@ -1352,9 +1352,9 @@
      "anchor": "make-room",
      "title": "Make room for a class",
      "question": "How do I put a new class in front of the ones already planned?",
-     "about": "Section > Make Room for Classes: inserting classes ahead of planned ones; not undoable from the menu, the backup is the way back.",
+     "about": "Classes > Make Room for Classes: inserting classes ahead of planned ones; not undoable from the menu, the backup is the way back.",
      "steps": [
-      "Section > Make Room for Classes…",
+      "Classes > Make Room for Classes…",
       "Choose the class to make room before, and how many",
       "Read the plan: which pages are renumbered and re-dated; the new class pages are made blank and unpublished",
       "It cannot be undone with Undo Last Change, because other classes move; the copy saved to Backups just before it is the way back (link backups)"
@@ -1405,13 +1405,13 @@
      "anchor": "start-of-year",
      "title": "Get ready for the start of the year",
      "question": "How do I take last year's classes out of view before a new class starts?",
-     "about": "Section > Get Ready for the Start of the Year: which pages go into draft and why, and its undo.",
+     "about": "Classes > Get Ready for the Start of the Year: which pages go into draft and why, and its undo.",
      "steps": [
       "Select the section",
-      "Section > Get Ready for the Start of the Year…",
+      "Classes > Get Ready for the Start of the Year…",
       "Read what goes into draft and why; agree. Nothing is re-dated or published",
       "Undo it from the same menu until you next deploy or publish",
-      "To move a copied course onto this year's dates, use Re-date Classes… (link redate), or Section > Roll Over to a New Year…, which also asks whether to keep last year's website or start a new one",
+      "To move a copied course onto this year's dates, use Re-date Classes… (link redate), or Classes > Roll Over to a New Year…, which also asks whether to keep last year's website or start a new one",
       "Deploy when it looks right"
      ],
      "pictures": [
@@ -1876,7 +1876,7 @@
       "A rename turns off the course's scheduled deploy and says so; the site's address does not change",
       "To remove: Course > Remove Course… and confirm; it moves to Archived, nothing is deleted",
       "File > Restore from Archive… brings it back (link archive)",
-      "Section > Remove Section… removes one section the same way"
+      "Section > Remove Section removes one section the same way"
      ],
      "pictures": [
       {

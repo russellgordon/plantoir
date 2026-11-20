@@ -207,32 +207,14 @@ final class SectionVerbs {
         )
     }
 
-    /// Where the item is, the way a teacher would say it.
+    /// Where the item is, the way a teacher would say it: the menu that
+    /// holds it, from `SubjectMenuLayout` (#990: Section or Classes), and
+    /// the title it is drawn with there.
     static func menuPath(of item: SubjectMenuRules.Item) -> String {
-        switch item {
-        case .publishPages:
-            return "Section ▸ Publish Pages…"
-        case .hidePages:
-            return "Section ▸ Hide Pages…"
-        case .publishClassForADate:
-            return "Section ▸ Publish Class for a Date…"
-        case .rebuildPreview:
-            return "Section ▸ Rebuild Preview"
-        case .undoLastChange:
-            return "Section ▸ Undo Last Change"
-        case .addClass:
-            return "Section ▸ Add Class…"
-        case .reDateClasses:
-            return "Section ▸ Re-date Classes…"
-        case .makeRoomForClasses:
-            return "Section ▸ Make Room for Classes…"
-        case .classDates:
-            return "Section ▸ Class Dates…"
-        case .rollOverToANewYear:
-            return "Section ▸ Roll Over to a New Year…"
-        default:
+        if SubjectMenuLayout.menu(containing: item) == nil {
             return item.rawValue
         }
+        return SubjectMenuLayout.path(of: item, titled: SectionMenu.title(for: item))
     }
 
     // MARK: - The calls, built in code

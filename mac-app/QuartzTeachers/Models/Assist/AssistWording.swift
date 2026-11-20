@@ -2444,7 +2444,7 @@ nonisolated enum AssistWording {
     // #897: what only the built-in assistant's window could do before,
     // in the menu's voice. The window's own sentences are unchanged.
 
-    /// Section ▸ Add Class…'s sheet: its title, the question, and one
+    /// Classes ▸ Add Class…'s sheet: its title, the question, and one
     /// line per way (`SubjectMenuRules.AddClassWay`), in the sheet's order.
     static func menuAddClassTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
         return "Add a \(noun.singular) to \(course) Section \(section)"
@@ -2512,13 +2512,15 @@ nonisolated enum AssistWording {
     /// The menu item is titled Class Dates… in every course, a club
     /// included, and a club's sentences never say "class"
     /// (`ClubNounTests.testEveryMeetingKeyHasItsClassTwin`), so a club is
-    /// pointed at the Section menu without the item's title.
+    /// pointed at the menu without the item's title. Since #990 the item is
+    /// in the Classes menu, whose title says "Classes" too, so a club is
+    /// pointed at it by its place: the menu after Section.
     static func menuNeedsClassDatesFirst(noun: ClassNoun = .class) -> String {
         let firstSentence: String = "This section has no \(noun.singular) dates on file, so nothing was copied."
         if noun == .meeting {
-            return firstSentence + " Add them from the Section menu, then try again."
+            return firstSentence + " Add them from the menu after Section in the menu bar, then try again."
         }
-        return firstSentence + " Add them with Section ▸ Class Dates…, then try again."
+        return firstSentence + " Add them with Classes ▸ Class Dates…, then try again."
     }
 
     /// The third way: a copy of one of this section's classes.
@@ -2568,7 +2570,7 @@ nonisolated enum AssistWording {
              + "course's settings, then choose this again."
     }
 
-    // #897 piece B: Section ▸ Roll Over to a New Year…, the rollover the
+    // #897 piece B: Classes ▸ Roll Over to a New Year…, the rollover the
     // built-in assistant's window asks about in words, in the menu's voice.
     // The window's own sentences are unchanged.
 
@@ -2587,15 +2589,15 @@ nonisolated enum AssistWording {
     }
 
     /// The last date on file is before today: probably last year's. A club
-    /// is pointed at the Section menu without the item's title, which says
-    /// "Class" (`menuNeedsClassDatesFirst` does the same).
+    /// is pointed at the menu after Section without the item's or the menu's
+    /// title, which say "Class" (`menuNeedsClassDatesFirst` does the same).
     static func menuRollOverDatesAreOld(noun: ClassNoun = .class) -> String {
         let firstSentence: String = "The last of these dates has passed, so they may be last year's."
         if noun == .meeting {
             return firstSentence + " To give this year's meeting dates, cancel and add them from the "
-                 + "Section menu first."
+                 + "menu after Section in the menu bar first."
         }
-        return firstSentence + " To give this year's class dates, cancel and choose Section ▸ Class Dates… first."
+        return firstSentence + " To give this year's class dates, cancel and choose Classes ▸ Class Dates… first."
     }
 
     /// The question's two answers, under `rolloverWebsiteQuestion`.
