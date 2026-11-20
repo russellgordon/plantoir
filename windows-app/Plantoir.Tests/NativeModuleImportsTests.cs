@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -93,8 +94,8 @@ public sealed class NativeModuleImportsTests
         Assert.True(HasStatement(recipe, $"$NodeVcRuntimeVersion = \"{version}\""), $"fetch-runtime.ps1 does not set $NodeVcRuntimeVersion = \"{version}\".");
         Assert.True(HasStatement(recipe, $"$NodeVcRuntimeSha256  = \"{sha}\""), $"fetch-runtime.ps1 does not set $NodeVcRuntimeSha256 to the contract's {sha}.");
         Assert.True(HasStatement(recipe, $"$NodeVcRuntimeLength  = {bytes}"), $"fetch-runtime.ps1 does not set $NodeVcRuntimeLength = {bytes}.");
-        Assert.True(HasStatement(recipe, "Install-NodeVcRuntime $pyDir $nodeDir"),
-            "fetch-runtime.ps1 never runs Install-NodeVcRuntime $pyDir $nodeDir: the runtime would carry no Visual C++ runtime beside node.exe (#965).");
+        Assert.True(HasStatement(recipe, "Install-NodeVcRuntime $pyDir $nodeDir $Runtime"),
+            "fetch-runtime.ps1 never runs Install-NodeVcRuntime $pyDir $nodeDir $Runtime: the runtime would carry no Visual C++ runtime beside node.exe (#965).");
         Assert.True(HasStatement(recipe, "$fields.nodeVcRuntime = $NodeVcRuntimeVersion"),
             "fetch-runtime.ps1 never records nodeVcRuntime in the manifest, so the build's guard cannot see it.");
     }
@@ -114,18 +115,46 @@ public sealed class NativeModuleImportsTests
             "fetch-runtime.ps1 never records nodeVcRuntimeLayout in the manifest, so the build's guard cannot tell a runtime with the node.exe copy alone.");
         Assert.Equal("node", Entry["besideNode"]!.ToString());
 
-        int start = recipe.IndexOf("$NodeVcRuntimeModuleFolders = @(", StringComparison.Ordinal);
-        Assert.True(start >= 0, "fetch-runtime.ps1 has no $NodeVcRuntimeModuleFolders = @( list.");
-        int end = recipe.IndexOf(")", start + "$NodeVcRuntimeModuleFolders = @(".Length, StringComparison.Ordinal);
-        var listed = new List<string>();
-        foreach (string line in recipe[start..end].Split('\n').Skip(1))
-        {
-            string trimmed = line.Trim().TrimEnd(',').Trim();
-            if (trimmed.Length == 0) continue;
-            listed.Add(trimmed.Trim('"'));
-        }
-        Assert.Equal(ModuleFolders, listed);
+        Assert.Equal(ModuleFolders, ListedModuleFolders(recipe));
         Assert.True(ModuleFolders.Count >= 2, "windowsNodeVcRuntime -> besideModules names fewer than the two modules that import vcruntime140.dll (lightningcss, the Typst compiler).");
+
+        // The function takes the runtime as a parameter (#1006): it never
+        // reads the script's own $Runtime, so it can be lifted and run alone.
+        int begin = recipe.IndexOf("# BEGIN Install-NodeVcRuntime", StringComparison.Ordinal);
+        int finish = recipe.IndexOf("# END Install-NodeVcRuntime", StringComparison.Ordinal);
+        Assert.True(begin >= 0 && finish > begin, "fetch-runtime.ps1 has no Install-NodeVcRuntime between its markers.");
+        string function = recipe[begin..finish];
+        Assert.Contains("function Install-NodeVcRuntime([string]$From, [string]$To, [string]$RuntimeFolder)", function);
+        Assert.False(Regex.IsMatch(function, @"\$Runtime\b"),
+            "Install-NodeVcRuntime reads the script-level $Runtime; it should use its $RuntimeFolder parameter.");
+    }
+
+    /// <summary>
+    /// The quoted folders of the recipe's <c>$NodeVcRuntimeModuleFolders =
+    /// @(</c> list, read line by line up to the line that closes it. A
+    /// comment line is skipped; any other line that is not one quoted
+    /// folder, with or without a trailing comma, fails the test by name
+    /// rather than being read as a folder.
+    /// </summary>
+    private static List<string> ListedModuleFolders(string recipe)
+    {
+        const string opening = "$NodeVcRuntimeModuleFolders = @(";
+        string[] lines = recipe.Replace("\r\n", "\n").Split('\n');
+        int first = Array.FindIndex(lines, line => line.Trim() == opening);
+        Assert.True(first >= 0, $"fetch-runtime.ps1 has no line reading {opening}");
+        var listed = new List<string>();
+        var folder = new Regex("^\"([^\"]+)\",?$");
+        for (int index = first + 1; index < lines.Length; index++)
+        {
+            string trimmed = lines[index].Trim();
+            if (trimmed == ")") return listed;
+            if (trimmed.Length == 0 || trimmed.StartsWith("#", StringComparison.Ordinal)) continue;
+            Match match = folder.Match(trimmed);
+            Assert.True(match.Success, $"fetch-runtime.ps1 line {index + 1} in $NodeVcRuntimeModuleFolders is not one quoted folder: {trimmed}");
+            listed.Add(match.Groups[1].Value);
+        }
+        Assert.Fail($"fetch-runtime.ps1's {opening} list is never closed by a line reading ).");
+        return listed;
     }
 
     [Fact]
@@ -150,8 +179,11 @@ public sealed class NativeModuleImportsTests
 
     // MARK: - The import reader
 
-    /// <summary>The reader itself, on a file every run has: the test host.</summary>
-    [Fact]
+    /// <summary>
+    /// The reader itself, on a file every run has: the test host. Off
+    /// Windows the test host is not a Windows program, so it skips (#1006).
+    /// </summary>
+    [WindowsFact]
     public void TheImportReaderReadsTheTestHostsImports()
     {
         string host = Environment.ProcessPath!;
@@ -278,6 +310,20 @@ public sealed class NativeModuleImportsTests
         var parsed = JsonNode.Parse(manifest)!;
         Assert.Equal(CarriedFile["fileVersion"]!.ToString(), parsed["nodeVcRuntime"]?.ToString());
         Assert.Equal(Entry["layout"]!.ToString(), parsed["nodeVcRuntimeLayout"]?.ToString());
+    }
+}
+
+/// <summary>
+/// A fact that needs Windows itself, here a Windows program to read: it
+/// skips, saying so, anywhere else (#1006), as the suite's other
+/// platform-bound facts do.
+/// </summary>
+public sealed class WindowsFactAttribute : FactAttribute
+{
+    public WindowsFactAttribute()
+    {
+        if (!OperatingSystem.IsWindows())
+            Skip = "Needs Windows: the test host here is not a Windows program, so it has no import table to read.";
     }
 }
 
