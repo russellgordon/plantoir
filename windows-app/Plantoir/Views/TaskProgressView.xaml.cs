@@ -163,6 +163,18 @@ public sealed partial class TaskProgressView : UserControl
     private StopQuestionAsking? _stopAsking;
 
     /// <summary>
+    /// True while something is drawn over this panel in its own place: a
+    /// section's preview site, once it serves, covers the console though the
+    /// preview still runs. Escape on a web page never stops the preview (the
+    /// mac's <c>progressPanelTakesTheCancelKeys</c>); the toolbar's Stop
+    /// Preview does.
+    /// </summary>
+    public bool IsCovered { get; set; }
+
+    /// <summary>The run a stop was last sent to, so a repeating key or a second press stops it once (the mac's <c>CancelOncePerRun</c>).</summary>
+    private (ScriptRunner Runner, DateTime? StartedAt)? _stopSentTo;
+
+    /// <summary>
     /// Choose which registered runner the panel displays.
     /// <paramref name="multiRunner"/>, when set and carrying more than one
     /// leg, adds the destination checklist, the combined console (every leg
@@ -724,7 +736,7 @@ public sealed partial class TaskProgressView : UserControl
         {
             args.Handled = true;
             bool goesToCancel = StopKey.GoesToCancel(
-                cancelIsShown: IsOnScreen(TaskCancelButton),
+                cancelIsShown: !IsCovered && IsOnScreen(TaskCancelButton),
                 taskIsRunning: _runner is { IsRunning: true, WasCancelled: false },
                 aDialogIsOpen: Plantoir.Services.DialogGate.IsOpen(XamlRoot),
                 anEditableTextBoxHasTheFocus: IsEditableText(XamlRoot is { } root ? FocusManager.GetFocusedElement(root) : null));
@@ -774,6 +786,14 @@ public sealed partial class TaskProgressView : UserControl
 
     private void StopTheTask()
     {
+        // Once per run: a held Escape repeats (Microsoft: an accelerator
+        // auto-repeats, and that cannot be changed), and a second stop of a
+        // run already stopping does nothing a teacher asked for.
+        if (_runner is { } runner)
+        {
+            if (_stopSentTo is { } sent && ReferenceEquals(sent.Runner, runner) && sent.StartedAt == runner.StartedAt) return;
+            _stopSentTo = (runner, runner.StartedAt);
+        }
         if (OnCancel is not null)
         {
             OnCancel.Invoke();

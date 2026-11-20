@@ -184,6 +184,11 @@ public sealed class StopQuestionsContractTests : IDisposable
         Assert.Contains("Progress.GiveCancelTheEscapeKey();", AppSource("Views", "SectionDetailView.xaml.cs"));
         Assert.DoesNotContain("GiveCancelTheEscapeKey", AppSource("Views", "NewCourseDialog.cs"));
         Assert.Contains("stopQuestion: StopQuestion.Deploy", AppSource("Views", "SectionDetailView.xaml.cs"));
+        // The preview's site drawn over the console holds no key (the mac's progressPanelTakesTheCancelKeys).
+        Assert.Contains("Progress.IsCovered = Preview.Visibility == Visibility.Visible;", AppSource("Views", "SectionDetailView.xaml.cs"));
+        Assert.Contains("cancelIsShown: !IsCovered && IsOnScreen(TaskCancelButton),", panel);
+        // Once per run: the accelerator repeats while Escape is held.
+        Assert.Contains("_stopSentTo = (runner, runner.StartedAt);", panel);
     }
 
     [Fact]

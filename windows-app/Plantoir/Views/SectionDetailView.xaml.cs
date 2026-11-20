@@ -644,6 +644,8 @@ public sealed partial class SectionDetailView : UserControl
                              == SectionProblems.Tab.Problems;
         BaseLayer.Visibility = problemsShown ? Visibility.Collapsed : Visibility.Visible;
         Preview.Visibility = previewShown && !problemsShown ? Visibility.Visible : Visibility.Collapsed;
+        // #1009: the site drawn over the console holds no stop key.
+        Progress.IsCovered = Preview.Visibility == Visibility.Visible;
         _problemsView.Visibility = problemsShown ? Visibility.Visible : Visibility.Collapsed;
 
         PreviewChromeChanged?.Invoke(this, EventArgs.Empty);
