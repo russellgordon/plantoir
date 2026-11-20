@@ -14,8 +14,10 @@ namespace Plantoir.Tests;
 /// a clean machine stopped with <c>ERR_DLOPEN_FAILED</c>, because the only
 /// copy was in <c>runtime\python</c>, which is not on PATH. The runtime now
 /// carries that file beside <c>runtime\node\node.exe</c> and beside each of
-/// those two modules (Russell's rulings, 2026-11-14 and 2026-11-19), copied
-/// by <c>fetch-runtime.ps1</c> from the Python zip it already pins. Node
+/// those two modules (Russell's rulings, 2026-11-14 and 2026-11-19), taken
+/// by <c>fetch-runtime.ps1</c> out of Microsoft's own Visual C++
+/// Redistributable without running it (#1010; until then from the Python
+/// zip). Node
 /// loads a <c>.node</c> file with <c>LOAD_WITH_ALTERED_SEARCH_PATH</c>, so
 /// Windows looks for its libraries in the MODULE's folder, then System32,
 /// and node.exe's folder only through PATH: the copy beside the module is
@@ -94,10 +96,63 @@ public sealed class NativeModuleImportsTests
         Assert.True(HasStatement(recipe, $"$NodeVcRuntimeVersion = \"{version}\""), $"fetch-runtime.ps1 does not set $NodeVcRuntimeVersion = \"{version}\".");
         Assert.True(HasStatement(recipe, $"$NodeVcRuntimeSha256  = \"{sha}\""), $"fetch-runtime.ps1 does not set $NodeVcRuntimeSha256 to the contract's {sha}.");
         Assert.True(HasStatement(recipe, $"$NodeVcRuntimeLength  = {bytes}"), $"fetch-runtime.ps1 does not set $NodeVcRuntimeLength = {bytes}.");
-        Assert.True(HasStatement(recipe, "Install-NodeVcRuntime $pyDir $nodeDir $Runtime"),
-            "fetch-runtime.ps1 never runs Install-NodeVcRuntime $pyDir $nodeDir $Runtime: the runtime would carry no Visual C++ runtime beside node.exe (#965).");
+        Assert.True(HasStatement(recipe, "Install-NodeVcRuntime $vcRuntimeSource $nodeDir $Runtime"),
+            "fetch-runtime.ps1 never runs Install-NodeVcRuntime $vcRuntimeSource $nodeDir $Runtime: the runtime would carry no Visual C++ runtime beside node.exe (#965).");
         Assert.True(HasStatement(recipe, "$fields.nodeVcRuntime = $NodeVcRuntimeVersion"),
             "fetch-runtime.ps1 never records nodeVcRuntime in the manifest, so the build's guard cannot see it.");
+    }
+
+    /// <summary>
+    /// #1010 (Russell's ruling of 2026-11-19 on #1006): the copy comes from
+    /// Microsoft's own Visual C++ Redistributable, pinned by the contract's
+    /// SHA-256, size, version and the places inside it, and never from the
+    /// Python zip. Every call that places the file is fed by
+    /// <c>Get-MicrosoftVcRuntime</c>, and its cache sits outside
+    /// <c>runtime\</c>, which the installer packs whole.
+    /// </summary>
+    [Fact]
+    public void TheRecipeTakesTheFileFromMicrosoftsRedistributable()
+    {
+        string recipe = File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
+        JsonNode bundle = Entry["redistributable"]
+            ?? throw new InvalidOperationException("contracts/toolchain.json -> windowsNodeVcRuntime has no redistributable.");
+        string[] expected =
+        {
+            $"$VcRedistVersion   = \"{bundle["version"]}\"",
+            $"$VcRedistUrl       = \"{bundle["url"]}\"",
+            $"$VcRedistPermalink = \"{bundle["permalink"]}\"",
+            $"$VcRedistSha256    = \"{bundle["sha256"]}\"",
+            $"$VcRedistLength    = {bundle["bytes"]}",
+            $"$VcRedistContainerOffset = {bundle["containerOffset"]}",
+            $"$VcRedistContainerLength = {bundle["containerBytes"]}",
+            $"$VcRedistPayload         = \"{bundle["payload"]}\"",
+            $"$VcRedistPayloadLength   = {bundle["payloadBytes"]}",
+            $"$VcRedistMember          = \"{bundle["member"]}\"",
+        };
+        foreach (string statement in expected)
+            Assert.True(HasStatement(recipe, statement), $"fetch-runtime.ps1 does not set {statement} (contracts/toolchain.json -> windowsNodeVcRuntime -> redistributable).");
+
+        Assert.StartsWith("https://download.visualstudio.microsoft.com/", bundle["url"]!.ToString(), StringComparison.Ordinal);
+        Assert.StartsWith("https://aka.ms/", bundle["permalink"]!.ToString(), StringComparison.Ordinal);
+
+        int placements = 0;
+        int fetches = 0;
+        foreach (string line in recipe.Split('\n'))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("Install-NodeVcRuntime ", StringComparison.Ordinal))
+            {
+                placements += 1;
+                Assert.Equal("Install-NodeVcRuntime $vcRuntimeSource $nodeDir $Runtime", trimmed);
+            }
+            if (trimmed == "$vcRuntimeSource = Get-MicrosoftVcRuntime $VcRuntimeCache $Temp") fetches += 1;
+        }
+        Assert.Equal(2, placements);
+        Assert.Equal(placements, fetches);
+        Assert.False(recipe.Contains("Install-NodeVcRuntime $pyDir", StringComparison.Ordinal),
+            "fetch-runtime.ps1 still places the copy from runtime\\python (the Python zip), which #1010 replaced with Microsoft's redistributable.");
+        Assert.True(HasStatement(recipe, "$VcRuntimeCache = Join-Path $VendorDir \"vc-runtime\""),
+            "fetch-runtime.ps1's cache of the checked file must be windows-app\\Vendor\\vc-runtime, outside runtime\\ (which the installer packs whole).");
     }
 
     /// <summary>

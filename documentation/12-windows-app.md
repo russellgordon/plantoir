@@ -13152,11 +13152,11 @@ what is imported).
 
 **What landed.**
 - `fetch-runtime.ps1` → `Install-NodeVcRuntime` copies `vcruntime140.dll`
-  from `runtime\python` (the Python 3.14.10 embeddable zip, already checked
-  by SHA-256; the file is Microsoft's, Authenticode-signed, version
-  14.51.36247.0, newer than the 14.43 and 14.42 toolsets the modules were
-  built with) to three places, each checked by SHA-256 and size before and
-  after:
+  (taken from Microsoft's own Visual C++ Redistributable since #1010, below;
+  until then from `runtime\python`, the Python zip's copy, 14.51.36247.0;
+  now version 14.52.37029.0, newer than the 14.43 and 14.42 toolsets the
+  modules were built with) to three places, each checked by SHA-256 and size
+  before and after:
 
   | Place (under `runtime\`) | Why |
   |---|---|
@@ -13171,9 +13171,10 @@ what is imported).
   `nodeVcRuntime` (the version) and `nodeVcRuntimeLayout`
   (`beside-node-and-modules`). A runtime made before #965, or with the
   `node.exe` copy alone (this branch's first version, on the PC and the dev
-  VM), is repaired in place: the file copied, no download. A Python bump that
-  brings another copy refuses until the contract and the `$NodeVcRuntime*`
-  lines move with it.
+  VM), is repaired in place: the file copied, downloaded only when the cache
+  does not hold it (#1010). A different file at the pinned addresses refuses
+  until the contract and the `$NodeVcRuntime*` and `$VcRedist*` lines move
+  with it.
 - `Plantoir.csproj` → `CheckNativeRuntimeManifest` refuses a runtime whose
   manifest has no `nodeVcRuntime` at that version, or no
   `nodeVcRuntimeLayout` of `beside-node-and-modules`, so a release cannot
@@ -13215,11 +13216,15 @@ what is imported).
   Pinned by `scripts/test_mirror_module_libraries.py` (a mirror laid out as
   1.9.3 left it gains both copies through the build's own dependency step).
   The `node.exe` copy stays beside them.
-- `THIRD_PARTY_LICENSES.md` has the licence row, as Russell ruled on #1006
-  (2026-11-19): Microsoft's Distributable Code terms in the Visual Studio
-  licence, with Russell Gordon as the licence holder under the free Community
-  or Build Tools terms; the file is on the Distributable List for Visual
-  Studio 2026 (any file in `VC\redist`, unmodified, with the program).
+- `THIRD_PARTY_LICENSES.md` has the licence row. Since #1010 (Russell's
+  second ruling on #1006, 2026-11-19) it names the Distributable Code section
+  of the Visual Studio Community 2026 licence only, with Russell Gordon as the
+  licence holder; the Build Tools licence is a supplement with no
+  Distributable Code section and gives no right to redistribute. The file is
+  on the Distributable List for Visual Studio 2026 (any file in `VC\redist`,
+  unmodified, with the program; the same package and its individual
+  binaries from Microsoft's download pages, for licensed Visual Studio
+  users).
 - `NativeModuleImportsTests`: every `.node` file in a fetched runtime, and
   every library beside it that it pulls in, finds each import **beside
   itself** or on `windowsSystemLibraries`, a named list that deliberately
@@ -13302,16 +13307,65 @@ the redistributable, a module loads the copy beside it (its own folder comes
 first, ahead of System32) and the system's is untouched. Within one Node
 process Windows keeps one library per name, so the second module to load
 gets the copy the first one loaded; the copies are the same file, so that is
-harmless.
+harmless. (Python's own copy in `runtime\python`, 14.51 under Python's
+licence, is loaded by `python.exe`, never by Node.)
+
+**Where the file comes from (#1010).** Written 2026-11-19 for
+[#1010](https://github.com/russellgordon/plantoir/issues/1010), after
+Russell's ruling that the copy is to come from Microsoft's own Visual C++
+Redistributable, not from Python's zip (a source Microsoft's redistribution
+page does not name). The contract half is `windowsNodeVcRuntime` →
+`redistributable` and `source`.
+
+- **The download.** Microsoft's "Latest supported Visual C++ Redistributable
+  downloads" page (https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist,
+  read 2026-11-19) gives the permalink `https://aka.ms/vc14/vc_redist.x64.exe`,
+  which always serves the LATEST v14 redistributable (the page lists no
+  version, "because it's updated frequently"). A hash pin on it would refuse
+  on Microsoft's next release, so the recipe downloads the versioned address
+  the permalink resolved to on 2026-11-19
+  (`download.visualstudio.microsoft.com/download/pr/78d061c5-…/VC_redist.x64.exe`,
+  14.52.37029.0, 18,863,624 B) and tries the permalink only when that stops
+  answering; either way the bundle's SHA-256 and size must be the pin's.
+- **Taken apart, never run.** Running the redistributable installs into
+  System32 and asks for administrator rights (Microsoft's "Redistribute
+  Visual C++ files" page: "If you aren't running from an elevated command
+  prompt, you'll need to respond to a User Account Control prompt").
+  Its documented `/layout` option, measured at Medium integrity on the PC,
+  exited 0 and copied only the bundle itself: the packages are embedded, so
+  nothing came out. The bundle is a WiX Burn bundle whose attached container
+  is a cabinet at offset 629,952 (18,223,522 B); its Burn manifest names
+  payload `a4` as `packages\vcRuntimeMinimum_amd64\cab1.cab` (1,060,683 B),
+  and that cabinet holds `vcruntime140.dll` under its MSI file key
+  `vcruntime140.dll_amd64`. `Get-MicrosoftVcRuntime` checks the bundle,
+  copies the container out at the pinned offset and length (`MSCF` and its
+  own length field checked), and takes the two levels out with Windows' own
+  `expand.exe`, the approach `swift_windows_fetch.py` already uses for the
+  Swift installer. The file is checked by SHA-256 and size, kept in
+  `windows-app\Vendor\vc-runtime` (outside `runtime\`, which the installer
+  packs whole; not committed), and checked again at each place. A cached
+  file that is not the pin is deleted and fetched again.
+- **Measured 2026-11-19** on the development PC: about 2 s for the download,
+  the checks and both `expand` steps; the same at Medium integrity (a
+  scheduled task in the desktop session, not elevated) as from SSH (High).
+  The file is 14.52.37029.0, 176,488 B, SHA-256 `eb1ee979…4915a0`, with a
+  valid Authenticode signature (signer "Microsoft Windows Software
+  Compatibility Publisher", O=Microsoft Corporation). It differs in bytes
+  from the copy pinned until then (Python's, 14.51.36247.0, 178,616 B,
+  `d1f4225d…9ce7`), so the pin moved to Microsoft's file and every existing
+  runtime is repaired in place on its next `fetch-runtime.ps1`.
+- **Rejected.** `msiexec /a` on the MSI (a second step to the same file,
+  which the payload cabinet already holds); the permalink alone (see above);
+  keeping Python's copy as the source (the ruling).
 
 **Rejected.** Adding `runtime\python` to PATH in the three launchers (smaller,
 but it leans on Python's copy and on every Node being started by a launcher).
 The copy beside `node.exe` alone, this issue's first version: a module finds
 it only through PATH and only after an older copy in System32 (run A below);
 it is kept beside the module copies because the first ruling asked for it.
-Fetching `VC_redist.x64.exe` and unpacking it: a WiX Burn bundle, so a second
-unpacker (as `swift_windows_fetch.py` carves the Swift installer) for one
-178,616-byte file the pinned Python zip already carries, signed by Microsoft.
+Fetching `VC_redist.x64.exe` and unpacking it was rejected at first (a
+second unpacker for a file Python's zip already carried) and became the
+source in #1010, on Russell's ruling; see "Where the file comes from" above.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 

@@ -259,13 +259,15 @@ dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
 
-**A runtime fetched before #965 needs `fetch-runtime.ps1` once more.** The
-build refuses it ("does not carry the Visual C++ runtime ... beside
-node.exe", or, for a runtime that has the `node.exe` copy only, "not beside
-the native modules that import it"); the re-run copies one file,
-`vcruntime140.dll`, from `runtime\python` to beside `node.exe` and beside
-the lightningcss and Typst compiler modules in `runtime\quartz\node_modules`,
-with no download. Without it the website builder's native modules do not
+**A runtime fetched before #1010 needs `fetch-runtime.ps1` once more.** The
+build refuses it ("does not carry the Visual C++ runtime 14.52.37029.0 ...
+beside node.exe", or, for a runtime that has the `node.exe` copy only, "not
+beside the native modules that import it"); the re-run places one file,
+`vcruntime140.dll`, beside `node.exe` and beside the lightningcss and Typst
+compiler modules in `runtime\quartz\node_modules`. The file comes from
+Microsoft's own Visual C++ Redistributable (about 18 MB, downloaded and taken
+apart, never run, no administrator rights; #1010) and is kept in
+`windows-app\Vendor\vc-runtime`, so later repairs download nothing. Without it the website builder's native modules do not
 load on a PC that lacks the Visual C++ redistributable, and the development
 PC, which has it, would never show it (`documentation/12-windows-app.md` →
 "The Visual C++ runtime beside node.exe (#965)").
