@@ -4467,11 +4467,17 @@ nothing, so the menu's line says "changed nothing". A re-date says "Nothing
 was changed: …" with the file in the way, and so, since U3a's second
 round, does a publish, a hide and a whole unit: `publishStoppedPartWay`
 ("Only part of … was changed") was true only while the write went page by
-page, and is no longer said on the Mac on any path (the first review of
-U3a, MEDIUM 1; `AssistWording` is unchanged, the key stays for the re-date
-catch that can no longer be reached and for Windows, which still writes
-page by page). Nor is the Restore Section pointer added: there is nothing
-to put back. `SectionVerbsEndingTests`' three tests for these paths pin
+page (the first review of U3a, MEDIUM 1). Since U3a's third round it is
+said on the Mac in ONE case, where it is true: a swap refused after some
+pages went in whose reversal could not put one back
+(`JournaledStepError.leftPartWay`), so a page holds the new content and
+what it held before is kept beside it under a hidden name the sentence
+names (the second review of U3a, MEDIUM a; documentation 09, "The third
+round"). Every action's "Nothing was …" catch says it through the runner's
+`saidWhenTheStepStopped`, which also counts the write as one with no new
+undo entry. `AssistWording` is unchanged; Windows still writes page by
+page. Nor is the Restore Section pointer added: there is nothing to put
+back. `SectionVerbsEndingTests`' three tests for these paths pin
 this (`testAPublishThatCannotWriteEveryPageWritesNone`,
 `testAWholeUnitThatCannotWriteEveryPageWritesNone`,
 `testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`), and
