@@ -106,6 +106,25 @@ public sealed class SectionProblemsSourceTests
         Assert.Contains("TickTable.Status(item, box);", table);
     }
 
+    /// <summary>
+    /// #1017: a dimmed Fix with button's tooltip is its frame's, never the
+    /// button's own (a disabled WinUI control opens no tooltip; measured on the
+    /// PC, documentation 12), and the reason stays on the button as HelpText.
+    /// </summary>
+    [Fact]
+    public void TheFixWithTooltipIsOnTheButtonsFrame_AndTheHelpTextOnTheButton()
+    {
+        string table = Source("Views", "SectionProblemsView.cs");
+        string show = Body(table, "    private void ShowTheFixButtons(");
+        Assert.Contains("ToolTipService.SetToolTip(frame, help.Length > 0 ? help : null);", show);
+        Assert.Contains("AutomationProperties.SetHelpText(button, help);", show);
+        Assert.Contains("frame.Visibility = visibility;", show);
+        Assert.DoesNotContain("ToolTipService.SetToolTip(button", table);
+        Assert.Contains("Footer.Children.Add(_fixWithClaudeFrame);", table);
+        Assert.Contains("Footer.Children.Add(_fixWithCodexFrame);", table);
+        Assert.DoesNotContain("Footer.Children.Add(_fixWithClaude);", table);
+    }
+
     /// <summary>The sidebar's marker is read from the store's memory, on every reconcile and when the store says something moved.</summary>
     [Fact]
     public void TheSidebarReadsTheMarkerFromMemory()
