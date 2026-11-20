@@ -7390,7 +7390,9 @@ are plain text, RTF and flat RTFD, and an outline row's selection holds
 none), so the failing path cannot make a note at all; the trail's `Section ▸
 Rebuild Preview` line is the proof the menu item ran. It records whether
 Stickies was running before the key, and the tear-down quits a Stickies the
-test caused, through XCTest. The precedence over a LIVE service is the
+test caused (AppKit's terminate, then force-terminate after ten seconds;
+not an `XCUIApplication`, which `UITestLaunchTripwireTests` keeps to the
+one door). The precedence over a LIVE service is the
 measurement above, taken once; it is not re-taken by the test.
 
 **Why ⇧⌘O moves rather than sitting on both Open in Obsidian items** — the
