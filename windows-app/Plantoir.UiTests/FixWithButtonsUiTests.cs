@@ -159,8 +159,8 @@ public class FixWithButtonsUiTests
     /// control. Measured only when <c>PLANTOIR_MEASURE_TOOLTIPS</c> names a file:
     /// the pointer rests on the dimmed Fix with Claude… (its tooltip is
     /// <see cref="FixWithAssistant.NotEnabledHelp"/>) and, as the control, on
-    /// an ENABLED control that carries a tooltip (the first problem row, whose
-    /// tooltip is its help), and what UI Automation finds on screen after each
+    /// an ENABLED control that carries a tooltip (the sidebar's + button, whose
+    /// tooltip is in its XAML), and what UI Automation finds on screen after each
     /// rest is written to the file. A measurement, not a check: the result is
     /// written up in documentation 12, and nothing here asserts it.
     /// </summary>
@@ -220,7 +220,8 @@ public class FixWithButtonsUiTests
                       + (seen.Count == 0 ? "no tooltip seen in 4 s" : string.Join("; ", seen)));
         }
         Rest(Wait(app, "fixWithClaudeButton"), "Fix with Claude…, dimmed");
-        Rest(app.Find("problemRow-pageSettingsUnreadable|Unit 1/Lesson 1", "the first row"), "the first problem row, enabled");
+        // The control: an ENABLED button whose tooltip is in its XAML.
+        Rest(app.Find("addCourseButton", "the sidebar's + button"), "the sidebar's + button, enabled, tooltip \"Add a course or club\"");
         File.WriteAllLines(into, lines);
         Mouse.MoveTo(DrivenApp.MiddleOf(app.Window));
     }
