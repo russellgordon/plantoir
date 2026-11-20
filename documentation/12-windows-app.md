@@ -14102,8 +14102,9 @@ writes one `stop question setting changed` line, the mac's words
 `stopQuestions`, added from Windows): on the mac they lived only in Swift,
 so this piece moved them where both apps read one copy, with fourteen
 `cases` for what each answer stops and remembers (played through
-`StopQuestionAsking` in `StopQuestionsContractTests`). The mac owes a test
-pinning its Swift constants to it and a runner for the cases.
+`StopQuestionAsking` in `StopQuestionsContractTests`). The mac runs the same
+section in a class of the same name (#1009's mac side): its Swift constants
+pinned to it, and every case through its own `StopQuestionAsking`.
 
 **Windows has no Command-Period, and no counterpart was found.** Nothing in
 `contracts/` names one; Microsoft's "Dialog controls" page lists what closes
