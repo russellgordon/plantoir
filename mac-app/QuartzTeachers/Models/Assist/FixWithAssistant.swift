@@ -218,7 +218,7 @@ nonisolated enum FixWithAssistant {
     /// (`fixWith.notInstalledHelp`, #990): since then the button is drawn
     /// dimmed rather than left out (D11, Russell's ruling Q9), and a dimmed
     /// button alone says nothing about why, as `notEnabledHelp` says.
-    static let notInstalledHelp: String = "This assistant is not set up on this Mac. Revise With ▸ Set Up an Assistant… can set it up."
+    static let notInstalledHelp: String = "Not set up on this Mac. To set it up, see Settings ▸ Other Assistants."
 
     // MARK: - Functions
 

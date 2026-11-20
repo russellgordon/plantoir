@@ -9342,8 +9342,8 @@ and the rule's re-check passes (Preview is enabled while running), so
 `PressPreview(opposite: true)` refuses when the runner is running and the menu
 is redrawn.
 
-**No key on the second item.** The mac's is ⌥⇧⌘P; the counterpart,
-Ctrl+Alt+Shift+P, is AltGr+Shift+P on keyboards with an AltGr (Ctrl+Alt is
+**No key on the second item.** The mac's is ⌥⌘Y (⌥⇧⌘P until #990); the
+counterpart, Ctrl+Alt+Y, is AltGr+Y on keyboards with an AltGr (Ctrl+Alt is
 AltGr to Windows), a character a teacher may be typing. REJECTED for that
 reason, as Ctrl+Alt was for #488's keys.
 

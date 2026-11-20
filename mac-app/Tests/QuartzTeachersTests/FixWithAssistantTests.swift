@@ -562,6 +562,11 @@ final class FixWithAssistantTests: XCTestCase {
         XCTAssertEqual(FixWithAssistant.buttonHint(assistantIsInstalled: true, hasRows: true), "", "enabled: no hint")
         XCTAssertEqual(FixWithAssistant.buttonHint(assistantIsInstalled: false, hasRows: true), notInstalled, "not on this Mac")
         XCTAssertEqual(FixWithAssistant.buttonHint(assistantIsInstalled: false, hasRows: false), notInstalled, "not on this Mac")
+        // #990, second review: a help tag stays within the HIG's 60 to 75
+        // characters (Offering help, "Be brief"), and it names the place
+        // Revise With ▸ Set Up an Assistant… really opens.
+        XCTAssertLessThanOrEqual(notInstalled.count, 75, "the not-installed help tag is brief")
+        XCTAssertTrue(notInstalled.contains("Settings ▸ \(AssistantSetUpWording.paneTitle)"), "it names the pane that sets one up")
 
         let view: String = try FixWithAssistantTests.readSource("QuartzTeachers/Views/Section/ProblemsTableView.swift")
         let buttons: String = try FixWithAssistantTests.body(of: "var fixButtons: some View {", in: view)
