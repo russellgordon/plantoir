@@ -21320,7 +21320,9 @@ recovery, as for any step with a move.
 A list that cannot take the step in shadow changes nothing about the
 rollover: the step is made all or none WITHOUT a record
 (`JournaledStep.makeWithoutARecord`, the same staged swap with nothing
-written down), and the same goes for a step that cannot be named in one.
+written down in the list, noted through `UndoShadowStaging` so a kill part
+way is tidied, and judged against the bytes the plan read), and the same
+goes for a step that cannot be named in one.
 `testInShadowAListThatCannotBeWrittenChangesNothingAboutTheRollover`.
 
 #### The rollover's action traces
