@@ -23,8 +23,8 @@ import XCTest
 /// A synthetic course in the runner's own temporary folder, `--state-dir`
 /// (IsolatedLaunch) and a STUB `preview.sh`: nothing is built, and no
 /// container is used. It skips while Stickies is running, and if Stickies
-/// starts during the test anyway, the tear-down quits the copy the test
-/// caused. Opt-in (`PLANTOIR_UI_TESTS=1`): it needs the foreground. Part of
+/// starts during the test anyway, the test FAILS and says to quit it by hand
+/// (the sandboxed runner never quits another app). Opt-in (`PLANTOIR_UI_TESTS=1`): it needs the foreground. Part of
 /// no gate, as the whole UI target is.
 final class RebuildPreviewKeyUITests: XCTestCase {
 
@@ -33,7 +33,8 @@ final class RebuildPreviewKeyUITests: XCTestCase {
     private var stubPreviewPIDFileURL: URL?
 
     /// Whether Stickies was running just before the key was pressed; nil
-    /// until then. Only a copy the test caused is quit in tear-down.
+    /// until then. A copy that was not running before and is running after
+    /// fails the test; the test never quits it.
     private var stickiesWasRunningBeforeTheKey: Bool?
 
     static let stickiesBundleIdentifier: String = "com.apple.Stickies"
@@ -46,12 +47,9 @@ final class RebuildPreviewKeyUITests: XCTestCase {
         }
         stubPreviewPIDFileURL = nil
         if stickiesWasRunningBeforeTheKey == false && RebuildPreviewKeyUITests.stickiesIsRunning() {
-            // The test caused this copy: quit it. Never an XCUIApplication
-            // here (UITestLaunchTripwireTests keeps that word to the one
-            // door), so through AppKit: Quit, then, if it is still running
-            // ten seconds later, Force Quit.
-            RebuildPreviewKeyUITests.quitStickies()
-            XCTFail("Stickies started during the test and was quit")
+            // The runner is sandboxed and cannot quit another app, so the
+            // test never tries: it says so and leaves Stickies alone.
+            XCTFail("Stickies started during the test and is still running; quit it by hand; no note was made because nothing was selected")
         }
         stickiesWasRunningBeforeTheKey = nil
         super.tearDown()
@@ -163,22 +161,6 @@ final class RebuildPreviewKeyUITests: XCTestCase {
     }
 
     // MARK: - Helpers
-
-    /// Quits every running Stickies; only called for a copy this test
-    /// caused, since the test skips while one is already running.
-    static func quitStickies() {
-        let copies: [NSRunningApplication] = NSRunningApplication.runningApplications(withBundleIdentifier: stickiesBundleIdentifier)
-        for copy in copies {
-            copy.terminate()
-        }
-        let deadline: Date = Date().addingTimeInterval(10)
-        while stickiesIsRunning() && Date() < deadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-        }
-        for copy in copies where !copy.isTerminated {
-            copy.forceTerminate()
-        }
-    }
 
     static func stickiesIsRunning() -> Bool {
         return !NSRunningApplication.runningApplications(withBundleIdentifier: stickiesBundleIdentifier).isEmpty

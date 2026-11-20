@@ -7389,10 +7389,11 @@ Plantoir ▸ Services offers no live Stickies item (the service's send types
 are plain text, RTF and flat RTFD, and an outline row's selection holds
 none), so the failing path cannot make a note at all; the trail's `Section ▸
 Rebuild Preview` line is the proof the menu item ran. It records whether
-Stickies was running before the key, and the tear-down quits a Stickies the
-test caused (AppKit's terminate, then force-terminate after ten seconds;
-not an `XCUIApplication`, which `UITestLaunchTripwireTests` keeps to the
-one door). The precedence over a LIVE service is the
+Stickies was running before the key. The test never quits another app (the
+runner is sandboxed and cannot): if Stickies was not running before the key
+and is running afterwards, the test fails with "Stickies started during the
+test and is still running; quit it by hand; no note was made because nothing
+was selected". The precedence over a LIVE service is the
 measurement above, taken once; it is not re-taken by the test.
 
 **Why ⇧⌘O moves rather than sitting on both Open in Obsidian items** — the
