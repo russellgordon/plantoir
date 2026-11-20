@@ -143,6 +143,10 @@ public static partial class AssistWording
     public static string SectionIsChangingFromTheMenu(string course, string section, Plantoir.Core.Models.ClassNoun noun) =>
         $"{course} Section {section} is being changed from the {Plantoir.Core.Models.SubjectMenuLayout.EitherMenu(noun)} menu right now, so nothing was changed. Try again once that has finished.";
 
+    /// <summary>The same refusal in a club: "the Section or Meetings menu" (<c>sectionIsChangingFromTheMeetingsMenu</c>).</summary>
+    public static string SectionIsChangingFromTheMeetingsMenu(string course, string section) =>
+        SectionIsChangingFromTheMenu(course, section, Plantoir.Core.Models.ClassNoun.Meeting);
+
     // ---- Why the class dates are asked for first ------------------------------
 
     /// <summary>Why Make Room for Classes… opens the class dates first.</summary>
