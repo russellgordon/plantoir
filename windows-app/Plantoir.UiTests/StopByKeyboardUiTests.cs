@@ -208,9 +208,13 @@ public class StopByKeyboardUiTests
 
     private static void AssertStopped(DrivenApp app, string after)
     {
-        // Read off the trail, not the phase: the console of a preview stopped
-        // before it wrote anything goes away with it, taking its phase along.
-        Assert.True(Retry.WhileFalse(() => MenuBar.Trail(app).Contains("finished preview.ps1 — stopped by the teacher"), Patience, TimeSpan.FromMilliseconds(250)).Result,
+        // The phase, or the trail: the console of a preview stopped before it
+        // wrote anything goes away with it, taking its phase along, and the
+        // trail's line waits for the launcher to end. "Cancelled" is shown
+        // only for a stop the teacher asked for (ScriptRunner.CancelByUser).
+        Assert.True(Retry.WhileFalse(() => Phase(app) is "Stopped" or "Cancelled"
+                                           || MenuBar.Trail(app).Contains("finished preview.ps1 — stopped by the teacher"),
+                                     TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(250)).Result,
                     $"{after} did not stop the running preview (phase \"{Phase(app)}\", Preview button \"{app.Find("previewButton", "the Preview button").Name}\")");
         Assert.False(PreviewRuns(app), $"the preview still runs after {after}");
         Assert.Null(app.OpenDialog());
