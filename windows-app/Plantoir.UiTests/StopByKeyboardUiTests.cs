@@ -502,6 +502,8 @@ public class StopByKeyboardUiTests
             first = new HeldDestination(PublishedFolder(courses));
             second = new HeldDestination(BesideTheWorkingFolder(courses, "published-second"));
             thirdFolder = BesideTheWorkingFolder(courses, "published-third");
+            // A folder destination must exist to be deployed to.
+            Directory.CreateDirectory(thirdFolder);
             WriteCourse(courses, out published, out courseDirectory, padded: false, second.Folder, thirdFolder);
         });
         // Let go before the app's own clean-up, which deletes the temp tree.
