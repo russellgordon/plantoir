@@ -475,4 +475,26 @@ final class JournaledStepTests: XCTestCase {
         }
         XCTAssertEqual(try later.read().records[1]?.phase, .begun, "pruned without a recovery in the same hold")
     }
+
+    /// A dead process's note never removes what another swap staged beside
+    /// the same page: every shadow swap has a label of its own (the second
+    /// review of U3a, LOW 2; one label shared by every process let a dead
+    /// note's tidy take a running swap's staged file). MUST FAIL with every
+    /// swap labelled `shadow`.
+    func testADeadProcesssNoteLeavesAnotherSwapsStagedFiles() throws {
+        let made = try course(inAWorkingFolder: false)
+        let journal: UndoJournal = UndoJournal(folderURL: made.list)
+        let target: UndoSwapTarget = UndoSwapTarget(
+            url: made.day1, relativePath: made.day1.lastPathComponent, expected: nil, replacement: Data("new".utf8)
+        )
+        let deadLabel: String = UndoShadowStaging.newLabel(for: journal)
+        XCTAssertNotNil(UndoShadowStaging.writeNote(for: [target], label: deadLabel, in: journal))
+        let runningLabel: String = UndoShadowStaging.newLabel(for: journal)
+        let running: URL = UndoSwap.besideURL(for: made.day1, label: runningLabel, role: "new")
+        try Data("staged by a swap still running".utf8).write(to: running)
+
+        let removed: Int = UndoShadowStaging.tidyLeftovers(of: UndoJournal(folderURL: made.list, processIsAlive: { _ in false }))
+        XCTAssertEqual(removed, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: running.path), "the dead note's tidy removed another swap's staged file")
+    }
 }

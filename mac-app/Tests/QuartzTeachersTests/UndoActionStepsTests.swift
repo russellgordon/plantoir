@@ -794,6 +794,69 @@ final class UndoActionStepsTests: XCTestCase {
         XCTAssertNotEqual(fullSentence, AssistToolRefusal.unreadablePage("ICS3U").message)
     }
 
+    /// Yes to today's class, when the front page went in and could not be
+    /// put back (an edit raced the swap, and the put-back failed): the page
+    /// DOES name the class now, so the answer is read back from the page,
+    /// never "could not save", which was false (the second review of U3a,
+    /// MEDIUM a). MUST FAIL with `leftPartWay` answered as `couldNotSave`.
+    func testTodaysClassLeftPartWayIsAnsweredByWhatThePageShows() throws {
+        let today: AssistFixture.Made = try morning()
+        let day: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-09-30"))
+        let offer: TodaysClassOnTheFrontPage.Offer = try XCTUnwrap(
+            TodaysClassOnTheFrontPage.offer(forSection: 1, in: today.course, today: day)
+        )
+        let indexURL: URL = SectionIndexPointer.indexURL(forSection: 1, in: today.course)
+        UndoKillPoints.beforeTheRename = { _, url in
+            if url.lastPathComponent != indexURL.lastPathComponent {
+                return
+            }
+            guard let handle = try? FileHandle(forWritingTo: url) else {
+                return
+            }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data("Edited in Obsidian.\n".utf8))
+            try? handle.close()
+        }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        defer {
+            UndoKillPoints.beforeTheRename = nil
+            UndoKillPoints.putBackFailsAt = nil
+        }
+        let outcome: TodaysClassOnTheFrontPage.Outcome = TodaysClassOnTheFrontPage.show(offer, in: today.course)
+        let after: String = try String(contentsOf: indexURL, encoding: .utf8)
+        XCTAssertTrue(after.contains("Unit 2, Day 5"), "the page was put back, so this proves nothing: \(after)")
+        XCTAssertEqual(outcome, .shown(from: "Unit 2, Day 4", to: "Unit 2, Day 5"))
+    }
+
+    /// A press that went in part way (a page could not be put back after the
+    /// step was refused) says so, `publishStoppedPartWay`, naming where the
+    /// page's earlier content is kept, never "Nothing was changed" (the
+    /// second review of U3a, MEDIUM a). MUST FAIL without the part-way case
+    /// in `LinksChecklistPublisher.sentence(forRefused:)`.
+    func testAChecklistPressLeftPartWaySaysOnlyPartWasChanged() throws {
+        let pressed = try checklistToPress()
+        let course: Course = pressed.made.course
+        let graph: AssistSectionGraph = AssistSectionGraph.read(
+            forSection: 1, in: course, workspaceURL: pressed.made.root
+        )
+        let step: JournaledStep = JournaledStep(
+            course: course, section: 1, maker: UndoStepMaker.sheet("answerTheLinksChecklist")
+        )
+        let kept: String = ".Unit 2, Day 5.md" + UndoSwap.stagedMarker + "1-apply-orig"
+        let error: JournaledStepError = JournaledStepError.leftPartWay(
+            .fileIsInUse(path: "courses/ICS3U/section1/All Classes/Unit 2, Day 6.md"),
+            fileName: "Unit 2, Day 6.md", keptOriginals: [kept]
+        )
+        let said: String = LinksChecklistPublisher.sentence(
+            forRefused: error, of: step, graph: graph, offer: pressed.offer, in: course
+        )
+        XCTAssertEqual(
+            said, AssistWording.publishStoppedPartWay(what: "the pages you ticked", problem: error.localizedDescription)
+        )
+        XCTAssertTrue(said.contains(kept), said)
+        XCTAssertFalse(said.hasPrefix("Nothing was changed"), said)
+    }
+
     /// A press the door could not check (`cannotTellNow`) says "could not
     /// be read" only for a file that really cannot be read now; a place
     /// that is a folder, not a page, is the could-not-be-saved sentence (the
