@@ -14413,6 +14413,24 @@ the New Course wizard.* Since the first review it goes through
 so it now ends the work with `ScriptRunner.CancelByUser` (Control-C, then
 the process ended after two seconds), the teacher's stop, which reads
 "Cancelled". It used to be `Terminate`, which read "Something went wrong".
+**Measured in the VM** (2026-11-20): the 600-page course deploying to a
+folder and then to Netlify reached destination 2 53 to 104 s after the
+question opened during its build, and the question was still up; Stop
+Deploy then ended it "Cancelled" with no third start of `deploy.ps1`. The
+wizard's console Stop, pressed at "Step 1 of 7", ended the work "Cancelled".
+**Tests.** `StopQuestionsContractTests`: the rule holds between two
+destinations and a press there asks (state set by hand); a real
+`RunAsync` over three stand-in destinations on a one-thread context,
+cancelled from the first leg's own ending (the gap, before the run's poll
+sees it), asks there and runs `deploy.ps1` once; an exception thrown
+between a real build and the deploy's `Run` leaves no leg between phases.
+`StopByKeyboardUiTests`: the question across the change of destination, and
+the wizard's console Stop. Sabotaged in the VM, each red: the rule without
+the whole run (both gap unit tests, "read as ended"; the UI test, "taken
+down when destination 1 finished"), no `WasCancelled` check before a leg
+(three deploys, not one), no clearing in `finally` (the leg "still marked
+between the build and the deploy"), the wizard's Stop back to `Terminate`
+("Something went wrong").
 
 ## The lap cap on Windows (#720, the mac's #689)
 
