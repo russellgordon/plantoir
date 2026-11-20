@@ -201,6 +201,26 @@ public sealed class UndoSwapTests : IDisposable
     }
 
     /// <summary>
+    /// The same re-read when the page was deleted by hand just before its swap:
+    /// changed since, and the page is not made again. (An edit in place is
+    /// also caught after the rename by the kept original, L4; a deletion leaves
+    /// no original, so only the re-read can stop it.)
+    /// </summary>
+    [Fact]
+    public void APageDeletedJustBeforeItsSwapIsChangedSinceAndNotMadeAgain()
+    {
+        string first = Page("courses/A/a.md", Old);
+        string second = Page("courses/A/b.md", Old);
+        var seams = new UndoSeams { BeforeEachSwap = (index, fullPath) => { if (index == 1) File.Delete(fullPath); } };
+        UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New), Target("courses/A/b.md", Old, New)], "1-undo", _root, seams);
+        var refused = Assert.IsType<UndoSwapResult.Refused>(result);
+        Assert.Equal(new UndoRefusal(UndoRefusalKind.ChangedSince, "courses/A/b.md"), refused.Refusal);
+        Assert.Equal(Old, File.ReadAllBytes(first));
+        Assert.False(File.Exists(second), "a page the teacher deleted was made again");
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>
     /// <c>rule.stagedThenSwapped</c>: "a place that now leads outside (a folder
     /// on its path replaced by a link) is a change since, and nothing is moved
     /// through it". The folder is replaced by a junction to a folder OUTSIDE the
