@@ -130,7 +130,9 @@ internal static class DoorRuns
         int index = -1;
         if (at.Contains('@'))
         {
-            index = at.EndsWith("@mid", StringComparison.Ordinal) ? pages / 2 : int.Parse(at[(at.IndexOf('@') + 1)..], CultureInfo.InvariantCulture);
+            index = at.EndsWith("@mid", StringComparison.Ordinal) ? pages / 2
+                  : at.EndsWith("@last", StringComparison.Ordinal) ? pages - 1
+                  : int.Parse(at[(at.IndexOf('@') + 1)..], CultureInfo.InvariantCulture);
             at = at[..at.IndexOf('@')];
         }
         var seams = new UndoSeams
@@ -147,8 +149,186 @@ internal static class DoorRuns
         Console.WriteLine("STARTED");
         Console.Out.Flush();
         var door = new UndoDoor(Journal(folder), UndoMode.Live, seams: at == "atRandom" ? null : seams);
-        UndoOutcome outcome = parts[0] == "undo" ? door.Undo() : door.Perform(Publish(folder, pages));
+        UndoOutcome outcome = parts[0] switch
+        {
+            "undo" => door.Undo(),
+            "redo" => door.Redo(),
+            _ => door.Perform(Publish(folder, pages)),
+        };
         Console.WriteLine("DONE " + outcome.Word);
+        return 0;
+    }
+
+    // ---- recovery-kill: every kill point, then recovery by a second process (W3) ----
+
+    /// <summary>
+    /// #899 W3: a CHILD makes (or undoes, or redoes) a step of
+    /// <paramref name="pages"/> pages and is killed at each point; then a
+    /// second child recovers. Each point twice: (A) the recovery runs to its
+    /// end; (B) the recovery is itself killed part way through its put-back
+    /// (at its <c>pages/4</c>th swap, when it has that many to make) and a third
+    /// process recovers again. After the last recovery every page must be
+    /// wholly old or wholly new and ALL one way, the way the journal says the
+    /// step stands; nothing staged left; the step not in flight; and, for the
+    /// points a seam chooses, A and B the same answer.
+    /// </summary>
+    internal static int RecoveryKill(string folder, int pages)
+    {
+        string[] points =
+        [
+            "apply:afterBegin", "apply:beforeSwap@0", "apply:beforeSwap@mid", "apply:beforeSwap@last", "apply:beforeApplied", "apply:atRandom",
+            "undo:afterUndoing", "undo:beforeSwap@mid", "undo:beforeUndone", "undo:atRandom",
+            "redo:afterRedoing", "redo:beforeSwap@mid", "redo:beforeRedone", "redo:atRandom",
+        ];
+        int failures = 0;
+        foreach (string point in points)
+        {
+            var answers = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (string variant in new[] { "A", "B" })
+            {
+                string run = Path.Combine(folder, point.Replace(':', '-').Replace('@', '-') + "-" + variant);
+                MakePages(run, pages);
+                string work = point[..point.IndexOf(':')];
+                if (work is "undo" or "redo")
+                {
+                    UndoOutcome made = new UndoDoor(Journal(run), UndoMode.Live).Perform(Publish(run, pages));
+                    if (made.Kind != UndoOutcomeKind.Applied) { Console.WriteLine($"RESULT recovery-kill {point} setup {made.Word}"); failures++; continue; }
+                    if (work == "redo" && new UndoDoor(Journal(run), UndoMode.Live).Undo().Kind != UndoOutcomeKind.Undone)
+                    { Console.WriteLine($"RESULT recovery-kill {point} setup undo"); failures++; continue; }
+                }
+                KillAChild(["child-door", run, pages.ToString(CultureInfo.InvariantCulture), point], run, pages, work, point.EndsWith("atRandom", StringComparison.Ordinal));
+                string inFlightAfterTheKill = StateOfTheStep(run);
+                bool recoveryKilled = false;
+                double recoveryMs = 0;
+                if (variant == "B")
+                {
+                    string at = "recoveryBeforeSwap@" + (pages / 4).ToString(CultureInfo.InvariantCulture);
+                    (recoveryKilled, _) = RunRecovery(run, at, killWhenItStops: true);
+                }
+                (_, recoveryMs) = RunRecovery(run, "none", killWhenItStops: false);
+                // Read the pages and the list as a third reader.
+                int old = 0, made2 = 0, torn = 0;
+                for (int number = 1; number <= pages; number++)
+                {
+                    byte[]? now = TryRead(UndoDoor.FullPath(WorkingFolder(run), PagePath(number)));
+                    if (Same(now, OldPage(number))) old++;
+                    else if (Same(now, NewPage(number))) made2++;
+                    else torn++;
+                }
+                int staged = Directory.EnumerateFiles(WorkingFolder(run), "*", SearchOption.AllDirectories)
+                    .Count(file => Path.GetFileName(file).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal));
+                UndoJournal journal = Journal(run);
+                UndoReading reading = journal.Read();
+                UndoFoldedStep step = reading.Folded.Steps[1];
+                long? head = journal.Offer(reading.Folded).Head?.Seq;
+                bool pagesNew = made2 == pages;
+                bool pagesOld = old == pages;
+                // Where the step stands says which way every page must be.
+                bool expectNew = step.State == UndoStepState.Done;
+                bool consistent = torn == 0 && (expectNew ? pagesNew : pagesOld) && !step.IsInFlight && staged == 0 && reading.IsFresh;
+                string answer = $"pages={(pagesNew ? "allNew" : pagesOld ? "allOld" : "MIXED")} onTheList={step.IsOnTheList} head={(head?.ToString(CultureInfo.InvariantCulture) ?? "none")}";
+                answers[variant] = answer;
+                Console.WriteLine($"RESULT recovery-kill point={point} variant={variant} pages={pages} afterTheKill={inFlightAfterTheKill} recoveryKilled={recoveryKilled} " +
+                                  $"oldPages={old} newPages={made2} tornPages={torn} staged={staged} state={step.State} {answer} lastRecoveryMs={Ms(recoveryMs)} {(consistent ? "CONSISTENT" : "NOT-CONSISTENT")}");
+                if (!consistent) failures++;
+            }
+            if (!point.EndsWith("atRandom", StringComparison.Ordinal) && answers.Count == 2)
+            {
+                bool same = answers["A"] == answers["B"];
+                Console.WriteLine($"RESULT recovery-same point={point} {(same ? "SAME" : "DIFFERENT")} A[{answers["A"]}] B[{answers["B"]}]");
+                if (!same) failures++;
+            }
+        }
+        return failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>Where step 1 stands, as a reader sees it.</summary>
+    private static string StateOfTheStep(string run)
+    {
+        UndoReading reading = Journal(run).Read();
+        return reading.Folded.Steps.TryGetValue(1, out UndoFoldedStep? step) ? step.State.ToString() : "none";
+    }
+
+    /// <summary>Starts a child, waits for it to reach its point (or, at random, for its first page to change), and kills it.</summary>
+    private static void KillAChild(string[] arguments, string run, int pages, string work, bool atRandom)
+    {
+        var start = new ProcessStartInfo(Exe) { RedirectStandardOutput = true, UseShellExecute = false };
+        foreach (string arg in arguments) start.ArgumentList.Add(arg);
+        using Process child = Process.Start(start)!;
+        string? said = child.StandardOutput.ReadLine();
+        if (said != "STARTED") Console.WriteLine("child said: " + said);
+        if (atRandom)
+        {
+            // Killed the moment its first page is seen changed: a moment the race chooses.
+            bool undoing = work == "undo";
+            int watched = undoing ? pages : 1;
+            byte[] watchFor = undoing ? OldPage(pages) : NewPage(1);
+            var clock = Stopwatch.StartNew();
+            string first = UndoDoor.FullPath(WorkingFolder(run), PagePath(watched));
+            while (!child.HasExited && !Same(TryRead(first), watchFor) && clock.Elapsed < TimeSpan.FromSeconds(60)) Thread.SpinWait(200);
+        }
+        else
+        {
+            said = child.StandardOutput.ReadLine();
+            if (said is null || !said.StartsWith("AT ", StringComparison.Ordinal)) Console.WriteLine("child said: " + said);
+        }
+        try { child.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+        child.WaitForExit();
+    }
+
+    /// <summary>A recovering child: stopped (and killed) at <paramref name="at"/> when it gets there, else run to its end. Whether it was killed, and its own time.</summary>
+    private static (bool Killed, double Ms) RunRecovery(string run, string at, bool killWhenItStops)
+    {
+        var start = new ProcessStartInfo(Exe) { RedirectStandardOutput = true, UseShellExecute = false };
+        foreach (string arg in new[] { "child-recover", run, at }) start.ArgumentList.Add(arg);
+        using Process child = Process.Start(start)!;
+        string? said = child.StandardOutput.ReadLine();
+        if (said != "STARTED") Console.WriteLine("recovering child said: " + said);
+        said = child.StandardOutput.ReadLine();
+        bool killed = false;
+        double ms = 0;
+        if (said is not null && said.StartsWith("AT ", StringComparison.Ordinal) && killWhenItStops)
+        {
+            try { child.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            killed = true;
+        }
+        else if (said is not null && said.StartsWith("DONE ", StringComparison.Ordinal))
+        {
+            string[] parts = said.Split(' ');
+            ms = double.Parse(parts[1], CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            Console.WriteLine("recovering child said: " + said);
+        }
+        child.WaitForExit();
+        return (killed, ms);
+    }
+
+    /// <summary>The recovering child: the app's recovery (<see cref="UndoDoor.Recover"/>), as a process that sees the killed one as gone.</summary>
+    internal static int ChildRecover(string folder, string at)
+    {
+        string point = at.Contains('@') ? at[..at.IndexOf('@')] : at;
+        int index = at.Contains('@') ? int.Parse(at[(at.IndexOf('@') + 1)..], CultureInfo.InvariantCulture) : -1;
+        var seams = new UndoSeams
+        {
+            StopsHere = (name, where) =>
+            {
+                if (name != point || (index >= 0 && where != index)) return false;
+                Console.WriteLine($"AT {name} {where}");
+                Console.Out.Flush();
+                Thread.Sleep(Timeout.Infinite);
+                return true;
+            },
+        };
+        Console.WriteLine("STARTED");
+        Console.Out.Flush();
+        var clock = Stopwatch.StartNew();
+        UndoRecoveryRun run = new UndoDoor(Journal(folder), UndoMode.Live, seams: point == "none" ? null : seams).Recover();
+        double ms = clock.Elapsed.TotalMilliseconds;
+        string settled = string.Join(",", run.Settled.Select(result => $"{result.Seq}:{result.Outcome}:{result.FilesPutBack}"));
+        Console.WriteLine($"DONE {Ms(ms)} {settled}");
+        Console.Out.Flush();
         return 0;
     }
 
