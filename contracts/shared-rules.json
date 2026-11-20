@@ -52763,7 +52763,7 @@
     "howToRunACase": "Start with the two settings as settingsBefore and a model of the question being asked for `question` (null: a preview). Play each step in order: pressCancel (the task's Cancel, by click, by the accessibility interface or by its key; taskRunning says whether the task can still be stopped), tickDontAskAgain (tick the open question's box), chooseStop (the question's stopButton), chooseCancel (its cancelButton), taskEnded (the task ends while the question is open), settingsTurnOn / settingsTurnOff (the question's row in Settings ▸ Deploying ▸ Stopping). After each step, stopsAfterStep says whether that step stops the task now, and asksAfterStep whether the question is open. At the end the two settings are settingsAfter, and the trail lines written are exactly `trail`, in order.",
     "knownLimits": [
       "The keys are not carried here: which key presses Cancel, and when a focused text box keeps the key, are each app's mechanics (the mac: Escape and Command-Period through TaskCancelButton; Windows: Escape through a KeyboardAccelerator on the visible Cancel). Both apps rule that while an editable text box has the focus, the key belongs to the box, and a click or an accessibility press on Cancel still stops the task.",
-      "Windows has no share of unit plans yet (#824), so questions.share and its Settings row have nothing to stop there; #1009's closing comment says what Windows shows until it does."
+      "Windows has no share of unit plans yet (#824), so no panel there asks questions.share. Its setting is kept, and File ▸ Settings ▸ Deploying ▸ Stopping shows its row beside the deploy's, as the mac's Settings does, so the answer is in place when the share comes."
     ]
   }
 }

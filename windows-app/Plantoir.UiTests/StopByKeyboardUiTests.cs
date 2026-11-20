@@ -250,4 +250,98 @@ public class StopByKeyboardUiTests
         app.Find("taskCancelButton", "the panel's Cancel").AsButton().Invoke();
         AssertStopped(app, "Invoke on Cancel with a text box focused");
     }
+
+    // ---- #1009's first review: every route asks, one "under way" rule, a held Escape ----
+
+    private static bool DeployPhaseStarted(DrivenApp app) => MenuBar.Trail(app).Contains($"started deploy.ps1 {Code} 1");
+
+    private void AssertNotPublished(string published, string after) =>
+        Assert.False(File.Exists(Path.Combine(published, "section1", "index.html")), $"{after}: the deploy finished, so it was never stopped");
+
+    /// <summary>
+    /// The console's own Stop, beside its answer box, asks as Cancel does, and
+    /// Stop Deploy then ends the deploy "Cancelled" (the section's sweep, as
+    /// Cancel's). Before the change it killed the deploy with no question.
+    /// </summary>
+    [UiFact]
+    public void TheConsolesStopOnADeployAsks_AndStopDeployCancelsIt()
+    {
+        string published = "";
+        using var app = new DrivenApp(courses => WriteCourse(courses, out published));
+        app.SelectSection(Code, 1);
+        StartDeploy(app, 1);
+        app.Find("taskDetailsDisclosure", "Show details").AsButton().Invoke();
+        var stop = app.Find("consoleStopButton", "the console's Stop");
+        stop.AsButton().Invoke();
+        var asked = Asked(app, "the console's Stop on a running deploy");
+        Thread.Sleep(400);
+        AssertStillDeploying(app, "the console's Stop with the question up");
+        asked.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))!.AsButton().Invoke();
+        AssertGone(app, "Cancel on the question");
+        AssertStillDeploying(app, "Cancel on the question the console's Stop opened");
+
+        app.Find("consoleStopButton", "the console's Stop").AsButton().Invoke();
+        Asked(app, "the console's Stop, again").FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
+        AssertGone(app, "Stop Deploy");
+        AssertCancelled(app, "Stop Deploy after the console's Stop");
+        AssertNotPublished(published, "the console's Stop");
+    }
+
+    /// <summary>
+    /// A held Escape: the first press opens the question; the key's repeats
+    /// must not answer it (Microsoft: an accelerator repeats while the key is
+    /// held, and a ContentDialog closes on Escape).
+    /// </summary>
+    [UiFact]
+    public void AHeldEscapeOpensTheQuestion_AndItsRepeatsDoNotAnswerIt()
+    {
+        string published = "";
+        using var app = new DrivenApp(courses => WriteCourse(courses, out published));
+        app.SelectSection(Code, 1);
+        StartDeploy(app, 1);
+        CopyAPageEscapeUiTests.Front(app);
+        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Thread.Sleep(2000);   // the key held: Windows repeats it after about half a second
+        Keyboard.Release(VirtualKeyShort.ESCAPE);
+        Thread.Sleep(700);
+        bool open = OpenStopQuestion(app) is not null;
+        Measured($"a held Escape (2 s): question {(open ? "still open" : "gone")}, phase \"{Phase(app)}\"");
+        Assert.True(open, "a held Escape opened the question and its repeats closed it");
+        AssertStillDeploying(app, "a held Escape");
+        // A fresh Escape, after the release, is the question's Cancel as before.
+        Press(app, VirtualKeyShort.ESCAPE);
+        AssertGone(app, "Escape after a held Escape");
+        AssertStillDeploying(app, "Escape after a held Escape");
+        Press(app, VirtualKeyShort.ESCAPE);
+        Press(app, VirtualKeyShort.RETURN);
+        AssertCancelled(app, "Enter (Stop Deploy) after a held Escape");
+        AssertNotPublished(published, "a held Escape");
+    }
+
+    /// <summary>
+    /// A deploy that builds first runs both halves on one runner, with a gap
+    /// between: the question opened during the build stays up across the
+    /// change to the deploy, and Stop Deploy then stops the deploy. Before the
+    /// change the question was taken down when the build finished.
+    /// </summary>
+    [UiFact]
+    public void TheQuestionStaysAcrossTheBuildToDeployChange_AndStopDeployStopsTheDeploy()
+    {
+        string published = "";
+        using var app = new DrivenApp(courses => WriteCourse(courses, out published));
+        app.SelectSection(Code, 1);
+        StartDeploy(app, 1);
+        Assert.False(DeployPhaseStarted(app), "the deploy half began before the build was seen; nothing here tests the change");
+        Press(app, VirtualKeyShort.ESCAPE);
+        var asked = Asked(app, "Escape during the build");
+        var started = DateTime.Now;
+        Assert.True(Retry.WhileFalse(() => DeployPhaseStarted(app), TimeSpan.FromMinutes(10), TimeSpan.FromMilliseconds(200)).Result,
+                    "the build never reached the deploy");
+        Measured($"the build ended {(DateTime.Now - started).TotalSeconds:0.0} s after the question opened; question {(OpenStopQuestion(app) is null ? "gone" : "open")}");
+        Assert.True(OpenStopQuestion(app) is not null, "the question was taken down when the build finished, though the deploy went on");
+        asked.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
+        AssertGone(app, "Stop Deploy across the change");
+        AssertCancelled(app, "Stop Deploy across the change");
+        AssertNotPublished(published, "Stop Deploy across the change");
+    }
 }

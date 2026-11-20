@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Tests;
 
@@ -224,5 +225,73 @@ public sealed class StopQuestionsContractTests : IDisposable
         Assert.Contains("StopQuestionWording.Footer", pane);
         Assert.Contains("StopQuestionWording.SetAsked(question, true, settings, StopQuestionChangedFrom.Settings)", pane);
         Assert.Contains("StopQuestionWording.SetAsked(question, false, settings, StopQuestionChangedFrom.Settings)", pane);
+    }
+
+    // ---- one "under way" rule, and every route asks (#1009's first review) ------
+
+    [Fact]
+    public void ARunBetweenItsBuildAndItsDeployIsUnderWay_AndAPressThereAsks()
+    {
+        var runner = new ScriptRunner();
+        Assert.False(runner.IsUnderWay);
+        runner.IsBetweenPhases = true;
+        Assert.False(runner.IsRunning);
+        Assert.True(runner.IsUnderWay, "a run between its build and its deploy is not under way");
+        var asking = new StopQuestionAsking(StopQuestion.Deploy, new AppSettings(), note: _ => { });
+        Assert.False(asking.PressCancel(runner.IsUnderWay), "a press in the gap stopped at once");
+        Assert.True(asking.IsAsking, "a press in the gap asked nothing");
+    }
+
+    [Fact]
+    public void ACancelInTheGapMarksTheRunCancelled_SoTheDeployNeverStarts()
+    {
+        var runner = new ScriptRunner { IsBetweenPhases = true };
+        runner.CancelByUser();
+        Assert.True(runner.WasCancelled);
+        string multi = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Core", "Scripting", "MultiDestinationDeployRunner.cs"))
+            .Replace("\r\n", "\n");
+        Assert.Contains("if (CurrentLeg is { Runner.IsUnderWay: true } leg) leg.Runner.CancelByUser();", multi);
+        Assert.Contains("if (runner.WasCancelled || runner.WasStoppedByUser || WasCancelled)", multi);
+        // The run is never out of the way between the two: Run clears
+        // IsBetweenPhases only once the deploy is running.
+        string script = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Core", "Scripting", "ScriptRunner.cs"))
+            .Replace("\r\n", "\n");
+        Assert.Contains("IsRunning = true;\n        IsBetweenPhases = false;", script);
+    }
+
+    [Fact]
+    public void ThePanelDecidesEveryStopByOneUnderWayRule_AndTheConsolesStopAsksToo()
+    {
+        string panel = AppSource("Views", "TaskProgressView.xaml.cs");
+        Assert.Contains("private bool TaskIsUnderWay => _runner is { IsUnderWay: true, WasCancelled: false };", panel);
+        Assert.Contains("taskIsRunning: TaskIsUnderWay,", panel);
+        Assert.Contains("if (asking.PressCancel(TaskIsUnderWay))", panel);
+        Assert.Contains("if (TaskIsUnderWay) StopTheTask();", panel);
+        Assert.Contains("&& !runner.IsUnderWay", panel);
+        Assert.Contains("RunningActionsRow.Visibility = TaskIsUnderWay ?", panel);
+        int from = panel.IndexOf("// ---- Stopping, by click", StringComparison.Ordinal);
+        Assert.True(from >= 0, "the stopping code is not where this test looks");
+        Assert.DoesNotContain("IsRunning: true", panel.Substring(from));
+        // The console's own Stop goes the way Cancel goes: it asks, it is swept, it reads "Cancelled".
+        Assert.Contains("private void ConsoleStop_Click(object sender, RoutedEventArgs e) => _ = PressCancelAsync();", panel);
+        Assert.DoesNotContain("Terminate()", panel);
+    }
+
+    [Fact]
+    public void AChangedQuestionIsAnnounced_OncePerChange_SoAnOpenSettingsShowsIt()
+    {
+        var settings = new AppSettings();
+        var heard = new List<StopQuestion>();
+        settings.StopQuestionSettingChanged += question => heard.Add(question);
+        var asking = new StopQuestionAsking(StopQuestion.Deploy, settings, note: _ => { });
+        asking.PressCancel(taskCanStillBeStopped: true);
+        asking.DontAskAgain = true;
+        asking.ChooseStop();
+        Assert.Equal(new[] { StopQuestion.Deploy }, heard);
+        StopQuestionWording.SetAsked(StopQuestion.Deploy, false, settings, StopQuestionChangedFrom.Settings, _ => { });
+        Assert.Single(heard);
+        string pane = AppSource("Views", "DeployingSettingsPane.cs");
+        Assert.Contains("settings.StopQuestionSettingChanged += ShowStored;", pane);
+        Assert.Contains("box.Unloaded += (_, _) => settings.StopQuestionSettingChanged -= ShowStored;", pane);
     }
 }

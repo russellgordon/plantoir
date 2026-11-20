@@ -166,7 +166,10 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     public void Cancel()
     {
         WasCancelled = true;
-        if (CurrentLeg is { Runner.IsRunning: true } leg) leg.Runner.CancelByUser();
+        // Under way, not running (#1009's review): a cancel that lands between
+        // a leg's build and its deploy marks that leg's runner cancelled, so
+        // RunAsync's check after the build stops before the deploy starts.
+        if (CurrentLeg is { Runner.IsUnderWay: true } leg) leg.Runner.CancelByUser();
     }
 
     /// <summary>
@@ -313,7 +316,7 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                     // (row 318b).
                     runner.IsBetweenPhases = true;
                     bool built = await runner.WaitUntilFinished();
-                    if (runner.WasCancelled || runner.WasStoppedByUser)
+                    if (runner.WasCancelled || runner.WasStoppedByUser || WasCancelled)
                     {
                         runner.IsBetweenPhases = false;
                         WasCancelled = WasCancelled || runner.WasCancelled;

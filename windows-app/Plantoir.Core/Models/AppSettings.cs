@@ -175,8 +175,16 @@ public sealed class AppSettings
         if (question == StopQuestion.Deploy) AsksBeforeStoppingADeploy = asked;
         else AsksBeforeStoppingAShare = asked;
         Save();
+        StopQuestionSettingChanged?.Invoke(question);
         return true;
     }
+
+    /// <summary>
+    /// Raised after one stop question is turned on or off, from wherever:
+    /// an open File ▸ Settings ▸ Deploying shows the change at once when the
+    /// question's own Don't ask again turns it off (#1009's review).
+    /// </summary>
+    public event Action<StopQuestion>? StopQuestionSettingChanged;
 
     /// <summary>
     /// Which section File ▸ Settings… opened on last ("assistant", "preview", "deploying"),

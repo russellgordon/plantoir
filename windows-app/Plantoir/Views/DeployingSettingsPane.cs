@@ -155,6 +155,22 @@ public sealed class DeployingSettingsPane
             AutomationProperties.SetName(box, label);
             box.Checked += (_, _) => StopQuestionWording.SetAsked(question, true, settings, StopQuestionChangedFrom.Settings);
             box.Unchecked += (_, _) => StopQuestionWording.SetAsked(question, false, settings, StopQuestionChangedFrom.Settings);
+            // A question's Don't ask again, ticked while this pane is open,
+            // shows here at once (#1009's review). Setting the box to what is
+            // stored already changes nothing, so it writes no second trail
+            // line. Listened to only while the box is on screen.
+            void ShowStored(StopQuestion changed)
+            {
+                if (changed != question) return;
+                box.DispatcherQueue.TryEnqueue(() => box.IsChecked = settings.AsksBeforeStopping(question));
+            }
+            box.Loaded += (_, _) =>
+            {
+                settings.StopQuestionSettingChanged -= ShowStored;
+                settings.StopQuestionSettingChanged += ShowStored;
+                box.IsChecked = settings.AsksBeforeStopping(question);
+            };
+            box.Unloaded += (_, _) => settings.StopQuestionSettingChanged -= ShowStored;
             panel.Children.Add(box);
         }
         var footer = FormBuilders.ExampleCaption(StopQuestionWording.Footer);
