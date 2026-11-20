@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using Plantoir.Core.Undo;
 
@@ -209,10 +210,11 @@ internal static class DoorRuns
             return path;
         }
 
-        void One(string label, string path, byte[] expected, byte[] replacement, Func<IDisposable?>? holder = null)
+        void One(string label, string path, byte[] expected, byte[] replacement, Func<IDisposable?>? holder = null, bool probeLink = true)
         {
             FileAttributes before = File.GetAttributes(path);
-            bool linkable = CanHardLink(path, out int linkError);
+            int linkError = 0;
+            bool linkable = probeLink && CanHardLink(path, out linkError);
             using IDisposable? held = holder?.Invoke();
             var clock = Stopwatch.StartNew();
             UndoSwapResult result = UndoSwap.Swap([new UndoSwapTarget(path, Path.GetFileName(path), expected, replacement)], "1-undo", folder);
@@ -227,7 +229,7 @@ internal static class DoorRuns
             byte[]? now = TryRead(path);
             string content = Same(now, replacement) ? "new" : Same(now, expected) ? "old" : "OTHER";
             int stagedLeft = Directory.EnumerateFiles(folder).Count(file => Path.GetFileName(file).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal));
-            Console.WriteLine($"RESULT swap-case place={(inOneDrive ? "onedrive" : "outside")} case={label} outcome={outcome} ms={Ms(ms)} content={content} hardLinkToIt={(linkable ? "ok" : "refused-" + linkError)} attributesBefore=[{before}] attributesAfter=[{SafeAttributes(path)}] stagedLeft={stagedLeft}");
+            Console.WriteLine($"RESULT swap-case place={(inOneDrive ? "onedrive" : "outside")} case={label} outcome={outcome} ms={Ms(ms)} content={content} hardLinkToIt={(!probeLink ? "notProbed" : linkable ? "ok" : "refused-" + linkError)} attributesBefore=[{before}] attributesAfter=[{SafeAttributes(path)}] stagedLeft={stagedLeft}");
             if (content == "OTHER" || stagedLeft > 0) failures++;
         }
 
@@ -244,17 +246,33 @@ internal static class DoorRuns
 
         if (inOneDrive)
         {
-            // A cloud-only placeholder: written, then unpinned so OneDrive frees
-            // it once uploaded (Files On Demand), waited for until its data is
-            // no longer on the disk (RECALL_ON_DATA_ACCESS) or the wait runs out.
+            // Cloud-only placeholders: written, then unpinned so OneDrive frees
+            // them once uploaded (Files On Demand), waited for until their data
+            // is no longer on the disk (RECALL_ON_DATA_ACCESS) or the wait runs
+            // out. One is swapped onto; the other is only linked to and read
+            // back through the link, as the swap's kept original would be.
             string cloud = Make("cloud-only.md", oldBytes);
+            string probe = Make("cloud-only-link-probe.md", oldBytes);
             const FileAttributes Pinned = (FileAttributes)0x00080000, Unpinned = (FileAttributes)0x00100000, Recall = (FileAttributes)0x00400000;
-            File.SetAttributes(cloud, (File.GetAttributes(cloud) & ~Pinned) | Unpinned);
+            foreach (string path in new[] { cloud, probe }) File.SetAttributes(path, (File.GetAttributes(path) & ~Pinned) | Unpinned);
             var waited = Stopwatch.StartNew();
-            while (!File.GetAttributes(cloud).HasFlag(Recall) && waited.Elapsed < TimeSpan.FromSeconds(placeholderWaitSeconds)) Thread.Sleep(1000);
+            while (!(File.GetAttributes(cloud).HasFlag(Recall) && File.GetAttributes(probe).HasFlag(Recall))
+                   && waited.Elapsed < TimeSpan.FromSeconds(placeholderWaitSeconds)) Thread.Sleep(1000);
             bool isPlaceholder = File.GetAttributes(cloud).HasFlag(Recall);
-            Console.WriteLine($"RESULT placeholder made={isPlaceholder} afterMs={Ms(waited.Elapsed.TotalMilliseconds)} attributes=[{SafeAttributes(cloud)}]");
-            One(isPlaceholder ? "cloudOnlyPlaceholder" : "unpinnedNotYetFreed", cloud, oldBytes, newBytes);
+            Console.WriteLine($"RESULT placeholder made={isPlaceholder} afterMs={Ms(waited.Elapsed.TotalMilliseconds)} attributes=[{SafeAttributes(cloud)}] probe=[{SafeAttributes(probe)}]");
+            // The link probe: CreateHardLink onto a placeholder, then a read through the link.
+            string link = probe + ".link";
+            bool linked = CreateHardLink(link, probe);
+            string readThroughLink;
+            try { readThroughLink = TryReadOrThrow(link) is { } bytes ? (Same(bytes, oldBytes) ? "same bytes" : "other bytes") : "null"; }
+            catch (Exception error) { readThroughLink = error.GetType().Name + " " + (error.HResult & 0xFFFF) + " " + error.Message.Replace('\n', ' '); }
+            string readByName;
+            try { readByName = TryReadOrThrow(probe) is { } bytes ? (Same(bytes, oldBytes) ? "same bytes" : "other bytes") : "null"; }
+            catch (Exception error) { readByName = error.GetType().Name + " " + (error.HResult & 0xFFFF); }
+            Console.WriteLine($"RESULT placeholder-link linked={linked} readThroughTheLink={readThroughLink} readByItsName={readByName} attributesAfter=[{SafeAttributes(probe)}]");
+            try { File.Delete(link); } catch { }
+            initial.Add(Path.GetFileName(link));
+            One(isPlaceholder ? "cloudOnlyPlaceholder" : "unpinnedNotYetFreed", cloud, oldBytes, newBytes, probeLink: false);
         }
 
         // Anything OneDrive adds beside the pages (a conflict copy, a stray staged name).
@@ -275,19 +293,23 @@ internal static class DoorRuns
     {
         string link = path + ".linkprobe";
         error = 0;
-        int? failed = UndoSwap.Keep(path, link);
-        bool linked = failed is null && File.Exists(link);
-        // Keep copies where it cannot link; whether it LINKED is what is asked: a link shares the file's index.
-        if (linked)
-        {
-            using var a = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            using var b = new FileStream(link, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            linked = Equals(UndoFileIdentity.Of(a), UndoFileIdentity.Of(b));
-            if (!linked) error = -1;   // copied, not linked
-        }
-        else error = failed ?? 0;
+        bool linked = CreateHardLink(link, path);
+        if (!linked) error = Marshal.GetLastWin32Error();
         try { File.Delete(link); } catch { }
         return linked;
+    }
+
+    private static bool CreateHardLink(string link, string existing) => CreateHardLinkW(link, existing, IntPtr.Zero);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLinkW(string newName, string existing, IntPtr security);
+
+    private static byte[]? TryReadOrThrow(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return memory.ToArray();
     }
 
     private static byte[]? TryRead(string path)

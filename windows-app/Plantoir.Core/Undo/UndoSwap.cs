@@ -306,8 +306,17 @@ internal static class UndoSwap
         // so an edit made in place between the re-read and the rename shows
         // here. The page then holds this step's content over that edit: the
         // step is reversed, which puts the edit back, and refused as changed.
-        if (originals[index] is { } original && !SameBytes(ReadAllShared(original), target.Expected))
-            return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
+        if (originals[index] is { } original)
+        {
+            // An original that cannot be read back (a OneDrive placeholder's
+            // link answers "access to the cloud file is denied", measured) is
+            // cannot tell: reversed, never changed since, which would clear the
+            // list for a page nobody touched (ruling 4: only content that was
+            // read and differs is changed).
+            byte[]? kept = ReadAllShared(original);
+            if (kept is null) return new UndoRefusal(UndoRefusalKind.CannotTellNow, target.RelativePath);
+            if (!SameBytes(kept, target.Expected)) return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
+        }
         return null;
     }
 

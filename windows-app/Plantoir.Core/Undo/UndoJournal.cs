@@ -33,7 +33,7 @@ internal sealed record UndoReading
 /// W1) and, since W2a, its store: the one lock (<see cref="UndoLock"/>,
 /// <see cref="WithLock{T}"/>), the append (<see cref="UndoJournalWriter"/>),
 /// blobs, reading on, and pruning carried out (<see cref="Prune"/>). Nothing
-/// here changes a page: the staged swap and the door that does are W2b's.
+/// here changes a page: the door that does is <see cref="UndoDoor"/> (W2b).
 ///
 /// <para><b>An instance, never a static</b> (the plan review's H1). The folder,
 /// the clock, the liveness check, the reach check and the switch are all
@@ -164,7 +164,7 @@ internal sealed class UndoJournal
     /// process's memory and written first at its next hold, so a step this
     /// process made is not left in flight for the life of the process (the
     /// mac's <c>keepPendingClosing</c>, its core review's I3). The wait the
-    /// door passes (10 seconds on the mac, <c>UndoSwitch</c>) is the door's, W2b.
+    /// door passes is <see cref="UndoDoor.FinishWait"/> (10 seconds, the mac's <c>UndoSwitch</c>).
     /// Returns whether it was written now.
     /// </summary>
     /// <param name="thenPrune">Prune in the same hold, after the closing (the door's closing hold: the ONLY hold of a step that prunes, W2a's review LOW 2).</param>
@@ -272,8 +272,9 @@ internal sealed class UndoJournal
     /// deleted by a later hold.
     /// </summary>
     /// <remarks>
-    /// A step closed <c>unsettled</c> here gets its line only; tidying the
-    /// staged files it may have left is W2b's, which knows the swap's names.
+    /// A step closed <c>unsettled</c> here has its staged files removed in the
+    /// same hold when its folder can be reached (W2b,
+    /// <see cref="TidyTheStagedFilesOf"/>).
     /// </remarks>
     internal void Prune(UndoJournalWriter writer)
     {
