@@ -250,6 +250,9 @@ internal static class UndoSwap
             return new UndoRefusal(cannot.ErrorCode is 32 or 33 ? UndoRefusalKind.FileIsInUse : UndoRefusalKind.CannotTellNow, target.RelativePath);
         }
         if (!Holds(now, target.Expected)) return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
+        // A read-only page is never forced (the plan review's M4): it is a page
+        // that will not take a write, the same word as a full disk, never "in use".
+        if (now is UndoCurrent.Bytes && IsReadOnly(target.FullPath)) return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath);
 
         if (now is UndoCurrent.Bytes)
         {
@@ -343,6 +346,12 @@ internal static class UndoSwap
             catch (Exception failed) when (failed is IOException or UnauthorizedAccessException) { }
         }
         return UndoRefusalKind.FileIsInUse;
+    }
+
+    private static bool IsReadOnly(string path)
+    {
+        try { return File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
     }
 
     /// <summary>Whether an error number says the disk is full or the folder will not take a new file, rather than that a file is held.</summary>

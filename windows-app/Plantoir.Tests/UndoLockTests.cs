@@ -27,7 +27,8 @@ public sealed class UndoLockTests : IDisposable
     private static string OneLock => UndoContract.Undo.GetProperty("rule").GetProperty("oneLock").GetString()!;
 
     private UndoJournal Journal(UndoProcessMemory? memory = null) =>
-        new(_folder, TimeProvider.System, _ => true, _ => true, isLive: false, readRetry: TimeSpan.Zero, memory: memory);
+        new(_folder, TimeProvider.System, _ => true, _ => true, isLive: false, readRetry: TimeSpan.Zero,
+            memory: memory ?? new UndoProcessMemory());   // each journal a process of its own unless the test shares one
 
     private static UndoJournalFailure FailureOf(Action action) =>
         Assert.IsType<UndoJournalException>(Record.Exception(action)).Failure;
