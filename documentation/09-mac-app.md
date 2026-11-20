@@ -21379,7 +21379,17 @@ changed). Two exceptions are deliberate, each true:
   said as "Nothing was changed: the website record
   “.merged_output/section1/.netlify_site.json” could not be moved to
   “.netlify_sites/section1.json”." (`LegacyMarkerNotMovedIn`; the place
-  written is removed again, so the folder is as it was).
+  written, and a `.netlify_sites` folder the bring-in made, are removed
+  again, so the folder is as it was). Every record is placed WHOLE
+  (`DeployCommand.placeWhole`: written beside its place as
+  `.<name>.bringing-in-<id>`, its mode set, then renamed in, never over
+  anything), so a death mid-write leaves no partial record where a deploy
+  reads one (a partial current record would have made the next rollover
+  set the good legacy record aside as stale); the next bring-in removes
+  any such half-written copy. This code lives in
+  `Models/LegacyNetlifyRecord.swift`, which the writer scan lists as
+  `notAStep` (the built output is outside the working folder, and the
+  bring-in is a deploy's own migration), so U4 does not take it as work.
 
   **A step refused after the record was brought in puts it back**
   (`LegacyMarkerBroughtIn.putBack`, from `makeTheRolloverStep`: never over
@@ -21465,7 +21475,10 @@ job, or the write is off the main thread) is left apart the same way and
 named after what the check left apart, never a refusal of the whole Undo
 (`UndoSwap.swap`'s `leaveApart`, given only by an Undo or a Redo): a label
 that stayed loaded would otherwise block its step, and every step under
-it, for good (the review of U3b, LOW 3). Undone while its moment is ahead, the plist and its script
+it, for good (the review of U3b, LOW 3). If launchd refuses and the plist
+just written cannot be taken away again, it stays in LaunchAgents and loads
+at the next login, so the schedule IS set back: `write` answers true and
+the Undo does not name it as left apart (the re-review, LOW 4). Undone while its moment is ahead, the plist and its script
 come back byte for byte and the job is loaded again (`UndoScheduledDeploys`,
 through the action's own `LaunchControlRunning`, never the real
 `launchctl` under the suite). That runner is the main actor's, so a write
