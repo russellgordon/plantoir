@@ -16678,7 +16678,7 @@ door's hook points for it are marked in `UndoDoor`).
 
 **Tests:** `UndoSwapTests` (11), `UndoDoorTests` (11), `UndoStepContractTests`
 (6), every stack case and trace through the door; the Undo classes 546 on the
-PC (run `w2b-h1`: 545 passed, 1 skipped, the deny-listing ACE probe of W5).
+PC (run `w2b-h1`: 545 passed, 1 skipped, the deny-listing ACE probe of W5). The whole unit suite on 8070e021c (run `w2b-full`): 4,730 tests, exactly the six known failures.
 Sixteen must-fail proofs, each red alone and green restored
 (`vm-tools/guest/899-w2b-mustfail.json`, runs `w2b-c2` and `w2b-h1`): MoveFileEx
 in place of the POSIX rename; a failed staging write leaving its file (two
