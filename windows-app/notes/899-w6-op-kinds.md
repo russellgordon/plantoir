@@ -18,7 +18,9 @@ Branch `issue/899-w6-op-kinds` (on W4 with its review fixes, `dev` 2ba8490e7 in 
 
 - **Fix round (the first review of W6, NOT CLEAN; and the final sweep of W3 and W4).** MEDIUM: `UndoAppSettingsPlaces` reads `settings.json` as it is on the disk and sets one member by replacing it exactly (lists and dictionaries whole), checked before a temporary file and one rename, nothing written on a mismatch, the running copy then given the member; the kill harness's preference is now `AcceptedSyncedFolders` in the real store (`UndoAppSettingsPlacesTests`, 6). LOW 1: editJSON byte for byte with the mac (`UndoMacKeyOrder`, `UndoJson.SpellNumber`, `UndoJson.ReadAsTheMacReads`), measured through the mac's own code and pinned as 8 new contract rows the mac's `UndoJournalContractTests` passes (this piece now touches `contracts/`). LOW 2: a file starting with a byte-order mark judged as on the mac. LOWs 3 and 4 and W4's front-page note: "For W7" below. The sweep: pruning stops at a step kept for a re-deriving recovery; the launch-call comments say W4; the owed-pieces table's corrections are below. PC `899w6f-a3` (head 6c5d2281a, `dev` 6b2a48a99 merged in): the Undo classes 681 passed, 1 not run (the `[DenyBitesFact]`), 0 failed; must-fail (`vm-tools/guest/899-w6f-mustfail.json`, 14 sabotages) all red, restored green; `kinds-kill` 132 runs, every one whole, the settings file's other member kept and no `settings.json.undo-writing` left in all 132 (no kill point falls inside the settings write itself, so this says nothing about a kill between its temporary and its rename: see fix round two), outside and inside OneDrive (settled as before: done 26, undone 22, rolled back 14, failed 4 in each place; 0.6 to 2.0 s a run). Mac (this Mac, macOS 26.7.3, Xcode 27.0): `UndoJournalContractTests` 17 of 17 with the 16 editJSON rows, and red when one new row's result is changed.
 
-- **Fix round two (the second review of W6, NOT CLEAN: two MEDIUMs, three LOWs).** The rule now is: for an editJSON op, Windows writes exactly the bytes the mac would write, proven by a contract row run on both, or it writes nothing. M1: a key beyond printable ASCII (a new value's, a key path part, or any key of an object the path passes through) and text starting with a byte-order mark are refused (`UndoJson.IsMeasured`, `UndoJsonMember.PathIsMeasured`): cannot tell when judged, never written. M2: a file's number spelled with an exponent and more than 17 digits, or more than 38 without, makes the whole file cannot tell (`UndoJson.SpellingIsMeasured`). Also measured and matched: a negative number beyond a double's range is minus infinity on the mac (cannot tell when it is the member, judged as usual beside it); a positive one, and text holding half a surrogate pair, make the file unreadable on both (half a pair used to throw out of Windows' reader). 18 contract rows (7 `editJSONCases`, 11 `checkCases`), every result and verdict measured through the mac's own code; 13 of them carry what the mac does and Windows refuses, held by name in `NamedGapLedger` (`UndoEditJsonCasesRefusedHere`, `UndoCheckCasesRefusedHere`), where each must be REFUSED. The Python reference model (`scripts/make_undo_traces.py`) follows the same rules and holds the same 13: its test had failed on round one's 8 rows since that round (ordinal keys, Python's shortest numbers, no read-back), unseen because only the Undo classes ran. LOWs 2 and 3: tests for a stale `settings.json.undo-writing` (never read, gone after the next set) and a rename refused while the file is held open (nothing changed). LOW 1 is W8's ("For W8" below). Runs on the PC (LENOVO i5-8365U, Windows 11 Pro 26200): `899w6g-a1` at 6e3743a94 (classes, then the 26 sabotages of `vm-tools/guest/899-w6f-mustfail.json` each alone, then `kinds-kill`): all 26 sabotages red (build 0, test failed); `kinds-kill` 66 of 66 whole outside OneDrive and 66 of 66 inside it, 0 failures, A and B the same at every point; its class run had 1 failure of 726 (`WhatCanBeUndoneCanThenBeRedone` running a held row), the same 1 after the sabotages were restored. `899w6g-a2` at 901241af6 (the Undo classes): 716 passed, 0 failed, 1 skipped, 717 in all (9 fewer than a1's 726; not looked into tonight).
+- **Fix round two (the second review of W6, NOT CLEAN: two MEDIUMs, three LOWs).** The rule now is: for an editJSON op, Windows writes exactly the bytes the mac would write, proven by a contract row run on both, or it writes nothing. M1: a key beyond printable ASCII (a new value's, a key path part, or any key of an object the path passes through) and text starting with a byte-order mark are refused (`UndoJson.IsMeasured`, `UndoJsonMember.PathIsMeasured`): cannot tell when judged, never written. M2: a file's number spelled with an exponent and more than 17 digits, or more than 38 without, makes the whole file cannot tell (`UndoJson.SpellingIsMeasured`). Also measured and matched: a negative number beyond a double's range is minus infinity on the mac (cannot tell when it is the member, judged as usual beside it); a positive one, and text holding half a surrogate pair, make the file unreadable on both (half a pair used to throw out of Windows' reader). 18 contract rows (7 `editJSONCases`, 11 `checkCases`), every result and verdict measured through the mac's own code; 13 of them carry what the mac does and Windows refuses, held by name in `NamedGapLedger` (`UndoEditJsonCasesRefusedHere`, `UndoCheckCasesRefusedHere`), where each must be REFUSED. The Python reference model (`scripts/make_undo_traces.py`) follows the same rules and holds the same 13: its test had failed on round one's 8 rows since that round (ordinal keys, Python's shortest numbers, no read-back), unseen because only the Undo classes ran. LOWs 2 and 3: tests for a stale `settings.json.undo-writing` (never read, gone after the next set) and a rename refused while the file is held open (nothing changed). LOW 1 is W8's ("For W8" below). Runs on the PC (LENOVO i5-8365U, Windows 11 Pro 26200): `899w6g-a1` at 6e3743a94 (classes, then the 26 sabotages of `vm-tools/guest/899-w6f-mustfail.json` each alone, then `kinds-kill`): all 26 sabotages red (build 0, test failed); `kinds-kill` 66 of 66 whole outside OneDrive and 66 of 66 inside it, 0 failures, A and B the same at every point; its class run had 1 failure of 726 (`WhatCanBeUndoneCanThenBeRedone` running a held row), the same 1 after the sabotages were restored. `899w6g-a2` at 901241af6 (the Undo classes): 716 passed, 0 failed, 1 skipped, 717 in all. The 9 fewer than a1's 726 are a different filter, not a lost test (review 3 compared the two `results.trx`): a1 was started with a wider `-Filter`, which took in the 8 `NamedGapLedgerTests` facts and `PythonToolchainTests.SharedPythonTestFilePasses("test_make_undo_traces.py")`, all 9 green there; a2 ran the script's default `FullyQualifiedName~Plantoir.Tests.Undo`, which matches none of them.
+
+- **Fix round three (the third review of W6, NOT CLEAN: one MEDIUM, three LOWs).** M1: an exponent the mac does not read (more than 4 characters after the `e`, sign included, measured) makes the file not JSON on both platforms, by one rule in the contract (`undo.numberSpellingRule`, 37 `numberSpellingCases`, one `checkCases` row for `1e-0001`), held in `UndoJson` and `scripts/make_undo_traces.py` and checked against the contract by both (documentation 12 section below). L3: the 9-test gap is explained in the round-two paragraph. L1 (the Mac's runners on round two's 18 rows and this round's row) needs the Mac gate: no xcodebuild in this piece. L2 (the 13 held rows) is Russell's ruling, carried by the director. `dev` 5cf38d656 merged in (1aaa6577e; the ledger keeps W6's built rows gone and takes dev's U3b and U3c holds). PC `899w6h-a1` at 5be9984b3 (filter: the Undo classes, `NamedGapLedgerTests`, `test_make_undo_traces.py`): 814 passed, 0 failed, 1 skipped, 815; the 37 new rows, the limits fact, the 8 ledger facts and the Python file all passed. Sabotages (`vm-tools/guest/899-w6h-mustfail.json`): 1 (exponent check out) red, 13 of 37 `EveryNumberSpellingCase`; 2 (the same) red, 1 of 129 `EveryCheckCase`; 3 and 4 were still running at hand-back. On this Mac `python3 scripts/test_make_undo_traces.py`: 26 OK, and with the Python check taken out red on the `1e-0001` check case and the notJSON spelling rows.
 
 ## For documentation 12
 
@@ -177,7 +179,10 @@ Mac (macOS 26.7.3, 2026-11-20) through the mac's own code
   what the mac does there. No row can carry a new value with the mark (the
   mac's runner drops it when it reads the contract), so a Windows test pins it.
 - **Numbers.** With an exponent: at most 17 digits read as the nearest double
-  (4,000 random spellings, exponents -330 to 310, every one), and more than 17
+  (fix round two measured 4,000 random spellings whose exponents' values ran
+  from -330 to 310, but the code then accepted ANY exponent, which was more
+  than was measured; fix round three measured the exponent itself, below),
+  and more than 17
   are a decimal number there (`1.2345678901234567890123e-5` is
   `1.2345678901234573e-05`, not the nearest). Without an exponent: 18 to 38
   digits agree with `ReadAsTheMacReads` (30,000 random spellings, every one);
@@ -227,6 +232,60 @@ never an exponent. So no file Plantoir writes holds one: only a file a person
 or another tool edited by hand (an accented key added, a number pasted with 20
 digits, a mark in front of a value) can. Folder, page and course names with
 accents are values there, never keys, so they are unaffected.
+
+### An exponent the mac cannot read (fix round three)
+
+The third review of W6 found the same kind of hole as review 2's M2, for the
+exponent: Windows read `1e-0001`, `1.5e+0010` or `0e99999` and judged or moved
+the member beside it, while the mac cannot read such a file at all and answers
+changed since. **The rule now, on both platforms:** Windows judges and
+rewrites a member only where the mac's `JSONSerialization` reads the same file
+to the same value; a spelling the mac cannot read makes the file not one JSON
+object (changed since, every move refused). It is one rule in the contract,
+`undo.numberSpellingRule` (`exponentCharactersAtMost` 4,
+`digitsWithAnExponentAtMost` 17, `digitsWithoutAnExponentAtMost` 38), which
+`UndoJson` (`MacExponentCharactersAtMost`, `TheMacReadsTheExponent`) and
+`scripts/make_undo_traces.py` (`MAC_EXPONENT_CHARACTERS_AT_MOST`,
+`_exponent_read_by_the_mac`) hold as constants that their tests compare with
+the contract's (`TheNumberLimitsAreTheContractsRule`,
+`test_the_number_limits_are_the_contracts_rule`), and 37 rows,
+`undo.numberSpellingCases`, that both run (`EveryNumberSpellingCase`,
+`test_number_spelling_cases`), plus one `checkCases` row, "another member
+written 1e-0001": changed since both ways.
+
+**Measured** on this Mac (macOS 26.7.3, Apple silicon), `swift` scripts
+calling `JSONSerialization.jsonObject` on `{"a":<n>,"b":1}` (no xcodebuild;
+the probe is `vm-tools/reference/899-w6-mac-json-exponents.swift`):
+
+- The mac reads an exponent written with **at most 4 characters after the `e`
+  or `E`, its sign and leading zeros included**, and cannot read the file when
+  there are more, whatever the value or the digits before it: `1e0005`,
+  `1e+005`, `1e-005`, `1e-999`, `0e9999`, `-1e9999` are read; `1e00005`,
+  `1e+0005`, `1e-0001`, `1e-0500`, `1e-1000`, `0e99999` are not. 103,528 of
+  103,528 random spellings with 5 to 7 such characters (mantissas of 1 to 22
+  digits) could not be read.
+- Within 4 characters, with at most 17 digits, every reading is the nearest
+  double: every exponent string of 1 to 4 characters (13,330: with and without
+  a sign, every leading-zero form) on 14 mantissas at a double's range's edges
+  (`4.9406564584124654`, `2.4703282292062328` and `...27`, `1.7976931348623159`,
+  `17976931348623157` and others), and 200,000 random spellings: 140,193
+  nearest doubles, 121,381 above a double's range (not readable, as Windows
+  already refused a positive infinity), negatives beyond it minus infinity, 0
+  disagreements. With more than 17 digits the mac read a decimal number (6,044)
+  or nothing (15,474): cannot tell here, as before, unless the exponent itself
+  is too long, which is settled first (not JSON).
+- So: `-1e999` is minus infinity, `1e-999` is 0, `2.4703282292062327e-324` is
+  0 and `...28e-324` is `5e-324`, `1.7976931348623159e308` is not readable.
+
+What is NOT measured: how Windows' own `double.Parse` rounds was not compared
+with the mac outside the 37 rows (both are IEEE nearest; the rows pin the
+edges); a lone `e` or `e+` with no digits is not JSON on any reader. The mac's
+runner does not read `numberSpellingCases` (an `undo` key it does not know is
+ignored there), so those rows are run by Windows and Python only; the new
+`checkCases` row is run by the mac's replay too, and its verdict follows from
+the measured fact that the mac cannot read the file and from the mac's own row
+"editJSON: the file is not JSON": the Mac gate is what proves it (no
+xcodebuild in this piece).
 
 ### For W8: the settings write and `AppSettings.Save` (the second review of W6, LOW 1)
 
