@@ -104,6 +104,9 @@ struct SectionScheduleSheet: View {
         let title: String
         let message: String
         let timetable: SectionTimetable
+
+        /// Where each kept file is, for the alert's Show in Finder.
+        let keptFiles: [URL]
     }
 
     @Environment(\.dismiss) var dismiss
@@ -197,13 +200,21 @@ struct SectionScheduleSheet: View {
                         dismiss()
                     }
                 }
-            )
-        ) {
-            // Purely informational: one OK, the default (the HIG's Alerts
-            // page). Closing it carries on as a plain save does.
+            ),
+            presenting: rememberedKeeping
+        ) { remembered in
+            // Informational: OK, the default, on the trailing side, with
+            // Show in Finder beside it (the HIG's Alerts page; Russell's
+            // second ruling of 2026-11-20, night). Either closes it, and
+            // closing it carries on as a plain save does. The files come
+            // with the alert, never read back from state its closing clears.
             Button("OK") { }
-        } message: {
-            Text(rememberedKeeping?.message ?? "")
+                .keyboardShortcut(.defaultAction)
+            Button(FrontPageWording.showKept) {
+                FolderActions.showInFinder(files: remembered.keptFiles)
+            }
+        } message: { remembered in
+            Text(remembered.message)
         }
         .task {
             // Remembering the dates makes a step on the main actor: the list
@@ -557,12 +568,22 @@ struct SectionScheduleSheet: View {
             return .rememberedKeeping(RememberedKeeping(
                 title: SectionTimetableStore.Problem.rememberedTitle(plan.courseCode, plan.sectionNumber),
                 message: SectionTimetableStore.Problem.keptMessage(keptOriginals),
-                timetable: timetable
+                timetable: timetable,
+                keptFiles: SectionScheduleSheet.keptFiles(keptOriginals, beside: plan.fileURL)
             ))
         } catch {
             return .notRemembered(error.localizedDescription)
         }
         return .remembered(timetable)
+    }
+
+    /// Each kept file's place: beside the file it was kept from.
+    static func keptFiles(_ keptOriginals: [String], beside fileURL: URL) -> [URL] {
+        var files: [URL] = []
+        for name in keptOriginals {
+            files.append(fileURL.deletingLastPathComponent().appendingPathComponent(name))
+        }
+        return files
     }
 
     func remember(_ plan: RememberTimetablePlan) {

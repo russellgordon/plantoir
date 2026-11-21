@@ -747,7 +747,7 @@ nonisolated enum UndoContractReplay {
             var unreadableKeptOriginals: [URL] = []
             var keptWhatItReplacedLines: Int = 0
             let keptWhatItReplacedHookBefore = UndoTrailHook.keptWhatItReplacedLine
-            UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _ in
+            UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _, _ in
                 keptWhatItReplacedLines += 1
             }
             defer {
@@ -996,6 +996,28 @@ nonisolated enum UndoContractReplay {
                     }
                     try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: contentURL.path)
                     contentFolderMadeReadOnly = contentURL
+                } else if value == "beforeContentGoneAndCannotBeStored" {
+                    // Only the newest step's content for what p1 held before
+                    // is gone from the list, and the list's folder for it
+                    // takes no new file: what p1 held after is still there
+                    // (the second review of U3c, MEDIUM).
+                    let fold: UndoFold = try journal().read()
+                    var removedOne: Bool = false
+                    if let head = fold.offer(now: journal().now()).head {
+                        for op in head.step.ops where op.path == pagePath && op.knownKind == .writeFile {
+                            if let sha = op.beforeSha {
+                                let blobURL: URL = journal().blobURL(sha: sha)
+                                try FileManager.default.removeItem(at: blobURL)
+                                let prefixFolder: URL = blobURL.deletingLastPathComponent()
+                                try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: prefixFolder.path)
+                                contentFolderMadeReadOnly = prefixFolder
+                                removedOne = true
+                            }
+                        }
+                    }
+                    if !removedOne {
+                        failures.append("stackCases '\(name)': no whole-file step whose before content to take away")
+                    }
                 } else if value == "keepTheOriginal" {
                     // The newest step's kept original of p1, as a swap whose
                     // tidy could not remove it leaves it: what p1 held before.
@@ -1269,7 +1291,7 @@ nonisolated enum UndoContractReplay {
         "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
-        "keptOriginalsAfterTheTidy",
+        "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1476,6 +1498,40 @@ nonisolated enum UndoContractReplay {
                 }
                 try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: contentURL.path)
                 unreadableKept.append(contentURL)
+            }
+            var foldersMadeReadOnly: [URL] = []
+            defer {
+                for folder in foldersMadeReadOnly {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+                }
+            }
+            if let page = string(testCase["keptContentGoneAndCannotBeStored"]), let path = pathOf[page] {
+                // Only the content a page's kept originals hold is gone from
+                // the list, and the list's folder for it takes no new file;
+                // every other blob is still there (the second review of
+                // U3c, MEDIUM).
+                let place: URL = root.appendingPathComponent(path)
+                let folder: URL = place.deletingLastPathComponent()
+                let prefix: String = "." + place.lastPathComponent + UndoSwap.stagedMarker
+                for staged in try FileManager.default.contentsOfDirectory(atPath: folder.path)
+                where staged.hasPrefix(prefix) && staged.hasSuffix("-orig") {
+                    guard case .file(let data) = UndoItem.read(at: folder.appendingPathComponent(staged)) else {
+                        continue
+                    }
+                    let blobURL: URL = dying.blobURL(sha: UndoHash.sha256(of: data))
+                    if UndoItem.read(at: blobURL) != .absent {
+                        try FileManager.default.removeItem(at: blobURL)
+                    }
+                    let prefixFolder: URL = blobURL.deletingLastPathComponent()
+                    if UndoItem.read(at: prefixFolder) == .absent {
+                        try FileManager.default.createDirectory(at: prefixFolder, withIntermediateDirectories: true)
+                    }
+                    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: prefixFolder.path)
+                    foldersMadeReadOnly.append(prefixFolder)
+                }
+                if foldersMadeReadOnly.isEmpty {
+                    failures.append("recoveryCases '\(name)': no kept original beside \(page) whose content to take away")
+                }
             }
             if testCase["keptOriginalUnreadable"] as? Bool == true {
                 // A kept original that is there and cannot be read just now,

@@ -100,10 +100,13 @@ nonisolated enum UndoTrail {
                 )
             )
         }
-        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals in
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow in
             ActivityTrail.note(
                 .undoKeptWhatItReplaced,
-                UndoTrail.keptWhatItReplacedLine(course: course, section: section, isUndo: isUndo, keptOriginals: keptOriginals)
+                UndoTrail.keptWhatItReplacedLine(
+                    course: course, section: section, isUndo: isUndo,
+                    keptOriginals: keptOriginals, keptOfWhatItHoldsNow: keptOfWhatItHoldsNow
+                )
             )
         }
         UndoTrailHook.leftNewestLine = { course, section, isUndo, refusal in
@@ -151,14 +154,20 @@ nonisolated enum UndoTrail {
     }
 
     /// `ICS3U/1 · Undo put back “A.md” from what was kept beside it, but the
-    /// list could not keep a copy of what it held a moment before, so Redo
-    /// is not offered. What “A.md” held a moment before is kept beside it as
-    /// the hidden file “.A.md.plantoir-undo-4-undo-orig”.` After a Redo,
-    /// `… so Undo is not offered and the list was cleared.` (the first
-    /// review of U3c, MEDIUM).
-    static func keptWhatItReplacedLine(course: String, section: Int?, isUndo: Bool, keptOriginals: [String]) -> String {
+    /// list could not keep a copy of all it needs for this change, so what
+    /// it could not keep stays beside the page, and the next Undo or Redo of
+    /// this change uses it. What “A.md” held a moment before is kept beside
+    /// it as the hidden file “.A.md.plantoir-undo-4-undo-orig”.` A kept
+    /// original it put back whose bytes the list would not take is said as
+    /// `What “A.md” holds now is kept beside it as the hidden file “…”.`
+    /// Nothing is said to be withheld or cleared: the step stays on the
+    /// list with both directions offered (Russell's ruling of 2026-11-20,
+    /// night; the second review of U3c, MEDIUM and LOW 1).
+    static func keptWhatItReplacedLine(
+        course: String, section: Int?, isUndo: Bool, keptOriginals: [String], keptOfWhatItHoldsNow: [String] = []
+    ) -> String {
         var places: [String] = []
-        for kept in keptOriginals {
+        for kept in keptOriginals + keptOfWhatItHoldsNow {
             let place: String = JournaledStepError.placeName(ofKept: kept)
             if !places.contains(place) {
                 places.append(place)
@@ -167,10 +176,13 @@ nonisolated enum UndoTrail {
         let which: String = isUndo ? "Undo" : "Redo"
         let what: String = places.isEmpty ? "a page" : places.joined(separator: ", ")
         var line: String = UndoTrail.prefix(course: course, section: section)
-        line += "\(which) put back \(what) from what was kept beside it, but the list could not keep a copy of what it held a moment before, "
-        line += isUndo ? "so Redo is not offered." : "so Undo is not offered and the list was cleared."
+        line += "\(which) put back \(what) from what was kept beside it, but the list could not keep a copy of all it needs for this change, "
+        line += "so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it."
         for kept in keptOriginals {
             line += " What \(JournaledStepError.placeName(ofKept: kept)) held a moment before is kept beside it as the hidden file “\(kept)”."
+        }
+        for kept in keptOfWhatItHoldsNow {
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) holds now is kept beside it as the hidden file “\(kept)”."
         }
         return line
     }

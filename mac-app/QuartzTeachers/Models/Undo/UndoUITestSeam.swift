@@ -18,6 +18,11 @@ nonisolated enum UndoUITestSeam {
 
     static let flag: String = "--ui-test-edit-races-the-swap"
 
+    /// `--ui-test-record-show-in-finder <file>`: the kept-file alerts' Show
+    /// in Finder writes the paths it was asked to show into that file, one
+    /// per line, instead of bringing Finder to the front.
+    static let showInFinderFlag: String = "--ui-test-record-show-in-finder"
+
     /// Whether the race has been run once: it is never run again.
     final class Once: @unchecked Sendable {
 
@@ -28,6 +33,17 @@ nonisolated enum UndoUITestSeam {
     }
 
     // MARK: - Functions
+
+    /// The file Show in Finder records into, when the arguments ask for it
+    /// (with `--state-dir` beside it); otherwise nil.
+    static func showInFinderRecord(arguments: [String]) -> URL? {
+        guard arguments.contains(RealHome.stateDirectoryFlag),
+              let flagIndex = arguments.firstIndex(of: UndoUITestSeam.showInFinderFlag),
+              flagIndex + 1 < arguments.count else {
+            return nil
+        }
+        return URL(fileURLWithPath: arguments[flagIndex + 1])
+    }
 
     /// Sets the kill points when the arguments ask for it (with
     /// `--state-dir` beside it); otherwise does nothing.

@@ -678,6 +678,14 @@ class ContractCaseTests(unittest.TestCase):
                         model.content_removed = True
                     elif call == "contentCannotBeStored":
                         model.content_cannot_be_stored = True
+                    elif call == "beforeContentGoneAndCannotBeStored":
+                        # Only the newest step's before text of p1 is gone
+                        # from the list, and the list will not take it again.
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.removed_texts.add(op["beforeText"])
+                                model.unstorable_texts.add(op["beforeText"])
                     elif call == "keepTheOriginal":
                         # The newest step's kept original of p1: what p1
                         # held before its whole-file op (U3c).

@@ -827,10 +827,12 @@ final class UndoActionStepsTests: XCTestCase {
         XCTAssertTrue(after.contains("Unit 2, Day 5"), "the page was put back, so this proves nothing: \(after)")
         // What the page held just before is named, never a silent `.shown`
         // (the third review of U3a, LOW 3; MUST FAIL answering `.shown`).
-        guard case .shownKeepingWhatItHeld(let from, let to, let kept) = outcome else {
+        guard case .shownKeepingWhatItHeld(let from, let to, let kept, let folder) = outcome else {
             XCTFail("said as \(outcome)")
             return
         }
+        // Where the alert's Show in Finder looks: beside the front page.
+        XCTAssertEqual(folder.standardizedFileURL.path, indexURL.deletingLastPathComponent().standardizedFileURL.path)
         XCTAssertEqual(from, "Unit 2, Day 4")
         XCTAssertEqual(to, "Unit 2, Day 5")
         XCTAssertEqual(kept.count, 1)
@@ -932,6 +934,8 @@ final class UndoActionStepsTests: XCTestCase {
         }
         XCTAssertEqual(keptOnDisk.count, 1, "\(keptOnDisk)")
         XCTAssertTrue(remembered.message.contains(keptOnDisk.first ?? "?"), remembered.message)
+        // The alert's Show in Finder shows exactly the kept file on the disk.
+        XCTAssertEqual(remembered.keptFiles, [folder.appendingPathComponent(keptOnDisk.first ?? "?")])
     }
 
     /// A press that went in part way (a page could not be put back after the

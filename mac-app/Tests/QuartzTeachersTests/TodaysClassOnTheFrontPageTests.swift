@@ -107,7 +107,8 @@ final class TodaysClassOnTheFrontPageTests: XCTestCase {
             "noLongerOffered": FrontPageWording.noLongerOffered(noun: "{noun}"),
             "couldNotSave": FrontPageWording.couldNotSave(shown: "{shown}"),
             "keptTitle": FrontPageWording.keptTitle(class: "{class}"),
-            "kept": FrontPageWording.keptSentence(kept: "{kept}")
+            "kept": FrontPageWording.keptSentence(kept: "{kept}"),
+            "showKept": FrontPageWording.showKept
         ]
         XCTAssertEqual(ours, wording)
     }
@@ -128,7 +129,8 @@ final class TodaysClassOnTheFrontPageTests: XCTestCase {
             FrontPageWording.noLongerOffered(noun: "class"),
             FrontPageWording.couldNotSave(shown: "Unit 2, Day 4"),
             FrontPageWording.keptTitle(class: "Unit 2, Day 5"),
-            FrontPageWording.kept(["KEPT"])
+            FrontPageWording.kept(["KEPT"]),
+            FrontPageWording.showKept
         ]
         for sentence in sentences {
             var sentenceWords: Set<String> = []

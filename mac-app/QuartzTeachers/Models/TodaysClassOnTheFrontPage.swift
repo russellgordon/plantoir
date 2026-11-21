@@ -72,8 +72,10 @@ enum TodaysClassOnTheFrontPage {
         /// what the front page held just before (an edit another program
         /// made as it was saved) could not be put back over it and is kept
         /// beside it under each hidden name in `keptOriginals` (the third
-        /// review of U3a, LOW 3). Said on the trail, naming the kept file.
-        case shownKeepingWhatItHeld(from: String, to: String, keptOriginals: [String])
+        /// review of U3a, LOW 3). Said on the trail, naming the kept file;
+        /// `folder` is where they are, beside the front page, for the
+        /// alert's Show in Finder.
+        case shownKeepingWhatItHeld(from: String, to: String, keptOriginals: [String], folder: URL)
         /// The page already shows today's class — the teacher changed it
         /// while the question was up. Nothing was written.
         case alreadyRight
@@ -331,7 +333,9 @@ enum TodaysClassOnTheFrontPage {
             return .couldNotSave
         }
         if let keptOriginals {
-            return .shownKeepingWhatItHeld(from: decision.shown, to: page.title, keptOriginals: keptOriginals)
+            return .shownKeepingWhatItHeld(
+                from: decision.shown, to: page.title, keptOriginals: keptOriginals, folder: indexURL.deletingLastPathComponent()
+            )
         }
         return .shown(from: decision.shown, to: page.title)
     }
@@ -362,7 +366,7 @@ enum TodaysClassOnTheFrontPage {
         switch outcome {
         case .shown(let from, let to):
             return (.putTodaysClassOnTheFrontPage, "put today's class on the front page — \(to) in place of \(from)")
-        case .shownKeepingWhatItHeld(let from, let to, let keptOriginals):
+        case .shownKeepingWhatItHeld(let from, let to, let keptOriginals, _):
             var line: String = "put today's class on the front page — \(to) in place of \(from)"
             for kept in keptOriginals {
                 line += ". What \(JournaledStepError.placeName(ofKept: kept)) held just before is kept beside it as the hidden file “\(kept)”"

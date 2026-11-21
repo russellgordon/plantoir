@@ -240,7 +240,8 @@ final class UndoShadowPublishTests: XCTestCase {
     /// said as kept because the list no longer holds a copy of it, never as
     /// differing from what the list recorded: the reason the contract's row
     /// carries (the first review of U3c, LOW 2). After a Redo, the line says
-    /// the Undo is not offered and the list was cleared.
+    /// nothing is withheld or cleared, since nothing is (the second review,
+    /// LOW 1, and Russell's ruling of 2026-11-20, night).
     func testTheKeptLinesSayWhatIsTrueInEachCase() throws {
         let rules: [String: Any] = try UndoContractReplay.contract("shared-rules.json")
         let trail: [String: Any] = rules["activityTrail"] as? [String: Any] ?? [:]
@@ -264,6 +265,21 @@ final class UndoShadowPublishTests: XCTestCase {
             keptOriginals: [".A.md.plantoir-undo-4-redo-orig"]
         )
         XCTAssertTrue(afterARedo.hasPrefix("ICS3U/1 · Redo put back “A.md”"), afterARedo)
-        XCTAssertTrue(afterARedo.contains("so Undo is not offered and the list was cleared."), afterARedo)
+        // Nothing is withheld or cleared at the move (Russell's ruling of
+        // 2026-11-20, night; the second review of U3c, LOW 1), so the line
+        // never says so; a kept original the list would not take is named
+        // as what the page holds now (the second review's MEDIUM).
+        XCTAssertFalse(afterARedo.contains("not offered"), afterARedo)
+        XCTAssertFalse(afterARedo.contains("cleared"), afterARedo)
+        XCTAssertTrue(afterARedo.contains("the next Undo or Redo of this change uses it."), afterARedo)
+        let holdingNow: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: true,
+            keptOriginals: [], keptOfWhatItHoldsNow: [".A.md.plantoir-undo-4-apply-orig"]
+        )
+        XCTAssertTrue(
+            holdingNow.hasSuffix(" What “A.md” holds now is kept beside it as the hidden file “.A.md.plantoir-undo-4-apply-orig”."),
+            holdingNow
+        )
+        XCTAssertTrue(holdingNow.hasPrefix("ICS3U/1 · Undo put back “A.md”"), holdingNow)
     }
 }

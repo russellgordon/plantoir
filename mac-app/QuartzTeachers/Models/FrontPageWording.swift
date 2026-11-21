@@ -48,8 +48,8 @@ nonisolated enum FrontPageWording {
     /// the same instant could not be merged and is kept hidden beside the
     /// page (#899 U3c, Russell's ruling of 2026-11-20, night). A complete
     /// sentence, so sentence-style capitals and a full stop (the HIG's
-    /// Alerts page, read that night); one OK, since it is purely
-    /// informational.
+    /// Alerts page, read that night); OK, the default, since it is
+    /// informational, with Show in Finder beside it.
     static func keptTitle(class className: String) -> String {
         return "The front page now shows \(className)."
     }
@@ -66,4 +66,10 @@ nonisolated enum FrontPageWording {
     static func keptSentence(kept name: String) -> String {
         return "What the front page held a moment before is kept beside it, hidden, as “\(name)”."
     }
+
+    /// The alert's second button (Russell's second ruling of 2026-11-20,
+    /// night): a verb phrase naming its result, title-style, the words this
+    /// action has everywhere else in the app (the HIG's Alerts page, read
+    /// that night). OK stays the default, on the trailing side.
+    static let showKept: String = "Show in Finder"
 }

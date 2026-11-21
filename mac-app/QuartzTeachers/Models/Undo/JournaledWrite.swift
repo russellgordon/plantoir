@@ -1195,12 +1195,15 @@ nonisolated enum UndoTrailHook {
     nonisolated(unsafe) static var keptAnOriginalLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ keptOriginals: [String], _ noLongerInTheList: [String]) -> Void)?
 
     /// An Undo (`isUndo`) or a Redo put a page back from its kept original
-    /// and the list would not take what the page held a moment before, so
-    /// the other direction is never offered (a Redo dropped, or after a Redo
-    /// the list cleared): the course and section, and the hidden name each
-    /// such page's content is kept under beside it (the first review of
-    /// U3c, MEDIUM).
-    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String]) -> Void)?
+    /// and the list would not take all it needs for the step: the course
+    /// and section, the hidden name what each page held a moment before is
+    /// kept under beside it (`keptOriginals`, the first review of U3c,
+    /// MEDIUM), and the hidden name of each kept original it put back whose
+    /// bytes the list would not take, which stays beside its page
+    /// (`keptOfWhatItHoldsNow`, the second review's MEDIUM). The step stays
+    /// on the list with both directions offered: the next Undo or Redo of it
+    /// uses those files (Russell's ruling of 2026-11-20, night).
+    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String], _ keptOfWhatItHoldsNow: [String]) -> Void)?
 
     /// An Undo (`isUndo`) or a Redo was refused because the newest step is
     /// a gone process's that recovery has just tried and left: the course

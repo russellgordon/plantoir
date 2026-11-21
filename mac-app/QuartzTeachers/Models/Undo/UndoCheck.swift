@@ -493,6 +493,29 @@ nonisolated struct UndoKeptOriginalUse: Equatable, Sendable {
     let outgoing: UndoItem
 }
 
+/// What a put-back from kept originals could not write back into the list
+/// (`UndoRecovery.storeWhatKeptOriginalsGive`).
+nonisolated struct UndoWhatTheListCouldNotTake: Equatable, Sendable {
+
+    // MARK: - Stored properties
+
+    /// The pages whose outgoing content (what the other direction needs)
+    /// the list did not take: the swap keeps it beside them.
+    let outgoingOf: [String]
+
+    /// The hashes of kept originals' bytes the list did not take: no tidy
+    /// removes a kept original holding them, even once its page holds the
+    /// same bytes (the second review of U3c, MEDIUM).
+    let keptOriginalsHolding: Set<String>
+
+    // MARK: - Computed properties
+
+    /// Whether the list took everything.
+    var isEmpty: Bool {
+        return outgoingOf.isEmpty && keptOriginalsHolding.isEmpty
+    }
+}
+
 /// What a check found.
 nonisolated enum UndoPlan: Equatable, Sendable {
     case ready(targets: [UndoSwapTarget], recomputes: [UndoOp])
@@ -1224,6 +1247,17 @@ nonisolated enum UndoSwap {
         return copied
     }
 
+    /// Whether a kept original's bytes hash to one of these.
+    static func holdsAnyOf(_ shas: Set<String>, _ keptURL: URL) -> Bool {
+        if shas.isEmpty {
+            return false
+        }
+        guard case .file(let kept) = UndoItem.read(at: keptURL) else {
+            return false
+        }
+        return shas.contains(UndoHash.sha256(of: kept))
+    }
+
     /// Whether a kept original is NOT the only copy of what it holds: its
     /// place holds a file with the same bytes (the original was kept and the
     /// new content never went in, or recovery put it back). A kept original
@@ -1338,7 +1372,8 @@ nonisolated enum UndoSwap {
         onAside: ((UndoAsideFolder) -> Void)? = nil,
         root: URL? = nil,
         keepingOnlyCopies: Bool = false,
-        unlessTheListHolds listHolds: ((_ kept: URL, _ place: URL) -> Bool)? = nil
+        unlessTheListHolds listHolds: ((_ kept: URL, _ place: URL) -> Bool)? = nil,
+        keepingCopiesHolding notInTheList: Set<String> = []
     ) -> Bool {
         var allGone: Bool = true
         var folders: [URL] = []
@@ -1410,6 +1445,13 @@ nonisolated enum UndoSwap {
                     let placeURL: URL = folder.appendingPathComponent(place)
                     let theListHoldsIt: Bool = listHolds?(stagedURL, placeURL) ?? false
                     if !UndoSwap.isACopyOfItsPlace(stagedURL, place: placeURL) && !theListHoldsIt {
+                        continue
+                    }
+                    // A copy of its page whose bytes the list would not take
+                    // just now: the step's next move the other way would
+                    // leave them in no file, so it stays (the second review
+                    // of U3c, MEDIUM).
+                    if UndoSwap.holdsAnyOf(notInTheList, stagedURL) {
                         continue
                     }
                 }
@@ -1684,7 +1726,7 @@ nonisolated extension UndoJournal {
         let starting: UndoEventKind = direction == .backward ? .undoing : .redoing
         let ending: UndoEventKind = direction == .backward ? .undone : .redone
         let phase: UndoPhase = direction == .backward ? .undoing : .redoing
-        var notWhole: [String] = []
+        var notTaken: UndoWhatTheListCouldNotTake = UndoWhatTheListCouldNotTake(outgoingOf: [], keptOriginalsHolding: [])
         do {
             try withLock { writer in
                 let offer: UndoOffer = writer.fold.offer(now: now())
@@ -1695,7 +1737,7 @@ nonisolated extension UndoJournal {
                 // What the kept originals give, and what the swap sets aside
                 // for the other direction, into the list first (the first
                 // review of U3c, MEDIUM).
-                notWhole = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
+                notTaken = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
                 try writer.append(UndoEventLine(seq: seq, event: starting, process: process))
                 try writer.sync()
             }
@@ -1710,7 +1752,7 @@ nonisolated extension UndoJournal {
 
         // 4. Swap, then re-derive the files kept true by a rule.
         let label: String = "\(seq)-" + (direction == .backward ? "undo" : "redo")
-        switch UndoSwap.swap(targets, label: label, places: places, root: root, keepingTheOriginalsOf: Set(notWhole)) {
+        switch UndoSwap.swap(targets, label: label, places: places, root: root, keepingTheOriginalsOf: Set(notTaken.outgoingOf)) {
         case .refused(let refusal):
             JournaledWrite.finish(seq: seq, with: .failed, phase: phase, reason: "refused", in: self, mode: .live)
             // Caught at the swap rather than the check: the same hand edit,
@@ -1736,30 +1778,49 @@ nonisolated extension UndoJournal {
         if !uses.isEmpty {
             // The kept original it was put back from is now a copy of its
             // page, and its bytes are in the list: nothing of the step's is
-            // left beside it but what the list could not take.
-            UndoRecovery.tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true)
+            // left beside it but what the list could not take. A kept
+            // original whose bytes the list would not take stays, though its
+            // page holds the same: the next move the other way would leave
+            // them in no file (the second review of U3c, MEDIUM).
+            UndoRecovery.tidyStagedFiles(
+                of: record.step, root: root, keepingOnlyCopies: true,
+                keepingCopiesHolding: notTaken.keptOriginalsHolding
+            )
         }
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
-        if !notWhole.isEmpty {
-            // The other direction can never be made from the list: never
-            // offered. A Redo is dropped; after a Redo, the Undo of it would
-            // be refused for content missing, so the list is cleared now, as
-            // that refusal would. What the pages held is kept beside them and
-            // named on the trail.
-            if direction == .backward {
-                try? dropTheRedoBranchAfterARefusal(of: seq)
-            } else {
-                _ = try? clearAfterARefusal(of: seq, reason: .contentMissing)
-            }
-            var kept: [String] = []
-            for path in notWhole {
-                let place: URL = root.appendingPathComponent(path)
-                for keptURL in UndoRecovery.keptOriginalFiles(of: record.step, beside: place)
-                where UndoSwap.isStaged(keptURL.lastPathComponent, label: label) {
-                    kept.append(keptURL.lastPathComponent)
+        if !notTaken.isEmpty {
+            // The list could not take all the step needs. The step stays on
+            // the list with the other direction offered, resting on what is
+            // kept beside its pages, as recovery's does (Russell's ruling of
+            // 2026-11-20, night): if that file is gone or changed by then,
+            // that Undo or Redo is refused then, with its true sentence, and
+            // the list answers that refusal as any other. Nothing is dropped
+            // or cleared here, so this line is written from one state.
+            var keptOfWhatItHeld: [String] = []
+            var keptOfWhatItHoldsNow: [String] = []
+            var pathsOfTheStep: [String] = []
+            for op in record.step.ops {
+                if let path = op.path, !pathsOfTheStep.contains(path) {
+                    pathsOfTheStep.append(path)
                 }
             }
-            UndoTrailHook.keptWhatItReplacedLine?(record.step.course ?? "", record.step.section, direction == .backward, kept)
+            for path in pathsOfTheStep {
+                let place: URL = root.appendingPathComponent(path)
+                for keptURL in UndoRecovery.keptOriginalFiles(of: record.step, beside: place) {
+                    let name: String = keptURL.lastPathComponent
+                    if keptOfWhatItHeld.contains(name) || keptOfWhatItHoldsNow.contains(name) {
+                        continue
+                    }
+                    if notTaken.outgoingOf.contains(path) && UndoSwap.isStaged(name, label: label) {
+                        keptOfWhatItHeld.append(name)
+                    } else if UndoSwap.holdsAnyOf(notTaken.keptOriginalsHolding, keptURL) {
+                        keptOfWhatItHoldsNow.append(name)
+                    }
+                }
+            }
+            UndoTrailHook.keptWhatItReplacedLine?(
+                record.step.course ?? "", record.step.section, direction == .backward, keptOfWhatItHeld, keptOfWhatItHoldsNow
+            )
         }
         return direction == .backward ? .undone(seq: seq) : .redone(seq: seq)
     }

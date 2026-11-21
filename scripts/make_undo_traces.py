@@ -936,6 +936,10 @@ class Model:
         self.stored = set()
         self.kept = {}
         self.content_cannot_be_stored = False
+        # The second review of U3c: texts whose blob alone is gone from the
+        # list, and texts the list will not take again.
+        self.removed_texts = set()
+        self.unstorable_texts = set()
         self.kept_what_it_replaced_lines = 0
         self.kept_unreadable = False   # every kept original cannot be read now
         self.maintainer_registered = True   # UndoMaintainers has a runner
@@ -1199,8 +1203,9 @@ class Model:
         if self.holds_a_recompute(undo) and not self.maintainer_registered:
             return ("notAvailable",)
         used = []
-        result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed,
+        result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_missing(),
                       self.available, used)
+        used = self.taken_from_kept_originals(used)
         if result[0] == "contentMissing" and self.kept_unreadable and self.kept.get(result[1]):
             # A kept original that cannot be read may be the one: cannot
             # tell now, the list kept (the first review of U3c, LOW 5).
@@ -1221,11 +1226,8 @@ class Model:
             self.write_line()
             self.tidy_kept_copies()
             if not_whole:
-                # The Redo can never be made: dropped, never offered.
-                for step in self.steps:
-                    if step["phase"] == "undone" and step["seq"] >= undo["seq"]:
-                        step["phase"] = "dropped"
-                self.write_line()
+                # The Redo stays offered, resting on what is kept beside the
+                # page (Russell's ruling of 2026-11-20, night).
                 self.kept_what_it_replaced_lines += 1
             self.prune()
         return ("undone", undo["seq"])
@@ -1243,8 +1245,9 @@ class Model:
         if self.holds_a_recompute(candidate) and not self.maintainer_registered:
             return ("notAvailable",)
         used = []
-        result = plan(candidate["ops"], False, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed,
+        result = plan(candidate["ops"], False, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_missing(),
                       self.available, used)
+        used = self.taken_from_kept_originals(used)
         if result[0] in ("changedSince", "contentMissing"):
             if not dry:
                 # Ruling 20: refused once, then only the redo branch goes.
@@ -1262,34 +1265,55 @@ class Model:
             self.write_line()
             self.tidy_kept_copies()
             if not_whole:
-                # Its Undo can never be made: the list is cleared now, as
-                # that refusal would clear it.
-                self.clear()
+                # Its Undo stays offered, resting on what is kept beside the
+                # page; cleared only if it is refused then (Russell's ruling
+                # of 2026-11-20, night).
                 self.kept_what_it_replaced_lines += 1
             self.prune()
         return ("redone", candidate["seq"])
 
-    def available(self, path, text):
-        """Content the list's content no longer holds that can still be had:
-        written back since, or a kept original beside its page that can be
-        read now."""
+    def content_missing(self):
+        """Whether any content the list held is gone: all of it, or one blob."""
+        return self.content_removed or bool(self.removed_texts)
+
+    def in_the_list(self, text):
+        """Whether the list's content holds this text now."""
         if text in self.stored:
             return True
+        return not self.content_removed and text not in self.removed_texts
+
+    def storable(self, text):
+        """Whether the list would take this text now."""
+        return not self.content_cannot_be_stored and text not in self.unstorable_texts
+
+    def available(self, path, text):
+        """Content the step needs: in the list, written back since, or a
+        kept original beside its page that can be read now."""
+        if self.in_the_list(text):
+            return True
         return not self.kept_unreadable and text in self.kept.get(path, [])
+
+    def taken_from_kept_originals(self, used):
+        """Of the plan's uses, those the list itself could not give: only
+        those are taken from a kept original."""
+        return [use for use in used if not self.in_the_list(use[1])]
 
     def store_what_kept_originals_give(self, used):
         """Before the swap (the first review of U3c, MEDIUM): the kept
         original's text, and what the page held as the other direction's
         text when it is exactly that, written back into the list. True when
-        some page's other text could not be: what the page held is then kept
-        beside it."""
+        anything could not be: what the page held is then kept beside it,
+        and a kept original whose own text the list would not take stays
+        (the second review's MEDIUM: `tidy_kept_copies` keeps it)."""
         not_whole = False
         for path, taken, outgoing, other in used:
-            if not self.content_cannot_be_stored:
+            if self.storable(taken):
                 self.stored.add(taken)
-            if other is None or other in self.stored:
+            else:
+                not_whole = True
+            if other is None or self.in_the_list(other):
                 continue
-            if outgoing == other and not self.content_cannot_be_stored:
+            if outgoing == other and self.storable(outgoing):
                 self.stored.add(outgoing)
                 continue
             not_whole = True
@@ -1297,9 +1321,12 @@ class Model:
         return not_whole
 
     def tidy_kept_copies(self):
-        """A kept original whose page holds the same text is a copy: gone."""
+        """A kept original whose page holds the same text is a copy: gone,
+        unless the list does not hold that text (the second review of U3c,
+        MEDIUM)."""
         for path in list(self.kept):
-            self.kept[path] = [text for text in self.kept[path] if text != self.pages.get(path)]
+            self.kept[path] = [text for text in self.kept[path]
+                               if text != self.pages.get(path) or not self.in_the_list(text)]
             if not self.kept[path]:
                 del self.kept[path]
 

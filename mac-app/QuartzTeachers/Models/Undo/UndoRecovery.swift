@@ -223,7 +223,8 @@ nonisolated enum UndoRecovery {
     /// page is left where it is (`UndoSwap.isACopyOfItsPlace`).
     @discardableResult
     static func tidyStagedFiles(
-        of step: UndoStep, root: URL, keepingOnlyCopies: Bool = false, unlessTheListHoldsFrom journal: UndoJournal? = nil
+        of step: UndoStep, root: URL, keepingOnlyCopies: Bool = false, unlessTheListHoldsFrom journal: UndoJournal? = nil,
+        keepingCopiesHolding notInTheList: Set<String> = []
     ) -> Bool {
         var urls: [URL] = []
         for op in step.ops {
@@ -241,7 +242,7 @@ nonisolated enum UndoRecovery {
                 label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) },
                 root: root, keepingOnlyCopies: keepingOnlyCopies,
-                unlessTheListHolds: listHolds
+                unlessTheListHolds: listHolds, keepingCopiesHolding: notInTheList
             ) {
                 allGone = false
             }
@@ -334,10 +335,19 @@ nonisolated enum UndoRecovery {
     /// other direction's content could not be made whole (the list would
     /// not take it, or the page does not hash to what was recorded): their
     /// outgoing bytes must be kept beside them, never tidied.
-    static func storeWhatKeptOriginalsGive(_ uses: [UndoKeptOriginalUse], _ writer: UndoJournalWriter) -> [String] {
+    ///
+    /// A kept original whose own bytes the list will not take is never
+    /// ignored (the second review of U3c, MEDIUM): once the page holds them
+    /// it is a copy of its page, and the next move the other way would leave
+    /// them in no file at all. Its hash is told back, and no tidy removes a
+    /// kept original holding it (`keepingCopiesHolding`).
+    static func storeWhatKeptOriginalsGive(_ uses: [UndoKeptOriginalUse], _ writer: UndoJournalWriter) -> UndoWhatTheListCouldNotTake {
         var notWhole: [String] = []
+        var keptNotStored: Set<String> = []
         for use in uses {
-            _ = try? writer.writeBlob(use.kept)
+            if (try? writer.writeBlob(use.kept)) == nil {
+                keptNotStored.insert(UndoHash.sha256(of: use.kept))
+            }
             guard let otherSha = use.otherSha else {
                 // The other direction wants no file there: nothing to keep.
                 continue
@@ -353,7 +363,7 @@ nonisolated enum UndoRecovery {
                 notWhole.append(use.path)
             }
         }
-        return notWhole
+        return UndoWhatTheListCouldNotTake(outgoingOf: notWhole, keptOriginalsHolding: keptNotStored)
     }
 
     /// Every kept original (`-orig`, a file) of this step's beside one
@@ -735,6 +745,10 @@ nonisolated enum UndoRecovery {
 
         var outcome: UndoRecoveryResult.Outcome
         var events: [UndoEventLine] = []
+        // Kept originals' bytes a put-back took that the list would not take
+        // just now: no tidy removes a kept original holding them (the second
+        // review of U3c, MEDIUM).
+        var keptNotTaken: Set<String> = []
         if inTheWay.isEmpty && atEnd == 0 {
             outcome = .nothingTookEffect
             events.append(UndoEventLine(seq: step.seq, event: .failed, phase: phase, reason: "nothingTookEffect"))
@@ -840,10 +854,11 @@ nonisolated enum UndoRecovery {
                     label: label, beside: urls, root: root, keepingOnlyCopies: true,
                     unlessTheListHolds: UndoRecovery.listHolds(step, root: root, from: writer.journal)
                 )
-                let notWhole: [String] = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
+                let notTaken: UndoWhatTheListCouldNotTake = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
                 var keepingTheOriginalsOf: Set<String> = []
                 if phase != .begin {
-                    keepingTheOriginalsOf = Set(notWhole)
+                    keepingTheOriginalsOf = Set(notTaken.outgoingOf)
+                    keptNotTaken = notTaken.keptOriginalsHolding
                 }
                 switch UndoSwap.swap(
                     targets, label: label + "-recover", places: places, root: root,
@@ -896,8 +911,14 @@ nonisolated enum UndoRecovery {
                 // beside its page and named on the trail (the third review
                 // of U3a, LOW 1).
                 let listHolds: (URL, URL) -> Bool = UndoRecovery.listHolds(step, root: root, from: writer.journal)
-                UndoSwap.tidyLeftovers(label: label, beside: urls, root: root, keepingOnlyCopies: true, unlessTheListHolds: listHolds)
-                UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true, unlessTheListHolds: listHolds)
+                UndoSwap.tidyLeftovers(
+                    label: label, beside: urls, root: root, keepingOnlyCopies: true,
+                    unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken
+                )
+                UndoSwap.tidyLeftovers(
+                    label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true,
+                    unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken
+                )
                 let kept: [String] = UndoRecovery.keptOriginalsLeft(of: step, root: root)
                 if !kept.isEmpty {
                     UndoTrailHook.keptAnOriginalLine?(

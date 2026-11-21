@@ -34,6 +34,15 @@ struct QuartzTeachersApp: App {
         // A test through the real window asking for a change to go in part
         // way (#899 U3c); only with --state-dir, never in a release build.
         UndoUITestSeam.installIfAsked(arguments: CommandLine.arguments)
+        if let recordURL = UndoUITestSeam.showInFinderRecord(arguments: CommandLine.arguments) {
+            FolderActions.showInFinderRecorder = { files in
+                var lines: String = ""
+                for file in files {
+                    lines += file.path + "\n"
+                }
+                try? lines.write(to: recordURL, atomically: true, encoding: .utf8)
+            }
+        }
         #endif
 
         // Claude Code drives the same tools the built-in assistant does, by

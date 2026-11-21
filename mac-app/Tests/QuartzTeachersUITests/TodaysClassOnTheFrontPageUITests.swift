@@ -94,13 +94,96 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
         application.terminate()
     }
 
-    /// #899 U3c, Russell's ruling of 2026-11-20, night: Show on Front Page
+    /// #899 U3c, Russell's rulings of 2026-11-20, night: Show on Front Page
     /// goes in while another program edits the page at the same instant (the
     /// app's debug-only `--ui-test-edit-races-the-swap`), so what the page
     /// held a moment before is kept in a hidden file beside it. ONE alert
-    /// names that file, with one OK; never "The Front Page Was Not Changed";
-    /// OK closes it and the preview starts.
+    /// names that file, with OK and Show in Finder; never "The Front Page Was
+    /// Not Changed". OK is the default, on the trailing side of a row (or on
+    /// top of a stack): Return closes the alert without showing anything,
+    /// and the preview starts.
     func testShowGoingInPartWayNamesTheKeptFileInOneAlert() throws {
+        let made: KeptAlert = try showGoingInPartWay()
+        let application: XCUIApplication = made.application
+
+        var alertButtons: [String] = []
+        var okButton: XCUIElement? = nil
+        var showButton: XCUIElement? = nil
+        for container in [application.sheets, application.dialogs] {
+            let holding: XCUIElement = container.containing(.staticText, identifier: made.title).firstMatch
+            if holding.exists {
+                for index in 0..<holding.buttons.count {
+                    let button: XCUIElement = holding.buttons.element(boundBy: index)
+                    let said: String = button.title.isEmpty ? button.label : button.title
+                    alertButtons.append(said)
+                    if said == "OK" {
+                        okButton = button
+                    } else if said == "Show in Finder" {
+                        showButton = button
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(alertButtons.sorted(), ["OK", "Show in Finder"], "the alert's buttons")
+        let ok: XCUIElement = try XCTUnwrap(okButton, "the alert has no OK")
+        let showInFinder: XCUIElement = try XCTUnwrap(showButton, "the alert has no Show in Finder")
+        // The HIG's Alerts page: the default button on the trailing side of
+        // a row, or at the top of a stack.
+        let inOneRow: Bool = abs(ok.frame.midY - showInFinder.frame.midY) < 1
+        if inOneRow {
+            XCTAssertGreaterThan(ok.frame.minX, showInFinder.frame.minX, "OK is not on the trailing side")
+        } else {
+            XCTAssertLessThan(ok.frame.minY, showInFinder.frame.minY, "OK is not on top of the stack")
+        }
+
+        // Return presses the default: OK. The alert closes, nothing is shown
+        // in Finder, and the preview starts.
+        application.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(application.webViews.firstMatch.waitForExistence(timeout: 90), "The preview did not start after OK")
+        XCTAssertFalse(application.staticTexts[made.title].firstMatch.exists)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: made.showInFinderRecord.path),
+            "Return showed the kept file in Finder: Show in Finder is the default"
+        )
+        application.buttons["stopPreviewButton"].firstMatch.click()
+        application.terminate()
+    }
+
+    /// The same alert's Show in Finder closes it and shows exactly the kept
+    /// file named in it, selected in its folder (recorded by the debug-only
+    /// `--ui-test-record-show-in-finder`, so the test never brings Finder to
+    /// the front); the preview starts as after OK.
+    func testShowInFinderShowsTheKeptFileItNames() throws {
+        let made: KeptAlert = try showGoingInPartWay()
+        let application: XCUIApplication = made.application
+        let showInFinder: XCUIElement = application.buttons["Show in Finder"].firstMatch
+        XCTAssertTrue(showInFinder.exists, "the alert has no Show in Finder")
+        showInFinder.click()
+        XCTAssertTrue(application.webViews.firstMatch.waitForExistence(timeout: 90), "The preview did not start after Show in Finder")
+        XCTAssertFalse(application.staticTexts[made.title].firstMatch.exists)
+        let recorded: String = try String(contentsOf: made.showInFinderRecord, encoding: .utf8)
+        var shown: [String] = []
+        for line in recorded.components(separatedBy: "\n") where !line.isEmpty {
+            shown.append(URL(fileURLWithPath: line).resolvingSymlinksInPath().path)
+        }
+        XCTAssertEqual(shown, [made.keptFile.resolvingSymlinksInPath().path])
+        application.buttons["stopPreviewButton"].firstMatch.click()
+        application.terminate()
+    }
+
+    /// What `showGoingInPartWay` leaves on screen.
+    struct KeptAlert {
+
+        // MARK: - Stored properties
+
+        let application: XCUIApplication
+        let title: String
+        let keptFile: URL
+        let showInFinderRecord: URL
+    }
+
+    /// Up to the one alert naming the kept file, checked against the disk.
+    private func showGoingInPartWay() throws -> KeptAlert {
         let fixtureURL: URL = try UITestFolders.makeFixture()
         let sectionURL: URL = fixtureURL.appendingPathComponent("courses/EXC2O/section1")
         let classesURL: URL = sectionURL.appendingPathComponent("All Classes")
@@ -124,8 +207,14 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
         let publicURL: URL = fixtureURL.appendingPathComponent("courses/EXC2O/.merged_output/section1/public")
         stubPreviewPIDFileURL = try StubLaunchers.writeStubPreviewScript(in: fixtureURL, buildingInto: publicURL)
 
+        // Outside the working folder, in the fixture's own temporary folder.
+        let showInFinderRecord: URL = fixtureURL.appendingPathComponent("show-in-finder.txt")
         let application: XCUIApplication = try IsolatedLaunch.launch(
-            workspace: fixtureURL, extraArguments: ["--ui-test-edit-races-the-swap", "index.md"]
+            workspace: fixtureURL,
+            extraArguments: [
+                "--ui-test-edit-races-the-swap", "index.md",
+                "--ui-test-record-show-in-finder", showInFinderRecord.path,
+            ]
         ).application
         let courseRow: XCUIElement = application.outlines.staticTexts["EXC2O"]
         XCTAssertTrue(courseRow.waitForExistence(timeout: 10))
@@ -141,7 +230,8 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
         show.click()
 
         // The one alert, naming the hidden file that is really on the disk.
-        let title: XCUIElement = application.staticTexts["The front page now shows Unit 9, Day 2."].firstMatch
+        let titleText: String = "The front page now shows Unit 9, Day 2."
+        let title: XCUIElement = application.staticTexts[titleText].firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 15), "no alert naming what was kept")
         let names: [String] = try FileManager.default.contentsOfDirectory(atPath: sectionURL.path)
         var keptName: String? = nil
@@ -156,28 +246,10 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
         XCTAssertFalse(application.staticTexts["The Front Page Was Not Changed"].firstMatch.exists)
         let afterYes: String = try String(contentsOf: indexURL, encoding: .utf8)
         XCTAssertTrue(afterYes.contains("![[Unit 9, Day 2]]"), afterYes)
-
-        // One button, OK; it closes the alert and the preview starts.
-        // The alert is the sheet (or dialog) holding the title: its buttons
-        // are exactly one, OK.
-        var alertButtons: [String] = []
-        for container in [application.sheets, application.dialogs] {
-            let holding: XCUIElement = container.containing(.staticText, identifier: "The front page now shows Unit 9, Day 2.").firstMatch
-            if holding.exists {
-                for index in 0..<holding.buttons.count {
-                    let button: XCUIElement = holding.buttons.element(boundBy: index)
-                    alertButtons.append(button.title.isEmpty ? button.label : button.title)
-                }
-            }
-        }
-        XCTAssertEqual(alertButtons, ["OK"], "the alert's buttons")
-        let ok: XCUIElement = application.buttons["OK"].firstMatch
-        XCTAssertTrue(ok.exists, "the alert has no OK")
-        ok.click()
-        XCTAssertTrue(application.webViews.firstMatch.waitForExistence(timeout: 90), "The preview did not start after OK")
-        XCTAssertFalse(title.exists)
-        application.buttons["stopPreviewButton"].firstMatch.click()
-        application.terminate()
+        return KeptAlert(
+            application: application, title: titleText,
+            keptFile: sectionURL.appendingPathComponent(kept), showInFinderRecord: showInFinderRecord
+        )
     }
 
     // MARK: - Helpers

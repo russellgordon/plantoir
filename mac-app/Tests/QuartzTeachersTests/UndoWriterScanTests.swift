@@ -135,7 +135,7 @@ final class UndoWriterScanTests: XCTestCase {
     /// why. Paths are under `QuartzTeachers/`.
     static let allowed: [String: (calls: Int, reason: String)] = [
         "App/ProblemReportCommands.swift": (5, "notAStep: a problem report, built and saved outside every course"),
-        "App/QuartzTeachersApp.swift": (1, "notAStep: the app's own state folder for `--state-dir`"),
+        "App/QuartzTeachersApp.swift": (2, "notAStep: the app's own state folder for `--state-dir`, and a debug build's test seam writing what Show in Finder was asked to show into a file the test names, only with --state-dir (#899 U3c, Russell's second ruling of 2026-11-20, night)"),
         "Models/AgentGuidance.swift": (2, "waitsFor: U4"),
         "Models/Assist/AppRulesContract.swift": (1, "notAStep: writes the contract files for `--write-contracts`, a developer's command"),
         "Models/Assist/AssistChangeHistory.swift": (2, "waitsFor: U7 (today's undo itself; kept as an adapter when the switch flips)"),
