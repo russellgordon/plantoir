@@ -1263,6 +1263,33 @@ nonisolated enum ActivityTrail {
         /// place because something else holds that place, both named.
         /// Written just before the rename. Never page text.
         case undoFoundAFolderSetAside = "undo found a folder set aside"
+        /// Recovery could not put back a step left part way (#899, U3c):
+        /// content it needs is gone from the list and no kept original beside
+        /// its page matches what the journal recorded. The course and
+        /// section, which of a change, an undo or a redo stopped, how many
+        /// files were left part way, that the list was cleared, and the
+        /// hidden name of each kept original left beside its page. Never
+        /// page text.
+        case undoCouldNotPutBack = "undo could not put back a change that stopped"
+        /// Recovery settled a step left part way and kept a kept original
+        /// beside its page that differs from what the list recorded, such as
+        /// an edit another program made as the change went in (#899, U3c):
+        /// the course and section, which work stopped, and each kept
+        /// original's hidden name with its page's. Never page text.
+        case undoKeptAnOriginal = "undo kept what a page held"
+        /// An Undo or a Redo put a page back from the kept original beside
+        /// it, and the list could not keep a copy of what the page held a
+        /// moment before (#899, U3c's first review, MEDIUM): the course and
+        /// section, Undo or Redo, that the other direction is not offered
+        /// (after a Redo the list was cleared), and the hidden name each
+        /// page's content is kept under. Never page text.
+        case undoKeptWhatItReplaced = "undo kept what it replaced"
+        /// An Undo or a Redo was refused because the newest step is one a
+        /// change that stopped left part way, and recovery has just tried to
+        /// put it back and could not yet (#899, U3c): a file in use, or one
+        /// it cannot read now. The course and section, Undo or Redo, and the
+        /// file and why. The list is kept. Never page text.
+        case undoRefusedForAChangeLeftPartWay = "undo refused for a change left part way"
         /// Setting up an outside assistant was opened (#855): from where (the
         /// Settings pane, the Help menu, Revise With), so a report shows how
         /// the teacher got there.

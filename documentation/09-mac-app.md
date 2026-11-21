@@ -21174,7 +21174,7 @@ changed", and recovery then deleted the only copy of what the page held.
     those two rows and the rule's sentence on staged files, so it is a
     contract change and its own piece (Mac first, then Windows' W4 from the
     same rows), not this round. The first tidy already leaves the original
-    in place for it.
+    in place for it. (Built in U3c, below: no tidy removes an only copy now.)
 - **(c) A shadow swap without the list keeps what it must.** Each such swap
   has a label of its own, `shadow-<pid>-<id>` (`UndoShadowStaging.newLabel`,
   stored in its note as `Note.label`; LOW 2: one label shared by every
@@ -21222,6 +21222,200 @@ changed", and recovery then deleted the only copy of what the page held.
   without them the original is a copy that the race never reaches, so such
   an edit is not seen there.
 
+#### U3c: a kept original puts a page back; nothing that is an only copy is deleted
+
+Russell's ruling of 2026-11-20, 15:20, and the third review of U3a's six
+lows. The contract is `undo.rule.recovery` (its "WHAT STAYS FOR GOOD"
+sentence and the kept-original sentences), `file-formats.json` →
+`undoJournal.stagedFiles`, the `recoveryCases` and `stackCases` rows marked
+U3c, and four `activityTrail.mustRecord` events (the fourth, "undo kept
+what it replaced", from the first review's fix round).
+
+- **A kept original puts the page back.** `UndoCheck.plan(keptOriginal:)`
+  asks, for a `writeFile` whose blob the list no longer holds, for a kept
+  original of the step's own beside that page (`UndoRecovery.keptOriginal`:
+  any of the step's labels, `-orig` or `-<n>-orig`) whose bytes hash to
+  exactly the sha the op wants. Recovery passes it, so a step that died part
+  way with its content gone is rolled back (or an undo or redo ends where
+  it began) and its staged files, the kept original now a copy of its page
+  included, are removed. The door's Undo and Redo pass it too, and tidy the
+  one used once the swap went in. A kept original that does not match is
+  never used. Rejected: trusting a kept original by its name alone; a file
+  someone edited is then put back as if it were the record.
+- **Nothing a put-back sets aside is lost (the first review of U3c,
+  MEDIUM).** The swap that puts a page back from its kept original keeps
+  what the page held a moment before as its own `-undo-orig`, `-redo-orig`
+  or `-recover-orig`, and its tidy deletes it; with the list's content gone,
+  that was the only copy of the step's other side, and the Redo the Undo
+  then offered came to contentMissing (the reviewer's probe: "offered [1],
+  not [1, 2]"). Now `UndoCheck.plan(keptOriginalUsed:)` reports each use
+  (`UndoKeptOriginalUse`: the kept bytes, the other direction's sha, and what
+  the page holds at that op), and `UndoRecovery.storeWhatKeptOriginalsGive`,
+  inside the lock and before the swap, writes the kept bytes back as their
+  blob and the outgoing bytes as the other direction's blob when they hash
+  to the recorded sha. When the list will not take the outgoing content (a
+  full or read-only disk: the contract's `contentCannotBeStored`), the swap
+  is told to keep that page's original (`keepingTheOriginalsOf`), and "undo
+  kept what it replaced" names the hidden file. Recovery does the same
+  before its put-back's swap; it keeps the outgoing content only for a step
+  that stays on the list (an undo or a redo ending where it began: a change
+  rolled back leaves the list, and what it set aside is its own new
+  content), naming it with "undo kept what a page held". Rejected: writing
+  the blobs after the swap (a death between the two would lose them).
+- **A kept original whose own bytes the list will not take stays (the
+  second review of U3c, MEDIUM).** `storeWhatKeptOriginalsGive` ignored a
+  failed write of the kept bytes. With only that blob gone and its folder
+  taking no new file (the contract's `beforeContentGoneAndCannotBeStored`;
+  `contentCannotBeStored` could not see it, since it takes the whole folder
+  and the other blob is then always missing too), the Undo put the page back
+  from the kept `-apply-orig`, the tidy removed it as a copy of its page, the
+  Redo was real, and the Redo's swap tidied its own copy of the before bytes:
+  they were in no file, and the Undo the list offered came to
+  `contentMissing`. It now answers `UndoWhatTheListCouldNotTake`, whose
+  `keptOriginalsHolding` carries the hash of every kept original's bytes the
+  list did not take, and the door's tidy and recovery's settled tidy pass it
+  as `keepingCopiesHolding`: a kept original holding one of those hashes is
+  never removed for being a copy of its page. The next move that uses it
+  tries the write again, and once the list takes the bytes the kept
+  original goes as before. The line "undo kept what it replaced" names it as
+  what the page "holds now"; recovery names it with "undo kept what a page
+  held", "because the list no longer holds a copy of it".
+- **An offer may rest on a kept file (Russell's ruling of 2026-11-20,
+  night; the second review of U3c, LOWs 1 and 2).** After an Undo or a Redo
+  whose other side the list cannot store, the step stays on the list with
+  the other direction offered, resting on the files kept beside its pages,
+  exactly as recovery's offers already did (`-recover-orig`, found by hash).
+  If such a file is gone or changed when the Undo or Redo is chosen, it is
+  refused then with its true sentence, and the list answers that refusal as
+  any other (ruling 13 or 22 for an Undo, ruling 20 for a Redo). Rejected,
+  and replaced: the door dropping the Redo, or clearing the whole list after
+  a Redo, because "an offer must not rest on" a hidden file. Clearing after
+  a Redo that succeeded predicts a refusal that may never come and costs the
+  teacher the whole history on a full disk; withholding only that step's
+  Undo would strand every older step behind it on a linear list, a clearing
+  in all but name. Dropping that clearing also took the door's second lock
+  away (LOW 1: the drop or clear ran after the finish under a lock of its
+  own, so another process acting between the two left the trail line saying
+  "not offered" untruly, and a kill between them left the state the old
+  "Rejected" paragraph forbade): the move now writes once, and its trail
+  line says nothing of an offer withheld, because none is.
+- **A kept original that cannot be read just now (LOW 5)** (a cloud
+  placeholder not downloaded, a permission) is "cannot tell now", never "no
+  match": `UndoRecovery.keptOriginal(couldNotRead:)` reports it, recovery
+  leaves the step for the next try (`leftByRecovery`, so an Undo answers
+  `cannotTellNow`), and the door answers `cannotTellNow` with the list kept
+  instead of `contentMissing`, which clears it.
+- **Nothing that is an only copy is deleted.** A kept original FILE is
+  removed only when its bytes are its page's (`UndoSwap.isACopyOfItsPlace`)
+  or exactly what the list gives for its page, undone or redone from what
+  the page holds now (`UndoRecovery.listHolds`, which plans the step's ops on
+  that page both ways; a whole file needs its blob, a line, a hunk or a
+  member is derived from the page). It replaced `listCanPutBack`, which only
+  asked whether the step's blobs were there: a key edit needs none, so a
+  racing edit's only copy was tidied away when the step settled (LOW 1;
+  `recoveryCases` "a step whose first page was edited in place by another
+  program as the swap went in…"). Every tidy keeps such a file: recovery's
+  before it plans (which since the first review of U3c, LOW 1, keeps every
+  kept original that differs from its page, even one the list gives, and
+  tidies those only once the plan is ready: another page may yet stop the
+  put-back and the list be cleared, and then the first page's kept original
+  is the only copy), after a step settles, at a `couldNotPutBack` closing, of
+  a step already closed (live too now, since nothing will put a closed
+  step's page back and its content is pruned with it), and pruning's.
+- **What the trail says.** `couldNotPutBack` writes "undo could not put back
+  a change that stopped" (no longer the "changed by hand since" line, which
+  was untrue there), naming each kept original left, read after the tidy. A
+  step that settles with one left writes "undo kept what a page held",
+  saying why for each: "because it differs from what the list recorded"
+  (its hash is nothing the journal recorded for the page: a racing edit), or
+  "because the list no longer holds a copy of it" (its hash is exactly a
+  recorded before or after whose content is gone; the first review of U3c,
+  LOW 2, where "it differs" was untrue). Both give the page and the hidden
+  name, never page text.
+- **An Undo or Redo refused for a step left part way (W3's LOW 4, from
+  W4).** When the newest step is a gone process's that recovery, run at once
+  by the Undo, tried and left (a file in use, a page it cannot read now),
+  `UndoJournal.move` answers that refusal from
+  `UndoJournalWriter.leftByRecovery`, never "another change is under way",
+  writes nothing to the list, and writes "undo refused for a change left
+  part way" through `UndoTrailHook.leftNewestLine`.
+- **A kept original's name is never reused (LOW 6).** Step numbers are not
+  unique across two Macs syncing one folder or after a list is started
+  again, and an earlier undo of the same step can leave its kept original
+  for good. `swapAFile` no longer removes whatever holds the `-orig` name:
+  it keeps its original under the next free `-<n>-orig`
+  (`UndoSwap.freeKeptName`), and since the first review of U3c a folder a
+  tree op sets aside takes the next free name too (LOW 3: it was refused
+  `fileIsInUse` for good). A file that appears at the chosen name after it
+  was found free is never overwritten or removed (LOW 4): `keep` answers
+  `EEXIST` from `link` without falling back to a copy, the copy itself is
+  `COPYFILE_EXCL` (`keepByCopying`), and the swap takes the next free name.
+  Rejected: a label
+  carrying a machine and list identity (it changes the staged-name format
+  both platforms parse, for a case the next free name settles); refusing
+  (a step whose undo once kept an edit could then never be undone again).
+- **Class dates and today's class left part way (LOWs 2 and 3).**
+  `SectionTimetableStore.applyRememberTimetable` passes
+  `JournaledStepError.leftPartWay` through; the class-dates sheet says the
+  dates ARE remembered and the assistant says it as part way. Since the
+  first review of U3c (LOW 6) the Class Dates sheet carries on exactly as a
+  plain save does (`SectionScheduleSheet.save` answers
+  `.rememberedKeeping`): one alert, "The class dates for … are
+  remembered." naming the kept file, whose OK calls `onRemembered` and
+  closes the sheet, so a verb waiting on the dates (`afterTheDates`)
+  continues; before, it was a `.blocking` status line and nothing waiting
+  ran. Today's class answers `.shownKeepingWhatItHeld`, and its trail line
+  names the kept file. The Section window shows one alert naming it
+  (Russell's ruling of 2026-11-20, night): "The front page now shows
+  {class}." / "What the front page held a moment before is kept beside it,
+  hidden, as “{kept}”." with OK and Show in Finder, never "The Front Page
+  Was Not Changed" (`class-planning.json` → `todaysClassOnTheFrontPage.wording`,
+  `keptTitle`, `kept` and `showKept`). Apple's HIG Alerts page, read that
+  night: a title that is a complete sentence takes sentence-style capitals
+  and a full stop; "OK" for acceptance in an informational alert; a button
+  title is a verb phrase naming its result, title-style; the default button
+  on the trailing side of a row or at the top of a stack; and "avoid using
+  an alert merely to provide information … informative, but not
+  actionable", which the second review raised (LOW 3: the teacher could not
+  find the file the alert named). **Show in Finder (Russell's second ruling
+  of 2026-11-20, night)** is beside OK on both kept-file alerts, today's
+  class's and the Class Dates sheet's; OK stays the default
+  (`.keyboardShortcut(.defaultAction)`), and either button closes the alert
+  and carries on. It shows the kept files selected in their folder
+  (`FolderActions.showInFinder(files:)`, `NSWorkspace.activateFileViewerSelecting`).
+  Measured on this Mac that night before it was built, with Finder not
+  showing hidden files (no `AppleShowAllFiles`): asked to show a file whose
+  name starts with a dot, Finder opened its folder with the file listed,
+  greyed, and selected ("1 of 2 selected"), so the button never opens a
+  folder in which the file cannot be seen, and the app never changes
+  Finder's settings. The alert is shown once the question has gone, before
+  whatever the preview then says, which waits behind it (`frontPageKept`,
+  `afterThePreviewAlert`). It is proved through the real window
+  (`TodaysClassOnTheFrontPageUITests.testShowGoingInPartWayNamesTheKeptFileInOneAlert`,
+  which also checks OK is the default and trailing, and
+  `testShowInFinderShowsTheKeptFileItNames`) with the debug-only
+  `--ui-test-edit-races-the-swap <file name>` (`UndoUITestSeam`, honoured
+  only beside `--state-dir`), which makes the first swap of that file race
+  an in-place edit with the put-back failing, and
+  `--ui-test-record-show-in-finder <file>`, which writes what Show in
+  Finder was asked to show into that file instead of bringing Finder to
+  the front.
+  The plain-words check of that wording runs with `{kept}` filled by a
+  placeholder: the hidden name is the app's, and holds "index".
+- **How I Teach (LOW 4)** is said as part way with no pointer at a copy of a
+  section (documentation 10).
+
+**What stays on the disk for good, and what a teacher sees of it.** Two
+kinds of leftover are never removed, by design: a kept original that is the
+only copy of what it holds (above), and, in shadow, the staged files of a
+swap without the list whose note could not be written (nothing records that
+they are Plantoir's to remove, `UndoShadowStaging`). Both are dot files
+beside the page, `.<page name>.plantoir-undo-…`: Obsidian, the Finder and
+the website builder pass over them, so a teacher sees nothing of them unless
+they show hidden files. The way to one is its trail line (each kept
+original is named there, with its page), and a problem report carries the
+trail. Removing one by hand loses only what it holds.
+
 #### If the app dies part way: what is on disk
 
 Every action has the same five places to die, because every action is one
@@ -21239,7 +21433,8 @@ step through the same door:
 
 Live (U7), recovery puts places 2 to 4 right once the process is gone.
 Places 2 and 3 are put back to before the step: `failed`, or `rolledBack`
-with one trail line. Place 4 is completed (`done`). Nothing staged is left.
+with one trail line. Place 4 is completed (`done`). Nothing staged is left,
+except a kept original that is the only copy of what it holds (U3c, below).
 
 In SHADOW (today), recovery never writes into a working folder. A step left
 at place 3 is recorded `interrupted` and the list cleared. Its staged new

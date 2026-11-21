@@ -573,6 +573,12 @@ nonisolated final class UndoJournalWriter {
     /// (`UndoPruning.prune`).
     var recoveredInThisHold: Bool = false
 
+    /// The steps recovery tried in this hold and left in flight, by number,
+    /// with the refusal that stopped it (a file in use, a page it cannot
+    /// read now): what an Undo or a Redo answers when that step is the
+    /// newest, never "another change is under way" (`UndoJournal.move`).
+    var leftByRecovery: [Int: UndoRefusal] = [:]
+
     /// The segment being appended to, open for the lock's length.
     private var openSegment: (number: Int, handle: FileHandle, lines: Int)?
 

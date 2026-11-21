@@ -166,6 +166,77 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(UndoContractKinds.stagedLeftovers(in: root), [])
     }
 
+    /// A folder taken out whose `-orig` name another Mac's list or an
+    /// earlier list already holds is set aside under the next free name and
+    /// the take-out goes in; the folder under the taken name is never
+    /// touched (the first review of U3c, LOW 3). MUST FAIL with the old
+    /// `isAFolderSetAside(asideURL)` refusal, which answered fileIsInUse for
+    /// good.
+    func testAFolderTakenOutGoesAsideUnderTheNextFreeName() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let folder: URL = root.appendingPathComponent("made", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("A\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        guard case .tree(let listing, _) = UndoTreeReading.read(at: folder) else {
+            return XCTFail("the folder could not be listed")
+        }
+        let foreign: URL = UndoSwap.besideURL(for: folder, label: "9-undo", role: "orig")
+        try FileManager.default.createDirectory(at: foreign, withIntermediateDirectories: true)
+        try Data("Another list's folder.\n".utf8).write(to: foreign.appendingPathComponent("theirs.md"))
+        let targets: [UndoSwapTarget] = [
+            UndoSwapTarget(url: folder, relativePath: "made", change: .takeTree(listingSha: listing.sha)),
+        ]
+        XCTAssertEqual(UndoSwap.swap(targets, label: "9-undo", root: root), .swapped)
+        XCTAssertEqual(UndoTreeReading.read(at: folder), .absent, "the folder was not taken out")
+        XCTAssertEqual(try Data(contentsOf: foreign.appendingPathComponent("theirs.md")), Data("Another list's folder.\n".utf8))
+        XCTAssertEqual(UndoContractKinds.stagedLeftovers(in: root), [foreign.lastPathComponent, foreign.lastPathComponent + "/theirs.md"])
+    }
+
+    /// A file that appears at the name a swap chose for a kept original, in
+    /// the instant after the name was found free, is never overwritten or
+    /// removed: the original is kept under the next free name and the swap
+    /// goes in (the first review of U3c, LOW 4). Both ways a kept original
+    /// is made are proved: a hard link, and the copy a volume without links
+    /// falls back to (`keep`, reached here by making the link refuse as
+    /// such a volume does). MUST FAIL with `copyfile` without
+    /// `COPYFILE_EXCL` and the name not tried again.
+    func testAFileThatAppearsAtTheKeptNameIsNeverOverwrittenOrRemoved() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let page: URL = root.appendingPathComponent("page.md")
+        try Data("old\n".utf8).write(to: page)
+        let theirs: Data = Data("What another Mac kept.\n".utf8)
+
+        // The copy a volume without hard links falls back to refuses a name
+        // that is taken and leaves what is there whole.
+        let taken: URL = root.appendingPathComponent(".taken")
+        try theirs.write(to: taken)
+        XCTAssertEqual(UndoSwap.keepByCopying(page, as: taken), EEXIST)
+        XCTAssertEqual(try Data(contentsOf: taken), theirs)
+        try FileManager.default.removeItem(at: taken)
+
+        // The swap: a file appears at its chosen name after the name was
+        // found free; the original goes under the next free name.
+        var placedAt: URL? = nil
+        UndoKillPoints.beforeKeepingTheOriginal = { _, url in
+            if placedAt == nil {
+                try? theirs.write(to: url)
+                placedAt = url
+            }
+        }
+        defer {
+            UndoKillPoints.beforeKeepingTheOriginal = nil
+        }
+        let targets: [UndoSwapTarget] = [
+            UndoSwapTarget(url: page, relativePath: "page.md", expected: Data("old\n".utf8), replacement: Data("new\n".utf8)),
+        ]
+        XCTAssertEqual(UndoSwap.swap(targets, label: "9-undo", root: root), .swapped)
+        XCTAssertEqual(try Data(contentsOf: page), Data("new\n".utf8))
+        let placed: URL = try XCTUnwrap(placedAt)
+        XCTAssertEqual(try Data(contentsOf: placed), theirs, "the file that appeared was overwritten or removed")
+        XCTAssertEqual(UndoContractKinds.stagedLeftovers(in: root).count, 1, "\(UndoContractKinds.stagedLeftovers(in: root))")
+    }
+
     /// A process that died with a teacher's folder renamed aside (a tree
     /// taken out) never has that folder deleted by recovery's tidying: it
     /// is put back where it was, so it is judged as the work found it, even

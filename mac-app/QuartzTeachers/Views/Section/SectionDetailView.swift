@@ -146,6 +146,11 @@ struct SectionDetailView: View {
     enum PreviewAlert: Equatable {
         case refusal(title: String, sentence: String)
         case todaysClass(TodaysClassOnTheFrontPage.Offer)
+        /// Informational, OK the default, with Show in Finder beside it
+        /// (#899 U3c, Russell's rulings of 2026-11-20, night): Yes to
+        /// today's class went in, and what the front page held a moment
+        /// before is kept in the named hidden file, `keptFiles`.
+        case notice(title: String, sentence: String, keptFiles: [URL])
     }
 
     /// A refusal that arrived while the question about today's class was up
@@ -178,6 +183,12 @@ struct SectionDetailView: View {
     /// the question has gone — unless starting the preview had something to
     /// say first (the trail has both).
     @State var frontPageNotChanged: String?
+
+    /// The one alert naming the hidden file what the front page held a
+    /// moment before is kept in, when Show on Front Page went in part way
+    /// (Russell's ruling of 2026-11-20, night, on #899 U3c). Shown once the
+    /// question has gone; whatever the preview then says waits behind it.
+    @State var frontPageKept: PreviewAlert?
 
     /// A deploy that was set to happen on its own and did not get through.
     ///
@@ -1069,6 +1080,18 @@ struct SectionDetailView: View {
                     .keyboardShortcut(.cancelAction)
                 case .refusal:
                     Button("OK") { }
+                case .notice(_, _, let keptFiles):
+                    // OK is the default, on the trailing side: the alert is
+                    // informational, and closing it is what most teachers
+                    // want. Show in Finder closes it too and shows the kept
+                    // file selected in its folder, which Finder does for a
+                    // hidden file without showing hidden files (measured
+                    // 2026-11-20, night; the HIG's Alerts page, read then).
+                    Button("OK") { }
+                        .keyboardShortcut(.defaultAction)
+                    Button(FrontPageWording.showKept) {
+                        FolderActions.showInFinder(files: keptFiles)
+                    }
                 }
             } message: {
                 Text(previewAlertMessage)
@@ -1823,7 +1846,7 @@ struct SectionDetailView: View {
 
     var previewAlertTitle: String {
         switch previewAlert {
-        case .refusal(let title, _):
+        case .refusal(let title, _), .notice(let title, _, _):
             return title
         case .todaysClass(let offer):
             return FrontPageWording.question(class: offer.classTitle)
@@ -1832,7 +1855,7 @@ struct SectionDetailView: View {
 
     var previewAlertMessage: String {
         switch previewAlert {
-        case .refusal(_, let sentence):
+        case .refusal(_, let sentence), .notice(_, let sentence, _):
             return sentence
         case .todaysClass(let offer):
             return FrontPageWording.because(noun: offer.noun.singular, shown: offer.shownTitle)
@@ -1881,6 +1904,25 @@ struct SectionDetailView: View {
             if !previewRunner.isRunning {
                 startPreview(at: pendingPreviewRequest)
             }
+        }
+        if let kept = frontPageKept {
+            // The kept file is named first, in its own alert; whatever the
+            // preview has just said, and anything held, is shown when it
+            // closes (this runs again then).
+            frontPageKept = nil
+            var waiting: PreviewAlert? = heldPreviewRefusal
+            if previewAlertIsUp {
+                if let earlier = waiting {
+                    waiting = SectionDetailView.joining(earlier, then: previewAlert)
+                } else {
+                    waiting = previewAlert
+                }
+            }
+            heldPreviewRefusal = waiting
+            frontPageNotChanged = nil
+            previewAlert = kept
+            previewAlertIsUp = true
+            return
         }
         if previewAlertIsUp, let held = heldPreviewRefusal {
             // The button's own preview was refused too: both are said, the
@@ -2057,7 +2099,20 @@ struct SectionDetailView: View {
         )
         ActivityTrail.note(line.event, line.what, course: course.code, section: sectionNumber)
         switch outcome {
-        case .shown:
+        case .shown, .shownKeepingWhatItHeld:
+            if case .shownKeepingWhatItHeld(_, let shown, let keptOriginals, let folder) = outcome {
+                // One alert naming the kept file (Russell's ruling of
+                // 2026-11-20, night), shown once the question has gone.
+                var keptFiles: [URL] = []
+                for name in keptOriginals {
+                    keptFiles.append(folder.appendingPathComponent(name))
+                }
+                frontPageKept = .notice(
+                    title: FrontPageWording.keptTitle(class: shown),
+                    sentence: FrontPageWording.kept(keptOriginals),
+                    keptFiles: keptFiles
+                )
+            }
             refreshEditedMarker()
             // The teacher has just asked to change the FRONT page, so that
             // is what they are shown, even when they asked for the page last

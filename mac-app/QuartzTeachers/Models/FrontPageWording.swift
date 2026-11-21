@@ -41,4 +41,35 @@ nonisolated enum FrontPageWording {
     static func couldNotSave(shown: String) -> String {
         return "The front page could not be saved, so it still shows \(shown)."
     }
+
+    // MARK: - When it went in and what it held is kept
+
+    /// The one alert when Show on Front Page went in but an edit made at
+    /// the same instant could not be merged and is kept hidden beside the
+    /// page (#899 U3c, Russell's ruling of 2026-11-20, night). A complete
+    /// sentence, so sentence-style capitals and a full stop (the HIG's
+    /// Alerts page, read that night); OK, the default, since it is
+    /// informational, with Show in Finder beside it.
+    static func keptTitle(class className: String) -> String {
+        return "The front page now shows \(className)."
+    }
+
+    /// `{kept}` is the hidden name, quoted; one sentence per name.
+    static func kept(_ keptNames: [String]) -> String {
+        var sentences: [String] = []
+        for name in keptNames {
+            sentences.append(keptSentence(kept: name))
+        }
+        return sentences.joined(separator: " ")
+    }
+
+    static func keptSentence(kept name: String) -> String {
+        return "What the front page held a moment before is kept beside it, hidden, as “\(name)”."
+    }
+
+    /// The alert's second button (Russell's second ruling of 2026-11-20,
+    /// night): a verb phrase naming its result, title-style, the words this
+    /// action has everywhere else in the app (the HIG's Alerts page, read
+    /// that night). OK stays the default, on the trailing side.
+    static let showKept: String = "Show in Finder"
 }
