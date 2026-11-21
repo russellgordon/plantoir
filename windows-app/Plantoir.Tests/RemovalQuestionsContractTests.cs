@@ -59,9 +59,13 @@ public class RemovalQuestionsContractTests
         Assert.Contains("DialogButtons.AskWithNoDefault(dialog);", question);   // no default, the focus on Cancel (#979)
         // Both doors to it say the command's words.
         Assert.Contains("MenuItem(ScheduledDeployRemovalWording.MenuItem,", sidebar);
-        // The menu bar draws Section ▸ from SubjectMenuLayout since #990; the item's words are its title there.
-        Assert.Contains("Item.CancelScheduledDeploy => ScheduledDeployRemovalWording.MenuItem,", Source("..", "Plantoir.Core", "Models", "SubjectMenuLayout.cs"));
-        Assert.Contains("Add(into, LayoutTitle(item), id, item);", Source("MainWindow.Menus.cs"));
+        // The menu bar draws Section ▸ from SubjectMenuLayout since #990: the item's words are its title
+        // there in every course, and no club retitles it (#1027).
+        foreach (var noun in new[] { ClassNoun.Class, ClassNoun.Meeting })
+            Assert.Equal(ScheduledDeployRemovalWording.MenuItem,
+                         SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.CancelScheduledDeploy, noun));
+        Assert.Null(SubjectMenuLayout.TitleSayingTheNoun(SubjectMenuRules.Item.CancelScheduledDeploy, ClassNoun.Meeting));
+        Assert.Contains("LayoutTitle(Item item, ClassNoun noun) => SubjectMenuLayout.TitleHere(item, noun)", Source("MainWindow.Menus.cs"));
     }
 
     [Fact]
