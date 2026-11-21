@@ -101,6 +101,49 @@ Branch `issue/928-win-preview-starts`. #1022 item 1 is done here; #1022 item 2
   - `LaunchProblemWordingTests.TheFolderNotSetUpRefusalNamesNoFileOrPath` line 84 (via line 21): the old sentence naming `preview.ps1` put back (L6).
 - Proven on VM B, head 90598c6b9 (dev 10d04bfbd merged): the piece's classes and every class that reads a changed file as source text, 44 classes in batches, all green except `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel` (deploy.sh line 1472 inside `run_token_mode()`; `deploy.sh` is untouched by this branch, so it is dev's, unrelated). `DialogTitleScanTests` needed the census at 17 for the "Cannot Preview Yet" alert. `PreviewThatCannotStartUiTests` passed twice.
 
+- Review 2 (`vm-tools/briefs/2026-11-21-lane-d-review-2.md`), fixed:
+  - M3: `StartAutomatedPreview` now answers its caller once the start is
+    decided (`Task<string?>`: null went ahead, otherwise the sentence shown).
+    `PreviewStarts.Begin` stays the one place that decides; a lease refusal
+    (and an outside build's decline, and this section's deploy) is shown under
+    "Cannot Preview Yet" through `ShowPreviewRefusal`, the press's own way,
+    and the answer goes back through `RebuildPreviewAsync`,
+    `MainWindow.RebuildPreviewFor` and the `RebuildPreviewInApp` seam (now
+    `Func<Task<string?>>`). The runner answers that sentence
+    (`ShownInTheWindow`, so the Section menu does not show it a second time),
+    the trail ends "not rebuilt", and the assistant's two own rebuild routes
+    (card and plain words) say it instead of "is opening". The runner now
+    waits for the stop before it answers, as the Mac's `bringThePreviewUpToDate` does.
+    Census: `SectionDetailView.xaml.cs` 17 to 15, the four "Cannot Preview
+    Yet" dialogs of the start (press refusal, press decline, run that never
+    started, and the new automated one) being one `ShowPreviewRefusal`.
+  - Left as they were (each already shows its own dialog and the runner or
+    `RebuildPreviewFor` asks the same thing first): the folder getting ready,
+    no folder, a view replaced during the stop. Those still answer null.
+  - Mac difference (not touched, Windows only): the Mac's
+    `bringThePreviewUpToDate` returns `previewIsRebuilding` after
+    `startPreview()` whatever it did, and `SectionVerbs` writes "rebuilt", so
+    on the Mac the assistant and the trail are wrong for a refused start
+    while the window does show "Cannot Preview Yet".
+  - L10: `MainWindow.Closed`, after the view lets go, sweeps and releases by
+    reference every row the window still holds (`PreviewLeases.HeldBy`), so
+    a replaced view's row cannot outlive its window. A crashed process takes
+    its table with it; a replaced view in a live window is swept by that
+    window's next start of the section, as before.
+  - L11: not measured (whether `Close()` raises `AppWindow.Closing` at once
+    or later). The model showed the state reachable whenever it is later, so
+    it is made impossible either way: a pass handed the quit by its own
+    window's earlier pass, finding the close no longer quits, takes the quit
+    back (`QuitGoingAhead.BeginPass(..., window:)`).
+- Must-fail (review 2), all six reverts at once in scratch commit 7ffbb49e2 (local only, deleted after), VM B 2026-11-21 01:42, 6 of 6 failed. The log names the tests, not lines; the line given is the first assertion each revert reaches:
+  - `SectionVerbsTests.ARebuildTheWindowRefuses_IsAnsweredWithItsSentence_NeverRebuilding` line 514: the runner put back to ignore the window's answer (M3).
+  - `SectionVerbsTests.ThePlainRebuildTheWindowRefuses_SaysTheWindowsSentence` line 531: the plain route put back to "is opening" (M3).
+  - `PreviewStartRecordTests.TheAutomatedStartAnswersWithTheRefusalItShows` line 423: the automated start's answer and dialog removed (M3).
+  - `PreviewStartRecordTests.AClosingWindowHandsBackEveryRowItHolds` line 284: `HeldBy` made to return nothing (L10).
+  - `PreviewStartRecordTests.TheClosingWindowLetsGoOfWhatItStillHolds` line 438: the call in `Closed` removed (L10).
+  - `QuitGoingAheadTests.AHandedOnQuitThatIsNoLongerAQuitIsTakenBack` line 93: `NotAQuit` made unconditional again (L11).
+- Proven on VM B, head ad119f41b (dev 10d04bfbd in): 31 classes (the piece's and every class that reads a changed file as source text), 470 of 470 passed; `PreviewThatCannotStartUiTests` passed.
+
 ### #1022 item 1
 
 Done. Both shapes go one way: a `preview.ps1` missing before the press used to
