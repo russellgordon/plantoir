@@ -528,7 +528,7 @@ public sealed partial class AssistWindow : Window
             ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
             // "Rebuild" means rebuild (#489, Q1): a serving preview is stopped
             // and started again, where ShowPreviewFor would leave it as it was.
-            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section),
+            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section) ?? Task.FromResult<string?>(null),
             // The Section menu's claim (#489): this window's change to a
             // section the menu is changing right now is refused, never interleaved.
             SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, _course.Code, _section),

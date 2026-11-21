@@ -419,6 +419,13 @@ public partial class App : Application
         return window;
     }
 
+    /// <summary>
+    /// The teacher's quit has gone ahead (#928 items 6 and 7): see
+    /// <see cref="Plantoir.Core.Models.QuitGoingAhead"/>, which the closing
+    /// handler sets and clears through one pass per close.
+    /// </summary>
+    public static bool QuitHasGoneAhead => Plantoir.Core.Models.QuitGoingAhead.Shared.HasGoneAhead;
+
     /// <summary>Whether closing this window quits the app: it is the last one still open (#231).</summary>
     public static bool ClosingThisQuits(MainWindow window) =>
         _windows.Where(open => !open.IsClosed).All(open => ReferenceEquals(open, window));
