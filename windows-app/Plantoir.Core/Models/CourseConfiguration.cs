@@ -143,7 +143,11 @@ public sealed class CourseConfiguration
     public SaveReport Write(string path)
     {
         JObject? onDisk = null;
-        var read = ReadBytes(path);
+        HeldFiles.FileBytes read;
+        // A refusal that is not a hold (a permission) keeps today's path: the
+        // write below meets the same refusal and says it in the system's words.
+        try { read = ReadBytes(path); }
+        catch { read = new HeldFiles.FileBytes(HeldFiles.ReadOutcome.NotThere, null); }
         if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw new FileInUseException(Path.GetFileName(path));
         try { if (read.Outcome == HeldFiles.ReadOutcome.Read) onDisk = ParseObject(read.Data!); }
         catch { onDisk = null; }   // not valid JSON: this copy is the only truth left
