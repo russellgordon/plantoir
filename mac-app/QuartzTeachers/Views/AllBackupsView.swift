@@ -53,7 +53,7 @@ struct AllBackupsView: View {
                         Text(row.item.whenDescription)
                     }
                     TableColumn("Made By") { row in
-                        Text(madeBy(row.item))
+                        Text(madeBy(row.item, noun: workspace.classNoun(ofCourse: row.item.courseCode)))
                     }
                     TableColumn("Size", value: \.bytesForSorting) { row in
                         Text(workspace.shortSizeDescription(of: row.item) ?? "—")
@@ -263,15 +263,17 @@ struct AllBackupsView: View {
         return "\(count) \(noun) — " + AssistWording.backupSizeCouldNotBeRead
     }
 
-    /// Who made a backup, short enough for a column.
-    func madeBy(_ item: BackupItem) -> String {
+    /// Who made a backup, short enough for a column. `noun` is what the
+    /// backup's course calls its class pages: a club's menu copy says "The
+    /// Meetings menu" (#990).
+    func madeBy(_ item: BackupItem, noun: ClassNoun) -> String {
         switch item.maker {
         case .teacher:
             return "You"
         case .assistant(let sectionNumber):
             return "The assistant, Section \(sectionNumber)"
-        case .menu(let sectionNumber):
-            return "The Section menu, Section \(sectionNumber)"
+        case .menu(let sectionNumber, let inMenu):
+            return "The \(SubjectMenuLayout.title(of: inMenu, noun: noun)) menu, Section \(sectionNumber)"
         }
     }
 

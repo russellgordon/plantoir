@@ -263,11 +263,11 @@ nonisolated struct LinksChecklistAnswered: Sendable, Equatable {
 
     /// Written with a rename, so a reader never meets half a file. Last writer
     /// wins between two windows: the worst outcome is being asked once more.
-    func write(courseDirectory: URL, section: Int, at moment: Date = Date()) throws {
+    ///
+    /// Through the door (#899, U3): planned into `step` when the answer is
+    /// part of a larger step (Publish's pages), otherwise one step of its own.
+    func write(courseDirectory: URL, section: Int, at moment: Date = Date(), into step: JournaledStep? = nil) throws {
         let url: URL = LinksChecklistAnswered.fileURL(courseDirectory: courseDirectory, section: section)
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
-        )
         let formatter: ISO8601DateFormatter = ISO8601DateFormatter()
         let object: [String: Any] = [
             "version": 1,
@@ -276,7 +276,16 @@ nonisolated struct LinksChecklistAnswered: Sendable, Equatable {
             "leftUnticked": leftUnticked.sorted()
         ]
         let data: Data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: url, options: .atomic)
+        if let step {
+            step.write(data, to: url)
+            return
+        }
+        let own: JournaledStep = JournaledStep(
+            courseCode: courseDirectory.lastPathComponent, courseDirectory: courseDirectory,
+            section: section, maker: UndoStepMaker.sheet("answerTheLinksChecklist")
+        )
+        own.write(data, to: url)
+        try own.make()
     }
 }
 

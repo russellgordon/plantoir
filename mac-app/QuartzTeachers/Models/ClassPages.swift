@@ -234,7 +234,7 @@ enum ClassPages {
     ) -> ClassPageSummary {
         let title: String = url.deletingPathExtension().lastPathComponent
         var date: CalendarDay? = nil
-        if let text = try? String(contentsOf: url, encoding: .utf8) {
+        if let text = JournaledStep.textAsPlanned(at: url) {
             // Class pages live inside `section<N>/`, so they carry a plain
             // `created:` — the section-local key.
             date = PageFrontmatter.createdDay(

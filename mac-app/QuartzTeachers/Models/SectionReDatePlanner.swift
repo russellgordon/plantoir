@@ -268,8 +268,18 @@ enum SectionReDatePlanner {
     /// pages whose date changes — so a section with some classes already on
     /// their days was told "Re-dated 14 classes and -4 pages they use". A
     /// page left on its day, or declined, is counted nowhere.
-    static func apply(_ plan: SectionReDatePlan, forSection sectionNumber: Int, in course: Course)
-        throws -> (change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int) {
+    ///
+    /// ONE step through the door (#899, U3): every page re-dated together,
+    /// all or none; the front page is the rule's (`recompute`). Given a step
+    /// (Roll Over), the caller adds to it and makes it, and repoints the
+    /// front page itself once the step is made.
+    static func apply(
+        _ plan: SectionReDatePlan, forSection sectionNumber: Int, in course: Course,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("reDateClasses"),
+        into outerStep: JournaledStep? = nil
+    ) throws -> (change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int) {
+        let step: JournaledStep = outerStep
+            ?? JournaledStep(course: course, section: sectionNumber, maker: maker)
         let tail: String = ClassPages.siblingTimeAndOffset(
             from: ClassPages.list(forSection: sectionNumber, in: course),
             forSection: sectionNumber
@@ -281,7 +291,7 @@ enum SectionReDatePlanner {
         var pagesTheyUseReDated: Int = 0
         do {
             for move in plan.moves {
-                let before: String = try String(contentsOf: move.fileURL, encoding: .utf8)
+                let before: String = try step.readTextOrThrow(move.fileURL)
                 let dated: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                     in: before,
                     key: PageFrontmatter.createdKey(
@@ -320,22 +330,21 @@ enum SectionReDatePlanner {
                 if after == before {
                     continue
                 }
-                try after.write(to: move.fileURL, atomically: true, encoding: .utf8)
+                step.write(after, to: move.fileURL)
                 saved.append(AssistSavedFile(fileURL: move.fileURL, before: before, after: after))
             }
-        } catch {
-            if saved.isEmpty {
-                throw error
-            }
-            var written: [URL] = []
-            for file in saved {
-                written.append(file.fileURL)
-            }
-            throw StoppedAfterWriting(written: written, underlying: error)
         }
-
-        if let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
-            saved.append(repointed)
+        step.keepsTheFrontPageTrue(
+            of: sectionNumber, at: SectionIndexPointer.indexURL(forSection: sectionNumber, in: course)
+        )
+        // Nothing is written before every page is planned, so a page that
+        // cannot be read stops it with nothing changed: `StoppedAfterWriting`
+        // is no longer thrown from here.
+        if outerStep == nil {
+            try step.make()
+            if let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
+                saved.append(repointed)
+            }
         }
 
         // The undo line names what MOVED (#343), not every class in the section.

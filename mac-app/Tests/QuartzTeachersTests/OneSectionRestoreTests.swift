@@ -725,7 +725,7 @@ final class OneSectionFixture {
     /// The copy the Section menu saves before changing Section 2.
     func backUp() async throws -> BackupItem {
         let backupURL: URL = try await CourseArchiver.backUpCourse(
-            course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .menu(sectionNumber: 2)
+            course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .menu(sectionNumber: 2, inMenu: .section)
         )
         return try XCTUnwrap(BackupItem.from(fileURL: backupURL, courseCode: "ICS3U"))
     }

@@ -1371,7 +1371,7 @@ public sealed partial class MainWindow : Window
             case SidebarSelection.BackupEntry(var backupId)
                 when Workspace.BackupItems.FirstOrDefault(b => b.Id == backupId) is { } backup:
                 DetailHost.Content = EmptyState(backup.Title,
-                    $"{backup.Subtitle}. Restoring puts {backup.CourseCode} back to exactly this " +
+                    $"{backup.SubtitleFor(Workspace.ClassNounOf(backup.CourseCode))}. Restoring puts {backup.CourseCode} back to exactly this " +
                     "moment — the current version is archived first, and the backup is kept.",
                     "Restore…", () => Sidebar.ConfirmRestoreBackup(backup),
                     "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup));

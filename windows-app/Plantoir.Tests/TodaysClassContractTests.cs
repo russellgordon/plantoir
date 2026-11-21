@@ -154,6 +154,16 @@ public sealed class TodaysClassContractTests : IDisposable
         Assert.Equal(w["notChangedTitle"]!.ToString(), TodaysClassOnTheFrontPage.NotChangedTitle);
         Assert.Equal(w["noLongerOffered"]!.ToString().Replace("{noun}", "class"), TodaysClassOnTheFrontPage.NoLongerOffered(ClassNoun.Class));
         Assert.Equal(w["couldNotSave"]!.ToString().Replace("{shown}", "Y"), TodaysClassOnTheFrontPage.CouldNotSave("Y"));
+
+        // Every key the contract has is compared above or held by name in
+        // NamedGapLedger (the mac's U3c added the kept-file alert's three,
+        // #899): a key added on the mac turns this red rather than passing
+        // unseen. A held key fails the day it is said here.
+        var saidHere = new[] { "question", "because", "show", "notToday", "notChangedTitle", "noLongerOffered", "couldNotSave" };
+        var keys = w.AsObject().Select(pair => pair.Key).ToList();
+        var held = NamedGapLedger.GapsIn(NamedGapLedger.TodaysClassWording, keys, saidHere);
+        foreach (string key in keys)
+            Assert.True(saidHere.Contains(key) || held.Contains(key), $"todaysClassOnTheFrontPage.wording.{key} is neither said here nor held");
     }
 
     /// <summary>

@@ -49,8 +49,8 @@ final class BackupTests: XCTestCase {
             BackupItem.from(fileURL: fileURL, courseCode: "ICS3U")
         )
         XCTAssertEqual(backup.maker, .teacher)
-        XCTAssertTrue(backup.subtitle.hasPrefix("Backed up "))
-        XCTAssertTrue(backup.subtitle.hasSuffix("made by you"), backup.subtitle)
+        XCTAssertTrue(backup.subtitle(noun: .class).hasPrefix("Backed up "))
+        XCTAssertTrue(backup.subtitle(noun: .class).hasSuffix("made by you"), backup.subtitle(noun: .class))
     }
 
     /// The assistant's own say so in the name, and the list says what the
@@ -64,8 +64,8 @@ final class BackupTests: XCTestCase {
             BackupItem.from(fileURL: fileURL, courseCode: "ICS3U")
         )
         XCTAssertEqual(backup.maker, .assistant(sectionNumber: 3))
-        XCTAssertTrue(backup.subtitle.contains("before an assistant chat about Section 3"),
-                      backup.subtitle)
+        XCTAssertTrue(backup.subtitle(noun: .class).contains("before an assistant chat about Section 3"),
+                      backup.subtitle(noun: .class))
         let teachersOwn: BackupItem = BackupItem(
             courseCode: "ICS3U", backedUpAt: backup.backedUpAt, fileURL: fileURL, maker: .teacher
         )

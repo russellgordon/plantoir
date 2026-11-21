@@ -31,7 +31,7 @@ description: Open the assistant that runs on this {{machine}}, agree to its one-
 ---
 The local assistant runs on this {{machine}}. You type what you want done in a section, in a sentence, and it does it once you agree. It runs entirely on this {{machine}}, and nothing you have written is sent anywhere.
 
-Plantoir does not need it. Everything it does is also in the Section menu.
+Plantoir does not need it. Everything it does is also in the Section and Classes menus.
 
 {{mac}}
 It needs a Mac with Apple silicon.
@@ -83,7 +83,7 @@ With the question, the assistant says:
 
 Type Undo that. The assistant takes back its last change.
 
-The assistant's undo list is its own. It is separate from {{menu:undoLastChange}}, which takes back a change made from the Section menu.
+The assistant's undo list is its own. It is separate from {{menu:undoLastChange}}, which takes back a change made from the Section or Classes menu.
 
 ## Settings for the assistant
 

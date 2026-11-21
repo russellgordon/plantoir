@@ -100,4 +100,4 @@ If you choose one for a section with no dates on file, this sheet opens first, w
 - **The address is not a Google Sheet's.** Copy it from the browser's address bar while the sheet is open. A link that Google makes for showing a sheet as a web page of its own does not work, and the sheet says so. Use the address of the sheet itself, which ends in `/edit`.
 - **Google sent a sign-in page.** The sheet is not shared. Share it as described above.
 - **The file is refused.** It is not a .csv or .ics file, or it is a calendar file with no events in it.
-- **{{menu:classDates}} is greyed.** The course is kept for reference, or the section is busy with a deploy, a backup or another command from the Section menu.
+- **{{menu:classDates}} is greyed.** The course is kept for reference, or the section is busy with a deploy, a backup or another command from the Section or Classes menu.
