@@ -73,6 +73,7 @@ public sealed class RestoreKillTests : IDisposable
         Assert.Equal(outsideTheSectionBefore, SnapshotOutsideTheSection());
 
         // The next open of the working folder, as WorkspaceViewModel.Reload makes it.
+        Workspace.Classify(_fixture.Folder);
         Workspace.DiscoverCourses(_fixture.Folder);
         Workspace.FindBackups(_fixture.Folder);
         Workspace.FindArchivedItems(_fixture.Folder);
