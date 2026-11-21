@@ -1046,11 +1046,19 @@ public static class ActivityTrail
         Append(PromptRecord(prompt, course, section, moment ?? DateTime.Now));
     }
 
-    /// <summary>The record <see cref="NotePrompt"/> writes, without writing it.</summary>
+    /// <summary>
+    /// The record <see cref="NotePrompt"/> writes, without writing it. Each of
+    /// its two lines goes through <see cref="SafeTrailLine"/> on its RAW text
+    /// (<c>trailLines.order</c>: redact, clean, redact again), never cleaned
+    /// first: cleaning the sentence before redacting it turned a NUL inside a
+    /// token into a space and wrote the token's tail (lane E review 1, M1).
+    /// The joined record is then put through once more, keeping its one line
+    /// break; redacting again changes nothing (<c>redactedAgainCases</c>).
+    /// </summary>
     public static string PromptRecord(string prompt, string course, int section, DateTime moment)
     {
-        string head = OneLineText.Cleaned($"{DateText.Stamp(moment)} · {Place(course, section)}asked a question");
-        string asked = PromptPrefix + OneLineText.Cleaned(prompt).Trim();
+        string head = SafeTrailLine($"{DateText.Stamp(moment)} · {Place(course, section)}asked a question", keepingLineBreaks: false);
+        string asked = PromptPrefix + SafeTrailLine(prompt, keepingLineBreaks: false).Trim();
         return SafeTrailLine(head + "\n" + asked, keepingLineBreaks: true);
     }
 

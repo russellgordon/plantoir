@@ -247,6 +247,62 @@ public sealed class TrailLinesContractTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// The teacher's sentence goes through <c>trailLines.order</c> on its RAW
+    /// text, like every other line (lane E review 1, M1): each
+    /// <c>trailLines.cases</c> line that keeps no line breaks, asked as a
+    /// prompt, is written behind the prefix exactly as the case says. Cleaning
+    /// the sentence first wrote the tail of a token with a NUL, ESC or DEL
+    /// inside it; redacting only once let an isolate inside a label hide it.
+    /// </summary>
+    [Fact]
+    public void APromptIsRedactedOnItsRawTextAsEveryLineIs()
+    {
+        var moment = new DateTime(2026, 11, 21, 9, 0, 0);
+        int asked = 0;
+        foreach (var testCase in CourseNameCharacters()["trailLines"]!["cases"]!.AsArray())
+        {
+            if (testCase!["keepsLineBreaks"]!.GetValue<bool>()) continue;
+            string name = testCase["name"]!.ToString();
+            File.Delete(_trail);
+            ActivityTrail.NotePrompt(testCase["line"]!.ToString(), "ICS3U", 1, moment);
+            string[] lines = TrailLines();
+            string expected = ActivityTrail.PromptPrefix + testCase["written"]!.AsArray()[0]!.ToString().Trim();
+            Assert.True(lines.Length == 2 && lines[1] == expected, name + ": " + string.Join(" | ", lines));
+            asked++;
+        }
+        Assert.Equal(13, asked);
+    }
+
+    /// <summary>
+    /// A secret split three ways inside a sentence: by a NUL (taken whole), by
+    /// an isolate inside its label (found by the second pass), and by a line
+    /// break, which is white space to the redactor (<c>knownLimits</c>: its
+    /// tail is not pinned here, only that the record stays two lines and the
+    /// token's head is removed).
+    /// </summary>
+    [Fact]
+    public void ASecretSplitInsideAPromptDoesNotGetPast()
+    {
+        var moment = new DateTime(2026, 11, 21, 9, 0, 0);
+
+        File.Delete(_trail);
+        ActivityTrail.NotePrompt("use Bearer abc123\u0000SECRETTAIL please", "ICS3U", 1, moment);
+        string[] nul = TrailLines();
+        Assert.True(nul.Length == 2 && nul[1] == "  asked: use Bearer [removed: token] please", "NUL: " + Units(string.Join(" | ", nul)));
+
+        File.Delete(_trail);
+        ActivityTrail.NotePrompt("set CLOUDFLARE_API_⁦TOKEN=abc123XYZ_secret please", "ICS3U", 1, moment);
+        string[] bidi = TrailLines();
+        Assert.True(bidi.Length == 2 && bidi[1] == "  asked: set CLOUDFLARE_API_TOKEN=[removed: token] please", "bidi: " + Units(string.Join(" | ", bidi)));
+
+        File.Delete(_trail);
+        ActivityTrail.NotePrompt("use Bearer abc123\nSECRETTAIL please", "ICS3U", 1, moment);
+        string[] newline = TrailLines();
+        Assert.True(newline.Length == 2 && newline[1].StartsWith("  asked: use Bearer [removed: token]", StringComparison.Ordinal)
+                    && !newline[1].Contains("abc123", StringComparison.Ordinal), "newline: " + Units(string.Join(" | ", newline)));
+    }
+
     // ---- Helpers -------------------------------------------------------------
 
     private static List<(int First, int Last)> Ranges(JsonNode node)
