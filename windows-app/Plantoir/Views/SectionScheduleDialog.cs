@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
@@ -47,11 +48,11 @@ public sealed class SectionScheduleDialog : ContentDialog
     /// <summary>The source box's name, the mac's label for it.</summary>
     public const string WhereTheseCameFromName = "Where these came from";
 
-    /// <summary>Set by the teacher's first keyboard or pointer move of the focus; from then the focus is theirs.</summary>
-    private bool _theTeacherHasMovedTheFocus;
-
-    /// <summary>Whether a focus the app or the dialog places still goes to the dates box (see the constructor).</summary>
-    private bool TheBoxTakesTheFocus => !_theTeacherHasMovedTheFocus && _routePicker.SelectedIndex == 0;
+    /// <summary>
+    /// Set once the focus has first come into the dialog (see the constructor):
+    /// from then on every focus move is the teacher's, whoever makes it.
+    /// </summary>
+    private bool _theFirstFocusHasArrived;
 
     private readonly TextBox _typedBox = new()
     {
@@ -127,28 +128,46 @@ public sealed class SectionScheduleDialog : ContentDialog
         // the teacher came to fill. Tab then leaves the box for "Where these
         // came from" (a TextBox types no tab), as the mac's ruling Q-C asks.
         //
-        // The dialog places its own first focus (on the route picker, its
-        // first stop), and measured in VM B on 2026-11-20 it sometimes did so
-        // AFTER Opened, taking the focus back from a box focused there. So
-        // the box asks on Opened, and until the teacher first moves the focus
-        // by keyboard or pointer, any focus the app or the dialog places
-        // elsewhere is redirected to the box through GettingFocus, the
-        // documented place to change where focus lands. Changing the route
-        // ends it, as the mac's takesTheFocusWhenShown does.
-        Opened += (_, _) =>
-        {
-            if (TheBoxTakesTheFocus) _typedBox.Focus(FocusState.Programmatic);
-        };
-        GettingFocus += (_, args) =>
-        {
-            if (args.FocusState is FocusState.Keyboard or FocusState.Pointer)
-            {
-                _theTeacherHasMovedTheFocus = true;
-                return;
-            }
-            if (TheBoxTakesTheFocus && !ReferenceEquals(args.NewFocusedElement, _typedBox))
-                args.TrySetNewFocusedElement(_typedBox);
-        };
+        // The dialog places its own first focus, on the route picker, and
+        // only that one placement is sent to the box: the first focus move
+        // that comes INTO the dialog from outside it. Every later move stays
+        // where it was going, whoever makes it. Measured in VM B on
+        // 2026-11-20 (notes, "Class Dates' keys"): a UI Automation SetFocus,
+        // and Narrator moving its cursor with focus following it, arrive as
+        // FocusState.Programmatic, the same as the dialog's own placement,
+        // so the state cannot tell them apart and is not read. The
+        // placement came before Opened in some opens and after it in
+        // others, and when the dialog was opened from the keyboard it was
+        // raised only on FocusManager.GettingFocus, never on the dialog's
+        // own GettingFocus; so the app-wide event is the one listened to,
+        // from now until the dialog closes, and nothing is focused on
+        // Opened. GettingFocus with TrySetNewFocusedElement is WinUI's
+        // documented place to change where focus lands, so nothing waits.
+        FocusManager.GettingFocus += SendTheFirstFocusToTheBox;
+        Closed += (_, _) => FocusManager.GettingFocus -= SendTheFirstFocusToTheBox;
+    }
+
+    /// <summary>
+    /// The dialog's first placement of the focus goes to the dates box while
+    /// the route is Type or paste; nothing after it is touched (see the
+    /// constructor). A move between two places outside the dialog, such as
+    /// the menu closing, is not the first focus and is left alone.
+    /// </summary>
+    private void SendTheFirstFocusToTheBox(object? sender, GettingFocusEventArgs args)
+    {
+        if (_theFirstFocusHasArrived) return;
+        if (!IsInThisDialog(args.NewFocusedElement) || IsInThisDialog(args.OldFocusedElement)) return;
+        _theFirstFocusHasArrived = true;
+        if (_routePicker.SelectedIndex == 0 && !ReferenceEquals(args.NewFocusedElement, _typedBox))
+            args.TrySetNewFocusedElement(_typedBox);
+    }
+
+    /// <summary>Whether an element is this dialog or inside it, by its visual parents.</summary>
+    private bool IsInThisDialog(DependencyObject? element)
+    {
+        for (var step = element; step is not null; step = VisualTreeHelper.GetParent(step))
+            if (ReferenceEquals(step, this)) return true;
+        return false;
     }
 
     /// <summary>

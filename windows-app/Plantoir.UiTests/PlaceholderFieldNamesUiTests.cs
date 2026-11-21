@@ -58,6 +58,13 @@ public class PlaceholderFieldNamesUiTests
     {
         using var app = new DrivenApp(WriteCourses);
 
+        // Three of these boxes have a placeholder that is exactly their name
+        // (the filter's "Filter", the list's "New folder name", the deploy
+        // box's "Folder"), and WinUI hands a TextBox's placeholder over as
+        // its automation Name when nothing else names it (measured, notes).
+        // So those three assertions show what a screen reader is told, not
+        // that the fix is there: PlaceholderFieldNamesSourceTests pins their
+        // SetName calls and is their guard.
         AssertNamed(app.Find("courseFilterField", "the sidebar's filter"), "Filter", "the sidebar's filter");
 
         app.SelectCourse(CourseFixtures.Renamed);
@@ -126,6 +133,93 @@ public class PlaceholderFieldNamesUiTests
                     $"Shift-Tab from the dates box went to '{Focused(app)}', not to the route picker");
         Assert.Equal("2026-09-08", box.Patterns.Value.Pattern.Value.Value);
         MenuBar.CloseDialog(app);
+    }
+
+    /// <summary>
+    /// The review's M1 (#1024): the dialog sends only its own first placement
+    /// of the focus to the dates box. A focus move made afterwards by UI
+    /// Automation, the way Narrator moves focus with its cursor and Voice
+    /// Access moves it to a control, stays where it was sent, with no key
+    /// pressed first. Measured, such a move arrives as Programmatic, the same
+    /// as the dialog's own placement.
+    /// </summary>
+    [UiFact]
+    public void FocusSentByAssistiveTechnologyStaysWhereItWasSent()
+    {
+        using var app = new DrivenApp(WriteCourses);
+        app.SelectSection(CourseFixtures.Renamed, 1);
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesClassDates");
+        var dates = MenuBar.Dialog(app, "Classes > Class Dates…");
+        var source = InDialog(dates, "sectionScheduleSourceField", "the source box");
+        var cancel = InDialog(dates, "CloseButton", "the Cancel button");
+        var aFile = dates.FindFirstDescendant(cf => cf.ByName("A file").And(cf.ByControlType(ControlType.RadioButton)))
+                    ?? throw new Xunit.Sdk.XunitException("the dialog offers no file route");
+        CopyAPageEscapeUiTests.Front(app);
+        Assert.True(FocusArrivesAt(app, id => id == "sectionScheduleTypedField"),
+                    $"the sheet opened with the keyboard on '{Focused(app)}', not in the dates box");
+
+        source.Focus();
+        Assert.True(FocusArrivesAt(app, id => id == "sectionScheduleSourceField"),
+                    $"focus sent to \"Where these came from\" went to '{Focused(app)}'");
+        aFile.Focus();
+        Assert.True(Retry.WhileFalse(() =>
+        {
+            try { return app.Window.Automation.FocusedElement()?.ControlType == ControlType.RadioButton; }
+            catch { return false; }
+        }, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(100)).Result,
+                    $"focus sent to the route picker went to '{Focused(app)}'");
+        cancel.Focus();
+        Assert.True(FocusArrivesAt(app, id => id == "CloseButton"), $"focus sent to Cancel went to '{Focused(app)}'");
+        source.Focus();
+        Assert.True(FocusArrivesAt(app, id => id == "sectionScheduleSourceField"),
+                    $"focus sent back to \"Where these came from\" went to '{Focused(app)}'");
+        MenuBar.CloseDialog(app);
+    }
+
+    /// <summary>
+    /// The review's L1 (#1024): opened from the keyboard (the menu walked
+    /// with Down and the item pressed with Enter), the sheet starts in the
+    /// dates box too, and the Enter types nothing there. Measured on the
+    /// fix's first version, three keyboard opens in six started on the
+    /// route picker, because the dialog's placement then reaches only
+    /// FocusManager's event; each open here is a placement of its own.
+    /// </summary>
+    [UiFact]
+    public void OpenedFromTheKeyboardTheSheetStartsInTheDatesBox()
+    {
+        using var app = new DrivenApp(WriteCourses);
+        app.SelectSection(CourseFixtures.Renamed, 1);
+        for (int open = 1; open <= 3; open++)
+        {
+            CopyAPageEscapeUiTests.Front(app);
+            PressClassDatesFromTheKeyboard(app);
+            var dates = MenuBar.Dialog(app, "Classes > Class Dates…");
+            var box = InDialog(dates, "sectionScheduleTypedField", "the dates box");
+            Assert.True(FocusArrivesAt(app, id => id == "sectionScheduleTypedField"),
+                        $"opened from the keyboard (open {open}), the sheet started on '{Focused(app)}', not in the dates box");
+            Assert.Equal("", box.Patterns.Value.Pattern.Value.Value);
+            MenuBar.CloseDialog(app);
+        }
+    }
+
+    /// <summary>Open Classes, walk it with Down to Class Dates… and press Enter.</summary>
+    private static void PressClassDatesFromTheKeyboard(DrivenApp app)
+    {
+        var top = app.Window.FindFirstDescendant(cf => cf.ByName("Classes").And(cf.ByControlType(ControlType.MenuItem)))
+                  ?? throw new Xunit.Sdk.XunitException("the menu bar has no Classes menu");
+        top.Patterns.ExpandCollapse.Pattern.Expand();
+        Assert.True(Retry.WhileFalse(() => Focused(app).StartsWith("classes"), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(100)).Result,
+                    $"the Classes menu opened with the focus on '{Focused(app)}'");
+        // Down at most once per item the menu holds: past that it has wrapped.
+        int items = app.Desktop.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem)).Length;
+        for (int press = 0; press < items && Focused(app) != "classesClassDates"; press++)
+        {
+            string before = Focused(app);
+            Keyboard.Type(VirtualKeyShort.DOWN);
+            Retry.WhileFalse(() => Focused(app) != before, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(100));
+        }
+        Assert.Equal("classesClassDates", Focused(app));
+        Keyboard.Type(VirtualKeyShort.ENTER);
     }
 
     /// <summary>
