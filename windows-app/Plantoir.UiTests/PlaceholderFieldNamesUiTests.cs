@@ -144,11 +144,13 @@ public class PlaceholderFieldNamesUiTests
                     $"the cut-short code's text carries \"{longTitle.Properties.HelpText.ValueOrDefault}\", not the whole code");
         Assert.Equal(LongCode, NameOf(app.Find($"sidebar-{LongCode}", "the long code's row")));
 
-        // The row stays inside the sidebar, so nothing after the text is pushed out of sight.
-        var sidebar = app.Find("coursesSidebar", "the sidebar");
-        var row = longTitle.BoundingRectangle;
-        Assert.True(row.Right <= sidebar.BoundingRectangle.Right,
-                    $"the long code's text ends at {row.Right}, past the sidebar's edge at {sidebar.BoundingRectangle.Right}");
+        // The text stays inside the sidebar, so nothing after it is pushed out
+        // of sight: it ends no further right than the filter box, which runs to
+        // the sidebar's own padding at the foot of the same column.
+        var filter = app.Find("courseFilterField", "the sidebar's filter");
+        var text = longTitle.BoundingRectangle;
+        Assert.True(text.Right <= filter.BoundingRectangle.Right,
+                    $"the long code's text ends at {text.Right}, past the sidebar's filter box at {filter.BoundingRectangle.Right}");
 
         var shortTitle = app.Find($"sidebar-{CourseFixtures.Renamed}-title", "a short code's text");
         Assert.Equal("", shortTitle.Properties.HelpText.ValueOrDefault ?? "");
