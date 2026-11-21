@@ -151,6 +151,9 @@ internal static class UndoSwap
     /// <summary>The part of a staged name that says it is Plantoir's.</summary>
     internal const string StagedMarker = ".plantoir-undo-";
 
+    /// <summary>How many kept names (<c>-orig</c>, <c>-2-orig</c> … <c>-1000-orig</c>) a keep or a take-out tries before it is could not write.</summary>
+    internal const int KeptNames = 1000;
+
     /// <summary>How many times a refused rename is tried in all, and how long apart.</summary>
     private const int RenameTries = 6;
     private static readonly TimeSpan RenameRetryPause = TimeSpan.FromMilliseconds(10);
@@ -419,9 +422,27 @@ internal static class UndoSwap
                 // walked can no longer go aside unseen and be deleted with it
                 // (the mac's hard review of U2b, MEDIUM 4). A folder that
                 // differs is put back as it is and the take-out refused.
-                string aside = BesidePath(target.FullPath, label, "orig");
-                if (IsAFolderSetAside(aside) || RenameWithRetries(target.FullPath, aside, replace: false, seams) != 0)
+                // Set aside under the first kept name nothing holds (-orig,
+                // then -2-orig and on), as a page's original is: a folder
+                // already aside under a name (step numbers that collide across
+                // two computers, or a list started again) is never reused, and
+                // the take-out is never refused for good because of it (the
+                // mac's U3c, first review, LOW 3; W4c review 1, LOW 1). Every
+                // name taken is could not write, as the mac's freeKeptName.
+                string? aside = null;
+                int failure = 0;
+                bool everyNameTaken = true;
+                for (int number = 1; number <= KeptNames; number++)
                 {
+                    string candidate = BesidePath(target.FullPath, label, number == 1 ? "orig" : number + "-orig");
+                    if (UndoLinks.Look(candidate) != UndoLinks.What.Nothing) continue;
+                    failure = RenameWithRetries(target.FullPath, candidate, replace: false, seams);
+                    if (failure == 0) { aside = candidate; everyNameTaken = false; break; }
+                    if (failure is not (80 or 183)) { everyNameTaken = false; break; }
+                }
+                if (aside is null)
+                {
+                    if (everyNameTaken) return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath);
                     return UndoTreeReading.Read(target.FullPath).ListingSha == take.ListingSha
                         ? new UndoRefusal(UndoRefusalKind.FileIsInUse, target.RelativePath)
                         : new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
@@ -559,19 +580,22 @@ internal static class UndoSwap
             // going). A page the step replaces is held by its staged content.
             UndoStagedFile? kept = null;
             int failure = 0;
-            for (int number = 1; number <= 1000 && kept is null; number++)
+            bool everyNameTaken = true;
+            for (int number = 1; number <= KeptNames && kept is null; number++)
             {
                 string originalPath = BesidePath(target.FullPath, label, number == 1 ? "orig" : number + "-orig");
                 if (UndoLinks.Look(originalPath) != UndoLinks.What.Nothing) continue;
                 kept = UndoStagedFile.Keep(target.FullPath, originalPath, out failure, holdItsFolder: staged[index] is null);
-                if (kept is null && failure is not (80 or 183)) break;
+                if (kept is null && failure is not (80 or 183)) { everyNameTaken = false; break; }
             }
             if (kept is null)
             {
                 // On a volume without hard links the original is COPIED, and a
                 // copy can fail for room or permission: the same word as a
-                // staging write that fails (the mac's U2a review, LOW 1).
-                return new UndoRefusal(IsRoomOrPermission(failure) ? UndoRefusalKind.CouldNotWrite : UndoRefusalKind.FileIsInUse, target.RelativePath);
+                // staging write that fails (the mac's U2a review, LOW 1). Every
+                // kept name taken is could not write too, never "in use" (the
+                // mac's UndoCheck couldNotWrite; W4c review 1, LOW 2).
+                return new UndoRefusal(everyNameTaken || IsRoomOrPermission(failure) ? UndoRefusalKind.CouldNotWrite : UndoRefusalKind.FileIsInUse, target.RelativePath);
             }
             originals[index] = kept;
         }

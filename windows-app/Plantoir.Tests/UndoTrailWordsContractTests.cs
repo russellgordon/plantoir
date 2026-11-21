@@ -47,4 +47,18 @@ public sealed class UndoTrailWordsContractTests
     public void RefusedForAChangeLeftPartWaySaysWhatTheContractSays() =>
         Assert.Equal(ExampleLine("undo refused for a change left part way"),
                      UndoTrail.LeftNewestWords(true, new UndoRefusal(UndoRefusalKind.FileIsInUse, "courses/ICS3U/Section 1/Classes/A.md")));
+
+    /// <summary>
+    /// W4c review 1, LOW 3: a step left because the list's own content for it
+    /// could not be read (recovery's plan threw UndoListUnreadableException,
+    /// a refusal with no path) names the list, never "a page".
+    /// </summary>
+    [Fact]
+    public void RefusedBecauseTheListCouldNotBeReadNamesTheListNotAPage()
+    {
+        string words = UndoTrail.LeftNewestWords(false, new UndoRefusal(UndoRefusalKind.CannotTellNow));
+        Assert.DoesNotContain("a page", words, StringComparison.Ordinal);
+        Assert.Contains("because what the list holds for it could not be read just now.", words, StringComparison.Ordinal);
+        Assert.StartsWith("Redo was refused:", words, StringComparison.Ordinal);
+    }
 }

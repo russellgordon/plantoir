@@ -184,6 +184,10 @@ internal static class UndoTrail
         string why = refusal.Kind switch
         {
             UndoRefusalKind.FileIsInUse => $"{path} is in use by another program",
+            // No path: what could not be read is the list's own content for
+            // the step (the plan's UndoListUnreadableException), never a page
+            // (W4c review 1, LOW 3).
+            UndoRefusalKind.CannotTellNow when refusal.Path is null => "what the list holds for it could not be read just now",
             UndoRefusalKind.CannotTellNow => $"{path} could not be read just now",
             UndoRefusalKind.CouldNotWrite => $"nothing could be written beside {path} (the disk may be full)",
             UndoRefusalKind.ChangedSince => $"{path} changed while it was being put back",

@@ -678,7 +678,7 @@ internal sealed class UndoDoor
     internal void RecoverThenPrune(UndoJournalWriter writer)
     {
         UndoRecovery.Run(writer, _journal, _mode, trySwapsNow: false, leavingStepsThatRederive: true, _maintainers, _trail, _seams, _places);
-        _journal.Prune(writer);
+        _journal.Prune(writer, _trail);
     }
 
     /// <summary>The files every step recovery settled keeps true by a rule, re-derived (outside the lock), whichever way it settled; never in shadow.</summary>
