@@ -154,13 +154,22 @@ public class PlaceholderFieldNamesUiTests
         // What a person sees: a real hover over the cut-short code draws the
         // tooltip, and it holds the whole code.
         app.BringToFront();
-        Mouse.MoveTo(DrivenApp.MiddleOf(longTitle));
+        // Two moves: the first can land as the pointer's entry alone, and a
+        // tooltip opens on the pointer moving over the element.
+        var middle = DrivenApp.MiddleOf(longTitle);
+        Mouse.MoveTo(new System.Drawing.Point(middle.X - 4, middle.Y));
+        Mouse.MoveTo(middle);
         string? tipWords = null;
         Retry.WhileFalse(() =>
         {
             try
             {
-                foreach (var tip in app.Desktop.FindAllDescendants(cf => cf.ByControlType(ControlType.ToolTip)))
+                // WinUI draws a tooltip in a popup inside the app's own window
+                // (as it does a dialog: DrivenApp.OpenDialog), so the window is
+                // asked first and the desktop after.
+                var tips = new List<AutomationElement>(app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.ToolTip)));
+                tips.AddRange(app.Desktop.FindAllChildren(cf => cf.ByControlType(ControlType.ToolTip)));
+                foreach (var tip in tips)
                 {
                     var words = new List<string> { tip.Properties.Name.ValueOrDefault ?? "" };
                     words.AddRange(DrivenApp.TextsUnder(tip));
