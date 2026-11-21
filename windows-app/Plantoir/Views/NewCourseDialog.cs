@@ -1527,7 +1527,9 @@ public sealed class NewCourseDialog : ContentDialog
         // shown under a progress bar reads like a creation that started.
         if (ToolchainReadiness.Refusal(workspacePath) is { } notReady) { ShowValidation(notReady); return; }
 
-        string name = _nameBox.Text.Trim();
+        // Cleaned BEFORE it is trimmed (#821, courseNameCharacters.noTrimming),
+        // so a name that is only a line break or a NUL gets the default.
+        string name = OneLineText.CourseName(_nameBox.Text).Trim();
         if (name.Length == 0) name = WizardWording.Panel(IsClub).DefaultSiteName;
 
         BeginProgress(WizardWording.Panel(IsClub).CreatingTitle);
