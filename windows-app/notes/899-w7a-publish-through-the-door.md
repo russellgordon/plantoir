@@ -25,13 +25,26 @@ Branch `issue/899-w7a-publish-through-the-door`, from W4c (2e10771f6) with `orig
 - Must-fail: `vm-tools/guest/899-w7a-mustfail-2.json` (12 sabotages, `899w7a-d2`): 11 RED; B was NOT-RED (recovery tidied again in a later hold and wrote the line), so the two pruning tests now lay their leftover after every recovery tidy and check the last one, which only pruning meets. `899-w7a-mustfail-3.json` (`899w7a-d3`): LOW 5, B and M3 all RED; restored 828 passed; HEAD SAME.
 - Contract wording lows (the director's): `undo-json-cases.json` note names `ContractFilesWindowsPowerShellReadsTests`; `contracts/README.md` "the eight authored files"; `WINDOWS-BOOTSTRAP.md` thirteen JSON files, eight authored. `origin/issue/899-w6-op-kinds` 9f3e16b85 merged in. Merged `origin/issue/899-w6-op-kinds` (6437a9b89) and `origin/dev` da5af161e (3aee10d3c).
 
-### Not done in this round (left for the next writer)
+## Round three (the next writer), 2026-11-21
 
-- C (`ApplyWholeUnit`, Publish Class for a Date through the step): not started. Plan: an `UndoActionStep? _planningThrough` field read by the planners' eleven `File.ReadAllText` calls (lines 388, 444, 474, 727, 1187, 1276, 1398, 1453, 1501, 1519, 1531 at 13d66f531), set for the unit's loop; one `KeepsTheFrontPageTrue` instead of `ApplyIndexChange` per class. Publish Class for a Date today is `Apply(plan)` then `KeepTheClassesPublishedByTheirDate` (MCP `PlantoirTools.cs` ~1900): `LaterClassesKept.Keep` must write through the step.
-- D (killed publish by the harness, W4c LOW 6) and E (`actionTraces` replay, `rule.recovery`'s U3 sentence): not started.
-- Review 1 lows not done: unrecorded `shadow` swaps never tidied after a kill; a front page through a link out of the folder makes the step unrecordable; kept names found by comparing the folder before and after; stale remark in `PublishStoppedPartWayTests`; the workspace test's weak `NotEqual`.
+- **C, a whole unit** (`ApplyWholeUnit`): ONE step, key `publishPages` / `hidePages` (the mac's `publishPagesAWholeUnit`). While a step is planned, `_planningThrough` routes the planners' page reads through it (`ReadPlanned`: `PlanPublish`, `IndexChangeFor`, `WriterDeclines`, the visibility and link reads, `SiblingTimeAndOffset`), so each class is planned seeing the classes before it. `DateOf` is static and still reads the disk (no publish moves a class page's date). Tests: `UndoWholeUnitAndByDateStepTests` (one step with one recompute and today's undo; hiding a unit takes down the page both classes use; a unit that cannot be written whole changes nothing).
+- **C, Publish Class for a Date**: `Apply(…, keepingTheClassByItsDate: true)` from `publish_class_on`, key `publishClassForADate`; `later-classes-kept.json` is planned INSIDE the step (`KeepTheClassesItPublished(…, step)`, `ClassesDatedLater.FlaggedIn(readPage, readRecord)`, `LaterClassesKept.RecordKeeping`), written only if the pages are, never told to today's undo (`UndoActionStep.Write(…, todaysUndoKeepsIt: false)`; Undo Last Change leaves it, as on the mac). When the pages need no change, the record is a step of its own (`KeepTheClassesPublishedByTheirDateOnAStepOfTheirOwn`); before, Windows kept nothing there. Changed for a teacher: the record now goes in with the pages even when the preview build then fails (the mac's U3 LOW 10).
+- **The front page's recompute is named on every publish, hide and unit** (the sweep, 2), as the mac's step names it.
+- **E**: `UndoActionTraceContractTests` replays every `actionTraces` trace through the real door from `undo-action-steps.json` (front page re-derived by `UndoSectionFrontPage`). Held by name in `NamedGapLedger.UndoActionTraces`: action-121 to 132 (rollover, `moves`, `Reason899W7U3b`) and action-133 to 150 (U4a `members`/`trees`, new `Reason899W8U4a`). The contract now has 150 traces, not 120: the 18 U4a ones are W8's.
+- **E, `rule.recovery`'s U3 sentence was NOT true on Windows**: recovery tidied closed steps only live. Now `TidyClosedSteps(…, onlyStepsOfFiles: mode == Shadow)` (`UndoRecovery.ChangesOnlyFiles`, the mac's `changesOnlyFiles`). Test: `UndoShadowClosedStepTidyTests`.
+- **F**: the weak `NotEqual` and the front page in today's entry (`UndoActionStepTests`); the stale remark in `PublishStoppedPartWayTests`, whose theory now goes part way only by the door's own put-back failure (`AssistWorkspace.UndoSeams`, a test's seams for every step of a workspace) and names the kept file; the could-not-write sentence pinned (`ACouldNotWriteRefusalSaysTheDiskOrThePermissionAndChangesNothing`). Contract wording: `WINDOWS-BOOTSTRAP.md` "eight authored files"; `contracts/README.md` names `undo-json-cases.json` for `editJSONCases`.
+- Must-fail: `vm-tools/guest/899-w7a-mustfail-4.json` (11 sabotages).
+
+### Not done (left for the next writer)
+
+- D, the killed publish by the harness (a `W7Runs` publish through `AssistWorkspace` killed at `afterBegin`, each `beforeSwap@i`, `beforeApplied`, then recovery; shadow: each page whole and no `-new` left; live: all one way): not written.
+- Review 1 lows: unrecorded `shadow` swaps never tidied after a kill (the mac's `UndoShadowStaging`); a front page through a link out of the folder makes the step unrecordable; kept names found by comparing the folder before and after.
+- Part two review lows: 1 (a put-back after a failed clear of Hidden), 2, 3 (cleanups meeting a Hidden kept file), 4 (could-not-write said when all kept names are taken), 5 (the plain path's part way), 8 is now covered by the theory above.
+- The sweep: (1) a test that a linked page is written through its link with the switch off, the link staying a link (a symbolic link needs a privilege the PC's test run may not have); (4) the live-only sentences "a file it writes cannot be named in a step", "the list of changes could not be written", "another change to this folder is under way" (`UndoActionStep.Make`, typed on Windows only, also inside the trail's could-not-record words) are for the wording review.
 
 ## For documentation 12
+
+- Correct the sentence near line 17589 that says a linked page is refused with the switch off: in shadow a page that is a link is written through the link, all or none, and the link stays a link (the sweep's (1); the invariant: with the switch off nothing behaves differently from before Undo).
 
 ### What Windows has built: W7a, the step for a daily action (#899, #949)
 
@@ -40,22 +53,12 @@ The bullets above, plus: the door is the product's through `UndoForThisProcess.C
 ## For W7b
 
 - Entry points: `AssistWorkspace.NewUndoStep(key, course, section)`, then `step.ReadText` / `step.Write` / `step.KeepsTheFrontPageTrue`, then `MakeTheUndoStep(step)` inside the action's `UndoHistory.Record`, and in its `catch (IOException or UnauthorizedAccessException)` `StoppedWhileWriting(error is UndoStepLeftPartWayException, error)`.
-- Still to go through it (writer scan entries still `waitsFor: W7`, counts unchanged since `Save` remains for them): `ApplyWholeUnit` and Publish Class for a Date (see "Not done" below), and every action W7b lists.
-- The planners (`PlanPublish`, `IndexChangeFor`, `ClassPages`) read the DISK, not the step: an action that plans one class after another inside one step (a whole unit) must plan each class seeing the classes before it, so either the planner reads through the step or the action plans from the step's view. This is why `ApplyWholeUnit` was not converted here.
-
-## Not done in this piece
-
-- `ApplyWholeUnit` (one step for a unit, each class planned seeing the ones before it) and Publish Class for a Date with `later-classes-kept.json`: not converted (the planner reads the disk; budget).
-- `actionTraces` replay (120 daily traces through the door, 12 rollover traces held under `Reason899W7U3b`): not written. No ledger row holds them and no Windows class reads them, as before this piece.
-- `rule.recovery`'s U3 sentence on a closed shadow step: not checked.
-- The prune-time tidy's "undo found a folder set aside": not built (the change is one `onAside` argument and a trail sink on `UndoJournal`, but its test needs a pruned unsettled tree step with a folder aside, which was not written; a change without a test that fails was not left in).
-- Killed-step proof of a publish (injected and by the harness): not run.
-- The File Explorer measurement of the kept file: not done; the alert's keys stay held.
-- W4c review 1 lows: LOW 4 done (`contracts/shared-rules.json` `editJSONCasesHow`: "only for a row that platform holds by name as not yet measured"). LOWs 1, 2, 3, 5 and 6 not done (budget).
+- Still to go through it: every action W7b lists (writer scan entries `waitsFor: W7`; `LaterClassesKept.Keep` stays for Deploy's and the links checklist's records).
+- The planners read through the step while `_planningThrough` is set: an action that plans several things in one step sets it for its planning, as `Apply` and `ApplyWholeUnit` do.
 
 ## Changed tests (the failure is now all or none)
 
-`PublishStoppedPartWayTests.APageThatCannotBeWrittenIsAnsweredAndTheCopyIsNamedOnlyInTheWindow` (the page-list rows), `SectionVerbsTests.APublishThatStoppedPartWay_IsCarriedOut` and `UndoAcrossToolsTests.AnOperationThatThrewPartWayLeavesNothingOpenToSwallowTheNext` asserted the old file-by-file part-way outcome. A publish of pages is now one step, so a page that cannot be written leaves every page as it was, and the sentence is "Nothing was changed: …". The whole-unit rows still go part way: `ApplyWholeUnit` is not converted yet.
+`PublishStoppedPartWayTests.APageThatCannotBeWrittenIsAnsweredAndTheCopyIsNamedOnlyInTheWindow` (the page-list rows), `SectionVerbsTests.APublishThatStoppedPartWay_IsCarriedOut` and `UndoAcrossToolsTests.AnOperationThatThrewPartWayLeavesNothingOpenToSwallowTheNext` asserted the old file-by-file part-way outcome. A publish of pages is now one step, so a page that cannot be written leaves every page as it was, and the sentence is "Nothing was changed: …". Since round three the whole-unit rows are one step too.
 
 ## Runs (PC, LENOVO i5-8365U, Windows 11 Pro 26200)
 

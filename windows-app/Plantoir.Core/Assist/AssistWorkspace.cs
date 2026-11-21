@@ -1996,7 +1996,9 @@ public sealed partial class AssistWorkspace
 
                 // And the front page catches up with what is now published: kept
                 // true by its rule, re-derived once after the step.
-                if (plan.Index is { WillChange: true }) step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
+                // Named on every publish and hide, as the mac's step names it, so
+            // both platforms record the same ops (the W7a sweep, 2).
+            step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
             finally { _planningThrough = null; }
 
@@ -2294,9 +2296,9 @@ public sealed partial class AssistWorkspace
                         catch { }
                     }
 
-                    if (pagePlan.Index is { WillChange: true })
-                        step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
                 }
+                // Named once, on every unit published or hidden (the W7a sweep, 2).
+                step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
             finally { _planningThrough = null; }
 

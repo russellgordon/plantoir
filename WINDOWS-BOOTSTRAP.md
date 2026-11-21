@@ -144,7 +144,7 @@ reasons rather than tasks:
   arguments changing on the mac arrived here looking like it came from nowhere.
   Only `assist-cases.json` and `app-rules.json` carry that key, because they
   are the two MIXED files and it marks the boundary; `assist-wording.json` is
-  generated in full and says so in its `note`, and the seven authored files
+  generated in full and says so in its `note`, and the eight authored files
   have no generated half to mark.
 - **A red contract test is usually a HANDOVER arriving, and the issue naming it
   is often already open.** The mac opens a `windows` issue in the session it
