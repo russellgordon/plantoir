@@ -7980,14 +7980,37 @@ sentences, which read the noun of the backup's course when drawn
 (`WorkspaceModel.classNoun(ofCourse:)`; a backup of a course no longer in
 the folder is read by its code, a club's code meaning meetings). The file
 name does not change. `ClubNounTests` checks every club sentence for "class"
-with no exception for menu titles. `nothingToUndoFromTheMenu` keeps "the
-Section or Classes menu": with nothing to undo there is no course to read a
-noun from, and the item leaves with #899 U7. The HIG has no sentence on a
+with no exception for menu titles. The HIG has no sentence on a
 menu title that follows the selection; the nearest, Menus, has an item's
 "changeable label that describes an item's current state", and The menu
 bar's "Always show the same set of menu items" is kept: only the title
 changes. `SectionAndClassesMenusUITests.testTheClassesMenuIsTitledMeetingsWhileAClubIsSelected`
 proves it live in the real menu bar.
+
+**And its items say meeting** (#1027, Russell, 2026-11-20 night). Every item
+of Section or Classes whose title says class has a club title in the contract,
+`subjectMenus.layout.itemTitles`: Publish Meeting for a Date…, Add Meeting…,
+Meeting Dates…, Re-date Meetings…, Make Room for Meetings…. They are drawn
+from `SubjectMenuLayout.titleSayingTheNoun(of:noun:)` (nonisolated, so the
+assistant's sentences can use it), which `SectionMenu.title(for:noun:)` calls,
+so the menu bar, a section row's right-click menu (by the row's course) and
+the "ran from a menu" path (`SectionVerbs.menuPath`, "Meetings ▸ Add
+Meeting…") say the same words, live with the selected course; the items, their
+order, ellipses and greying do not change (The menu bar: "Always show the same
+set of menu items"; Menus: the ellipsis for an action that "requires more
+information before it can complete", which each still does). The two club
+sentences that used to point at "the Meetings menu" without the item's title
+now name it ("Add them with Meetings ▸ Meeting Dates…, then try again"), and
+Undo Last Change's nothing-to-undo is named from the selected section's
+course: `SectionVerbs.perform` sets the runner's `menuSelectedCourseCode` for
+one call (contract key `nothingToUndoFromTheMeetingsMenu`). `ClubNounTests`
+walks every item of the two menus against the contract list (an item not
+listed may not change with the noun nor say class), the list's
+`ranFromAMenuCases`, and every `…ForAMeeting` / `…FromTheMeetingsMenu`
+sentence whose class twin names an item. Help's club page quotes the titles
+with `say` tokens. Still saying class in a club, and outside this piece: the
+body of the Class Dates sheet (its purpose line and the timetable's own
+sentences, `SectionTimetable`).
 
 ### The shape: one focused value per OWNER of the state
 
