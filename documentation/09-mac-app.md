@@ -20537,7 +20537,7 @@ off.
   A key written twice in an object on the path, a file that is not UTF-8
   or not one JSON object, or bytes that do not scan, refuse the move as a
   change since; the result must read back as exactly the file with that
-  one member changed. `undo.editJSONCases` pins the bytes for both
+  one member changed. `undo-json-cases.json` → `editJSONCases` pins the bytes for both
   platforms, and the Python reference produces the same ones. The reserved
   `element` (an array element) is left to the piece that needs it: an op
   carrying it cannot be read here, so an older reader can never undo it by
@@ -22076,7 +22076,7 @@ stays off.
   never an empty list (#986 section 4.5: the first Marks tick creates
   `graded_folders`). The bytes each member leaves are worked out at plan
   time by the member rule (`UndoJSONMember.moved`, the bytes
-  `undo.editJSONCases` pins), so `lastSavedData` is exactly the file the
+  `undo-json-cases.json` → `editJSONCases` pins), so `lastSavedData` is exactly the file the
   step leaves. A file that is missing, is not one JSON object, or whose
   bytes the member rule cannot move (a key written twice, a number a double
   cannot hold) is planned WHOLE, the bytes `write(to:)` writes, and the door

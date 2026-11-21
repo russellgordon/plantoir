@@ -232,7 +232,8 @@ public sealed class UndoFormatTests
     public void AnUnreadableStepKeepsEveryBlobNameItsBeginHolds()
     {
         string name = new('d', 64);
-        string op = $"{{\"kind\":\"move\",\"from\":\"a.md\",\"to\":\"b.md\",\"listingSha\":\"{name}\"}}";
+        // A kind no reader knows (a move is U2's and reads since W6), naming a blob in a key of its own.
+        string op = $"{{\"kind\":\"aKindNobodyKnows\",\"from\":\"a.md\",\"to\":\"b.md\",\"listingSha\":\"{name}\"}}";
         UndoFolded folded = Fold(Begin(1, op), Applied(1));
         Assert.Contains(name, folded.Steps[1].Step.Blobs);
         Assert.Contains(name, folded.Segments[1].BlobsKeptByUnreadables);

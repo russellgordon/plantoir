@@ -38,7 +38,11 @@ internal sealed record UndoRefusal(UndoRefusalKind Kind, string? Path = null, in
 }
 
 /// <summary>One file a step changes: where it is, what it must still hold (null: no file), and what goes in its place (null: removed).</summary>
-internal sealed record UndoSwapTarget(string FullPath, string RelativePath, byte[]? Expected, byte[]? Replacement);
+internal sealed record UndoSwapTarget(string FullPath, string RelativePath, byte[]? Expected, byte[]? Replacement)
+{
+    /// <summary>A whole op's change (U2's kinds, W6); null for a file's content swapped.</summary>
+    internal UndoSwapChange? Change { get; init; }
+}
 
 /// <summary>How a swap went.</summary>
 internal abstract record UndoSwapResult
@@ -148,13 +152,15 @@ internal static class UndoSwap
     private const int RenameTries = 6;
     private static readonly TimeSpan RenameRetryPause = TimeSpan.FromMilliseconds(10);
 
-    internal static UndoSwapResult Swap(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams = null)
+    /// <param name="places">Where an external op's target is read and set (W6); needed only by a step that holds one.</param>
+    internal static UndoSwapResult Swap(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams = null,
+                                        IUndoExternalPlaces? places = null)
     {
         // Every staged file's handle is let go however the swap ends, a test's
         // kill point included, as a process that died there would let it go.
         var staged = new UndoStagedFile?[targets.Count];
         var originals = new UndoStagedFile?[targets.Count];
-        try { return SwapStaged(targets, label, root, seams, staged, originals); }
+        try { return SwapStaged(targets, label, root, seams, places, staged, originals); }
         finally
         {
             foreach (UndoStagedFile? file in staged) file?.LetGo();
@@ -163,12 +169,18 @@ internal static class UndoSwap
     }
 
     private static UndoSwapResult SwapStaged(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams,
-                                             UndoStagedFile?[] staged, UndoStagedFile?[] originals)
+                                             IUndoExternalPlaces? places, UndoStagedFile?[] staged, UndoStagedFile?[] originals)
     {
         int count = targets.Count;
         int swapsMade = 0;
+        // A tree's own: the folder it built beside its place (-new), and the
+        // teacher's folder it took out, renamed aside (-orig).
+        var stagedFolders = new string?[count];
+        var asideFolders = new string?[count];
 
-        void Tidy()
+        // True when a test stopped it while a folder taken out was being
+        // deleted, as a process that died there would stop.
+        bool Tidy()
         {
             for (int index = 0; index < count; index++)
             {
@@ -176,7 +188,19 @@ internal static class UndoSwap
                 originals[index]?.Remove();
                 staged[index] = null;
                 originals[index] = null;
+                if (stagedFolders[index] is { } made) UndoLinks.RemoveFolder(made);
+                stagedFolders[index] = null;
             }
+            for (int index = 0; index < count; index++)
+            {
+                if (asideFolders[index] is not { } aside) continue;
+                asideFolders[index] = null;
+                // Renamed to a name recovery never puts back BEFORE it is
+                // deleted, so a delete cut short is finished, never mistaken
+                // for the teacher's folder (the mac's fourth review of U2b, MEDIUM).
+                if (RemoveAFolderTakenOut(aside, seams)) return true;
+            }
+            return false;
         }
 
         // True when every swap already made was reversed. False when one could
@@ -190,6 +214,30 @@ internal static class UndoSwap
             for (int index = swapsMade - 1; index >= 0; index--)
             {
                 UndoSwapTarget target = targets[index];
+                switch (target.Change)
+                {
+                    case UndoSwapChange.MoveHere move:
+                        if (RenameWithRetries(target.FullPath, move.FromFull, replace: false, seams) != 0) whole = false;
+                        continue;
+                    case UndoSwapChange.MakeTree:
+                    {
+                        // Back under its staged name, removed with the rest.
+                        string back = BesidePath(target.FullPath, label, "new");
+                        if (RenameWithRetries(target.FullPath, back, replace: false, seams) == 0) stagedFolders[index] = back;
+                        else whole = false;
+                        continue;
+                    }
+                    case UndoSwapChange.TakeTree:
+                        // Never removed by the tidy that follows: put back, or,
+                        // if even that fails, left aside under its staged name
+                        // for recovery, which puts it back or keeps it visibly.
+                        if (asideFolders[index] is { } aside && RenameWithRetries(aside, target.FullPath, replace: false, seams) != 0) whole = false;
+                        asideFolders[index] = null;
+                        continue;
+                    case UndoSwapChange.SetExternal external:
+                        if (places is null || !places.Write(external.Target, external.Expected)) whole = false;
+                        continue;
+                }
                 if (originals[index] is { } original)
                 {
                     // Put back, it is the page again; not put back, it is the
@@ -213,11 +261,32 @@ internal static class UndoSwap
         for (int index = 0; index < count; index++)
         {
             UndoSwapTarget target = targets[index];
-            if (root is not null && !UndoPlaces.StaysInside(root, target.RelativePath))
+            if (root is not null && !StaysInside(target, root))
             {
                 Tidy();
                 return new UndoSwapResult.Refused(new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath));
             }
+            if (target.Change is UndoSwapChange.MakeTree tree)
+            {
+                string stagedFolder = BesidePath(target.FullPath, label, "new");
+                bool made;
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(target.FullPath)!);
+                    UndoLinks.RemoveFolder(stagedFolder);
+                    made = UndoTreeReading.Make(tree.Listing, tree.Contents, stagedFolder, failTheWrite: seams?.StagingWriteFailsAt?.Invoke(index) == true);
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { made = false; }
+                if (!made)
+                {
+                    UndoLinks.RemoveFolder(stagedFolder);
+                    Tidy();
+                    return new UndoSwapResult.Refused(new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath));
+                }
+                stagedFolders[index] = stagedFolder;
+                continue;
+            }
+            if (target.Change is not null) continue;
             if (target.Replacement is not { } replacement) continue;
             string stagedPath = BesidePath(target.FullPath, label, "new");
             try
@@ -250,7 +319,17 @@ internal static class UndoSwap
         {
             UndoSwapTarget target = targets[index];
             if (seams?.Stops("beforeSwap", index) == true) return new UndoSwapResult.StoppedByATest();
-            UndoRefusal? refusal = SwapAFile(target, index, label, root, staged, originals, seams, out bool wentIn);
+            UndoRefusal? refusal;
+            bool wentIn;
+            if (target.Change is null) refusal = SwapAFile(target, index, label, root, staged, originals, seams, out wentIn);
+            else
+            {
+                seams?.BeforeEachSwap?.Invoke(index, target.FullPath);
+                refusal = root is not null && !StaysInside(target, root)
+                    ? new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath)
+                    : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders);
+                wentIn = refusal is null;
+            }
             if (wentIn) swapsMade++;
             if (refusal is not null)
             {
@@ -261,9 +340,147 @@ internal static class UndoSwap
         }
 
         // 3. Every swap went in: the kept originals are no longer needed.
-        Tidy();
+        if (Tidy()) return new UndoSwapResult.StoppedByATest();
         return new UndoSwapResult.Swapped();
     }
+
+    /// <summary>Whether every place a change touches is still inside the working folder, links resolved (a move's two; none for an external target).</summary>
+    private static bool StaysInside(UndoSwapTarget target, string root) => target.Change switch
+    {
+        UndoSwapChange.SetExternal => true,
+        UndoSwapChange.MoveHere move => UndoPlaces.StaysInside(root, move.FromRelative) && UndoPlaces.StaysInside(root, target.RelativePath),
+        _ => UndoPlaces.StaysInside(root, target.RelativePath),
+    };
+
+    /// <summary>One whole op's change (the mac's swap of <c>moveHere</c>, <c>makeTree</c>, <c>takeTree</c>, <c>setExternal</c>); the refusal, or null when it went in.</summary>
+    private static UndoRefusal? SwapAWholeOp(UndoSwapTarget target, int index, string label, UndoSeams? seams, IUndoExternalPlaces? places,
+                                             string?[] stagedFolders, string?[] asideFolders)
+    {
+        switch (target.Change)
+        {
+            case UndoSwapChange.MoveHere move:
+            {
+                // The pair once more, just before the rename: the content at
+                // the place it leaves, nothing where it goes.
+                UndoMoveSide atFrom = UndoMoveSides.Read(move.Op, move.FromFull);
+                UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath);
+                if (atFrom == UndoMoveSide.CannotRead || atTarget == UndoMoveSide.CannotRead)
+                    return new UndoRefusal(UndoRefusalKind.CannotTellNow, target.RelativePath);
+                if (atFrom != UndoMoveSide.HoldsTheContent || atTarget != UndoMoveSide.Free)
+                    return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
+                try { Directory.CreateDirectory(Path.GetDirectoryName(target.FullPath)!); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath);
+                }
+                // MoveFileEx WITHOUT MOVEFILE_REPLACE_EXISTING: never over
+                // anything that appeared at the destination since.
+                int moved = RenameWithRetries(move.FromFull, target.FullPath, replace: false, seams);
+                return moved == 0 ? null : new UndoRefusal(Classify(moved, move.FromFull), target.RelativePath);
+            }
+            case UndoSwapChange.MakeTree:
+            {
+                switch (UndoTreeReading.Read(target.FullPath))
+                {
+                    case UndoTreeReading.CannotRead: return new UndoRefusal(UndoRefusalKind.CannotTellNow, target.RelativePath);
+                    case UndoTreeReading.Absent: break;
+                    default: return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
+                }
+                if (stagedFolders[index] is { } made && RenameWithRetries(made, target.FullPath, replace: false, seams) == 0)
+                {
+                    stagedFolders[index] = null;
+                    return null;
+                }
+                return new UndoRefusal(UndoRefusalKind.FileIsInUse, target.RelativePath);
+            }
+            case UndoSwapChange.TakeTree take:
+            {
+                // Renamed aside FIRST, then its listing checked where nobody
+                // else writes into it: a file added while the folder was being
+                // walked can no longer go aside unseen and be deleted with it
+                // (the mac's hard review of U2b, MEDIUM 4). A folder that
+                // differs is put back as it is and the take-out refused.
+                string aside = BesidePath(target.FullPath, label, "orig");
+                if (IsAFolderSetAside(aside) || RenameWithRetries(target.FullPath, aside, replace: false, seams) != 0)
+                {
+                    return UndoTreeReading.Read(target.FullPath).ListingSha == take.ListingSha
+                        ? new UndoRefusal(UndoRefusalKind.FileIsInUse, target.RelativePath)
+                        : new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
+                }
+                if (UndoTreeReading.Read(aside).ListingSha != take.ListingSha)
+                {
+                    // Put back as it is: a change since. If its place was taken
+                    // in that instant it stays aside, hidden and whole, never
+                    // deleted, and the refusal is cannot tell now, which never
+                    // clears the list; recovery puts it back or keeps it under a
+                    // visible name (the mac's second hard review, MEDIUM 3).
+                    return RenameWithRetries(aside, target.FullPath, replace: false, seams) == 0
+                        ? new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath)
+                        : new UndoRefusal(UndoRefusalKind.CannotTellNow, target.RelativePath);
+                }
+                asideFolders[index] = aside;
+                return null;
+            }
+            case UndoSwapChange.SetExternal external:
+                // Re-read just before it is set.
+                if (places is null || !places.Read(external.Target).Matches(external.Expected))
+                    return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
+                return places.Write(external.Target, external.Value) ? null : new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath);
+            default:
+                return new UndoRefusal(UndoRefusalKind.NotReadable, target.RelativePath);
+        }
+    }
+
+    /// <summary>
+    /// The name a folder taken out is renamed to before it is deleted: its
+    /// <c>-orig</c> role becomes <c>-gone</c>, which <see cref="IsAFolderSetAside"/>
+    /// never matches, so recovery finishes the delete of whatever is left
+    /// under it as it does any staged item.
+    /// </summary>
+    internal static string GonePath(string aside) =>
+        aside.EndsWith("-orig", StringComparison.Ordinal) ? aside[..^"-orig".Length] + "-gone" : aside + "-gone";
+
+    /// <summary>
+    /// Deletes a folder a swap took out, once every change has gone in: one
+    /// rename to its <c>-gone</c> name (atomic: wholly the teacher's folder set
+    /// aside, or wholly a leftover to finish deleting), then the delete, which
+    /// is not. If the rename fails the folder is left whole under its
+    /// <c>-orig</c> name, never deleted in place. True only when a test (or
+    /// the harness) stopped it between the two (<c>whileDeletingAFolder</c>).
+    /// </summary>
+    internal static bool RemoveAFolderTakenOut(string aside, UndoSeams? seams)
+    {
+        string gone = GonePath(aside);
+        if (UndoLinks.Look(gone) != UndoLinks.What.Nothing) UndoLinks.RemoveFolder(gone);   // an earlier delete cut short
+        if (RenameWithRetries(aside, gone, replace: false, seams) != 0) return false;
+        if (seams?.Stops("whileDeletingAFolder") == true) return true;
+        UndoLinks.RemoveFolder(gone);
+        return false;
+    }
+
+    /// <summary>Whether a staged item is a folder kept aside as an original (<c>-orig</c>): a folder a tree op took out, which holds the teacher's files.</summary>
+    internal static bool IsAFolderSetAside(string path) =>
+        Path.GetFileName(path).EndsWith("-orig", StringComparison.Ordinal) && UndoLinks.Look(path) == UndoLinks.What.Folder;
+
+    /// <summary>The place a staged name stands beside: the name between its leading dot and its LAST <c>.plantoir-undo-</c>, or null.</summary>
+    internal static string? PlaceOfStagedName(string name)
+    {
+        if (!name.StartsWith('.')) return null;
+        int marker = name.LastIndexOf(StagedMarker, StringComparison.Ordinal);
+        if (marker <= 1) return null;
+        return name[1..marker];
+    }
+
+    /// <summary>
+    /// The visible name a folder set aside is kept under when something else
+    /// holds its place: <c>&lt;name&gt; (kept by Undo)</c>, then
+    /// <c>(kept by Undo 2)</c> and on. It is a REAL folder beside its place:
+    /// under <c>courses/</c> it is part of the course, so a build and a deploy
+    /// include its pages (Russell's ruling of 2026-11-19 and the mac's, the
+    /// first review of W6's LOW 4: nothing of the teacher's stays hidden).
+    /// </summary>
+    internal static string VisibleName(string place, int number) =>
+        number <= 1 ? place + " (kept by Undo)" : place + $" (kept by Undo {number.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
 
     /// <summary>
     /// One file's swap; the refusal, or null when it went in.
@@ -536,13 +753,30 @@ internal static class UndoSwap
         name.StartsWith('.') && name.Contains(StagedMarker + label + "-", StringComparison.Ordinal);
 
     /// <summary>
-    /// Removes every file a step's apply, undo or redo left beside the files
-    /// it names (<c>undoJournal.stagedFiles</c>), in folders inside
-    /// <paramref name="root"/> only. Folders under a staged name are a later
-    /// kind's (U2's <c>-orig</c> folders, W6) and are never touched here. True
-    /// when none is left.
+    /// Removes everything a step's apply, undo, redo or recovery left beside
+    /// the places it names (<c>undoJournal.stagedFiles</c>), in folders inside
+    /// <paramref name="root"/> only. True when nothing of it is left (a file
+    /// another program holds stays until a later try).
+    ///
+    /// <para>A FOLDER set aside (<c>-orig</c>, a tree taken out) is the
+    /// teacher's own and is never deleted here (the mac's <c>tidyLeftovers</c>,
+    /// W6). Whenever its place is free it is renamed back into it, whatever its
+    /// listing; whether its listing is the one <paramref name="asideListings"/>
+    /// records decides what recovery makes of the step, not where the folder
+    /// goes. When something else holds its place it is renamed to the first
+    /// free visible name beside it, <c>&lt;name&gt; (kept by Undo)</c>, then
+    /// <c>(kept by Undo 2)</c> and on, so nothing of the teacher's stays hidden
+    /// and nothing is merged or overwritten (Russell's ruling of 2026-11-19);
+    /// that name is a real folder, which a build and a deploy include.
+    /// Both renames never replace. <paramref name="onAside"/> is told BEFORE
+    /// the rename (the intent first: a death between the rename and the trail
+    /// line would lose it). When its place cannot be read now it is left for a
+    /// later try and nothing is said. A <c>-gone</c> folder is a delete cut
+    /// short and is finished here; a <c>-new</c> folder is a tree made beside
+    /// its place that never went in, and goes.</para>
     /// </summary>
-    internal static bool TidyLeftovers(long seq, IEnumerable<string> relativePaths, string root)
+    internal static bool TidyLeftovers(long seq, IEnumerable<string> relativePaths, string root,
+                                       IReadOnlyDictionary<string, string>? asideListings = null, Action<UndoAsideFolder>? onAside = null)
     {
         bool allGone = true;
         var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -555,22 +789,63 @@ internal static class UndoSwap
         string[] labels = [$"{seq}-apply", $"{seq}-undo", $"{seq}-redo"];
         foreach (string folder in folders)
         {
-            IEnumerable<string> files;
-            try { files = Directory.EnumerateFiles(folder, "." + "*" + StagedMarker + seq + "-*").ToList(); }
+            List<string> entries;
+            try { entries = Directory.EnumerateFileSystemEntries(folder, "." + "*" + StagedMarker + seq + "-*").ToList(); }
             catch (DirectoryNotFoundException) { continue; }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { allGone = false; continue; }
-            foreach (string file in files)
+            foreach (string entry in entries)
             {
-                string name = Path.GetFileName(file);
+                string name = Path.GetFileName(entry);
                 if (!labels.Any(label => IsStaged(name, label))) continue;
+                UndoLinks.What what = UndoLinks.Look(entry);
+                if (what == UndoLinks.What.Nothing) continue;
+                if (what == UndoLinks.What.Folder)
+                {
+                    if (IsAFolderSetAside(entry))
+                    {
+                        if (!PutBackOrKeepVisibly(entry, name, folder, asideListings, onAside)) allGone = false;
+                    }
+                    else if (!UndoLinks.RemoveFolder(entry))
+                    {
+                        allGone = false;
+                    }
+                    continue;
+                }
                 // A kept original a stopped swap left may still be a hard link
                 // to the live page (it died before the rename): removed with
                 // the read-only attribute ignored, never cleared, since the
                 // two names share it (W2b's review, LOW 4).
-                if (!UndoStagedFile.RemoveByName(file)) allGone = false;
+                if (!UndoStagedFile.RemoveByName(entry)) allGone = false;
             }
         }
         return allGone;
+    }
+
+    /// <summary>A teacher's folder a stopped swap set aside: renamed back into its place when that is free, else to the first free visible name beside it. True when it went.</summary>
+    private static bool PutBackOrKeepVisibly(string aside, string hiddenName, string folder,
+                                             IReadOnlyDictionary<string, string>? asideListings, Action<UndoAsideFolder>? onAside)
+    {
+        if (PlaceOfStagedName(hiddenName) is not { } placeName) return false;
+        string place = Path.Combine(folder, placeName);
+        string? recorded = null;
+        asideListings?.TryGetValue(Path.GetFullPath(place), out recorded);
+        bool matched = recorded is not null && UndoTreeReading.Read(aside).ListingSha == recorded;
+        UndoLinks.What there = UndoLinks.Look(place);
+        if (there == UndoLinks.What.CannotLook) return false;   // not known to be free or taken: a later try
+        if (there == UndoLinks.What.Nothing)
+        {
+            onAside?.Invoke(new UndoAsideFolder(place, hiddenName, aside, null, matched));
+            return RenameWithRetries(aside, place, replace: false, null) == 0;
+        }
+        for (int number = 1; number <= 1000; number++)
+        {
+            string kept = Path.Combine(folder, VisibleName(placeName, number));
+            if (UndoLinks.Look(kept) != UndoLinks.What.Nothing) continue;
+            onAside?.Invoke(new UndoAsideFolder(place, hiddenName, aside, kept, matched));
+            if (RenameWithRetries(aside, kept, replace: false, null) == 0) return true;
+            if (UndoLinks.Look(kept) == UndoLinks.What.Nothing) return false;   // not taken in that instant: the rename itself failed
+        }
+        return false;
     }
 
     /// <summary>Writes a file that must not be there yet, whole, and flushes it to the disk.</summary>
@@ -820,4 +1095,15 @@ internal sealed class UndoStagedFile
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CreateHardLinkW(string newName, string existing, IntPtr security);
+}
+
+/// <summary>
+/// A teacher's folder recovery found set aside by a stopped swap, as it is
+/// about to be put back (<see cref="KeptAs"/> null) or kept under a visible
+/// name beside its place because something else holds that place. Whether
+/// its listing was the one the step recorded (<see cref="Matched"/>).
+/// </summary>
+internal sealed record UndoAsideFolder(string Place, string HiddenName, string FoundAt, string? KeptAs, bool Matched)
+{
+    internal bool PutBack => KeptAs is null;
 }

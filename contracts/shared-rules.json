@@ -50285,6 +50285,222 @@
         },
         "undo": "cannotTell",
         "redo": "cannotTell"
+      },
+      {
+        "name": "editJSON: a file's number spelled with an exponent and more than 17 digits is read by the mac as a decimal number, whose double is not the nearest one: the step's value is that double",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1.2345678901234573e-05,
+          "after": 1
+        },
+        "current": {
+          "text": "{\"k\": 1.2345678901234567890123e-5}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a file's number spelled with an exponent and more than 17 digits, the step's value its nearest double, which the mac does not read from it",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1.2345678901234568e-05,
+          "after": 1
+        },
+        "current": {
+          "text": "{\"k\": 1.2345678901234567890123e-5}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a member holding an object whose key is \u00e9 written as e with a combining accent, the step's value \u00e9 as one character",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": {
+            "\u00e9": 1
+          },
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": {\"e\u0301\": 1}}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a key path part \u00e9 as one character, the file's key e with a combining accent, the step having added the member",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "\u00e9"
+          ],
+          "after": 2
+        },
+        "current": {
+          "text": "{\"e\u0301\": 2}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a member holding text that starts with a byte-order mark (written \\ufeff), which the mac reads without it",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "text": "{\"k\": \"\\ufeffa\"}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a file's key that is the Kelvin sign, the key path the letter K, the step having added the member",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "K"
+          ],
+          "after": 2
+        },
+        "current": {
+          "text": "{\"\u212a\": 1}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: another member's number written with 168 digits after the point, which the mac cannot read: the file is not JSON there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": 0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000123456789012345678}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a member written -1e400, which the mac reads as minus infinity, not a number a double holds exactly: cannot tell",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": -1e400}\n"
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: another member written -1e400, which the mac reads as minus infinity: the member is judged as usual",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": -1e400}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: another member written 1e400, which the mac cannot read: the file is not JSON there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": 1e400}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: another member written 1e-0001, five characters after the e, which the mac cannot read: the file is not JSON there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": 1e-0001}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's reader (JSONSerialization) cannot read this file, measured on macOS 26.7.3, 2026-11-20 (#899 W6 review 3; undo.numberSpellingRule), and a file that is not JSON is changed since, as in 'editJSON: the file is not JSON'."
+      },
+      {
+        "name": "editJSON: text holding half of a surrogate pair (written \\ud800), which the mac cannot read: the file is not JSON there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": \"\\ud800\"}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
       }
     ],
     "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. Places, and the places two ops name, are compared without regard to case.",
@@ -50358,130 +50574,200 @@
       }
     ],
     "listingCasesHow": "A folder's listing (file-formats.json -> undoJournal.opKinds.createTree): tree is the folder's content (folders, and files with their text); listing is the exact text both platforms must make from it, and listingSha its SHA-256. One line per item inside the folder, each ending in a line feed: `folder <path>` or `file <sha256 of its bytes> <path>`, path relative to the folder with forward slashes, spelled as the file system gives it; lines in the order of the paths' UTF-8 bytes; the folder itself is not listed, and an empty folder's listing is empty. A file named .DS_Store (the Finder's record of a window), at any depth, is never listed, and is removed with the folder when the folder is taken out.",
-    "editJSONCases": [
+    "numberSpellingRule": {
+      "exponentCharactersAtMost": 4,
+      "digitsWithAnExponentAtMost": 17,
+      "digitsWithoutAnExponentAtMost": 38,
+      "why": "Measured on macOS 26.7.3, 2026-11-20, through JSONSerialization.jsonObject on {\"a\": <n>, \"b\": 1} (#899 W6 review 3). The mac reads an exponent written with at most 4 characters after the e or E, its sign and leading zeros included (1e0005, 1e+005, 1e-999, 0e9999), and cannot read the file when there are more (1e00005, 1e+0005, 1e-0001, 1e-1000, 0e99999), whatever the value or the digits before it: 103,528 of 103,528 random spellings with 5 to 7 such characters could not be read. Within that, a spelling with at most 17 digits (counted from the first that is not a leading zero of the integer part) is the nearest double, minus infinity below a double's range and not readable above it: every exponent of 1 to 4 characters (13,330) on 14 mantissas at the range's edges, and 200,000 random spellings, every one agreeing. More digits than that with an exponent, or more than 38 without, the mac reads as a decimal number or not at all: cannot tell, or not JSON where it is the exponent the mac cannot read."
+    },
+    "numberSpellingCasesHow": "What the mac's reader (Foundation's JSONSerialization) takes from a number a JSON file spells with an exponent, measured on macOS 26.7.3, 2026-11-20 (#899 W6 review 3), and so what both platforms take from it when they judge or move an editJSON member: spelling is the number, read as the member a of the file {\"a\": <spelling>, \"b\": 1}; reads is notJSON (the mac cannot read the file, so it is not one JSON object: every editJSON op on it is changed since and every move refused, as undo.checkCases 'editJSON: the file is not JSON'), cannotTell (the mac reads a decimal number that Windows and the Python model are not measured to copy: there the file is cannot tell, never judged or moved; these rows are not the mac's own answer), minusInfinity, or the double read. The rule (numberSpellingRule) holds for every spelling, and both runners check their own constants against it as well as every row.",
+    "numberSpellingCases": [
       {
-        "name": "only the member's value changes: spacing, 1.50, an escaped slash and a key written twice elsewhere stay",
-        "file": "{\n    \"zeta\": 1.50,\n    \"alpha\": \"a\\/b \\u00e9\",\n    \"dup\": 1,\n    \"dup\": 2,\n    \"school_year\": \"2026-2027\"\n}\n",
-        "op": {
-          "keyPath": [
-            "school_year"
-          ],
-          "before": "2025-2026",
-          "after": "2026-2027",
-          "kind": "editJSON",
-          "path": "course_config.json"
-        },
-        "direction": "undo",
-        "result": "{\n    \"zeta\": 1.50,\n    \"alpha\": \"a\\/b \\u00e9\",\n    \"dup\": 1,\n    \"dup\": 2,\n    \"school_year\": \"2025-2026\"\n}\n"
+        "name": "1e-0001: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e-0001",
+        "reads": "notJSON"
       },
       {
-        "name": "a member added goes after the last one, spaced as that one is",
-        "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
-        "op": {
-          "keyPath": [
-            "c"
-          ],
-          "after": "x",
-          "kind": "editJSON",
-          "path": "course_config.json"
-        },
-        "direction": "redo",
-        "result": "{\n  \"a\" : 1,\n  \"b\" : 0.10,\n  \"c\" : \"x\"\n}\n"
+        "name": "1e-1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e-1000",
+        "reads": "notJSON"
       },
       {
-        "name": "the first member taken out takes the comma after it",
-        "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
-        "op": {
-          "keyPath": [
-            "a"
-          ],
-          "after": 1,
-          "kind": "editJSON",
-          "path": "course_config.json"
-        },
-        "direction": "undo",
-        "result": "{\n  \"b\" : 0.10\n}\n"
+        "name": "-1e-1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "-1e-1000",
+        "reads": "notJSON"
       },
       {
-        "name": "the last member taken out takes the comma before it",
-        "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
-        "op": {
-          "keyPath": [
-            "b"
-          ],
-          "after": 0.1,
-          "kind": "editJSON",
-          "path": "course_config.json"
-        },
-        "direction": "undo",
-        "result": "{\n  \"a\" : 1\n}\n"
+        "name": "0e-1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "0e-1000",
+        "reads": "notJSON"
       },
       {
-        "name": "a member added to an empty object, its value spelled compactly with keys sorted",
-        "file": "{}",
-        "op": {
-          "keyPath": [
-            "k"
-          ],
-          "after": {
-            "z": true,
-            "a": null
-          },
-          "kind": "editJSON",
-          "path": "course_config.json"
-        },
-        "direction": "redo",
-        "result": "{\"k\": {\"a\":null,\"z\":true}}"
+        "name": "1e-0999: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e-0999",
+        "reads": "notJSON"
       },
       {
-        "name": "a member inside objects inside objects",
-        "file": "{\"s\": {\"2\": {\"label\": \"P2\"}}}",
-        "op": {
-          "keyPath": [
-            "s",
-            "2",
-            "label"
-          ],
-          "before": "P1",
-          "after": "P2",
-          "kind": "editJSON",
-          "path": "course_config.json"
-        },
-        "direction": "undo",
-        "result": "{\"s\": {\"2\": {\"label\": \"P1\"}}}"
+        "name": "1.5e+0010: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1.5e+0010",
+        "reads": "notJSON"
       },
       {
-        "name": "the key written twice on the path: refused, never a guess",
-        "file": "{\"school_year\": \"2026-2027\", \"school_year\": \"2026-2027\"}\n",
-        "op": {
-          "keyPath": [
-            "school_year"
-          ],
-          "before": "2025-2026",
-          "after": "2026-2027",
-          "kind": "editJSON",
-          "path": "course_config.json"
-        },
-        "direction": "undo",
-        "result": null
+        "name": "1e+1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e+1000",
+        "reads": "notJSON"
       },
       {
-        "name": "a whole number beyond 2^53 is refused, never written through a double",
-        "file": "{\"k\": 1}",
-        "op": {
-          "kind": "editJSON",
-          "path": "course_config.json",
-          "keyPath": [
-            "k"
-          ],
-          "before": 12345678901234567890,
-          "after": 1
-        },
-        "direction": "undo",
-        "result": null
+        "name": "-1e+1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "-1e+1000",
+        "reads": "notJSON"
+      },
+      {
+        "name": "0e99999: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "0e99999",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e00005: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e00005",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1E-0005: 5 characters after the E, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1E-0005",
+        "reads": "notJSON"
+      },
+      {
+        "name": "12345678901234567e+0001: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "12345678901234567e+0001",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1.23456789012345678e-00005: 6 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1.23456789012345678e-00005",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e0005: 4 characters after the e, read as the nearest double, 100000.0",
+        "spelling": "1e0005",
+        "reads": 100000.0
+      },
+      {
+        "name": "1e+005: 4 characters after the e, read as the nearest double, 100000.0",
+        "spelling": "1e+005",
+        "reads": 100000.0
+      },
+      {
+        "name": "1e-005: 4 characters after the e, read as the nearest double, 1e-05",
+        "spelling": "1e-005",
+        "reads": 1e-05
+      },
+      {
+        "name": "1e0001: 4 characters after the e, read as the nearest double, 10.0",
+        "spelling": "1e0001",
+        "reads": 10.0
+      },
+      {
+        "name": "2.5E0002: 4 characters after the E, read as the nearest double, 250.0",
+        "spelling": "2.5E0002",
+        "reads": 250.0
+      },
+      {
+        "name": "1e-999: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "1e-999",
+        "reads": 0.0
+      },
+      {
+        "name": "-1e-999: 4 characters after the e, read as the nearest double, -0.0",
+        "spelling": "-1e-999",
+        "reads": -0.0
+      },
+      {
+        "name": "0.1e-998: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "0.1e-998",
+        "reads": 0.0
+      },
+      {
+        "name": "0e9999: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "0e9999",
+        "reads": 0.0
+      },
+      {
+        "name": "1e-400: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "1e-400",
+        "reads": 0.0
+      },
+      {
+        "name": "-1e999: below a double's range, which the mac reads as minus infinity",
+        "spelling": "-1e999",
+        "reads": "minusInfinity"
+      },
+      {
+        "name": "-1e9999: below a double's range, which the mac reads as minus infinity",
+        "spelling": "-1e9999",
+        "reads": "minusInfinity"
+      },
+      {
+        "name": "1e999: above a double's range, which the mac cannot read: the file is not JSON",
+        "spelling": "1e999",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e9999: above a double's range, which the mac cannot read: the file is not JSON",
+        "spelling": "1e9999",
+        "reads": "notJSON"
+      },
+      {
+        "name": "4.9406564584124654e-324: 4 characters after the e, read as the nearest double, 5e-324",
+        "spelling": "4.9406564584124654e-324",
+        "reads": 5e-324
+      },
+      {
+        "name": "2.4703282292062328e-324: 4 characters after the e, read as the nearest double, 5e-324",
+        "spelling": "2.4703282292062328e-324",
+        "reads": 5e-324
+      },
+      {
+        "name": "2.4703282292062327e-324: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "2.4703282292062327e-324",
+        "reads": 0.0
+      },
+      {
+        "name": "1.7976931348623157e308: 3 characters after the e, read as the nearest double, 1.7976931348623157e+308",
+        "spelling": "1.7976931348623157e308",
+        "reads": 1.7976931348623157e+308
+      },
+      {
+        "name": "17976931348623157e292: 3 characters after the e, read as the nearest double, 1.7976931348623157e+308",
+        "spelling": "17976931348623157e292",
+        "reads": 1.7976931348623157e+308
+      },
+      {
+        "name": "1.7976931348623159e308: above a double's range, which the mac cannot read: the file is not JSON",
+        "spelling": "1.7976931348623159e308",
+        "reads": "notJSON"
+      },
+      {
+        "name": "-1.7976931348623159e308: below a double's range, which the mac reads as minus infinity",
+        "spelling": "-1.7976931348623159e308",
+        "reads": "minusInfinity"
+      },
+      {
+        "name": "12345678901234567e-005: 4 characters after the e, read as the nearest double, 123456789012.34567",
+        "spelling": "12345678901234567e-005",
+        "reads": 123456789012.34567
+      },
+      {
+        "name": "1.2345678901234567e-0330: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1.2345678901234567e-0330",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1.23456789012345678e-5: 18 digits with an exponent, which the mac reads as a decimal number Windows does not copy: cannot tell",
+        "spelling": "1.23456789012345678e-5",
+        "reads": "cannotTell"
       }
     ],
-    "editJSONCasesHow": "An editJSON move on the bytes of a file (file-formats.json -> undoJournal.opKinds.editJSON): file is the file's text, op the op (its before and after any JSON, a missing one meaning no such member), direction undo (towards before) or redo (towards after), and result the file's exact text afterwards, or null when the move is refused (as changed since). Both platforms must produce these bytes exactly: only the member's own bytes change, and a new value is spelled compactly with keys sorted.",
     "stackCases": [
       {
         "name": "three steps: the newest is the head",
@@ -53315,7 +53601,7 @@
       "putBackOverOneHandEdit": "A step that died with every file swapped in but before applied, with one page then changed by hand, is put back on every other page (measured: 299 of 300) and closed interrupted, as rule.recovery says: the journal never calls half a step done. For the UI review, not a change of rule.",
       "shadowProcessAfterTheFlip": "A process still running a build with the switch off after the switch goes live (an outside-assistant session that outlives an update: on the mac that server is the app binary; or a build with the switch off run beside a live one on a developer's Mac) goes on writing shadow steps into the same list, and a live reader cannot tell them from live ones. Measured (the Fable sweep of U1, a standalone probe): after goLive and one live step, a shadow-mode step was recorded as step 3 and was the head the live app offered, and Undo took it back past a newer change the shadow process never recorded; a LIVE two-page step killed after its first swap, when the first process to take the lock was in shadow, was recorded interrupted (partlyTookEffect) and cleared, with one page published and the other not, both staged files left, and no trail line. Reaches a teacher only if a build with the switch off is released beside a live one; under ruling 2 none is. No v1 line changes for it: U7 settles it (laterPieces.U7).",
       "stagedFilesOfAFolderAway": "A step closed interrupted while its working folder could not be reached has its staged files removed by the first recovery that reaches the folder again, for as long as the journal still holds the step's lines (until its segment goes, normally some 60 days). A folder away for longer keeps them: hidden dot files beside its pages, which Obsidian and the website builder pass over.",
-      "jsonFileRewritten": "Withdrawn by the hard review of U2b (LOW a): an editJSON no longer rewrites the file; it changes only its member's bytes (file-formats.json -> undoJournal.opKinds.editJSON, undo.editJSONCases) and refuses a file where that cannot be done safely, a key written twice on the path among them. Kept as a key so a reader of an older contract finds it answered. Left as they are for the merge with the journal off (the director's ruling after the third review, to be recorded on #899): the member an editJSON sets has its number spelled by the app (2.0 is written 2), and a new object value's non-ASCII keys are sorted as Foundation sorts them, which the contract does not pin. A whole number beyond 2^53 is never compared or written through a double: cannotTell, or refused.",
+      "jsonFileRewritten": "Withdrawn by the hard review of U2b (LOW a): an editJSON no longer rewrites the file; it changes only its member's bytes (file-formats.json -> undoJournal.opKinds.editJSON, undo-json-cases.json -> editJSONCases) and refuses a file where that cannot be done safely, a key written twice on the path among them. Kept as a key so a reader of an older contract finds it answered. Left as they are for the merge with the journal off (the director's ruling after the third review, to be recorded on #899): the member an editJSON sets has its number spelled by the app (2.0 is written 2), and a new object value's non-ASCII keys are sorted as Foundation sorts them, which the contract does not pin. A whole number beyond 2^53 is never compared or written through a double: cannotTell, or refused.",
       "linkBetweenTheCheckAndTheChange": "A place is checked inside the working folder (links resolved) immediately before each change, and the change is a separate system call: a folder on the path replaced by a link to outside in the instant between the two calls is not caught. Measured as a window of one system call by the third hard review of U2b (probe C); closing it needs the change made relative to an open handle of the folder (openat/renameat on the mac, a handle opened without following reparse points on Windows), which is U7's or later. The check runs at plan time, before staging, before each swap, before a re-derivation and in the tidying."
     }
   },

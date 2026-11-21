@@ -302,6 +302,14 @@ public static class ActivityTrail
         /// </summary>
         UndoRolledBack,
         /// <summary>
+        /// Undo's recovery found a teacher's folder a stopped step had set
+        /// aside (#899 W6, U2b's kinds): being put back in its place though it
+        /// changed while aside, with what changed, or kept under a visible
+        /// name beside its place because something else holds that place,
+        /// both named. Written just before the rename. Never page text.
+        /// </summary>
+        UndoFoundAFolderSetAside,
+        /// <summary>
         /// A whole course was put back, from one of its backups (Restore…) or
         /// from Archived: the code it shows, its folder, the zip's FILE NAME,
         /// what became of the course as it was first (the archive made of it,
@@ -906,6 +914,7 @@ public static class ActivityTrail
         Event.HowITeachPageKeptOff => "How I Teach page kept off the website",
         Event.SectionRestored => "section restored",
         Event.UndoRolledBack => "undo rolled back",
+        Event.UndoFoundAFolderSetAside => "undo found a folder set aside",
         Event.CourseRestoredFromABackup => "course restored from a backup",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
