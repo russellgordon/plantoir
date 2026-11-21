@@ -1769,6 +1769,38 @@ public sealed partial class SidebarPane : UserControl
             return;
         }
 
+        // A backup made for ONE section offers that section first (#911, the
+        // mac's #897 C; Russell's ruling: Restore Section N is the default),
+        // the whole course beside it. The zip is read once per backup, now,
+        // as the dialog is about to open, never while it draws.
+        Course? course = Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode);
+        OneSectionRestore.BackupFacts? facts = null;
+        int? offered = null;
+        if (OneSectionRestore.MadeFor(item.Maker) is not null && course is not null)
+        {
+            facts = await FactsOfBackup(item);
+            offered = OneSectionRestore.OfferFor(item, course, facts);
+        }
+        if (offered is int section)
+        {
+            var question = new ContentDialog
+            {
+                Title = OneSectionRestoreWording.Title(item.CourseCode),
+                Content = OneSectionRestoreWording.Message(section,
+                    item.Maker.DescriptionFor(Workspace.ClassNounOf(item.CourseCode)), item.WhenDescription),
+                PrimaryButtonText = OneSectionRestoreWording.RestoreSectionButton(section),
+                SecondaryButtonText = OneSectionRestoreWording.RestoreWholeCourseButton,
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            var answer = await ShowDialogSafelyAsync(question);
+            if (answer == ContentDialogResult.None) return;
+            if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+            if (answer == ContentDialogResult.Primary) await RestoreOneSection(section, item, facts!);
+            else await RestoreWholeCourse(item);
+            return;
+        }
+
         var dialog = new ContentDialog
         {
             Title = $"Restore {item.CourseCode}?",
@@ -1782,7 +1814,55 @@ public sealed partial class SidebarPane : UserControl
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+        await RestoreWholeCourse(item);
+    }
 
+    /// <summary>What each backup zip holds that the one-section offer needs, read once per backup (a zip does not change; an unreadable one holds nothing).</summary>
+    private readonly Dictionary<string, OneSectionRestore.BackupFacts> _backupFacts = new(StringComparer.OrdinalIgnoreCase);
+
+    private async Task<OneSectionRestore.BackupFacts> FactsOfBackup(BackupItem item)
+    {
+        if (_backupFacts.TryGetValue(item.FilePath, out var kept)) return kept;
+        string path = item.FilePath;
+        var facts = await Task.Run(() => OneSectionRestore.ReadFacts(path));
+        _backupFacts[path] = facts;
+        return facts;
+    }
+
+    /// <summary>
+    /// Restore from Backup…'s "Restore Section N" (#911 step 4): the click's
+    /// order is <see cref="MenuSectionRestore.Run"/>'s; the finished or
+    /// refused sentence is shown in the one result dialog, the backup
+    /// dialog's slot, as the mac shows it in the backup alert's.
+    /// </summary>
+    private async Task RestoreOneSection(int section, BackupItem item, OneSectionRestore.BackupFacts facts)
+    {
+        string coursesDirectory = Workspace.CoursesDirectory();
+        string? folder = Workspace.WorkspacePath;
+        string? BusyRefusal()
+        {
+            if (folder is null) return null;
+            if (CourseActivity.IsPreviewingOrPublishing(folder, item.CourseCode))
+                return $"{item.CourseCode} is previewing or deploying right now. Stop that first, then restore.";
+            if (CourseActivity.AssistHoldRefusal(folder, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held) return held;
+            if (SectionMenuActivity.IsChanging(folder, item.CourseCode, section) || AssistActivity.IsWorking(folder, item.CourseCode, section))
+                return OneSectionRestoreWording.Busy(section, item.CourseCode);
+            return null;
+        }
+        // The course as loaded; RefusalAtTheClick asks the folder and the saved settings themselves.
+        Course? course = Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode);
+        var result = await Task.Run(() => MenuSectionRestore.Run(section, item, course, facts, coursesDirectory, BusyRefusal));
+        if (result.ArchivePath is not null || result.Finished)
+        {
+            Workspace.Reload();
+            if (result.Finished) Workspace.Selection = new SidebarSelection.SectionItem(item.CourseCode, section);
+            _window.ApplyState();
+        }
+        await ShowError(result.Title, result.Message);
+    }
+
+    private async Task RestoreWholeCourse(BackupItem item)
+    {
         try
         {
             // Even a restore has an undo: the current version is archived

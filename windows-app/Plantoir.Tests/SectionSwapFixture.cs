@@ -55,12 +55,17 @@ internal sealed class SectionSwapFixture : IDisposable
     }
 
     /// <summary>A backup of the whole course, made by the assistant for Section 2.</summary>
-    public BackupItem BackUp()
+    public BackupItem BackUp() => BackUp(new BackupMaker.Assistant(2));
+
+    /// <summary>A backup of the whole course, made by <paramref name="maker"/>.</summary>
+    public BackupItem BackUp(BackupMaker maker)
     {
-        var course = Workspace.DiscoverCourses(Folder).First(found => found.Code == "ICS3U");
-        string path = CourseArchiver.BackUpCourse(course, CoursesDir, new BackupMaker.Assistant(2));
+        string path = CourseArchiver.BackUpCourse(Course(), CoursesDir, maker);
         return BackupItem.From(path, "ICS3U")!;
     }
+
+    /// <summary>The course as the window loads it now.</summary>
+    public Course Course() => Workspace.DiscoverCourses(Folder).First(found => found.Code == "ICS3U");
 
     /// <summary>Every file under <paramref name="root"/> by relative path and SHA-256, and every folder as "dir:" + its path.</summary>
     public static SortedDictionary<string, string> Snapshot(string root)
