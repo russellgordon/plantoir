@@ -168,7 +168,7 @@ public sealed class UndoLockTests : IDisposable
         journal.WithLock(_ => { });
         Assert.True(File.Exists(LockPath));
         Assert.Equal(0, new FileInfo(LockPath).Length);
-        journal.WithLock(writer => journal.Prune(writer));
+        journal.WithLock(writer => new UndoDoor(journal, UndoMode.Live).RecoverThenPrune(writer));
         Assert.True(File.Exists(LockPath));
     }
 }

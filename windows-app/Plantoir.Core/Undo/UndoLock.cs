@@ -100,6 +100,75 @@ internal sealed class UndoProcessMemory
     {
         lock (_guard) return _pendingClosings.TryGetValue(KeyOf(folder), out var kept) ? kept.Count : 0;
     }
+
+    // ---- Recovery's memory (#899 W3) -------------------------------------------
+
+    private readonly Dictionary<string, (int Refusals, DateTimeOffset NextTry)> _refusedSwaps = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _tidied = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _abandoned = new(StringComparer.Ordinal);
+
+    /// <summary>The first wait after a refused put-back (<c>rule.recovery</c>: "one minute after a refusal").</summary>
+    internal static readonly TimeSpan FirstRetry = TimeSpan.FromMinutes(1);
+
+    /// <summary>The longest wait between tries (<c>rule.recovery</c>: "never more than an hour apart").</summary>
+    internal static readonly TimeSpan LongestWait = TimeSpan.FromHours(1);
+
+    /// <summary>Whether recovery may try this step's put-back now on the ordinary path: yes at the process's first lock, then by the schedule.</summary>
+    internal bool RefusedSwapIsDue(string key, DateTimeOffset now)
+    {
+        lock (_guard) return !_refusedSwaps.TryGetValue(key, out var entry) || now >= entry.NextTry;
+    }
+
+    /// <summary>One more refusal: the next try one minute later, doubling with each refusal in a row, never more than an hour.</summary>
+    internal void NoteARefusedSwap(string key, DateTimeOffset now)
+    {
+        lock (_guard)
+        {
+            int refusals = (_refusedSwaps.TryGetValue(key, out var entry) ? entry.Refusals : 0) + 1;
+            TimeSpan wait = FirstRetry;
+            for (int doubled = 1; doubled < refusals && wait < LongestWait; doubled++) wait += wait;
+            if (wait > LongestWait) wait = LongestWait;
+            _refusedSwaps[key] = (refusals, now + wait);
+        }
+    }
+
+    internal void ForgetTheRefusedSwap(string key)
+    {
+        lock (_guard) _refusedSwaps.Remove(key);
+    }
+
+    /// <summary>Whether this process has already removed the staged files of a step closed <c>interrupted</c> (once per process).</summary>
+    internal bool HasTidied(string key)
+    {
+        lock (_guard) return _tidied.Contains(key);
+    }
+
+    internal void NoteTidied(string key)
+    {
+        lock (_guard) _tidied.Add(key);
+    }
+
+    /// <summary>
+    /// A step THIS process left in flight and gave up on (a reversal that did
+    /// not go in, a closing that could not be written or kept): recovery may
+    /// settle it although this process is alive, because nothing of this
+    /// process is still working on it. Another process never does while this
+    /// one lives, since only this process knows.
+    /// </summary>
+    internal void NoteAbandoned(string key)
+    {
+        lock (_guard) _abandoned.Add(key);
+    }
+
+    internal bool IsAbandoned(string key)
+    {
+        lock (_guard) return _abandoned.Contains(key);
+    }
+
+    internal void ForgetAbandoned(string key)
+    {
+        lock (_guard) _abandoned.Remove(key);
+    }
 }
 
 /// <summary>

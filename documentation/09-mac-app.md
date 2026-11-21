@@ -1827,10 +1827,29 @@ key and Command-Period." They are the grouped form's switches, as the
 Obsidian and Assistant panes draw theirs (Toggles: "Within a grouped form,
 consider using a mini switch"; "In general, don't replace a checkbox with a
 switch"). Each change, from the box or the pane, writes one
-`stop question setting changed` line. Windows owes it with the questions
-([#1009](https://github.com/russellgordon/plantoir/issues/1009)) and holds it
-in `NamedGapLedger` until then; never `appliesOn`, which is for a permanent
-difference (`contracts/README.md` → "Named gaps"). Rejected: one setting for both (above), and
+`stop question setting changed` line. Windows records it too since
+[#1009](https://github.com/russellgordon/plantoir/issues/1009), which also
+moved the questions' words into `shared-rules.json` → `stopQuestions`
+(documentation 12 → "Escape stops a running preview or deploy, and the stop
+questions"). The mac reads that section in `StopQuestionsContractTests`: its
+Swift constants pinned to `questions`, `wording` and `trail`, and every one
+of the `cases` played step by step through `StopQuestionAsking` and the
+Settings row's binding, `StopQuestionSettingsSection.isOn`; never
+`appliesOn`, which is for a permanent difference. The same test plays
+`stopQuestions.aStoppedDeploy` (#1009's third review) against
+`MultiDestinationDeployRunner.outcome` and `result`: a destination a stop
+kept the run from reaching counts as not deployed, so a stopped run is never
+`allSucceeded` and `recordWhatWentOut` writes no stamp. On Windows a stop
+could land between two destinations and the run was stamped published and
+the assistant told "deployed"; the mac's Cancel answers only while the shown leg is running or
+between its phases (`TaskProgressView`), so a stop cannot land in that gap.
+One sentence the mac says did change: with three destinations stopped during
+the second, `deployPartiallySucceeded` named only the second as not deployed,
+and now names the second and the third, which never got the site either (the
+contract case "stopped during the second of three", #1009's fourth review). A
+stop in the first of two legs now lists the second as not deployed too, which
+is never said, since no leg went out.
+Rejected: one setting for both (above), and
 Xcode's "Reset all questions" button, which says nothing about which
 question it brings back.
 
@@ -1927,10 +1946,10 @@ focus, acts once per run, and for a deploy or a plan share asks first ("Stop
 the deploy?", "Stop this share?"), with the stopping button the default and
 Cancel on Escape, a "Don't ask again" box that counts only with the stop,
 one setting per question, and both turned back on in the Deploying part of
-Settings. The words are Mac-only (`DeployStopWording`, `ShareStopWording`,
-`StopQuestionSettingsWording`), not yet in `contracts/`; the trail event
-`stop question setting changed` is in `activityTrail.mustRecord`, held on
-Windows by `NamedGapLedger` against #1009. Two lessons from the Mac's fifth
+Settings. The words (`DeployStopWording`, `ShareStopWording`,
+`StopQuestionSettingsWording`) and the cases are in `shared-rules.json` →
+`stopQuestions` since #1009, run by both suites; the trail event
+`stop question setting changed` is in `activityTrail.mustRecord`. Two lessons from the Mac's fifth
 round travel: decide whether a key is the text box's when the key arrives,
 from the focused element as it is then, never afterwards from a "last event"
 global (a click or a UI Automation Invoke on Cancel must always stop the

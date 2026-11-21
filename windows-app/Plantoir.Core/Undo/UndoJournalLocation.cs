@@ -10,8 +10,10 @@ namespace Plantoir.Core.Undo;
 /// is moved, and a synced copy of it would be a second list.
 ///
 /// <para>The ONLY place that reads <see cref="AppDataRoot"/> for Undo, so a
-/// journal is otherwise handed its folder (the plan review's H1). Nothing
-/// calls it before W4 builds the composition root.</para>
+/// journal is otherwise handed its folder (the plan review's H1). Read only
+/// by the composition root, <see cref="UndoForThisProcess"/> (W4), in the
+/// window and in every <c>plantoir-mcp.exe</c>, after each has applied
+/// <c>--state-dir</c>.</para>
 /// </summary>
 internal static class UndoJournalLocation
 {

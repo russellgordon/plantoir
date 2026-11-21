@@ -313,6 +313,15 @@ internal static class NamedGapLedger
     internal const string UndoTraces = "undo-traces.json → traces";
 
     /// <summary>
+    /// <c>shared-rules.json</c> → <c>undo.recoveryCases</c>, by case <c>name</c>:
+    /// a case that needs a key this replay does not check yet (U2b's
+    /// <c>withAMove</c>, <c>withATree</c>, <c>withAPreference</c>,
+    /// <c>recoveredBy</c>: W6). A held case must still stop at that key
+    /// (<c>UndoRecoveryContractTests.EveryRecoveryCase</c>).
+    /// </summary>
+    internal const string UndoRecoveryCases = "shared-rules.json → undo.recoveryCases";
+
+    /// <summary>
     /// The older name each <see cref="SubjectMenuItemsUnderAnOlderName"/> entry
     /// is said under here. Every entry has exactly one, and every name here has
     /// an entry (<c>NamedGapLedgerTests</c>).
@@ -419,8 +428,7 @@ internal static class NamedGapLedger
     private const string Reason899W4c = "the mac's U3c for #899 (2026-11-20; Russell's ruling of 15:20): recovery and an Undo or Redo put a page back from the step's own kept original (-orig, or -<n>-orig) when its hash matches the journal's record, every tidy keeps a kept original that is the only copy of what it holds (its bytes neither its page's nor what the list gives for its page), a swap never removes or reuses a kept original's name, an Undo or Redo of a newest step recovery has just left answers that refusal, a put-back from a kept original first writes both of the page's contents back into the list (and when the list will not take the outgoing one, or the kept original's own bytes, keeps them beside the page and still offers the other direction, resting on those files: Russell's ruling of 2026-11-20, night), a kept original that cannot be read just now leaves the step for the next try, and four trail lines say what was kept or refused; Windows' W4c, kept-original recovery, builds it (UndoRecovery.Settle, UndoDoor.AnswerARefusal, UndoSwap, UndoTrail.ToTheActivityTrail); until it lands this replay does not know the calls and keys those cases use, and this app writes none of those lines";
     private const string Reason899W4cKeptAlert = "the mac's U3c for #899 (Russell's rulings of 2026-11-20, night): when Show on Front Page goes in while another program edits the page at that instant, what the page held is kept in a hidden file beside it and ONE alert names it (keptTitle, kept), with OK, the default, and a button that shows the kept file selected in its folder (showKept: Show in Finder on the mac, Show in File Explorer here, as workingFolderPathBar's reveal; what File Explorer does for a hidden file is to be measured before it is built). Windows' W4c builds the part-way outcome this alert reports; until it lands Windows has no part-way front page to report and says none of these";
     private const string Reason899W6Traces = Reason899W6 + ". COVERAGE LOST, for W6 to restore: until U2b's contract put a move in them, W1 replayed all 20 traces call by call to their final hashes; held, each of these 15 is asserted only up to its first move and must stop exactly there, and trace-002, trace-012 and trace-020 open with a move, so they check nothing at all here until W6 replays them whole";
-    private const string Reason1009 = "stopping a running preview, deploy or plan share from the keyboard, with the two stop questions, their Don't ask again boxes and Settings > Deploying > Stopping (the mac's #988), is #1009's piece of v2.0.0; until it lands Windows asks no stop question and has no setting for one, so it has no change to record";
-    private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
+    private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) has no action wired on Windows yet (W7 wires them, with 'undo could not record a step'), and no op kind that sets a folder aside (W6, with 'undo found a folder set aside'); 'undo rolled back' is written by W3's recovery";
 
     /// <summary>
     /// The outside doors the contract names that this app does not have,
@@ -558,8 +566,7 @@ internal static class NamedGapLedger
              "Cloudflare token end date learned"),
         Owed(ActivityTrailEvents, 936, V200, Reason936,
              "files for the site downloaded", "files for the site could not be downloaded"),
-        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back", "undo found a folder set aside"),
-        Owed(ActivityTrailEvents, 1009, V200, Reason1009, "stop question setting changed"),
+        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo found a folder set aside"),
         Owed(ActivityTrailEvents, 899, V200, Reason899W4c,
              "undo could not put back a change that stopped",
              "undo kept what a page held",
@@ -689,6 +696,42 @@ internal static class NamedGapLedger
              "trace-017",
              "trace-018",
              "trace-020"),
+        // The mac's U3 rows (U3a's third review, U3c's kept originals and
+        // its two fix rounds) arrived with W3's reader already on dev: each
+        // uses a key this replay does not check, and W4c builds them.
+        Owed(UndoRecoveryCases, 899, V200, Reason899W4c,
+             "a step dies part way and its content is then missing, but the page's kept original matches what the journal recorded: the page is put back from it, rolled back, and nothing is left beside the pages (Russell's ruling of 2026-11-20, 15:20)",
+             "a step left part way whose first page's kept original holds exactly what the list gives for it: the tidy before the plan keeps it, and only once the step is put back does it go",
+             "the same, with the kept original there but unreadable just now (a cloud placeholder not downloaded): cannot tell now, so the step is left for the next recovery, never closed, the list kept, and an Undo is refused naming the page",
+             "the same, with the kept original no longer matching what the journal recorded: closed as interrupted naming the page left part way, the list cleared, the kept original left beside its page, and the trail line names it",
+             "a step whose first page was edited in place by another program as the swap went in, and whose put-back then failed, is left part way; recovery rolls it back and keeps the edit, in the kept original, beside the page, naming it on the trail",
+             "a file still in use when that Undo tries the put-back again: the Undo is refused naming the file, never another change under way, the list kept, and the refusal is on the trail",
+             "an undo of a step with a page now missing its content dies part way, the page's kept original matching what the journal recorded: the undone page goes forward again from it, and the undo ends where it began",
+             "the same undo when the list cannot keep a copy of what the page held as it went forward again: ended where it began, and that content kept beside the page under the put-back's hidden name, with the kept original it went forward from, and both named on the trail as no longer in the list",
+             "the same undo when only the content its kept original holds is gone from the list and the list will not take it again: ended where it began, and the kept original stays beside the page, though the page now holds the same, and is named on the trail as no longer in the list",
+             "the same undo, with the kept original no longer matching: closed as interrupted naming the page, the list cleared, and the kept original left beside its page and named on the trail"),
+        Owed(UndoRecoveryCases, 899, V200, Reason899W6,
+             "U2: a step with a marker move and the front page dies after every swap, before its re-derivation: completed, and recovery re-derives the front page",
+             "U2: the same step dies with its pages swapped and its marker not yet moved: the pages put back, rolled back, and the front page re-derived",
+             "U2: the same step dies before anything is swapped: failed, nothing to put back, and the front page re-derived all the same (re-deriving is idempotent)",
+             "U2: its undo dies after its swaps, before its re-derivation: completed, and re-derived",
+             "U2: its undo dies with the marker moved back and the pages not yet: the marker moved aside again, the undo ends where it began",
+             "U2: a deploy wrote a new marker after the step died with its marker moved: the pair is in the way, the pages are put back, both markers kept, the step interrupted and the list cleared",
+             "U2: a step that removes a folder dies with the folder set aside and its marker not yet moved: the folder put back from where it was set aside (its listing the step's), the pages put back, rolled back",
+             "U2: the same step dies after every change, before applied: completed, the folder gone, nothing staged left",
+             "U2: its undo dies with the pages and the marker back and the folder not yet made: the folder made beside its place is removed, and the undo rolled back",
+             "U2: a step that sets a preference dies with its pages swapped and the preference not yet set: rolled back, the preference as it was",
+             "U2: the same step dies after the preference is set, before applied: completed",
+             "U2: a step with the front page that died before applied is settled by the next write through the door for ops, and its front page re-derived",
+             "U2: the same step meets a write through U1's door first: the write is refused (another change is under way) and the step left in flight for a recovery that re-derives, never settled with its front page stale",
+             "U2: a step that removes a folder dies with the folder set aside, and a file is saved into it while it is aside: the folder is put back in its place, changed, and is in the way: the pages are put back, the step is interrupted naming the folder, and the list cleared",
+             "U2: the same, with something else made in the folder's place since: the folder set aside is kept under a visible name beside it, the step interrupted naming the folder, and the list cleared",
+             "U2: the same, with that visible name taken too: the folder is kept as '(kept by Undo 2)', the taken name untouched",
+             "U2: the same, with the recovery dying after the folder is kept under its visible name and before it writes to the list: the next recovery finds nothing hidden and settles the step as interrupted, the folder still kept, one trail line",
+             "U2: a step that removes a folder dies with the folder changed while aside and the recovery dying after putting it back, before it writes to the list: the next recovery finds the folder in its place, in the way, and settles the step as interrupted, one trail line",
+             "U2: a step that removes a folder dies part way through deleting it, every change in: the folder was renamed to its -gone name first, so recovery finishes the delete and the step is completed, never a half-emptied folder put back",
+             "U2: its redo dies the same way, part way through deleting the folder again: recovery finishes the delete and the redo is completed",
+             "U2: a write through U1's door on the very file a dead front-page step left part way is refused, never written over it"),
         Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
         Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921, "cloudflareToken"),
         Owed(CredentialRequestsSaidDifferently, 920, V200, Reason920, "teacherSurname", "siteName", "siteNameConflict"),

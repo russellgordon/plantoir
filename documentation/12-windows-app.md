@@ -14322,6 +14322,333 @@ no Obsidian, and no UI test drives these dialogs. Whether Obsidian for Windows
 writes its list in time for the reopen to find the course is #581's
 measurement, unchanged.
 
+## Escape stops a running preview or deploy, and the stop questions (#1009, the mac's #988)
+
+The mac's side, and every reason behind the rulings, is
+`documentation/09-mac-app.md` → "Escape and Command-Period stop a running
+preview, deploy or plan share (#988)"; this is what Windows did with it.
+
+**What a teacher sees.** The console's Cancel (`TaskProgressView`,
+`taskCancelButton`) answers Escape while a preview builds or a deploy runs.
+A preview stops at once. A deploy asks first, by click, by UI Automation
+Invoke or by key: "Stop the deploy?", "The website may be left partly
+updated until you deploy again.", a "Don't ask again" box, **Stop Deploy**
+(the default: the accent button, and Enter) and **Cancel** (WinUI's Close
+button, rightmost, which Escape presses). Ticked with Stop Deploy, the box
+turns the deploy's question off, and Escape and Cancel then stop a deploy at
+once; ticked with Cancel, nothing is remembered and the next question opens
+unticked. File ▸ Settings ▸ Deploying opens with a **Stopping** section, two
+checkboxes ("Ask before stopping a deploy", "Ask before stopping a share of
+unit plans") and the footer "When one is off, Cancel stops that task at
+once, and so does the Escape key." Each change, from the box or the pane,
+writes one `stop question setting changed` line, the mac's words
+(`StopQuestionWording.TrailLine`); `NamedGapLedger` no longer holds it.
+
+**The words are in the contract now** (`shared-rules.json` →
+`stopQuestions`, added from Windows): on the mac they lived only in Swift,
+so this piece moved them where both apps read one copy, with fourteen
+`cases` for what each answer stops and remembers (played through
+`StopQuestionAsking` in `StopQuestionsContractTests`). The mac runs the same
+section in a class of the same name (#1009's mac side): its Swift constants
+pinned to it, and every case through its own `StopQuestionAsking`.
+
+**Windows has no Command-Period, and no counterpart was found.** Nothing in
+`contracts/` names one; Microsoft's "Dialog controls" page lists what closes
+a dialog through its Close button: the button, the system back button,
+Escape and Gamepad B. So Windows names Escape alone, and its footer is
+`stopQuestions.windowsWording.footer`, the precedent of
+`obsidianAddOnsForFigures.windowsWording` (Enter for Return).
+
+**Where the key lives: a `KeyboardAccelerator` on the visible Cancel**
+(`TaskProgressView.GiveCancelTheEscapeKey`, called by the section's view
+only). No hidden control, and no key handler gives Escape its action: the
+panel's one other key handler is the console answer box's own `KeyDown`
+(Enter sends the typed line; Escape is not looked at), and the section and
+the window add none for it.
+WinUI shows the key in the button's own tooltip, "Cancel (Esc)". (The
+one key filter since the first review is on the stop question itself, and
+it is a filter, not a key catcher: see "A held Escape" below.) Microsoft,
+"Keyboard accelerators", Resolving accelerators: an accelerator with no
+`ScopeOwner` is looked for only after the key has bubbled from the focused
+element to the root unhandled, so a control that uses Escape itself (an
+open flyout, a drop-down, a dialog) has it first. The key is decided as it
+arrives (`StopKey.GoesToCancel`, Core, unit-tested): Cancel is on screen
+(it and every parent visible), the task runs, no ContentDialog is up
+(`DialogGate.IsOpen`), the preview's site is not drawn over the console
+(`IsCovered`, set where the web view is shown: the mac's
+`progressPanelTakesTheCancelKeys`), and no editable text box has the focus
+(`FocusManager.GetFocusedElement`: a `TextBox` that is not read-only, a
+`PasswordBox`, a `RichEditBox` that is not read-only; an `AutoSuggestBox` or
+`NumberBox` focuses its inner `TextBox`). The console's output is a
+selectable `TextBlock`, not a box. The handler sets `Handled` whatever it
+decides: Microsoft's "Invoke a keyboard accelerator" says an unhandled one
+goes on to press the button through its Invoke pattern, which would stop the
+task from inside a box. A click and an Invoke reach `PressCancelAsync` with no
+focus check, so they always stop (or ask). A run is stopped once
+(`_stopSentTo`, the runner and its start): Microsoft says an accelerator
+auto-repeats while held "and this behavior cannot be modified".
+
+**Measured in the VM** (Windows 11 Pro ARM64 in Parallels, the x64 app under
+emulation, 2026-11-20): the question's first focus is the "Don't ask again"
+box (WinUI's first focus is the first focusable control in the content,
+then the default button), and Enter there presses Stop Deploy, the default,
+as Return does on the mac; Space there ticks the box. With the focus moved to
+Cancel, Enter and Space both press Cancel. A second preview started straight
+after a stopped one ended on its own with "Something went wrong" in this VM,
+so each UI test runs one preview; not looked into (it is not this piece's).
+
+**Rejected.** A `KeyDown` or `PreviewKeyDown` on the window or the panel: a
+hidden key catcher. Initial focus moved to Cancel as #979's
+`AskWithNoDefault` does: this question has a default, ruled for the mac
+(Stop Deploy, Return), and a focused Cancel would take Enter from it, the
+"looks like the default and is not" fault #979's review found. A destructive
+style on Stop Deploy: ruled plain. Leaving `Handled` false when the key is
+the box's: the button would then be invoked.
+
+**Not built here, and why.** Windows has no share of unit plans yet (#824),
+so no panel asks "Stop this share?"; the words, the setting and its
+Settings row are in place for it, as the mac shows both rows.
+
+**The first review's fixes (2026-11-20).** *Every route asks.* The console's
+own "Stop" beside the answer box (`consoleStopButton`; the mac has no such
+button) used to kill the launcher (`Terminate`) with no question, skipping
+the section's `CancelDeploy` sweep and never setting `WasCancelled`, so the
+deploy read "Something went wrong". Ruled: stopping a deploy asks first by
+every route. It now goes through `PressCancelAsync`, as Cancel does: a
+deploy asks, is swept and ends "Cancelled"; a preview stops at once; the
+button stays. *One "under way" rule.* A deploy that builds first runs both
+scripts on one runner, and between them `IsRunning` is false until
+`RunAsync`'s wait on `WaitUntilFinished` resumes (`IsBetweenPhases`, row
+318b): up to 100 ms when this was written, a turn of the window's thread since
+#1016 made the wait a `TaskCompletionSource` that the run's ending completes.
+The stopping code read `IsRunning` alone, so a "Stop the deploy?" open when
+the build ended was taken down while the deploy went on, and a press in the
+gap asked nothing. Now `ScriptRunner.IsUnderWay` (running, or between
+phases: the mac's rule) is the one rule: the key, a click, the console's
+Stop, Stop Deploy, taking the question down, Cancel's row staying on screen
+(`TaskIsUnderWay`), and `MultiDestinationDeployRunner.Cancel`, which now
+marks a runner cancelled in the gap so `RunAsync` stops before the deploy
+starts. `ScriptRunner.Run` clears `IsBetweenPhases` only once the next
+script is running (or has failed to start): cleared first, its own
+notification read as the run having ended. *Settings follows the box.* An
+open File ▸ Settings ▸ Deploying shows the change at once when the
+question's "Don't ask again" turns it off (`AppSettings.StopQuestionSettingChanged`,
+listened to while the row is loaded; setting the row to the stored value
+writes no second trail line). *The contract.* `stopQuestions.knownLimits[1]`
+pointed at a closing comment that does not exist; it now says what is true:
+no panel asks the share's question, and its row stands beside the deploy's.
+
+**Measured in the VM, after the fixes** (same machine, 2026-11-20): a build
+of the 600-page test course ended 30.8 s after the question opened during
+it, and the question stayed up across the change; Stop Deploy then ended
+the deploy "Cancelled" with nothing published. **A held Escape** (one
+press, then key-downs 33 ms apart with no key-up, as a keyboard repeats;
+one `SendInput` held down sends no repeats, so a test must send them): the
+press opened the question, and a repeat then pressed its Cancel, in 1 run of
+3 with the repeats starting at 500 ms and in 4 holds of 4 (repeats from 250,
+400, 500 and 650 ms) in the next run, so a held Escape asked and took the
+question down before the teacher could read it. Fixed on the question
+itself, structurally: its `PreviewKeyDown` marks an Escape whose
+`KeyStatus.WasKeyDown` is set (a repeat) handled, as `TickTable` swallows a
+held Space's repeats; a fresh Escape, and every other key, is the dialog's
+as before. Why this is a filter and not a key catcher: it sits on the
+visible question, the control whose key Escape is; it gives no key an
+action (nothing is pressed, stopped or answered from it); and it only drops
+key-downs whose previous-state flag is set. The repeats cannot be stopped
+where they start (Microsoft, "Keyboard accelerators": an accelerator
+auto-repeats while held, "and this behavior cannot be modified"), and
+`ContentDialog` closes on an Escape key-down, so the question is the only
+place a repeat can be told from a press. With it, 4 holds of 4 left the question open, and the next fresh
+Escape was its Cancel. Rejected: a timed delay before the question takes
+keys (a guess at the repeat delay, which a teacher sets), and refusing a
+close while Escape is down (a fresh press is down too). **Escape where another control owns it**: with
+the menu bar's File menu open, it closed the menu; with a sidebar row's
+context menu open, it closed the menu; neither asked or stopped the deploy
+(the accelerator is reached only by a key that bubbled to the root
+unhandled). The main window has no ComboBox while a section's panel shows:
+the only one is in a course's settings ("Language and region"), which
+replace the panel; there, Escape with it focused, and with it open (it
+closed), asked nothing, and the deploy was still running on return.
+
+**Left as they are, for Russell or a later issue.** The question's first
+focus is the "Don't ask again" box (WinUI's rule, above), so Space ticks it
+and Enter is Stop Deploy; whether the first focus should be a button is a
+design question. Settings ▸ Deploying ▸ Stopping uses checkboxes, as the
+pane's other setting does, where the mac uses switches; whether Windows
+should use toggle switches there is the same kind of question.
+
+**Tests.** `StopQuestionsContractTests` (unit): every word against the
+contract, every case, the trail lines and the `mustRecord` example, the
+setting kept, the key rule, and by source the accelerator on the visible
+Cancel, no key handler on the panel (the question's repeat filter is
+above), the question's words with Stop Deploy as default, the
+box read only before Stop, and Stopping first in Settings ▸ Deploying; since
+the review, a run between its phases is under way and a press there asks, a
+cancel in the gap marks the run cancelled, every stop decision reads
+`TaskIsUnderWay`, the console's Stop goes through `PressCancelAsync`, and a
+changed question is announced once per change.
+`StopByKeyboardUiTests` (opt-in, `[UiFact]`, real keys in the VM): Escape
+stops a running preview; Escape on a running deploy asks, Enter and Space on
+the focused Cancel and Escape on the question keep it running and remember
+nothing, Enter with the first focus is Stop Deploy, Stop Deploy with the box
+ticked turns the question off (setting and trail line), and the next Escape
+stops a deploy at once; Escape in the console's focused answer box stops
+nothing and an Invoke on Cancel then stops the preview. Sabotaged in the VM,
+each red: no accelerator (the preview and deploy tests), the box check
+removed (the text-box test), Cancel reading the box (the deploy test).
+Since the review: the console's Stop on a deploy asks and Stop Deploy ends
+it "Cancelled"; the question opened during the build stays across the
+change to the deploy and Stop Deploy stops it; a held Escape's repeats do
+not answer the question (four holds); Escape with a menu open or a ComboBox focused is
+theirs (a measurement). Sabotaged in the VM, each red: the console's Stop
+back to `Terminate` (its test: "asked nothing"), the question taken down on
+`IsRunning` alone (its test: "taken down when the build finished");
+`IsUnderWay` as `IsRunning` alone and the announcement removed (their two
+unit tests), the repeat filter taken off (the held-Escape test, 4 holds of 4
+closed).
+
+**The second review's fixes (2026-11-20).** *Between two destinations.* A
+course that deploys to two or more places runs a leg each, and when leg 1's
+runner stops, `RunAsync` moves to leg 2 only once its wait resumes (up to
+100 ms then; since #1016, the post queued behind the runner's own ending) and
+`CurrentLegIndex` changes; only then does the section show leg
+2's runner. In that gap the panel's runner was leg 1's and not under way, so
+a "Stop the deploy?" open when destination 1 finished was taken down while
+the deploy went on, Cancel's row hid, and Escape did nothing. The panel's
+one rule now counts the whole run: `MultiDestinationDeployRunner.ShownTaskIsUnderWay`
+(the shown runner under way and not cancelled, or the run running and not
+cancelled), read by `TaskIsUnderWay` everywhere the panel decides, and the
+question is taken down by it on a runner's change and when the section
+shows the panel again (`TakeDownTheStopQuestionIfTheTaskEnded`; the whole
+run ending reaches the panel only that way). A cancel in the gap reaches no
+leg's runner, so `RunAsync` checks the run's own `WasCancelled` before each
+leg and starts no later one, and the panel's badge reads "Cancelled" from
+the run's mark too. *No stuck mark.* `IsBetweenPhases` is no longer cleared
+on entry to `Run` (the first review), so an exception after the build and
+before the deploy's `Run` would leave it set for good, and the panel would
+ask about a run that had ended. `RunAsync`'s `finally` now clears it on
+every leg, before the run's `IsRunning` goes false. *The console's Stop in
+the New Course wizard.* Since the first review it goes through
+`PressCancelAsync`; the wizard's panel has no question and no `OnCancel`,
+so it now ends the work with `ScriptRunner.CancelByUser` (Control-C, then
+the process ended after two seconds), the teacher's stop, which reads
+"Cancelled". It used to be `Terminate`, which read "Something went wrong".
+**Measured in the VM** (2026-11-20): the 600-page course deploying to a
+folder and then to Netlify reached destination 2 53 to 104 s after the
+question opened during its build, and the question was still up; Stop
+Deploy then ended it "Cancelled" with no third start of `deploy.ps1`. The
+wizard's console Stop, pressed at "Step 1 of 7", ended the work "Cancelled".
+**Tests.** `StopQuestionsContractTests`: the rule holds between two
+destinations and a press there asks (state set by hand); a real
+`RunAsync` over three stand-in destinations on a one-thread context,
+cancelled from the first leg's own ending (the gap, before the run's wait
+resumes), asks there and runs `deploy.ps1` once; an exception thrown
+between a real build and the deploy's `Run` leaves no leg between phases.
+`StopByKeyboardUiTests`: the question across the change of destination, and
+the wizard's console Stop. Sabotaged in the VM, each red: the rule without
+the whole run (both gap unit tests, "read as ended"; the UI test, "taken
+down when destination 1 finished"), no `WasCancelled` check before a leg
+(three deploys, not one), no clearing in `finally` (the leg "still marked
+between the build and the deploy"), the wizard's Stop back to `Terminate`
+("Something went wrong").
+
+**The third review's fixes (2026-11-20).** *A stopped deploy is never
+every destination deployed.* A stop between two destinations reached no
+leg's runner, the run never started leg 2, and `CurrentOutcome` counted
+finished legs only, so the outcome was `AllSucceeded`: `RecordWhatWentOut`
+stamped the section published (its " — Edited" went away) and the window
+and the assistant were told "deployed to all 2 destinations". A destination
+a stop kept the run from reaching now counts as not deployed, as the one a
+stop lands in does: the case is `shared-rules.json` → `stopQuestions` →
+`aStoppedDeploy`, added from here and played by both suites through their
+own runner's outcome and `MultiDestinationDeployRunner.Result` (the mac's
+`outcome` and `result`, changed the same way). The sentence for a stop
+between two is `deployPartiallySucceeded` naming the unreached
+destinations, the one the mac says for a stop during the second of two;
+the mac's Cancel answers only while the shown leg runs, so it has no gap
+case of its own. A leg not reached because the shared BUILD failed is still
+not counted (the build's own answer is said). *A stop after the last leg
+stops nothing.* Once the last leg's runner has ended, `IsRunning` stays
+true until `RunAsync`'s wait resumes (a post queued behind the leg's own
+ending since #1016's `TaskCompletionSource`, so a key or click already queued
+on the window's thread can land there); the panel's rule read that as under way,
+so a press there asked, and Stop Deploy marked the run cancelled: the badge
+read "Cancelled" over a deploy that had gone out everywhere. The run's half
+of the rule is now `CanStillBeStopped`: running, not cancelled, and its
+current leg under way, or announced and not yet started, or a later leg
+still to start; `Cancel()` marks nothing when it is false, and a question
+open at that moment comes down. The "not yet started" clause was found in
+the VM: `RunAsync` announces the new `CurrentLegIndex`, and the section
+shows that leg's runner, a moment before the leg's `Run`, and without it a
+question open across the change of destination came down there (the
+two-folder UI test, red: "taken down when destination 1 finished").
+*No outcome badge beside Cancel.* In the gap between two destinations
+`Render` drew leg 1's ending ("Done", or "Something went wrong" since no leg
+had yet been marked finished) beside a Cancel that still stopped the
+deploy; it now draws the working state by
+`MultiDestinationDeployRunner.ShownTaskShowsAsWorking`. *A throw in the
+ending.* `RunAsync`'s `finally` stamped, cleared the marks and set
+`IsRunning` false in sequence, so a throw from the stamp or from a listener
+skipped the rest and left the run going for good; each step now runs in a
+`finally` of the one before. *No real account from the UI class.*
+`StopByKeyboardUiTests` deployed its two-destination course to a folder and
+then Netlify, and `deploy.ps1` reads the machine's own Netlify credential
+from Windows Credential Manager, so on a PC with one it could publish for
+real; every destination in the class is now a folder in the test's own temp
+tree.
+
+**The fourth review's fixes (2026-11-20).** *After #1016.* `dev`'s #1016
+replaced `WaitUntilFinished`'s 100 ms look with a `TaskCompletionSource`
+that the run's ending completes after it has announced the ending, and the
+await in `RunAsync` resumes in a post to the window's thread. Every gap this
+piece handles (between a leg's build and its deploy, between two
+destinations, after the last leg) still exists, one turn of the window's
+thread long instead of up to 100 ms: a key or a click already queued there
+lands in it. Each gap path was re-read against the new wait and every gap
+test re-run (they cancel from inside the runner's own ending, which still
+runs before the post that resumes `RunAsync`). *A leg announced and not yet
+started.* `CanStillBeStopped` counts that leg (the third review), so a
+cancel landing there marks the run cancelled and refuses a second Stop, but
+nothing read the mark before that leg's `Run`, so the leg started anyway.
+`RunAsync` now checks `WasCancelled` immediately before each `Run` (the
+build's and the deploy's), so a leg announced after a cancel can never start.
+*The mac says one new sentence.* With three destinations stopped during the
+second, the mac's `deployPartiallySucceeded` named only the second as not
+deployed and now names the second and the third (the third review's rule
+changed the mac's `outcome` too); the contract case "stopped during the
+second of three" holds it on both platforms, and documentation 09 says so.
+*The text-box test.* `EscapeInAFocusedTextBoxIsTheBoxs_AndInvokeOnCancelStillStops`
+failed in the VM. Measured there (scratch test, unpadded course): the
+answer box kept the focus when the preview's site was drawn, so the site
+takes no focus from a box a teacher is typing in and the product was not at
+fault; but the site drew about 35 s after the start, inside the test's
+presses, and a press after it lands on a console the site covers (Escape is
+then never Cancel's, so the box rule is not tested), and stopping a serving
+preview then ended without the "stopped by the teacher" line the test waited for: `preview.ps1` exits 0 on Control-C and the outcome was read from the exit code first, so the line said "succeeded" (fixed in the fifth review's round: a stop is recorded as a stop). The test now
+runs on a deploy, where no site is drawn, held by the test (below), and an
+Invoke on Cancel asks, and Stop Deploy ends it "Cancelled". *Held
+destinations, not padding.* The two-folder test kept destination 2 going
+with 20,000 stale files for `robocopy /MIR` to remove, a guess at how long
+is long enough. A destination is now held by the test instead
+(`HeldDestination`): its section's `index.html`, "left by an earlier
+deploy", open with no sharing, so robocopy cannot replace it and retries for
+as long as the test holds it. The multi-destination test deploys to three
+folders, opens the question while destination 1 is held, lets destination 1
+go (destination 2 began 4.1 s later in the VM), and stops while destination
+2 is held: it waits on events only (a leg's start on the trail, the run's
+end shown by Deploy being offered again), and with three legs "no later leg
+started" can fail (sabotaged with every `WasCancelled` check removed:
+"destination 3 started after Stop Deploy (2 deploys started at the stop, 3
+after)"). Its no-stamp check cannot fail on the third review's outcome rule
+(sabotaged, it passed): a stop during a destination keeps the stamp off
+through the stopped leg itself, so that rule is held by the unit tests
+(`EveryStoppedDeployCaseHolds`, the two `RunAsync` gap tests), which go red
+under the same sabotage.
+**Tests.** `StopQuestionsContractTests.ACancelOnceALegIsAnnouncedKeepsThatLegFromStarting`
+(the first leg's build, the second leg's deploy; red with the checks removed).
+
+**A stop is recorded as a stop.** The "task finished" line's outcome is decided in the mac's order: "stopped by the teacher" when the teacher stopped the task (Escape, Cancel, the console's Stop, or Stop Deploy at the question), then "closed for a deploy", then "backed out at a question", and only then the exit code. The order matters on Windows because a preview stopped with Control-C exits 0: read by exit code first, a stop was written as "succeeded", and a problem report could not tell a teacher's stop from a preview that ended on its own. `ScriptRunner.FinishedOutcome` is the one place the order lives; the run's saved transcript carries the same words. The order is not data in `shared-rules.json` (`activityTrail` gives only why the outcome must tell a stop from a failure), so the cases are in the test.
+
 ## The lap cap on Windows (#720, the mac's #689)
 
 One teacher action asks the model at most `shared-rules.json` →
@@ -16791,6 +17118,285 @@ its door as ONE step (a whole unit, the links checklist with its records,
 Publish Class for a Date with its kept record, the window's Duplicate with
 its room), the step keys of the 09 table, and the action traces replayed.
 
+### What Windows has built: W3, recovery (#899, #949)
+
+Piece W3 (branch `issue/899-w3-recovery`, on W2b, 2026-11-20) settles a step
+whose work stopped part way, by `undo.rule.recovery`. Nothing a teacher sees
+changed and nothing in the app calls it: the switch stays off, the built-in
+assistant's surface did not move. The plan is
+`vm-tools/reference/899-w3-plan.md`.
+
+- **`UndoRecovery.Run`**, inside the lock (the mac's `UndoRecovery.run` and
+  `settle`). For each step in flight, oldest first, whose process can be
+  identified (a pid of 1 to 2^31-1: a pid of 0 or less is never read as a
+  known process, the W1 review's low) and is gone, or that THIS process gave
+  up on (below): readable, its folder reachable (ruling 10, else left), every
+  `recompute` with a runner. Live, every staged file of its number is removed
+  first (its `-orig` files too: the list holds the content to put back).
+  Then each file is judged by CONTENT (`UndoCurrent.Read`, `UndoCheck.StateOf`;
+  a place that now leads outside the folder is in the way): all where the work
+  started, `failed` (`nothingTookEffect`); all where it was going, completed
+  (`applied` with the redo branch dropped, `undone`, `redone`); some of each,
+  what took effect put back by `UndoCheck.Plan` the other way and `UndoSwap`
+  (label `<seq>-<work>-recover`), `rolledBack` (`partlyTookEffect`); any in
+  the way, the verified ones put back, `interrupted` (`changedByHand`, the
+  paths) and `cleared` (`interrupted`); a put-back that cannot be planned
+  (content missing), `interrupted` (`couldNotPutBack`) and cleared. A file in
+  use or that cannot be read now, a refused put-back, or the list unreadable:
+  left, to be tried again. In shadow nothing is written into a folder; a step
+  that partly took effect is `interrupted` (`partlyTookEffect`) and cleared.
+  Then, live, every step closed `interrupted` has its staged files removed
+  once per process when its folder can be reached
+  (`knownLimits.stagedFilesOfAFolderAway`).
+- **The schedule** (in `UndoProcessMemory`, per process, never a static):
+  at once at an Undo, a Redo and `UndoDoor.Recover()`; on the ordinary path
+  at the process's first lock, then one minute after a refusal, doubling, at
+  most an hour. A step that pruning would close in this hold is tried at once
+  whatever the schedule, so a step is never closed `unsettled` while one more
+  try could settle it.
+- **Where it runs.** The begin hold (on the schedule; a plain write on the
+  course of a gone process's step that keeps a file true is refused
+  `anotherChangeIsUnderWay`, the mac's U2b LOW 1); `Perform(UndoOpsDraft)`
+  recovers and re-derives first; the hold that finds what Undo or Redo acts
+  on (at once, re-deriving; a gone step that keeps a file true and could not be
+  settled makes Undo and Redo not available, never "under way" for ever);
+  `UndoDoor.Recover()` (W4's launch call); and **before every prune**:
+  `UndoJournal.Prune` throws in a hold where recovery has not run
+  (`UndoJournalWriter.RecoveredThisHold`), and the door prunes only through
+  `RecoverThenPrune` (W2b's review, LOW 7: a reachable dead step that died
+  mid-swap is put back whole, never closed `unsettled` with its originals
+  removed). Re-derivation runs after the hold that settled, outside the lock,
+  whichever way the step was settled; never in shadow.
+- **A step this process gave up on** (W2b's review, LOW 1). `UndoSwap`
+  reports a reversal that did not go in (`Refused.LeftPartWay`: a page still
+  holds the step's content, its original left under its staged name). The
+  door then writes NO closing, never `failed` for a half-applied step, and
+  notes the step abandoned in the process's memory; so does a closing that
+  could neither be written nor kept. Recovery settles an abandoned step of
+  this process by content at the next lock although the process is alive; no
+  other process does while it lives. No new refusal word, no contract change.
+- **The trail.** `ActivityTrail.Event.UndoRolledBack` (`undo rolled back`),
+  in the mac's words: `ICS3U/1 · the undo list put back 2 files left part way
+  by a change that stopped`, and `…, found 1 file changed by hand since, and
+  cleared the list`. The door is given a sink (`trail:`); W4's start-up passes
+  `UndoTrail.ToTheActivityTrail`. Written only live. The ledger entry is gone.
+
+**W2b's review LOWs, fixed here, each with a test that fails without it.**
+(1) above. (2) While a swap is under way every staged new content holds an
+attributes-only handle (no sharing check, so no program is kept from it), and
+the original of a page the step removes holds one from the keep to the
+delete: Windows will not rename or move a folder with a file open below it
+(measured: access denied), so a page's folder cannot be replaced by a junction
+between its re-read and its rename at all, and a staged file is removed by its
+handle, never through a name that leads elsewhere; a kept original holds no
+handle (it IS the page, and a handle on it would refuse an editor's save by
+replace) and is removed by name only while the name is still that file. The
+cost: a teacher renaming or moving a page's folder in the milliseconds of its
+swap is told by Windows that it is in use. (3) The containment check and the
+attribute copy come before the keep, and just before the rename the page's
+file identity (volume and file index) must still be the kept link's: an editor
+that saved by REPLACING the page in that window is changed since and its save
+kept. What remains: the microseconds between that check and the rename; and
+on a volume with no hard links (the original a copy) there is no identity to
+compare, so a save by replace after the re-read is not seen. (4) A kept
+original, and any leftover the tidy removes, is deleted with
+`FileDispositionInfoEx` and IGNORE_READONLY, never by clearing read-only on a
+link that shares the live page's attributes. (5) A blob an ops step names as
+held is asked for again inside the begin hold. (6) An ops step with no working
+folder is refused `notReadable`. (7) above. (8) OneDrive's Pinned and Unpinned
+are carried by the attribute copy (they stick on any NTFS file, measured).
+
+**Tests:** `UndoRecoveryContractTests` (every `recoveryCases` row from the
+JSON: 20 run through the real door, swap and recovery, `fileInUseDuringRecovery`
+a real `FileShare.ReadWrite` holder; the 21 rows of U2b's kinds held on the
+ledger for W6, each still stopping at its key), `UndoRecoveryTests` (14 methods, 16 cases),
+six new `UndoSwapTests`. The Undo classes on the PC: 611 passed, 1 skipped (the deny-listing ACE probe of W5).
+The whole unit suite on 0284c2613 (run `w3-full2`): 4,796 tests, exactly the six known
+failures. Twenty-three must-fail proofs, each red alone and green restored
+(`vm-tools/guest/899-w3-mustfail.json`, runs `w3-full1` and `w3-full2`): recovery doing
+nothing (17 contract rows red); a refused put-back retried at every lock (a test and a
+contract row); an Undo waiting its turn; the wait never doubling; a step past the limits
+waiting its turn; pruning without recovery; a reversal not reported; an abandoned step not
+settled; a pid of 0 read as a process; a plain write settling a step that keeps a file true;
+nothing re-derived; no closed-step tidy; no tidy before judging (3 cases); no trail line;
+LOWs 2 to 6 and 8, one each (two for LOW 4, two for LOW 2). The first run also caught a
+trail wiring scan this piece had to satisfy (`ActivityTrailWiringTests`: the sink now names
+its event).
+
+**The kill harness** (`Plantoir.UndoHarness recovery-kill`, Release, the PC
+above, `vm-tools/guest/899-w3-pc-run.ps1 -Mode recovery`, run `w3-r1`), outside
+OneDrive (`C:\vm-setup\…\scratch`) and in a scratch folder made inside the PC's
+signed-in OneDrive and removed after (nothing else there touched). A CHILD
+process made a 233-page step (or undid it, or redid it) through the door and
+was killed with `Process.Kill` at each of 14 points: after the begin, before
+the 1st, the 117th and the 233rd swap, before `applied`, and at the moment its
+first page was seen changed (a race, no seam); after `undoing`, before the
+117th swap, before `undone`, at random; the same four for a redo. A SECOND
+process then ran the app's recovery (`UndoDoor.Recover`). Each point twice:
+(A) that recovery ran to its end; (B) it was itself killed at its 58th
+put-back swap (where it had that many to make: 5 of the 14 points) and a THIRD
+process recovered again.
+
+| | Outside OneDrive | Inside OneDrive |
+|---|---|---|
+| Runs, every page then wholly old or wholly new, ALL one way, the way the journal says the step stands, the step not in flight, nothing staged left | 28 of 28 | 28 of 28 |
+| Points whose two runs (A, and B with the recovery killed and run again) came to the same pages and the same list | 11 of 11 (the three at-random points are not compared) | 11 of 11 |
+| Recovery that found nothing to put back (killed after the begin, before the 1st swap, after `undoing`/`redoing`), the whole process | 212 to 245 ms | 388 to 675 ms |
+| Recovery completing a step whose swaps were all in (before `applied`, `undone`, `redone`) | 221 to 227 ms | 418 to 899 ms |
+| Recovery putting back 116 pages (killed before the 117th swap), `rolledBack` | 748 to 767 ms | 1,457 to 1,839 ms |
+| Recovery putting back 232 pages (killed before the 233rd swap) | 1,173 ms | 2,650 ms |
+
+Outcomes, the same in both places: killed after the begin or before the 1st
+swap, `failed`, every page old; part way through, `rolledBack`, every page
+old; after the last swap, `applied`, every page new (and the step on the
+list); an undo part way, put forward again, the step `done`; an undo after its
+last swap, `undone`; a redo part way, put back, `undone`; a redo after its
+last swap, `done`. A recovery killed part way left its own `-recover` files,
+which the next recovery removed before it judged the step.
+
+Read from it:
+
+- **Recovery holds the lock while it puts pages back**, as the contract says
+  (the one exception to never changing a page under the lock: two processes
+  cannot repair one step at once). A 232-page put-back held it 1.2 s outside
+  OneDrive and 2.7 s inside it, so a live process waiting its 2 s for the
+  lock at that moment would be refused (`lockBusy`, nothing changed) and the
+  teacher would try again. Only after a crash, once; recorded for W4,
+  which runs recovery on its own thread beside the first window; W4's
+  section below says what a waiter behind a long put-back does.
+- **A recovery killed part way is no worse than the first death**: every one
+  of the ten killed recoveries (five in each place) was finished by the next with the same pages
+  and the same list.
+
+### What Windows has built: W4, the switch (#899, #949)
+
+Piece W4 (branch `issue/899-w4-switch`, on W3, 2026-11-20) wires the list to
+the app's two processes and keeps it switched off. Nothing a teacher sees
+changed. The plan is `vm-tools/reference/899-w4-plan.md`.
+
+- **The switch.** `UndoSwitch.UndoJournalIsLive` is `false`, a
+  `static readonly` field rather than a setting, because a half-covered Undo
+  is worse than none: the step it silently passes over is the one a teacher
+  needed back. Nobody turns it on early from a test, a command line or the
+  settings file. `static readonly` rather than `const` only so the live paths
+  compile without an unreachable-code warning. W11a flips it, and
+  `UndoWriterScanTests.TheSwitchStaysOffWhileWritersWait` fails while any
+  writer still waits for a piece.
+- **One list per process, found the same way by both programs.**
+  `UndoForThisProcess` is the composition root (the plan review's H1): the
+  only code that reads the switch and `UndoJournalLocation`. It is made the
+  first time it is asked for, which both programs do only after `--state-dir`
+  has been applied, so the window, the window's own `plantoir-mcp` (handed
+  `--state-dir` by `McpClient`, #641) and an outside door's `plantoir-mcp`
+  (handed none) all find one list: `%LOCALAPPDATA%\Plantoir\undo`, or
+  `undo\` under the redirected state folder. A test makes its own instance
+  with its own folder, mode and trail and never touches the process's.
+- **Recovery at launch.** `UndoAtLaunch.Recover()` runs W3's
+  `UndoDoor.Recover()` on a thread of its own, so the window's UI thread never
+  waits on the lock and `plantoir-mcp` answers its client meanwhile. It never
+  throws: a list that cannot be had (busy behind another process's put-back,
+  unreadable, its folder not makeable, a failure nobody foresaw) leaves every
+  step for the next hold of any process, and the window's startup log says so.
+  In the window it runs after the marketing scenes (which must never open the
+  list); a deploy set for later leaves `Program.Main` before it and never
+  opens the list.
+- **Shadow, as `rule.shadow` defines it.** With the switch off, a failure of
+  the list never stops or changes what a teacher asked for: ANY exception from
+  the list in shadow, the unforeseen included, lets the change go ahead
+  unrecorded at the begin; a closing that cannot be written or kept leaves the
+  change as it is; giving a step up never reads the list and never throws.
+  Recovery in shadow records what it finds and writes nothing into a working
+  folder, so a step killed part way leaves its staged files beside the pages
+  (`staged=8` below); that is moot until W7 puts actions through the door.
+  A shadow step that goes ahead unrecorded still has the files a rule keeps
+  true re-derived (the section's front page), as the mac's
+  `performAndRederive` does on `appliedWithoutARecord`: every door the
+  process makes is given the app's own runner (`UndoSectionFrontPage`).
+  The exception, as on the mac's `JournaledWrite.perform(ops:)`: a step given
+  only as its ops is refused (`couldNotRecordTheStep`) before anything changes
+  in either mode, since the door cannot carry out an ops step it has not
+  recorded. (The W4 plan first said the ops entry would go ahead in shadow;
+  the mid-piece sweep corrected it.)
+- **A waiter behind a long put-back.** W3 measured a 232-page put-back holding
+  the lock 1.2 s outside OneDrive and 2.7 s inside, past the 2 s live wait.
+  Every waiter gives up after its bounded wait (`rule.oneLock`) and nothing is
+  lost: a live step is refused before anything changes
+  (`couldNotRecordTheStep`, the teacher told the step could not be recorded,
+  the page untouched), a shadow step goes ahead unrecorded (only its own
+  pages), an Undo or Redo answers the list unavailable, a launch's recovery
+  leaves the step for the next hold, and a closing waits its 10 s and is then
+  kept in the process's memory. When the put-back finishes the step is settled
+  and the refused step can be made. Proved without timing:
+  `UndoForThisProcessTests.AWaiterBehindALongPutBackGivesUpAndNothingIsLost`
+  holds a recovery inside its put-back on an event.
+- **Staged files and folder renames while a swap runs** (W3's review, LOW 5).
+  A swap holds handles on its staged files, which keep their folder in place
+  (W2b), so renaming the course folder or a parent of it while a swap runs is
+  refused: File Explorer shows "Folder In Use", and OneDrive retries its own
+  move later. No data is lost; the rename succeeds once the swap is over. How
+  long that is: the swap's span, measured in W2b on the Lenovo i5-8365U at
+  233 pages 1.07 s outside OneDrive and 1.9 s inside, almost all of it outside
+  the lock.
+- **The writer scan on Windows** (`UndoWriterScanTests`, the mac's). Every
+  product `.cs` under `Plantoir`, `Plantoir.Core`, `Plantoir.Mcp` and
+  `PtyDriver` with a writing call (the shapes are in the class's summary;
+  comments are taken out, strings kept, since a launcher's name is a string)
+  is listed with its count and one of three kinds: `door` (5, the list
+  itself), `notAStep` with its reason (37: the trail, leases, the toolchain
+  mirror, models, problem reports, the app's state, a deploy), or `waitsFor`
+  with the Windows piece that wires it (W7 mirrors U3, W8 U4, W9 U5, W11a U7;
+  33 files). 75 files at W4. `TaskScheduling.cs` waits for W8 by ruling 23,
+  where the mac's entry still says held (M10).
+- **W3's review lows.** LOW 2: a gone process's step that keeps a file true is
+  never closed `unsettled` by the pruning of a hold that cannot re-derive
+  (`UndoJournalWriter.LeftForARederivingRecovery`). LOW 3: a step this process
+  gives up is noted by what the door knows (list, number, where its work
+  stands, its own pid), never by a reading of the list, which at those moments
+  could not be read. LOW 4: an Undo whose newest step is a gone process's that
+  recovery has just tried and left (a file in use, a page it cannot read now)
+  answers that refusal, naming the file, never "another change is under way"
+  until the step ages out. The sweep: the files entry, like the ops entry,
+  refuses a step holding a recompute this process has no runner for.
+
+**Measured, `899w4-p1`, Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro
+26200).** A harness child made an 8-page shadow step in the list under the
+state folder and was killed, then the real program was started and the list
+read by a third process until the step left flight:
+
+| State folder | Killed at | Started | Settled after | Step became | Pages |
+|---|---|---|---|---|---|
+| `--state-dir` (scratch) | half way through the swap | `plantoir-mcp.exe --state-dir` | 2.3 s | interrupted | 4 old, 4 new, none torn, 8 staged left (shadow) |
+| `--state-dir` (same list) | after its begin | `Plantoir.exe --state-dir`, desktop session | 3.7 s | failed (nothing took effect) | 8 old |
+| default `%LOCALAPPDATA%\Plantoir` | half way through the swap | `plantoir-mcp.exe` | 0.9 s | interrupted | 4 old, 4 new, none torn, 8 staged left |
+| default (same list) | after its begin | `Plantoir.exe`, desktop session | 1.6 s | failed | 8 old |
+
+Each second program found the step the first had settled in the same list
+(five lines, steps 1 and 2 closed). The "settled after" times include the
+process's start and a half-second read interval; they are not a measure of
+recovery. The default `undo` folder did not exist before and was removed
+after; `settings.json` was put back.
+
+**Held out of W4, to be built as a shared piece (Mac first, since both change
+`contracts/`):**
+
+1. Recovery puts a page back from a kept `-orig` whose hash matches the
+   journal's record (Russell's ruling of 2026-11-20, 15:20 on #899; the
+   `recoveryCases` rows "a step dies part way and its content is then missing"
+   and "an undo of a step with a page now missing its content" become rolled
+   back). On Windows it goes in `UndoRecovery.Settle`: the live tidy at its top
+   (`UndoSwap.TidyLeftovers` before the plan) must stop removing the `-orig`
+   files until after the plan, and the `default:` arm of the plan switch (the
+   put-back that cannot be planned, closed `interrupted`
+   (`couldNotPutBack`)) must first offer each missing content from the
+   matching `-orig`. The Undo path's missing-content answer
+   (`UndoDoor.AnswerARefusal`, `ContentMissing`) follows the same rows.
+2. The trail line for LOW 4 (an Undo refused because a gone step's file is in
+   use): a new `activityTrail.mustRecord` event, added to
+   `contracts/shared-rules.json` and `ActivityTrail.Event` together. On
+   Windows it is written in `UndoDoor`'s Undo/Redo path where `leftNewest`
+   returns the refusal, through the door's `_trail`, and routed by
+   `UndoTrail.ToTheActivityTrail` beside `UndoRolledBack`.
+
 ### The pieces still owed for #899 on Windows, and what each waits for
 
 The plan (`plans/899-plan.md` of the v2.0.0 Windows run) as amended by its
@@ -16802,7 +17408,7 @@ recording and the trail event `undo could not record a step` move to W7.
 |---|---|---|
 | W2a | BUILT (2026-11-20, above): `UndoLock` (`LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY` on a `CreateFileW` overlapped handle .NET never binds), the store in `UndoJournal.WithLock` and `UndoJournalWriter` (segments, the LF-only append, the torn line cut inside the lock, reading on, blobs by a no-overwrite rename), pruning and deletion carried out, `UndoJournalLocation` | W1 merged |
 | W2b | BUILT (2026-11-20, above): `UndoSwap` (staged, then the POSIX-semantics rename, `MoveFileEx` only on 87/50; re-read, read-only refused, attributes and creation time kept, the kept original read back; staged files removed on every failure path, F1), `UndoPlaces` (containment by a handle's final path), `UndoDoor` (step, undo, redo, refusals, clearing, dropping; blobs and begin in one hold), `JournaledSetting`; `stepCases`, the stack cases and traces through the real door; pruning's tidy of an unsettled step's staged files | W2a merged |
-| W3 | recovery (run inside the door's begin hold and before every undo and redo: W2b marks the places), the refused-swap schedule, `interrupted` closed and its staged files tidied, the staged files of a step pruning closed `unsettled` while its folder was away; `recoveryCases`; the kill harness outside the gate; the ledger entry for `undo rolled back` out | W2b merged |
+| W3 | BUILT (2026-11-20, above): `UndoRecovery` (settle by content, put back, `rolledBack`, `interrupted` and cleared, shadow), the refused-swap schedule, recovery before every prune, the abandoned own step, the closed-step tidy, re-derivation on settle, `undo rolled back`; `recoveryCases` (20 run, 21 held for W6); the kill harness; W2b's review LOWs | W2b merged |
 | W4 | doc 12's step 7 and the scaffolding: where the list lives (following `--state-dir`), `madeBy` from `AssistWorkspace.Surface` (L1), the writer scan | W2a merged; no longer after W3 |
 | W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
 | W6 | the reserved op kinds and running `recompute` | the mac's U2 |

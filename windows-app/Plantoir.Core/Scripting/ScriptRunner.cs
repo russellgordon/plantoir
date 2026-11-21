@@ -131,8 +131,8 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// stays false until <c>Run</c> is called again for the deploy, and
     /// <c>TaskProgressView</c> — which only ever checks <c>IsRunning</c> —
     /// reads that gap as "finished" and flashes the outcome badge for the
-    /// span the 100ms poll in <see cref="WaitUntilFinished"/> takes to
-    /// notice. Mirrors the mac's `ScriptRunner.isBetweenPhases` (row 318b).
+    /// span before the caller's wait on <see cref="WaitUntilFinished"/>
+    /// resumes (a post to the window's thread since #1016). Mirrors the mac's `ScriptRunner.isBetweenPhases` (row 318b).
     /// Reset to false at the top of every <see cref="Run"/>, the same as
     /// <see cref="WasCancelled"/> and <see cref="WasStoppedByUser"/>.
     /// </summary>
@@ -142,6 +142,17 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         get => _isBetweenPhases;
         set { _isBetweenPhases = value; Notify(); }
     }
+
+    /// <summary>
+    /// The run is under way: its script is running, or it is between the
+    /// build and the deploy of one leg (<see cref="IsBetweenPhases"/>). The
+    /// one rule for "can this still be stopped?" (#1009's review, the mac's
+    /// <c>isRunning || isBetweenPhases</c>): the task panel's Cancel, its
+    /// key, its stop question and <see cref="MultiDestinationDeployRunner.Cancel"/>
+    /// all read this, never <see cref="IsRunning"/> alone, so a stop that
+    /// lands in the gap still asks and still stops.
+    /// </summary>
+    public bool IsUnderWay => IsRunning || IsBetweenPhases;
     public string StepDetail { get; private set; } = "";
     public string? CustomDomainForLinks { get; set; }
 
@@ -226,7 +237,11 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         WasClosedForADeploy = false;
         HasBeenServing = false;
         _runArguments = arguments.ToArray();
-        IsBetweenPhases = false;
+        // IsBetweenPhases is cleared only once this run is running, or has
+        // failed to start (#1009's review): cleared here, the next line's
+        // notification would read as the run having ENDED between the build
+        // and the deploy, and a stop question open across the change was taken
+        // down while the deploy carried on.
         StepDetail = "";
         if (!keepTranscript)
         {
@@ -265,6 +280,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             Notify(nameof(LastExitCode));
             ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
                 $"could not start {scriptName} — {notReady}");
+            IsBetweenPhases = false;
             return;
         }
 
@@ -278,6 +294,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             // carrying "the last 0 tasks" after three visible failures.
             ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
                 $"could not start {scriptName} — {LaunchProblem}");
+            IsBetweenPhases = false;
             return;
         }
 
@@ -309,12 +326,14 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         {
             LaunchProblem = $"Could not get started: {error.Message}";
             Notify(nameof(LaunchProblem));
+            IsBetweenPhases = false;
             return;
         }
 
         _runEnded = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         int thisRun = BeginRunNumber();
         IsRunning = true;
+        IsBetweenPhases = false;
         StartedAt = DateTime.UtcNow;
         // A new process, so a new stage - even for a keepTranscript leg. Its
         // first line starts with no text of its own, whatever the previous
@@ -657,17 +676,26 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// The trail line distinguishes a failure from a stop the teacher asked
-    /// for and from backing out at a question — all three exit non-zero, and
-    /// only one is a fault (see shared-rules.json → activityTrail.mustRecord).
+    /// The outcome the trail line and the run's record carry. It distinguishes
+    /// a failure from a stop the teacher asked for and from backing out at a
+    /// question (shared-rules.json → activityTrail.mustRecord, "task
+    /// finished"), and a stop is told as a stop whatever the launcher exited
+    /// with: Escape or Cancel on a preview sends Control-C, preview.ps1 ends
+    /// its serve and exits 0, and checking the exit code first recorded a stop
+    /// as "succeeded" (#1009's fifth review). The mac's order
+    /// (<c>ScriptRunner.outcomeDescription</c>): stopped, closed for a deploy,
+    /// backed out, then the exit code.
     /// </summary>
+    public static string FinishedOutcome(int exitCode, bool wasStoppedByUser, bool wasCancelled, bool wasClosedForADeploy) =>
+        wasStoppedByUser ? "stopped by the teacher"
+        : wasClosedForADeploy ? "closed for a deploy"
+        : wasCancelled ? "backed out at a question"
+        : exitCode == 0 ? "succeeded"
+        : $"failed (exit code {exitCode})";
+
     private void NoteTaskFinished(int exitCode)
     {
-        string outcome = exitCode == 0 ? "succeeded"
-            : WasStoppedByUser ? "stopped by the teacher"
-            : WasCancelled ? "backed out at a question"
-            : WasClosedForADeploy ? "closed for a deploy"
-            : $"failed (exit code {exitCode})";
+        string outcome = FinishedOutcome(exitCode, WasStoppedByUser, WasCancelled, WasClosedForADeploy);
         string duration = "";
         if (StartedAt is { } startedAt)
         {
