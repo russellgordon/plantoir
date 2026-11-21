@@ -1163,7 +1163,7 @@ public sealed partial class AssistWindow : Window
             var xamlRoot = Root.XamlRoot ?? Content?.XamlRoot;
             if (xamlRoot is null)
             {
-                Say("Assistant", "Could not open class dates dialog.");
+                Say("Assistant", ClassDatesDialogWords.CouldNotOpen(_course));
                 return;
             }
             var dialog = new SectionScheduleDialog(_folder, _course, _section, hwnd)
@@ -1175,17 +1175,17 @@ public sealed partial class AssistWindow : Window
                 var result = await dialog.ShowAsync();
                 if (result == ContentDialogResult.Primary && dialog.SavedDates is { Count: > 0 } dates)
                 {
-                    Say("Assistant", $"Remembered {dates.Count} class {(dates.Count == 1 ? "date" : "dates")} for {_course.Code} Section {_section}.");
+                    Say("Assistant", ClassDatesDialogWords.Remembered(dates.Count, _course, _section));
                 }
                 else
                 {
-                    Say("Assistant", "No class dates were recorded.");
+                    Say("Assistant", ClassDatesDialogWords.NoneRecorded(_course));
                 }
             }
             catch (Exception ex)
             {
                 App.LogDiagnostic($"SectionScheduleDialog ShowAsync exception: {ex.Message}");
-                Say("Assistant", "No class dates were recorded.");
+                Say("Assistant", ClassDatesDialogWords.NoneRecorded(_course));
             }
         };
 
@@ -1193,7 +1193,7 @@ public sealed partial class AssistWindow : Window
         {
             buttons.Visibility = Visibility.Collapsed;
             Say("You", AssistWording.DeclineDatesButton);
-            Say("Assistant", "No class dates recorded. You can add them anytime.");
+            Say("Assistant", ClassDatesDialogWords.NotGivenYet(_course));
         };
 
         buttons.Children.Add(enterBtn);

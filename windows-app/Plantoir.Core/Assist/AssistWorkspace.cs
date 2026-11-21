@@ -1693,9 +1693,13 @@ public sealed partial class AssistWorkspace
             ActivityTrail.Note(ActivityTrail.Event.LaterClassesHeldADeployBack,
                 ClassesDatedLater.HeldBackLine(later.Count), course.Code, section);
             var titles = later.Select(page => page.Title).ToList();
+            var noun = course.Configuration.ClassNoun;
             throw new AssistRefusal(IsOutside
                 ? AssistWording.DeployHasClassesDatedLater(course.Code, section.ToString(), titles)
-                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles));
+                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles),
+                IsOutside
+                ? AssistWording.DeployHasClassesDatedLater(course.Code, section.ToString(), titles, noun)
+                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles, noun));
         }
 
         using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy", asker);
@@ -3754,10 +3758,10 @@ public sealed partial class AssistWorkspace
                 $"{course.Code} Section {section} has no pages named “{naming.ShapeDescription}”, so there is nothing " +
                 "to make room in.");
 
-        var problems = new List<string>();
+        // Each in both nouns (#1027): the card reads the course's, the model the class form.
+        var problems = new List<PlanProblem>();
         if (unnumbered > 0)
-            problems.Add($"{unnumbered} class page{(unnumbered == 1 ? " is" : "s are")} not named " +
-                         $"“{naming.ShapeDescription}”, so I left it where it is — including its date.");
+            problems.Add(PlanProblem.Said(noun => AssistWording.PagesNotNamedTheCoursesWay(unnumbered, naming.ShapeDescription, noun)));
 
         if (naming.IsNumbered)
             return PlanNumberedInsert(course, section, naming, atDay, count, classes, remembered.Dates, problems);
@@ -3780,15 +3784,13 @@ public sealed partial class AssistWorkspace
         int needed = count + shifted.Count;
         if (runway.Count < needed)
         {
-            int short_ = needed - runway.Count;
-            problems.Add($"This needs {needed} class days from {DateText.Iso(firstFree)} onwards and the " +
-                         $"timetable only has {runway.Count}. Add {short_} more class " +
-                         $"date{(short_ == 1 ? "" : "s")} and ask again.");
+            int has = runway.Count;
+            problems.Add(PlanProblem.Said(noun => AssistWording.TimetableTooShortFrom(needed, DateText.Iso(firstFree), has, noun)));
             return new InsertPlan
             {
                 CourseCode = course.Code, SectionNumber = section, Unit = unit, AtDay = atDay, Naming = naming,
                 Added = Array.Empty<NewClass>(), Renames = Array.Empty<Rename>(),
-                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = problems,
+                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
             };
         }
 
@@ -3834,7 +3836,7 @@ public sealed partial class AssistWorkspace
             Renames = renames,
             Moves = moves,
             LinksToRewrite = CountLinksTo(course, section, renames.Select(r => r.From)),
-            Problems = problems,
+            Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
         };
     }
 
@@ -3867,7 +3869,7 @@ public sealed partial class AssistWorkspace
     /// and renamed two published meetings for a slot that was empty.
     /// </summary>
     private InsertPlan PlanNumberedInsert(Course course, int section, ClassPageNaming naming, int atNumber, int count,
-                                          List<ClassRef> numbered, IReadOnlyList<DateOnly> timetable, List<string> problems)
+                                          List<ClassRef> numbered, IReadOnlyList<DateOnly> timetable, List<PlanProblem> problems)
     {
         var shifted = numbered.Where(c => c.Day >= atNumber).OrderBy(c => c.Day).ToList();
         var untouched = numbered.Where(c => c.Day < atNumber).ToList();
@@ -3877,23 +3879,22 @@ public sealed partial class AssistWorkspace
         var runway = timetable.Where(d => !held.Contains(d) && (latestKept is null || d > latestKept.Value))
             .OrderBy(d => d).ToList();
 
-        InsertPlan Refused(string why)
+        InsertPlan Refused(PlanProblem why)
         {
             problems.Add(why);
             return new InsertPlan
             {
                 CourseCode = course.Code, SectionNumber = section, Unit = 1, AtDay = atNumber, Naming = naming,
                 Added = Array.Empty<NewClass>(), Renames = Array.Empty<Rename>(),
-                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = problems,
+                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
             };
         }
 
         if (runway.Count < count)
         {
-            int missing = count - runway.Count;
             string from = latestKept is { } kept ? DateText.Iso(kept) : "the start of the course";
-            return Refused($"This needs {count} class day{(count == 1 ? "" : "s")} after {from} and the timetable " +
-                           $"only has {runway.Count}. Add {missing} more class date{(missing == 1 ? "" : "s")} and ask again.");
+            int has = runway.Count;
+            return Refused(PlanProblem.Said(noun => AssistWording.TimetableTooShortAfter(count, from, has, noun)));
         }
 
         string folder = ClassFolder(course, section);
@@ -3920,8 +3921,7 @@ public sealed partial class AssistWorkspace
         var byDate = InDateOrder(shifted);
         var destinations = DestinationsKeepingGaps(byDate, runway, count);
         if (destinations is null)
-            return Refused("There are not enough class days after the last page to move it onto. " +
-                           "Add more class dates and ask again.");
+            return Refused(PlanProblem.Said(AssistWording.NoDaysAfterTheLastPage));
 
         var moves = new List<DateMove>();
         for (int i = 0; i < byDate.Count; i++)
@@ -3936,7 +3936,7 @@ public sealed partial class AssistWorkspace
             CourseCode = course.Code, SectionNumber = section, Unit = 1, AtDay = atNumber, Naming = naming,
             Added = added, Renames = upward, Moves = moves,
             LinksToRewrite = CountLinksTo(course, section, upward.Select(r => r.From)),
-            Problems = problems,
+            Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
         };
     }
 
@@ -4028,7 +4028,9 @@ public sealed partial class AssistWorkspace
         if (plan.ChangesNothing)
             return new AssistResult(true, "Nothing needed moving.", null);
         if (plan.Added.Count == 0)
-            throw new AssistRefusal(string.Join(" ", plan.Problems));
+            throw new AssistRefusal(string.Join(" ", plan.Problems),
+                                    string.Join(" ", course.Configuration.ClassNoun == ClassNoun.Meeting
+                                        ? plan.ProblemsForAMeeting ?? plan.Problems : plan.Problems));
 
         RefuseIfPlantoirIsBuilding(course);
 
@@ -4230,7 +4232,8 @@ public sealed partial class AssistWorkspace
 
         var numbers = course.Configuration.Naming.Parse(sourceTitle)
             ?? throw new AssistRefusal(
-                ClassChangeWording.NotANumberedClassPage(sourceTitle));
+                ClassChangeWording.NotANumberedClassPage(sourceTitle),
+                ClassChangeWording.NotANumberedClassPage(sourceTitle, course.Configuration.ClassNoun));
 
         // The source's own next day. Throws the timetable refusal unchanged,
         // which is the sentence that asks for the class dates.
@@ -4309,7 +4312,8 @@ public sealed partial class AssistWorkspace
                 "did not copy a class — the page the copy would have become still held a lesson, " +
                 "and other classes may already have moved", course.Code, section);
             throw new AssistRefusal(
-                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
+                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath),
+                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath, course.Configuration.ClassNoun));
         }
 
         progress?.Report($"Copying “{plan.SourceTitle}”…");
@@ -4337,7 +4341,9 @@ public sealed partial class AssistWorkspace
                 "did not copy a class — the copy could not be made certainly hidden, and a copy " +
                 "of a published lesson must never arrive where students can read it", course.Code, section);
             throw new AssistRefusal(
-                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath));
+                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath),
+                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath,
+                                                               course.Configuration.ClassNoun));
         }
 
         Save(newPath, copied);
@@ -4910,7 +4916,15 @@ public sealed partial class AssistWorkspace
 /// A request that will not be carried out, with a reason a teacher can act on.
 /// Never a stack trace, never a code — the assistant reads this back aloud.
 /// </summary>
-public sealed class AssistRefusal(string message) : Exception(message);
+public sealed class AssistRefusal(string message, string? forTheTeacher = null) : Exception(message)
+{
+    /// <summary>
+    /// What the teacher reads when it differs from <see cref="Exception.Message"/>
+    /// by the course's noun (#1027): "meeting" in a club. The model reads the
+    /// message, the class form, in every course (#267).
+    /// </summary>
+    public string ForTheTeacher { get; } = forTheTeacher ?? message;
+}
 
 /// <summary>How an operation ended, and where the backup went.</summary>
 public sealed record AssistResult(bool Succeeded, string Message, string? BackupPath);

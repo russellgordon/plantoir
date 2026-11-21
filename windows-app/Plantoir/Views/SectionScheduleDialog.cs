@@ -317,7 +317,7 @@ public sealed class SectionScheduleDialog : ContentDialog
 
             // What TimetableMemory.Read would not believe, Write refuses; say
             // which date rather than "could not save" (#144).
-            if (TimetableMemory.Unbelievable(_parsedDates, today) is { } impossible)
+            if (TimetableMemory.EveryUnbelievable(_parsedDates, today) is { Count: > 0 } impossible)
             {
                 _statusBlock.Text = ClassDatesDialogWords.CannotBeADate(impossible, _course, _sectionNumber);
                 _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];

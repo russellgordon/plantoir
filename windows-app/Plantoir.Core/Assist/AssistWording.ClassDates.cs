@@ -115,9 +115,23 @@ public static class ClassDatesDialogWords
     public static string Purpose(Course course) => AssistWording.ClassDatesPurpose(course.Configuration.ClassNoun);
 
     /// <summary>Refused before writing: a date <c>TimetableMemory.Read</c> would not believe.</summary>
-    public static string CannotBeADate(DateOnly impossible, Course course, int section) =>
-        AssistWording.ClassDatesTooFarFromToday(new[] { DateText.Iso(impossible) }, course.Code, section.ToString(),
+    public static string CannotBeADate(IReadOnlyList<DateOnly> impossible, Course course, int section) =>
+        AssistWording.ClassDatesTooFarFromToday(impossible.Select(DateText.Iso).ToList(), course.Code, section.ToString(),
                                                 course.Configuration.ClassNoun);
+
+    /// <summary>The assistant's dates card, after the dialog or Not Now (#1027 review 2, low 3), in the course's noun.</summary>
+    public static string CouldNotOpen(Course course) =>
+        $"Could not open the {(course.Configuration.ClassNoun == ClassNoun.Meeting ? "meeting" : "class")} dates dialog.";
+
+    public static string NoneRecorded(Course course) =>
+        $"No {(course.Configuration.ClassNoun == ClassNoun.Meeting ? "meeting" : "class")} dates were recorded.";
+
+    /// <summary>Not Now: the mac's <c>datesNotGivenYet</c>, in the course's noun.</summary>
+    public static string NotGivenYet(Course course) =>
+        course.Configuration.ClassNoun == ClassNoun.Meeting ? AssistWording.DatesNotGivenYetForAMeeting : AssistWording.DatesNotGivenYet;
+
+    public static string Remembered(int count, Course course, int section) =>
+        AssistWording.RememberedTheClassDates(count, $"{course.Code} Section {section}", course.Configuration.ClassNoun);
 
     /// <summary>The status once the dates are read: what Remember These Dates would remember.</summary>
     public static string Found(IReadOnlyList<DateOnly> dates, Course course, int section) =>

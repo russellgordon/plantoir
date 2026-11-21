@@ -326,6 +326,40 @@ public class ContractTests
         Assert.Equal(wording["menuNoVisiblePages"]!.ToString(), AssistWording.MenuNoVisiblePages("{course}", "{section}"));
         Assert.Equal(wording["menuSavingACopy"]!.ToString(), AssistWording.MenuSavingACopy("{course}"));
 
+        // #1027 round 3 (review 2): the twins of sentences a club's teacher reads.
+        Assert.Equal(wording["addClassesNeedsAUnitForAMeeting"]!.ToString(), AssistWording.AddClassesNeedsAUnitForAMeeting);
+        Assert.Equal(wording["addClassesNeedsACountForAMeeting"]!.ToString(), AssistWording.AddClassesNeedsACountForAMeeting);
+        Assert.Equal(wording["menuPickPagesToPublishForAMeeting"]!.ToString(), AssistWording.MenuPickPagesToPublishForAMeeting);
+        Pair("addClassCountsNext", AssistWording.AddClassCountsNext(), AssistWording.AddClassCountsNextForAMeeting());
+        Pair("addClassCountsAsACopy", AssistWording.AddClassCountsAsACopy(), AssistWording.AddClassCountsAsACopyForAMeeting());
+        Pair("untickedAtDeployCounts", AssistWording.UntickedAtDeployCounts(3), AssistWording.UntickedAtDeployCountsForAMeeting(3));
+        Assert.Equal(wording["timetableTooShortFrom"]!.ToString(), AssistWording.TimetableTooShortFrom(4, "2026-12-08", 2));
+        Assert.Equal(wording["timetableTooShortFromForAMeeting"]!.ToString(), AssistWording.TimetableTooShortFromForAMeeting(4, "2026-12-08", 2));
+        Assert.Equal(wording["timetableTooShortAfter"]!.ToString(), AssistWording.TimetableTooShortAfter(3, "2026-12-08", 2));
+        Assert.Equal(wording["timetableTooShortAfterForAMeeting"]!.ToString(), AssistWording.TimetableTooShortAfterForAMeeting(3, "2026-12-08", 2));
+        Pair("noDaysAfterTheLastPage", AssistWording.NoDaysAfterTheLastPage(), AssistWording.NoDaysAfterTheLastPageForAMeeting());
+        Pair("unusedDatesRunShort", AssistWording.UnusedDatesRunShort(1, 2), AssistWording.UnusedDatesRunShortForAMeeting(1, 2));
+        Assert.Equal(wording["pagesNotNamedTheCoursesWay"]!.ToString(), AssistWording.PagesNotNamedTheCoursesWay(2, "Unit N, Day N"));
+        Assert.Equal(wording["pagesNotNamedTheCoursesWayForAMeeting"]!.ToString(), AssistWording.PagesNotNamedTheCoursesWayForAMeeting(2, "Week N"));
+        Pair("workedOutTheClassDates", AssistWording.WorkedOutTheClassDates(), AssistWording.WorkedOutTheClassDatesForAMeeting());
+        Pair("rememberedTheClassDates", AssistWording.RememberedTheClassDates(12, "{course} Section {section}"),
+             AssistWording.RememberedTheClassDatesForAMeeting(12, "{course} Section {section}"));
+        Assert.Equal(wording["deployHasClassesDatedLaterForAMeeting"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterForAMeeting("{course}", "{section}", new[] { "Week 5" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterNamingSeveralForAMeeting"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterNamingSeveralForAMeeting("{course}", "{section}", new[] { "Week 5", "Week 6" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterAndNoWindowForAMeeting"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterAndNoWindowForAMeeting("{course}", "{section}", new[] { "Week 5" }));
+        Assert.Equal(wording["notANumberedClassPageForAMeeting"]!.ToString(), ClassChangeWording.NotANumberedClassPageForAMeeting("{page}"));
+        Assert.Equal(wording["thePlaceForTheCopyIsStillTakenForAMeeting"]!.ToString(),
+                     ClassChangeWording.ThePlaceForTheCopyIsStillTakenForAMeeting("{copy}", null));
+        Assert.Equal(wording["thePlaceForTheCopyIsStillTakenNamingTheBackupForAMeeting"]!.ToString(),
+                     ClassChangeWording.ThePlaceForTheCopyIsStillTakenNamingTheBackupForAMeeting("{copy}", "{course}_backup_2026-09-08_190000.zip"));
+        Assert.Equal(wording["theCopyCouldNotBeMadeHiddenForAMeeting"]!.ToString(),
+                     ClassChangeWording.TheCopyCouldNotBeMadeHiddenForAMeeting("{page}", "{copy}", null));
+        Assert.Equal(wording["theCopyCouldNotBeMadeHiddenNamingTheBackupForAMeeting"]!.ToString(),
+                     ClassChangeWording.TheCopyCouldNotBeMadeHiddenNamingTheBackupForAMeeting("{page}", "{copy}", "{course}_backup_2026-09-08_190000.zip"));
+
         // #1027: the Class Dates dialog's own sentences, with the generator's examples.
         Pair("classDatesPurpose", AssistWording.ClassDatesPurpose(), AssistWording.ClassDatesPurposeForAMeeting());
         Pair("classDatesCourseMissing", AssistWording.ClassDatesCourseMissing("{course}"),

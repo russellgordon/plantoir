@@ -100,8 +100,13 @@ public static partial class ClassChangeWording
     /// shorter sentence since #200; Windows' used to add "— a copy can only
     /// become the next day of a unit that has numbered days".
     /// </summary>
-    public static string NotANumberedClassPage(string title) =>
-        $"“{title}” isn’t a numbered class page, so there is no next day for it to become.";
+    public static string NotANumberedClassPage(string title, ClassNoun noun = ClassNoun.Class) =>
+        $"“{title}” isn’t a numbered {Noun(noun)} page, so there is no next day for it to become.";
+    public static string NotANumberedClassPageForAMeeting(string title) => NotANumberedClassPage(title, ClassNoun.Meeting);
+
+    private static string Noun(ClassNoun noun) => noun == ClassNoun.Meeting ? "meeting" : "class";
+
+    private static string Nouns(ClassNoun noun) => noun == ClassNoun.Meeting ? "meetings" : "classes";
 
     /// <summary>The source page is there and cannot be read. (Not a contract key; the mac says "could not be read".)</summary>
     public static string CouldNotBeRead(string title) =>
@@ -119,10 +124,14 @@ public static partial class ClassChangeWording
     /// form with no backup can promise a copy that does not exist when the
     /// backup itself failed; the mac left it that way deliberately (#200).
     /// </remarks>
-    public static string ThePlaceForTheCopyIsStillTaken(string newTitle, string? backupPath) =>
-        $"“{newTitle}” is still there — the class that had to move out of the way did not, and I " +
-        "will not write over a lesson. Nothing was copied, but other classes may already have moved. " +
+    public static string ThePlaceForTheCopyIsStillTaken(string newTitle, string? backupPath, ClassNoun noun = ClassNoun.Class) =>
+        $"“{newTitle}” is still there — the {Noun(noun)} that had to move out of the way did not, and I " +
+        $"will not write over a lesson. Nothing was copied, but other {Nouns(noun)} may already have moved. " +
         $"{TheCourseCopy(backupPath)} Look the section over in Plantoir.";
+    public static string ThePlaceForTheCopyIsStillTakenForAMeeting(string newTitle, string? backupPath) =>
+        ThePlaceForTheCopyIsStillTaken(newTitle, backupPath, ClassNoun.Meeting);
+    public static string ThePlaceForTheCopyIsStillTakenNamingTheBackupForAMeeting(string newTitle, string backupPath) =>
+        ThePlaceForTheCopyIsStillTaken(newTitle, backupPath, ClassNoun.Meeting);
 
     /// <summary>The contract's <c>thePlaceForTheCopyIsStillTakenNamingTheBackup</c>.</summary>
     public static string ThePlaceForTheCopyIsStillTakenNamingTheBackup(string newTitle, string backupPath) =>
@@ -134,11 +143,16 @@ public static partial class ClassChangeWording
     /// column-0 place for a key. Says what the teacher is LEFT with — a hidden
     /// blank page on that day, and possibly moved classes.
     /// </summary>
-    public static string TheCopyCouldNotBeMadeHidden(string sourceTitle, string newTitle, string? backupPath) =>
+    public static string TheCopyCouldNotBeMadeHidden(string sourceTitle, string newTitle, string? backupPath,
+                                                     ClassNoun noun = ClassNoun.Class) =>
         $"“{sourceTitle}” was not copied — I could not be certain the copy would start hidden, and a lesson " +
         "students can already see must not turn up somewhere new where they can read it. " +
-        $"A blank class page called “{newTitle}” is waiting on that day instead, and it is hidden. " +
-        $"Other classes may already have moved. {TheCourseCopy(backupPath)} Look the section over in Plantoir.";
+        $"A blank {Noun(noun)} page called “{newTitle}” is waiting on that day instead, and it is hidden. " +
+        $"Other {Nouns(noun)} may already have moved. {TheCourseCopy(backupPath)} Look the section over in Plantoir.";
+    public static string TheCopyCouldNotBeMadeHiddenForAMeeting(string sourceTitle, string newTitle, string? backupPath) =>
+        TheCopyCouldNotBeMadeHidden(sourceTitle, newTitle, backupPath, ClassNoun.Meeting);
+    public static string TheCopyCouldNotBeMadeHiddenNamingTheBackupForAMeeting(string sourceTitle, string newTitle, string backupPath) =>
+        TheCopyCouldNotBeMadeHidden(sourceTitle, newTitle, backupPath, ClassNoun.Meeting);
 
     /// <summary>The contract's <c>theCopyCouldNotBeMadeHiddenNamingTheBackup</c>.</summary>
     public static string TheCopyCouldNotBeMadeHiddenNamingTheBackup(string sourceTitle, string newTitle, string backupPath) =>

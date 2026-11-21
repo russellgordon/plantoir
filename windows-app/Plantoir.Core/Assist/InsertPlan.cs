@@ -40,7 +40,14 @@ public sealed class InsertPlan
     /// <summary>Links that would be rewritten to follow a renamed page.</summary>
     public required int LinksToRewrite { get; init; }
 
+    /// <summary>What the teacher should know before saying yes, as the model reads it: always "class".</summary>
     public required IReadOnlyList<string> Problems { get; init; }
+
+    /// <summary>The same in a club's noun, for the card only (#1027); none given means the same as <see cref="Problems"/>.</summary>
+    public IReadOnlyList<string>? ProblemsForAMeeting { get; init; }
+
+    private IReadOnlyList<string> ProblemsIn(ClassNoun noun) =>
+        noun == ClassNoun.Meeting ? ProblemsForAMeeting ?? Problems : Problems;
 
     public bool ChangesNothing => Added.Count == 0 && Renames.Count == 0 && Moves.Count == 0;
 
@@ -62,7 +69,7 @@ public sealed class InsertPlan
         if (ChangesNothing)
         {
             lines.Add($"Nothing would change in {CourseCode} Section {SectionNumber}.");
-            foreach (string problem in Problems) lines.Add("• " + problem);
+            foreach (string problem in ProblemsIn(noun)) lines.Add("• " + problem);
             return string.Join("\n", lines);
         }
 
@@ -109,7 +116,7 @@ public sealed class InsertPlan
                 lines.Add($"  …and {Moves.Count - MostShown} more.");
         }
 
-        foreach (string problem in Problems) lines.Add("• " + problem);
+        foreach (string problem in ProblemsIn(noun)) lines.Add("• " + problem);
         return string.Join("\n", lines);
     }
 
@@ -121,3 +128,16 @@ public sealed record Rename(string From, string To, string FromPath, string ToPa
 
 /// <summary>A class that keeps its name but moves to a different day.</summary>
 public sealed record DateMove(string Title, string RelativePath, DateOnly? From, DateOnly To);
+
+/// <summary>
+/// One thing a plan's teacher should know, said in both nouns (#1027), from one
+/// wording function called once for each: the mac's <c>PlanProblem</c>.
+/// </summary>
+public sealed record PlanProblem(string ForAClass, string ForAMeeting)
+{
+    public static PlanProblem Said(Func<ClassNoun, string> sentence) =>
+        new(sentence(ClassNoun.Class), sentence(ClassNoun.Meeting));
+
+    public static IReadOnlyList<string> In(IEnumerable<PlanProblem> problems, ClassNoun noun) =>
+        problems.Select(problem => noun == ClassNoun.Meeting ? problem.ForAMeeting : problem.ForAClass).ToList();
+}

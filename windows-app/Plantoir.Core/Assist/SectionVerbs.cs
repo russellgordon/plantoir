@@ -211,11 +211,12 @@ public sealed class SectionVerbs : IAsyncDisposable
     }
 
     /// <summary>The trail line's counts for Add Class…: how it was added, never the class's title.</summary>
-    public static string AddClassCounts(SubjectMenuRules.AddClassWay way) => way switch
+    /// <remarks>In the course's noun (#1027; <c>subjectMenus.layout.itemTitles.countsCases</c>): a club's is "the next meeting".</remarks>
+    public static string AddClassCounts(SubjectMenuRules.AddClassWay way, ClassNoun noun) => way switch
     {
-        SubjectMenuRules.AddClassWay.NextInThisUnit => "the next class in this unit",
+        SubjectMenuRules.AddClassWay.NextInThisUnit => AssistWording.AddClassCountsNext(noun),
         SubjectMenuRules.AddClassWay.InANewUnit => "in a new unit",
-        _ => "as a copy of a class",
+        _ => AssistWording.AddClassCountsAsACopy(noun),
     };
 
     /// <summary>

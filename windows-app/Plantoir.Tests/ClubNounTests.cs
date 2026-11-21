@@ -364,7 +364,7 @@ public sealed class ClubNounTests : IDisposable
 
         Assert.Equal(Said("classDatesPurposeForAMeeting"), ClassDatesDialogWords.Purpose(club));
         Assert.Equal(Said("classDatesTooFarFromTodayForAMeeting"),
-                     ClassDatesDialogWords.CannotBeADate(new DateOnly(2569, 9, 8), club, 1));
+                     ClassDatesDialogWords.CannotBeADate(new[] { new DateOnly(2569, 9, 8) }, club, 1));
 
         var tuesdays = Enumerable.Range(0, 12).Select(week => new DateOnly(2026, 9, 8).AddDays(7 * week)).ToList();
         Assert.Equal(Said("classDatesToRememberForAMeeting").Replace("2026-12-15 (Tuesday)", "2026-11-24 (Tuesday)"),
@@ -378,4 +378,105 @@ public sealed class ClubNounTests : IDisposable
         Assert.Equal(Said("classDatesHalfRead").Replace("2026-13-01", "“banana”").Replace("the pasted dates", "what you pasted"),
                      asTheModelReads.Message);
     }
+
+    // ---- #1027 round 3 (review 2).
+
+    private static bool SaysClass(string text) =>
+        System.Text.RegularExpressions.Regex.IsMatch(text, @"\b[Cc]lass(es)?\b");
+
+    /// <summary>
+    /// Every key of the contract whose words say class has a club twin
+    /// (<c>…ForAMeeting</c>, or <c>…FromTheMeetingsMenu</c> for a
+    /// <c>…FromTheMenu</c> key) or is on <c>staysClass</c> with its reason, and
+    /// nothing stale is on that list. MUST FAIL with any twin taken out.
+    /// </summary>
+    [Fact]
+    public void EveryClassSentenceInTheContractHasAClubFormOrAReason()
+    {
+        var file = ContractLoader.LoadJson("assist-wording.json");
+        var wording = file["wording"]!.AsObject();
+        var staysClass = file["staysClass"]!.AsObject();
+        var withoutAClubForm = new List<string>();
+        int saidInClass = 0;
+        foreach (var (key, value) in wording)
+        {
+            if (key.EndsWith("ForAMeeting") || key.EndsWith("FromTheMeetingsMenu")) continue;
+            if (value is not JsonValue || !SaysClass(value.ToString())) continue;
+            saidInClass++;
+            bool hasATwin = wording.ContainsKey(key + "ForAMeeting")
+                || (key.EndsWith("FromTheMenu") && wording.ContainsKey(key[..^"FromTheMenu".Length] + "FromTheMeetingsMenu"));
+            if (!hasATwin && !staysClass.ContainsKey(key)) withoutAClubForm.Add(key);
+        }
+        Assert.True(saidInClass > 50, $"only {saidInClass} class sentences read");
+        Assert.True(withoutAClubForm.Count == 0, "say class with no club form and no reason: " + string.Join(", ", withoutAClubForm));
+        foreach (var (key, reason) in staysClass)
+        {
+            Assert.True(wording.ContainsKey(key), $"staysClass names no key {key}");
+            Assert.True(SaysClass(wording[key]!.ToString()), $"{key} no longer says class");
+            Assert.False(wording.ContainsKey(key + "ForAMeeting"), $"{key} has a twin, so it is not an exception");
+            Assert.False(string.IsNullOrWhiteSpace(reason!.ToString()), key);
+        }
+    }
+
+    /// <summary>Review 2, MEDIUM 1: Add Meeting…'s trail counts say meeting (<c>itemTitles.countsCases</c>), and so do Deploy's hide counts.</summary>
+    [Fact]
+    public void TheRanFromAMenuCountsSayMeetingInAClub()
+    {
+        var cases = ContractLoader.LoadJson("shared-rules.json")["subjectMenus"]!["layout"]!["itemTitles"]!["countsCases"]!.AsArray();
+        Assert.Equal(5, cases.Count);
+        foreach (var testCase in cases)
+        {
+            var way = Enum.Parse<SubjectMenuRules.AddClassWay>(testCase!["way"]!.ToString(), ignoreCase: true);
+            var noun = testCase["noun"]!.ToString() == "meeting" ? ClassNoun.Meeting : ClassNoun.Class;
+            Assert.Equal(testCase["counts"]!.ToString(), SectionVerbs.AddClassCounts(way, noun));
+        }
+        Assert.Equal("1 meeting dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(1, ClassNoun.Meeting));
+        Assert.Equal("3 classes dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(3));
+    }
+
+    /// <summary>
+    /// Review 2, MEDIUM 2: a make-room plan that runs out of dates says meeting
+    /// days on a club's card and in the refusal the teacher reads; the model
+    /// reads the class form. MUST FAIL with the problem typed in the class noun only.
+    /// </summary>
+    [Fact]
+    public void APlanShortOfDatesSaysMeetingToAClubsTeacher()
+    {
+        var tools = Club("meeting");
+        var plan = tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2, 40);
+        string card = TeacherCopy(plan);
+        Assert.Contains("meeting day", card);
+        Assert.DoesNotContain("class day", card);
+        Assert.DoesNotContain("class date", card);
+        Assert.Contains("class day", ModelCopy(plan));
+
+        var write = tools.MakeRoomForClasses("ICS3U", 1, 1, 2, 40);
+        Assert.Contains("meeting date", TeacherCopy(write));
+        Assert.False(SaysClass(TeacherCopy(write)), TeacherCopy(write));
+        Assert.Contains("class date", ModelCopy(write));
+    }
+
+    /// <summary>Review 2, lows 3 and 5: the assistant's dates card lines say meeting in a club; the too-far refusal names every such date.</summary>
+    [Fact]
+    public void TheDatesCardLinesSayMeetingAndTheRefusalNamesEveryDate()
+    {
+        Club("meeting");
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        string folder = Path.Combine(_folder, "courses", "ICS3U");
+        var club = new Course("ICS3U", folder, CourseConfiguration.Load(Path.Combine(folder, "course_config.json")));
+        Assert.Equal("Could not open the meeting dates dialog.", ClassDatesDialogWords.CouldNotOpen(club));
+        Assert.Equal("No meeting dates were recorded.", ClassDatesDialogWords.NoneRecorded(club));
+        Assert.Equal(wording["datesNotGivenYetForAMeeting"]!.ToString(), ClassDatesDialogWords.NotGivenYet(club));
+        Assert.Equal(wording["rememberedTheClassDatesForAMeeting"]!.ToString().Replace("{course}", "ICS3U").Replace("{section}", "1"),
+                     ClassDatesDialogWords.Remembered(12, club, 1));
+
+        var today = new DateOnly(2026, 11, 20);
+        var typed = new[] { new DateOnly(2026, 9, 8), new DateOnly(2569, 9, 8), new DateOnly(2570, 1, 5), new DateOnly(2569, 9, 8) };
+        var refused = TimetableMemory.EveryUnbelievable(typed, today);
+        Assert.Equal(new[] { new DateOnly(2569, 9, 8), new DateOnly(2570, 1, 5) }, refused);
+        string said = ClassDatesDialogWords.CannotBeADate(refused, club, 1);
+        Assert.StartsWith("2569-09-08 and 2570-01-05 are too far from today to be meeting dates", said);
+        Assert.Contains("those dates corrected", said);
+    }
+
 }

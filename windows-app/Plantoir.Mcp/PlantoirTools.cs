@@ -1497,6 +1497,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             return Answering(summary, detail);
         }
+        // The teacher's copy in the course's noun when it differs (#1027); the model's is the message.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
     }
@@ -1981,6 +1983,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                             text.ToString())
                 : Answering(text.ToString());
         }
+        // The teacher's copy in the course's noun when it differs (#1027); the model's is the message.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
         // A page Obsidian moved between the plan and the write, a file
@@ -2209,6 +2213,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 ? Answering($"{verb} {changing} {word}.", result.Message)
                 : Answering(result.Message);
         }
+        // The teacher's copy in the course's noun when it differs (#1027); the model's is the message.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
         // A page Obsidian moved between the plan and the write, a file
@@ -2365,6 +2371,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private CallToolResult Guarded(Func<CallToolResult> work)
     {
         try { return work(); }
+        // The teacher's copy in the course's noun when it differs (#1027); the model's is the message.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
         catch (IOException error) { return Answering($"That couldn’t be read: {error.Message}"); }

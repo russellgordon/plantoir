@@ -110,7 +110,8 @@ public sealed partial class MainWindow
         var answer = await verbs.Perform(SectionVerbs.HidePages(code, section, places, plan: false),
                                          SectionVerbDialog.MenuPath(Item.HidePages, Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun ?? ClassNoun.Class), code, section,
                                          SubjectMenuLayout.MenuContaining(Item.HidePages),
-                                         ClassesDatedLater.UntickedAtDeployCounts(places.Count),
+                                         ClassesDatedLater.UntickedAtDeployCounts(places.Count,
+                                             Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun ?? ClassNoun.Class),
                                          previewFollows: false);
         ApplyMenuEnablement();
         return answer;

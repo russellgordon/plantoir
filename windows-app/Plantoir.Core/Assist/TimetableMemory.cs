@@ -84,6 +84,22 @@ public sealed class TimetableMemory
     /// accepts the other believes: a tool that saved and then read back
     /// would otherwise find nothing where it had just written.
     /// </summary>
+    /// <summary>
+    /// Every date <see cref="Unbelievable"/> would refuse, once each, in the
+    /// order given: the Class Dates dialog names them all, as the mac does
+    /// (#1027 review 2, low 5).
+    /// </summary>
+    public static IReadOnlyList<DateOnly> EveryUnbelievable(IEnumerable<DateOnly> dates, DateOnly today)
+    {
+        DateOnly ceiling = today.AddYears(YearsAheadBelievable);
+        var refused = new List<DateOnly>();
+        foreach (var date in dates)
+        {
+            if ((date < EarliestBelievable || date > ceiling) && !refused.Contains(date)) refused.Add(date);
+        }
+        return refused;
+    }
+
     public static DateOnly? Unbelievable(IEnumerable<DateOnly> dates, DateOnly today)
     {
         DateOnly ceiling = today.AddYears(YearsAheadBelievable);

@@ -1061,7 +1061,7 @@ internal sealed class SectionVerbDialog
                                            new[] { page.Folder, day }, Ticked: false));
         }
         var table = new TickTable("sectionVerbPickerTable",
-                                  publishing ? AssistWording.MenuPickPagesToPublish : AssistWording.MenuPickPagesToHide,
+                                  publishing ? PickPagesToPublish(_course) : AssistWording.MenuPickPagesToHide,
                                   new[] { AssistWording.MenuPlanFolderColumn, AssistWording.MenuPickDateColumn },
                                   new[] { PageTableLayout.PickFolder, PageTableLayout.PickDate }, offers);
         for (int i = 0; i < pages.Count; i++) _rows.Add((pages[i], table.Rows[i].Box));
@@ -1080,7 +1080,7 @@ internal sealed class SectionVerbDialog
                                   || pages[row.Index].Folder.Contains(wanted, StringComparison.CurrentCultureIgnoreCase));
         };
         var panel = new StackPanel { Spacing = 12, MinWidth = 460 };
-        panel.Children.Add(Words(publishing ? AssistWording.MenuPickPagesToPublish : AssistWording.MenuPickPagesToHide));
+        panel.Children.Add(Words(publishing ? PickPagesToPublish(_course) : AssistWording.MenuPickPagesToHide));
         panel.Children.Add(find);
         panel.Children.Add(table.Panel);
         // The table's height is counted from EVERY page offered, never the
@@ -1105,12 +1105,18 @@ internal sealed class SectionVerbDialog
 
     private List<string> Ticked() => _rows.Where(row => row.Box.IsChecked == true).Select(row => row.Page.Name).ToList();
 
+    /// <summary>Publish Pages…' sentence above the ticks, in the course's noun (#1027).</summary>
+    internal static string PickPagesToPublish(Course course) =>
+        course.Configuration.ClassNoun == ClassNoun.Meeting
+            ? AssistWording.MenuPickPagesToPublishForAMeeting
+            : AssistWording.MenuPickPagesToPublish;
+
     /// <summary>The trail line's counts — never a title.</summary>
     private string? Counts() => _item switch
     {
         Item.PublishPages or Item.HidePages => Ticked().Count == 1 ? "1 page ticked" : $"{Ticked().Count} pages ticked",
         Item.MakeRoomForClasses when _howMany is not null => (int)_howMany.Value == 1 ? "room for 1" : $"room for {(int)_howMany.Value}",
-        Item.AddClass when _way is { } way => SectionVerbs.AddClassCounts(way),
+        Item.AddClass when _way is { } way => SectionVerbs.AddClassCounts(way, _course.Configuration.ClassNoun),
         _ => null,
     };
 }
