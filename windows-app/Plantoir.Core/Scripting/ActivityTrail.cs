@@ -1101,6 +1101,64 @@ public static class ActivityTrail
         return LogRedactor.Redacting(cleanedAfterRedacting);
     }
 
+    // ---- The headless path's task lines (#774) ------------------------------
+
+    /// <summary>
+    /// <c>task started</c>'s words, as the window's <c>ScriptRunner</c> writes
+    /// them: "started preview.ps1 COMP 1 --build-only". The arguments are
+    /// written as they are and redacted with the whole line on the way in
+    /// (<see cref="SafeTrailLine"/>), so <c>--account</c> and any token never
+    /// reach the file. Shared with <c>plantoir-mcp.exe</c>'s
+    /// <c>LauncherRunner</c>, which has no <c>ScriptRunner</c> (ConPTY and a
+    /// window's synchronisation context), so the headless door and the window
+    /// say the same sentence.
+    /// </summary>
+    public static string TaskStartedWords(string launcherFile, IReadOnlyList<string> arguments) =>
+        arguments.Count > 0 ? $"started {launcherFile} {string.Join(" ", arguments)}" : $"started {launcherFile}";
+
+    /// <summary><c>task finished</c>'s words: "finished deploy.ps1 — succeeded after 12s".</summary>
+    public static string TaskFinishedWords(string launcherFile, string outcome, TimeSpan? elapsed) =>
+        $"finished {launcherFile} — {outcome}{(elapsed is { } took ? DurationWords(took) : "")}";
+
+    /// <summary>How long a task took, in the window's words: " after 12s", " after 3m 4s".</summary>
+    public static string DurationWords(TimeSpan elapsed) =>
+        elapsed.TotalSeconds < 60
+            ? $" after {Math.Max(1, (int)elapsed.TotalSeconds)}s"
+            : $" after {(int)elapsed.TotalMinutes}m {elapsed.Seconds}s";
+
+    /// <summary>
+    /// Exit 3: a launcher run with <c>--non-interactive</c> reached a question
+    /// and refused rather than wait for an answer nobody could give
+    /// (<c>activityTrail.mustRecord</c> → "task finished" → <c>why</c>, #378).
+    /// The headless path always runs its launchers that way.
+    /// </summary>
+    public const string StoppedAtAQuestionNobodyCouldAnswer = "stopped at a question nobody was there to answer (exit 3)";
+
+    /// <summary>A headless run whose caller stopped waiting for it (the assistant's call was cancelled): the launcher was ended part way.</summary>
+    public const string StoppedBeforeItFinished = "stopped before it finished";
+
+    /// <summary>The outcome of a headless run that exited: exit 3 in its own words, any other exit in the window's.</summary>
+    public static string HeadlessOutcome(int exitCode) =>
+        exitCode == 3
+            ? StoppedAtAQuestionNobodyCouldAnswer
+            : ScriptRunner.FinishedOutcome(exitCode, wasStoppedByUser: false, wasCancelled: false, wasClosedForADeploy: false);
+
+    /// <summary>
+    /// The course and section a launcher's arguments name: every launcher
+    /// takes the course code first and the section number second
+    /// (<c>PreviewCommand.BuildOnlyArguments</c>, <c>DeployCommand.Arguments</c>).
+    /// No course when the first argument is a flag; section 0 (none, for
+    /// <see cref="Place"/>) when the second is not a number.
+    /// </summary>
+    public static (string Course, int Section) PlaceOfLauncherArguments(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count == 0 || arguments[0].StartsWith('-')) return ("", 0);
+        int section = 0;
+        if (arguments.Count > 1)
+            int.TryParse(arguments[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out section);
+        return (arguments[0], section);
+    }
+
     /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
     public static string PageSettingsLeftAsTheyWereLine(string act, int pages) =>
         $"left the settings of {(pages == 1 ? "1 page" : $"{pages} pages")} as they were while {act}: no room at the top for a new setting";
