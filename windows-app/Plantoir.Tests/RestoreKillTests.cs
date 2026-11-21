@@ -32,15 +32,34 @@ public sealed class RestoreKillTests : IDisposable
         return path;
     }
 
+    /// <summary>
+    /// Every point a kill can fall: part way through the unpack, at
+    /// <c>staged</c>, part way through setting aside, at <c>setAside</c>, part
+    /// way through moving the backup's in (assistant: moves 5 and 6 of 7;
+    /// menu: 7 and 10 of 11, the last the outside files), and part way
+    /// through a way back that a REAL refusal started (<c>back:</c>, with
+    /// the harness holding <c>zz notes\n.md</c> open without delete
+    /// sharing, so the fourth move out fails).
+    /// </summary>
     [Theory]
+    [InlineData("unpack:2", "assistant")]
     [InlineData("staged", "assistant")]
-    [InlineData("setAside", "assistant")]
     [InlineData("move:1", "assistant")]
     [InlineData("move:3", "assistant")]
+    [InlineData("setAside", "assistant")]
+    [InlineData("move:5", "assistant")]
+    [InlineData("move:6", "assistant")]
+    [InlineData("back:1", "assistant")]
+    [InlineData("back:2", "assistant")]
+    [InlineData("unpack:2", "menu")]
     [InlineData("staged", "menu")]
-    [InlineData("setAside", "menu")]
     [InlineData("move:1", "menu")]
     [InlineData("move:5", "menu")]
+    [InlineData("setAside", "menu")]
+    [InlineData("move:7", "menu")]
+    [InlineData("move:10", "menu")]
+    [InlineData("back:1", "menu")]
+    [InlineData("back:2", "menu")]
     public void AKilledRestoreLeavesEveryOriginalInTheCourseOrTheStagingFolder(string point, string route)
     {
         // The menu's route (#911 step 3) also moves the section's files
@@ -61,6 +80,7 @@ public sealed class RestoreKillTests : IDisposable
         var originals = SectionSwapFixture.FilesOf(SectionSwapFixture.Snapshot(_fixture.Section2));
         var outsideOriginals = OutsideOriginals(outside);
         var outsideTheSectionBefore = SnapshotOutsideTheSection(outside);
+        var sectionBefore = SectionSwapFixture.Snapshot(_fixture.Section2);
 
         var start = new ProcessStartInfo("dotnet")
         {
@@ -72,6 +92,7 @@ public sealed class RestoreKillTests : IDisposable
         };
         foreach (string argument in new[] { "exec", HarnessPath(), _fixture.CoursesDir, backup.FilePath, "ICS3U", "2", point, _fixture.TrailPath, route })
             start.ArgumentList.Add(argument);
+        if (point.StartsWith("back:", StringComparison.Ordinal)) start.ArgumentList.Add(Path.Combine("section2", "zz notes", "n.md"));
         start.Environment["PLANTOIR_BUILD_ROOT"] = Path.Combine(_fixture.Folder, "builds");
         using var child = Process.Start(start)!;
         string? announced = child.StandardOutput.ReadLine();          // blocks until the child writes its line
@@ -80,6 +101,12 @@ public sealed class RestoreKillTests : IDisposable
         child.WaitForExit();
 
         Assert.Equal(zipBefore, SectionSwapFixture.Hash(backup.FilePath));
+        if (point == "staged" || point.StartsWith("unpack:", StringComparison.Ordinal))
+        {
+            // Before the swap nothing in the course has moved: it would fail if any move came before `Staged`.
+            Assert.Equal(sectionBefore, SectionSwapFixture.Snapshot(_fixture.Section2));
+            Assert.Empty(_fixture.AsideFoldersInStaging());
+        }
         var missing = _fixture.OriginalsMissing(originals, _fixture.AsideFoldersInStaging());
         Assert.True(missing.Count == 0, $"killed at {point} ({route}): lost {string.Join(", ", missing)}");
         Assert.Empty(OutsideOriginalsMissing(outsideOriginals));

@@ -260,6 +260,47 @@ public sealed class SectionSwapTests : IDisposable
         Assert.Equal("ref: refs/heads/main", File.ReadAllText(Path.Combine(aside, "section2", "project", ".git", "HEAD")));
     }
 
+    [Fact]
+    public void ADeeperFolderOfWorkABackupLeavesOutKeepsTheAsideCopy()
+    {
+        _fixture.Write(Path.Combine("project", "main.md"), "as backed up");
+        var backup = _fixture.BackUp();
+        _fixture.Write(Path.Combine("project", "node_modules", "x", "index.js"), "module");
+
+        CourseRestorer.RestoreSection(2, backup, _fixture.CoursesDir);
+
+        string aside = Assert.Single(_fixture.AsideFoldersInStaging());
+        Assert.Equal("module", File.ReadAllText(Path.Combine(aside, "section2", "project", "node_modules", "x", "index.js")));
+    }
+
+    /// <summary>A course made on a Mac has a <c>.DS_Store</c> at every depth; it, and a tool's cache, never keep a replaced section aside (the review of steps 1 and 2, LOW 3).</summary>
+    [Fact]
+    public void SystemLitterDeeperInTheSectionNeverKeepsTheAsideCopy()
+    {
+        _fixture.Write(Path.Combine("project", "main.md"), "as backed up");
+        var backup = _fixture.BackUp();
+        _fixture.Write(Path.Combine("project", ".DS_Store"), "finder");
+        _fixture.Write(Path.Combine("project", "__pycache__", "m.pyc"), "cache");
+        _fixture.Write(Path.Combine("project", ".cache", "c"), "cache");
+
+        CourseRestorer.RestoreSection(2, backup, _fixture.CoursesDir);
+
+        Assert.Empty(_fixture.AsideFoldersInStaging());
+        Assert.False(Directory.Exists(Path.Combine(_fixture.CoursesDir, ".internal")), "nothing kept, so the staging folders are tidied away");
+        Assert.Equal("as backed up", File.ReadAllText(Path.Combine(_fixture.Section2, "project", "main.md")));
+    }
+
+    /// <summary>Every name of work is on the backups' left-out list, and the litter is the rest of it, named here so a name added to the list is decided, not defaulted.</summary>
+    [Fact]
+    public void TheLeftOutListSplitsIntoWorkAndLitter()
+    {
+        var litter = new[] { ".merged_output", ".quartz-cache", ".cache", "__pycache__", ".DS_Store" };
+        foreach (string name in CourseRestorer.LeftOutWork) Assert.Contains(name, CourseArchiver.ExcludedFromArchives);
+        foreach (string name in litter) Assert.DoesNotContain(name, CourseRestorer.LeftOutWork);
+        Assert.Equal(CourseArchiver.ExcludedFromArchives.OrderBy(name => name, StringComparer.Ordinal),
+                     CourseRestorer.LeftOutWork.Concat(litter).OrderBy(name => name, StringComparer.Ordinal));
+    }
+
     // ---- the double-failure sweep (the mac's 12 of 91) ---------------------
 
     /// <summary>
@@ -327,9 +368,12 @@ public sealed class SectionSwapTests : IDisposable
             Reached = _ => { },
         };
         mix = false;
+        Exception? error = null;
+        ActivityTrail.SetCustomLogPathForTesting(fixture.TrailPath);
         try { CourseRestorer.RestoreSection(2, backup, fixture.CoursesDir, hooks); }
-        catch (CourseRestorer.RestoreException) { }
+        catch (CourseRestorer.RestoreException refused) { error = refused; }
         if (!failed) return false;
+        fixture.AssertToldTruly(error, wayBackFailed: j > 0, archived: false, $"k {k}, j {j}");
         if (j == 0) return true;
 
         var kept = fixture.KeptFoldersInBackups().Concat(fixture.AsideFoldersInStaging()).ToList();

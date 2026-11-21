@@ -128,4 +128,40 @@ internal sealed class SectionSwapFixture : IDisposable
             : new List<string>();
 
     public string Trail() => File.Exists(TrailPath) ? File.ReadAllText(TrailPath) : "";
+
+    /// <summary>
+    /// What a sweep case was told is what is on disk (the review of steps 1
+    /// and 2, LOW 4): a failure whose way back finished says
+    /// <c>leftAsItWas</c> and writes no stopped line; one whose way back did
+    /// not finish says <c>stoppedPartWay</c> naming the kept folder (or
+    /// <c>stoppedPartWayNothingToOpen</c> when nothing in it but dot-named
+    /// files), with the archive sentence on the menu's route, and writes
+    /// <c>section restore stopped part way</c> naming that folder.
+    /// </summary>
+    public void AssertToldTruly(Exception? error, bool wayBackFailed, bool archived, string which)
+    {
+        Assert.True(error is CourseRestorer.RestoreException, which + ": no refusal was said");
+        if (!wayBackFailed)
+        {
+            Assert.False(error is CourseRestorer.SectionRestoreStoppedPartWay, which + ": said stopped part way");
+            Assert.StartsWith(OneSectionRestoreWording.LeftAsItWas(2, ""), error!.Message);
+            Assert.DoesNotContain("section restore stopped part way", Trail());
+            return;
+        }
+        Assert.True(error is CourseRestorer.SectionRestoreStoppedPartWay, which + ": said " + error!.Message);
+        string kept = Assert.Single(KeptFoldersInBackups());
+        string keptAt = Path.GetRelativePath(Folder, kept);
+        bool somethingToOpen = false;
+        foreach (string file in Directory.EnumerateFiles(kept, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0 }))
+        {
+            bool hidden = false;
+            foreach (string part in Path.GetRelativePath(kept, file).Split(Path.DirectorySeparatorChar))
+                if (part.StartsWith('.')) hidden = true;
+            if (!hidden) somethingToOpen = true;
+        }
+        string said = somethingToOpen ? OneSectionRestoreWording.StoppedPartWay(2, keptAt) : OneSectionRestoreWording.StoppedPartWayNothingToOpen(2);
+        if (archived) said += " " + OneSectionRestoreWording.StoppedPartWayArchived;
+        Assert.Equal(said, error.Message);
+        Assert.Contains(Plantoir.Core.Scripting.ActivityTrail.SectionRestoreStoppedPartWayLine(keptAt), Trail());
+    }
 }

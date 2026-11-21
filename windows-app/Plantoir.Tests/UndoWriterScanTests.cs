@@ -116,7 +116,7 @@ public sealed class UndoWriterScanTests
         ["Plantoir.Core/Models/CourseConfiguration.cs"] = (6, W8 + " (a course's course_config.json, as editJSON)"),
         ["Plantoir.Core/Models/CoursePageCopy.cs"] = (6, W8 + " (Copy a Page, the mac's CoursePageCopier)"),
         ["Plantoir.Core/Models/CourseRenamer.cs"] = (1, W8),
-        ["Plantoir.Core/Models/CourseRestorer.cs"] = (31, W9 + " (restore, remove, archive and delete, the mac's CourseRestorer)"),
+        ["Plantoir.Core/Models/CourseRestorer.cs"] = (34, W9 + " (restore, remove, archive and delete, the mac's CourseRestorer)"),
         ["Plantoir.Core/Models/DeployCommand.cs"] = (1, "notAStep: names deploy.ps1; the deploy is not counted (rulings 17 and 18)"),
         ["Plantoir.Core/Models/FolderContainers.cs"] = (1, "notAStep: names powershell.exe to stop a folder's previews; writes no course file"),
         ["Plantoir.Core/Models/FolderScaffold.cs"] = (1, W8 + " (a new working folder's scaffold, made with New Course)"),

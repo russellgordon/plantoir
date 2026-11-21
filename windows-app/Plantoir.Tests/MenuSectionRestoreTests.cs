@@ -442,9 +442,12 @@ public sealed class MenuSectionRestoreTests : IDisposable
             Reached = _ => { },
         };
         mix = false;
+        Exception? error = null;
+        ActivityTrail.SetCustomLogPathForTesting(fixture.TrailPath);
         try { CourseRestorer.RestoreSectionFromTheMenu(2, backup, fixture.CoursesDir, hooks); }
-        catch (CourseRestorer.RestoreException) { }
+        catch (CourseRestorer.RestoreException refused) { error = refused; }
         if (!failed) return false;
+        fixture.AssertToldTruly(error, wayBackFailed: j > 0, archived: true, $"k {k}, j {j}");
         if (j == 0) return true;
 
         var kept = fixture.KeptFoldersInBackups().Concat(fixture.AsideFoldersInStaging()).ToList();

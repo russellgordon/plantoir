@@ -164,7 +164,7 @@ public static class CourseRestorer
         var staging = new RestoreStaging(coursesDirectory);
         try
         {
-            string payload = staging.Unpack(item);
+            string payload = staging.Unpack(item, hooks);
             string folderName = "section" + sectionNumber;
             if (!Directory.Exists(Path.Combine(payload, folderName)))
                 throw new RestoreException($"The copy of {item.CourseCode} does not hold a Section {sectionNumber}.");
@@ -236,7 +236,7 @@ public static class CourseRestorer
         try
         {
             // Unpack and check BEFORE anything in the course moves.
-            string payload = staging.Unpack(item);
+            string payload = staging.Unpack(item, hooks);
             if (!Directory.Exists(Path.Combine(payload, "section" + sectionNumber)))
                 throw new RestoreException(SectionMissingFromBackup(item.CourseCode, sectionNumber));
             CourseConfiguration backedUpConfiguration;
@@ -426,6 +426,8 @@ public static class CourseRestorer
     {
         public required Action<string, string> Move { get; init; }
         public required Action<SwapPoint> Reached { get; init; }
+        /// <summary>Called after each entry of the backup is unpacked, with how many are out so far: where the kill harness stops part way through the unpack.</summary>
+        public Action<int> UnpackedAnEntry { get; init; } = _ => { };
 
         public static SectionSwapHooks Real { get; } = new() { Move = MoveEntry, Reached = _ => { } };
     }
@@ -469,10 +471,43 @@ public static class CourseRestorer
         /// <summary>True when the aside folder holds the only copy of something and must stay.</summary>
         public bool KeepAside { get; set; }
 
-        public string Unpack(BackupItem item)
+        /// <summary>
+        /// Unpacks the backup into <c>backup\</c>, one entry at a time so the
+        /// kill harness can stop part way through (<see cref="SectionSwapHooks.UnpackedAnEntry"/>),
+        /// with <c>ZipFile.ExtractToDirectory</c>'s own guard: an entry whose
+        /// path would land outside the folder refuses the whole backup.
+        /// </summary>
+        public string Unpack(BackupItem item, SectionSwapHooks hooks)
         {
             Directory.CreateDirectory(_unpacked);
-            return CourseRestorer.Unpack(item.FilePath, item.CourseCode, _unpacked);
+            string root = Path.GetFullPath(_unpacked) + Path.DirectorySeparatorChar;
+            try
+            {
+                using var archive = ZipFile.OpenRead(item.FilePath);
+                int count = 0;
+                foreach (var entry in archive.Entries)
+                {
+                    string target = Path.GetFullPath(Path.Combine(root, entry.FullName));
+                    if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                        throw new IOException("an entry would land outside the folder it is unpacked into");
+                    if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
+                    {
+                        Directory.CreateDirectory(target);
+                    }
+                    else
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                        entry.ExtractToFile(target, overwrite: false);
+                    }
+                    count++;
+                    hooks.UnpackedAnEntry(count);
+                }
+            }
+            catch (Exception error)
+            {
+                throw new RestoreException($"The archive could not be opened: {error.Message}");
+            }
+            return PayloadIn(_unpacked, item.CourseCode);
         }
 
         /// <summary>
@@ -504,7 +539,23 @@ public static class CourseRestorer
         }
     }
 
-    /// <summary>Whether anything at any depth of <paramref name="folder"/> is named as backups leave out (<see cref="CourseArchiver.ExcludedFromArchives"/>).</summary>
+    /// <summary>
+    /// The names in <see cref="CourseArchiver.ExcludedFromArchives"/> that are
+    /// a teacher's WORK when they turn up deeper inside a section folder: a
+    /// project's history (<c>.git</c>), its installed packages
+    /// (<c>node_modules</c>) and what its own tools made (<c>dist</c>,
+    /// <c>build</c>, <c>out</c>), which a backup leaves out and so cannot put
+    /// back. The rest of the list is litter the system or a tool makes again
+    /// on its own (<c>.DS_Store</c>, <c>__pycache__</c>, <c>.cache</c>,
+    /// <c>.quartz-cache</c>, <c>.merged_output</c>), which never keeps a
+    /// replaced section aside: a course made on a Mac has a <c>.DS_Store</c>
+    /// at every depth, and keeping one section's full copy per restore for it
+    /// is growth nobody would miss losing (the review of steps 1 and 2, LOW 3).
+    /// </summary>
+    internal static readonly IReadOnlySet<string> LeftOutWork =
+        new HashSet<string>(StringComparer.Ordinal) { ".git", "node_modules", "dist", "build", "out" };
+
+    /// <summary>Whether anything at any depth of <paramref name="folder"/> is work a backup leaves out (<see cref="LeftOutWork"/>), so the folder must be kept.</summary>
     private static bool HoldsSomethingBackupsLeaveOut(string folder)
     {
         if (!Directory.Exists(folder)) return false;
@@ -518,7 +569,7 @@ public static class CourseRestorer
             catch { return true; }                                   // cannot tell: keep it
             foreach (var entry in entries)
             {
-                if (CourseArchiver.ExcludedFromArchives.Contains(entry.Name)) return true;
+                if (LeftOutWork.Contains(entry.Name)) return true;
                 if ((entry.Attributes & FileAttributes.Directory) != 0 && (entry.Attributes & FileAttributes.ReparsePoint) == 0)
                     pending.Push(entry.FullName);
             }
@@ -1003,6 +1054,12 @@ public static class CourseRestorer
             throw new RestoreException($"The archive could not be opened: {error.Message}");
         }
 
+        return PayloadIn(staging, expectedName);
+    }
+
+    /// <summary>The folder the archive's name promised inside <paramref name="staging"/>, or the single folder it holds.</summary>
+    private static string PayloadIn(string staging, string expectedName)
+    {
         string payload = Path.Combine(staging, expectedName);
         if (!Directory.Exists(payload))
         {
