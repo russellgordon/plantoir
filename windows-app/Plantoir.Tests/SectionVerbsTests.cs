@@ -507,7 +507,7 @@ public class SectionVerbsTests : IDisposable
         const string refusal = "Section 1 of ICS3U is already being previewed in another window. Stop that preview first, or work with it there.";
         var tools = new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.Menu });
         var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ShowPreviewInApp = () => { },
             RebuildPreviewInApp = () => Task.FromResult<string?>(refusal),
             CourseIsBeingCopied = () => false,
@@ -526,7 +526,7 @@ public class SectionVerbsTests : IDisposable
         const string refusal = "Section 1 of ICS3U is already being previewed in another window. Stop that preview first, or work with it there.";
         var agent = new AssistAgent(new NoModel(), new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher())),
                                     new JsonArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ShowPreviewInApp = () => { },
             RebuildPreviewInApp = () => Task.FromResult<string?>(refusal),
         };
