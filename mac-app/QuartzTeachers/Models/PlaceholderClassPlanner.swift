@@ -98,7 +98,7 @@ enum PlaceholderClassPlanner {
 
         var classes: [PlannedClass] = []
         var alreadyThere: [String] = []
-        var problems: [String] = []
+        var problems: [PlanProblem] = []
 
         let fileManager: FileManager = FileManager.default
         for offset in 0..<count {
@@ -116,7 +116,10 @@ enum PlaceholderClassPlanner {
             }
             if classes.count >= freeDates.count {
                 let undated: Int = count - alreadyThere.count - classes.count
-                problems.append("Only \(freeDates.count) unused class date\(freeDates.count == 1 ? "" : "s") remain in the timetable, so the last \(undated) can’t be dated. Add more class dates and ask again.")
+                let free: Int = freeDates.count
+                problems.append(PlanProblem { noun in
+                    AssistWording.unusedDatesRunShort(free: free, undated: undated, noun: noun)
+                })
                 break
             }
             classes.append(PlannedClass(
@@ -267,8 +270,14 @@ struct PlaceholderClassPlan {
     /// Pages that already exist and would be left exactly as they are.
     let alreadyThere: [String]
 
-    /// Anything the teacher should know before saying yes.
-    let problems: [String]
+    /// Anything the teacher should know before saying yes, in both nouns
+    /// (#1027): the card reads the course's, the model the class form.
+    let plannedProblems: [PlanProblem]
+
+    /// The problems as the model reads them: always "class".
+    var problems: [String] {
+        return PlanProblem.sentences(plannedProblems, noun: .class)
+    }
 
     /// Meeting dates still spare once these classes take theirs.
     let spareDatesLeft: Int
@@ -314,7 +323,7 @@ struct PlaceholderClassPlan {
 
         if changesNothing {
             lines.append("Nothing to add — every class asked for in \(whereTheyGo) already exists.")
-            for problem in problems {
+            for problem in PlanProblem.sentences(plannedProblems, noun: noun) {
                 lines.append("• " + problem)
             }
             return lines.joined(separator: "\n")
@@ -331,7 +340,7 @@ struct PlaceholderClassPlan {
             lines.append("\(alreadyThere.count) already exist\(alreadyThere.count == 1 ? "s" : "") and \(alreadyThere.count == 1 ? "is" : "are") left alone: \(SectionTimetableStore.list(alreadyThere)).")
         }
 
-        for problem in problems {
+        for problem in PlanProblem.sentences(plannedProblems, noun: noun) {
             lines.append("• " + problem)
         }
 
@@ -360,7 +369,7 @@ struct PlaceholderClassPlan {
         naming: ClassPageNaming,
         classes: [PlannedClass],
         alreadyThere: [String],
-        problems: [String],
+        problems: [PlanProblem],
         spareDatesLeft: Int,
         sharingTheLastDay: Int = 0,
         timetableSource: String
@@ -371,7 +380,7 @@ struct PlaceholderClassPlan {
         self.naming = naming
         self.classes = classes
         self.alreadyThere = alreadyThere
-        self.problems = problems
+        self.plannedProblems = problems
         self.spareDatesLeft = spareDatesLeft
         self.sharingTheLastDay = sharingTheLastDay
         self.timetableSource = timetableSource

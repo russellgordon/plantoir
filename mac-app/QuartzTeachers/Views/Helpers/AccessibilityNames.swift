@@ -28,15 +28,24 @@ nonisolated enum AccessibilityNames {
     /// as "face.smiling". Its tooltip's words, shortened.
     static let chooseEmoji: String = "Choose emoji"
 
+    // In a club each of these says meeting, as the sheet's own words do
+    // (#1027): VoiceOver reads them to the club's teacher.
+
     /// Publish Class for a Date: the date field (D18).
-    static let classDate: String = "Class date"
+    static func classDate(noun: ClassNoun = .class) -> String {
+        return noun == .meeting ? "Meeting date" : "Class date"
+    }
 
     /// Make Room: which class to make room before (D18).
-    static let makeRoomClass: String = "Class"
+    static func makeRoomClass(noun: ClassNoun = .class) -> String {
+        return noun == .meeting ? "Meeting" : "Class"
+    }
 
     /// Make Room: how many classes of room (D18). VoiceOver reads the
     /// number as the stepper's value after this name.
-    static let makeRoomHowMany: String = "Number of classes"
+    static func makeRoomHowMany(noun: ClassNoun = .class) -> String {
+        return "Number of \(noun.plural)"
+    }
 
     /// Add Class: the radio group of ways (D18).
     static let addClassWay: String = "Way to add"
@@ -54,7 +63,9 @@ nonisolated enum AccessibilityNames {
     static let openingFolder: String = "Opening folder"
 
     /// The Class Dates sheet's typing area (D41).
-    static let classDates: String = "Class dates"
+    static func classDates(noun: ClassNoun = .class) -> String {
+        return noun == .meeting ? "Meeting dates" : "Class dates"
+    }
 
     /// The assistant's composer (#1012): its placeholder's words, without
     /// the ellipsis, as the sidebar's Filter field is named by its own.
@@ -84,10 +95,14 @@ nonisolated enum AccessibilityNames {
     static let planTable: String = "Changes"
 
     /// Add Class as a copy: the table of classes to copy from (D41).
-    static let sourceTable: String = "Classes"
+    static func sourceTable(noun: ClassNoun = .class) -> String {
+        return noun == .meeting ? "Meetings" : "Classes"
+    }
 
     /// Deploy's later-classes table (D41).
-    static let laterClassesTable: String = "Later classes"
+    static func laterClassesTable(noun: ClassNoun = .class) -> String {
+        return "Later \(noun.plural)"
+    }
 
     /// The multi-destination deploy checklist, one state per destination
     /// (D19): before this, the state was only a coloured symbol.

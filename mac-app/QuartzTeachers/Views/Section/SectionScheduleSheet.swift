@@ -287,7 +287,7 @@ struct SectionScheduleSheet: View {
                 // lands, rather than on the scroll view around it.
                 ClassDatesTextBox(
                     text: $typed,
-                    accessibilityName: AccessibilityNames.classDates,
+                    accessibilityName: AccessibilityNames.classDates(noun: noun),
                     identifier: "sectionScheduleTypedField",
                     takesTheFocusWhenShown: !hasChangedRoute
                 )

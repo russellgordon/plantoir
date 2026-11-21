@@ -83,10 +83,13 @@ enum ClassInsertionPlanner {
             throw Problem.noNumberedClasses(course.code, sectionNumber, naming.shapeDescription)
         }
 
-        var problems: [String] = []
+        var problems: [PlanProblem] = []
         let unnumbered: Int = allPages.count - numbered.count
         if unnumbered > 0 {
-            problems.append("\(unnumbered) class page\(unnumbered == 1 ? " is" : "s are") not named “\(naming.shapeDescription)”, so \(unnumbered == 1 ? "it was" : "they were") left where \(unnumbered == 1 ? "it is" : "they are") — including \(unnumbered == 1 ? "its" : "their") date.")
+            let shape: String = naming.shapeDescription
+            problems.append(PlanProblem { noun in
+                AssistWording.pagesNotNamedTheCoursesWay(count: unnumbered, shape: shape, noun: noun)
+            })
         }
 
         if naming.isNumbered {
@@ -150,9 +153,11 @@ enum ClassInsertionPlanner {
 
         let needed: Int = count + shifted.count
         if runway.count < needed {
-            let missing: Int = needed - runway.count
             let from: String = firstFree?.text ?? "the end of the course"
-            problems.append("This needs \(needed) class days from \(from) onwards and the timetable only has \(runway.count). Add \(missing) more class date\(missing == 1 ? "" : "s") and ask again.")
+            let has: Int = runway.count
+            problems.append(PlanProblem { noun in
+                AssistWording.timetableTooShortFrom(needed: needed, from: from, has: has, noun: noun)
+            })
             return ClassInsertionPlan(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -527,12 +532,12 @@ enum ClassInsertionPlanner {
         count: Int,
         numbered: [ClassPageSummary],
         timetable: [CalendarDay],
-        problems startingProblems: [String],
+        problems startingProblems: [PlanProblem],
         forSection sectionNumber: Int,
         in course: Course
     ) throws -> ClassInsertionPlan {
         let naming: ClassPageNaming = course.configuration.classPageNaming
-        var problems: [String] = startingProblems
+        var problems: [PlanProblem] = startingProblems
 
         // Below the insertion point stays; at or after it may move.
         var shifted: [ClassPageSummary] = []
@@ -575,9 +580,11 @@ enum ClassInsertionPlanner {
         runway.sort()
 
         if runway.count < count {
-            let missing: Int = count - runway.count
             let from: String = latestKept?.text ?? "the start of the course"
-            problems.append("This needs \(count) class day\(count == 1 ? "" : "s") after \(from) and the timetable only has \(runway.count). Add \(missing) more class date\(missing == 1 ? "" : "s") and ask again.")
+            let has: Int = runway.count
+            problems.append(PlanProblem { noun in
+                AssistWording.timetableTooShortAfter(count: count, from: from, has: has, noun: noun)
+            })
             return ClassInsertionPlan(
                 courseCode: course.code, sectionNumber: sectionNumber,
                 unit: 1, atDay: atNumber, naming: naming,
@@ -632,7 +639,7 @@ enum ClassInsertionPlanner {
         guard let destinations = ClassInsertionPlanner.destinationsKeepingGaps(
             for: shiftedByDate, after: runway, skippingFirst: count
         ) else {
-            problems.append("There are not enough class days after the last page to move it onto. Add more class dates and ask again.")
+            problems.append(PlanProblem { noun in AssistWording.noDaysAfterTheLastPage(noun: noun) })
             return ClassInsertionPlan(
                 courseCode: course.code, sectionNumber: sectionNumber,
                 unit: 1, atDay: atNumber, naming: naming,
@@ -912,10 +919,16 @@ struct ClassInsertionPlan {
     /// Links that would be rewritten to follow a renamed page.
     let linksToRewrite: Int
 
-    /// Anything the teacher should know before saying yes.
-    let problems: [String]
+    /// Anything the teacher should know before saying yes, in both nouns
+    /// (#1027): the card reads the course's, the model the class form.
+    let plannedProblems: [PlanProblem]
 
     // MARK: - Computed properties
+
+    /// The problems as the model reads them: always "class".
+    var problems: [String] {
+        return PlanProblem.sentences(plannedProblems, noun: .class)
+    }
 
     var changesNothing: Bool {
         return added.isEmpty && renames.isEmpty && moves.isEmpty
@@ -980,7 +993,7 @@ struct ClassInsertionPlan {
 
         if changesNothing {
             lines.append("Nothing would change in \(courseCode) Section \(sectionNumber).")
-            for problem in problems {
+            for problem in PlanProblem.sentences(plannedProblems, noun: noun) {
                 lines.append("• " + problem)
             }
             return lines.joined(separator: "\n")
@@ -1039,7 +1052,7 @@ struct ClassInsertionPlan {
             }
         }
 
-        for problem in problems {
+        for problem in PlanProblem.sentences(plannedProblems, noun: noun) {
             lines.append("• " + problem)
         }
         return lines.joined(separator: "\n")
@@ -1057,7 +1070,7 @@ struct ClassInsertionPlan {
         renames: [ClassRename],
         moves: [ClassDateMove],
         linksToRewrite: Int,
-        problems: [String]
+        problems: [PlanProblem]
     ) {
         self.courseCode = courseCode
         self.sectionNumber = sectionNumber
@@ -1068,9 +1081,43 @@ struct ClassInsertionPlan {
         self.renames = renames
         self.moves = moves
         self.linksToRewrite = linksToRewrite
-        self.problems = problems
+        self.plannedProblems = problems
     }
 
     /// How many renames or moves a plan spells out before summarising.
     static let mostShown: Int = 10
+}
+
+/// One thing a plan's teacher should know, said in both nouns (#1027): the
+/// card shows the course's own ("meeting" in a club), and the model reads the
+/// class form, as it reads every detail (#267). Both come from one wording
+/// function, called once for each noun, so the sentence is typed once.
+struct PlanProblem: Equatable, Sendable {
+
+    // MARK: - Stored properties
+
+    let forAClass: String
+
+    let forAMeeting: String
+
+    // MARK: - Initializer
+
+    init(_ sentence: (ClassNoun) -> String) {
+        self.forAClass = sentence(.class)
+        self.forAMeeting = sentence(.meeting)
+    }
+
+    // MARK: - Functions
+
+    func sentence(noun: ClassNoun) -> String {
+        return noun == .meeting ? forAMeeting : forAClass
+    }
+
+    static func sentences(_ problems: [PlanProblem], noun: ClassNoun) -> [String] {
+        var sentences: [String] = []
+        for problem in problems {
+            sentences.append(problem.sentence(noun: noun))
+        }
+        return sentences
+    }
 }

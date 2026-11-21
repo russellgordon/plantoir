@@ -292,7 +292,7 @@ final class SectionVerbSheetModel: Identifiable {
             if pageRows.isEmpty {
                 return AssistWording.menuNoHiddenPages(course: courseName, section: String(sectionNumber))
             }
-            return AssistWording.menuPickPagesToPublish
+            return AssistWording.menuPickPagesToPublish(noun: noun)
         case .hidePages:
             if pageRows.isEmpty {
                 return AssistWording.menuNoVisiblePages(course: courseName, section: String(sectionNumber))
@@ -986,7 +986,7 @@ struct SectionVerbSheet: View {
             ), displayedComponents: [.date])
             .labelsHidden()
             .datePickerStyle(.field)
-            .accessibilityLabel(Text(AccessibilityNames.classDate))
+            .accessibilityLabel(Text(AccessibilityNames.classDate(noun: model.noun)))
             .accessibilityIdentifier("sectionVerbSheetDay")
         case .makeRoom:
             Picker("", selection: Binding(
@@ -998,7 +998,7 @@ struct SectionVerbSheet: View {
                 }
             }
             .labelsHidden()
-            .accessibilityLabel(Text(AccessibilityNames.makeRoomClass))
+            .accessibilityLabel(Text(AccessibilityNames.makeRoomClass(noun: model.noun)))
             .accessibilityIdentifier("sectionVerbSheetClass")
             Stepper(value: Binding(
                 get: { return model.howMany },
@@ -1008,7 +1008,7 @@ struct SectionVerbSheet: View {
                     .monospacedDigit()
             }
             .accessibilityValue(Text("\(model.howMany)"))
-            .accessibilityLabel(Text(AccessibilityNames.makeRoomHowMany))
+            .accessibilityLabel(Text(AccessibilityNames.makeRoomHowMany(noun: model.noun)))
             .accessibilityIdentifier("sectionVerbSheetHowMany")
         case .addClass:
             // One line per way, in the contract's order; a way this section
@@ -1079,7 +1079,7 @@ struct SectionVerbSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(sourceTableHeight)
-        .accessibilityLabel(Text(AccessibilityNames.sourceTable))
+        .accessibilityLabel(Text(AccessibilityNames.sourceTable(noun: model.noun)))
         .accessibilityIdentifier("sectionVerbSheetSourceTable")
     }
 
@@ -1162,7 +1162,7 @@ struct SectionVerbSheet: View {
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(laterClassesTableHeight)
-        .accessibilityLabel(Text(AccessibilityNames.laterClassesTable))
+        .accessibilityLabel(Text(AccessibilityNames.laterClassesTable(noun: model.noun)))
         .onKeyPress(.space) {
             if pickedLaterClassID == nil {
                 return .ignored

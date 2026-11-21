@@ -206,6 +206,22 @@ final class SectionVerbs {
         return line
     }
 
+    /// The "ran from a menu" counts for Add Class… (Add Meeting… in a club):
+    /// how the page was added, never its title (#897), in the course's noun
+    /// (#1027; `subjectMenus.layout.itemTitles.countsCases`).
+    static func addClassCounts(_ way: SubjectMenuRules.AddClassWay?, noun: ClassNoun) -> String {
+        switch way {
+        case .nextInThisUnit:
+            return AssistWording.addClassCountsNext(noun: noun)
+        case .inANewUnit:
+            return "in a new unit"
+        case .asACopyOfAClass:
+            return AssistWording.addClassCountsAsACopy(noun: noun)
+        case nil:
+            return ""
+        }
+    }
+
     static func noteRan(_ item: SubjectMenuRules.Item, ending: String, counts: String,
                         courseCode: String, sectionNumber: Int, noun: ClassNoun) {
         ActivityTrail.note(

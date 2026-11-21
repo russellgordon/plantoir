@@ -964,8 +964,8 @@ nonisolated enum AssistWording {
         + "any of it is in Plantoir's Backups list."
 
     /// A page that is not "Unit N, Day N" has no next day to become.
-    static func notANumberedClassPage(page: String) -> String {
-        return "“\(page)” isn’t a numbered class page, so there is no next day for it to become."
+    static func notANumberedClassPage(page: String, noun: ClassNoun = .class) -> String {
+        return "“\(page)” isn’t a numbered \(noun.singular) page, so there is no next day for it to become."
     }
 
     /// The copy's place is still occupied, so nothing was written over it.
@@ -980,15 +980,15 @@ nonisolated enum AssistWording {
     /// Two forms, the way Windows' has two: the backup is named when there is
     /// a name for it, because a teacher looking at a list of five backups is
     /// better off with the file than with the category.
-    static func thePlaceForTheCopyIsStillTaken(page: String, backupNamed name: String?) -> String {
+    static func thePlaceForTheCopyIsStillTaken(page: String, backupNamed name: String?, noun: ClassNoun = .class) -> String {
         var wayBack: String = "The copy of the course made before any of this is "
         if let name {
             wayBack += "\(name), in Plantoir's Backups list."
         } else {
             wayBack += "in Plantoir's Backups list."
         }
-        return "“\(page)” is still there — the class that had to move out of the way did not, and "
-             + "I will not write over a lesson. Nothing was copied, but other classes may already "
+        return "“\(page)” is still there — the \(noun.singular) that had to move out of the way did not, and "
+             + "I will not write over a lesson. Nothing was copied, but other \(noun.plural) may already "
              + "have moved. \(wayBack) Look the section over in Plantoir."
     }
 
@@ -1009,7 +1009,7 @@ nonisolated enum AssistWording {
     /// before any of this was known. Leaving that unsaid would let a teacher
     /// read "was not copied" as "nothing happened", twice over.
     static func theCopyCouldNotBeMadeHidden(
-        page: String, as copy: String, backupNamed name: String?
+        page: String, as copy: String, backupNamed name: String?, noun: ClassNoun = .class
     ) -> String {
         var wayBack: String = "The copy of the course made before any of this is "
         if let name {
@@ -1019,8 +1019,8 @@ nonisolated enum AssistWording {
         }
         return "“\(page)” was not copied — I could not be certain the copy would start hidden, "
              + "and a lesson students can already see must not turn up somewhere new where they "
-             + "can read it. A blank class page called “\(copy)” is waiting on that day instead, "
-             + "and it is hidden. Other classes may already have moved. \(wayBack) "
+             + "can read it. A blank \(noun.singular) page called “\(copy)” is waiting on that day instead, "
+             + "and it is hidden. Other \(noun.plural) may already have moved. \(wayBack) "
              + "Look the section over in Plantoir."
     }
 
@@ -1820,13 +1820,16 @@ nonisolated enum AssistWording {
     /// `add_classes` or its plan with no unit (#865). A missing unit used to
     /// send the call down the "next class" path, which planned one class
     /// after the last one in the section.
-    static let addClassesNeedsAUnit: String =
-        "No unit was named. Which unit should the class pages be added to? Give its number, for example 4."
+    static func addClassesNeedsAUnit(noun: ClassNoun = .class) -> String {
+        return "No unit was named. Which unit should the \(noun.singular) pages be added to? "
+             + "Give its number, for example 4."
+    }
 
     /// `add_classes` or its plan with no count, or a count below one (#865).
     /// A missing count used to be read as 0, with the same result.
-    static let addClassesNeedsACount: String =
-        "No number of class pages was given. How many should be added?"
+    static func addClassesNeedsACount(noun: ClassNoun = .class) -> String {
+        return "No number of \(noun.singular) pages was given. How many should be added?"
+    }
 
     /// A finished answer chose a tool that needs something this window cannot
     /// supply — which pages, which day, which time — and wrote nothing for it,
@@ -2510,8 +2513,10 @@ nonisolated enum AssistWording {
         return "Make room for \(noun.plural) in \(course) Section \(section)"
     }
 
-    static let menuPickPagesToPublish: String =
-        "Tick the pages to publish. The pages they link to are published with them, as far as the next class."
+    static func menuPickPagesToPublish(noun: ClassNoun = .class) -> String {
+        return "Tick the pages to publish. The pages they link to are published with them, as far as the next "
+             + "\(noun.singular)."
+    }
 
     static let menuPickPagesToHide: String =
         "Tick the pages to hide. Pages only they link to are hidden with them."
@@ -2864,10 +2869,12 @@ nonisolated enum AssistWording {
     /// stopped, shaped like `deployNeedsAnAnswer`: the question is answered
     /// once in the section's window, and the answer is remembered.
     /// `pages` is the classes, named a few at a time.
-    static func deployHasClassesDatedLater(course: String, section: String, pages: String, count: Int) -> String {
+    static func deployHasClassesDatedLater(
+        course: String, section: String, pages: String, count: Int, noun: ClassNoun = .class
+    ) -> String {
         let are: String = count == 1 ? "is" : "are"
         return "\(course) Section \(section) was not deployed, so nothing was sent to students: \(pages) "
-             + "\(are) published and dated after the next class, and the teacher is asked about that before "
+             + "\(are) published and dated after the next \(noun.singular), and the teacher is asked about that before "
              + "the section goes out. Deploy it once from its window in Plantoir, where the question can be "
              + "answered; after that it can be deployed from here."
     }
@@ -2882,10 +2889,12 @@ nonisolated enum AssistWording {
 
     /// The in-app assistant asked to deploy, and no window shows the section
     /// to ask in.
-    static func deployHasClassesDatedLaterAndNoWindow(course: String, section: String, pages: String, count: Int) -> String {
+    static func deployHasClassesDatedLaterAndNoWindow(
+        course: String, section: String, pages: String, count: Int, noun: ClassNoun = .class
+    ) -> String {
         let are: String = count == 1 ? "is" : "are"
         return "\(course) Section \(section) was not deployed: \(pages) \(are) published and dated after "
-             + "the next class. Deploy it from its window in Plantoir, where you are asked about that first."
+             + "the next \(noun.singular). Deploy it from its window in Plantoir, where you are asked about that first."
     }
 
     /// An assistant's write refused while the Section or Classes menu is
@@ -2896,5 +2905,71 @@ nonisolated enum AssistWording {
     static func sectionIsChangingFromTheMenu(course: String, section: String, noun: ClassNoun) -> String {
         return "\(course) Section \(section) is being changed from the \(SubjectMenuLayout.eitherMenu(noun: noun)) menu "
              + "right now, so nothing was changed. Try again once that has finished."
+    }
+
+    // MARK: - Trail counts, plan problems and the dates card, in the course's noun (#1027)
+
+    /// The "ran from a menu" counts for Add Class… (Add Meeting… in a club):
+    /// how the page was added, never its title (#897).
+    static func addClassCountsNext(noun: ClassNoun = .class) -> String {
+        return noun == .meeting ? "the next meeting" : "the next class in this unit"
+    }
+
+    static func addClassCountsAsACopy(noun: ClassNoun = .class) -> String {
+        return "as a copy of a \(noun.singular)"
+    }
+
+    /// The counts of the hide that Deploy's question about later classes
+    /// runs, for the "ran from a menu" line.
+    static func untickedAtDeployCounts(count: Int, noun: ClassNoun = .class) -> String {
+        let pages: String = count == 1 ? "1 \(noun.singular)" : "\(count) \(noun.plural)"
+        return "\(pages) dated later, unticked at Deploy"
+    }
+
+    /// A make-room plan's problem: the remembered dates run out.
+    static func timetableTooShortFrom(
+        needed: Int, from: String, has: Int, noun: ClassNoun = .class
+    ) -> String {
+        let missing: Int = needed - has
+        return "This needs \(needed) \(noun.singular) days from \(from) onwards and the timetable only has "
+             + "\(has). Add \(missing) more \(noun.singular) date\(missing == 1 ? "" : "s") and ask again."
+    }
+
+    static func timetableTooShortAfter(
+        count: Int, from: String, has: Int, noun: ClassNoun = .class
+    ) -> String {
+        let missing: Int = count - has
+        return "This needs \(count) \(noun.singular) day\(count == 1 ? "" : "s") after \(from) and the "
+             + "timetable only has \(has). Add \(missing) more \(noun.singular) date\(missing == 1 ? "" : "s") "
+             + "and ask again."
+    }
+
+    static func noDaysAfterTheLastPage(noun: ClassNoun = .class) -> String {
+        return "There are not enough \(noun.singular) days after the last page to move it onto. "
+             + "Add more \(noun.singular) dates and ask again."
+    }
+
+    /// An add-pages plan's problem: fewer unused dates than pages.
+    static func unusedDatesRunShort(free: Int, undated: Int, noun: ClassNoun = .class) -> String {
+        return "Only \(free) unused \(noun.singular) date\(free == 1 ? "" : "s") remain in the timetable, "
+             + "so the last \(undated) can’t be dated. Add more \(noun.singular) dates and ask again."
+    }
+
+    /// A make-room plan's problem: pages not named the course's way.
+    static func pagesNotNamedTheCoursesWay(count: Int, shape: String, noun: ClassNoun = .class) -> String {
+        let one: Bool = count == 1
+        return "\(count) \(noun.singular) page\(one ? " is" : "s are") not named “\(shape)”, so "
+             + "\(one ? "it was" : "they were") left where \(one ? "it is" : "they are") — including "
+             + "\(one ? "its" : "their") date."
+    }
+
+    /// The one-line summaries of `plan_remember_timetable` and
+    /// `remember_timetable`, which the teacher reads in the window.
+    static func workedOutTheClassDates(noun: ClassNoun = .class) -> String {
+        return "Worked out what recording those \(noun.singular) dates would do."
+    }
+
+    static func rememberedTheClassDates(count: Int, place: String, noun: ClassNoun = .class) -> String {
+        return "Remembered \(count) \(noun.singular) \(count == 1 ? "date" : "dates") for \(place)."
     }
 }

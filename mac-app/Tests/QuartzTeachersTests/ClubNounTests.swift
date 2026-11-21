@@ -564,4 +564,139 @@ final class ClubNounTests: XCTestCase {
         XCTAssertEqual(command?.toolName, "add_next_class")
         XCTAssertEqual(command?.arguments, ["duplicate": "Week 2"])
     }
+
+    // MARK: - #1027 round 3: every class sentence has its club form
+
+    /// The contract's wording, read from the file both apps read.
+    private func wordingFile() throws -> [String: Any] {
+        let url: URL = AssistantSetUpContractTests.contractsURL().appendingPathComponent("assist-wording.json")
+        return try XCTUnwrap(try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any])
+    }
+
+    /// Every key of the contract whose words say class has a club twin
+    /// (`…ForAMeeting`, or `…FromTheMeetingsMenu` for a `…FromTheMenu` key)
+    /// or is on `staysClass` with its reason; nothing stale is on that list.
+    /// MUST FAIL with any twin taken out of the table.
+    func testEveryClassSentenceInTheContractHasAClubFormOrAReason() throws {
+        let file: [String: Any] = try wordingFile()
+        let wording: [String: Any] = try XCTUnwrap(file["wording"] as? [String: Any])
+        let staysClass: [String: String] = try XCTUnwrap(file["staysClass"] as? [String: String])
+        var withoutAClubForm: [String] = []
+        var saidInClass: Int = 0
+        for (key, value) in wording {
+            if key.hasSuffix("ForAMeeting") || key.hasSuffix("FromTheMeetingsMenu") {
+                continue
+            }
+            guard let sentence = value as? String, saysClass(sentence) else {
+                continue
+            }
+            saidInClass += 1
+            var hasATwin: Bool = wording[key + "ForAMeeting"] != nil
+            if key.hasSuffix("FromTheMenu") {
+                hasATwin = hasATwin || wording[String(key.dropLast("FromTheMenu".count)) + "FromTheMeetingsMenu"] != nil
+            }
+            if !hasATwin && staysClass[key] == nil {
+                withoutAClubForm.append(key)
+            }
+        }
+        XCTAssertGreaterThan(saidInClass, 50)
+        XCTAssertEqual(withoutAClubForm.sorted(), [], "say class with no club form and no reason")
+        for (key, reason) in staysClass {
+            let sentence: String = try XCTUnwrap(wording[key] as? String, "staysClass names no key \(key)")
+            XCTAssertTrue(saysClass(sentence), "\(key) no longer says class")
+            XCTAssertNil(wording[key + "ForAMeeting"], "\(key) has a twin, so it is not an exception")
+            XCTAssertFalse(reason.isEmpty, key)
+        }
+    }
+
+    /// Review 2, MEDIUM 1: Add Meeting…'s trail counts say meeting
+    /// (`itemTitles.countsCases`), and so do the counts of Deploy's hide.
+    /// MUST FAIL with the counts said in the ordinary noun.
+    func testTheRanFromAMenuCountsSayMeetingInAClub() throws {
+        let layout: [String: Any] = try SubjectMenuLayoutTests.layout()
+        let itemTitles: [String: Any] = try XCTUnwrap(layout["itemTitles"] as? [String: Any])
+        let cases: [[String: String]] = try XCTUnwrap(itemTitles["countsCases"] as? [[String: String]])
+        XCTAssertEqual(cases.count, 5)
+        for testCase in cases {
+            let way: SubjectMenuRules.AddClassWay = try XCTUnwrap(SubjectMenuRules.AddClassWay(rawValue: testCase["way"] ?? ""))
+            let noun: ClassNoun = try XCTUnwrap(ClassNoun(rawValue: testCase["noun"] ?? ""))
+            XCTAssertEqual(SectionVerbs.addClassCounts(way, noun: noun), testCase["counts"])
+        }
+        XCTAssertEqual(
+            AssistWording.untickedAtDeployCounts(count: 3, noun: .meeting),
+            try contractSentence("untickedAtDeployCountsForAMeeting", course: "ROBOTICS", section: 1)
+        )
+        XCTAssertEqual(AssistWording.untickedAtDeployCounts(count: 1, noun: .meeting), "1 meeting dated later, unticked at Deploy")
+        let source: String = try String(
+            contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().appendingPathComponent("QuartzTeachers/Views/Section/SectionDetailVerbs.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("SectionVerbs.addClassCounts(model.way, noun: course.configuration.classNoun)"))
+        XCTAssertTrue(source.contains("AssistWording.untickedAtDeployCounts(count: hidden.count, noun: course.configuration.classNoun)"))
+    }
+
+    /// Review 2, MEDIUM 2: a make-room plan that runs out of dates tells a
+    /// club's teacher about meeting days and dates, on the card and in the
+    /// refusal, and the model the class form. MUST FAIL with the problem
+    /// typed in the class noun only.
+    func testAPlanShortOfDatesSaysMeetingToAClubsTeacher() async throws {
+        let club = try makeClub(noun: .meeting)
+        defer { try? FileManager.default.removeItem(at: club.root) }
+        let arguments: [String: Any] = ["course": "ICS3U", "section": 1, "unit": 2, "howMany": 60]
+
+        let plan: AssistToolOutcome = await run(club.runner, "plan_make_room_for_classes", arguments)
+        XCTAssertTrue(plan.forTheCard.contains("meeting days"), plan.forTheCard)
+        XCTAssertFalse(plan.forTheCard.contains("class day"), plan.forTheCard)
+        XCTAssertFalse(plan.forTheCard.contains("class date"), plan.forTheCard)
+        XCTAssertTrue(plan.detail.contains("class days"), plan.detail)
+
+        let write: AssistToolOutcome = await run(club.runner, "make_room_for_classes", arguments)
+        XCTAssertTrue(write.summary.contains("meeting date"), write.summary)
+        XCTAssertFalse(saysClass(write.summary), write.summary)
+        XCTAssertTrue(write.detail.contains("class date"), write.detail)
+
+    }
+
+    /// Review 2, low 4: the dates card and its summaries, and a refusal of
+    /// add_classes, say meeting to a club's teacher; the model reads class.
+    /// MUST FAIL with the card or a summary said in the ordinary noun.
+    func testTheDatesCardAndItsSummariesSayMeetingInAClub() async throws {
+        let club = try makeClub(noun: .meeting)
+        defer { try? FileManager.default.removeItem(at: club.root) }
+        let arguments: [String: Any] = [
+            "course": "ICS3U", "section": 1, "dates": ["2026-09-08", "2026-09-15", "2026-09-22"],
+        ]
+        let plan: AssistToolOutcome = await run(club.runner, "plan_remember_timetable", arguments)
+        XCTAssertEqual(plan.summary, try contractSentence("workedOutTheClassDatesForAMeeting", course: "ICS3U", section: 1))
+        XCTAssertTrue(plan.forTheCard.contains("meeting dates"), plan.forTheCard)
+        XCTAssertFalse(saysClass(plan.forTheCard), plan.forTheCard)
+        XCTAssertTrue(plan.detail.contains("class dates"), plan.detail)
+
+        let write: AssistToolOutcome = await run(club.runner, "remember_timetable", arguments)
+        XCTAssertEqual(write.summary, "Remembered 3 meeting dates for ICS3U Section 1.")
+        XCTAssertTrue(write.detail.contains("Remembered 3 class dates"), write.detail)
+
+        let none: AssistToolOutcome = await run(club.runner, "remember_timetable", ["course": "ICS3U", "section": 1, "dates": [String]()])
+        XCTAssertFalse(saysClass(none.summary), none.summary)
+        XCTAssertTrue(saysClass(none.detail), none.detail)
+
+        let noCount: AssistToolOutcome = await run(club.runner, "add_classes", ["course": "ICS3U", "section": 1, "unit": 2])
+        XCTAssertEqual(noCount.summary, try contractSentence("addClassesNeedsACountForAMeeting", course: "ICS3U", section: 1))
+        XCTAssertEqual(noCount.detail, try contractSentence("addClassesNeedsACount", course: "ICS3U", section: 1))
+    }
+
+    /// Review 2, low 3: what VoiceOver says on a club's sheets says meeting.
+    /// MUST FAIL with a name that keeps the class word in a club.
+    func testVoiceOverNamesSayMeetingInAClub() {
+        let names: [String] = [
+            AccessibilityNames.classDate(noun: .meeting), AccessibilityNames.classDates(noun: .meeting),
+            AccessibilityNames.makeRoomClass(noun: .meeting), AccessibilityNames.makeRoomHowMany(noun: .meeting),
+            AccessibilityNames.sourceTable(noun: .meeting), AccessibilityNames.laterClassesTable(noun: .meeting),
+        ]
+        XCTAssertEqual(names, ["Meeting date", "Meeting dates", "Meeting", "Number of meetings", "Meetings", "Later meetings"])
+        XCTAssertEqual(AccessibilityNames.classDates(), "Class dates")
+        XCTAssertEqual(AccessibilityNames.makeRoomHowMany(), "Number of classes")
+    }
+
 }
