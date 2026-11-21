@@ -132,11 +132,58 @@ mac's reason: a rename should not cost a teacher their website.
 
 ## Must-fail lines
 
-(Filled in below from the runs.)
+Each sabotage was a scratch commit on top of the branch (refs `mf911-g1` to
+`g7`, never pushed to `origin`), built and run on the first VM with
+`vm-tools/guest/911-mustfail.ps1` over `KeptCopiesTests`, `SectionSwapTests`,
+`RestoreKillTests` and `OneSectionRestoreContractTests` (26 tests). Several
+sabotages share a build only where they hit different tests. Green at the
+branch head: 207 of 207 over every class named in the brief's run rule.
+
+| Group | Behaviour reverted | Failed (test, line) |
+|---|---|---|
+| g1 | `RestoreBackup` back to `DiscardBuilds` (both paths) | `KeptCopiesTests.RestoringOverTheCourse…` :93, `RestoringACourseThatIsGone…` :109 |
+| g1 | the kept-copies folder kept even as a link | `KeptCopiesTests.EveryClearTheContractNamesKeepsTheCopiesItShould` (WalkOne :237) |
+| g1 | `CourseRenamer` without `MoveBuild` | `RenamingCarriesTheBuildsFolderToTheNewCode` :141, `ABuildsFolderThatIsALinkIsRemovedAsALinkOnRename…` :158 |
+| g1 | a shared folder removed since ignored | `OneSectionRestoreContractTests.EveryNamingCaseFindsTheContractsDifference` :95 |
+| g1 | `LeftAsItWas` reworded (a comma dropped) | `TheStoppedAndLeftSentencesAreTheContractsTemplates` :27 |
+| g2 | no way back (moves never undone) | `SectionSwapTests.AFolderHoldingAnOpenFile…` :68, `WhenEvenTheKeep…` :215, `AWayBack…` :166, the sweep (SweepOne :337) |
+| g2 | a deeper left-out name not kept | `ADeeperGitFolderThatWentAside…` :259 |
+| g2 | every kept folder said to hold something to open | `WithOnlyHiddenFilesLeftAside…` :194 |
+| g2 | `renameUnfinished` ignored by the offer | `EveryOfferCaseGivesTheContractsSection` :73 |
+| g2 | links checklist offer `leftAsItIs` instead of `discarded` | `TheFilesOutsideTheSectionAreTheContractsList` :45 |
+| g3 | the keep never moves the files to `_backups` | `AWayBack…` :171, `WithOnlyHiddenFilesLeftAside…` :199 |
+| g3 | left-out names in the section moved aside like the rest | `AGitFolderAndNodeModulesInTheSectionStayWhereTheyAre` :243 |
+| g3 | `restoring` and `.internal` never tidied | `ABackupWithoutTheSectionIsRefusedBeforeAnythingMoves` :86, `ARestoreThatFinishes…` :109, `AFolderHoldingAnOpenFile…` :69 |
+| g4 | staging under `%TEMP%` | `RestoreKillTests(setAside)`, `(move:1)`, `(move:3)` :72; `WhenEvenTheKeep…` :220; `ADeeperGit…` :259 |
+| g4 | a builds folder that is a link enumerated (clear and rename) | `ABuildsFolderThatIsItselfALinkIsNeverEnumerated` :176, `…RemovedAsALinkOnRename…` :159 |
+| g5 | delete first (the old `ReplaceContents` shape) | `RestoreKillTests(setAside)`, `(move:1)`, `(move:3)` :72, the sweep, `AFolderHoldingAnOpenFile…` :68, `AWayBack…` :166 and three more |
+| g5 | `ReadFacts` never reads the naming | `TheFactsAreReadFromTheZipsListing…` :109 |
+| g6 | the keep deletes the aside folder | the sweep (SweepOne :337), `AWayBack…` :166, `WithOnlyHiddenFilesLeftAside…` :199 |
+| g7 | `KeptCopiesFolderName` spelled otherwise | `KeptCopiesTests.TheFolderNameIsTheContracts` :56 |
+| g7 | `Restore(ArchivedItem)` keeps the kept copies | `RestoringFromArchivedStillDiscardsEverything` :128 |
+| g7 | `AssistSectionRestore` without its `StoppedPartWay` catch | `SectionSwapTests.AWayBackThatDoesNotFinish…` :166 (the window would have said "Nothing was put back:") |
+
+`RestoreKillTests(staged)` passes under every sabotage, by its nature: at
+`staged` nothing in the course has moved, so it holds only that staging moves
+nothing (it would fail on a restore that touched the course before checking
+the backup; none of the sabotages did that). It is kept as that check.
+`KeptCopiesTests.RestoringFromArchivedStillDiscardsEverything` passed either
+way at first (archiving had already discarded the build); it now plants a
+build after the archive and is proved by g7.
 
 ## The double-failure sweep
 
-(Filled in below from the run.)
+`SectionSwapTests.EveryDoubleFailureKeepsEveryOriginalAndTheMixesAreCounted`,
+the mac's shape (the move seam throws at forward move k and at way-back move
+j, every k from 2 and every j below k), on Windows' own fixture of the
+ASSISTANT route (no outside files): four live entries (one hidden, one a
+folder holding a deeper folder, one made since) and three backup entries, so
+seven forward moves and 21 cases. **Every original was kept in all 21**, in
+the section or the kept folder (asserted). **3 of 21 left `section2\` a mix**
+of original and backup files (first VM, five runs between 01:58 and 02:03,
+the same every time). The mac's 12 of 91 is the menu route on a larger fixture (four
+section files and six outside files, 14 forward moves); the menu route is
+step 3, not built, so the like-for-like count waits on it.
 
 ## Where this meets the Undo door
 
