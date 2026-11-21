@@ -160,11 +160,20 @@ enum SectionTimetableStore {
 
         /// That alert's message, naming each hidden file kept.
         static func keptMessage(_ keptOriginals: [String]) -> String {
-            var said: String = "Another program may have changed their file as they were saved."
+            var said: String = keptLead
             for kept in keptOriginals {
-                said += " What \(JournaledStepError.placeName(ofKept: kept)) held just before is kept beside it as the hidden file “\(kept)”."
+                said += " " + keptSentence(place: JournaledStepError.placeName(ofKept: kept), kept: kept)
             }
             return said
+        }
+
+        /// `shared-rules.json` → `undo.wording.classDatesKeptLead` (the U3
+        /// sweep, finding 5).
+        static let keptLead: String = "Another program may have changed their file as they were saved."
+
+        /// `undo.wording.classDatesKeptBesideIt`; `place` is already quoted.
+        static func keptSentence(place: String, kept: String) -> String {
+            return "What \(place) held just before is kept beside it as the hidden file “\(kept)”."
         }
     }
 

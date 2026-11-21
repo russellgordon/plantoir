@@ -374,41 +374,77 @@ enum FolderScaffold {
         return "---\n" + lines.joined(separator: "\n") + rest
     }
 
-    /// Writes the pages for a folder added later — only into the folders in
-    /// `newFolders`, the ones this click has just made, and never over a file
-    /// that is already there (`.withoutOverwriting`, so even a page that
-    /// appeared in between is left alone). A folder that already existed is
-    /// a teacher's, and nothing is put into it.
-    nonisolated static func writePages(
+    /// Plans each folder Add folder makes, with the pages that go in it,
+    /// into `step` as ONE `createTree` per folder (#899 U4a): the folder
+    /// (and any folder above it inside the course that is not there yet)
+    /// with exactly Plantoir's pages, made whole or not at all, never over
+    /// anything. An Undo takes a folder out only while it still holds just
+    /// what Plantoir put there (#986 ruling 7). Pages for a folder that is
+    /// not new are left out: a folder already there is the teacher's.
+    nonisolated static func planPages(
         _ pages: [Page],
         intoNewFolders newFolders: [URL],
-        courseDirectory: URL
+        courseDirectory: URL,
+        into step: JournaledStep
     ) -> Outcome {
         var outcome: Outcome = Outcome()
         outcome.foldersCreated = newFolders.count
-        var newFolderPaths: Set<String> = []
+        // Each tree by the folder it is made at: the highest folder of the
+        // new one's path that is not there yet.
+        var treeOrder: [String] = []
+        var treeRoot: [String: URL] = [:]
+        var treeFolders: [String: [String]] = [:]
+        var treeFiles: [String: [String: Data]] = [:]
+        var rootOfNewFolder: [String: (key: String, inside: String)] = [:]
+        let coursePath: String = courseDirectory.standardizedFileURL.path
         for folder in newFolders {
-            newFolderPaths.insert(folder.standardizedFileURL.path)
+            var root: URL = folder.standardizedFileURL
+            var parent: URL = root.deletingLastPathComponent()
+            while parent.path.hasPrefix(coursePath + "/") && !FileManager.default.fileExists(atPath: parent.path) {
+                root = parent
+                parent = root.deletingLastPathComponent()
+            }
+            let key: String = root.path
+            if treeRoot[key] == nil {
+                treeOrder.append(key)
+                treeRoot[key] = root
+                treeFolders[key] = []
+                treeFiles[key] = [:]
+            }
+            var inside: String = ""
+            let folderPath: String = folder.standardizedFileURL.path
+            if folderPath != key {
+                inside = String(folderPath.dropFirst(key.count + 1))
+                var walked: String = ""
+                for part in inside.split(separator: "/") {
+                    walked = walked.isEmpty ? String(part) : walked + "/" + String(part)
+                    if !(treeFolders[key] ?? []).contains(walked) {
+                        treeFolders[key]?.append(walked)
+                    }
+                }
+            }
+            rootOfNewFolder[folderPath] = (key: key, inside: inside)
         }
         for page in pages {
             let pageURL: URL = courseDirectory.appendingPathComponent(page.relativePath)
             let folderPath: String = pageURL.deletingLastPathComponent().standardizedFileURL.path
-            if !newFolderPaths.contains(folderPath) {
+            guard let place = rootOfNewFolder[folderPath] else {
                 continue
             }
-            do {
-                try Data(page.text.utf8).write(to: pageURL, options: [.withoutOverwriting])
-            } catch {
-                // A page already there is the teacher's and stays; a genuine
-                // failure leaves the folder as it was before #506 — empty —
-                // which the build reports in its own words.
-                continue
-            }
-            if pageURL.lastPathComponent == templateFileName {
+            let name: String = pageURL.lastPathComponent
+            let pathInTree: String = place.inside.isEmpty ? name : place.inside + "/" + name
+            treeFiles[place.key]?[pathInTree] = Data(page.text.utf8)
+            if name == templateFileName {
                 outcome.templatesWritten += 1
             } else {
                 outcome.indexPagesWritten += 1
             }
+        }
+        for key in treeOrder {
+            guard let root = treeRoot[key] else {
+                continue
+            }
+            step.makeTree(at: root, folders: treeFolders[key] ?? [], files: treeFiles[key] ?? [:])
         }
         return outcome
     }
