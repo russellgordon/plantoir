@@ -464,6 +464,12 @@ struct CourseSettingsView: View {
             // folder may have saved. Never over unsaved edits (issue #265).
             course.configuration.reloadIfNothingUnsaved(url: course.configFileURL)
         }
+        .task {
+            // Start the How I Teach Page… makes a step on the main actor:
+            // the list is read off it while the settings are open (#899,
+            // ruling 8 on U1's third round; the first review of U3a, LOW 6).
+            await JournaledStep.readTheListAhead()
+        }
         .onChange(of: controlActiveState) { oldState, newState in
             if newState == .key {
                 marksWalkGeneration += 1

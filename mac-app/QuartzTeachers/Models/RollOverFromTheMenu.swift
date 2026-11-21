@@ -1,6 +1,6 @@
 import Foundation
 
-/// Section ▸ Roll Over to a New Year… (#897 piece B): the one rule that
+/// Classes ▸ Roll Over to a New Year… (#897 piece B): the one rule that
 /// decides what its sheet asks about the website, and what its call sends.
 ///
 /// The built-in assistant asks the website question in words, and its

@@ -375,7 +375,10 @@ enum AssistCurriculumMentions {
 
     /// Write the transclusions the plan describes into the page, and hand back
     /// the whole file before and after so `undo_last_change` can take it back.
-    static func apply(_ plan: AssistCurriculumMentionsPlan) throws -> AssistChange {
+    static func apply(
+        _ plan: AssistCurriculumMentionsPlan,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("addCurriculumMentions")
+    ) throws -> AssistChange {
         let before: String = try String(contentsOf: plan.fileURL, encoding: .utf8)
         let lineEnd: String = before.contains("\r\n") ? "\r\n" : "\n"
 
@@ -404,7 +407,12 @@ enum AssistCurriculumMentions {
             }
         }
 
-        try after.write(to: plan.fileURL, atomically: true, encoding: .utf8)
+        // One step through the door (#899, U3).
+        let step: JournaledStep = JournaledStep(
+            courseCode: plan.courseCode, fileInside: plan.fileURL, section: plan.sectionNumber, maker: maker
+        )
+        step.write(after, to: plan.fileURL)
+        try step.make()
 
         let word: String = plan.adding.count == 1 ? "expectation" : "expectations"
         return AssistChange(

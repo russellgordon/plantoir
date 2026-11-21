@@ -495,7 +495,7 @@ public sealed partial class SidebarPane : UserControl
                 {
                     Title = item.Title,
                     Glyph = RestoreGlyph,
-                    Tooltip = item.Subtitle,
+                    Tooltip = item.SubtitleFor(Workspace.ClassNounOf(item.CourseCode)),
                     Selection = new SidebarSelection.BackupEntry(item.Id),
                     AutomationId = $"backup-{Path.GetFileName(item.FilePath)}",
                 };
@@ -531,7 +531,7 @@ public sealed partial class SidebarPane : UserControl
                     group.Tooltip = BackupsSummarySentence(summary);
                     foreach (var (item, bytes) in task.Result)
                         if (rows.FirstOrDefault(r => r.Selection is SidebarSelection.BackupEntry(var id) && id == item.Id) is { } row)
-                            row.Tooltip = $"{item.Subtitle} · " +
+                            row.Tooltip = $"{item.SubtitleFor(Workspace.ClassNounOf(item.CourseCode))} · " +
                                 (bytes is { } b ? BackupSizes.Describe(b) : AssistWording.BackupSizeCouldNotBeRead);
                 });
             });
@@ -612,7 +612,7 @@ public sealed partial class SidebarPane : UserControl
             string who = item.Maker switch
             {
                 BackupMaker.Assistant a => $"Assistant, Section {a.SectionNumber}",
-                BackupMaker.Menu m => $"Section menu, Section {m.SectionNumber}",
+                BackupMaker.Menu m => $"{SubjectMenuLayout.Title(m.InMenu, Workspace.ClassNounOf(item.CourseCode))} menu, Section {m.SectionNumber}",
                 _ => "You",
             };
             string[] cells = { item.CourseCode, item.WhenDescription, who,
@@ -1186,7 +1186,7 @@ public sealed partial class SidebarPane : UserControl
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
 
         // Only shown when there is one to cancel. A permanently greyed-out
-        // "Remove Scheduled Deploy…" on every section would teach teachers to
+        // "Remove Scheduled Deploy" on every section would teach teachers to
         // ignore the line, which is the opposite of what it is for.
         // Scheduling without going through the assistant: the same act, and
         // most teachers setting a 6:30 deploy know exactly what they want and
@@ -1247,7 +1247,7 @@ public sealed partial class SidebarPane : UserControl
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
-        AddRemoval(menu, row, SubjectMenuRules.Item.RemoveSection, "Remove Section…");
+        AddRemoval(menu, row, SubjectMenuRules.Item.RemoveSection, "Remove Section");   // no ellipsis since #990: it only confirms
 
         // Read when the menu OPENS, never captured at render — the staleness
         // lesson from row 104, which cost a live debugging session.
@@ -1595,7 +1595,7 @@ public sealed partial class SidebarPane : UserControl
     private void Add_Click(object sender, RoutedEventArgs e) => _ = OpenNewCourseWizard();
 
     /// <summary>
-    /// The − button runs Remove Course… or Remove Section… through the menu
+    /// The − button runs Remove Course… or Remove Section through the menu
     /// bar's guard (#491 item 5): greyed where the item is, so on a section of
     /// a course kept for reference it does nothing — it used to remove the
     /// whole course there. A backup or an archive is never −'s to delete.
@@ -1609,13 +1609,13 @@ public sealed partial class SidebarPane : UserControl
     /// <summary>Remove Course… — from the menu bar, the row's menu, the − button and the Delete key alike.</summary>
     internal Task ConfirmRemoveCourse(Course course) => ConfirmRemove(course, null);
 
-    /// <summary>Remove Section… — from the menu bar, the row's menu, the − button and the Delete key alike.</summary>
+    /// <summary>Remove Section — from the menu bar, the row's menu, the − button and the Delete key alike.</summary>
     internal Task ConfirmRemoveSection(Course course, int section) => ConfirmRemove(course, section);
 
     /// <summary>
     /// Remove a course, or one of its sections, after asking: the footer's
     /// minus button, the Delete key, the rows' menus, Course > Remove Course…
-    /// and Section > Remove Section… (#488, #491) all come here, so they ask
+    /// and Section > Remove Section (#488, #491) all come here, so they ask
     /// the same question.
     /// </summary>
     private async Task ConfirmRemove(Course course, int? sectionNumber)
@@ -1626,7 +1626,7 @@ public sealed partial class SidebarPane : UserControl
 
         // A reference course's section is never removed on its own
         // (interface.whatIsWithheld: "Remove Section N (removing the whole
-        // course stays)"). Every route greys Remove Section… there; this guards
+        // course stays)"). Every route greys Remove Section there; this guards
         // a caller that skipped the rule. Until #491 the − button turned a
         // section's removal into the WHOLE course's here, silently.
         if (sectionNumber is not null && ReferenceCourse.IsKeptForReference(course)) return;

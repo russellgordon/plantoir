@@ -1,7 +1,7 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// Section ▸ Roll Over to a New Year… (#897 piece B), the two safety rules
+/// Classes ▸ Roll Over to a New Year… (#897 piece B), the two safety rules
 /// the implementation review asked for, kept in a class of their own so
 /// each can be proven red on the code before the fixes:
 ///

@@ -68,7 +68,7 @@ The same command moves a course you taught before onto this year's dates. Give t
 
 Choose {{menu:undoLastChange}}. Re-dating is one change, and it is put back as one.
 
-- This works while re-dating is still the last change made from the Section menu in this window.
+- This works while re-dating is still the last change made from the Section or Classes menu in this window.
 - A page you have edited since is left alone.
 - Undo does not change a website that is already deployed. Deploy again when you want it to match.
 
@@ -81,4 +81,4 @@ The copy saved before the change is in Plantoir's list of backups. See [Back up 
   Give the dates, and Re-date Classes carries on.
 - **The answer says every page is already on its day.** Nothing needed to move. Check that you gave the new dates first.
 - **Only the pages classes use were re-dated.** Every class was already on its day.
-- **{{menu:reDateClasses}} is greyed.** The course is kept for reference, or the section is busy with a deploy, a backup or another command from the Section menu.
+- **{{menu:reDateClasses}} is greyed.** The course is kept for reference, or the section is busy with a deploy, a backup or another command from the Section or Classes menu.

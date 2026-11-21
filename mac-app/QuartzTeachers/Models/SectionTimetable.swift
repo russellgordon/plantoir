@@ -127,6 +127,11 @@ enum SectionTimetableStore {
         case halfRemembered(String, Int, [String])
         case cannotBeClassDates(String, Int, [String])
         case couldNotWrite(String, Int, String)
+        /// The dates went in, but what the file held just before could not
+        /// be put back over them after a check, so it is kept beside it
+        /// under each hidden name (`JournaledStepError.leftPartWay`; the
+        /// third review of U3a, LOW 2). The dates ARE remembered.
+        case savedWithWhatItHeldKept(String, Int, [String])
 
         var errorDescription: String? {
             switch self {
@@ -140,7 +145,26 @@ enum SectionTimetableStore {
                 return "\(SectionTimetableStore.list(offenders)) \(offenders.count == 1 ? "is too far from today to be a class date" : "are too far from today to be class dates"), so nothing was remembered for \(code) Section \(number). A half-remembered timetable would date the wrong classes, so the whole list is refused — send it again with \(offenders.count == 1 ? "that date" : "those dates") corrected."
             case .couldNotWrite(let code, let number, let reason):
                 return "The class dates for \(code) Section \(number) could not be saved, so they are NOT remembered: \(reason)"
+            case .savedWithWhatItHeldKept(let code, let number, let keptOriginals):
+                return Problem.rememberedTitle(code, number) + " " + Problem.keptMessage(keptOriginals)
             }
+        }
+
+        /// The title of the one alert the Class Dates sheet shows when the
+        /// dates went in part way (#899 U3c's first review, LOW 6, after
+        /// Russell's ruling for today's class): a complete sentence, so
+        /// sentence-style capitals and a full stop (the HIG's Alerts page).
+        static func rememberedTitle(_ code: String, _ number: Int) -> String {
+            return "The class dates for \(code) Section \(number) are remembered."
+        }
+
+        /// That alert's message, naming each hidden file kept.
+        static func keptMessage(_ keptOriginals: [String]) -> String {
+            var said: String = "Another program may have changed their file as they were saved."
+            for kept in keptOriginals {
+                said += " What \(JournaledStepError.placeName(ofKept: kept)) held just before is kept beside it as the hidden file “\(kept)”."
+            }
+            return said
         }
     }
 
@@ -387,7 +411,12 @@ enum SectionTimetableStore {
     /// Write the dates down. The plan is trusted because the plan is the only
     /// thing that can make one — every list has already been through
     /// `checkedDates`.
-    static func applyRememberTimetable(_ plan: RememberTimetablePlan) throws {
+    ///
+    /// One step through the door (#899, U3): "remember timetable".
+    static func applyRememberTimetable(
+        _ plan: RememberTimetablePlan,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("rememberTimetable")
+    ) throws {
         var datesText: [String] = []
         for date in plan.dates {
             datesText.append(date.text)
@@ -399,17 +428,25 @@ enum SectionTimetableStore {
         values["source"] = plan.source
         values["recorded"] = plan.recorded.text
 
-        let fileManager: FileManager = FileManager.default
         do {
-            try fileManager.createDirectory(
-                at: plan.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
-            )
             // Key order is alphabetical, which neither reader minds — both
             // look keys up by name.
             let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             var data: Data = try JSONSerialization.data(withJSONObject: values, options: options)
             data.append(contentsOf: [0x0A])
-            try data.write(to: plan.fileURL, options: [.atomic])
+            let step: JournaledStep = JournaledStep(
+                courseCode: plan.courseCode, fileInside: plan.fileURL, section: plan.sectionNumber, maker: maker
+            )
+            step.write(data, to: plan.fileURL)
+            try step.make()
+        } catch JournaledStepError.leftPartWay(let refusal, let fileName, let keptOriginals) {
+            // The dates went in and what the file held could not be put
+            // back over them: carried through as it is, so every caller says
+            // what is true, never "NOT remembered" (the third review of U3a,
+            // LOW 2). The assistant says it as part way
+            // (`saidWhenTheStepStopped`); the sheet as remembered
+            // (`Problem.savedWithWhatItHeldKept`).
+            throw JournaledStepError.leftPartWay(refusal, fileName: fileName, keptOriginals: keptOriginals)
         } catch {
             throw Problem.couldNotWrite(plan.courseCode, plan.sectionNumber, error.localizedDescription)
         }

@@ -42,7 +42,7 @@ description: Add Class makes the page for a section's next class. It can be the 
 2. Choose {{menu:addClass}} from the menu bar. A sheet opens and asks how the new class should be added.
 
 {{picture:add-next-class-1}}
-alt: The Section menu open, with Add Class marked.
+alt: The Classes menu open, with Add Class marked.
 
 {{picture:add-next-class-3}}
 alt: The sheet that asks how the new class should be added, with its three ways and the Add button.
@@ -84,7 +84,7 @@ The copy holds everything the first page held. Change what differs in Obsidian, 
 - **The first word follows your course.** Where units are called Module or Thread, the sheet and the new page use that word. See [Change what units are called](page:unit-word).
 - **A club's pages carry one number.** After Week 9 comes Week 10. A missing number earlier in the list is not filled in. A club has no units, so the way that starts a new unit is greyed, and the sheet speaks of meetings.
 
-Each use of {{menu:addClass}} adds one page. The Section menu has no command that adds several days at once.
+Each use of {{menu:addClass}} adds one page. The Classes menu has no command that adds several days at once.
 
 ## If the section has no class dates yet
 
@@ -98,13 +98,13 @@ Give the dates there. When you press {{control:rememberTheseDates}}, the sheet t
 
 Select the section and choose {{menu:undoLastChange}}. The new page is deleted, unless you have written in it since. A page you have changed is kept, and the sheet says so. This is the same for all three ways.
 
-This works while adding the page is still the last change made from the Section menu in this window. [Show or hide pages for a section](page:publish-pages) has the rules for Undo Last Change.
+This works while adding the page is still the last change made from the Section or Classes menu in this window. [Show or hide pages for a section](page:publish-pages) has the rules for Undo Last Change.
 
 The copy of the course that Plantoir saved first is in its list of backups. See [Back up a course and restore it](page:backups).
 
 ## If it does not work
 
-- **{{menu:addClass}} is greyed.** The course may be kept for reference. Or the section is busy. It is being deployed, a copy of the course is being saved, or another command from the Section menu is still running in this window.
+- **{{menu:addClass}} is greyed.** The course may be kept for reference. Or the section is busy. It is being deployed, a copy of the course is being saved, or another Section or Classes command is still running here.
 - **A way on the sheet is greyed.** A line under the ways says why. There are three reasons.
   - The course has no units:
     {{say:assist-wording#wording.menuAddClassGreyedNoUnits}}

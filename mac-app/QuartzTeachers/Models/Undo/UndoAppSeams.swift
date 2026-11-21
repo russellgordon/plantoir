@@ -85,6 +85,156 @@ nonisolated enum UndoTrail {
                 UndoTrail.rolledBackLine(course: course, section: section, phase: phase, files: files)
             )
         }
+        UndoTrailHook.couldNotPutBackLine = { course, section, phase, leftPartWay, keptOriginals in
+            ActivityTrail.note(
+                .undoCouldNotPutBack,
+                UndoTrail.couldNotPutBackLine(course: course, section: section, phase: phase, leftPartWay: leftPartWay, keptOriginals: keptOriginals)
+            )
+        }
+        UndoTrailHook.keptAnOriginalLine = { course, section, phase, keptOriginals, noLongerInTheList in
+            ActivityTrail.note(
+                .undoKeptAnOriginal,
+                UndoTrail.keptAnOriginalLine(
+                    course: course, section: section, phase: phase,
+                    keptOriginals: keptOriginals, noLongerInTheList: noLongerInTheList
+                )
+            )
+        }
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow in
+            ActivityTrail.note(
+                .undoKeptWhatItReplaced,
+                UndoTrail.keptWhatItReplacedLine(
+                    course: course, section: section, isUndo: isUndo,
+                    keptOriginals: keptOriginals, keptOfWhatItHoldsNow: keptOfWhatItHoldsNow
+                )
+            )
+        }
+        UndoTrailHook.leftNewestLine = { course, section, isUndo, refusal in
+            ActivityTrail.note(
+                .undoRefusedForAChangeLeftPartWay,
+                UndoTrail.leftNewestLine(course: course, section: section, isUndo: isUndo, refusal: refusal)
+            )
+        }
+    }
+
+    /// `ICS3U/1 · the undo list could not put back 2 files left part way by
+    /// a change that stopped, because what it needs to put them back is no
+    /// longer in the list, and cleared the list. What “A.md” held before is
+    /// kept beside it as the hidden file “.A.md.plantoir-undo-4-apply-orig”.`
+    /// One sentence per kept original; none when nothing is kept.
+    static func couldNotPutBackLine(course: String, section: Int?, phase: UndoPhase, leftPartWay: Int, keptOriginals: [String]) -> String {
+        var line: String = UndoTrail.prefix(course: course, section: section)
+        let counted: String = leftPartWay == 1 ? "1 file" : "\(leftPartWay) files"
+        line += "the undo list could not put back \(counted) left part way by \(UndoTrail.what(phase)) that stopped, "
+        line += "because what it needs to put \(leftPartWay == 1 ? "it" : "them") back is no longer in the list, and cleared the list."
+        for kept in keptOriginals {
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”."
+        }
+        return line
+    }
+
+    /// `ICS3U/1 · the undo list settled a change that stopped. What “A.md”
+    /// held before is kept beside it as the hidden file
+    /// “.A.md.plantoir-undo-4-apply-orig”, because it differs from what the
+    /// list recorded.` For a kept original in `noLongerInTheList` (its bytes
+    /// exactly what the list recorded) the reason is `because the list no
+    /// longer holds a copy of it.` (the first review of U3c, LOW 2).
+    static func keptAnOriginalLine(
+        course: String, section: Int?, phase: UndoPhase, keptOriginals: [String], noLongerInTheList: [String] = []
+    ) -> String {
+        var line: String = UndoTrail.prefix(course: course, section: section)
+        line += "the undo list settled \(UndoTrail.what(phase)) that stopped."
+        for kept in keptOriginals {
+            let because: String = noLongerInTheList.contains(kept)
+                ? "because the list no longer holds a copy of it"
+                : "because it differs from what the list recorded"
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”, \(because)."
+        }
+        return line
+    }
+
+    /// `ICS3U/1 · Undo put back “A.md” from what was kept beside it, but the
+    /// list could not keep a copy of all it needs for this change, so what
+    /// it could not keep stays beside the page, and the next Undo or Redo of
+    /// this change uses it. What “A.md” held a moment before is kept beside
+    /// it as the hidden file “.A.md.plantoir-undo-4-undo-orig”.` A kept
+    /// original it put back whose bytes the list would not take is said as
+    /// `What “A.md” holds now is kept beside it as the hidden file “…”.`
+    /// Nothing is said to be withheld or cleared: the step stays on the
+    /// list with both directions offered (Russell's ruling of 2026-11-20,
+    /// night; the second review of U3c, MEDIUM and LOW 1).
+    static func keptWhatItReplacedLine(
+        course: String, section: Int?, isUndo: Bool, keptOriginals: [String], keptOfWhatItHoldsNow: [String] = []
+    ) -> String {
+        var places: [String] = []
+        for kept in keptOriginals + keptOfWhatItHoldsNow {
+            let place: String = JournaledStepError.placeName(ofKept: kept)
+            if !places.contains(place) {
+                places.append(place)
+            }
+        }
+        let which: String = isUndo ? "Undo" : "Redo"
+        let what: String = places.isEmpty ? "a page" : places.joined(separator: ", ")
+        var line: String = UndoTrail.prefix(course: course, section: section)
+        line += "\(which) put back \(what) from what was kept beside it, but the list could not keep a copy of all it needs for this change, "
+        line += "so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it."
+        for kept in keptOriginals {
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) held a moment before is kept beside it as the hidden file “\(kept)”."
+        }
+        for kept in keptOfWhatItHoldsNow {
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) holds now is kept beside it as the hidden file “\(kept)”."
+        }
+        return line
+    }
+
+    /// `ICS3U/1 · Undo was refused: a change that stopped part way could not
+    /// be put back yet, because courses/ICS3U/Section 1/Classes/A.md is in
+    /// use by another program. The list is kept, and the next Undo tries
+    /// again.`
+    static func leftNewestLine(course: String, section: Int?, isUndo: Bool, refusal: UndoRefusal) -> String {
+        let which: String = isUndo ? "Undo" : "Redo"
+        var why: String
+        switch refusal {
+        case .fileIsInUse(let path):
+            why = "\(path) is in use by another program"
+        case .cannotTellNow(let path):
+            why = "\(path) could not be read just now"
+        case .couldNotWrite(let path):
+            why = "nothing could be written beside \(path) (the disk may be full)"
+        case .changedSince(let path, _):
+            why = "\(path) changed while it was being put back"
+        case .contentMissing(let path):
+            why = "what it needs for \(path) is no longer in the list"
+        case .notReadable:
+            why = "it holds something this version cannot read"
+        }
+        return UndoTrail.prefix(course: course, section: section)
+            + "\(which) was refused: a change that stopped part way could not be put back yet, because \(why). "
+            + "The list is kept, and the next \(which) tries again."
+    }
+
+    /// `ICS3U/1 · `, `ICS3U · `, or nothing when there is no course.
+    static func prefix(course: String, section: Int?) -> String {
+        if course.isEmpty {
+            return ""
+        }
+        var line: String = course
+        if let section {
+            line += "/\(section)"
+        }
+        return line + " · "
+    }
+
+    /// "a change", "an undo" or "a redo": the work that stopped.
+    static func what(_ phase: UndoPhase) -> String {
+        switch phase {
+        case .begin:
+            return "a change"
+        case .undoing:
+            return "an undo"
+        case .redoing:
+            return "a redo"
+        }
     }
 
     /// `ICS3U/1 · the undo list could not record publishPages: the list was

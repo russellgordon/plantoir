@@ -203,7 +203,7 @@ struct MainWindowView: View {
                 ContentUnavailableView {
                     Label(item.title, systemImage: item.symbolName)
                 } description: {
-                    Text("\(item.subtitle)\(backupSizeClause(for: item)). A saved copy of \(item.courseCode) — restore it to put the course back the way it was then. \(item.keptDescription) You can delete any of them yourself.")
+                    Text("\(item.subtitle(noun: workspace.classNoun(ofCourse: item.courseCode)))\(backupSizeClause(for: item)). A saved copy of \(item.courseCode) — restore it to put the course back the way it was then. \(item.keptDescription(noun: workspace.classNoun(ofCourse: item.courseCode))) You can delete any of them yourself.")
                 } actions: {
                     Button("Restore…") {
                         workspace.backupRestoreRequest = item

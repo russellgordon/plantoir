@@ -30,6 +30,20 @@ struct QuartzTeachersApp: App {
             FileHandle.standardError.write(Data(("Plantoir: could not create the state folder: \(error)\n").utf8))
             exit(64)
         }
+        #if DEBUG
+        // A test through the real window asking for a change to go in part
+        // way (#899 U3c); only with --state-dir, never in a release build.
+        UndoUITestSeam.installIfAsked(arguments: CommandLine.arguments)
+        if let recordURL = UndoUITestSeam.showInFinderRecord(arguments: CommandLine.arguments) {
+            FolderActions.showInFinderRecorder = { files in
+                var lines: String = ""
+                for file in files {
+                    lines += file.path + "\n"
+                }
+                try? lines.write(to: recordURL, atomically: true, encoding: .utf8)
+            }
+        }
+        #endif
 
         // Claude Code drives the same tools the built-in assistant does, by
         // launching this binary with --mcp-stdio. Checked FIRST, and it never
@@ -125,15 +139,18 @@ struct QuartzTeachersApp: App {
             }
             // The menu bar reads Plantoir · File · Edit · View · Course ·
             // Section · Window · Help (#457). File works with no window open;
-            // View carries the preview's Back, Forward and Reload Page; Course
-            // and Section carry every action on a course or a section, which
-            // the context menus and buttons also reach. Edit is the system's
+            // View carries the preview's Back, Forward and Reload Page; Course,
+            // Section and Classes carry every action on a course or a section,
+            // which the context menus and buttons also reach. Classes follows
+            // Section (#990, grouping A): courses hold sections, sections hold
+            // classes, and SubjectMenuLayout says which items each holds. Edit is the system's
             // own again: Rename moved to Course, where a teacher looks for
             // "do something to this course".
             FileCommands(openWindow: openWindow)
             ViewCommands()
             CourseMenu()
-            SectionMenu()
+            SectionMenu(layout: .section)
+            SectionMenu(layout: .classes)
             // Plantoir Help opens plantoir.app's support page, in place of
             // the system's "Help isn't available" (#457, the HIG sweep).
             CommandGroup(replacing: .help) {

@@ -43,6 +43,13 @@ LONGEST = 40
 STEPS_KEPT = 50
 DAYS_KEPT = 30
 CONTRACT = Path(__file__).resolve().parent.parent / "contracts" / "undo-traces.json"
+# U3: each daily page action's step, recorded by the Mac from the real action
+# code (UndoActionStepsTests writes it; never typed by hand), from which the
+# action traces below are made: ACTION_TRACES_PER_STEP traces per step.
+ACTION_STEPS = Path(__file__).resolve().parent.parent / "contracts" / "undo-action-steps.json"
+ACTION_TRACES_PER_STEP = 6
+ACTION_SHORTEST = 2
+ACTION_LONGEST = 12
 
 # --------------------------------------------------------------------------
 # The fixture: one section's pages, each a shape the line model must handle.
@@ -734,15 +741,35 @@ def external_state(op, current):
     return "neither"
 
 
-def plan(ops, backward, pages_by_path, content_missing=False):
-    """UndoCheck.plan: ('ready', {path: new text or None}), ('changedSince',
-    first, others), or ('contentMissing', path) when a whole-file op needs a
-    blob and the list's content is gone (`content_missing`)."""
+def plan(ops, backward, pages_by_path, content_missing=False, available=None, used=None, leaves_apart=False):
+    """UndoCheck.plan: ('ready', {path: new text or None}, left_apart),
+    ('changedSince', first, others), or ('contentMissing', path) when a
+    whole-file op needs a blob and the list's content is gone
+    (`content_missing`). `available(path, text)` says whether a text the
+    list's content no longer holds can still be had (written back since, or
+    a kept original beside the page whose hash matches: Russell's ruling of
+    2026-11-20, 15:20); each such use is added to `used` as (path, text
+    taken, text the page held, the other text). With `leaves_apart` (an
+    Undo or a Redo, never the making of a step), a `moveApart` found changed
+    since is left where it is and named in left_apart, and the rest goes
+    ahead (U3b, Russell's ruling of 2026-11-19 on Q3), as is an external op
+    on a scheduledDeploy. The step's moveApart ops (a section's website
+    records) go as a GROUP: when any one is changed since, every one not
+    already where it is wanted is left apart (the director's decision of
+    2026-11-20, on #899). A `setAside` (a leftover no deploy reads) stands
+    apart ON ITS OWN, never one of that group (the review of U3b's fixes,
+    LOW 3). A move, a moveApart or a setAside needs no blob (it is a
+    rename, judged by its hash), so no kept original is ever looked for
+    for one (the merge of U3b and U3c)."""
     ordered = list(reversed(ops)) if backward else list(ops)
+    group_stays_apart = leaves_apart and any(
+        op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
+    )
     original = {}
     working = {}
     in_the_way = []
     whole_changes = {}
+    left_apart = []
     wanted_from = "after" if backward else "before"
     linked = pages_by_path.get(LINKED_OUTSIDE, set())
     for op in ordered:
@@ -762,7 +789,13 @@ def plan(ops, backward, pages_by_path, content_missing=False):
             # Judged whole against what is there (opKinds.wholeOps).
             state = whole_state(op, pages_by_path)
             place = op.get("path") or op.get("from") or op.get("target")
+            if group_stays_apart and kind == "moveApart" and state in ("neither", wanted_from):
+                left_apart.append(place)
+                continue
             if state == "neither":
+                if leaves_apart and stands_apart(op):
+                    left_apart.append(place)
+                    continue
                 if place not in in_the_way:
                     in_the_way.append(place)
                 continue
@@ -788,7 +821,11 @@ def plan(ops, backward, pages_by_path, content_missing=False):
         if op["kind"] == "writeFile":
             target = op["beforeText"] if backward else op["afterText"]
             if content_missing and target is not None:
-                return ("contentMissing", path)
+                if available is None or not available(path, target):
+                    return ("contentMissing", path)
+                if used is not None:
+                    other = op["afterText"] if backward else op["beforeText"]
+                    used.append((path, target, working[path], other))
             working[path] = target
         elif kind == "replaceText":
             moved = hunk_moved(op, backward, working[path])
@@ -815,11 +852,44 @@ def plan(ops, backward, pages_by_path, content_missing=False):
         if original[path] != working[path]:
             changes[path] = working[path]
     changes.update(whole_changes)
-    return ("ready", changes)
+    return ("ready", changes, left_apart)
 
 
-WHOLE_KINDS = ("move", "createTree", "removeTree", "external")
+WHOLE_KINDS = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
+SCHEDULED_DEPLOY = "scheduledDeploy:"
+
+
+def stands_apart(op):
+    """UndoOp.standsApart: a moveApart, a setAside, or an external op on a
+    deploy set for later."""
+    if op["kind"] in ("moveApart", "setAside"):
+        return True
+    return op["kind"] == "external" and op.get("target", "").startswith(SCHEDULED_DEPLOY)
+
+
+def set_or_leave_apart(model, result):
+    """The swap of an Undo or a Redo (UndoSwap.swap's leaveApart): a deploy
+    set for later that cannot be set now (launchd refuses it, or the write
+    is off the main thread: `refuses_schedules`) is left as it is and named
+    after what the check left apart; the rest goes in."""
+    changes = {}
+    left_apart = list(result[2])
+    model.starts_at_the_next_login = []
+    for path, text in result[1].items():
+        if model.refuses_schedules and path.startswith(SCHEDULED_DEPLOY):
+            left_apart.append(path)
+            continue
+        if model.schedules_start_at_the_next_login and path.startswith(SCHEDULED_DEPLOY) and text is not None:
+            # Back on disk, not started now: it starts at the next login,
+            # named so, never as left apart (the re-review of U3b's fixes,
+            # LOW 2; UndoExternalWrite.startsAtTheNextLogin).
+            model.starts_at_the_next_login.append(path)
+        changes[path] = text
+    return changes, left_apart
 LINKED_OUTSIDE = "\0linkedOutside"
+# What a deploy after a rollover onto a new website writes in the place the
+# marker left (an action trace's `deploy` call, U3b).
+DEPLOYED_MARKER = "{\"site_id\": \"this-year\"}"
 
 
 def page_item(value):
@@ -834,7 +904,7 @@ def page_item(value):
 
 def whole_state(op, pages):
     kind = op["kind"]
-    if kind == "move":
+    if kind in ("move", "moveApart", "setAside"):
         return move_state(op, page_item(pages.get(op["from"])), page_item(pages.get(op["to"])))
     if kind in ("createTree", "removeTree"):
         return tree_state(op, page_item(pages.get(op["path"])))
@@ -846,7 +916,7 @@ def whole_state(op, pages):
 
 def whole_moved(op, backward, pages):
     kind = op["kind"]
-    if kind == "move":
+    if kind in ("move", "moveApart", "setAside"):
         source, destination = (op["to"], op["from"]) if backward else (op["from"], op["to"])
         return {destination: pages.get(source), source: None}
     if kind in ("createTree", "removeTree"):
@@ -914,9 +984,25 @@ class Model:
         self.newest_written = None
         self.unreachable = set()   # working folders that cannot be reached
         self.content_removed = False   # the list's content/ was taken away
+        # U3c: texts written back into the list after its content was taken
+        # away, the kept originals beside each page ({path: [text, ...]}),
+        # whether the list takes new content, and how many 'undo kept what
+        # it replaced' lines were written.
+        self.stored = set()
+        self.kept = {}
+        self.content_cannot_be_stored = False
+        # The second review of U3c: texts whose blob alone is gone from the
+        # list, and texts the list will not take again.
+        self.removed_texts = set()
+        self.unstorable_texts = set()
+        self.kept_what_it_replaced_lines = 0
+        self.kept_unreadable = False   # every kept original cannot be read now
         self.maintainer_registered = True   # UndoMaintainers has a runner
         self.linked_outside = set()   # folders replaced by a link to outside
         self.rederived = 0   # how many times a recompute's runner ran
+        self.refuses_schedules = False   # every write to a scheduledDeploy fails
+        self.schedules_start_at_the_next_login = False   # a scheduledDeploy set back is not started now
+        self.starts_at_the_next_login = []   # what the last undo or redo named so
 
     # -- the fold -----------------------------------------------------
 
@@ -1055,6 +1141,36 @@ class Model:
         self.finish(seq)
         return ("applied", seq)
 
+    def files_step(self, changes, recomputes, moves=()):
+        """JournaledWrite.perform(UndoStepDraft): one action's files, each
+        before and after, as ops (lines where they reproduce the change,
+        otherwise the whole file), in the order the action planned them,
+        the recompute ops last. ('applied', seq, ops) or ('changedNothing',)."""
+        ops = []
+        for path, before, after in changes:
+            if before == after:
+                continue
+            ops.extend(ops_for_change(path, before, after))
+        for moved in moves:
+            # U3b: each file moved, after the files (JournaledStep's order).
+            ops.append({"kind": "moveApart" if moved.get("standsApart") else "move",
+                        "from": moved["from"], "to": moved["to"], "sha": sha(moved["content"])})
+        if not ops:
+            return ("changedNothing",)
+        for kept in recomputes:
+            ops.append({"kind": "recompute", "path": kept["path"], "maintainer": kept["maintainer"],
+                        "section": kept.get("section")})
+        seq = self.begin(ops)
+        for path, before, after in changes:
+            if after is None:
+                self.pages.pop(path, None)
+            else:
+                self.pages[path] = after
+        for moved in moves:
+            self.pages[moved["to"]] = self.pages.pop(moved["from"])
+        self.finish(seq)
+        return ("applied", seq, ops)
+
     def holds_a_recompute(self, step):
         return any(op["kind"] == "recompute" for op in step["ops"])
 
@@ -1150,7 +1266,14 @@ class Model:
             return ("notAvailable",)
         if self.holds_a_recompute(undo) and not self.maintainer_registered:
             return ("notAvailable",)
-        result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed)
+        used = []
+        result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_missing(),
+                      self.available, used, leaves_apart=True)
+        used = self.taken_from_kept_originals(used)
+        if result[0] == "contentMissing" and self.kept_unreadable and self.kept.get(result[1]):
+            # A kept original that cannot be read may be the one: cannot
+            # tell now, the list kept (the first review of U3c, LOW 5).
+            return ("cannotTellNow", result[1])
         if result[0] == "contentMissing" and not UNDO_REFUSED_FOR_MISSING_CONTENT_CLEARS:
             return result
         if result[0] in ("changedSince", "contentMissing"):
@@ -1158,14 +1281,21 @@ class Model:
                 self.clear()
                 self.prune()
             return result
+        changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
-            self.write(result[1])
+            not_whole = self.store_what_kept_originals_give(used)
+            self.write(changes)
             if self.holds_a_recompute(undo):
                 self.rederived += 1
             undo["phase"] = "undone"
             self.write_line()
+            self.tidy_kept_copies()
+            if not_whole:
+                # The Redo stays offered, resting on what is kept beside the
+                # page (Russell's ruling of 2026-11-20, night).
+                self.kept_what_it_replaced_lines += 1
             self.prune()
-        return ("undone", undo["seq"])
+        return ("undone", undo["seq"], left_apart)
 
     def redo(self, dry=False):
         _, candidate, _ = self.offer()
@@ -1179,7 +1309,10 @@ class Model:
             return ("notAvailable",)
         if self.holds_a_recompute(candidate) and not self.maintainer_registered:
             return ("notAvailable",)
-        result = plan(candidate["ops"], False, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed)
+        used = []
+        result = plan(candidate["ops"], False, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_missing(),
+                      self.available, used, leaves_apart=True)
+        used = self.taken_from_kept_originals(used)
         if result[0] in ("changedSince", "contentMissing"):
             if not dry:
                 # Ruling 20: refused once, then only the redo branch goes.
@@ -1188,14 +1321,80 @@ class Model:
                         step["phase"] = "dropped"
                 self.write_line()
             return result
+        changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
-            self.write(result[1])
+            not_whole = self.store_what_kept_originals_give(used)
+            self.write(changes)
             if self.holds_a_recompute(candidate):
                 self.rederived += 1
             candidate["phase"] = "done"
             self.write_line()
+            self.tidy_kept_copies()
+            if not_whole:
+                # Its Undo stays offered, resting on what is kept beside the
+                # page; cleared only if it is refused then (Russell's ruling
+                # of 2026-11-20, night).
+                self.kept_what_it_replaced_lines += 1
             self.prune()
-        return ("redone", candidate["seq"])
+        return ("redone", candidate["seq"], left_apart)
+
+    def content_missing(self):
+        """Whether any content the list held is gone: all of it, or one blob."""
+        return self.content_removed or bool(self.removed_texts)
+
+    def in_the_list(self, text):
+        """Whether the list's content holds this text now."""
+        if text in self.stored:
+            return True
+        return not self.content_removed and text not in self.removed_texts
+
+    def storable(self, text):
+        """Whether the list would take this text now."""
+        return not self.content_cannot_be_stored and text not in self.unstorable_texts
+
+    def available(self, path, text):
+        """Content the step needs: in the list, written back since, or a
+        kept original beside its page that can be read now."""
+        if self.in_the_list(text):
+            return True
+        return not self.kept_unreadable and text in self.kept.get(path, [])
+
+    def taken_from_kept_originals(self, used):
+        """Of the plan's uses, those the list itself could not give: only
+        those are taken from a kept original."""
+        return [use for use in used if not self.in_the_list(use[1])]
+
+    def store_what_kept_originals_give(self, used):
+        """Before the swap (the first review of U3c, MEDIUM): the kept
+        original's text, and what the page held as the other direction's
+        text when it is exactly that, written back into the list. True when
+        anything could not be: what the page held is then kept beside it,
+        and a kept original whose own text the list would not take stays
+        (the second review's MEDIUM: `tidy_kept_copies` keeps it)."""
+        not_whole = False
+        for path, taken, outgoing, other in used:
+            if self.storable(taken):
+                self.stored.add(taken)
+            else:
+                not_whole = True
+            if other is None or self.in_the_list(other):
+                continue
+            if outgoing == other and self.storable(outgoing):
+                self.stored.add(outgoing)
+                continue
+            not_whole = True
+            self.kept.setdefault(path, []).append(outgoing)
+        return not_whole
+
+    def tidy_kept_copies(self):
+        """A kept original whose page holds the same text is a copy: gone,
+        unless the list does not hold that text (the second review of U3c,
+        MEDIUM)."""
+        for path in list(self.kept):
+            self.kept[path] = [text for text in self.kept[path]
+                               if text != self.pages.get(path) or not self.in_the_list(text)]
+            if not self.kept[path]:
+                del self.kept[path]
 
     def write(self, changes):
         for path, text in changes.items():
@@ -1321,6 +1520,8 @@ def one_trace(rng, number):
         call = {"call": "undo", "expect": outcome[0]}
         if outcome[0] == "undone":
             call["seq"] = outcome[1]
+            if outcome[2]:
+                call["leftApart"] = outcome[2]
         if outcome[0] == "changedSince":
             call["page"] = page_named(outcome[1])
             call["others"] = outcome[2]
@@ -1335,6 +1536,8 @@ def one_trace(rng, number):
         call = {"call": "redo", "expect": outcome[0]}
         if outcome[0] == "redone":
             call["seq"] = outcome[1]
+            if outcome[2]:
+                call["leftApart"] = outcome[2]
         if outcome[0] == "changedSince":
             call["page"] = page_named(outcome[1])
             call["others"] = outcome[2]
@@ -1346,6 +1549,135 @@ def one_trace(rng, number):
     hand_edited = any(call["call"] == "handEdit" for call in calls)
     return {"name": "trace-%03d" % number, "handEdits": hand_edited, "calls": calls,
             "afterUndoingAll": undone_to, "final": final_hashes(model)}
+
+
+def read_action_steps(path=None):
+    """The recorded steps, or [] before the Mac has recorded any."""
+    source = ACTION_STEPS if path is None else path
+    if not source.exists():
+        return []
+    document = json.loads(source.read_bytes().decode("utf-8"))
+    return document.get("steps", [])
+
+
+def action_trace(rng, recorded, number):
+    """One trace of a recorded action step: the step made from the files it
+    names (their befores, an empty list), then undos, redos, hand edits of
+    its files and notes, then the closing undos and redos."""
+    files = recorded["files"]
+    paths = [entry["path"] for entry in files]
+    moves = recorded.get("moves", [])
+    pages = {}
+    for entry in files:
+        if entry["before"] is not None:
+            pages[entry["path"]] = entry["before"]
+    for moved in moves:
+        pages[moved["from"]] = moved["content"]
+        paths.extend([moved["from"], moved["to"]])
+    apart = [moved for moved in moves if moved.get("standsApart")]
+    model = Model(pages=dict(pages))
+    calls = []
+    changes = [(entry["path"], entry["before"], entry["after"]) for entry in files]
+    outcome = model.files_step(changes, recorded.get("recomputes", []), moves)
+    call = {"call": "action", "step": recorded["name"], "expect": outcome[0]}
+    if outcome[0] == "applied":
+        call["seq"] = outcome[1]
+        call["ops"] = [op["kind"] for op in outcome[2]]
+    call.update(model.summary())
+    calls.append(call)
+
+    length = rng.randint(ACTION_SHORTEST, ACTION_LONGEST)
+    attempts = 0
+    while len(calls) < length and attempts < length * 20:
+        attempts += 1
+        roll = rng.random()
+        if apart and roll >= 0.65 and roll < 0.75:
+            # U3b: a deploy writes a new marker in the place a rollover's
+            # marker left (when it is free), and nothing to the list.
+            place = apart[0]["from"]
+            if model.pages.get(place) is not None:
+                continue
+            model.pages[place] = DEPLOYED_MARKER
+            call = {"call": "deploy", "path": place, "text": DEPLOYED_MARKER}
+            call.update(model.summary())
+            calls.append(call)
+            continue
+        if roll < 0.35:
+            outcome = model.undo()
+            call = {"call": "undo", "expect": outcome[0]}
+            if outcome[0] == "undone":
+                call["seq"] = outcome[1]
+                if outcome[2]:
+                    call["leftApart"] = outcome[2]
+            if outcome[0] == "changedSince":
+                call["path"] = outcome[1]
+                call["others"] = outcome[2]
+                call["clearedTheList"] = True
+        elif roll < 0.65:
+            outcome = model.redo()
+            call = {"call": "redo", "expect": outcome[0]}
+            if outcome[0] == "redone":
+                call["seq"] = outcome[1]
+                if outcome[2]:
+                    call["leftApart"] = outcome[2]
+            if outcome[0] == "changedSince":
+                call["path"] = outcome[1]
+                call["others"] = outcome[2]
+                call["droppedTheRedo"] = True
+        elif roll < 0.90:
+            kind = rng.choice(["body", "body", "otherKey", "sameLine", "deletePage"])
+            path = rng.choice(paths)
+            if not model.hand_edit_path(kind, path):
+                continue
+            call = {"call": "handEdit", "kind": kind, "path": path}
+        else:
+            model.note()
+            call = {"call": "note"}
+        call.update(model.summary())
+        calls.append(call)
+
+    while True:
+        outcome = model.undo()
+        call = {"call": "undo", "expect": outcome[0]}
+        if outcome[0] == "undone":
+            call["seq"] = outcome[1]
+            if outcome[2]:
+                call["leftApart"] = outcome[2]
+        if outcome[0] == "changedSince":
+            call["path"] = outcome[1]
+            call["others"] = outcome[2]
+            call["clearedTheList"] = True
+        call.update(model.summary())
+        calls.append(call)
+        if outcome[0] != "undone":
+            break
+    undone_to = path_hashes(model, paths)
+    while True:
+        outcome = model.redo()
+        call = {"call": "redo", "expect": outcome[0]}
+        if outcome[0] == "redone":
+            call["seq"] = outcome[1]
+            if outcome[2]:
+                call["leftApart"] = outcome[2]
+        if outcome[0] == "changedSince":
+            call["path"] = outcome[1]
+            call["others"] = outcome[2]
+            call["droppedTheRedo"] = True
+        call.update(model.summary())
+        calls.append(call)
+        if outcome[0] != "redone":
+            break
+    hand_edited = any(call["call"] == "handEdit" for call in calls)
+    return {"name": "action-%03d" % number, "step": recorded["name"], "handEdits": hand_edited,
+            "calls": calls, "afterUndoingAll": undone_to, "final": path_hashes(model, paths)}
+
+
+def path_hashes(model, paths):
+    result = {}
+    for path in paths:
+        text = model.pages.get(path)
+        result[path] = None if text is None else sha(text)
+    return result
 
 
 def archived(path):
@@ -1368,9 +1700,16 @@ def final_hashes(model):
     return result
 
 
-def generate(seed=SEED, count=TRACE_COUNT):
+def generate(seed=SEED, count=TRACE_COUNT, steps=None):
     rng = random.Random(seed)
     traces = [one_trace(rng, number + 1) for number in range(count)]
+    if steps is None:
+        steps = read_action_steps()
+    action_rng = random.Random(seed * 1000 + 3)
+    action_traces = []
+    for recorded in steps:
+        for _ in range(ACTION_TRACES_PER_STEP):
+            action_traces.append(action_trace(action_rng, recorded, len(action_traces) + 1))
     return {
         "note": "Generated by scripts/make_undo_traces.py (seed %d) - never edited by hand; run it again instead, and commit what it writes. Each trace starts from `fixture` in an empty working folder with an empty list; write each page from utf8Hex, its exact bytes (`text` is the same page for reading, but at least one JSON reader, Foundation's, drops a byte-order mark inside a string). A `step` sets each named page's top-level `key` to the exact `line` with JournaledWrite.settingEntry's rule (the entry replaced when the key is there once, inserted after the opening fence when it is not, a block made when the page has none, the page left alone when the key is there twice or the page is gone), and is recorded through the app's own door. `expect` is what the call must come to; `head` and `redo` are the step numbers the folded list must answer after it (null: none). `afterUndoingAll` is every page's SHA-256 (null: absent) once the closing run of undos has stopped; `final` the same after the closing run of redos. A `note` call appends one neutral note line (file-formats.json -> undoJournal.events.note: its seq the highest in the journal, with keys a reader does not know) and must change nothing. A `move` call (U2) moves the named page to `to`, in the section's Archive folder, as one `move` op (file-formats.json -> undoJournal.opKinds.move: from the page's path, its `sha` the SHA-256 of the page's bytes now) made through the door that plans a step's ops forward (the mac's JournaledWrite.perform(ops:)); a step or hand edit naming a page that is not at its path leaves it alone. A refused undo clears the list (clearedTheList); a refused redo drops only the redo branch (droppedTheRedo, ruling 20). A trace with no hand edits must end its undos exactly at the fixture. Rules: contracts/shared-rules.json -> undo." % seed,
         "seed": seed,
@@ -1378,6 +1717,8 @@ def generate(seed=SEED, count=TRACE_COUNT):
                     for page_id, path, text, shape in FIXTURE],
         "fixtureHashes": {page_id: sha(START[page_id]) for page_id in PAGE_IDS},
         "traces": traces,
+        "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
+        "actionTraces": action_traces,
     }
 
 
@@ -1405,6 +1746,23 @@ def render(document):
         lines.append("    }")
         traces.append("\n".join(lines))
     out.append(",\n".join(traces))
+    out.append("  ],")
+    out.append('  "actionNote": %s,' % json.dumps(document["actionNote"], ensure_ascii=False))
+    out.append('  "actionTraces": [')
+    action_traces = []
+    for trace in document["actionTraces"]:
+        lines = ["    {"]
+        lines.append('      "name": %s,' % json.dumps(trace["name"]))
+        lines.append('      "step": %s,' % json.dumps(trace["step"]))
+        lines.append('      "handEdits": %s,' % json.dumps(trace["handEdits"]))
+        lines.append('      "calls": [')
+        lines.append(",\n".join("        " + json.dumps(call, ensure_ascii=False) for call in trace["calls"]))
+        lines.append("      ],")
+        lines.append('      "afterUndoingAll": %s,' % json.dumps(trace["afterUndoingAll"], ensure_ascii=False))
+        lines.append('      "final": %s' % json.dumps(trace["final"], ensure_ascii=False))
+        lines.append("    }")
+        action_traces.append("\n".join(lines))
+    out.append(",\n".join(action_traces))
     out.append("  ]")
     out.append("}")
     return ("\n".join(out) + "\n").encode("utf-8")
@@ -1427,7 +1785,8 @@ def main(arguments):
         print("PLANTOIR_UNDO_FUZZ is set: use --print, so the committed traces stay the seeded ones.")
         return 2
     CONTRACT.write_bytes(data)
-    print("wrote %s (%d traces, %d bytes)" % (CONTRACT.name, len(generate(seed)["traces"]), len(data)))
+    made = generate(seed)
+    print("wrote %s (%d traces, %d action traces, %d bytes)" % (CONTRACT.name, len(made["traces"]), len(made["actionTraces"]), len(data)))
     return 0
 
 

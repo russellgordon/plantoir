@@ -811,6 +811,18 @@ nonisolated enum AssistWording {
         + "It may still try to deploy, and it has no way to ask what the new website should be "
         + "called — turn it off from the section's menu."
 
+    /// Undo (or Redo) of a rollover put a deploy set for later back, and
+    /// the computer would not start it now (the re-review of U3b's fixes,
+    /// LOW 2). Its file is back where it is read at login, so it starts the
+    /// next time the teacher logs in, and not before: it will not run at its
+    /// time unless they log out and back in first. Neither "it is back"
+    /// (it will not run at its time) nor "it stays off" (it will run) is
+    /// true, so it has a sentence of its own, for U7 to say beside the Undo.
+    static let undoScheduleStartsAtTheNextLogin: String =
+        "The deploy set for later is back, but it could not be started now. "
+        + "It starts the next time you log in, so it will not run at its time "
+        + "unless you log out and back in before then."
+
     // MARK: - Getting a section ready for the start of the year (#96)
 
     /// An outside assistant called `prepare_for_start_of_year` without the
@@ -2291,9 +2303,13 @@ nonisolated enum AssistWording {
 
     /// Undo Last Change with nothing to undo — greyed in the menu, so this is
     /// said only when the change went away between drawing the menu and the click.
+    /// Undo Last Change takes back a change from either menu, so this names
+    /// both (#990, "name the real menu"). With nothing to undo there is no
+    /// course to read a club's noun from, so it names the menus as an
+    /// ordinary course titles them; the item leaves with #899 U7.
     static let nothingToUndoFromTheMenu: String =
-        "Nothing has been changed from the Section menu in this window yet, so there is nothing to "
-        + "undo. Anything older is in Plantoir's Backups list."
+        "Nothing has been changed from the \(SubjectMenuLayout.eitherMenu(noun: .class)) menu in this window yet, so there is "
+        + "nothing to undo. Anything older is in Plantoir's Backups list."
 
     /// The section changed while its copy was being saved (#351), so the
     /// plan no longer fits and nothing was written.
@@ -2444,7 +2460,7 @@ nonisolated enum AssistWording {
     // #897: what only the built-in assistant's window could do before,
     // in the menu's voice. The window's own sentences are unchanged.
 
-    /// Section ▸ Add Class…'s sheet: its title, the question, and one
+    /// Classes ▸ Add Class…'s sheet: its title, the question, and one
     /// line per way (`SubjectMenuRules.AddClassWay`), in the sheet's order.
     static func menuAddClassTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
         return "Add a \(noun.singular) to \(course) Section \(section)"
@@ -2512,13 +2528,22 @@ nonisolated enum AssistWording {
     /// The menu item is titled Class Dates… in every course, a club
     /// included, and a club's sentences never say "class"
     /// (`ClubNounTests.testEveryMeetingKeyHasItsClassTwin`), so a club is
-    /// pointed at the Section menu without the item's title.
+    /// pointed at the menu without the item's title. Since #990 the item is
+    /// in the Classes menu, which a club's menu bar titles Meetings
+    /// (Russell's ruling on #990, 2026-11-20 evening: "in a club the menu
+    /// itself is titled Meetings, on both platforms, so no sentence a club's
+    /// teacher reads says 'class'"), so a club is pointed at the Meetings
+    /// menu. The menu Class Dates… is in, from the layout.
+    static var classDatesMenu: SubjectMenuLayout.Menu {
+        return SubjectMenuLayout.menu(containing: .classDates) ?? .classes
+    }
+
     static func menuNeedsClassDatesFirst(noun: ClassNoun = .class) -> String {
         let firstSentence: String = "This section has no \(noun.singular) dates on file, so nothing was copied."
         if noun == .meeting {
-            return firstSentence + " Add them from the Section menu, then try again."
+            return firstSentence + " Add them from the \(SubjectMenuLayout.title(of: classDatesMenu, noun: noun)) menu, then try again."
         }
-        return firstSentence + " Add them with Section ▸ Class Dates…, then try again."
+        return firstSentence + " Add them with \(SubjectMenuLayout.title(of: classDatesMenu, noun: noun)) ▸ Class Dates…, then try again."
     }
 
     /// The third way: a copy of one of this section's classes.
@@ -2568,7 +2593,7 @@ nonisolated enum AssistWording {
              + "course's settings, then choose this again."
     }
 
-    // #897 piece B: Section ▸ Roll Over to a New Year…, the rollover the
+    // #897 piece B: Classes ▸ Roll Over to a New Year…, the rollover the
     // built-in assistant's window asks about in words, in the menu's voice.
     // The window's own sentences are unchanged.
 
@@ -2587,15 +2612,15 @@ nonisolated enum AssistWording {
     }
 
     /// The last date on file is before today: probably last year's. A club
-    /// is pointed at the Section menu without the item's title, which says
+    /// is pointed at the Meetings menu without the item's title, which says
     /// "Class" (`menuNeedsClassDatesFirst` does the same).
     static func menuRollOverDatesAreOld(noun: ClassNoun = .class) -> String {
         let firstSentence: String = "The last of these dates has passed, so they may be last year's."
         if noun == .meeting {
             return firstSentence + " To give this year's meeting dates, cancel and add them from the "
-                 + "Section menu first."
+                 + "\(SubjectMenuLayout.title(of: classDatesMenu, noun: noun)) menu first."
         }
-        return firstSentence + " To give this year's class dates, cancel and choose Section ▸ Class Dates… first."
+        return firstSentence + " To give this year's class dates, cancel and choose \(SubjectMenuLayout.title(of: classDatesMenu, noun: noun)) ▸ Class Dates… first."
     }
 
     /// The question's two answers, under `rolloverWebsiteQuestion`.
@@ -2764,10 +2789,13 @@ nonisolated enum AssistWording {
              + "the next class. Deploy it from its window in Plantoir, where you are asked about that first."
     }
 
-    /// An assistant's write refused while the Section menu is changing the
-    /// same section (#457's ruling: the menu has its own claim).
-    static func sectionIsChangingFromTheMenu(course: String, section: String) -> String {
-        return "\(course) Section \(section) is being changed from the Section menu right now, so nothing "
-             + "was changed. Try again once that has finished."
+    /// An assistant's write refused while the Section or Classes menu is
+    /// changing the same section (#457's ruling: the menu has its own claim).
+    /// The claim does not say which menu, so this names both (#990), by the
+    /// titles the course's menu bar gives them: "the Section or Meetings
+    /// menu" in a club, whose sentences never say "class".
+    static func sectionIsChangingFromTheMenu(course: String, section: String, noun: ClassNoun) -> String {
+        return "\(course) Section \(section) is being changed from the \(SubjectMenuLayout.eitherMenu(noun: noun)) menu "
+             + "right now, so nothing was changed. Try again once that has finished."
     }
 }

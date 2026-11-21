@@ -33,6 +33,11 @@ struct SidebarMenuCommands: Equatable {
     /// When the selected section deploys on its own, for the Cancel item's title.
     var scheduledFor: Date?
 
+    /// What the selected course calls its class pages, for the Classes
+    /// menu's title: Meetings in a club (#990, Russell, 2026-11-20 evening).
+    /// It greys nothing, so it is not part of the situation the rules read.
+    var classNoun: ClassNoun
+
     /// Runs an item on whatever is selected when it runs.
     var perform: (SubjectMenuRules.Item) -> Void
 
@@ -41,6 +46,7 @@ struct SidebarMenuCommands: Equatable {
     static func == (left: SidebarMenuCommands, right: SidebarMenuCommands) -> Bool {
         return left.situation == right.situation
             && left.scheduledFor == right.scheduledFor
+            && left.classNoun == right.classNoun
     }
 }
 
