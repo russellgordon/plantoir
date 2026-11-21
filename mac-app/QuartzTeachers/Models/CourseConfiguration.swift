@@ -1903,6 +1903,57 @@ class CourseConfiguration {
         }
     }
 
+    /// `recordOnDisk` PLANNED into `step` instead of written (#899 U4b, the
+    /// folder rename): `change` applied to ONE read of the file, the read the
+    /// plan is built from and the step's `before`, and each top-level member
+    /// it changes one `editJSON` (U4a review 1, LOW 1: a `writeFile` below a
+    /// Save's `editJSON` steps is refused by the Save's Undo, by design, so no
+    /// writer of this file plans one but the fallback). A file whose bytes
+    /// the member rule cannot move is planned whole, as `planWrite` plans it.
+    /// Nothing is written until the caller makes the step; then
+    /// `finishRecord` records the change in this copy. Throws, planning
+    /// nothing, when the file cannot be read as one JSON object, as
+    /// `recordOnDisk` does.
+    func planRecordOnDisk(
+        _ change: ([String: Any]) -> [String: Any], at url: URL, into step: JournaledStep
+    ) throws -> PlannedWrite {
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let place: URL = CourseConfiguration.fileALinkLeadsTo(url)
+        let read: Data = try Data(contentsOf: place)
+        guard let onDisk = try JSONSerialization.jsonObject(with: read) as? [String: Any] else {
+            throw CourseConfigurationError.notADictionary
+        }
+        let changed: [String: Any] = change(onDisk)
+        guard let members = CourseConfiguration.memberChanges(from: read, to: changed) else {
+            var whole: Data = try JSONSerialization.data(withJSONObject: changed, options: options)
+            whole.append(contentsOf: [0x0A])
+            step.editJSON(at: place, read: read, members: [], leaving: whole)
+            return PlannedWrite(url: url, result: WriteResult(), values: changed, bytes: whole, memberKeys: [])
+        }
+        var keys: [String] = []
+        for member in members.changes {
+            keys.append(member.keyPath[0])
+        }
+        if !members.changes.isEmpty {
+            step.editJSON(at: place, read: read, members: members.changes, leaving: members.bytes)
+        }
+        return PlannedWrite(url: url, result: WriteResult(), values: changed, bytes: members.bytes, memberKeys: keys)
+    }
+
+    /// Once the caller's step is made: the file is what this copy last
+    /// read (read again, as `finishWrite` reads it), and `change` is
+    /// applied to this copy's values, so every other unsaved edit stays
+    /// unsaved, as `recordOnDisk` leaves them.
+    func finishRecord(_ planned: PlannedWrite, _ change: ([String: Any]) -> [String: Any]) {
+        if let data = try? Data(contentsOf: planned.url), CourseConfiguration.decodedDictionary(data) != nil {
+            lastSavedData = data
+        } else {
+            lastSavedData = planned.bytes
+        }
+        values = change(values)
+        WorkspaceModel.followWrite(of: self, at: planned.url)
+    }
+
     /// What Course Settings' Revert button does: the settings as the FILE
     /// has them now, not as this copy last read them (issue #265).
     ///

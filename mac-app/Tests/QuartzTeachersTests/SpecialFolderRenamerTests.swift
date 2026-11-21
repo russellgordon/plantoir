@@ -540,3 +540,4 @@ final class SpecialFolderRenamerTests: XCTestCase {
         return FileManager.default.fileExists(atPath: url.path)
     }
 }
+

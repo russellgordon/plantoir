@@ -22306,6 +22306,28 @@ the switch stays off. Rename folder through the door is NOT in this part
   `wholeOps` forbids), and a removeTree with a createTree (they overlap the
   same way).
 
+### U4b, third part: Rename folder is one step (#899)
+
+**What it is.** Course Settings' Rename folder (`CourseSettingsView.renameFolder`) is ONE step, key `renameFolder`, made through the door: every folder's `move` first (one per section that has the folder, for a per-section folder), then every page whose qualified links change, inside the moved folder (named at its new place, so the move carries it, `opKinds.wholeOps`) and outside it, then one `editJSON` per `course_config.json` member `SpecialFolderRenamer.renaming` changes (`CourseConfiguration.planRecordOnDisk`, the planning form of `recordOnDisk`). All of it goes in or none of it does.
+
+**How it is planned.** `SpecialFolderRenamer.plan` reads the disk OFF the main actor and writes nothing: each folder's listing SHA-256 (the move's pair) and each page's bytes and rewritten bytes (`FolderRenamePlan`, `Sendable`). On the main actor `apply` plans it into a `JournaledStep` (`moveFolder(_:to:listingSha:)`, `write(_:to:plannedFrom:)`, whose `before` is the walk's read, never a second one), the settings are planned from one read, and the step is made. A step refused as changed since (a page or a setting changed between the plan and the make) is planned again from the disk, up to three times, as Save is. In `JournaledStep`, a place at or inside a planned folder move's `to` is read where it is now (`placeOnDiskNow`) and named from the folder above `to` with `to`'s own spelling (`namedPath`), so a capitalisation-only rename is not named by the spelling the disk lists now (`realpath` gives the old one). A step that cannot be recorded in shadow is swapped in without the list (`makeWithoutARecord`): the folder moves first, each carried page staged only at its turn.
+
+**Refused.** A refused rename writes nothing and the sheet says `undo.wording.renameFolderNothingWasChanged` ("“{old}” was not renamed, and nothing was changed: {said}"); one refused part way whose swaps could not all be put back says `renameFolderStoppedPartWay`, with each kept file named. The two old half-failure sentences ("renamed N of M copies", and "renamed, but could not write the change to this course's settings") are gone: neither state can happen now.
+
+**The rename record is KEPT while the switch is off** (the director, 2026-11-21, after the part-two review's L6). With `undoJournalIsLive` off, recovery records and repairs nothing, so a rename killed part way (say between its moves and its pages) would be left half done with nothing to finish it. So `courses/.internal/renames/<code>.json` is still written before the step is made (when a folder moves) and cleared once the step is made or refused with nothing changed; a refusal left part way, or a kill, leaves it, and `interruptedRenameTarget` finishes the rename as before (`testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord`). **U7 owes**: once the switch is on and recovery settles a killed rename whole before or whole after, stop writing the record (keep reading one an earlier version left), and drop its writer-scan entry (`SpecialFolderRenamer.swift`, `waitsFor: U7`).
+
+**Save, then rename, then Undo, Undo** (U4a review 1, L1): both are `editJSON` on `course_config.json`, so the rename's Undo puts its members back by value and the Save's Undo then finds its members as it left them (`testSaveThenRenameThenUndoAndUndoTakesBothBack`, both touching `expandable`). The whole-file fallback (`writeFile`, for a file the member rule cannot move) below a Save's `editJSON` steps is refused by the Save's Undo BY DESIGN: a `writeFile` is judged by the whole file's hash, and a member put back by value is spelled compactly, so no writer of this file plans one except that fallback.
+
+**What is on disk if the app dies** between any two writes: the step's own staged files beside their places and the folders part moved; with the switch on, recovery settles it by content, whole before or whole after (`testARenameKilledBetween…`, at `beforeSwap(1)` between two folders, `beforeSwap(2)` between the moves and the pages, and `beforeApplied`); with it off, nothing is repaired and the rename record finishes it.
+
+**Not in this part.** The recorded trace (`renameFolder` in `undo-action-steps.json` and `undo-traces.json`): `UndoActionStepsTests.record` and `make_undo_traces.py`'s `action_trace` know file moves only, and a folder move with carried pages needs both, and the Swift action-trace replay, to learn one. The part-two review's M1 (the plan counting the step's own kept `-orig` files inside a moved folder as its content, and `keptOriginal` looking at `to`): latent while the carried edits are `replaceText`, but a relinked page the door writes whole (`writeFile`) opens it.
+
+#### For U4b2 (the unit-word rename and Rename Course)
+
+- `UnitWordRenamer` still calls `recordOnDisk`; give it `planRecordOnDisk` and `finishRecord` in one step with its page renames, the way `renameFolder` does. Its pages are files moved (`move`), not folders, and an edit of a moved file is carried the same way (`wholeOps`).
+- Rename Course (`CourseRenamer`) moves the course's own folder: every op of the step then sits inside that move's `to`; plan the move first through `moveFolder`, and every edit after it at its new place.
+- Keep each one's interrupted-rename record, if it has one, while the switch is off, for the reason above.
+
 ### The U1 harness
 
 Every core file in `Models/Undo/` except `UndoAppSeams.swift` and

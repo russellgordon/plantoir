@@ -1083,19 +1083,15 @@ struct CourseSettingsView: View {
         )
     }
 
-    /// Renames the folder on disk and rewrites the configuration keys that
-    /// named it, in that order.
-    ///
-    /// Disk first on purpose: if the move fails, nothing has been written and
-    /// the course is exactly as it was. The other way round would leave a
-    /// configuration naming a folder that is not there — which is the state
-    /// this whole feature exists to make impossible.
+    /// Renames the folder on disk, relinks the pages that named it and
+    /// rewrites the configuration keys that named it, as ONE step through
+    /// the door (#899 U4b, key `renameFolder`): every folder's move, every
+    /// page's relink and one `editJSON` per settings member it changes, all
+    /// of them or none. A rename that is refused writes nothing and says so;
+    /// there is no state in which the folder moved and the settings do not
+    /// know, which is what the old order (disk first, settings after) could
+    /// leave behind.
     func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) async -> RenameResult {
-        let outcome: FolderRenameOutcome
-        // OFF the main thread. The move is quick; reading every page in the
-        // course to rewrite links is not, on an iCloud-backed vault where an
-        // evicted file downloads on read. The configuration write below stays
-        // on the main actor, because it touches the observable model.
         let courseDirectory: URL = course.directoryURL
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
         // Read BEFORE the move, while the folder still has its old name: which
@@ -1103,47 +1099,90 @@ struct CourseSettingsView: View {
         // is a curriculum folder whose name must be written down (#128).
         let curriculumWithPages: [String] = CurriculumFolderRule.foldersWithPages(for: course)
         let curriculumWithLetterFirstPages: [String] = CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
-        do {
-            outcome = try await Task.detached(priority: .userInitiated) {
-                return try SpecialFolderRenamer.rename(
-                    oldName, to: newName, scope: scope,
-                    courseDirectory: courseDirectory,
-                    sectionNumbers: sectionNumbers
-                )
-            }.value
-        } catch {
-            return .failed(error.localizedDescription)
-        }
-        do {
-            try course.configuration.recordOnDisk({ values in
-                return SpecialFolderRenamer.renaming(
-                    oldName, to: newName, scope: scope, in: values, foldersWithPages: curriculumWithPages,
-                    foldersWithLetterFirstPages: curriculumWithLetterFirstPages
-                )
-            }, at: course.configFileURL)
-        } catch {
-            // Recorded BEFORE returning, and that ordering is the point: this
-            // is the one outcome the trail exists for. The folder has moved
-            // and the settings do not know, which is the state somebody will
-            // be asked to explain later — and it was the one case with no line
-            // at all, because the note used to sit after this block.
-            ActivityTrail.note(
-                .folderRenamed,
-                "renamed the folder " + oldName + " to " + newName + " in " + course.code
-                + " but could not write it to this course's settings — "
-                + error.localizedDescription
-            )
-            // The folder HAS moved, so this is not "the rename failed" — it is
-            // a rename whose bookkeeping did not land, and saying otherwise
-            // would send the teacher looking for a folder under its old name.
-            return .failed(
-                "“\(oldName)” was renamed to “\(newName)”, but Plantoir could not write the "
-                + "change to this course's settings: \(error.localizedDescription)"
+        let change: ([String: Any]) -> [String: Any] = { values in
+            return SpecialFolderRenamer.renaming(
+                oldName, to: newName, scope: scope, in: values, foldersWithPages: curriculumWithPages,
+                foldersWithLetterFirstPages: curriculumWithLetterFirstPages
             )
         }
-        // The configuration is written, so the rename is whole and the record
-        // of it having started can go. Anything that leaves this record behind
-        // is, by definition, a rename that did not finish.
+        var attempts: Int = 0
+        var outcome: FolderRenameOutcome = FolderRenameOutcome(foldersMoved: 0, pagesRelinked: 0)
+        while true {
+            // The walk OFF the main thread: reading every page in the course
+            // to find the links is not quick on an iCloud-backed vault, where
+            // an evicted file downloads on read. Nothing is written by it.
+            let planned: FolderRenamePlan
+            do {
+                planned = try await Task.detached(priority: .userInitiated) {
+                    return try SpecialFolderRenamer.plan(
+                        oldName, to: newName, scope: scope,
+                        courseDirectory: courseDirectory,
+                        sectionNumbers: sectionNumbers
+                    )
+                }.value
+            } catch let refused as JournaledStepError {
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: refused.localizedDescription
+                ))
+            } catch {
+                return .failed(error.localizedDescription)
+            }
+            let step: JournaledStep = JournaledStep(
+                course: course, section: nil, maker: UndoStepMaker.sheet("renameFolder"), holds: "course"
+            )
+            SpecialFolderRenamer.apply(planned, to: step)
+            let plannedSettings: CourseConfiguration.PlannedWrite
+            do {
+                plannedSettings = try course.configuration.planRecordOnDisk(change, at: course.configFileURL, into: step)
+            } catch {
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: error.localizedDescription
+                ))
+            }
+            // Recorded BEFORE the step is made, so that a rename killed part
+            // way can be recognised and finished: with the switch off, recovery
+            // records and repairs nothing (`interruptedRenameTarget`).
+            if !planned.moves.isEmpty {
+                SpecialFolderRenamer.recordRenameStarting(
+                    from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory
+                )
+            }
+            do {
+                try step.make()
+            } catch JournaledStepError.refused(.changedSince, _) where attempts < 3 {
+                // A page or a setting the step changes was changed between the
+                // plan and the make (a build's preflight, Obsidian): planned
+                // again from the disk as it is then, as Save does.
+                attempts += 1
+                continue
+            } catch let partWay as JournaledStepError {
+                if case .leftPartWay = partWay {
+                    return .failed(SpecialFolderRenamer.stoppedPartWay(
+                        renaming: oldName, said: partWay.localizedDescription
+                    ))
+                }
+                if case .stoppedByATest = partWay {
+                    // A process that died here leaves its record, as a kill does.
+                    return .failed(SpecialFolderRenamer.nothingWasChanged(
+                        renaming: oldName, said: partWay.localizedDescription
+                    ))
+                }
+                SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: partWay.localizedDescription
+                ))
+            } catch {
+                SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: error.localizedDescription
+                ))
+            }
+            course.configuration.finishRecord(plannedSettings, change)
+            outcome = planned.outcome
+            break
+        }
+        // The step is made, so the rename is whole and the record of it
+        // having started can go.
         SpecialFolderRenamer.clearRenameRecord(courseDirectory: course.directoryURL)
         ActivityTrail.note(
             .folderRenamed,
