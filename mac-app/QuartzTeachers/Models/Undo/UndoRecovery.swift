@@ -311,8 +311,16 @@ nonisolated enum UndoRecovery {
     static func keptOriginal(
         of step: UndoStep, root: URL, couldNotRead: ((_ path: String) -> Void)? = nil
     ) -> (_ path: String, _ sha: String) -> Data? {
+        // A page inside a folder the step moves is looked for where the
+        // page is now (`placeNow`): after an Undo its kept copies are under
+        // the move's `from` (the part-two review's M1, second layer).
+        let carriers: [String: UndoOp] = UndoCheck.carriers(in: step.ops)
         return { path, sha in
-            let place: URL = root.appendingPathComponent(path)
+            var placePath: String = path
+            if let carrier = carriers[path] {
+                placePath = UndoRecovery.placeNow(of: path, carriedBy: carrier, root: root)
+            }
+            let place: URL = root.appendingPathComponent(placePath)
             var unreadable: Bool = false
             for kept in UndoRecovery.keptOriginalFiles(of: step, beside: place) {
                 let item: UndoItem = UndoItem.read(at: kept)
@@ -994,7 +1002,8 @@ nonisolated enum UndoRecovery {
                             keptOriginalNotRead = path
                         }
                     }),
-                    keptOriginalUsed: { use in uses.append(use) }
+                    keptOriginalUsed: { use in uses.append(use) },
+                    ownSeq: step.seq
                 )
                 if case .refused(.contentMissing) = plan, let keptOriginalNotRead {
                     // A kept original that cannot be read just now may be the

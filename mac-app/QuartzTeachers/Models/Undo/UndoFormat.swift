@@ -758,6 +758,17 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return target ?? kind
     }
 
+    /// Where a teacher finds the item a step names now, going this way: a
+    /// `move`'s `to` before it is undone and its `from` before it is redone
+    /// (U4b: a refused Undo of a rename names the renamed folder, never the
+    /// place it had before the step); `placeName` for every other op.
+    func placeAsFound(going direction: UndoDirection) -> String {
+        if knownKind == .move, let from, let to {
+            return direction == .backward ? to : from
+        }
+        return placeName
+    }
+
     /// A move, a tree or an external op: checked and changed as a whole, on
     /// its own, never folded into another op's file (`UndoStep`'s rule that
     /// no other op of the step names its places).

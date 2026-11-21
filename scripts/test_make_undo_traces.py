@@ -832,6 +832,10 @@ class ContractCaseTests(unittest.TestCase):
         if call == "addAFileInsideTheMovedFolder":
             pages[self.RENAMED + "/c.md"] = "C\n"
             return None
+        if call == "leaveAKeptCopyInsideTheMovedFolder":
+            # The model holds no staged files: the step's own kept copy is
+            # never content (opKinds.wholeOps, the part-two review's M1).
+            return None
         if call == "editThePageInsideByHand":
             pages[self.RENAMED + "/a.md"] = "Hand.\n"
             return None
@@ -897,7 +901,8 @@ class ContractCaseTests(unittest.TestCase):
                   "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
                   "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
                   "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
-                  "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay")
+                  "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
+                  "leaveAKeptCopyInsideTheMovedFolder")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -1141,7 +1146,8 @@ class ContractCaseTests(unittest.TestCase):
                 if "rederived" in case:
                     self.assertEqual(model.rederived, case["rederived"])
                 if "keptOriginalLeft" in case:
-                    foreign = "foreignKeptOriginal" in case["calls"]
+                    # A kept copy the row itself left (a model holds none).
+                    foreign = "foreignKeptOriginal" in case["calls"] or "leaveAKeptCopyInsideTheMovedFolder" in case["calls"]
                     self.assertEqual(bool(model.kept) or foreign, case["keptOriginalLeft"])
                 if "keptBesideThePage" in case:
                     self.assertEqual(len(model.kept.get(p1, [])), case["keptBesideThePage"])

@@ -38,6 +38,7 @@ nonisolated enum UndoContractKinds {
         "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
         "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
         "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
+        "leaveAKeptCopyInsideTheMovedFolder",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -313,6 +314,14 @@ nonisolated enum UndoContractKinds {
             return nil
         case "addAFileInsideTheMovedFolder":
             try UndoContractReplay.write("C\n", to: renamedFolder + "/c.md", in: root)
+            return nil
+        case "leaveAKeptCopyInsideTheMovedFolder":
+            // The part-two review's M1: the newest step's own kept original
+            // beside a.md, wherever the folder is now, as a tidy that could
+            // not remove it leaves one.
+            let seq: Int = try journal.read().highestSeq
+            let folder: String = somethingIsAt(renamedFolder, in: root) ? renamedFolder : mediaFolder
+            try UndoContractReplay.write("Kept.\n", to: folder + "/.a.md\(UndoSwap.stagedMarker)\(seq)-undo-orig", in: root)
             return nil
         case "editThePageInsideByHand":
             try? FileManager.default.removeItem(at: root.appendingPathComponent(renamedFolder + "/a.md"))

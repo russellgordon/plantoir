@@ -236,10 +236,10 @@ final class UndoRenameFolderStepTests: XCTestCase {
         guard case .refused(.changedSince(let first, _), _) = undone else {
             return XCTFail("\(undone)")
         }
-        // The door names the move by its place before the step
-        // (`placeName`), not the folder as the teacher now finds it: owed
-        // with the part-two review's M1 (documentation 09, U4b third part).
-        XCTAssertTrue(first.hasPrefix("courses/ICS3U/section1/"), first)
+        // Named as the teacher finds the folder now, the renamed one
+        // (`UndoOp.placeAsFound`). MUST FAIL with the move named by its
+        // place before the step (`placeName`: `section1/Tasks`).
+        XCTAssertEqual(first, "courses/ICS3U/section1/Assessments")
         XCTAssertEqual(pages(of: course), pagesThen, "a refused Undo moves nothing")
     }
 
@@ -333,12 +333,13 @@ final class UndoRenameFolderStepTests: XCTestCase {
         try await killARename(at: .beforeSwap(1))
     }
 
+    /// The first section's folder moved and the page it carries edited in
+    /// (the swap's order: each move, then the edits it carries), the second
+    /// section's folder not: the page's kept original is inside the moved
+    /// folder, and the put-back must not count it as the folder's content.
+    /// MUST FAIL with the plan or the swap judging the move with the
+    /// step's own kept files inside (the part-two review's M1).
     func testARenameKilledBetweenItsMovesAndItsPagesIsWholeAfterRecovery() async throws {
-        // Held, by name: recovery of TWO folder moves killed before the
-        // carried page's swap leaves neither whole before nor whole after
-        // (a staged file left, a page missing). Owed with the part-two
-        // review's M1, the same code (`UndoRecovery.carryingMoveState`).
-        XCTExpectFailure("U4b: two folder moves killed before a carried page's swap (owed with M1)")
         try await killARename(at: .beforeSwap(2))
     }
 
@@ -346,32 +347,70 @@ final class UndoRenameFolderStepTests: XCTestCase {
         try await killARename(at: .beforeApplied)
     }
 
-    func killARename(at point: UndoKillPoint) async throws {
+    /// Killed before EVERY swap of the step in turn, until a kill point is
+    /// no longer reached (the step has no more swaps): each is whole before
+    /// or whole after once recovery has run, and none leaves a staged file.
+    func testARenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery() async throws {
+        var index: Int = 0
+        while try await killARename(at: .beforeSwap(index)) {
+            try? FileManager.default.removeItem(at: listFolder)
+            try? FileManager.default.removeItem(at: root)
+            try await setUp()
+            index += 1
+        }
+        XCTAssertGreaterThanOrEqual(index, 4, "two moves, two pages and the settings: at least four swaps")
+    }
+
+    /// Returns whether the kill point was reached (and so tested).
+    @discardableResult
+    func killARename(at point: UndoKillPoint) async throws -> Bool {
         let course: Course = try course()
         let pagesBefore: [String: Data] = pages(of: course)
         let settingsBefore: NSDictionary = try settings(of: course)
-        UndoKillPoints.hook = { reached in reached == point }
+        let settingsBytesBefore: Data = try Data(contentsOf: course.configFileURL)
+        var reachedIt: Bool = false
+        UndoKillPoints.hook = { reached in
+            if reached == point {
+                reachedIt = true
+                return true
+            }
+            return false
+        }
         let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
         UndoKillPoints.hook = nil
-        XCTAssertNotNil(failed(result))
+        if !reachedIt {
+            return false
+        }
+        XCTAssertNotNil(failed(result), "\(point)")
 
         let workingRoot: URL = root
         await UndoRecovery.recoverAndRederive(journal(processIsAlive: false), resolveRoot: { _ in workingRoot })
 
-        let now: [String: Data] = pages(of: course)
+        var now: [String: Data] = pages(of: course)
+        // The settings are put back by member (`editJSON`): the values
+        // come back, the teacher's spacing does not, so the apply's kept
+        // original of the settings file is the only copy of those bytes and
+        // stays beside it ("an only copy is never deleted"). It must be
+        // exactly the file as it was before the step; it is no staged file.
+        let keptSettings: URL = course.directoryURL.appendingPathComponent(".course_config.json.plantoir-undo-1-apply-orig")
+        if let kept = now.removeValue(forKey: ".course_config.json.plantoir-undo-1-apply-orig") {
+            XCTAssertEqual(kept, settingsBytesBefore, "the kept settings are not the file as it was, at \(point)")
+            try FileManager.default.removeItem(at: keptSettings)
+        }
         if now == pagesBefore {
             XCTAssertEqual(try settings(of: course), settingsBefore, "pages whole before, settings not")
         } else {
-            XCTAssertEqual(now["section1/Assessments/Quiz 1.md"], Data("See [[Assessments/Quiz 2]].\n".utf8), "not whole after")
-            XCTAssertEqual(now["section2/Assessments/Quiz 2.md"], Data("Quiz two.\n".utf8), "not whole after")
-            XCTAssertEqual(now["section1/index.md"], Data("Start with [[Assessments/Quiz 1]].\n".utf8), "not whole after")
-            XCTAssertEqual(now.count, pagesBefore.count, "not whole after")
+            XCTAssertEqual(now["section1/Assessments/Quiz 1.md"], Data("See [[Assessments/Quiz 2]].\n".utf8), "not whole after at \(point)")
+            XCTAssertEqual(now["section2/Assessments/Quiz 2.md"], Data("Quiz two.\n".utf8), "not whole after at \(point)")
+            XCTAssertEqual(now["section1/index.md"], Data("Start with [[Assessments/Quiz 1]].\n".utf8), "not whole after at \(point)")
+            XCTAssertEqual(now.count, pagesBefore.count, "not whole after at \(point)")
             XCTAssertEqual(try settings(of: course)["hidden"] as? [String], ["Assessments"], "pages whole after, settings not")
         }
         if point == .beforeApplied {
             XCTAssertNotEqual(now, pagesBefore, "a step whose swap went in is completed")
         }
-        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left")
+        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left at \(point)")
+        return true
     }
 
     /// With the switch off, a list that cannot take the step changes
@@ -397,28 +436,33 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(pages(of: course), expectedPages)
         XCTAssertEqual(try Data(contentsOf: course.configFileURL), expectedSettings)
     }
+    /// The recovery the app runs with the switch off: inside the next
+    /// step's begin, in shadow (`JournaledWrite.begin`), here with the
+    /// killed process gone. Shadow recovery records and never repairs.
+    func recoverInShadow() throws {
+        let workingRoot: URL = root
+        _ = try journal(processIsAlive: false).withLock { writer -> [UndoRecoveryResult] in
+            return UndoRecovery.run(writer, mode: .shadow, trySwapsNow: false, resolveRoot: { _ in workingRoot })
+        }
+    }
+
     /// With the switch off, a rename of a shared folder killed after its
-    /// move and before its page (`beforeSwap(1)`: the move is target 0, the
-    /// page it carries target 1) leaves its record, and the rename sheet
+    /// move and before its page (`beforeSwap(1)`: the swap's order is each
+    /// move, then the edits it carries, so target 0 is the move and target
+    /// 1 the page inside it) leaves its record, and the rename sheet
     /// finishes it from there, as before U4b: the record names the target,
     /// and renaming again relinks the page and writes the settings. MUST
-    /// FAIL with the record not written before the step. (A per-section
-    /// rename killed BETWEEN sections leaves a mixture, which the record's
-    /// rule has never finished: `testAMixtureIsNotTreatedAsAnInterruptedRename`.)
+    /// FAIL with the record not written before the step (the director's
+    /// ruling of 2026-11-21: kept while the switch is off).
     func testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord() async throws {
-        // NOT YET PROVEN, held by name: in shadow the swap's order is not
-        // the live one, and target 1 is not yet shown to be the carried page
-        // (the move is not found in at this point). Finish with the order
-        // read from the step, never a number tried until it passes.
-        XCTExpectFailure("U4b: the shadow kill point for a killed rename finished from its record is not yet established")
         JournaledStep.modeOverride = .shadow
         let course: Course = try course()
         UndoKillPoints.hook = { reached in reached == .beforeSwap(1) }
         _ = await CourseSettingsView(course: course).renameFolder("Concepts", to: "Ideas", scope: .shared)
         UndoKillPoints.hook = nil
-        let workingRoot: URL = root
-        await UndoRecovery.recoverAndRederive(journal(processIsAlive: false), resolveRoot: { _ in workingRoot })
+        try recoverInShadow()
         XCTAssertEqual(pages(of: course)["Ideas/Arrays.md"], Data("See [[Concepts/Loops]].\n".utf8), "the kill left the move in, not the page")
+        XCTAssertEqual(try settings(of: course)["shared_folders"] as? [String], ["Concepts"], "the kill left the settings as they were")
 
         let target: String? = SpecialFolderRenamer.interruptedRenameTarget(
             from: "Concepts", scope: .shared, courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
@@ -431,5 +475,30 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(try settings(of: course)["shared_folders"] as? [String], ["Ideas"])
         let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+    }
+
+    /// With the switch off, a per-section rename killed BETWEEN its
+    /// sections (`beforeSwap(1)`: the first section's folder moved, the
+    /// second's not) is a mixture, which the record's rule has never
+    /// finished (`SpecialFolderRenamerTests.testAMixtureIsNotTreatedAsAnInterruptedRename`):
+    /// pinned as it is today, and owed to U7, whose live recovery settles
+    /// it whole (`testARenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery`).
+    func testWithTheSwitchOffARenameKilledBetweenItsSectionsIsLeftAsTodaysRecordLeavesIt() async throws {
+        JournaledStep.modeOverride = .shadow
+        let course: Course = try course()
+        UndoKillPoints.hook = { reached in reached == .beforeSwap(1) }
+        _ = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        UndoKillPoints.hook = nil
+        try recoverInShadow()
+        let now: [String: Data] = pages(of: course)
+        XCTAssertNotNil(now["section1/Assessments/Quiz 1.md"], "the first section's folder moved")
+        XCTAssertNotNil(now["section2/Tasks/Quiz 2.md"], "the second section's folder did not")
+
+        let target: String? = SpecialFolderRenamer.interruptedRenameTarget(
+            from: "Tasks", scope: .perSection, courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+        )
+        XCTAssertNil(target, "a mixture is not an interrupted rename (today's rule, owed to U7)")
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: record.path), "the record is kept")
     }
 }

@@ -192,6 +192,12 @@ nonisolated enum UndoCheck {
     /// move, a tree or an external op is judged on its own against what is
     /// there now (`wholeState`), and becomes one change of its own.
     ///
+    /// `ownSeq` is the step's number for an Undo, a Redo or a recovery's
+    /// put-back (nil while a step is made, when it has none yet): a move
+    /// that carries edits is judged without the step's own staged files and
+    /// kept originals inside its folder, on either side (the part-two
+    /// review's M1, opKinds.wholeOps).
+    ///
     /// `leavesApart` is true for an Undo or a Redo (never for making a step,
     /// nor for recovery): an op that stands apart (`UndoOp.standsApart`)
     /// and is found changed since, or an external op that cannot be set
@@ -212,7 +218,8 @@ nonisolated enum UndoCheck {
         places: UndoExternalPlaces = UndoAppPreferences(),
         keptOriginal: ((_ path: String, _ sha: String) -> Data?)? = nil,
         keptOriginalUsed: ((UndoKeptOriginalUse) -> Void)? = nil,
-        leavesApart: Bool = false
+        leavesApart: Bool = false,
+        ownSeq: Int? = nil
     ) -> UndoPlan {
         var ordered: [UndoOp] = ops
         if direction == .backward {
@@ -271,31 +278,52 @@ nonisolated enum UndoCheck {
                 leavesTheFolder = true
             }
             if leavesTheFolder {
-                if !inTheWay.contains(op.placeName) {
-                    inTheWay.append(op.placeName)
+                if !inTheWay.contains(op.placeAsFound(going: direction)) {
+                    inTheWay.append(op.placeAsFound(going: direction))
                 }
                 continue
             }
             if op.isWhole {
                 var overridingTo: [String: UndoItem] = [:]
+                var overridingFrom: [String: UndoItem] = [:]
                 var carriesEdits: Bool = false
                 if let to = op.to {
-                    for (path, carrier) in carriers where carrier == op {
+                    for (_, carrier) in carriers where carrier == op {
                         carriesEdits = true
+                    }
+                    // The step's own staged files and kept originals inside
+                    // the folder, on either side, are never its content
+                    // (the part-two review's M1), in both directions.
+                    if carriesEdits, let ownSeq, let from = op.from {
+                        overridingTo = UndoSwap.stepsOwnFilesInside(root.appendingPathComponent(to), seq: ownSeq)
+                        overridingFrom = UndoSwap.stepsOwnFilesInside(root.appendingPathComponent(from), seq: ownSeq)
+                        if op.isCaseOnlyMove {
+                            for (inside, item) in overridingFrom {
+                                overridingTo[inside] = item
+                            }
+                            overridingFrom = overridingTo
+                        }
+                    }
+                    for (path, carrier) in carriers where carrier == op {
                         if direction == .backward, let item = working[path] {
                             let inside: String = path.count == to.count ? "" : String(path.dropFirst(to.count + 1))
                             overridingTo[inside] = item
+                            if op.isCaseOnlyMove {
+                                overridingFrom[inside] = item
+                            }
                         }
                     }
                 }
-                let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: places, overridingTo: overridingTo)
+                let state: UndoOpState = UndoCheck.wholeState(
+                    of: op, root: root, places: places, overridingTo: overridingTo, overridingFrom: overridingFrom
+                )
                 let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
                 if verdict == .alreadyBack || verdict == .alreadyRedone {
                     continue
                 }
                 if verdict == .cannotTell {
                     if cannotTellPath == nil {
-                        cannotTellPath = op.placeName
+                        cannotTellPath = op.placeAsFound(going: direction)
                     }
                     continue
                 }
@@ -313,8 +341,8 @@ nonisolated enum UndoCheck {
                         leftApart.append(op.placeName)
                         continue
                     }
-                    if !inTheWay.contains(op.placeName) {
-                        inTheWay.append(op.placeName)
+                    if !inTheWay.contains(op.placeAsFound(going: direction)) {
+                        inTheWay.append(op.placeAsFound(going: direction))
                     }
                     continue
                 }
@@ -1087,10 +1115,24 @@ nonisolated enum UndoSwap {
                     _ = reverse()
                     return .notPutBack(fileRefusal, keptOriginals: originalsLeft())
                 }
-            case .moveHere(let from, _, let op):
+            case .moveHere(let from, let fromPath, let op):
+                // A refusal names a folder the way a teacher finds it now,
+                // where it is moved from (U4b); a marker's move keeps its
+                // name in the step.
+                let namedAs: String = op.knownKind == .move ? fromPath : target.relativePath
                 // The pair once more, just before the rename: the content at
                 // the place it leaves, nothing where it goes.
-                let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: from, overriding: ownFilesInside(from))
+                // Without this swap's own files inside, nor the files an
+                // earlier swap of the same step left there (a kept original
+                // a tidy could not remove, or one an outgoing page rests on):
+                // the part-two review's M1.
+                var leftOut: [String: UndoItem] = ownFilesInside(from)
+                if let seq = UndoSwap.stepSeq(ofLabel: label) {
+                    for (inside, item) in UndoSwap.stepsOwnFilesInside(from, seq: seq) {
+                        leftOut[inside] = item
+                    }
+                }
+                let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: from, overriding: leftOut)
                 var atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url)
                 if op.isCaseOnlyMove, let spelled = UndoMoveSide.spellingListed(from: from, to: target.url) {
                     // One item under two spellings (U4b): it goes in only
@@ -1107,13 +1149,13 @@ nonisolated enum UndoSwap {
                     }
                 }
                 if atFrom == .cannotRead || atTarget == .cannotRead {
-                    refusal = .cannotTellNow(path: target.relativePath)
+                    refusal = .cannotTellNow(path: namedAs)
                 } else if atFrom != .holdsTheContent || atTarget != .free {
-                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
+                    refusal = .changedSince(firstPath: namedAs, others: 0)
                 } else {
                     makeTheFolder(for: target.url)
                     if !UndoSwap.renameExclusively(from, onto: target.url) {
-                        refusal = .fileIsInUse(path: target.relativePath)
+                        refusal = .fileIsInUse(path: namedAs)
                     } else {
                         followTheMove(from: from, to: target.url)
                     }
@@ -1434,6 +1476,35 @@ nonisolated enum UndoSwap {
             return lstat(path, &information)
         }
         return found == 0 && (information.st_mode & S_IFMT) == S_IFDIR
+    }
+
+    /// The step a swap's label belongs to (every step's label is
+    /// "<seq>-<work>"), or nil for a label that names no step.
+    static func stepSeq(ofLabel label: String) -> Int? {
+        guard let dash = label.firstIndex(of: "-") else {
+            return nil
+        }
+        return Int(label[label.startIndex..<dash])
+    }
+
+    /// Every staged file and kept original of step `seq`, from any of its
+    /// swaps (its apply, an undo, a redo, a recovery), inside `folder`,
+    /// relative to it, as absent: a move's pair is judged without them
+    /// (U4b, the part-two review's M1). Only the step's own names, by
+    /// marker; anything else inside the folder still counts.
+    static func stepsOwnFilesInside(_ folder: URL, seq: Int) -> [String: UndoItem] {
+        var found: [String: UndoItem] = [:]
+        let ownMarker: String = stagedMarker + "\(seq)-"
+        guard let walker = FileManager.default.enumerator(atPath: folder.path) else {
+            return found
+        }
+        while let inside = walker.nextObject() as? String {
+            let name: String = (inside as NSString).lastPathComponent
+            if name.hasPrefix(".") && name.contains(ownMarker) {
+                found[inside] = .absent
+            }
+        }
+        return found
     }
 
     /// Whether a file name is one a swap for this label left.
@@ -1972,7 +2043,8 @@ nonisolated extension UndoJournal {
             record.step.ops, direction: direction, root: root, journal: self, places: places,
             keptOriginal: keptOriginal,
             keptOriginalUsed: { use in uses.append(use) },
-            leavesApart: true
+            leavesApart: true,
+            ownSeq: record.step.seq
         )
         if UndoKillPoints.stopsHere(.afterTheCheck) {
             return .stoppedByATest

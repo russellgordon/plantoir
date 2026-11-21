@@ -627,6 +627,8 @@ internal static class NamedGapLedger
         Owed(UndoStackCases, 899, V200, Reason899W8U4b,
              "U4b, an edit inside a moved folder: Undo takes the edit back, then the move",
              "U4b, an edit inside a moved folder: undone and redone, the move goes in before the edit",
+             "U4b, M1: undone, the step's own kept copy left inside the folder at its old place, then redone: the copy is never the folder's content",
+             "U4b, M1: redone, the step's own kept copy left inside the folder at its new place, then undone: the copy is never the folder's content",
              "U4b, a file added inside the moved folder since: Undo refuses, nothing moved, the list cleared",
              "U4b, the page inside the moved folder edited by hand since: Undo refuses, nothing moved, the list cleared",
              "U4b, an op naming a path inside the place a move leaves: a step this version cannot read, a barrier",
