@@ -103,6 +103,18 @@ public sealed class UndoActionTraceContractTests
                     var expected = call.GetProperty("ops").EnumerateArray().Select(op => op.GetString()!).ToList();
                     Assert.True(expected.SequenceEqual(LastBeginsOpKinds(scribe)),
                                 $"{where}: ops {string.Join(",", LastBeginsOpKinds(scribe))}");
+                    // The files' ops in the order the step recorded them, as the
+                    // mac's door takes them: an Undo checks them newest first,
+                    // so this order decides which page a refusal names first.
+                    var recordedOrder = new List<string>();
+                    foreach (JsonElement file in files)
+                    {
+                        if (file.GetProperty("before").ToString() == file.GetProperty("after").ToString()
+                            && file.GetProperty("before").ValueKind == file.GetProperty("after").ValueKind) continue;
+                        recordedOrder.Add(file.GetProperty("path").GetString()!);
+                    }
+                    Assert.True(recordedOrder.SequenceEqual(LastBeginsFilePaths(scribe)),
+                                $"{where}: files in the order {string.Join(" | ", LastBeginsFilePaths(scribe))}");
                     break;
                 }
                 case "undo":
@@ -209,6 +221,30 @@ public sealed class UndoActionTraceContractTests
             foreach (JsonNode? op in ops) kinds.Add((string)op!["kind"]!);
         }
         return kinds;
+    }
+
+    /// <summary>Each file the newest begin line's ops change, once, in the order its ops name them (recompute ops left out).</summary>
+    private static List<string> LastBeginsFilePaths(UndoScribe scribe)
+    {
+        JsonObject? last = null;
+        foreach (string segment in Directory.EnumerateFiles(scribe.JournalFolder, "journal-*.jsonl").Order(StringComparer.Ordinal))
+        {
+            foreach (string line in File.ReadAllLines(segment))
+            {
+                if (JsonNode.Parse(line) is JsonObject read && (string?)read["event"] == "begin") last = read;
+            }
+        }
+        var paths = new List<string>();
+        if (last?["step"]?["ops"] is JsonArray ops)
+        {
+            foreach (JsonNode? op in ops)
+            {
+                if ((string?)op!["kind"] == UndoOp.Recompute) continue;
+                string path = (string)op["path"]!;
+                if (!paths.Contains(path)) paths.Add(path);
+            }
+        }
+        return paths;
     }
 
     private static Dictionary<string, string?> Hashes(UndoScribe scribe, IReadOnlyList<string> paths)

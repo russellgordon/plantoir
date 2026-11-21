@@ -203,7 +203,10 @@ internal sealed class UndoDoor
         var ops = new JsonArray();
         var blobs = new List<byte[]>();
         var targets = new List<UndoSwapTarget>();
-        foreach (UndoFileChange change in draft.Changes.OrderBy(change => change.RelativePath, StringComparer.Ordinal))
+        // In the order the action planned them, as the mac's JournaledWrite
+        // takes draft.changes: an Undo checks the ops newest first, so this
+        // order decides which page a refusal names first (action-047).
+        foreach (UndoFileChange change in draft.Changes)
         {
             if (SameBytes(change.Before, change.After)) continue;
             foreach (JsonNode? op in UndoLineOps.ForAFile(change.RelativePath, change.Before, change.After))
