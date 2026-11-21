@@ -206,7 +206,8 @@ internal static class UndoTrail
     internal static void ToTheActivityTrail(UndoTrailLine line)
     {
         // Each event Undo writes, named on the right of an arm so the trail's
-        // wiring scan sees its writer.
+        // wiring scan (ActivityTrailWiringTests) sees its writer: a case label
+        // alone, with the event passed on as line.Event, is not seen.
         ActivityTrail.Event written = line.Event switch
         {
             ActivityTrail.Event.UndoRolledBack => ActivityTrail.Event.UndoRolledBack,

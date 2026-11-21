@@ -25,9 +25,17 @@ internal static class UndoContract
     internal static JsonElement Undo => SharedRules.RootElement.GetProperty("undo");
     internal static JsonElement Journal => FileFormats.RootElement.GetProperty("undoJournal");
 
+    /// <summary>
+    /// <c>undo-json-cases.json</c>: the editJSON byte cases, kept out of
+    /// <c>shared-rules.json</c> because some hold keys that differ only by
+    /// case, which Windows PowerShell 5.1 cannot read (#899 W6).
+    /// </summary>
+    internal static JsonElement JsonCases => JsonCasesDocument.Value.RootElement;
+
     private static readonly Lazy<JsonDocument> SharedRulesDocument = new(() => ContractLoader.LoadDocument("shared-rules.json"));
     private static readonly Lazy<JsonDocument> FileFormatsDocument = new(() => ContractLoader.LoadDocument("file-formats.json"));
     private static readonly Lazy<JsonDocument> TracesDocument = new(() => ContractLoader.LoadDocument("undo-traces.json"));
+    private static readonly Lazy<JsonDocument> JsonCasesDocument = new(() => ContractLoader.LoadDocument("undo-json-cases.json"));
 
     internal static JsonDocument SharedRules => SharedRulesDocument.Value;
     internal static JsonDocument FileFormats => FileFormatsDocument.Value;

@@ -1,0 +1,438 @@
+{
+  "note": "Moved out of shared-rules.json -> undo (#899 W6), where both platforms first read them, because some of these rows must hold an object with two keys that differ only by case (X1 and x1, Ab and aB): Windows PowerShell 5.1's ConvertFrom-Json, which windows-app/test_launcher_rules.ps1 and test_stop_preview.ps1 use to read shared-rules.json, cannot read a file that holds one. This file is read by Windows' UndoOpKindsContractTests, the mac's UndoContractReplay (UndoJournalContractTests) and scripts/test_make_undo_traces.py, and by no PowerShell; every other contract file must stay readable by ConvertFrom-Json (Windows' ContractFilesReadInWindowsPowerShellTests runs it on each, and scripts/test_make_undo_traces.py checks its rule on this Mac). Everything else about these rows is as editJSONCasesHow says; the rules they pin stay in shared-rules.json -> undo and file-formats.json -> undoJournal.opKinds.editJSON.",
+  "editJSONCasesHow": "An editJSON move on the bytes of a file (file-formats.json -> undoJournal.opKinds.editJSON): file is the file's text, op the op (its before and after any JSON, a missing one meaning no such member), direction undo (towards before) or redo (towards after), and result the file's exact text afterwards, or null when the move is refused (as changed since). Both platforms must produce these bytes exactly: only the member's own bytes change, and a new value is spelled compactly with keys sorted.",
+  "editJSONCases": [
+    {
+      "name": "only the member's value changes: spacing, 1.50, an escaped slash and a key written twice elsewhere stay",
+      "file": "{\n    \"zeta\": 1.50,\n    \"alpha\": \"a\\/b \\u00e9\",\n    \"dup\": 1,\n    \"dup\": 2,\n    \"school_year\": \"2026-2027\"\n}\n",
+      "op": {
+        "keyPath": [
+          "school_year"
+        ],
+        "before": "2025-2026",
+        "after": "2026-2027",
+        "kind": "editJSON",
+        "path": "course_config.json"
+      },
+      "direction": "undo",
+      "result": "{\n    \"zeta\": 1.50,\n    \"alpha\": \"a\\/b \\u00e9\",\n    \"dup\": 1,\n    \"dup\": 2,\n    \"school_year\": \"2025-2026\"\n}\n"
+    },
+    {
+      "name": "a member added goes after the last one, spaced as that one is",
+      "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
+      "op": {
+        "keyPath": [
+          "c"
+        ],
+        "after": "x",
+        "kind": "editJSON",
+        "path": "course_config.json"
+      },
+      "direction": "redo",
+      "result": "{\n  \"a\" : 1,\n  \"b\" : 0.10,\n  \"c\" : \"x\"\n}\n"
+    },
+    {
+      "name": "the first member taken out takes the comma after it",
+      "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
+      "op": {
+        "keyPath": [
+          "a"
+        ],
+        "after": 1,
+        "kind": "editJSON",
+        "path": "course_config.json"
+      },
+      "direction": "undo",
+      "result": "{\n  \"b\" : 0.10\n}\n"
+    },
+    {
+      "name": "the last member taken out takes the comma before it",
+      "file": "{\n  \"a\" : 1,\n  \"b\" : 0.10\n}\n",
+      "op": {
+        "keyPath": [
+          "b"
+        ],
+        "after": 0.1,
+        "kind": "editJSON",
+        "path": "course_config.json"
+      },
+      "direction": "undo",
+      "result": "{\n  \"a\" : 1\n}\n"
+    },
+    {
+      "name": "a member added to an empty object, its value spelled compactly with keys sorted",
+      "file": "{}",
+      "op": {
+        "keyPath": [
+          "k"
+        ],
+        "after": {
+          "z": true,
+          "a": null
+        },
+        "kind": "editJSON",
+        "path": "course_config.json"
+      },
+      "direction": "redo",
+      "result": "{\"k\": {\"a\":null,\"z\":true}}"
+    },
+    {
+      "name": "a member inside objects inside objects",
+      "file": "{\"s\": {\"2\": {\"label\": \"P2\"}}}",
+      "op": {
+        "keyPath": [
+          "s",
+          "2",
+          "label"
+        ],
+        "before": "P1",
+        "after": "P2",
+        "kind": "editJSON",
+        "path": "course_config.json"
+      },
+      "direction": "undo",
+      "result": "{\"s\": {\"2\": {\"label\": \"P1\"}}}"
+    },
+    {
+      "name": "the key written twice on the path: refused, never a guess",
+      "file": "{\"school_year\": \"2026-2027\", \"school_year\": \"2026-2027\"}\n",
+      "op": {
+        "keyPath": [
+          "school_year"
+        ],
+        "before": "2025-2026",
+        "after": "2026-2027",
+        "kind": "editJSON",
+        "path": "course_config.json"
+      },
+      "direction": "undo",
+      "result": null
+    },
+    {
+      "name": "a whole number beyond 2^53 is refused, never written through a double",
+      "file": "{\"k\": 1}",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 12345678901234567890,
+        "after": 1
+      },
+      "direction": "undo",
+      "result": null
+    },
+    {
+      "name": "keys sorted as the mac sorts them: digits by their value, before letters, letters ignoring case",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": {
+          "B": 1,
+          "a": 1,
+          "10": 1,
+          "9": 1,
+          "b10": 1,
+          "b9": 1,
+          "A2": 1
+        }
+      },
+      "direction": "redo",
+      "result": "{\"k\": {\"9\":1,\"10\":1,\"a\":1,\"A2\":1,\"B\":1,\"b9\":1,\"b10\":1}}\n"
+    },
+    {
+      "name": "keys that differ only by case or by zeros in front: lowercase first, fewer zeros first, judged where they first differ",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": {
+          "X1": 1,
+          "x01": 1,
+          "x1": 1,
+          "01a": 1,
+          "1A": 1,
+          "Ab": 1,
+          "aB": 1,
+          "ab": 1
+        }
+      },
+      "direction": "redo",
+      "result": "{\"k\": {\"1A\":1,\"01a\":1,\"ab\":1,\"aB\":1,\"Ab\":1,\"x1\":1,\"x01\":1,\"X1\":1}}\n"
+    },
+    {
+      "name": "keys with punctuation: a space, then _ - , ; : ! ? . ' \" ( ) [ ] { } @ * / \\ & # % ` ^ + < = > | ~ $, then digits, then letters",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": {
+          "a.b": 1,
+          "a-b": 1,
+          "a_b": 1,
+          "a b": 1,
+          "ab": 1,
+          "a~b": 1,
+          "a$b": 1,
+          "a1b": 1,
+          "[": 1,
+          "-1": 1
+        }
+      },
+      "direction": "redo",
+      "result": "{\"k\": {\"-1\":1,\"[\":1,\"a b\":1,\"a_b\":1,\"a-b\":1,\"a.b\":1,\"a~b\":1,\"a$b\":1,\"a1b\":1,\"ab\":1}}\n"
+    },
+    {
+      "name": "fractions are spelled with 17 significant digits, as the mac writes a double",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": [
+          0.1,
+          0.5,
+          -0.1,
+          0.3333333333333333,
+          3.14159,
+          123.456,
+          1234567890123456.8
+        ]
+      },
+      "direction": "redo",
+      "result": "{\"k\": [0.10000000000000001,0.5,-0.10000000000000001,0.33333333333333331,3.1415899999999999,123.456,1234567890123456.8]}\n"
+    },
+    {
+      "name": "small numbers are spelled with an exponent of at least two digits",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": [
+          1e-07,
+          1.5e-10,
+          1e-05,
+          0.0001,
+          -1e-07,
+          5e-324
+        ]
+      },
+      "direction": "redo",
+      "result": "{\"k\": [9.9999999999999995e-08,1.5e-10,1.0000000000000001e-05,0.0001,-9.9999999999999995e-08,4.9406564584124654e-324]}\n"
+    },
+    {
+      "name": "large whole numbers below 2^53 are spelled whole, and negative zero is 0",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": [
+          9007199254740991,
+          9000000000000001,
+          1000000000000000,
+          -0.0,
+          -1.0
+        ]
+      },
+      "direction": "redo",
+      "result": "{\"k\": [9007199254740991,9000000000000001,1000000000000000,0,-1]}\n"
+    },
+    {
+      "name": "a fraction the mac's reader reads back as another number is refused: 0.0001234 is spelled 0.00012339999999999999, read back as 0.00012340000000000002",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": 0.0001234
+      },
+      "direction": "redo",
+      "result": null
+    },
+    {
+      "name": "a fraction whose long spelling still reads back as itself is written",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": 0.08129913717470501
+      },
+      "direction": "redo",
+      "result": "{\"k\": 0.081299137174705008}\n"
+    },
+    {
+      "name": "a new object's keys beyond ASCII: the mac sorts them by Unicode collation (an emoji first, \u00e9 between E and f, a full-width \uff21 beside A, \u00df after ss, a tab passed over)",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": {
+          "z": 1,
+          "\u00e9": 1,
+          "E": 1,
+          "e": 1,
+          "f": 1,
+          "\uff21": 1,
+          "A": 1,
+          "a": 1,
+          "\u00df": 1,
+          "ss": 1,
+          "\ud83d\ude00": 1,
+          "\u65e5\u672c": 1,
+          "\u03a9": 1,
+          "a\tb": 1,
+          "ab": 1,
+          "\uff11\uff10": 1,
+          "9": 1,
+          "10": 1
+        }
+      },
+      "direction": "redo",
+      "result": "{\"k\": {\"\ud83d\ude00\":1,\"9\":1,\"10\":1,\"\uff11\uff10\":1,\"a\":1,\"A\":1,\"\uff21\":1,\"a\\tb\":1,\"ab\":1,\"e\":1,\"E\":1,\"\u00e9\":1,\"f\":1,\"ss\":1,\"\u00df\":1,\"z\":1,\"\u03a9\":1,\"\u65e5\u672c\":1}}\n"
+    },
+    {
+      "name": "a new object holding \u00e9 written two ways (one character, and e with a combining accent): the mac takes them for one key",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": {
+          "\u00e9": 1,
+          "e\u0301": 2
+        }
+      },
+      "direction": "redo",
+      "result": "{\"k\": {\"\u00e9\":1}}\n"
+    },
+    {
+      "name": "a key path part beyond ASCII finds the member the file spells another way (\u00e9 as one character in the op, e with a combining accent in the file)",
+      "file": "{\"e\u0301\": 1}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "\u00e9"
+        ],
+        "before": 1,
+        "after": 2
+      },
+      "direction": "redo",
+      "result": "{\"e\u0301\": 2}\n"
+    },
+    {
+      "name": "a key path part beyond ASCII, spelled as the file spells it",
+      "file": "{\"\u00e9\": 1}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "\u00e9"
+        ],
+        "before": 1,
+        "after": 2
+      },
+      "direction": "redo",
+      "result": "{\"\u00e9\": 2}\n"
+    },
+    {
+      "name": "the Kelvin sign in a file's key is the letter K to the mac: the member is found and its value moved",
+      "file": "{\"\u212a\": 1}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "K"
+        ],
+        "after": 2
+      },
+      "direction": "redo",
+      "result": "{\"\u212a\": 2}\n"
+    },
+    {
+      "name": "a file's key that starts with a byte-order mark (written \\ufeff) is the key without it to the mac: the member is found and its value moved",
+      "file": "{\"\\ufeffk\": 1}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "after": 2
+      },
+      "direction": "redo",
+      "result": "{\"\\ufeffk\": 2}\n"
+    },
+    {
+      "name": "new text beyond ASCII and control characters: written as UTF-8, a control character escaped (\\b, \\f, \\u0001), DEL and the line and paragraph separators as they are",
+      "file": "{\"k\": 0}\n",
+      "op": {
+        "kind": "editJSON",
+        "path": "course_config.json",
+        "keyPath": [
+          "k"
+        ],
+        "before": 0,
+        "after": [
+          "\u00e9",
+          "e\u0301",
+          "\ud83d\ude00",
+          "\u65e5\u672c",
+          "\u0001",
+          "\b",
+          "\f",
+          "\u001f",
+          "\u007f",
+          "\u2028",
+          "\u2029",
+          "\u0000",
+          "</script>",
+          "\"\\",
+          "\u00a0",
+          "a\ufeffb"
+        ]
+      },
+      "direction": "redo",
+      "result": "{\"k\": [\"\u00e9\",\"e\u0301\",\"\ud83d\ude00\",\"\u65e5\u672c\",\"\\u0001\",\"\\b\",\"\\f\",\"\\u001f\",\"\u007f\",\"\u2028\",\"\u2029\",\"\\u0000\",\"</script>\",\"\\\"\\\\\",\"\u00a0\",\"a\ufeffb\"]}\n"
+    }
+  ]
+}
