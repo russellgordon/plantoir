@@ -444,10 +444,10 @@ public class SectionAndClassesUiTests
         EndToEnd.PressMenuBarItem(app, "Meetings", "classesClassDates");
         var dates = MenuBar.Dialog(app, "Meetings > Meeting Dates…");
         string purpose = Plantoir.Core.Assist.AssistWording.ClassDatesPurposeForAMeeting();
-        Assert.True(Retry.WhileFalse(() => dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Any(text => text.Name == purpose),
+        Assert.True(Retry.WhileFalse(() => dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Any(text => text.Properties.Name.ValueOrDefault == purpose),
                                      TimeSpan.FromSeconds(10)).Result,
                     "the Meeting Dates dialog does not show its purpose line in the club's noun: " +
-                    string.Join(" | ", dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(text => text.Name)));
+                    string.Join(" | ", dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(text => text.Properties.Name.ValueOrDefault ?? "")));
         if (Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") is { Length: > 0 } captures)
             FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(captures, "windows-meeting-dates-dialog.png"));
         MenuBar.CloseDialog(app);

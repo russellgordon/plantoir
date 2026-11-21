@@ -76,9 +76,9 @@ public class DeployedFolderInBrowserUiTests
                                          TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result
                          ?? throw new Xunit.Sdk.XunitException("a press of Open in Browser with the folder gone said nothing");
             string why = Plantoir.Core.Models.DeployedFolderWording.FolderNotFound;
-            Assert.True(dialog.FindAllDescendants().Any(element => element.Name == why),
+            Assert.True(dialog.FindAllDescendants().Any(element => element.Properties.Name.ValueOrDefault == why),
                         "the could-not-open dialog did not give the greyed reason: " +
-                        string.Join(" | ", dialog.FindAllDescendants().Select(element => element.Name)));
+                        string.Join(" | ", dialog.FindAllDescendants().Select(element => element.Properties.Name.ValueOrDefault ?? "")));
             MenuBar.CloseDialog(app);
             Assert.True(Retry.WhileFalse(() => !button.IsEnabled, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250)).Result,
                         "Open in Browser stayed live after a press found the folder gone");
