@@ -276,7 +276,7 @@ public sealed class TrailLinesContractTests : IDisposable
 
     /// <summary>
     /// A secret split three ways inside a sentence: by a NUL (taken whole), by
-    /// an isolate inside its label (found by the second pass), and by a line
+    /// an override before an email's <c>@</c> (found by the second pass), and by a line
     /// break, which is white space to the redactor (<c>knownLimits</c>: its
     /// tail is not pinned here, only that the record stays two lines and the
     /// token's head is removed).
@@ -292,9 +292,9 @@ public sealed class TrailLinesContractTests : IDisposable
         Assert.True(nul.Length == 2 && nul[1] == "  asked: use Bearer [removed: token] please", "NUL: " + Units(string.Join(" | ", nul)));
 
         File.Delete(_trail);
-        ActivityTrail.NotePrompt("set CLOUDFLARE_API_⁦TOKEN=abc123XYZ_secret please", "ICS3U", 1, moment);
+        ActivityTrail.NotePrompt("write to teacher\u202e@school.on.ca please", "ICS3U", 1, moment);
         string[] bidi = TrailLines();
-        Assert.True(bidi.Length == 2 && bidi[1] == "  asked: set CLOUDFLARE_API_TOKEN=[removed: token] please", "bidi: " + Units(string.Join(" | ", bidi)));
+        Assert.True(bidi.Length == 2 && bidi[1] == "  asked: write to [removed: email address] please", "bidi: " + Units(string.Join(" | ", bidi)));
 
         File.Delete(_trail);
         ActivityTrail.NotePrompt("use Bearer abc123\nSECRETTAIL please", "ICS3U", 1, moment);
