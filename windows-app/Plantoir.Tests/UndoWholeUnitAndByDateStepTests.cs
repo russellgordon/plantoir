@@ -93,6 +93,31 @@ public sealed class UndoWholeUnitAndByDateStepTests : IDisposable
         return found;
     }
 
+    /// <summary>
+    /// Part three, review 1, MEDIUM 1 (switch off): a unit whose every class is
+    /// already published, with a front page pointed by hand at an older class,
+    /// answers "already published" and touches nothing: the front page as it
+    /// was, no step, no entry in today's undo.
+    /// </summary>
+    [Fact]
+    public async Task AUnitThatChangesNoPageIsAlreadyPublishedAndTouchesNothing()
+    {
+        Class("Unit 1, Day 1", Today.AddDays(-7), published: true);
+        Class("Unit 2, Day 1", Today.AddDays(-2), published: true);
+        Class("Unit 2, Day 2", Today.AddDays(-1), published: true);
+        string indexBefore = File.ReadAllText(IndexPath);
+        var history = new UndoHistory();
+        var workspace = Open(history);
+
+        var result = await workspace.ApplyWholeUnit("ICS3U", 1, 2, publishing: true, preview: false);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(AssistWording.UnitAlreadyPublished("Unit", 2), result.Message);
+        Assert.Equal(indexBefore, File.ReadAllText(IndexPath));
+        Assert.Empty(Begins());
+        Assert.Empty(history.Entries);
+    }
+
     /// <summary>A unit published is ONE step: every class, then the front page once, as a recompute; today's undo puts it all back.</summary>
     [Fact]
     public async Task AWholeUnitIsOneStepWithTheFrontPageNamedOnce()
@@ -198,6 +223,69 @@ public sealed class UndoWholeUnitAndByDateStepTests : IDisposable
         history.Undo();
         Assert.Contains("publish: false", File.ReadAllText(PagePath("Unit 2, Day 5")));
         Assert.Equal(record, File.ReadAllText(KeptPath));
+    }
+
+    /// <summary>
+    /// Part three, review 1, MEDIUM 2 (switch off): a kept record that cannot
+    /// be read when the publish is planned (held by another program) costs
+    /// only the record: the class is published, and the record is as it was.
+    /// </summary>
+    [Fact]
+    public async Task APublishClassForADateWhoseRecordCannotBeReadStillPublishes()
+    {
+        Class("Unit 2, Day 3", Today, published: true);
+        Class("Unit 2, Day 4", Today.AddDays(1), published: true);
+        Class("Unit 2, Day 5", Today.AddDays(3), published: false);
+        Directory.CreateDirectory(Path.GetDirectoryName(KeptPath)!);
+        File.WriteAllText(KeptPath, "{\"kept\": []}\n");
+        byte[] recordBefore = File.ReadAllBytes(KeptPath);
+
+        using (new FileStream(KeptPath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            await PublishOn(Open(new UndoHistory()), Today.AddDays(3));
+        }
+
+        Assert.Contains("publish: true", File.ReadAllText(PagePath("Unit 2, Day 5")));
+        Assert.Equal(recordBefore, File.ReadAllBytes(KeptPath));
+    }
+
+    /// <summary>
+    /// Part three, review 1, LOW 3: the step an action plans through is its
+    /// own flow's. A plan another caller runs on the same workspace at that
+    /// moment (a flow started before the action's) reads the page from the
+    /// disk, never the action's half-planned step.
+    /// </summary>
+    [Fact]
+    public async Task AnotherCallersPlanNeverReadsThroughThisActionsStep()
+    {
+        Class("Unit 2, Day 1", Today.AddDays(-2), published: false);
+        string onDisk = File.ReadAllText(PagePath("Unit 2, Day 1"));
+        var workspace = Open(new UndoHistory());
+        var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var planningThrough = typeof(AssistWorkspace).GetProperty("PlanningThrough", flags)!;
+        var readPlanned = typeof(AssistWorkspace).GetMethod("ReadPlanned", flags)!;
+        using var planning = new SemaphoreSlim(0);
+        using var read = new SemaphoreSlim(0);
+
+        Task<string> otherCaller = Task.Run(async () =>
+        {
+            await planning.WaitAsync();
+            string text = (string)readPlanned.Invoke(workspace, [PagePath("Unit 2, Day 1")])!;
+            read.Release();
+            return text;
+        });
+        await Task.Run(async () =>
+        {
+            UndoActionStep step = workspace.NewUndoStep("publishPages", "ICS3U", 1);
+            step.Write(PagePath("Unit 2, Day 1"), "half planned");
+            planningThrough.SetValue(workspace, step);
+            Assert.Equal("half planned", (string)readPlanned.Invoke(workspace, [PagePath("Unit 2, Day 1")])!);
+            planning.Release();
+            await read.WaitAsync();
+            planningThrough.SetValue(workspace, null);
+        });
+
+        Assert.Equal(onDisk, await otherCaller);
     }
 
     /// <summary>A publish by date that is refused keeps nothing: the record goes in only with the pages (the mac's <c>testAPublishClassForADateThatIsRefusedKeepsNothing</c>).</summary>

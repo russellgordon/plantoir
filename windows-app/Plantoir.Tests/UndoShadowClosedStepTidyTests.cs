@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Nodes;
 using Plantoir.Core.Undo;
 
 namespace Plantoir.Tests;
@@ -57,5 +58,30 @@ public sealed class UndoShadowClosedStepTidyTests
         string kept = Assert.Single(left);
         Assert.EndsWith("-orig", kept, StringComparison.Ordinal);
         Assert.Equal(Old(First), File.ReadAllBytes(kept));
+    }
+
+    /// <summary>
+    /// Part three, review 1, LOW 4: a closed shadow step that holds an op other
+    /// than a file changed in place (here a <c>move</c>) is left alone by the
+    /// shadow tidy: its staged files stay where the dead process left them
+    /// (the mac's <c>onlyStepsOfFiles</c>).
+    /// </summary>
+    [Fact]
+    public void AShadowStepWithAMoveIsLeftAloneByTheTidy()
+    {
+        using var scribe = new UndoScribe();
+        scribe.WritePage("A", First, Old(First));
+        long seq = scribe.Fold().NextSeq;
+        JsonArray ops = scribe.OpsFor(First, Old(First), New(First));
+        ops.Add(new JsonObject { ["kind"] = UndoOp.Move, ["from"] = "courses/TST1O/x.json", ["to"] = "courses/TST1O/y.json", ["sha"] = UndoCheck.Sha(Old(Second)) });
+        scribe.Append(scribe.BeginLine(seq, ops, "A", pid: UndoScribe.AProcessThatIsGone));
+        string staged = UndoSwap.BesidePath(scribe.FullPath("A", First), $"{seq}-apply", "new");
+        File.WriteAllBytes(staged, New(First));
+
+        scribe.Door(mode: UndoMode.Shadow).Recover();
+
+        Assert.False(scribe.Fold().Steps[seq].IsInFlight);
+        Assert.True(File.Exists(staged), "the shadow tidy removed a staged file of a step that is not only files");
+        Assert.Equal(Old(First), scribe.Page("A", First));
     }
 }

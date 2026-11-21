@@ -1957,7 +1957,7 @@ public sealed partial class AssistWorkspace
                                course.Code, section);
         try
         {
-            _planningThrough = step;
+            PlanningThrough = step;
             try
             {
                 foreach (var page in plan.Changing)
@@ -1995,12 +1995,13 @@ public sealed partial class AssistWorkspace
                 if (keepingTheClassByItsDate) KeepTheClassesPublishedByTheirDate(plan, step);
 
                 // And the front page catches up with what is now published: kept
-                // true by its rule, re-derived once after the step.
-                // Named on every publish and hide, as the mac's step names it, so
-            // both platforms record the same ops (the W7a sweep, 2).
-            step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
+                // true by its rule, re-derived once after the step. Named on
+                // every publish and hide, as the mac's apply names it; when no
+                // page changes no step is made, and the front page is still
+                // repointed, as the mac's apply repoints it after its step.
+                step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
-            finally { _planningThrough = null; }
+            finally { PlanningThrough = null; }
 
             MakeTheUndoStep(step);
             if (changed.Count > 0)
@@ -2260,7 +2261,7 @@ public sealed partial class AssistWorkspace
         var step = NewUndoStep(publishing ? "publishPages" : "hidePages", course.Code, section);
         try
         {
-            _planningThrough = step;
+            PlanningThrough = step;
             try
             {
                 foreach (var page in unitPages)
@@ -2297,10 +2298,13 @@ public sealed partial class AssistWorkspace
                     }
 
                 }
-                // Named once, on every unit published or hidden (the W7a sweep, 2).
-                step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
+                // Named once, only when a class of the unit changes, as the
+                // mac names it (`if changedAnything`): a unit that changes no
+                // page touches nothing, its front page included, and answers
+                // "already published" (part three, review 1, MEDIUM 1).
+                if (step.ChangesAnything) step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
-            finally { _planningThrough = null; }
+            finally { PlanningThrough = null; }
 
             changedAnything = MakeTheUndoStep(step);
             recording.Done();
@@ -4908,13 +4912,22 @@ public sealed partial class AssistWorkspace
     /// <see cref="WriterDeclines"/>, the visibility reads) read each page as
     /// the step will leave it, so an action that plans one class after
     /// another inside ONE step (a whole unit) plans each seeing the ones
-    /// before it, as it did when each was written to the disk first.
+    /// before it, as it did when each was written to the disk first. Held
+    /// per flow of execution (<see cref="AsyncLocal{T}"/>), so a plan another
+    /// caller runs on this workspace at the same moment reads the disk, never
+    /// this action's half-planned step (part three, review 1, LOW 3).
     /// </summary>
-    private UndoActionStep? _planningThrough;
+    private readonly AsyncLocal<UndoActionStep?> _planningThroughHere = new();
+
+    private UndoActionStep? PlanningThrough
+    {
+        get => _planningThroughHere.Value;
+        set => _planningThroughHere.Value = value;
+    }
 
     /// <summary>A page's text for a planner: through the step being planned, else the disk's.</summary>
     private string ReadPlanned(string path) =>
-        _planningThrough is { } step ? step.ReadText(path) : File.ReadAllText(path);
+        PlanningThrough is { } step ? step.ReadText(path) : File.ReadAllText(path);
 
     /// <summary>The list a step goes to: this process's, or a test's own.</summary>
     internal UndoForThisProcess? UndoList { get; init; }

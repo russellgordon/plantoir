@@ -486,18 +486,28 @@ public sealed partial class AssistWorkspace
         var published = places.Select(ClassesDatedLater.PlaceKey).ToHashSet(StringComparer.Ordinal);
         Func<string, string>? readPage = step is null ? null : step.ReadText;
         Func<string, string?>? readRecord = step is null ? null : step.ReadTextIfAny;
-        var kept = ClassesDatedLater.FlaggedIn(course, section, Today(), readPage, readRecord)
-            .Where(page => published.Contains(page.Place))
-            .ToList();
         if (step is null)
         {
-            LaterClassesKept.Keep(course.DirectoryPath, section, kept);
+            var keptNow = ClassesDatedLater.FlaggedIn(course, section, Today(), readPage, readRecord)
+                .Where(page => published.Contains(page.Place))
+                .ToList();
+            LaterClassesKept.Keep(course.DirectoryPath, section, keptNow);
             return;
         }
         // Planned into the action's own step: written only if the pages are
-        // (#899 W7a), and never part of today's in-memory undo, as before.
-        if (LaterClassesKept.RecordKeeping(LaterClassesKept.Read(course.DirectoryPath, section, readRecord), kept) is { } record)
-            step.Write(LaterClassesKept.PathFor(course.DirectoryPath, section), record, todaysUndoKeepsIt: false);
+        // (#899 W7a), and never part of today's in-memory undo, as before. A
+        // record that cannot be read or planned just now costs only the
+        // record, never the publish, as before and as the mac's `try?`
+        // (part three, review 1, MEDIUM 2; LaterClassesKept's own sentence).
+        try
+        {
+            var kept = ClassesDatedLater.FlaggedIn(course, section, Today(), readPage, readRecord)
+                .Where(page => published.Contains(page.Place))
+                .ToList();
+            if (LaterClassesKept.RecordKeeping(LaterClassesKept.Read(course.DirectoryPath, section, readRecord), kept) is { } record)
+                step.Write(LaterClassesKept.PathFor(course.DirectoryPath, section), record, todaysUndoKeepsIt: false);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
     /// <summary>The classes a publish by DATE published, kept at that date (#475): the teacher named the day. Planned into <paramref name="step"/>.</summary>
