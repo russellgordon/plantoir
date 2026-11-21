@@ -43,6 +43,9 @@ internal static class Program
                 "kinds-kill" => W6Runs.KindsKill(folder),
                 "child-kinds" => W6Runs.ChildKinds(folder, args[2]),
                 "child-kinds-recover" => W6Runs.ChildKindsRecover(folder, args[2]),
+                "w7-publish-kill" => W7Runs.PublishKill(folder),
+                "child-w7-publish" => W7Runs.ChildPublish(folder, args[2], args[3]),
+                "child-w7-recover" => W7Runs.ChildRecover(folder, args[2]),
                 _ => Unknown(mode),
             };
         }

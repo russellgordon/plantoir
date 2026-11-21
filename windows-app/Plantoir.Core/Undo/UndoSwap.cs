@@ -25,6 +25,9 @@ internal enum UndoRefusalKind
 /// <summary>A refusal and the first page it names, with how many others were found in the way.</summary>
 internal sealed record UndoRefusal(UndoRefusalKind Kind, string? Path = null, int Others = 0)
 {
+    /// <summary>A couldNotWrite because every name a kept original can take beside the file is taken: neither room nor permission, so its sentence says so (W7a part two, review 1, LOW 4).</summary>
+    internal bool EveryKeptNameTaken { get; init; }
+
     /// <summary>The word the contract spells it with (<c>stepCases</c>' <c>undo</c>, the traces' <c>expect</c>).</summary>
     internal string Word => Kind switch
     {
@@ -91,6 +94,12 @@ internal sealed class UndoSeams
     /// <summary>Called with the index and the target's full path after its original is kept and before the rename (a test writes into the page in place there, L4).</summary>
     internal Action<int, string>? BetweenKeepingAndRenaming { get; init; }
 
+    /// <summary>A test's: putting the original of the swap at this index back fails, as a rename refused for good does (the mac's putBackFailsAt).</summary>
+    internal Func<int, bool>? PutBackFailsAt { get; init; }
+
+    /// <summary>A test's: clearing the Hidden attribute the swap set on the kept original at this index fails, as an attribute that will not take does (W7a part two, review 1, LOW 1).</summary>
+    internal Func<int, bool>? ShowingTheKeptFileFailsAt { get; init; }
+
     /// <summary>The POSIX-semantics rename answers "not supported" (87), as on a network share, so every swap takes the fallback (M5).</summary>
     internal bool PosixRenameIsNotSupported { get; init; }
 
@@ -148,19 +157,25 @@ internal static class UndoSwap
     /// <summary>The part of a staged name that says it is Plantoir's.</summary>
     internal const string StagedMarker = ".plantoir-undo-";
 
+    /// <summary>How many kept names (<c>-orig</c>, <c>-2-orig</c> … <c>-1000-orig</c>) a keep or a take-out tries before it is could not write.</summary>
+    internal const int KeptNames = 1000;
+
     /// <summary>How many times a refused rename is tried in all, and how long apart.</summary>
     private const int RenameTries = 6;
     private static readonly TimeSpan RenameRetryPause = TimeSpan.FromMilliseconds(10);
 
     /// <param name="places">Where an external op's target is read and set (W6); needed only by a step that holds one.</param>
+    /// <param name="keepingTheOriginalsOf">The pages (relative paths) whose kept original this swap leaves beside them once every
+    /// swap is in, never tidied: what each held a moment before, which the list would not take and the step's other direction
+    /// needs (the mac's U3c, <c>keepingTheOriginalsOf</c>; the first review of U3c, MEDIUM).</param>
     internal static UndoSwapResult Swap(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams = null,
-                                        IUndoExternalPlaces? places = null)
+                                        IUndoExternalPlaces? places = null, IReadOnlySet<string>? keepingTheOriginalsOf = null)
     {
         // Every staged file's handle is let go however the swap ends, a test's
         // kill point included, as a process that died there would let it go.
         var staged = new UndoStagedFile?[targets.Count];
         var originals = new UndoStagedFile?[targets.Count];
-        try { return SwapStaged(targets, label, root, seams, places, staged, originals); }
+        try { return SwapStaged(targets, label, root, seams, places, staged, originals, keepingTheOriginalsOf); }
         finally
         {
             foreach (UndoStagedFile? file in staged) file?.LetGo();
@@ -169,7 +184,8 @@ internal static class UndoSwap
     }
 
     private static UndoSwapResult SwapStaged(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams,
-                                             IUndoExternalPlaces? places, UndoStagedFile?[] staged, UndoStagedFile?[] originals)
+                                             IUndoExternalPlaces? places, UndoStagedFile?[] staged, UndoStagedFile?[] originals,
+                                             IReadOnlySet<string>? keepingTheOriginalsOf)
     {
         int count = targets.Count;
         int swapsMade = 0;
@@ -246,7 +262,21 @@ internal static class UndoSwap
                     // the tidy's to remove.
                     original.LetGo();
                     originals[index] = null;
-                    if (RenameWithRetries(original.Path, target.FullPath, replace: true, seams) != 0) whole = false;
+                    if (seams?.PutBackFailsAt?.Invoke(index) == true) whole = false;
+                    else
+                    {
+                        // Shown again before it is the page again; hidden
+                        // again if it stays under its kept name. Not shown,
+                        // it is never renamed onto the page: it stays Hidden
+                        // under its kept name, left for recovery, so a page
+                        // is never left Hidden (part two, review 1, LOW 1).
+                        if (!ShowTheKeptFile(original, seams?.ShowingTheKeptFileFailsAt?.Invoke(index) == true)) whole = false;
+                        else if (RenameWithRetries(original.Path, target.FullPath, replace: true, seams) != 0)
+                        {
+                            whole = false;
+                            HideTheKeptFile(original);
+                        }
+                    }
                 }
                 else if (!TryDelete(target.FullPath))
                 {
@@ -339,7 +369,18 @@ internal static class UndoSwap
             }
         }
 
-        // 3. Every swap went in: the kept originals are no longer needed.
+        // 3. Every swap went in: the kept originals are no longer needed,
+        // except one the caller keeps (what its page held a moment before,
+        // which the list would not take): let go, left under its hidden name.
+        if (keepingTheOriginalsOf is { Count: > 0 })
+        {
+            for (int index = 0; index < count; index++)
+            {
+                if (originals[index] is not { } original || !keepingTheOriginalsOf.Contains(targets[index].RelativePath)) continue;
+                original.LetGo();
+                originals[index] = null;
+            }
+        }
         if (Tidy()) return new UndoSwapResult.StoppedByATest();
         return new UndoSwapResult.Swapped();
     }
@@ -400,9 +441,27 @@ internal static class UndoSwap
                 // walked can no longer go aside unseen and be deleted with it
                 // (the mac's hard review of U2b, MEDIUM 4). A folder that
                 // differs is put back as it is and the take-out refused.
-                string aside = BesidePath(target.FullPath, label, "orig");
-                if (IsAFolderSetAside(aside) || RenameWithRetries(target.FullPath, aside, replace: false, seams) != 0)
+                // Set aside under the first kept name nothing holds (-orig,
+                // then -2-orig and on), as a page's original is: a folder
+                // already aside under a name (step numbers that collide across
+                // two computers, or a list started again) is never reused, and
+                // the take-out is never refused for good because of it (the
+                // mac's U3c, first review, LOW 3; W4c review 1, LOW 1). Every
+                // name taken is could not write, as the mac's freeKeptName.
+                string? aside = null;
+                int failure = 0;
+                bool everyNameTaken = true;
+                for (int number = 1; number <= KeptNames; number++)
                 {
+                    string candidate = BesidePath(target.FullPath, label, number == 1 ? "orig" : number + "-orig");
+                    if (UndoLinks.Look(candidate) != UndoLinks.What.Nothing) continue;
+                    failure = RenameWithRetries(target.FullPath, candidate, replace: false, seams);
+                    if (failure == 0) { aside = candidate; everyNameTaken = false; break; }
+                    if (failure is not (80 or 183)) { everyNameTaken = false; break; }
+                }
+                if (aside is null)
+                {
+                    if (everyNameTaken) return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath) { EveryKeptNameTaken = true };
                     return UndoTreeReading.Read(target.FullPath).ListingSha == take.ListingSha
                         ? new UndoRefusal(UndoRefusalKind.FileIsInUse, target.RelativePath)
                         : new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
@@ -461,6 +520,58 @@ internal static class UndoSwap
     /// <summary>Whether a staged item is a folder kept aside as an original (<c>-orig</c>): a folder a tree op took out, which holds the teacher's files.</summary>
     internal static bool IsAFolderSetAside(string path) =>
         Path.GetFileName(path).EndsWith("-orig", StringComparison.Ordinal) && UndoLinks.Look(path) == UndoLinks.What.Folder;
+
+    /// <summary>Marks a kept original Hidden, unless it already is (a page the teacher hid keeps its own attribute). Best effort: an attribute that will not take leaves the file as it is.</summary>
+    internal static void HideTheKeptFile(UndoStagedFile kept)
+    {
+        try
+        {
+            FileAttributes now = File.GetAttributes(kept.Path);
+            if (now.HasFlag(FileAttributes.Hidden)) return;
+            File.SetAttributes(kept.Path, now | FileAttributes.Hidden);
+            kept.HiddenByTheSwap = true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>
+    /// Marks a kept original Hidden where it is left and named as "the hidden
+    /// file" (recovery's lines, a step left part way, a kept file the list
+    /// could not take), so the word is true on every path: a kept file made
+    /// before a kill, before the swap hid it, or written fresh inside a tree
+    /// brought back (W7a part two, review 1, LOW 2). Only a file with one
+    /// name: a kept original that is still a hard link to its page (a kill
+    /// between keeping it and the page's rename) is left as it is, so a page
+    /// is never hidden. Best effort.
+    /// </summary>
+    internal static void HideAKeptFileLeft(string fullPath)
+    {
+        try
+        {
+            FileAttributes now = File.GetAttributes(fullPath);
+            if (now.HasFlag(FileAttributes.Hidden) || now.HasFlag(FileAttributes.Directory)) return;
+            using (var handle = File.OpenHandle(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                if (UndoFileIdentity.LinksOf(handle) != 1) return;
+            }
+            File.SetAttributes(fullPath, now | FileAttributes.Hidden);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>Clears the Hidden attribute the swap set, before a kept original is renamed back to be the page. False when it is still Hidden, so it must not be renamed onto the page.</summary>
+    private static bool ShowTheKeptFile(UndoStagedFile kept, bool failsForATest = false)
+    {
+        if (!kept.HiddenByTheSwap) return true;
+        if (failsForATest) return false;
+        try
+        {
+            File.SetAttributes(kept.Path, File.GetAttributes(kept.Path) & ~FileAttributes.Hidden);
+            kept.HiddenByTheSwap = false;
+            return true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+    }
 
     /// <summary>The place a staged name stands beside: the name between its leading dot and its LAST <c>.plantoir-undo-</c>, or null.</summary>
     internal static string? PlaceOfStagedName(string name)
@@ -526,20 +637,36 @@ internal static class UndoSwap
 
         if (replacing)
         {
-            string originalPath = BesidePath(target.FullPath, label, "orig");
-            // A leftover of an earlier try may be a link to this very page:
-            // removed without touching its attributes (LOW 4).
-            UndoStagedFile.RemoveByName(originalPath);
+            // Kept under the first name nothing holds (-orig, then -2-orig
+            // and on), created exclusively: a file under a kept name is never
+            // removed, overwritten or reused, since step numbers are not
+            // unique across two computers syncing one folder or after a list
+            // is started again, and an earlier undo of the same step can leave
+            // its kept original for good (the mac's U3c; the third review of
+            // U3a, LOW 6, and the first review of U3c, LOW 4). One that appears
+            // at the chosen name in that instant sends it to the next.
             // A page the step removes has no staged content holding its folder
             // in place: its original holds the handle instead, from the keep
             // to the delete, which an editor's save cannot meet (the page is
             // going). A page the step replaces is held by its staged content.
-            UndoStagedFile? kept = UndoStagedFile.Keep(target.FullPath, originalPath, out int failure, holdItsFolder: staged[index] is null);
+            UndoStagedFile? kept = null;
+            int failure = 0;
+            bool everyNameTaken = true;
+            for (int number = 1; number <= KeptNames && kept is null; number++)
+            {
+                string originalPath = BesidePath(target.FullPath, label, number == 1 ? "orig" : number + "-orig");
+                if (UndoLinks.Look(originalPath) != UndoLinks.What.Nothing) continue;
+                kept = UndoStagedFile.Keep(target.FullPath, originalPath, out failure, holdItsFolder: staged[index] is null);
+                if (kept is null && failure is not (80 or 183)) { everyNameTaken = false; break; }
+            }
             if (kept is null)
             {
                 // On a volume without hard links the original is COPIED, and a
                 // copy can fail for room or permission: the same word as a
-                // staging write that fails (the mac's U2a review, LOW 1).
+                // staging write that fails (the mac's U2a review, LOW 1). Every
+                // kept name taken is could not write too, never "in use" (the
+                // mac's UndoCheck couldNotWrite; W4c review 1, LOW 2).
+                if (everyNameTaken) return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath) { EveryKeptNameTaken = true };
                 return new UndoRefusal(IsRoomOrPermission(failure) ? UndoRefusalKind.CouldNotWrite : UndoRefusalKind.FileIsInUse, target.RelativePath);
             }
             originals[index] = kept;
@@ -593,6 +720,15 @@ internal static class UndoSwap
             }
         }
         wentIn = true;
+        // The page's rename has gone in, so the kept name alone holds its
+        // earlier content (a hard link no longer shares the page's
+        // attributes): it is marked Hidden now. On Windows a leading dot
+        // hides nothing: measured on the PC (LENOVO, Windows 11 Pro 26200,
+        // "Show hidden files" off), a dot file is listed and selected by
+        // File Explorer, outside and inside OneDrive, and one marked Hidden
+        // is not; so "kept beside it as the hidden file" is true only with
+        // the attribute (W7a review 1, MEDIUM 1; the director's call).
+        if (originals[index] is { } keptNow) HideTheKeptFile(keptNow);
 
         // L4: the original is the page as it was AT the rename (a hard link),
         // so an edit made in place between the re-read and the rename shows
@@ -775,8 +911,16 @@ internal static class UndoSwap
     /// short and is finished here; a <c>-new</c> folder is a tree made beside
     /// its place that never went in, and goes.</para>
     /// </summary>
+    /// <param name="keepingOnlyCopies">Removes a kept original FILE (<c>-orig</c>, <c>-&lt;n&gt;-orig</c>) only when it is not the
+    /// only copy of what it holds: its bytes are its page's (<see cref="IsACopyOfItsPlace"/>), or exactly what the list gives for
+    /// its page (<paramref name="unlessTheListHolds"/>, kept file and page in). One that differs stays beside its page under its
+    /// hidden name (the mac's U3c: nothing that is an only copy is deleted).</param>
+    /// <param name="keepingCopiesHolding">The hashes of kept originals' bytes the list would not take just now: a kept original
+    /// holding one stays even when its page holds the same (the second review of U3c, MEDIUM).</param>
     internal static bool TidyLeftovers(long seq, IEnumerable<string> relativePaths, string root,
-                                       IReadOnlyDictionary<string, string>? asideListings = null, Action<UndoAsideFolder>? onAside = null)
+                                       IReadOnlyDictionary<string, string>? asideListings = null, Action<UndoAsideFolder>? onAside = null,
+                                       bool keepingOnlyCopies = false, Func<string, string, bool>? unlessTheListHolds = null,
+                                       IReadOnlySet<string>? keepingCopiesHolding = null)
     {
         bool allGone = true;
         var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -811,6 +955,13 @@ internal static class UndoSwap
                     }
                     continue;
                 }
+                if (keepingOnlyCopies && name.EndsWith("-orig", StringComparison.Ordinal) && PlaceOfStagedName(name) is { } placeName)
+                {
+                    string place = Path.Combine(folder, placeName);
+                    bool theListHoldsIt = unlessTheListHolds?.Invoke(entry, place) == true;
+                    if (!IsACopyOfItsPlace(entry, place) && !theListHoldsIt) continue;
+                    if (HoldsAnyOf(keepingCopiesHolding, entry)) continue;
+                }
                 // A kept original a stopped swap left may still be a hard link
                 // to the live page (it died before the rename): removed with
                 // the read-only attribute ignored, never cleared, since the
@@ -820,6 +971,20 @@ internal static class UndoSwap
         }
         return allGone;
     }
+
+    /// <summary>
+    /// Whether a kept original is NOT the only copy of what it holds: its
+    /// place holds a file with the same bytes (the new content never went in,
+    /// or it was put back). One that differs from its place, whose place is
+    /// gone, or that cannot be read now, is kept (the mac's isACopyOfItsPlace).
+    /// </summary>
+    internal static bool IsACopyOfItsPlace(string kept, string place) =>
+        UndoCurrent.Read(kept) is UndoCurrent.Bytes keptBytes && UndoCurrent.Read(place) is UndoCurrent.Bytes there
+        && keptBytes.Content.AsSpan().SequenceEqual(there.Content);
+
+    /// <summary>Whether a kept original's bytes hash to one of these.</summary>
+    internal static bool HoldsAnyOf(IReadOnlySet<string>? shas, string kept) =>
+        shas is { Count: > 0 } && UndoCurrent.Read(kept) is UndoCurrent.Bytes bytes && shas.Contains(UndoCheck.Sha(bytes.Content));
 
     /// <summary>A teacher's folder a stopped swap set aside: renamed back into its place when that is free, else to the first free visible name beside it. True when it went.</summary>
     private static bool PutBackOrKeepVisibly(string aside, string hiddenName, string folder,
@@ -921,6 +1086,9 @@ internal sealed class UndoStagedFile
     private SafeFileHandle? _handle;
     private readonly (uint Volume, ulong Index)? _identity;
 
+    /// <summary>Whether the swap set the Hidden attribute on this kept original (so it clears it again before putting it back, and never clears one the page had of its own).</summary>
+    internal bool HiddenByTheSwap { get; set; }
+
     private UndoStagedFile(string path, bool isALink, SafeFileHandle? handle, (uint Volume, ulong Index)? identity)
     {
         Path = path;
@@ -954,6 +1122,16 @@ internal sealed class UndoStagedFile
         bool linked = CreateHardLinkW(UndoLock.LongPath(keptPath), UndoLock.LongPath(page), IntPtr.Zero);
         if (!linked)
         {
+            // Something already holds the name: never a copy over it, and
+            // never a reason to remove it (the mac's keepByCopying, U3c). The
+            // copy itself is exclusive, so a file that appears in between is
+            // never overwritten either.
+            int linkFailure = Marshal.GetLastWin32Error();
+            if (linkFailure is 80 or 183)
+            {
+                failure = linkFailure;
+                return null;
+            }
             try { File.Copy(page, keptPath, overwrite: false); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {

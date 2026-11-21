@@ -299,12 +299,15 @@ public class SectionVerbsTests : IDisposable
             answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
                                          "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "2 pages ticked");
 
-        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the pages you named", ""), answer.Summary);
-        Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
-        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — carried out, 2 pages ticked", File.ReadAllText(_trail));
+        // Since #899 W7a the publish is ONE step, all of it or none: the page
+        // in use stops it with nothing written, so the true sentence is
+        // "Nothing was changed" and Day 1 is untouched.
+        Assert.StartsWith("Nothing was changed: “Unit 1, Day 2.md” is in use by another program.", answer.Summary);
+        Assert.DoesNotContain("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.DoesNotContain("Section ▸ Publish Pages… — carried out", File.ReadAllText(_trail));
     }
 
-    /// <summary>The same through a whole unit, which has its own write loop.</summary>
+    /// <summary>The same through a whole unit: one step since #899 W7a, so a page held against writing leaves the whole unit as it was, said as nothing changed.</summary>
     [Fact]
     public async Task AWholeUnitThatStoppedPartWay_IsCarriedOut()
     {
@@ -314,9 +317,9 @@ public class SectionVerbsTests : IDisposable
             answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1" }, plan: false),
                                          "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "1 unit");
 
-        Assert.StartsWith(AssistWording.PublishStoppedPartWay("Unit 1", ""), answer.Summary);
-        Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
-        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — carried out, 1 unit", File.ReadAllText(_trail));
+        Assert.StartsWith("Nothing was changed: ", answer.Summary);
+        Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — changed nothing, 1 unit", File.ReadAllText(_trail));
     }
 
     /// <summary>
