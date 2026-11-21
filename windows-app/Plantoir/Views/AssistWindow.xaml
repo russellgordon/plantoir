@@ -76,7 +76,8 @@
             </Grid.ColumnDefinitions>
             <TextBox x:Name="Input" Grid.Column="0" PlaceholderText="Ask about this section…"
                      IsEnabled="False" KeyDown="Input_KeyDown"
-                     AutomationProperties.AutomationId="assistInput" />
+                     AutomationProperties.AutomationId="assistInput"
+                     AutomationProperties.Name="Ask about this section" />
             <Button x:Name="SendButton" Grid.Column="1" Content="Send" IsEnabled="False"
                     Style="{ThemeResource AccentButtonStyle}" Click="Send_Click"
                     AutomationProperties.AutomationId="assistSendButton" />
