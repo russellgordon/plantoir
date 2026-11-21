@@ -134,7 +134,7 @@ Quartz server". Since #1016:
 
 | What the wait needs | Where it comes from | How it waits |
 |---|---|---|
-| The run has ended, could not start, or was stopped | `ScriptRunner` (`IsRunning`, `LastExitCode`, `LaunchProblem`, `WasStoppedByUser`) | Woken by the change. A run refused because the folder's tools are not ready sets `LastExitCode` -1 and ends the wait. A run that sets only `LaunchProblem` (`preview.ps1` gone between the press's checks and the start, or a pseudo console that would not open; `LastExitCode` stays null) wakes the wait, which finds no ending and waits on with its sentence in the console, as the once-a-second loop did before #1016. Treating it as over was tried on the branch and withdrawn (second review): it took the console down with the sentence in it, so the teacher saw nothing; keeping the sentence up while letting the lease go is owed, with a window test. A `preview.ps1` missing BEFORE the press never gets this far: the press's own check refuses it (`AssistRefusal`, "isn't a Plantoir working folder"), and today that refusal is only logged, which is a separate gap |
+| The run has ended, could not start, or was stopped | `ScriptRunner` (`IsRunning`, `LastExitCode`, `LaunchProblem`, `WasStoppedByUser`) | Woken by the change. A run refused because the folder's tools are not ready sets `LastExitCode` -1 and ends the wait. A run that sets `LaunchProblem` (the folder has no `preview.ps1`, before the press or after its checks, or a pseudo console that would not open) is a run that never started (`PreviewStarts.HowTheRunStands`, asked before the exit code): the wait ends at once, the record and the lease go back, the trail gets `preview could not start` with the sentence and `LaunchProblemDetail`, and the sentence is shown under "Cannot Preview Yet" while the console keeps it (#928, #1022 item 1). The rule withdrawn in #1016 took the console down with the sentence in it; the console now stays up while `LaunchProblem` is set. |
 | The address | the launcher's line, collected as lines arrive (#278) | Woken by the change (`PreviewAddress` now raises `PropertyChanged` when it changes) |
 | "Launching Quartz preview" | `build_site.py`'s line, collected as lines arrive (`ScriptRunner.HasAnnouncedQuartzLaunch`) | Woken by the change |
 | "Started a Quartz server" | Quartz's line, collected as it arrives (`ScriptRunner.ServerStartedAt`, the time it ARRIVED, where the old loop stamped the look that first saw it, up to a second late), read in the unfinished line too: it is the last line before a quiet server, and ConPTY can hold a line's end back until the next drawing (#623, #661), so waiting for the end would leave the 45 s bound unstarted (#233). The address alone still waits for its line to end | Woken by the change |
@@ -148,6 +148,10 @@ reading and the wait is not lost (`AChangeBeforeTheAwaitIsNotLost`), and
 disposes it every turn. Unlike the mac's Observation registration (which
 cannot be withdrawn on macOS 15) a .NET event handler is removed, so nothing
 is left behind.
+
+One start at a time per window (#928, the mac's #812): a start while the window's own start waits for a stop or builds does nothing (`preview already starting`); every start takes through `PreviewStarts.Begin`, the lease then its own record; a parked start runs only while it still belongs (its own lease, the latest start, the page there, the quit not gone ahead, `App.QuitHasGoneAhead`). The repair's Preview Again carries its press (`PreviewAgainPresses`, #813).
+
+Sentences: launch problems name no file and carry no system text (`ScriptRunner.LaunchProblemDetail` holds both, trail only); `LaunchProblemWordingTests` holds Windows to it.
 
 `ScriptRunner.WaitUntilFinished` (a deploy leg, a build before a deploy, the
 tools' own runs) and `WaitUntilFinishedOrKill` looked at `IsRunning` every
@@ -14523,7 +14527,7 @@ then the default button), and Enter there presses Stop Deploy, the default,
 as Return does on the mac; Space there ticks the box. With the focus moved to
 Cancel, Enter and Space both press Cancel. A second preview started straight
 after a stopped one ended on its own with "Something went wrong" in this VM,
-so each UI test runs one preview; not looked into (it is not this piece's).
+so each UI test runs one preview. Explained by #1026: the earlier stop's two-second kill fallback (`ScriptRunner.CancelByUser`) asked only whether the runner was running and terminated the new run, whose stop flags were already reset, so it read as a failure. Since #1026 the fallback terminates only the run it was set for. The UI tests still run one preview each; that can now be relaxed.
 
 **Rejected.** A `KeyDown` or `PreviewKeyDown` on the window or the panel: a
 hidden key catcher. Initial focus moved to Cancel as #979's
