@@ -198,12 +198,12 @@ public sealed class UndoOpKindsContractTests : IDisposable
         Assert.True(scribe.Places.Read(UndoKindsForTheCases.Preference).NotSet);
     }
 
-    /// <summary>The compact spelling: keys sorted, a whole number without a point, the shortest double, and a whole number beyond 2^53 refused.</summary>
+    /// <summary>The compact spelling, as the mac's own code spells it (measured, 2026-11-20): keys sorted, a whole number without a point, a fraction in %.17g, and a whole number beyond 2^53 refused.</summary>
     [Fact]
     public void ANewValueIsSpelledCompactlyAndNeverApproximately()
     {
         using JsonDocument document = JsonDocument.Parse("{\"z\": [1.0, 0.1, \"a/b\\n\"], \"a\": null, \"m\": {\"y\": true, \"b\": false}}");
-        Assert.Equal("{\"a\":null,\"m\":{\"b\":false,\"y\":true},\"z\":[1,0.1,\"a/b\\n\"]}", UndoJson.From(document.RootElement)!.Spelled());
+        Assert.Equal("{\"a\":null,\"m\":{\"b\":false,\"y\":true},\"z\":[1,0.10000000000000001,\"a/b\\n\"]}", UndoJson.From(document.RootElement)!.Spelled());
         using JsonDocument big = JsonDocument.Parse("9007199254740993");
         Assert.Null(UndoJson.From(big.RootElement)!.Spelled());
     }
