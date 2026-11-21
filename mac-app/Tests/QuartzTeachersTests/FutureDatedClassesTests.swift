@@ -138,7 +138,12 @@ final class FutureDatedClassesTests: XCTestCase {
         ClassesDatedLater.keep(ClassesDatedLater.flagged(forSection: 1, in: course, today: today), forSection: 1, in: course)
         let fileURL: URL = ClassesDatedLater.KeptRecord.fileURL(courseDirectory: course.directoryURL, section: 1)
         let before: String = try String(contentsOf: fileURL, encoding: .utf8)
-        let released: [AssistSavedFile] = PublishedPagesRecord.release(courseDirectory: course.directoryURL, section: 1)
+        // Planned into the rollover's one step since #899 U3b, and made
+        // with it.
+        let step: JournaledStep = JournaledStep(course: course, section: 1, maker: UndoStepMaker.sheet("rollOver"))
+        let released: [AssistSavedFile] = PublishedPagesRecord.release(courseDirectory: course.directoryURL, section: 1, into: step)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path), "nothing is written until the step is made")
+        try step.make()
         XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
         var putBack: Bool = false
         for file in released where file.fileURL == fileURL && file.before == before && file.after == nil {

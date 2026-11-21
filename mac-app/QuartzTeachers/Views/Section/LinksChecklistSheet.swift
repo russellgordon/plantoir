@@ -369,6 +369,13 @@ struct LinksChecklistSheet: View {
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("linksChecklistSheet")
+        .task {
+            // Publish and Not Now each make a step on the main actor: the
+            // list is read off it now, while the teacher reads the sheet, so
+            // that step reads on from here (#899, ruling 8 on U1's third
+            // round; the first review of U3a, LOW 6).
+            await JournaledStep.readTheListAhead()
+        }
     }
 
     // MARK: - Parts

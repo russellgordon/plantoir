@@ -811,6 +811,18 @@ nonisolated enum AssistWording {
         + "It may still try to deploy, and it has no way to ask what the new website should be "
         + "called — turn it off from the section's menu."
 
+    /// Undo (or Redo) of a rollover put a deploy set for later back, and
+    /// the computer would not start it now (the re-review of U3b's fixes,
+    /// LOW 2). Its file is back where it is read at login, so it starts the
+    /// next time the teacher logs in, and not before: it will not run at its
+    /// time unless they log out and back in first. Neither "it is back"
+    /// (it will not run at its time) nor "it stays off" (it will run) is
+    /// true, so it has a sentence of its own, for U7 to say beside the Undo.
+    static let undoScheduleStartsAtTheNextLogin: String =
+        "The deploy set for later is back, but it could not be started now. "
+        + "It starts the next time you log in, so it will not run at its time "
+        + "unless you log out and back in before then."
+
     // MARK: - Getting a section ready for the start of the year (#96)
 
     /// An outside assistant called `prepare_for_start_of_year` without the

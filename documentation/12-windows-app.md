@@ -8699,7 +8699,11 @@ pinned:
   left alone (since #564 a file an earlier press already put back no longer
   counts), so `undo_last_change` notes the change exactly when it answers
   `undidPartly`: files both put back and left alone.
-- **A publish or hide that wrote and then stopped part way**, both the page
+- **A publish or hide that wrote and then stopped part way** (on the mac
+  this path, and the re-date's below, cannot happen since #899's U3, where
+  each is ONE step staged and swapped in whole; Windows' W7 brings the same,
+  and `SectionVerbsEndingTests`' mac tests now pin "changed nothing" and
+  nothing written: documentation 09, "U3"). Both the page
   list (`AssistWorkspace.Apply`) and the whole unit (`ApplyWholeUnit`). The
   recording is abandoned on the throw, so the top entry does not move. Each
   tracks whether a file has been written yet (`wrote`, and the whole unit's
@@ -17173,6 +17177,27 @@ through that handle AFTER the rename writes into the old file, which the tidy
 then removes (Obsidian writes by opening the path afresh, so this is the
 L4-shaped race the hash catches only before the rename).
 
+**U3 (the mac, `issue/899-u3-daily-page-actions`) puts every daily page
+action through the door, one step each**, recorded in shadow: documentation
+09 → "U3: every daily page action through the door". What Windows inherits:
+
+- `contracts/undo-action-steps.json`, each action's step as the mac's real
+  code made it (20 steps: key, maker, the files' whole text before and
+  after, the op kinds);
+- `undo-traces.json` → `actionTraces`, 120 traces made from those steps by
+  `scripts/make_undo_traces.py` beside the unchanged 20 `traces`.
+  `UndoTraceContractTests` reads `traces` only, so nothing on Windows reads
+  the new key yet (W7's);
+- one sentence in `undo.rule.recovery`: in shadow, recovery removes the
+  staged files of a step it closes interrupted when every op of the step
+  changes a file in place, because since U3 a shadow step is staged like a
+  live one.
+
+What Windows owes (W7): each daily action planned whole and made through
+its door as ONE step (a whole unit, the links checklist with its records,
+Publish Class for a Date with its kept record, the window's Duplicate with
+its room), the step keys of the 09 table, and the action traces replayed.
+
 ### What Windows has built: W3, recovery (#899, #949)
 
 Piece W3 (branch `issue/899-w3-recovery`, on W2b, 2026-11-20) settles a step
@@ -17467,9 +17492,45 @@ recording and the trail event `undo could not record a step` move to W7.
 | W4 | doc 12's step 7 and the scaffolding: where the list lives (following `--state-dir`), `madeBy` from `AssistWorkspace.Surface` (L1), the writer scan | W2a merged; no longer after W3 |
 | W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
 | W6 | the reserved op kinds and running `recompute` | the mac's U2 |
-| W7 | every daily page action through the door, publish and hide recorded (M1), `undo could not record a step` | the mac's U3, and #900 and #927 where they rewrite a writer |
+| W7 | every daily page action through the door, publish and hide recorded (M1), `undo could not record a step`; replay `undo-traces.json` → `actionTraces` (120, from `undo-action-steps.json`: an `action` call is a step given as each file's before and after, its ops worked out by the door's rule, and the trace pins the op kinds), and the one sentence U3 added to `rule.recovery` (shadow recovery removes the staged files of a closed step whose every op changes a file in place) ; from U3b, the rollover as ONE step (documentation 09, "U3b: the rollover as one step"): the new op kind `moveApart` (judged as `move`; an Undo or Redo that finds it changed since leaves it, names it in `leftApart`, and goes on: Russell's ruling of 2026-11-19 on Q3, #959), the `external` family `scheduledDeploy:<name>` with Windows' own value for its Task Scheduler job (removed by the rollover; set back only while its moment is ahead, otherwise left apart and named), a recorded step's `moves` in `undo-action-steps.json`, an action trace's `deploy` call and `leftApart`, and the 4 `moveApart` checkCases and 8 U3b stackCases (calls `rollOverOntoANewWebsite`, `rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`, `theScheduleCannotBeSetNow`; keys `leftApart`, `schoolYear`, `cloudflareMarkers`). From U3b's second round: a step's `moveApart` records move as a GROUP (any one changed since leaves every one apart, so a section is never split across two websites); a schedule the swap cannot set at an Undo or Redo (the scheduler refuses the task) is left apart and named, never a refusal; a job whose moment is not recorded is never set back; a refused swap removes the empty folders it made; the legacy Netlify record in the built output is brought into `.netlify_sites` BEFORE the step (never a refusal: Russell, 2026-11-20 evening); refused, nothing changed, only when a record cannot be read, written or removed; a step then refused moves it back, or says what moved. From U3b's fix round three: ONE question decides every record, which one a deploy reads now (`undo.netlifyRecordCases`, 20 rows run through deploy.py's own `load_netlify_marker` by `scripts/test_netlify_record_a_deploy_reads.py`, which Windows' Python already runs; W7 runs the rows through its own reader too): a current record that parses wins, else a legacy one that parses (migrated into the current place; a current record that does not parse is first moved to `section<N>.unreadable.json` and never moved again), else none; a record that names no site (`null`, `{}`, `[]`, a string, an empty `id`) is no website, so nothing is brought in or moved and the section is said to have had no website. Only what a deploy reads moves, plus a legacy record that parses and differs from the current one: that one is the LEFTOVER `section<N>.from-built-output.json` (`.2`, `.3`… when the name is taken, never a refusal) and is set aside by the step as the new op kind `setAside` (judged as `move`, standing apart ON ITS OWN, never one of the group: 3 checkCases, 4 stackCases, calls `rollOverSettingALeftoverAside` and `removeTheKeptLeftover`, key `leftoverMarkers`); a legacy record saying the same as the current one, compared parsed, is only removed; a record a deploy cannot parse is NOT moved (it stays in the built output), and `section<N>.unreadable.json` is no `setAside` leftover. Corrections in documentation 12, "The rollover, U3b fix round four". A schedule put back whose task will only start at the next login is named in `startsAtTheNextLogin` (an Undo outcome of its own, sentence `undoScheduleStartsAtTheNextLogin`, 1 stackCase, call `theScheduleStartsOnlyAtTheNextLogin`), never as left apart. Until W7 a reader that does not know `moveApart` reads the step as a barrier, which is safe; the rows (and the wording key) belong on the named-gap ledger against #899 for W7 | the mac's U3 (U3a landed the daily actions; U3b the rollover), and #900 and #927 where they rewrite a writer |
 | W8 | settings (`editJSON`, never `writeFile`, on `course_config.json`), renames, New Course, reference courses; rollover and restore | the mac's U4; #897 B; #909 and #873 |
 | W9 | Delete Backup and Delete Archive to the Recycle Bin | the mac's U5 and Windows' 785a (#912) |
 | W10 | the offer to deploy after an Undo or Redo | the mac's U6, and W5 |
 | W11a | the flip, recovery at a windowed launch, holds, reach, titles, `undo_last_change`'s body, today's three histories retired | the mac's U7; #904/#829 |
 | W11b | Edit ▸ Undo and Redo, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, typing first, the two-process UI test | W11a |
+
+### The rollover, U3b fix round four: corrections to the W7 row (#899, 2026-11-20)
+
+Corrections to the W7 row's U3b passage ("From U3b's fix round three: ..."),
+made true by fix round four:
+
+- `undo.netlifyRecordCases` is now 20 rows (was 13). New field
+  `currentEndsWithAByteThatIsNotUTF8` (the byte FF follows the row's text).
+  `site` is the id a deploy GOES ON WITH: `site_marker.get("id")`, null when
+  absent or empty, or when the record is not an object.
+- The section's website is that site. A Netlify record that names no site
+  (`null`, `{}`, `[]`, a string, an empty `id`) is not a website: a rollover
+  moves nothing of it and says the section was on no website. A record whose
+  bytes cannot be read at all stays "still pinned" (cannot tell now).
+- Only what must move, moves. With no site, nothing is brought in or moved.
+  With the legacy record's site, it is brought into the current place (a
+  current record there that does not parse first moved to
+  `section<N>.unreadable.json`, NEVER moved again). With the current record's
+  site, a legacy record that parses and differs is brought in as
+  `section<N>.from-built-output.json` and set aside by the step (`setAside`);
+  one that says the same is removed; one that does not parse stays in the
+  built output. Delete from the row: `section<N>.unreadable.json` as a
+  `setAside` leftover, and "a section<N>.json that does not parse" set aside.
+- Every kept name of a step comes from one chooser (Mac:
+  `DeployCommand.KeptNames`): the file's own name with `.previous-<stamp>`
+  before `.json`, then `.2`, `.3`… after the stamp, the first neither on disk
+  nor already chosen in the step. A record's kept name that is taken no
+  longer leaves the record pinned.
+- The "starts at the next login" trail line is written only after the whole
+  swap has gone in (Mac: `UndoExternalPlaces.noteItStartsAtTheNextLogin`,
+  called by the journal after `.swapped`), never inside the write.
+
+No contract row Windows runs today changed (Windows has no walk over
+`netlifyRecordCases`; `scripts/test_netlify_record_a_deploy_reads.py` runs
+there through `PythonToolchainTests` and passes on the new rows), so nothing
+new is held in `NamedGapLedger.cs`.

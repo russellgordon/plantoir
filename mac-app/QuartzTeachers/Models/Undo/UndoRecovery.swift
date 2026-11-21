@@ -25,10 +25,15 @@ import Foundation
 /// "never while a change is applied", so two processes cannot repair the
 /// same step at once. It is rare (a crash) and bounded by the step's size.
 ///
-/// A put-back that cannot be planned (content it needs is missing, or a
-/// file it must move is in the way) can never succeed later either: the
-/// step is closed `interrupted` (reason `couldNotPutBack`, naming the files
-/// left part way) and the list cleared, exactly as for a hand edit. A swap
+/// Content a put-back needs that the list no longer holds is taken from the
+/// step's own kept original beside the page (`-orig`) when its hash is the
+/// one the journal recorded, and the step is rolled back (Russell's ruling
+/// of 2026-11-20, 15:20). A put-back that still cannot be planned (no kept
+/// original matches, or a file it must move is in the way) can never
+/// succeed later either: the step is closed `interrupted` (reason
+/// `couldNotPutBack`, naming the files left part way) and the list
+/// cleared, and every kept original that differs from its page is left
+/// beside it, the only copy of what it held, named on the trail. A swap
 /// that is refused (a file another program holds, the everyday case on
 /// Windows) is tried again on a bounded schedule (`UndoRefusedSwaps`): at
 /// once at an Undo or a Redo, and on the ordinary path one minute after the
@@ -42,8 +47,9 @@ import Foundation
 /// for ever (the director's ruling 4 on U1's second reviews: measured
 /// before, 121 steps and none pruned behind one such step).
 ///
-/// A step closed `interrupted` leaves nothing of the journal's in a course:
-/// its staged files are removed when it is closed, and when its folder could
+/// A step closed `interrupted` leaves nothing of the journal's in a course
+/// but the kept originals that are the only copy of what a page held: its
+/// staged files are removed when it is closed, and when its folder could
 /// not be reached then, by the first recovery in each process that can reach
 /// it (`tidyClosedSteps`; the director's ruling 6 on U1's third round).
 nonisolated enum UndoRecovery {
@@ -70,6 +76,7 @@ nonisolated enum UndoRecovery {
         places: UndoExternalPlaces = UndoAppPreferences(),
         leavingStepsThatRederive: Bool = true
     ) -> [UndoRecoveryResult] {
+        writer.recoveredInThisHold = true
         var results: [UndoRecoveryResult] = []
         let now: Date = writer.journal.now()
         for record in writer.fold.inFlight {
@@ -104,16 +111,27 @@ nonisolated enum UndoRecovery {
                 continue
             }
             var swapRefused: Bool = false
-            if let result = settle(record, root: root, writer: writer, mode: mode, places: places, swapRefused: &swapRefused) {
+            var leftFor: UndoRefusal? = nil
+            if let result = settle(record, root: root, writer: writer, mode: mode, places: places, swapRefused: &swapRefused, leftFor: &leftFor) {
                 UndoRefusedSwaps.forget(key)
                 results.append(result)
             } else if swapRefused {
                 UndoRefusedSwaps.noteARefusal(key, now: now)
+                if let leftFor {
+                    writer.leftByRecovery[record.step.seq] = leftFor
+                }
             }
         }
-        if mode == .live {
-            tidyClosedSteps(writer, resolveRoot: resolveRoot)
-        }
+        // In shadow too, since U3: a shadow step is now staged beside its
+        // pages like a live one, so one closed interrupted would otherwise
+        // leave its dot-files in the course until the switch flips. Shadow
+        // removes only the journal's own staged FILES, never a folder set
+        // aside (steps that move or make folders are left to a live
+        // recovery), so it still writes nothing of the teacher's.
+        tidyClosedSteps(writer, resolveRoot: resolveRoot, onlyStepsOfFiles: mode == .shadow, mode: mode)
+        // And what a shadow swap without the list left when its process
+        // died (`UndoShadowStaging`; the first review of U3a, LOW 8).
+        UndoShadowStaging.tidyLeftovers(of: writer.journal)
         return results
     }
 
@@ -144,10 +162,21 @@ nonisolated enum UndoRecovery {
     /// process has not yet tidied and whose folder it can reach. Each is
     /// tidied once per process, a few folder listings for the rare step that
     /// was closed; one whose file could not be removed (held, or made
-    /// immutable) is looked for again at the next lock.
-    static func tidyClosedSteps(_ writer: UndoJournalWriter, resolveRoot: (UndoWorkingFolder) -> URL?) {
+    /// immutable) is looked for again at the next lock. A kept original
+    /// that differs from its page is kept, live and in shadow: the step is
+    /// closed, so nothing will put its page back from the list, whose
+    /// content for it is pruned with it (the third review of U3a, LOW 1).
+    static func tidyClosedSteps(
+        _ writer: UndoJournalWriter,
+        resolveRoot: (UndoWorkingFolder) -> URL?,
+        onlyStepsOfFiles: Bool = false,
+        mode: UndoMode = .live
+    ) {
         for seq in writer.fold.orderedSeqs {
             guard let record = writer.fold.records[seq], record.phase == .interrupted else {
+                continue
+            }
+            if onlyStepsOfFiles && !UndoRecovery.changesOnlyFiles(record.step) {
                 continue
             }
             let key: String = writer.journal.folderURL.standardizedFileURL.path + "#" + String(seq)
@@ -160,7 +189,10 @@ nonisolated enum UndoRecovery {
             guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
                 continue
             }
-            if !tidyStagedFiles(of: record.step, root: root) {
+            // Closed `interrupted`: the step did not settle, so a kept
+            // original that is the only copy of its page's earlier content
+            // stays beside the page (the second review of U3a, MEDIUM b).
+            if !tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true) {
                 // Something held or locked: looked for again at the next lock.
                 continue
             }
@@ -170,27 +202,233 @@ nonisolated enum UndoRecovery {
         }
     }
 
+    /// Whether every op of the step changes a file in place (`writeFile`,
+    /// `editLine`, `replaceText`, `editJSON`) or is a `recompute`: nothing
+    /// it stages is a folder or a moved item.
+    static func changesOnlyFiles(_ step: UndoStep) -> Bool {
+        for op in step.ops {
+            switch op.knownKind {
+            case .writeFile, .editLine, .replaceText, .editJSON, .recompute:
+                continue
+            default:
+                return false
+            }
+        }
+        return true
+    }
+
     /// Every staged file a step's apply, undo, redo or recovery left beside
-    /// the files it names. True when none is left.
+    /// the files it names. True when none is left. `keepingOnlyCopies`, for
+    /// a step that did not settle: a kept original that differs from its
+    /// page is left where it is (`UndoSwap.isACopyOfItsPlace`).
     @discardableResult
-    static func tidyStagedFiles(of step: UndoStep, root: URL) -> Bool {
+    static func tidyStagedFiles(
+        of step: UndoStep, root: URL, keepingOnlyCopies: Bool = false, unlessTheListHoldsFrom journal: UndoJournal? = nil,
+        keepingCopiesHolding notInTheList: Set<String> = []
+    ) -> Bool {
         var urls: [URL] = []
         for op in step.ops {
             for path in op.pathsNamed {
                 urls.append(root.appendingPathComponent(path))
             }
         }
+        var listHolds: ((URL, URL) -> Bool)? = nil
+        if let journal {
+            listHolds = UndoRecovery.listHolds(step, root: root, from: journal)
+        }
         var allGone: Bool = true
         for work in ["apply", "undo", "redo"] {
             if !UndoSwap.tidyLeftovers(
                 label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) },
-                root: root
+                root: root, keepingOnlyCopies: keepingOnlyCopies,
+                unlessTheListHolds: listHolds, keepingCopiesHolding: notInTheList
             ) {
                 allGone = false
             }
         }
         return allGone
+    }
+
+    /// Whether a kept original's bytes are exactly what the list gives for
+    /// its page, so it is not the only copy of what it holds: what the
+    /// step's ops on that page come to, undone or redone, from what the page
+    /// holds now (a whole file by its recorded hash, whose content the list
+    /// must still hold; a line, a hunk or a member derived from the page).
+    /// Never true for a kept original that holds anything else, such as an
+    /// in-place edit that raced the swap into the original's inode (the
+    /// third review of U3a, LOW 1: the old test only asked whether the
+    /// step's blobs were there, and a key edit needs none).
+    static func listHolds(_ step: UndoStep, root: URL, from journal: UndoJournal) -> (_ kept: URL, _ place: URL) -> Bool {
+        return { keptURL, place in
+            guard case .file(let kept) = UndoItem.read(at: keptURL) else {
+                return false
+            }
+            let wanted: String = place.standardizedFileURL.path
+            var opsOnThePlace: [UndoOp] = []
+            for op in step.ops where op.knownKind != .recompute && !op.isWhole {
+                if let path = op.path, root.appendingPathComponent(path).standardizedFileURL.path == wanted {
+                    opsOnThePlace.append(op)
+                }
+            }
+            if opsOnThePlace.isEmpty {
+                return false
+            }
+            for direction in [UndoDirection.backward, UndoDirection.forward] {
+                let plan: UndoPlan = UndoCheck.plan(opsOnThePlace, direction: direction, root: root, journal: journal)
+                guard case .ready(let targets, _, _) = plan else {
+                    continue
+                }
+                for target in targets where target.url.standardizedFileURL.path == wanted && target.replacement == kept {
+                    return true
+                }
+            }
+            return false
+        }
+    }
+
+    /// What a step's own swap kept beside a page as its original (`-orig`,
+    /// any of the step's labels: its apply, undo, redo or a recovery's),
+    /// answered for a page's path and the hash of the whole content wanted
+    /// there only when a kept original's bytes hash to exactly that: the
+    /// journal's record of what the page held (Russell's ruling of
+    /// 2026-11-20, 15:20). Nil when none matches; a kept original that does
+    /// not match is never used, and never removed for not matching.
+    ///
+    /// A kept original that is there and cannot be read just now (a cloud
+    /// placeholder not downloaded, a permission) is told to `couldNotRead`
+    /// with its page's path when none matches: it may be the one, so the
+    /// caller answers "cannot tell now", never "no kept original matches"
+    /// (the first review of U3c, LOW 5).
+    static func keptOriginal(
+        of step: UndoStep, root: URL, couldNotRead: ((_ path: String) -> Void)? = nil
+    ) -> (_ path: String, _ sha: String) -> Data? {
+        return { path, sha in
+            let place: URL = root.appendingPathComponent(path)
+            var unreadable: Bool = false
+            for kept in UndoRecovery.keptOriginalFiles(of: step, beside: place) {
+                let item: UndoItem = UndoItem.read(at: kept)
+                if item == .unreadable {
+                    unreadable = true
+                    continue
+                }
+                guard case .file(let data) = item else {
+                    continue
+                }
+                if UndoHash.sha256(of: data) == sha {
+                    return data
+                }
+            }
+            if unreadable {
+                couldNotRead?(path)
+            }
+            return nil
+        }
+    }
+
+    /// Writes back into the list what a put-back from kept originals takes
+    /// and sets aside (the first review of U3c, MEDIUM): each kept original's
+    /// bytes as the blob its hash names, and what the page holds now as the
+    /// other direction's blob when it hashes to the recorded other hash, so
+    /// the swap's tidy removes no only copy and the step's other direction
+    /// can still be made. Inside the lock, before the swap. The pages whose
+    /// other direction's content could not be made whole (the list would
+    /// not take it, or the page does not hash to what was recorded): their
+    /// outgoing bytes must be kept beside them, never tidied.
+    ///
+    /// A kept original whose own bytes the list will not take is never
+    /// ignored (the second review of U3c, MEDIUM): once the page holds them
+    /// it is a copy of its page, and the next move the other way would leave
+    /// them in no file at all. Its hash is told back, and no tidy removes a
+    /// kept original holding it (`keepingCopiesHolding`).
+    static func storeWhatKeptOriginalsGive(_ uses: [UndoKeptOriginalUse], _ writer: UndoJournalWriter) -> UndoWhatTheListCouldNotTake {
+        var notWhole: [String] = []
+        var keptNotStored: Set<String> = []
+        for use in uses {
+            if (try? writer.writeBlob(use.kept)) == nil {
+                keptNotStored.insert(UndoHash.sha256(of: use.kept))
+            }
+            guard let otherSha = use.otherSha else {
+                // The other direction wants no file there: nothing to keep.
+                continue
+            }
+            if writer.journal.readBlob(sha: otherSha) != nil {
+                continue
+            }
+            var stored: Bool = false
+            if case .file(let outgoing) = use.outgoing, UndoHash.sha256(of: outgoing) == otherSha {
+                stored = (try? writer.writeBlob(outgoing)) != nil
+            }
+            if !stored && !notWhole.contains(use.path) {
+                notWhole.append(use.path)
+            }
+        }
+        return UndoWhatTheListCouldNotTake(outgoingOf: notWhole, keptOriginalsHolding: keptNotStored)
+    }
+
+    /// Every kept original (`-orig`, a file) of this step's beside one
+    /// place, by name order.
+    static func keptOriginalFiles(of step: UndoStep, beside place: URL) -> [URL] {
+        let folder: URL = place.deletingLastPathComponent()
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            return []
+        }
+        let prefix: String = "." + place.lastPathComponent + UndoSwap.stagedMarker + "\(step.seq)-"
+        var found: [URL] = []
+        for name in names.sorted() where name.hasPrefix(prefix) && name.hasSuffix("-orig") {
+            if UndoSwap.placeOfStagedName(name) != place.lastPathComponent {
+                continue
+            }
+            let url: URL = folder.appendingPathComponent(name)
+            if UndoSwap.isAFolderSetAside(url) {
+                continue
+            }
+            found.append(url)
+        }
+        return found
+    }
+
+    /// Of these kept originals' hidden names, those whose bytes hash to what
+    /// the journal recorded for their page (a `writeFile` op's before or
+    /// after): kept because the list no longer holds that content, never
+    /// because they differ from it (the first review of U3c, LOW 2).
+    static func keptOriginalsOfWhatWasRecorded(_ names: [String], of step: UndoStep, root: URL) -> [String] {
+        var recorded: [String] = []
+        for op in step.ops where op.knownKind == .writeFile {
+            guard let path = op.path else {
+                continue
+            }
+            for kept in UndoRecovery.keptOriginalFiles(of: step, beside: root.appendingPathComponent(path)) {
+                let name: String = kept.lastPathComponent
+                if !names.contains(name) || recorded.contains(name) {
+                    continue
+                }
+                guard case .file(let data) = UndoItem.read(at: kept) else {
+                    continue
+                }
+                let sha: String = UndoHash.sha256(of: data)
+                if sha == op.beforeSha || sha == op.afterSha {
+                    recorded.append(name)
+                }
+            }
+        }
+        return recorded
+    }
+
+    /// The hidden name of every kept original of this step still beside the
+    /// files it names, each once, in the order the step names its files.
+    static func keptOriginalsLeft(of step: UndoStep, root: URL) -> [String] {
+        var names: [String] = []
+        for op in step.ops {
+            for path in op.pathsNamed {
+                for kept in UndoRecovery.keptOriginalFiles(of: step, beside: root.appendingPathComponent(path)) {
+                    if !names.contains(kept.lastPathComponent) {
+                        names.append(kept.lastPathComponent)
+                    }
+                }
+            }
+        }
+        return names
     }
 
     /// The trail line for a teacher's folder found set aside, written
@@ -404,7 +642,8 @@ nonisolated enum UndoRecovery {
         writer: UndoJournalWriter,
         mode: UndoMode,
         places: UndoExternalPlaces = UndoAppPreferences(),
-        swapRefused: inout Bool
+        swapRefused: inout Bool,
+        leftFor: inout UndoRefusal?
     ) -> UndoRecoveryResult? {
         let step: UndoStep = record.step
         let phase: UndoPhase
@@ -429,10 +668,17 @@ nonisolated enum UndoRecovery {
             }
         }
         if mode == .live {
+            // Before the plan is known to settle, every kept original that
+            // differs from its page stays, even one whose bytes the list
+            // gives (the Windows recovery review's 15; the first review of
+            // U3c, LOW 1: a page the list holds may still be left part way
+            // and the list cleared when ANOTHER page cannot be put back, and
+            // then the kept original is the only copy). Those the list holds
+            // are tidied only once the step has settled, below.
             UndoSwap.tidyLeftovers(
                 label: label, beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) },
-                root: root
+                root: root, keepingOnlyCopies: true
             )
             if UndoKillPoints.stopsHere(.afterRecoveryTidied) {
                 return nil
@@ -466,6 +712,7 @@ nonisolated enum UndoRecovery {
         // a file in use (the director's ruling on U2b's review).
         for file in files where file.state == .cannotTell {
             swapRefused = true
+            leftFor = .cannotTellNow(path: file.path)
             return nil
         }
         var atStart: Int = 0
@@ -498,6 +745,10 @@ nonisolated enum UndoRecovery {
 
         var outcome: UndoRecoveryResult.Outcome
         var events: [UndoEventLine] = []
+        // Kept originals' bytes a put-back took that the list would not take
+        // just now: no tidy removes a kept original holding them (the second
+        // review of U3c, MEDIUM).
+        var keptNotTaken: Set<String> = []
         if inTheWay.isEmpty && atEnd == 0 {
             outcome = .nothingTookEffect
             events.append(UndoEventLine(seq: step.seq, event: .failed, phase: phase, reason: "nothingTookEffect"))
@@ -527,7 +778,30 @@ nonisolated enum UndoRecovery {
                     }
                 }
                 let back: UndoDirection = startedFromBefore ? .backward : .forward
-                let plan: UndoPlan = UndoCheck.plan(opsToPutBack, direction: back, root: root, journal: writer.journal, places: places)
+                // Content the list no longer holds is taken from the step's
+                // own kept original beside the page when its hash is the one
+                // recorded (Russell's ruling of 2026-11-20, 15:20): the first
+                // tidy above left every such original for this.
+                var keptOriginalNotRead: String? = nil
+                var uses: [UndoKeptOriginalUse] = []
+                let plan: UndoPlan = UndoCheck.plan(
+                    opsToPutBack, direction: back, root: root, journal: writer.journal, places: places,
+                    keptOriginal: UndoRecovery.keptOriginal(of: step, root: root, couldNotRead: { path in
+                        if keptOriginalNotRead == nil {
+                            keptOriginalNotRead = path
+                        }
+                    }),
+                    keptOriginalUsed: { use in uses.append(use) }
+                )
+                if case .refused(.contentMissing) = plan, let keptOriginalNotRead {
+                    // A kept original that cannot be read just now may be the
+                    // one: cannot tell now, so the step is left for the next
+                    // recovery, never closed and the list never cleared (the
+                    // first review of U3c, LOW 5).
+                    swapRefused = true
+                    leftFor = .cannotTellNow(path: keptOriginalNotRead)
+                    return nil
+                }
                 if plan == .listUnreadable {
                     // Content it needs cannot be read just now: never
                     // closed for it, tried again on the schedule, as for a
@@ -535,8 +809,10 @@ nonisolated enum UndoRecovery {
                     swapRefused = true
                     return nil
                 }
-                guard case .ready(let targets, _) = plan else {
-                    // It can never be put back: closed, never left in flight.
+                guard case .ready(let targets, _, _) = plan else {
+                    // It can never be put back (no kept original matches
+                    // what the list no longer holds): closed, never left in
+                    // flight.
                     var leftPartWay: [String] = Array(endPaths).sorted()
                     for path in inTheWay where !leftPartWay.contains(path) {
                         leftPartWay.append(path)
@@ -548,11 +824,54 @@ nonisolated enum UndoRecovery {
                     if !UndoRecovery.write(closing, step: step, writer) {
                         return nil
                     }
-                    UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, 0, leftPartWay.count)
+                    // Nothing that is an only copy is deleted: a kept
+                    // original that differs from its page stays beside it
+                    // under its hidden name (the list cannot put the page
+                    // back, so `tidyClosedSteps` keeps it too). Only the
+                    // staged new content and copies go.
+                    UndoSwap.tidyLeftovers(label: label, beside: urls, root: root, keepingOnlyCopies: true)
+                    UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true)
+                    // Said after the tidy, so it names what is on the disk.
+                    UndoTrailHook.couldNotPutBackLine?(
+                        step.course ?? "", step.section, phase, leftPartWay.count,
+                        UndoRecovery.keptOriginalsLeft(of: step, root: root)
+                    )
                     return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: .interrupted(filesInTheWay: leftPartWay.count, filesPutBack: 0))
                 }
-                if UndoSwap.swap(targets, label: label + "-recover", places: places, root: root) != UndoSwapResult.swapped {
+                // What the kept originals give, and what the pages hold now,
+                // into the list before the swap (the first review of U3c,
+                // MEDIUM). A step that stays on the list (an undo or a redo
+                // put back to where it began) needs the content the swap sets
+                // aside for its next Undo or Redo: kept beside its page when
+                // the list will not take it. A change rolled back leaves the
+                // list, and what it set aside is its own new content.
+                // The plan is ready, so the list will put these pages back:
+                // only now does a kept original whose bytes the list gives
+                // go (the first review of U3c, LOW 1). One a put-back takes
+                // from a kept original is not among them, its content not
+                // in the list yet.
+                UndoSwap.tidyLeftovers(
+                    label: label, beside: urls, root: root, keepingOnlyCopies: true,
+                    unlessTheListHolds: UndoRecovery.listHolds(step, root: root, from: writer.journal)
+                )
+                let notTaken: UndoWhatTheListCouldNotTake = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
+                var keepingTheOriginalsOf: Set<String> = []
+                if phase != .begin {
+                    keepingTheOriginalsOf = Set(notTaken.outgoingOf)
+                    keptNotTaken = notTaken.keptOriginalsHolding
+                }
+                switch UndoSwap.swap(
+                    targets, label: label + "-recover", places: places, root: root,
+                    keepingTheOriginalsOf: keepingTheOriginalsOf
+                ) {
+                case .swapped:
+                    break
+                case .refused(let refusal), .notPutBack(let refusal, _):
                     // A file in use: tried again on the schedule.
+                    swapRefused = true
+                    leftFor = refusal
+                    return nil
+                case .stoppedByATest:
                     swapRefused = true
                     return nil
                 }
@@ -580,6 +899,36 @@ nonisolated enum UndoRecovery {
         }
         if !UndoRecovery.write(events, step: step, writer) {
             return nil
+        }
+        // Settled (made, nothing taken effect, or put back): its kept
+        // originals are needed no more. An `interrupted` or shadow outcome
+        // keeps them (`tidyClosedSteps`, keeping only copies).
+        switch outcome {
+        case .completed, .nothingTookEffect, .rolledBack:
+            if mode == .live {
+                // Except a kept original whose bytes the list does not hold
+                // (an edit that raced the swap): the only copy of it, kept
+                // beside its page and named on the trail (the third review
+                // of U3a, LOW 1).
+                let listHolds: (URL, URL) -> Bool = UndoRecovery.listHolds(step, root: root, from: writer.journal)
+                UndoSwap.tidyLeftovers(
+                    label: label, beside: urls, root: root, keepingOnlyCopies: true,
+                    unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken
+                )
+                UndoSwap.tidyLeftovers(
+                    label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true,
+                    unlessTheListHolds: listHolds, keepingCopiesHolding: keptNotTaken
+                )
+                let kept: [String] = UndoRecovery.keptOriginalsLeft(of: step, root: root)
+                if !kept.isEmpty {
+                    UndoTrailHook.keptAnOriginalLine?(
+                        step.course ?? "", step.section, phase, kept,
+                        UndoRecovery.keptOriginalsOfWhatWasRecorded(kept, of: step, root: root)
+                    )
+                }
+            }
+        case .interrupted, .leftAlone:
+            break
         }
         // The files kept true by a rule are re-derived, whichever way the
         // step was settled, by `recoverAndRederive` once the lock is
@@ -669,6 +1018,13 @@ nonisolated enum UndoPruning {
         mode: UndoMode = .live,
         resolveRoot: (UndoWorkingFolder) -> URL? = UndoReach.root
     ) {
+        // Recovery runs before every prune, in the same hold (the Windows
+        // recovery review's 14): a dead step past the limits would otherwise
+        // be closed `unsettled`, its original tidied and its content deleted,
+        // though a recovery could still have settled it.
+        if !writer.recoveredInThisHold {
+            return
+        }
         let fold: UndoFold = writer.fold
         let now: Date = writer.journal.now()
         let ageLimit: Double = Double(UndoSwitch.daysKept + UndoFold.deletionGraceDays) * 86_400
@@ -707,8 +1063,11 @@ nonisolated enum UndoPruning {
                 // Nothing of the journal's is left in a course: its staged
                 // files go now when its folder can be reached, or at the
                 // first recovery that can reach it (`tidyClosedSteps`).
+                // Closed unsettled: a kept original that is the only copy of
+                // its page's earlier content stays (the Windows recovery
+                // review's 14).
                 if mode == .live, let folder = record.step.workingFolder, let root = resolveRoot(folder) {
-                    UndoRecovery.tidyStagedFiles(of: record.step, root: root)
+                    UndoRecovery.tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true)
                 }
                 UndoRefusedSwaps.forget(UndoRefusedSwaps.key(for: record, in: writer.journal))
                 remaining -= 1

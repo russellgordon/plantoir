@@ -186,13 +186,26 @@ final class RollOverFromTheMenuTests: XCTestCase {
     /// schedule turned off, a copy saved first, and ONE undo entry, which
     /// one Undo Last Change takes back whole (the dates and the markers).
     /// Red before #897 piece B: two entries, and one undo left the dates.
+    ///
+    /// The legacy marker DIFFERS from the Netlify record (Russell's ruling of
+    /// 2026-11-20, evening, on #899 U3b): a deploy reads only the current
+    /// record, so the stale leftover is never a reason to refuse. It is
+    /// brought out of the built output into `.netlify_sites` (as
+    /// `section1.from-built-output.json`) and set aside in the rollover's
+    /// own change, so a later deploy cannot migrate it back in; the one undo
+    /// puts it back byte for byte beside the current record, where no deploy
+    /// reads it, never into the built output.
     func testANewWebsiteFromTheMenuIsOneChange() async throws {
         let made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: .menu, for: self)
         defer {
             try? FileManager.default.removeItem(at: made.root)
         }
         let copies: CopiesSaved = RollOverFromTheMenuTests.countCopies(of: made)
-        let markers: [URL] = try RollOverFromTheMenuTests.writeEveryMarker(in: made.course)
+        var markers: [URL] = try RollOverFromTheMenuTests.writeEveryMarker(in: made.course)
+        let legacy: URL = markers.removeLast()
+        let legacyBytes: Data = try Data(contentsOf: legacy)
+        XCTAssertNotEqual(legacyBytes, try Data(contentsOf: markers[0]), "a current record and a DIFFERENT legacy one")
+        let broughtIn: URL = made.course.directoryURL.appendingPathComponent(".netlify_sites/section1.from-built-output.json")
         let plistURL: URL = ScheduledDeploy.plistURL(courseCode: made.course.code, sectionNumber: 1, inWorkingFolder: made.root)
         try RolloverWebsiteTests.writeAgent(
             courseCode: made.course.code, sectionNumber: 1, workingFolder: made.root, at: plistURL
@@ -209,6 +222,8 @@ final class RollOverFromTheMenuTests: XCTestCase {
         for marker in markers {
             XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path), marker.path)
         }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the leftover is gone from the built output")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: broughtIn.path), "and set aside")
         XCTAssertFalse(FileManager.default.fileExists(atPath: plistURL.path), "the schedule must really be off")
         XCTAssertNotEqual(try String(contentsOf: page, encoding: .utf8), pageBefore, "the page was not re-dated")
         XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(outcome.summary), outcome.summary)
@@ -219,6 +234,46 @@ final class RollOverFromTheMenuTests: XCTestCase {
         for marker in markers {
             XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "one undo puts \(marker.lastPathComponent) back")
         }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "never back in the built output")
+        XCTAssertEqual(try Data(contentsOf: broughtIn), legacyBytes, "the leftover back byte for byte, beside the current record")
+    }
+
+    /// The same case with the legacy record holding the Netlify record's
+    /// OWN bytes, as a deploy's migration that stopped before removing it
+    /// leaves them (put back after the re-review's round, which had turned
+    /// the case above into a different leftover): it says what the current
+    /// record says, so the bring-in only removes it, and the one undo puts
+    /// the Netlify record back in its current place, never the legacy one in
+    /// the built output and never a leftover beside it.
+    func testANewWebsiteFromTheMenuWithTheSameRecordInTheBuiltOutputIsOneChange() async throws {
+        let made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: .menu, for: self)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        _ = RollOverFromTheMenuTests.countCopies(of: made)
+        var markers: [URL] = try RollOverFromTheMenuTests.writeEveryMarker(in: made.course)
+        let legacy: URL = markers.removeLast()
+        try Data(contentsOf: markers[0]).write(to: legacy)
+        let broughtIn: URL = made.course.directoryURL.appendingPathComponent(".netlify_sites/section1.from-built-output.json")
+
+        let changesBefore: Int = made.runner.changeCount
+        let outcome: AssistToolOutcome = await made.runner.run(
+            call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "new", planning: false)
+        )
+        XCTAssertEqual(made.runner.changeCount, changesBefore + 1, "one rollover, one undo entry: \(outcome.summary)")
+        for marker in markers {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path), marker.path)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the finished migration's leftover is removed")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: broughtIn.path), "never brought in as a leftover")
+
+        _ = await made.runner.run(call: SectionVerbs.undoLastChange())
+        XCTAssertEqual(made.runner.changeCount, changesBefore)
+        for marker in markers {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "one undo puts \(marker.lastPathComponent) back")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the record stays in its current place")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: broughtIn.path))
     }
 
     /// A new website from the menu on Cloudflare, rolled over from last
@@ -563,7 +618,9 @@ final class RollOverFromTheMenuTests: XCTestCase {
         for folder in [".netlify_sites", ".cloudflare_sites"] {
             let marker: URL = course.directoryURL.appendingPathComponent(folder).appendingPathComponent("section1.json")
             try FileManager.default.createDirectory(at: marker.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try "{\"site\":\"last-year\"}".write(to: marker, atomically: true, encoding: .utf8)
+            // Each names its site (`id`), as a real record does: a record
+            // naming none is not a website (#899 U3b, round four).
+            try "{\"id\":\"last-year\"}".write(to: marker, atomically: true, encoding: .utf8)
             written.append(marker)
         }
         written.append(try writeLegacyMarker(in: course))

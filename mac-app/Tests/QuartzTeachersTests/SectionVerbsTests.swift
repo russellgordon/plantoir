@@ -445,7 +445,7 @@ final class SectionVerbsFixesTests: XCTestCase {
             )
         )
         XCTAssertTrue(
-            publisher.contains("keepTheLaterClassesItPublished(\n            outcome.publishedPlaces"),
+            publisher.contains("keepTheLaterClassesItPublished(\n                outcome.publishedPlaces"),
             "Publish in the links checklist keeps what it published"
         )
     }
@@ -795,50 +795,67 @@ final class SectionVerbsEndingTests: XCTestCase {
         )
     }
 
-    /// A page list that wrote a page and then stopped part way (#412).
-    /// MUST FAIL on the old `perform`.
-    func testAPublishThatStoppedAfterAWriteIsCarriedOut() async throws {
+    /// A page list one of whose pages cannot be written (#412). Before U3
+    /// of #899 the linked page was written first and the class then failed,
+    /// so the change was carried out part way. Since U3 the pages are ONE
+    /// step through the door, staged and swapped in together or not at all
+    /// (`undo.rule.stagedThenSwapped`): nothing is written, the trail says
+    /// "changed nothing", and the teacher is told "Nothing was changed: …"
+    /// with the reason, which is true (the first review of U3a, MEDIUM 1:
+    /// `publishStoppedPartWay`, "Only part of …", was said here and is
+    /// false). MUST FAIL on the writes before U3, which left Notes
+    /// published, and on U3a's first round, which said only part changed.
+    func testAPublishThatCannotWriteEveryPageWritesNone() async throws {
         let (made, verbs) = try makeVerbs()
         try layOutAPublishThatStopsAfterAWrite(in: made)
         let outcome: AssistToolOutcome = await publish(["section1/All Classes/Unit 1, Day 1"], with: verbs)
-        XCTAssertTrue(
-            outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "the pages you named", problem: "")),
-            outcome.detail
-        )
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
         let notes: String = try String(
             contentsOf: made.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), encoding: .utf8
         )
-        XCTAssertNotEqual(notes, "---\ntitle: Notes\npublish: false\n---\nNotes.\n", "the linked page was not written first")
+        XCTAssertEqual(notes, "---\ntitle: Notes\npublish: false\n---\nNotes.\n", "a page was written part way")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "", noun: .class)),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "changed nothing", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
 
-    /// A whole unit that wrote a page and then stopped part way. MUST FAIL
-    /// on the old `perform`.
-    func testAWholeUnitThatStoppedAfterAWriteIsCarriedOut() async throws {
+    /// A whole unit one of whose pages cannot be written: since U3 the unit
+    /// is one step, so nothing of it is written, the trail says "changed
+    /// nothing" and the teacher is told "Nothing was changed: …". MUST FAIL
+    /// on the writes before U3, and on U3a's first round, which said
+    /// `publishStoppedPartWay` ("Only part of Unit 1 was changed").
+    func testAWholeUnitThatCannotWriteEveryPageWritesNone() async throws {
         let (made, verbs) = try makeVerbs()
         try layOutAPublishThatStopsAfterAWrite(in: made)
+        let notesBefore: String = try String(
+            contentsOf: made.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), encoding: .utf8
+        )
         let outcome: AssistToolOutcome = await verbs.perform(
             SectionVerbs.call("publish_pages", ["course": "ICS3U", "section": 1, "pages": "Unit 1"]),
             item: .publishPages, courseCode: "ICS3U", sectionNumber: 1
         )
-        XCTAssertTrue(
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
+        XCTAssertFalse(
             outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "Unit 1", problem: "")), outcome.detail
         )
+        XCTAssertEqual(
+            try String(contentsOf: made.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), encoding: .utf8),
+            notesBefore, "a page of the unit was written part way"
+        )
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "", noun: .class)),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "changed nothing", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
 
-    /// Re-date Classes… writes page by page: a class re-dated, then a page
-    /// it uses that cannot be written (ruling M3). The trail says "carried
-    /// out", and the teacher is told only PART was changed, with the page
-    /// already re-dated named — never "Nothing was changed". MUST FAIL on
-    /// the old code, on both counts.
-    func testAReDateThatStoppedAfterAWriteIsCarriedOutAndSaysSo() async throws {
+    /// Re-date Classes… with a page it uses that cannot be written (ruling
+    /// M3). Before U3 the class was re-dated first and the reply said only
+    /// part was changed, naming it. Since U3 the re-date is one step: the
+    /// class keeps its date, the teacher is told nothing was changed and
+    /// why, and the trail says "changed nothing". MUST FAIL on the writes
+    /// before U3, on every count.
+    func testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo() async throws {
         let (made, verbs) = try makeVerbs()
         let timetable: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
             dates: ["2026-09-08", "2026-09-10"], source: "typed in by hand", forSection: 1, in: made.course,
@@ -861,15 +878,11 @@ final class SectionVerbsEndingTests: XCTestCase {
         let classText: String = try String(
             contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course), encoding: .utf8
         )
-        XCTAssertFalse(classText.contains("2020-01-15"), "the class was not re-dated first: \(classText)")
+        XCTAssertTrue(classText.contains("2020-01-15"), "the class was re-dated part way: \(classText)")
+        XCTAssertTrue(outcome.summary.hasPrefix("Nothing was changed: "), outcome.summary)
+        XCTAssertTrue(outcome.summary.contains("Notes.md"), "the page in the way is not named: \(outcome.summary)")
         XCTAssertTrue(
-            outcome.summary.hasPrefix(AssistWording.publishStoppedPartWay(what: "the section's class dates", problem: "")),
-            outcome.summary
-        )
-        XCTAssertFalse(outcome.summary.contains("Nothing was changed"), outcome.summary)
-        XCTAssertTrue(outcome.summary.contains("Unit 1, Day 1"), "the page written is not named: \(outcome.summary)")
-        XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.reDateClasses, ending: "carried out", counts: "", noun: .class)),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.reDateClasses, ending: "changed nothing", counts: "", noun: .class)),
             lastMenuLine()
         )
     }
@@ -883,10 +896,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
         lockedFolder = folder
         let outcome: AssistToolOutcome = await publish(["section1/All Classes/Unit 1, Day 1"], with: verbs)
-        XCTAssertTrue(
-            outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "the pages you named", problem: "")),
-            outcome.detail
-        )
+        XCTAssertTrue(outcome.detail.hasPrefix("Nothing was changed: "), outcome.detail)
         XCTAssertTrue(
             lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "changed nothing", counts: "", noun: .class)),
             lastMenuLine()

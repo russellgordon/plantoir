@@ -309,7 +309,9 @@ enum ClassInsertionPlanner {
     @discardableResult
     static func apply(
         _ plan: ClassInsertionPlan,
-        in course: Course
+        in course: Course,
+        by maker: UndoStepMaker = UndoStepMaker.sheet("makeRoomForClasses"),
+        into outerStep: JournaledStep? = nil
     ) throws -> ClassChangeOutcome {
         if plan.courseCode != course.code {
             throw Problem.wrongCourse(plan.courseCode, course.code)
@@ -322,7 +324,12 @@ enum ClassInsertionPlanner {
         }
 
 
-        let fileManager: FileManager = FileManager.default
+        // ONE step through the door (#899, U3): every rename, link, date and
+        // new page planned first, each read as the step will leave it, then
+        // written together, all or none. Given a step (Duplicate Class), the
+        // caller adds to it and makes it.
+        let step: JournaledStep = outerStep
+            ?? JournaledStep(course: course, section: plan.sectionNumber, maker: maker)
         let folderURL: URL = ClassPages.folderURL(forSection: plan.sectionNumber, in: course)
         let tail: String = ClassPages.siblingTimeAndOffset(
             from: ClassPages.list(forSection: plan.sectionNumber, in: course),
@@ -341,27 +348,22 @@ enum ClassInsertionPlanner {
         // 1. The renames, highest day first.
         var renamed: [String: String] = [:]
         for rename in plan.renames {
-            if !fileManager.fileExists(atPath: rename.fromURL.path) {
+            if !step.fileExists(rename.fromURL) {
                 continue
             }
-            if fileManager.fileExists(atPath: rename.toURL.path) {
+            if step.fileExists(rename.toURL) {
                 notFinished.notRenamed.append(rename.from)
                 continue
             }
-            guard let text = try? String(contentsOf: rename.fromURL, encoding: .utf8) else {
+            guard let text = step.readText(rename.fromURL) else {
                 notFinished.notRenamed.append(rename.from)
                 continue
             }
             // The title inside the file follows the file name: a page whose
             // name and title disagree is worse than either being wrong alone.
             let retitled: String = PageFrontmatter.settingTitle(in: text, to: rename.to)
-            do {
-                try retitled.write(to: rename.toURL, atomically: true, encoding: .utf8)
-            } catch {
-                notFinished.notRenamed.append(rename.from)
-                continue
-            }
-            try? fileManager.removeItem(at: rename.fromURL)
+            step.write(retitled, to: rename.toURL)
+            step.remove(rename.fromURL)
             renamed[rename.from] = rename.to
         }
 
@@ -373,8 +375,11 @@ enum ClassInsertionPlanner {
             for (from, _) in renamed {
                 oldNames.append(from)
             }
-            for pageURL in ClassPages.pagesOfSection(plan.sectionNumber, in: course) {
-                guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+            let pagesAsPlanned: [URL] = step.markdownFiles(
+                under: course.directoryURL, onDisk: ClassPages.pagesOfSection(plan.sectionNumber, in: course)
+            )
+            for pageURL in pagesAsPlanned {
+                guard let text = step.readText(pageURL) else {
                     continue
                 }
                 let here: Int = WikiLinkRewriter.countLinks(to: oldNames, in: text)
@@ -383,12 +388,8 @@ enum ClassInsertionPlanner {
                 }
                 let updated: String = WikiLinkRewriter.rewriting(text, renamedPages: renamed)
                 if updated != text {
-                    do {
-                        try updated.write(to: pageURL, atomically: true, encoding: .utf8)
-                        linksRewritten += here
-                    } catch {
-                        notFinished.linksNotUpdated.append(pageURL.deletingPathExtension().lastPathComponent)
-                    }
+                    step.write(updated, to: pageURL)
+                    linksRewritten += here
                 }
             }
         }
@@ -416,20 +417,15 @@ enum ClassInsertionPlanner {
             if wasRenamedHere {
                 pageURL = folderURL.appendingPathComponent(move.title + ".md")
             }
-            guard fileManager.fileExists(atPath: pageURL.path),
-                  let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+            guard step.fileExists(pageURL), let text = step.readText(pageURL) else {
                 continue
             }
             let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                 in: text, key: createdKey, to: move.to, fallbackTail: tail
             )
             if result.outcome == .written {
-                do {
-                    try result.text.write(to: pageURL, atomically: true, encoding: .utf8)
-                    moved += 1
-                } catch {
-                    notFinished.notReDated.append(pageURL.deletingPathExtension().lastPathComponent)
-                }
+                step.write(result.text, to: pageURL)
+                moved += 1
             }
             if result.outcome == .noRoomForAKey {
                 notDated.append(pageURL.deletingPathExtension().lastPathComponent)
@@ -446,7 +442,6 @@ enum ClassInsertionPlanner {
 
         // 4. The blank pages the room was made for. Checked a second time,
         //    because the plan may be minutes old and Obsidian is open.
-        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
         // The URLs, not just how many. A caller that is about to WRITE to one
         // of these pages has exactly one safe question — "did this run make
         // that page, or was it already somebody's lesson?" — and it cannot be
@@ -456,7 +451,7 @@ enum ClassInsertionPlanner {
         // that dropped it on the floor.
         var created: [URL] = []
         for planned in plan.added {
-            if fileManager.fileExists(atPath: planned.fileURL.path) {
+            if step.fileExists(planned.fileURL) {
                 notFinished.newNotAdded.append(planned.title)
                 continue
             }
@@ -469,12 +464,12 @@ enum ClassInsertionPlanner {
                 howMany: plan.added.count,
                 tail: tail
             )
-            do {
-                try body.write(to: planned.fileURL, atomically: true, encoding: .utf8)
-                created.append(planned.fileURL)
-            } catch {
-                notFinished.newNotAdded.append(planned.title)
-            }
+            step.write(body, to: planned.fileURL)
+            created.append(planned.fileURL)
+        }
+        // The folder the new pages go in is made by the door with them.
+        if outerStep == nil {
+            try step.make()
         }
 
         var message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at \(plan.positionTitle). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."

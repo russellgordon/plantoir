@@ -135,39 +135,31 @@ final class UndoWriterScanTests: XCTestCase {
     /// why. Paths are under `QuartzTeachers/`.
     static let allowed: [String: (calls: Int, reason: String)] = [
         "App/ProblemReportCommands.swift": (5, "notAStep: a problem report, built and saved outside every course"),
-        "App/QuartzTeachersApp.swift": (1, "notAStep: the app's own state folder for `--state-dir`"),
+        "App/QuartzTeachersApp.swift": (2, "notAStep: the app's own state folder for `--state-dir`, and a debug build's test seam writing what Show in Finder was asked to show into a file the test names, only with --state-dir (#899 U3c, Russell's second ruling of 2026-11-20, night)"),
         "Models/AgentGuidance.swift": (2, "waitsFor: U4"),
         "Models/Assist/AppRulesContract.swift": (1, "notAStep: writes the contract files for `--write-contracts`, a developer's command"),
         "Models/Assist/AssistChangeHistory.swift": (2, "waitsFor: U7 (today's undo itself; kept as an adapter when the switch flips)"),
         "Models/Assist/AssistContract.swift": (2, "notAStep: writes the contract files for `--write-contracts`, a developer's command"),
-        "Models/Assist/AssistCurriculumMentions.swift": (1, "waitsFor: U3"),
         "Models/Assist/AssistModelStore.swift": (7, "notAStep: the assistant's model download and removal (class D, plan 7)"),
-        "Models/Assist/AssistPublishPlan.swift": (1, "waitsFor: U3"),
         "Models/Assist/AssistServerHost.swift": (5, "notAStep: the assistant's own launch files"),
         "Models/Assist/AssistSiteWork.swift": (1, "waitsFor: U4 (starts preview.sh, whose preflight rewrites a course's course_config.json outside the door)"),
-        "Models/Assist/AssistToolRunner.swift": (5, "waitsFor: U3 (the window's page writes, and #897a's Duplicate as Next Class from the menu: a folder made, the new page written without overwriting, and a half-written copy removed; one writeFile step, 897's ruling)"),
         "Models/Assist/ClaudeCodeLauncher.swift": (4, "notAStep: an outside assistant's launch files, outside any course"),
         "Models/Assist/CodexLauncher.swift": (2, "notAStep: an outside assistant's launch files, outside any course"),
         "Models/Assist/CopilotLauncher.swift": (3, "notAStep: an outside assistant's launch files, outside any course"),
         "Models/BuildOutputLocation.swift": (25, "notAStep: the built websites' folder and its move out of the working folder"),
         "Models/BuilderWarmUp.swift": (10, "notAStep: the builder cache of #836 (class D), and the shell and launchers it warms the builder with"),
-        "Models/ClassInsertionPlanner.swift": (6, "waitsFor: U3"),
-        "Models/ClassesDatedLater.swift": (2, "waitsFor: U3"),
         "Models/CourseArchiver.swift": (6, "waitsFor: U5"),
         "Models/CourseConfiguration.swift": (2, "waitsFor: U4"),
         "Models/CoursePageCopier.swift": (3, "waitsFor: U4"),
         "Models/CourseRenamer.swift": (3, "waitsFor: U4"),
         "Models/CourseRestorer.swift": (29, "waitsFor: U5"),
-        "Models/DeployCommand.swift": (3, "waitsFor: U4 (releaseSite: the rollover's cut loose, undone with it; the deploy.sh it names is not counted, rulings 17 and 18)"),
+        "Models/DeployCommand.swift": (3, "waitsFor: U4 (releaseSite's plain moves serve only Keep a Copy for Reference, on the copy it makes, U4's step; the rollover PLANS its markers into its one step, planSiteRelease, U3b; the deploy.sh it names is not counted, rulings 17 and 18)"),
         "Models/DeployTokens/DeployTokenPanel.swift": (1, "notAStep: runs deploy.sh --token through /bin/bash in its mode with no course and no section (#696): the teacher's deploy tokens, which are credentials and not on the list (ruling 8), in the launcher's token store outside every course"),
         "Models/FolderContainers.swift": (2, "notAStep: the website builder's containers, through a shell, outside every course"),
         "Models/FolderScaffold.swift": (1, "waitsFor: U4 (a new working folder's scaffold, made with New Course)"),
-        "Models/HowITeachPage.swift": (1, "waitsFor: U3"),
-        "Models/LinksChecklist/LinksChecklistOffer.swift": (2, "waitsFor: U3"),
-        "Models/LinksChecklist/PublishedPagesRecord.swift": (4, "notAStep: the published-pages record, written by a deploy (rulings 17 and 18) and read by undo.rule.deployed"),
+        "Models/LegacyNetlifyRecord.swift": (14, "notAStep: moveTheLegacyMarkerIn brings the legacy Netlify record out of the built output (outside the working folder, where no step can name a place) into .netlify_sites before the rollover's step, as deploy.py's own migration does (load_netlify_marker), moving a current record no deploy can read out of its way first, or brings it in as a leftover no deploy reads, which the step then sets aside; LegacyMarkerBroughtIn.putBack moves it back for a step then refused, and removes the .netlify_sites folder it made when it is empty again (rmdir, counted: Russell's rulings of 2026-11-20; the review of U3b's fixes, round three). Never a step, by ruling"),
         "Models/ObsidianFigureAddOns.swift": (11, "waitsFor: U4"),
         "Models/OneSectionRestore.swift": (1, "notAStep: `unzip -p` reads a backup's course_config.json to its output and writes nothing; the restore itself is CourseRestorer's (U5)"),
-        "Models/PlaceholderClassPlanner.swift": (2, "waitsFor: U3"),
         "Models/PlanSharing.swift": (7, "notAStep: sharing unit plans and stopping (ruling 18); its releasePlanMarkers runs inside a reference copy, which is U4's"),
         "Models/PlantoirDefaults.swift": (2, "notAStep: the preferences store's own note file under a state folder"),
         "Models/PreviewReachability.swift": (1, "notAStep: a shell that asks whether a preview answers; it writes no file"),
@@ -187,11 +179,8 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/ScheduledPublishWatcher.swift": (1, "notAStep: a scheduled run's outcome record, a world record"),
         "Models/ScheduledRunFolderRefresh.swift": (4, "notAStep: a deploy set for later refreshing its folder's launchers (rulings 17 and 18), outside every course"),
         "Models/SectionAdder.swift": (13, "waitsFor: U4"),
-        "Models/SectionIndexPointer.swift": (1, "waitsFor: U3"),
         "Models/SectionProblems.swift": (2, "notAStep: folder-problem acknowledgements (plan 7: not steps)"),
         "Models/SectionPublishState.swift": (2, "notAStep: the site markers, written by a deploy (rulings 17 and 18) and read by undo.rule.deployed"),
-        "Models/SectionReDatePlanner.swift": (1, "waitsFor: U3"),
-        "Models/SectionTimetable.swift": (2, "waitsFor: U3"),
         "Models/SetUp/AssistantSetUp.swift": (3, "notAStep: setting up an outside assistant, outside every course (held question M8, as AssistantSetUpCentre)"),
         "Models/SetUp/AssistantSetUpCentre.swift": (5, "notAStep: setting up an outside assistant, outside every course (it changes no course: not on the list; ruling 16's reason, asked again under ruling 17)"),
         "Models/SetUp/SetUpRecord.swift": (8, "notAStep: the record of the assistants Plantoir set up, outside every course (as AssistantSetUpCentre)"),
@@ -200,15 +189,17 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/SharedMedia/SharedMediaStore.swift": (36, "waitsFor: U5 (the shared Media store of #785 and its sweep, outside every course's pages, under _backups; Undo's seam keepForUndo and releaseForUndo is U5's)"),
         "Models/SiteHealthRepair.swift": (3, "waitsFor: U4"),
         "Models/SpecialFolderRenamer.swift": (5, "waitsFor: U4"),
-        "Models/StartOfYear/StartOfYearPlanner.swift": (1, "waitsFor: U3"),
-        "Models/TodaysClassOnTheFrontPage.swift": (3, "waitsFor: U3"),
         "Models/ToolchainCopyMarker.swift": (3, "notAStep: the toolchain mirror"),
         "Models/ToolchainFingerprints.swift": (7, "notAStep: the toolchain mirror's index"),
-        "Models/Undo/UndoCheck.swift": (16, "door: the staged swaps of an undo, a redo and recovery, and U2's rename that never replaces, a folder renamed aside and one made beside its place, a folder taken out deleted only after its rename to -gone"),
+        "Models/Undo/JournaledStep.swift": (1, "door: an action's step (U3), written through JournaledWrite, and the front page's rule (UndoKeptFiles); a step that cannot be named is staged and swapped through UndoSwap since U3a's second round"),
+        "Models/Undo/JournaledWrite.swift": (4, "door: the notes of a shadow swap made without the list, in the list's own folder (UndoShadowStaging, U3a's second round), never in a working folder"),
+        "Models/Undo/UndoCheck.swift": (15, "door: the staged swaps of an undo, a redo and recovery, and U2's rename that never replaces, a folder renamed aside and one made beside its place, a folder taken out deleted only after its rename to -gone"),
         "Models/Undo/UndoJournal.swift": (19, "door: the list itself, outside every working folder"),
         "Models/Undo/UndoLock.swift": (1, "door: the list's own lock file"),
         "Models/Undo/UndoOpKinds.swift": (4, "door: a folder a redo of createTree (or an undo of removeTree) makes under its staged name, from the list's content"),
+        "Models/Undo/UndoScheduledDeploys.swift": (11, "door: a deploy set for later as an external op (U3b), its LaunchAgent plist and script, outside every working folder"),
         "Models/Undo/UndoRecovery.swift": (2, "door: pruning the list's own content and segments"),
+        "Models/Undo/UndoUITestSeam.swift": (1, "notAStep: a debug build's test seam, only with --state-dir, which edits a page in place as another program racing a swap would (#899 U3c, the real-window test of Russell's ruling of 2026-11-20, night)"),
         "Models/UnitWordRenamer.swift": (6, "waitsFor: U4"),
         "Models/WorkLeaseFiles.swift": (3, "notAStep: work leases"),
         "Models/WorkLeaseRegistry.swift": (3, "notAStep: work leases"),
@@ -322,6 +313,19 @@ final class UndoWriterScanTests: XCTestCase {
             total += count
         }
         XCTAssertEqual(total, 9)
+    }
+
+    /// The `rmdir` that removes a folder a bring-in made once it is empty
+    /// (`DeployCommand.removeIfEmpty`, inside a closure that returns it) is
+    /// counted, as every bare C call that writes is (`bareWritingCalls`;
+    /// the review of U3b's fixes, LOW 8, checked).
+    func testTheScanCountsTheRmdirThatRemovesAnEmptyFolder() {
+        let source: String = "        _ = folder.withUnsafeFileSystemRepresentation { path in\n            return rmdir(path)\n        }"
+        var count: Int = 0
+        for code in UndoWriterScanTests.codeLines(of: source) {
+            count += UndoWriterScanTests.writingCallCount(inCode: code)
+        }
+        XCTAssertEqual(count, 1)
     }
 
     func testEveryReasonIsOneOfTheThreeKinds() {

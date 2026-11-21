@@ -186,6 +186,7 @@ enum AssistContract {
             "rolloverKeptTheSameWebsite": AssistWording.rolloverKeptTheSameWebsite,
             "rolloverWebsiteNotDecided": AssistWording.rolloverWebsiteNotDecided,
             "rolloverTurnedOffTheScheduledPublish": AssistWording.rolloverTurnedOffTheScheduledPublish,
+            "undoScheduleStartsAtTheNextLogin": AssistWording.undoScheduleStartsAtTheNextLogin,
             "noCoursesYet": AssistWording.noCoursesYet,
             "whatPublishingMeans": AssistWording.whatPublishingMeans,
             "publishingAlreadyExplained": AssistWording.publishingAlreadyExplained(

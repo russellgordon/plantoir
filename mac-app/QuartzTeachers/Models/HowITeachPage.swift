@@ -209,8 +209,14 @@ enum HowITeachPage {
         }
         beforeWriting()
         let pageURL: URL = newPageURL(for: course)
+        // One step through the door (#899, U3): a page that is not there
+        // yet, so one that appears in the meantime is never written over.
+        let step: JournaledStep = JournaledStep(
+            course: course, section: nil, maker: UndoStepMaker.sheet("startHowITeachPage"), holds: "course"
+        )
+        step.writeNew(Data(newPageSettings.utf8), to: pageURL)
         do {
-            try Data(newPageSettings.utf8).write(to: pageURL, options: [.withoutOverwriting])
+            try step.make()
         } catch {
             if let appeared = existingURL(for: course) {
                 return (appeared, false)

@@ -204,7 +204,7 @@ nonisolated struct AssistSectionGraph {
     static func read(forSection sectionNumber: Int, in course: Course, workspaceURL: URL?) -> AssistSectionGraph {
         var pages: [AssistSectionPage] = []
         for pageURL in ClassPages.pagesTheAssistantLists(forSection: sectionNumber, in: course) {
-            guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+            guard let text = JournaledStep.textAsPlanned(at: pageURL) else {
                 continue
             }
             pages.append(AssistSectionGraph.page(
@@ -235,7 +235,7 @@ nonisolated struct AssistSectionGraph {
             if !ClassFolder.isClassPage(relativePath: within, classFolders: classFolders) {
                 continue
             }
-            guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+            guard let text = JournaledStep.textAsPlanned(at: pageURL) else {
                 continue
             }
             pages.append(AssistSectionGraph.page(
