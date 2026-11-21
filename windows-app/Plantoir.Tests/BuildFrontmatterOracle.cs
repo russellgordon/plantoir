@@ -63,6 +63,16 @@ internal static class BuildFrontmatterOracle
             return {"loaded": True, "hidden": hidden, "problem": None}
 
         if __name__ == "__main__":
+            # Both imports in THIS process first (#964): a pool whose
+            # initializer raises starts a replacement worker for ever, so a
+            # Python without python-frontmatter hung the suite instead of
+            # failing. Raised here, it ends the run once, naming the package.
+            sys.path.insert(0, sys.argv[1])
+            try:
+                import build_site as _b, frontmatter as _f
+            except ImportError as e:
+                sys.exit("the build's reader cannot start: " + type(e).__name__ + ": " + str(e)
+                         + " (the Python on PATH needs the python-frontmatter package: python -m pip install python-frontmatter)")
             pages = json.load(open(sys.argv[2], encoding="utf-8"))
             folder = tempfile.mkdtemp(prefix="plantoir-oracle-")
             try:
@@ -76,7 +86,10 @@ internal static class BuildFrontmatterOracle
         """;
 
     /// <summary>Asks the build about every page, in one process; the answers are in the same order.</summary>
-    internal static List<Answer> Ask(IReadOnlyList<string> pages)
+    /// <param name="environment">Extra environment for the Python process (a test's import refusal, #964).</param>
+    /// <param name="hangBound">Only to turn a hang into a failure; passing never depends on it. None by default.</param>
+    internal static List<Answer> Ask(IReadOnlyList<string> pages, IReadOnlyDictionary<string, string>? environment = null,
+                                     TimeSpan? hangBound = null)
     {
         string folder = Directory.CreateTempSubdirectory("plantoir-oracle-io").FullName;
         try
@@ -96,12 +109,22 @@ internal static class BuildFrontmatterOracle
             foreach (string argument in new[] { script, Path.Combine(ContractLoader.RepositoryRoot, "scripts"), input, output })
                 start.ArgumentList.Add(argument);
             start.Environment["PYTHONUTF8"] = "1";
+            if (environment is not null)
+                foreach (var pair in environment) start.Environment[pair.Key] = pair.Value;
             using var process = Process.Start(start)!;
+            // Both streams read in the background: a pool's workers inherit
+            // them, so reading one to its end first would wait on the workers
+            // rather than on this process's exit.
             var stdout = process.StandardOutput.ReadToEndAsync();
-            string stderr = process.StandardError.ReadToEnd();
+            var stderr = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(hangBound ?? Timeout.InfiniteTimeSpan))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                throw new TimeoutException($"the build's reader had not exited after {hangBound}: it hung (#964)");
+            }
             process.WaitForExit();
+            if (process.ExitCode != 0) throw new InvalidOperationException("the build's reader did not run: " + stderr.Result);
             _ = stdout.Result;
-            if (process.ExitCode != 0) throw new InvalidOperationException("the build's reader did not run: " + stderr);
 
             return File.ReadLines(output).Select(line =>
             {

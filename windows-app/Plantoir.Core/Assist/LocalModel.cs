@@ -148,28 +148,24 @@ public sealed class LocalModel : IChatModel, IDisposable
 
     /// <summary>
     /// Locate the native llama-server executable.
+    ///
+    /// <para>Searched from the same two roots as
+    /// <see cref="ClaudeCodeLauncher.FindServer()"/> (#971): the running
+    /// program's folder and <see cref="AppContext.BaseDirectory"/>, which are
+    /// one folder in the installed app; under a test host on Windows ARM the
+    /// running program is <c>dotnet.exe</c>, so only the base folder leads to
+    /// the repository's <c>Vendor\llama</c>. Then PATH.</para>
     /// </summary>
-    public static string? FindServer()
+    public static string? FindServer() =>
+        FindServer(Path.GetDirectoryName(Environment.ProcessPath), AppContext.BaseDirectory);
+
+    /// <summary>The search as a function of its two roots, so a test can give it each.</summary>
+    internal static string? FindServer(string? processFolder, string? baseFolder)
     {
-        string? beside = Path.GetDirectoryName(Environment.ProcessPath);
-        if (beside is not null)
+        foreach (string root in ClaudeCodeLauncher.DistinctRoots(processFolder, baseFolder))
         {
-            string inSubdir = Path.Combine(beside, "llama", "llama-server.exe");
-            if (File.Exists(inSubdir)) return inSubdir;
-
-            string directBeside = Path.Combine(beside, "llama-server.exe");
-            if (File.Exists(directBeside)) return directBeside;
-
-            // Walk up looking for Vendor\llama\llama-server.exe for dev/debug runs
-            var directory = new DirectoryInfo(beside);
-            for (int up = 0; up < 8 && directory is not null; up++, directory = directory.Parent)
-            {
-                string devPath = Path.Combine(directory.FullName, "Vendor", "llama", "llama-server.exe");
-                if (File.Exists(devPath)) return devPath;
-
-                string devSubPath = Path.Combine(directory.FullName, "windows-app", "Vendor", "llama", "llama-server.exe");
-                if (File.Exists(devSubPath)) return devSubPath;
-            }
+            string? found = FindServerUnder(root);
+            if (found is not null) return found;
         }
 
         string paths = Environment.GetEnvironmentVariable("PATH") ?? "";
@@ -183,6 +179,27 @@ public sealed class LocalModel : IChatModel, IDisposable
             catch { }
         }
 
+        return null;
+    }
+
+    private static string? FindServerUnder(string beside)
+    {
+        string inSubdir = Path.Combine(beside, "llama", "llama-server.exe");
+        if (File.Exists(inSubdir)) return inSubdir;
+
+        string directBeside = Path.Combine(beside, "llama-server.exe");
+        if (File.Exists(directBeside)) return directBeside;
+
+        // Walk up looking for Vendor\llama\llama-server.exe for dev/debug runs
+        var directory = new DirectoryInfo(beside);
+        for (int up = 0; up < 8 && directory is not null; up++, directory = directory.Parent)
+        {
+            string devPath = Path.Combine(directory.FullName, "Vendor", "llama", "llama-server.exe");
+            if (File.Exists(devPath)) return devPath;
+
+            string devSubPath = Path.Combine(directory.FullName, "windows-app", "Vendor", "llama", "llama-server.exe");
+            if (File.Exists(devSubPath)) return devSubPath;
+        }
         return null;
     }
 
