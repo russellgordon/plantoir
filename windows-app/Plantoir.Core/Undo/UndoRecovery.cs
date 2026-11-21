@@ -30,7 +30,10 @@ internal sealed record UndoRecoveryRun(IReadOnlyList<UndoRecoveryResult> Settled
                                        IReadOnlyDictionary<long, UndoRefusal>? Left = null, string? NotRun = null);
 
 /// <summary>One line for the activity trail: the course and section it is about, and the words after them.</summary>
-internal sealed record UndoTrailLine(ActivityTrail.Event Event, string? Course, long? Section, string Words);
+/// <param name="Kept">The hidden names of the kept files the line names (U3c's lines), for a test to match against the disk.</param>
+/// <param name="NoLongerInTheList">Of those, the ones said to be kept because the list no longer holds a copy of them.</param>
+internal sealed record UndoTrailLine(ActivityTrail.Event Event, string? Course, long? Section, string Words,
+                                     IReadOnlyList<string>? Kept = null, IReadOnlyList<string>? NoLongerInTheList = null);
 
 /// <summary>
 /// The trail lines Undo writes (<c>activityTrail.mustRecord</c>), in the
@@ -72,6 +75,107 @@ internal static class UndoTrail
 
     private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
 
+    /// <summary>"a change", "an undo" or "a redo": the work that stopped.</summary>
+    private static string What(UndoPhase phase) => phase switch
+    {
+        UndoPhase.Undoing => "an undo",
+        UndoPhase.Redoing => "a redo",
+        _ => "a change",
+    };
+
+    /// <summary><c>“A.md”</c>: the page a kept file's hidden name stands beside.</summary>
+    private static string PlaceOfKept(string kept) => "\u201c" + (UndoSwap.PlaceOfStagedName(kept) ?? kept) + "\u201d";
+
+    private static string Quoted(string name) => "\u201c" + name + "\u201d";
+
+    /// <summary>
+    /// <c>the undo list could not put back 1 file left part way by a change
+    /// that stopped, because what it needs to put it back is no longer in the
+    /// list, and cleared the list. What “A.md” held before is kept beside it as
+    /// the hidden file “.A.md.plantoir-undo-4-apply-orig”.</c> (the mac's
+    /// <c>couldNotPutBackLine</c>): one sentence per kept original on the disk.
+    /// </summary>
+    internal static string CouldNotPutBackWords(UndoPhase phase, int leftPartWay, IReadOnlyList<string> keptOriginals)
+    {
+        var line = new System.Text.StringBuilder();
+        line.Append($"the undo list could not put back {Files(leftPartWay)} left part way by {What(phase)} that stopped, ");
+        line.Append($"because what it needs to put {(leftPartWay == 1 ? "it" : "them")} back is no longer in the list, and cleared the list.");
+        foreach (string kept in keptOriginals)
+            line.Append($" What {PlaceOfKept(kept)} held before is kept beside it as the hidden file {Quoted(kept)}.");
+        return line.ToString();
+    }
+
+    /// <summary>
+    /// <c>the undo list settled a change that stopped. What “A.md” held before
+    /// is kept beside it as the hidden file “…”, because it differs from what
+    /// the list recorded.</c>, or <c>because the list no longer holds a copy of
+    /// it.</c> for one in <paramref name="noLongerInTheList"/> (the mac's
+    /// <c>keptAnOriginalLine</c>).
+    /// </summary>
+    internal static string KeptWhatAPageHeldWords(UndoPhase phase, IReadOnlyList<string> keptOriginals, IReadOnlyList<string> noLongerInTheList)
+    {
+        var line = new System.Text.StringBuilder();
+        line.Append($"the undo list settled {What(phase)} that stopped.");
+        foreach (string kept in keptOriginals)
+        {
+            string because = noLongerInTheList.Contains(kept)
+                ? "because the list no longer holds a copy of it"
+                : "because it differs from what the list recorded";
+            line.Append($" What {PlaceOfKept(kept)} held before is kept beside it as the hidden file {Quoted(kept)}, {because}.");
+        }
+        return line.ToString();
+    }
+
+    /// <summary>
+    /// <c>Undo put back “A.md” from what was kept beside it, but the list could
+    /// not keep a copy of all it needs for this change, so what it could not
+    /// keep stays beside the page, and the next Undo or Redo of this change
+    /// uses it. What “A.md” held a moment before is kept beside it as the
+    /// hidden file “…”.</c> (the mac's <c>keptWhatItReplacedLine</c>).
+    /// </summary>
+    internal static string KeptWhatItReplacedWords(bool isUndo, IReadOnlyList<string> keptOfWhatItHeld, IReadOnlyList<string> keptOfWhatItHoldsNow)
+    {
+        var places = new List<string>();
+        foreach (string kept in keptOfWhatItHeld.Concat(keptOfWhatItHoldsNow))
+        {
+            string place = PlaceOfKept(kept);
+            if (!places.Contains(place)) places.Add(place);
+        }
+        string which = isUndo ? "Undo" : "Redo";
+        string what = places.Count == 0 ? "a page" : string.Join(", ", places);
+        var line = new System.Text.StringBuilder();
+        line.Append($"{which} put back {what} from what was kept beside it, but the list could not keep a copy of all it needs for this change, ");
+        line.Append("so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it.");
+        foreach (string kept in keptOfWhatItHeld)
+            line.Append($" What {PlaceOfKept(kept)} held a moment before is kept beside it as the hidden file {Quoted(kept)}.");
+        foreach (string kept in keptOfWhatItHoldsNow)
+            line.Append($" What {PlaceOfKept(kept)} holds now is kept beside it as the hidden file {Quoted(kept)}.");
+        return line.ToString();
+    }
+
+    /// <summary>
+    /// <c>Undo was refused: a change that stopped part way could not be put
+    /// back yet, because courses/ICS3U/Section 1/Classes/A.md is in use by
+    /// another program. The list is kept, and the next Undo tries again.</c>
+    /// (the mac's <c>leftNewestLine</c>).
+    /// </summary>
+    internal static string LeftNewestWords(bool isUndo, UndoRefusal refusal)
+    {
+        string which = isUndo ? "Undo" : "Redo";
+        string path = refusal.Path ?? "a page";
+        string why = refusal.Kind switch
+        {
+            UndoRefusalKind.FileIsInUse => $"{path} is in use by another program",
+            UndoRefusalKind.CannotTellNow => $"{path} could not be read just now",
+            UndoRefusalKind.CouldNotWrite => $"nothing could be written beside {path} (the disk may be full)",
+            UndoRefusalKind.ChangedSince => $"{path} changed while it was being put back",
+            UndoRefusalKind.ContentMissing => $"what it needs for {path} is no longer in the list",
+            _ => "it holds something this version cannot read",
+        };
+        return $"{which} was refused: a change that stopped part way could not be put back yet, because {why}. "
+             + $"The list is kept, and the next {which} tries again.";
+    }
+
     /// <summary>
     /// Writes a line to the real activity trail, <c>course/section · words</c>:
     /// the sink the app's start-up (W4) gives the door. Each event Undo
@@ -83,6 +187,10 @@ internal static class UndoTrail
         {
             case ActivityTrail.Event.UndoRolledBack:
             case ActivityTrail.Event.UndoFoundAFolderSetAside:
+            case ActivityTrail.Event.UndoCouldNotPutBack:
+            case ActivityTrail.Event.UndoKeptWhatAPageHeld:
+            case ActivityTrail.Event.UndoKeptWhatItReplaced:
+            case ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay:
                 if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(line.Event, line.Words);
                 else if (line.Section is { } section and >= 0 and <= int.MaxValue) ActivityTrail.Note(line.Event, line.Words, line.Course, (int)section);
                 else ActivityTrail.Note(line.Event, line.Course + " · " + line.Words);
@@ -395,12 +503,178 @@ internal static class UndoRecovery
             UndoStep closedStep = record.Step;
             try
             {
+                // Nothing will put a closed step's page back: a kept original
+                // that differs from its page is the only copy of what it held,
+                // and stays (the mac's U3c).
                 allGone = UndoSwap.TidyLeftovers(record.Seq, closedStep.Paths, root, AsideListings(closedStep, root),
-                                                 found => NoteAnAsideFolder(found, closedStep, root, journal, trail));
+                                                 found => NoteAnAsideFolder(found, closedStep, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { allGone = false; }
             if (allGone) journal.Memory.NoteTidied(key);
         }
+    }
+
+    // ---- Kept originals (the mac's U3c) --------------------------------------------
+
+    /// <summary>Every kept original (<c>-orig</c>, <c>-&lt;n&gt;-orig</c>, a file) of this step's beside one place, by name order.</summary>
+    internal static List<string> KeptOriginalFiles(UndoStep step, string place)
+    {
+        var found = new List<string>();
+        string? folder = Path.GetDirectoryName(place);
+        if (folder is null) return found;
+        string placeName = Path.GetFileName(place);
+        string prefix = "." + placeName + UndoSwap.StagedMarker + step.Seq + "-";
+        List<string> names;
+        try
+        {
+            names = new List<string>();
+            foreach (string entry in Directory.EnumerateFiles(folder, "." + "*" + UndoSwap.StagedMarker + step.Seq + "-*")) names.Add(Path.GetFileName(entry));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return found; }
+        names.Sort(StringComparer.Ordinal);
+        foreach (string name in names)
+        {
+            if (!name.StartsWith(prefix, StringComparison.Ordinal) || !name.EndsWith("-orig", StringComparison.Ordinal)) continue;
+            if (UndoSwap.PlaceOfStagedName(name) != placeName) continue;
+            found.Add(Path.Combine(folder, name));
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// What a step's own swap kept beside a page as its original (any of the
+    /// step's labels), answered for a page's path and the sha of the whole
+    /// content wanted there only when a kept original's bytes hash to exactly
+    /// that (Russell's ruling of 2026-11-20, 15:20): trusted by its content
+    /// alone, never its name or its times. Null when none matches. One that is
+    /// there and cannot be read just now (a cloud placeholder not downloaded,
+    /// a permission, another program holding it) is told to
+    /// <paramref name="couldNotRead"/> when none matches: it may be the one,
+    /// so the caller answers "cannot tell now", never "no match".
+    /// </summary>
+    internal static Func<string, string, byte[]?> KeptOriginal(UndoStep step, string root, Action<string>? couldNotRead = null) =>
+        (path, sha) =>
+        {
+            bool unreadable = false;
+            foreach (string kept in KeptOriginalFiles(step, UndoDoor.FullPath(root, path)))
+            {
+                UndoCurrent item = UndoCurrent.Read(kept);
+                if (item is UndoCurrent.CannotReadNow) { unreadable = true; continue; }
+                if (item is UndoCurrent.Bytes bytes && string.Equals(UndoCheck.Sha(bytes.Content), sha, StringComparison.Ordinal)) return bytes.Content;
+            }
+            if (unreadable) couldNotRead?.Invoke(path);
+            return null;
+        };
+
+    /// <summary>
+    /// Writes back into the list what a put-back from kept originals takes and
+    /// sets aside (the first review of U3c, MEDIUM): each kept original's bytes
+    /// as their blob, and what the page holds now as the other direction's blob
+    /// when it hashes to the recorded other sha. Inside the lock, before the
+    /// swap. A failed write is never ignored: the page's outgoing content is
+    /// then kept beside it by the swap (<c>OutgoingOf</c>), and a kept
+    /// original whose own bytes the list would not take is never tidied
+    /// (<c>KeptOriginalsHolding</c>; the second review of U3c, MEDIUM).
+    /// </summary>
+    internal static UndoWhatTheListCouldNotTake StoreWhatKeptOriginalsGive(IReadOnlyList<UndoKeptOriginalUse> uses, UndoJournalWriter writer, UndoJournal journal)
+    {
+        var notWhole = new HashSet<string>(StringComparer.Ordinal);
+        var keptNotStored = new HashSet<string>(StringComparer.Ordinal);
+        foreach (UndoKeptOriginalUse use in uses)
+        {
+            if (!TryToStore(use.Kept, writer)) keptNotStored.Add(UndoCheck.Sha(use.Kept));
+            // The other direction wants no file there: nothing to keep.
+            if (use.OtherSha is not { } otherSha) continue;
+            if (journal.Blob(otherSha) is not null) continue;
+            bool stored = use.Outgoing is UndoCurrent.Bytes outgoing
+                          && string.Equals(UndoCheck.Sha(outgoing.Content), otherSha, StringComparison.Ordinal)
+                          && TryToStore(outgoing.Content, writer);
+            if (!stored) notWhole.Add(use.Path);
+        }
+        return new UndoWhatTheListCouldNotTake(notWhole, keptNotStored);
+    }
+
+    private static bool TryToStore(byte[] bytes, UndoJournalWriter writer)
+    {
+        try { writer.WriteBlob(bytes); return true; }
+        catch (Exception error) when (error is UndoJournalException or IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>
+    /// Whether a kept original's bytes are exactly what the list gives for its
+    /// page, so it is not the only copy of what it holds: what the step's ops
+    /// on that page come to, undone or redone, from what the page holds now (a
+    /// whole file by its recorded sha, whose content the list must still hold;
+    /// a line, a hunk or a member derived from the page). Never true for one
+    /// that holds anything else, such as an edit that raced the swap into the
+    /// original's file (the mac's <c>listHolds</c>; the third review of U3a, LOW 1).
+    /// </summary>
+    internal static Func<string, string, bool> ListHolds(UndoStep step, string root, UndoJournal journal) =>
+        (kept, place) =>
+        {
+            if (UndoCurrent.Read(kept) is not UndoCurrent.Bytes keptBytes) return false;
+            string wanted = Path.GetFullPath(place);
+            var opsOnThePlace = new List<UndoOp>();
+            foreach (UndoOp op in step.Ops)
+            {
+                if (op.Kind == UndoOp.Recompute || op.IsWhole || op.Path is not { } path) continue;
+                if (string.Equals(Path.GetFullPath(UndoDoor.FullPath(root, path)), wanted, StringComparison.OrdinalIgnoreCase)) opsOnThePlace.Add(op);
+            }
+            if (opsOnThePlace.Count == 0) return false;
+            foreach (bool backward in new[] { true, false })
+            {
+                UndoCheck.PlanResult plan;
+                try { plan = UndoCheck.Plan(opsOnThePlace, backward, relative => UndoCurrent.Read(UndoDoor.FullPath(root, relative)), journal.Blob); }
+                catch (UndoListUnreadableException) { continue; }
+                if (plan is not UndoCheck.PlanResult.Ready ready) continue;
+                foreach ((string path, _, byte[]? replacement) in ready.InOrder)
+                {
+                    if (replacement is null) continue;
+                    if (string.Equals(Path.GetFullPath(UndoDoor.FullPath(root, path)), wanted, StringComparison.OrdinalIgnoreCase)
+                        && replacement.AsSpan().SequenceEqual(keptBytes.Content)) return true;
+                }
+            }
+            return false;
+        };
+
+    /// <summary>The hidden name of every kept original of this step still beside the files it names, each once, in the order the step names them.</summary>
+    internal static List<string> KeptOriginalsLeft(UndoStep step, string root)
+    {
+        var names = new List<string>();
+        foreach (string path in step.Paths)
+        {
+            if (!UndoPlaces.StaysInside(root, path)) continue;
+            foreach (string kept in KeptOriginalFiles(step, UndoDoor.FullPath(root, path)))
+            {
+                string name = Path.GetFileName(kept);
+                if (!names.Contains(name)) names.Add(name);
+            }
+        }
+        return names;
+    }
+
+    /// <summary>
+    /// Of these kept originals' hidden names, those whose bytes hash to what the
+    /// journal recorded for their page (a writeFile's before or after): kept
+    /// because the list no longer holds that content, never because they differ
+    /// from it (the first review of U3c, LOW 2).
+    /// </summary>
+    internal static List<string> KeptOriginalsOfWhatWasRecorded(IReadOnlyList<string> names, UndoStep step, string root)
+    {
+        var recorded = new List<string>();
+        foreach (UndoOp op in step.Ops)
+        {
+            if (op.Kind != UndoOp.WriteFile || op.Path is not { } path || !UndoPlaces.StaysInside(root, path)) continue;
+            foreach (string kept in KeptOriginalFiles(step, UndoDoor.FullPath(root, path)))
+            {
+                string name = Path.GetFileName(kept);
+                if (!names.Contains(name) || recorded.Contains(name)) continue;
+                if (UndoCurrent.Read(kept) is not UndoCurrent.Bytes bytes) continue;
+                string sha = UndoCheck.Sha(bytes.Content);
+                if (sha == op.BeforeSha || sha == op.AfterSha) recorded.Add(name);
+            }
+        }
+        return recorded;
     }
 
     private sealed record SettleAnswer(UndoRecoveryResult? Result, bool TryAgain, bool Stopped, UndoRefusal? Why = null)
@@ -477,15 +751,18 @@ internal static class UndoRecovery
 
         if (live)
         {
-            // Everything the stopped work staged goes first: its new contents,
-            // and the kept originals, whose content the list holds to put back
-            // (a step whose content is missing is closed as it stands).
-            // A teacher's folder it set aside is put back in its place, or
-            // kept under a visible name beside it, never deleted (W6).
+            // What the stopped work staged goes first: its new contents, and
+            // the kept originals that are copies of their pages. Every kept
+            // original that differs from its page stays until the plan is
+            // ready, even one the list gives: another page may yet stop the
+            // put-back and the list be cleared, and then it is the only copy
+            // (the mac's U3c; its first review, LOW 1). A teacher's folder it
+            // set aside is put back in its place, or kept under a visible name
+            // beside it, never deleted (W6).
             try
             {
                 UndoSwap.TidyLeftovers(step.Seq, step.Paths, root, AsideListings(step, root),
-                                       found => NoteAnAsideFolder(found, step, root, journal, trail));
+                                       found => NoteAnAsideFolder(found, step, root, journal, trail), keepingOnlyCopies: true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
             if (seams?.Stops("afterRecoveryTidied") == true) return SettleAnswer.Halted;
@@ -535,6 +812,9 @@ internal static class UndoRecovery
 
         var events = new List<JsonObject>();
         UndoRecoveryOutcome outcome;
+        // Kept originals' bytes a put-back took that the list would not take
+        // just now: no tidy removes a kept original holding them (U3c).
+        IReadOnlySet<string>? keptNotTaken = null;
         int putBack = 0;
         UndoTrailLine? line = null;
         string? course = step.Course;
@@ -558,23 +838,56 @@ internal static class UndoRecovery
             {
                 var opsToPutBack = step.Ops.Where(op => op.Kind != UndoOp.Recompute && endPaths.Contains(op.PlaceName)).ToList();
                 UndoCheck.PlanResult plan;
+                // Content the list no longer holds is taken from the step's own
+                // kept original beside the page when its hash is the one
+                // recorded (Russell's ruling of 2026-11-20, 15:20).
+                string? keptOriginalNotRead = null;
+                var uses = new List<UndoKeptOriginalUse>();
                 try
                 {
                     plan = UndoCheck.Plan(opsToPutBack, backward: startedFromBefore,
                                           relative => UndoCurrent.Read(UndoDoor.FullPath(root, relative)), journal.Blob,
-                                          whole: new UndoWholeReads(root, places));
+                                          whole: new UndoWholeReads(root, places),
+                                          keptOriginal: KeptOriginal(step, root, path => keptOriginalNotRead ??= path),
+                                          keptOriginalUsed: uses.Add);
                 }
                 catch (UndoListUnreadableException)
                 {
                     // Content it needs cannot be read just now: tried again.
                     return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow));
                 }
+                // A kept original that cannot be read just now may be the one:
+                // cannot tell now, the step left for the next try, never closed
+                // and the list never cleared (the first review of U3c, LOW 5).
+                if (plan is UndoCheck.PlanResult.ContentMissing && keptOriginalNotRead is { } notRead)
+                    return SettleAnswer.AgainFor(new UndoRefusal(UndoRefusalKind.CannotTellNow, notRead));
                 switch (plan)
                 {
                     case UndoCheck.PlanResult.FileIsInUse or UndoCheck.PlanResult.CannotTellNow or UndoCheck.PlanResult.FolderCannotBeReached:
                         return SettleAnswer.AgainFor(UndoDoor.RefusalOf(plan));
                     case UndoCheck.PlanResult.Ready ready:
                     {
+                        // The plan is ready, so the list will put these pages
+                        // back: only now does a kept original whose bytes the
+                        // list gives go (LOW 1). Then what the kept originals
+                        // give, and what the pages hold now, into the list
+                        // before the swap (MEDIUM). A step that stays on the
+                        // list (an undo or a redo put back to where it began)
+                        // keeps beside its page what the list will not take; a
+                        // change rolled back leaves the list.
+                        try
+                        {
+                            UndoSwap.TidyLeftovers(step.Seq, step.Paths, root, AsideListings(step, root), null,
+                                                   keepingOnlyCopies: true, unlessTheListHolds: ListHolds(step, root, journal));
+                        }
+                        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+                        UndoWhatTheListCouldNotTake notTaken = StoreWhatKeptOriginalsGive(uses, writer, journal);
+                        IReadOnlySet<string>? keepingTheOriginalsOf = null;
+                        if (phase != UndoPhase.Begin)
+                        {
+                            keepingTheOriginalsOf = notTaken.OutgoingOf;
+                            keptNotTaken = notTaken.KeptOriginalsHolding;
+                        }
                         var putBackTargets = ready.InOrder.Select(change => new UndoSwapTarget(UndoDoor.FullPath(root, change.Path), change.Path,
                                                                                                 change.Expected, change.Replacement)).ToList();
                         putBackTargets.AddRange(ready.Whole);
@@ -582,7 +895,7 @@ internal static class UndoRecovery
                         {
                             StopsHere = (point, index) => seams.Stops(point == "beforeSwap" ? "recoveryBeforeSwap" : point, index),
                         };
-                        switch (UndoSwap.Swap(putBackTargets, label + "-recover", root.Length == 0 ? null : root, recoverySeams, places))
+                        switch (UndoSwap.Swap(putBackTargets, label + "-recover", root.Length == 0 ? null : root, recoverySeams, places, keepingTheOriginalsOf))
                         {
                             case UndoSwapResult.StoppedByATest: return SettleAnswer.Halted;
                             case UndoSwapResult.Refused refused: return SettleAnswer.AgainFor(refused.Refusal);   // a file in use: tried again on the schedule
@@ -603,8 +916,17 @@ internal static class UndoRecovery
                         events.Add(new JsonObject { ["event"] = "cleared", ["reason"] = "interrupted" });
                         if (seams?.Stops("recoveryBeforeWriting") == true) return SettleAnswer.Halted;
                         if (!Write(events, step, writer)) return SettleAnswer.Nothing;
-                        trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoRolledBack, course, section,
-                                                        UndoTrail.InterruptedWords(phase, 0, leftPartWay.Count)));
+                        // Nothing that is an only copy is deleted: a kept original
+                        // that differs from its page stays under its hidden name.
+                        // Said after the tidy, so it names what is on the disk.
+                        try
+                        {
+                            UndoSwap.TidyLeftovers(step.Seq, step.Paths, root, AsideListings(step, root), null, keepingOnlyCopies: true);
+                        }
+                        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+                        List<string> keptLeft = KeptOriginalsLeft(step, root);
+                        trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoCouldNotPutBack, course, section,
+                                                        UndoTrail.CouldNotPutBackWords(phase, leftPartWay.Count, keptLeft), keptLeft));
                         return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, UndoRecoveryOutcome.Interrupted, step, root, 0, leftPartWay.Count), false, false);
                     }
                 }
@@ -641,6 +963,26 @@ internal static class UndoRecovery
         }
         if (!Write(events, step, writer)) return SettleAnswer.Nothing;
         if (line is not null) trail?.Invoke(line);
+        if (live && outcome is UndoRecoveryOutcome.Completed or UndoRecoveryOutcome.NothingTookEffect or UndoRecoveryOutcome.RolledBack)
+        {
+            // Settled: its kept originals are needed no more, except one whose
+            // bytes the list does not hold (an edit that raced the swap, or
+            // content the list would not take): the only copy, kept beside its
+            // page and named on the trail (the third review of U3a, LOW 1).
+            try
+            {
+                UndoSwap.TidyLeftovers(step.Seq, step.Paths, root, AsideListings(step, root), null, keepingOnlyCopies: true,
+                                       unlessTheListHolds: ListHolds(step, root, journal), keepingCopiesHolding: keptNotTaken);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            List<string> kept = KeptOriginalsLeft(step, root);
+            if (kept.Count > 0)
+            {
+                List<string> noLonger = KeptOriginalsOfWhatWasRecorded(kept, step, root);
+                trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoKeptWhatAPageHeld, course, section,
+                                                UndoTrail.KeptWhatAPageHeldWords(phase, kept, noLonger), kept, noLonger));
+            }
+        }
         return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, outcome, step, root, putBack, inTheWay.Count), false, false);
     }
 

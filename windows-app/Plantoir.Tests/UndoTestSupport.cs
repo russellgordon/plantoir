@@ -515,3 +515,67 @@ internal static class UndoKindsForTheCases
         Assert.True(Directory.Exists(place), "the junction was not made at " + place);
     }
 }
+
+/// <summary>
+/// A real refusal on the disk for the kept-original rows (#899 W4c, the mac's
+/// U3c): a deny entry for this user on a folder (it takes no new file or
+/// folder: a full or read-only disk, as far as the list can tell) or on a file
+/// (it cannot be read just now: a permission, as a cloud placeholder not
+/// downloaded cannot). Each is taken away again by <see cref="Dispose"/>.
+/// </summary>
+#pragma warning disable CA1416 // every deny entry is made only on Windows (checked in Deny), where the tests run
+internal sealed class UndoDenials : IDisposable
+{
+    private readonly List<Action> _restores = [];
+
+    /// <summary>The folder takes no new file or folder; made first if it is not there.</summary>
+    internal void FolderTakesNothingNew(string folder)
+    {
+        Directory.CreateDirectory(folder);
+        Deny(new DirectoryInfo(folder), System.Security.AccessControl.FileSystemRights.CreateFiles | System.Security.AccessControl.FileSystemRights.CreateDirectories);
+    }
+
+    /// <summary>The file cannot be read just now.</summary>
+    internal void FileCannotBeRead(string file) => Deny(new FileInfo(file), System.Security.AccessControl.FileSystemRights.ReadData);
+
+    private void Deny(FileSystemInfo item, System.Security.AccessControl.FileSystemRights rights)
+    {
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("a deny entry is Windows'");
+        var rule = new System.Security.AccessControl.FileSystemAccessRule(
+            System.Security.Principal.WindowsIdentity.GetCurrent().User!, rights, System.Security.AccessControl.AccessControlType.Deny);
+        if (item is DirectoryInfo folder)
+        {
+            System.Security.AccessControl.DirectorySecurity security = folder.GetAccessControl();
+            security.AddAccessRule(rule);
+            folder.SetAccessControl(security);
+            _restores.Add(() =>
+            {
+                System.Security.AccessControl.DirectorySecurity now = folder.GetAccessControl();
+                now.RemoveAccessRule(rule);
+                folder.SetAccessControl(now);
+            });
+            return;
+        }
+        var file = (FileInfo)item;
+        System.Security.AccessControl.FileSecurity fileSecurity = file.GetAccessControl();
+        fileSecurity.AddAccessRule(rule);
+        file.SetAccessControl(fileSecurity);
+        _restores.Add(() =>
+        {
+            System.Security.AccessControl.FileSecurity now = file.GetAccessControl();
+            now.RemoveAccessRule(rule);
+            file.SetAccessControl(now);
+        });
+    }
+
+    public void Dispose()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        for (int index = _restores.Count - 1; index >= 0; index--)
+        {
+            try { _restores[index](); } catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        }
+        _restores.Clear();
+    }
+}
+#pragma warning restore CA1416

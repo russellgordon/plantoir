@@ -350,7 +350,10 @@ internal sealed class UndoJournal
         if (step.WorkingFolder?.PathAtTheTime is not { } root || !CanReach(step)) return;
         // A teacher's folder set aside is put back or kept visibly, never deleted
         // (W6); this hold has no trail sink, so no line is written for it here.
-        try { UndoSwap.TidyLeftovers(seq, step.Paths, root, UndoRecovery.AsideListings(step, root)); }
+        // A kept original that differs from its page is the only copy of what
+        // it held, and the list no longer gives anything for a pruned step:
+        // it stays (the mac's U3c, pruning's tidy).
+        try { UndoSwap.TidyLeftovers(seq, step.Paths, root, UndoRecovery.AsideListings(step, root), keepingOnlyCopies: true); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
