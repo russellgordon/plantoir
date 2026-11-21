@@ -590,6 +590,35 @@ public sealed class ClubNounTests : IDisposable
                                                        new Progress<ModelContextProtocol.ProgressNotificationValue>(_ => { }), default, preview: false);
             return new[] { TeacherCopy(published) };
         },
+        // Meetings ▸ Roll Over to a New Year… (#954, met #1027 on the
+        // integration tree): the dialog's own lines in the club's noun, then
+        // the teacher's copy of the menu's rollover for each answer, a new
+        // website (from a Netlify record) and last year's.
+        [SubjectMenuRules.Item.RollOverToANewYear] = async () =>
+        {
+            Club("meeting");
+            var club = TheClub;
+            var lines = new List<string>
+            {
+                RollOverWords.Intro(club.Configuration.ClassNoun),
+                RollOverWords.Dates(RollOverFromTheMenu.DayAsWritten(new DateOnly(2025, 9, 18)),
+                                    RollOverFromTheMenu.DayAsWritten(new DateOnly(2025, 11, 20)), club.Configuration.ClassNoun),
+                RollOverWords.DatesAreOld(club.Configuration.ClassNoun),
+            };
+            foreach (string website in new[] { "new", "same" })
+            {
+                ClubWhoseDatesMoved();
+                string records = Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites");
+                Directory.CreateDirectory(records);
+                File.WriteAllText(Path.Combine(records, "section1.json"), """{"name": "ics3u-s1-2025-club"}""");
+                var fromTheMenu = new AssistWorkspace(_folder, new FakeLauncher(), undo: new UndoHistory()) { Surface = AssistSurface.Menu };
+                var rolledOver = await new PlantoirTools(fromTheMenu).ReDateClasses(
+                    "ICS3U", 1, timetable: "", block: "", cancellation: default, pages: null, meetings: null,
+                    firstDay: "", startYear: 0, website: website, rollover: "yes");
+                lines.Add(TeacherCopy(rolledOver));
+            }
+            return lines;
+        },
     };
 
     /// <summary>
