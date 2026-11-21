@@ -12,6 +12,83 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 76364b50b — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
+## 2026-11-20 — Undo and Redo, W6: the six op kinds U2b defines (#899, #949)
+
+Branch `issue/899-w6-op-kinds` (on W4 with its review fixes, `dev` 2ba8490e7 in it). Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200) over SSH. Nothing a teacher sees changed; the switch stays off; no action goes through the door yet (W7 on).
+
+- Reader (`UndoFormat`): `replaceText`, `editJSON`, `move`, `createTree`, `removeTree`, `external` read with the mac's shapes (`shapeIsKnown`), `opKinds.wholeOps` on the step, places compared without case, `element` and `heldBy` unreadable, a listing's hash among the blobs kept, a step of external ops alone needs no working folder.
+- `UndoJson.cs` (any JSON, compared as the contract says, exactness beyond 2^53, the compact spelling), `UndoOpKinds.cs` (`UndoHunk`, `UndoJsonMember` with its byte scanner, `UndoTreeListing`/`UndoTreeReading`, `UndoLinks`, move sides, `IUndoExternalPlaces` and the app's `UndoAppSettingsPlaces`).
+- Check, plan, swap and recovery for each kind (`UndoCheck.WholeStateOf`, `UndoSwapChange`, `UndoSwap.SwapAWholeOp`, `TidyLeftovers` putting a folder set aside back or keeping it as `<name> (kept by Undo)`, `-gone` before a delete, `UndoRecovery.FoldersKeptAside`, the `undo found a folder set aside` trail line).
+- Contract from the JSON: all 110 `checkCases` (move sides, trees, links, preferences placed on the disk), the 5 `listingCases` and 16 `editJSONCases` (new, `UndoOpKindsContractTests`; 8 added by the fix round), U2's 19 `stackCases`, the 15 traces holding a `move`, U2's 21 `recoveryCases`. Every W6 entry left `NamedGapLedger`, `undo found a folder set aside` with them.
+- PC `899w6-c3` (head 400083f60): the Undo classes 665 passed, 1 not run (the `[DenyBitesFact]` that cannot bite over SSH), 0 failed. Must-fail (`vm-tools/guest/899-w6-mustfail.json`, 20 sabotages): all red (`899w6-c1`, and `899w6-c3` for three made real: the contract's link rows and its key-written-twice row pass a reader that follows links or picks the first duplicate only because the content they lead to differs or the read-back refuses, so `AJunctionToTheVeryContentIsStillNeverFollowed` was added and the duplicate sabotage picks the last one). Killed-step harness (`Plantoir.UndoHarness kinds-kill`): 132 runs, every one whole, outside and inside OneDrive: `documentation/12-windows-app.md` → "What Windows has built: W6, the op kinds".
+
+- **Fix round (the first review of W6, NOT CLEAN; and the final sweep of W3 and W4).** MEDIUM: `UndoAppSettingsPlaces` reads `settings.json` as it is on the disk and sets one member by replacing it exactly (lists and dictionaries whole), checked before a temporary file and one rename, nothing written on a mismatch, the running copy then given the member; the kill harness's preference is now `AcceptedSyncedFolders` in the real store (`UndoAppSettingsPlacesTests`, 6). LOW 1: editJSON byte for byte with the mac (`UndoMacKeyOrder`, `UndoJson.SpellNumber`, `UndoJson.ReadAsTheMacReads`), measured through the mac's own code and pinned as 8 new contract rows the mac's `UndoJournalContractTests` passes (this piece now touches `contracts/`). LOW 2: a file starting with a byte-order mark judged as on the mac. LOWs 3 and 4 and W4's front-page note: "For W7" below. The sweep: pruning stops at a step kept for a re-deriving recovery; the launch-call comments say W4; the owed-pieces table's corrections are below. PC `899w6f-a3` (head 6c5d2281a, `dev` 6b2a48a99 merged in): the Undo classes 681 passed, 1 not run (the `[DenyBitesFact]`), 0 failed; must-fail (`vm-tools/guest/899-w6f-mustfail.json`, 14 sabotages) all red, restored green; `kinds-kill` 132 runs, every one whole, the settings file's other member kept and no `settings.json.undo-writing` left in all 132 (no kill point falls inside the settings write itself, so this says nothing about a kill between its temporary and its rename: see fix round two), outside and inside OneDrive (settled as before: done 26, undone 22, rolled back 14, failed 4 in each place; 0.6 to 2.0 s a run). Mac (this Mac, macOS 26.7.3, Xcode 27.0): `UndoJournalContractTests` 17 of 17 with the 16 editJSON rows, and red when one new row's result is changed.
+
+- **Fix round two (the second review of W6, NOT CLEAN: two MEDIUMs, three LOWs).** The rule now is: for an editJSON op, Windows writes exactly the bytes the mac would write, proven by a contract row run on both, or it writes nothing. M1: a key beyond printable ASCII (a new value's, a key path part, or any key of an object the path passes through) and text starting with a byte-order mark are refused (`UndoJson.IsMeasured`, `UndoJsonMember.PathIsMeasured`): cannot tell when judged, never written. M2: a file's number spelled with an exponent and more than 17 digits, or more than 38 without, makes the whole file cannot tell (`UndoJson.SpellingIsMeasured`). Also measured and matched: a negative number beyond a double's range is minus infinity on the mac (cannot tell when it is the member, judged as usual beside it); a positive one, and text holding half a surrogate pair, make the file unreadable on both (half a pair used to throw out of Windows' reader). 18 contract rows (7 `editJSONCases`, 11 `checkCases`), every result and verdict measured through the mac's own code; 13 of them carry what the mac does and Windows refuses, held by name in `NamedGapLedger` (`UndoEditJsonCasesRefusedHere`, `UndoCheckCasesRefusedHere`), where each must be REFUSED. The Python reference model (`scripts/make_undo_traces.py`) follows the same rules and holds the same 13: its test had failed on round one's 8 rows since that round (ordinal keys, Python's shortest numbers, no read-back), unseen because only the Undo classes ran. LOWs 2 and 3: tests for a stale `settings.json.undo-writing` (never read, gone after the next set) and a rename refused while the file is held open (nothing changed). LOW 1 is W8's ("For W8" below). Runs on the PC (LENOVO i5-8365U, Windows 11 Pro 26200): `899w6g-a1` at 6e3743a94 (classes, then the 26 sabotages of `vm-tools/guest/899-w6f-mustfail.json` each alone, then `kinds-kill`): all 26 sabotages red (build 0, test failed); `kinds-kill` 66 of 66 whole outside OneDrive and 66 of 66 inside it, 0 failures, A and B the same at every point; its class run had 1 failure of 726 (`WhatCanBeUndoneCanThenBeRedone` running a held row), the same 1 after the sabotages were restored. `899w6g-a2` at 901241af6 (the Undo classes): 716 passed, 0 failed, 1 skipped, 717 in all. The 9 fewer than a1's 726 are a different filter, not a lost test (review 3 compared the two `results.trx`): a1 was started with a wider `-Filter`, which took in the 8 `NamedGapLedgerTests` facts and `PythonToolchainTests.SharedPythonTestFilePasses("test_make_undo_traces.py")`, all 9 green there; a2 ran the script's default `FullyQualifiedName~Plantoir.Tests.Undo`, which matches none of them.
+
+- **Fix round three (the third review of W6, NOT CLEAN: one MEDIUM, three LOWs).** M1: an exponent the mac does not read (more than 4 characters after the `e`, sign included, measured) makes the file not JSON on both platforms, by one rule in the contract (`undo.numberSpellingRule`, 37 `numberSpellingCases`, one `checkCases` row for `1e-0001`), held in `UndoJson` and `scripts/make_undo_traces.py` and checked against the contract by both (documentation 12 section below). L3: the 9-test gap is explained in the round-two paragraph. L1 (the Mac's runners on round two's 18 rows and this round's row) needs the Mac gate: no xcodebuild in this piece. L2 (the 13 held rows) is Russell's ruling, carried by the director. `dev` 5cf38d656 merged in (1aaa6577e; the ledger keeps W6's built rows gone and takes dev's U3b and U3c holds). PC `899w6h-a1` at 5be9984b3 (filter: the Undo classes, `NamedGapLedgerTests`, `test_make_undo_traces.py`): 814 passed, 0 failed, 1 skipped, 815; the 37 new rows, the limits fact, the 8 ledger facts and the Python file all passed. Sabotages (`vm-tools/guest/899-w6h-mustfail.json`): 1 (exponent check out) red, 13 of 37 `EveryNumberSpellingCase`; 2 (the same) red, 1 of 129 `EveryCheckCase`; 3 and 4 both went red. On this Mac `python3 scripts/test_make_undo_traces.py`: 26 OK, and with the Python check taken out red on the `1e-0001` check case and the notJSON spelling rows.
+
+- **The integration fix (`night4/integration-2`, three tests red that pass on `dev`).** (1) Windows PowerShell 5.1's `ConvertFrom-Json` could not read `shared-rules.json`: it builds each object as a case-insensitive dictionary, and the editJSON rows added in fix round two hold objects with keys `X1` and `x1`, `Ab`/`aB`/`ab`, `E`/`e`, `A`/`a` (its message: "a dictionary that was converted from the string contains the duplicated keys 'X1' and 'x1'"). Only the launcher RUNNERS read the file that way (`test_launcher_rules.ps1`, `test_stop_preview.ps1`); the shipped launchers name it in comments only, so no teacher's launcher was affected. `editJSONCases` (23) and `editJSONCasesHow` moved, unchanged, to `contracts/undo-json-cases.json`, which no PowerShell reads; Windows' `UndoOpKindsContractTests` (through `UndoContract.JsonCases`), the mac's `UndoContractReplay`, `scripts/test_make_undo_traces.py` and the ledger area (`undo-json-cases.json → editJSONCases (refused here)`) read it there. New guards: Windows `ContractFilesWindowsPowerShellReadsTests` runs the real `ConvertFrom-Json` on every other contract file; `test_make_undo_traces.py` → `ContractFileReadabilityTests` checks the same rule on the Mac; the mac's `UndoJournalContractTests.testEveryContractFileIsOneObjectToJSONSerialization`. (2) `ActivityTrailWiringTests` did not see `UndoRolledBack` and `UndoFoundAFolderSetAside`: W6 had turned dev's `Note(ActivityTrail.Event.UndoRolledBack, …)` into `case` labels passing `line.Event` on, which the scan does not read. Both ARE written; `UndoTrail.ToTheActivityTrail` now names each on the right of a switch arm, the shape W4c already uses, so nothing is ledgered. W4c will conflict there when it takes this head: keep W4c's (a superset).
+
+### For W8: the settings write and `AppSettings.Save` (the second review of W6, LOW 1)
+
+`AppSettings.Save` is a plain `File.WriteAllText` that swallows every error,
+called from about 24 places on the app's thread; the undo settings write
+(`UndoAppSettingsPlaces.Write`) holds the undo lock, which `Save` does not
+take. Three windows follow: an app save between the write's read and its
+rename is lost on the disk until the app's next save; an app save between the
+rename and the running copy being given the member writes the old member back
+while the write says it succeeded (the file then disagrees with the journal's
+`applied`, and an Undo of that step would read changed since and clear the
+list); and while the write reads the file, an app `Save` cannot open it and is
+silently dropped. None of this is reachable before W8 (no action writes an
+external op, and recovery acts only on journal ops). **W8 owes one settings
+lock taken by `AppSettings.Save` and by this write, or the write done on the
+app's thread through the running copy**, together with the cross-process point
+above. Also W8's: populating the running copy bypasses `ChangePreviewOpensAt`
+and `ChangeCloudflareAccountId` and their events, so an open Settings pane or
+a window title would not follow an undone preference. And a write killed
+between its temporary and its rename leaves `settings.json.undo-writing`:
+harmless (nothing reads it, and the next set writes over it and renames it in,
+`UndoAppSettingsPlacesTests.ATemporaryLeftByAKilledWriteIsNeverReadAndGoesWithTheNextSet`),
+but no harness kill point falls inside the write, so W8's harness adds one
+there.
+
+### For W7: shadow leftovers (the first review of W6, LOW 3)
+
+In shadow, recovery never tidies a working folder and `TidyClosedSteps` runs
+live only (the mac's rule, unchanged here). So a `removeTree` killed after its
+folder went aside leaves the teacher's folder under its staged dot name
+(`.<name>.plantoir-undo-<step label>-orig`), which Explorer does NOT hide (a dot name is
+not hidden on Windows), and a `-gone` folder half deleted, until the switch
+goes on; the same if the step is pruned before a put-back succeeds. Nothing
+reaches this before W7, because no teacher action writes a tree op through the
+door in shadow yet. Before any teacher action sends a tree op through the door
+in shadow, W7 must prove, on the PC's disk and inside OneDrive, with the kill
+harness: a take-out killed at every point, in shadow, leaves the teacher's
+folder in its place or in a visible place the teacher is told about, never
+under a staged name; a `-gone` remnant left in shadow is finished or reported
+at the next live recovery; and pruning a shadow step never strands either.
+Until W7 proves that (or the rule changes for both apps), tree ops stay out of
+shadow writes.
+
+### For W7: the "(kept by Undo)" folder is a real folder (LOW 4)
+
+`<name> (kept by Undo)` (and `(kept by Undo 2)` and on) is an ordinary folder
+beside its place, so under `courses/` it is part of the course: a build and a
+deploy include its pages. That follows Russell's ruling of 2026-11-19 and the
+mac; the director is telling him. No sentence on screen says it yet (the only
+sentence is the trail line `undo found a folder set aside`, contract wording);
+whatever sentence a teacher is first told about a kept folder (W7 on, with the
+mac) must say plainly that it is a real folder that a build and a deploy
+include, until a ruling says otherwise.
+
+### For W7: the front page re-derived twice (from W4's re-review)
+
+In shadow the door, not the action, re-derives the front page: a W7 action that
+keeps its own front-page write and also routes a `recompute` through the door
+writes the page twice. W7 keeps one: the action's own write, or the door's.
+
 ## 2026-11-20 — The Windows halves of the mac's #1012 and #997 (#1020, #1024)
 
 Plan: `vm-tools/reference/night3-c-plan.md` (private setup repository).
