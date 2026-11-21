@@ -220,7 +220,7 @@ public class FixWithButtonsUiTests
     /// windows; up to three rests, as a person moves off and back. With a
     /// folder given, the whole screen in real pixels is saved there for each rest.
     /// </summary>
-    private static bool RestThePointerOn(DrivenApp app, AutomationElement element, string tip, string pictures, string name)
+    internal static bool RestThePointerOn(DrivenApp app, AutomationElement element, string tip, string pictures, string name)
     {
         app.BringToFront();
         var middle = DrivenApp.MiddleOf(element, app.Window.BoundingRectangle);

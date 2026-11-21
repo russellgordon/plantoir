@@ -621,6 +621,11 @@ public sealed partial class TaskProgressView : UserControl
                         inputControl = tb;
                         getAnswer = () => tb.Text;
                     }
+                    // Named by the label printed above it, as the mac's
+                    // credential field is (#1012, #1020): the placeholder is
+                    // a hint and goes when the teacher types.
+                    AutomationProperties.SetName(inputControl, req.FieldLabel);
+                    AutomationProperties.SetAutomationId(inputControl, "credentialField");
                     fieldColumn.Children.Add(inputControl);
                     panel.Children.Add(fieldColumn);
 
@@ -661,6 +666,8 @@ public sealed partial class TaskProgressView : UserControl
                     Text = runner.SuggestedAnswer,   // agreeing is one keystroke
                     PlaceholderText = "Your answer",
                 };
+                // A name of its own (#1020): a placeholder is not one.
+                AutomationProperties.SetName(answerBox, "Your answer");
                 var panel = new StackPanel { Spacing = 12 };
                 panel.Children.Add(new TextBlock { Text = runner.PendingQuestion, TextWrapping = TextWrapping.Wrap });
                 panel.Children.Add(answerBox);

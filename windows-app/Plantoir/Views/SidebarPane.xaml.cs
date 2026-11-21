@@ -57,8 +57,42 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
         get => _tooltip;
         set { if (_tooltip != value) { _tooltip = value; Raise(nameof(Tooltip)); } }
     }
+    /// <summary>
+    /// A course's row (#1024, the mac's #997 D44): when its code is cut short,
+    /// the code's own text carries the whole code as a tooltip, the HIG's
+    /// expansion tooltip ("Consider using an expansion tooltip to show the
+    /// full version of clipped or truncated text"). A code that fits has none.
+    /// </summary>
+    public bool ShowsWholeTitleWhenCutShort { get; init; }
+
+    private bool _titleIsCutShort;
+    /// <summary>Whether the row's text is drawn cut short, as its TextBlock last reported it.</summary>
+    public bool TitleIsCutShort
+    {
+        get => _titleIsCutShort;
+        set
+        {
+            if (_titleIsCutShort == value) return;
+            _titleIsCutShort = value;
+            Raise(nameof(TitleTooltip));
+            Raise(nameof(TitleHelpText));
+        }
+    }
+
+    /// <summary>The title's own tooltip: the whole code, only on a course's row and only while it is cut short.</summary>
+    public string? TitleTooltip => ShowsWholeTitleWhenCutShort && _titleIsCutShort ? Title : null;
+
+    /// <summary>
+    /// The same words as UI Automation help text, as the mac's help tag is read
+    /// off its tree (the house pattern: SectionProblemsView sets both); empty
+    /// when there is no tooltip.
+    /// </summary>
+    public string TitleHelpText => TitleTooltip ?? "";
+
     public bool IsExpanded { get; set; }   // mutable: user toggles are recorded (row 99)
     public string AutomationId { get; init; } = "";
+    /// <summary>The row's text's own id, so a test can read the text and its tooltip (#1024).</summary>
+    public string TitleId => AutomationId.Length > 0 ? AutomationId + "-title" : "";
     public ObservableCollection<SidebarRow> Children { get; init; } = new();
     public SidebarSelection? Selection { get; init; }
     public ArchivedItem? Archived { get; init; }
@@ -845,6 +879,7 @@ public sealed partial class SidebarPane : UserControl
                 row = new SidebarRow
                 {
                     Title = course.Code,
+                    ShowsWholeTitleWhenCutShort = true,
                     Glyph = LibraryGlyph,
                     // The window's own memory decides (row 99); a window
                     // without stored state opens everything.
@@ -2046,6 +2081,22 @@ public sealed partial class SidebarPane : UserControl
         await ShowDialogSafelyAsync(dialog);
     }
 
+    /// <summary>
+    /// A row's text reports whether it is drawn cut short (#1024): WinUI
+    /// raises this at layout time and again on every change, so nothing waits
+    /// or measures. A recycled container takes its new row's state at once,
+    /// and the event follows if the new text trims differently.
+    /// </summary>
+    private void RowTitle_IsTextTrimmedChanged(TextBlock sender, IsTextTrimmedChangedEventArgs args)
+    {
+        if (sender.DataContext is SidebarRow row) row.TitleIsCutShort = sender.IsTextTrimmed;
+    }
+
+    private void RowTitle_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        if (args.NewValue is SidebarRow row && sender is TextBlock title) row.TitleIsCutShort = title.IsTextTrimmed;
+    }
+
     private void Filter_TextChanged(object sender, TextChangedEventArgs e)
     {
         Workspace.FilterText = FilterBox.Text;
@@ -2172,6 +2223,10 @@ public sealed partial class SidebarPane : UserControl
             MaxWidth = 300,
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
+        // A name of its own, the mac's (#1012, #1020): the placeholder is an
+        // example, not what the box is.
+        AutomationProperties.SetName(codeBox, "Course code");
+        AutomationProperties.SetAutomationId(codeBox, "renameField");
         codeBox.SelectAll();
 
         var warning = new TextBlock

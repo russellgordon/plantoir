@@ -6,7 +6,9 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
@@ -36,6 +38,21 @@ public sealed class SectionScheduleDialog : ContentDialog
     private readonly StackPanel _typedPanel = new() { Spacing = 6 };
     private readonly StackPanel _filePanel = new() { Spacing = 6 };
     private readonly StackPanel _sheetPanel = new() { Spacing = 6 };
+
+    /// <summary>The dates box's name: the mac's <c>AccessibilityNames.classDates</c>.</summary>
+    public const string ClassDatesName = "Class dates";
+
+    /// <summary>The sheet link's name: the mac's <c>AccessibilityNames.googleSheetAddress</c>.</summary>
+    public const string GoogleSheetAddressName = "Google Sheet address";
+
+    /// <summary>The source box's name, the mac's label for it.</summary>
+    public const string WhereTheseCameFromName = "Where these came from";
+
+    /// <summary>
+    /// Set once the focus has first come into the dialog (see the constructor):
+    /// from then on every focus move is the teacher's, whoever makes it.
+    /// </summary>
+    private bool _theFirstFocusHasArrived;
 
     private readonly TextBox _typedBox = new()
     {
@@ -105,6 +122,110 @@ public sealed class SectionScheduleDialog : ContentDialog
 
         BuildContent(reason);
         RefreshButtons();
+
+        // The keyboard starts in the dates box, the mac's (#997, ClassDatesBoxKeyTests;
+        // #1024 here): the sheet opens on Type or paste, and the box is what
+        // the teacher came to fill. Tab then leaves the box for "Where these
+        // came from" (a TextBox types no tab), as the mac's ruling Q-C asks.
+        //
+        // The dialog places its own first focus, on the route picker, and
+        // only that one placement is sent to the box: the first focus move
+        // that comes INTO the dialog from outside it. Every later move stays
+        // where it was going, whoever makes it. Measured in VM B on
+        // 2026-11-20 (notes, "Class Dates' keys"): a UI Automation SetFocus,
+        // and Narrator moving its cursor with focus following it, arrive as
+        // FocusState.Programmatic, the same as the dialog's own placement,
+        // so the state cannot tell them apart and is not read. The
+        // placement came before Opened in some opens and after it in
+        // others, and when the dialog was opened from the keyboard it was
+        // raised only on FocusManager.GettingFocus, never on the dialog's
+        // own GettingFocus; so the app-wide event is the one listened to,
+        // from now until the dialog closes, and nothing is focused on
+        // Opened. GettingFocus with TrySetNewFocusedElement is WinUI's
+        // documented place to change where focus lands, so nothing waits.
+        //
+        // The app-wide event is static, so the dialog listens only for the
+        // length of one ShowWithTheFirstFocusInTheBoxAsync, and a finally
+        // leaves it on every way out, a ShowAsync that throws included
+        // (review 2's L5). Loaded is too late to join: measured in VM B on
+        // 2026-11-20, the placement came before Loaded in both a keyboard
+        // and a UI Automation open.
+    }
+
+    /// <summary>
+    /// Show the dialog with its first placement sent to the dates box. The
+    /// dialog listens to <c>FocusManager.GettingFocus</c> only inside this
+    /// call and stops in a finally, so a ShowAsync that throws (another
+    /// dialog already open on the same XamlRoot) leaves nothing joined to the
+    /// static event.
+    /// </summary>
+    public async Task<ContentDialogResult> ShowWithTheFirstFocusInTheBoxAsync()
+    {
+        StartListeningForTheFirstFocus();
+        try
+        {
+            return await ShowAsync();
+        }
+        finally
+        {
+            StopListeningForTheFirstFocus();
+        }
+    }
+
+    /// <summary>Whether this dialog is listening to the app-wide <c>FocusManager.GettingFocus</c> (it is only while shown).</summary>
+    private bool _isListeningForTheFirstFocus;
+
+    private void StartListeningForTheFirstFocus()
+    {
+        if (_isListeningForTheFirstFocus) return;
+        FocusManager.GettingFocus += SendTheFirstFocusToTheBox;
+        _isListeningForTheFirstFocus = true;
+    }
+
+    private void StopListeningForTheFirstFocus()
+    {
+        FocusManager.GettingFocus -= SendTheFirstFocusToTheBox;
+        _isListeningForTheFirstFocus = false;
+    }
+
+    /// <summary>
+    /// The dialog's first placement of the focus goes to the dates box while
+    /// the route is Type or paste; nothing after it is touched (see the
+    /// constructor). A move between two places outside the dialog, such as
+    /// the menu closing, is not the first focus and is left alone. Only the
+    /// dialog's OWN placement is moved (review 2's L4): it lands on the route
+    /// picker, where the dialog puts its first focus, and is made neither by
+    /// the pointer nor by a key that moves focus in a direction. If the
+    /// dialog opened without placing focus, the person's own first click or
+    /// key is the first move in, and it stays where they sent it. The rule is
+    /// <see cref="DialogFirstFocus"/>, tested in Plantoir.Tests.
+    /// </summary>
+    private void SendTheFirstFocusToTheBox(object? sender, GettingFocusEventArgs args)
+    {
+        bool landsInTheDialog = IsInThisDialog(args.NewFocusedElement);
+        bool comesFromInside = IsInThisDialog(args.OldFocusedElement);
+        bool isThePlacement = DialogFirstFocus.IsTheDialogsOwnFirstPlacement(
+            theFirstFocusHasArrived: _theFirstFocusHasArrived,
+            landsInTheDialog: landsInTheDialog,
+            comesFromInsideTheDialog: comesFromInside,
+            landsWhereTheDialogPlacesItsFirstFocus: IsInside(_routePicker, args.NewFocusedElement),
+            madeByThePersonsPointer: args.FocusState == FocusState.Pointer,
+            madeByAKeyThatMovesFocus: args.Direction != FocusNavigationDirection.None);
+        if (DialogFirstFocus.IsTheFirstMoveIntoTheDialog(_theFirstFocusHasArrived, landsInTheDialog, comesFromInside))
+            _theFirstFocusHasArrived = true;
+        if (isThePlacement && _routePicker.SelectedIndex == 0 && !ReferenceEquals(args.NewFocusedElement, _typedBox))
+            args.TrySetNewFocusedElement(_typedBox);
+    }
+
+    /// <summary>Whether an element is this dialog or inside it, by its visual parents.</summary>
+    private bool IsInThisDialog(DependencyObject? element) => IsInside(this, element);
+
+    /// <summary>Whether an element is <paramref name="container"/> or inside it, by its visual parents.</summary>
+    private static bool IsInside(DependencyObject container, DependencyObject? element)
+    {
+        for (var step = element; step is not null; step = VisualTreeHelper.GetParent(step))
+            if (ReferenceEquals(step, container)) return true;
+        return false;
     }
 
     /// <summary>
@@ -126,6 +247,15 @@ public sealed class SectionScheduleDialog : ContentDialog
 
     private void BuildContent(string reason)
     {
+        // Each box has a name of its own, the mac's words (#993 D41, #1012,
+        // #1020): a placeholder is a hint that goes as the teacher types.
+        AutomationProperties.SetName(_typedBox, ClassDatesName);
+        AutomationProperties.SetAutomationId(_typedBox, "sectionScheduleTypedField");
+        AutomationProperties.SetName(_sheetUrlBox, GoogleSheetAddressName);
+        AutomationProperties.SetAutomationId(_sheetUrlBox, "sectionScheduleGoogleSheetField");
+        AutomationProperties.SetName(_sourceBox, WhereTheseCameFromName);
+        AutomationProperties.SetAutomationId(_sourceBox, "sectionScheduleSourceField");
+
         var main = new StackPanel { Spacing = 14, MinWidth = 460, MaxWidth = 560 };
 
         // #1027: in the course's noun, "meeting" in a club.
