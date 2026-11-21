@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
@@ -36,6 +37,15 @@ public sealed class SectionScheduleDialog : ContentDialog
     private readonly StackPanel _typedPanel = new() { Spacing = 6 };
     private readonly StackPanel _filePanel = new() { Spacing = 6 };
     private readonly StackPanel _sheetPanel = new() { Spacing = 6 };
+
+    /// <summary>The dates box's name: the mac's <c>AccessibilityNames.classDates</c>.</summary>
+    public const string ClassDatesName = "Class dates";
+
+    /// <summary>The sheet link's name: the mac's <c>AccessibilityNames.googleSheetAddress</c>.</summary>
+    public const string GoogleSheetAddressName = "Google Sheet address";
+
+    /// <summary>The source box's name, the mac's label for it.</summary>
+    public const string WhereTheseCameFromName = "Where these came from";
 
     private readonly TextBox _typedBox = new()
     {
@@ -105,6 +115,18 @@ public sealed class SectionScheduleDialog : ContentDialog
 
         BuildContent(reason);
         RefreshButtons();
+
+        // The keyboard starts in the dates box, the mac's (#997, ClassDatesBoxKeyTests;
+        // #1024 here): the sheet opens on Type or paste, and the box is what
+        // the teacher came to fill. Opened, not the box's Loaded: the dialog
+        // places its own first focus after its content loads, and Opened is
+        // raised once that is done, once per showing. Tab then leaves the box
+        // for "Where these came from" (a TextBox types no tab), as the mac's
+        // ruling Q-C asks.
+        Opened += (_, _) =>
+        {
+            if (_routePicker.SelectedIndex == 0) _typedBox.Focus(FocusState.Programmatic);
+        };
     }
 
     /// <summary>
@@ -126,6 +148,15 @@ public sealed class SectionScheduleDialog : ContentDialog
 
     private void BuildContent(string reason)
     {
+        // Each box has a name of its own, the mac's words (#993 D41, #1012,
+        // #1020): a placeholder is a hint that goes as the teacher types.
+        AutomationProperties.SetName(_typedBox, ClassDatesName);
+        AutomationProperties.SetAutomationId(_typedBox, "sectionScheduleTypedField");
+        AutomationProperties.SetName(_sheetUrlBox, GoogleSheetAddressName);
+        AutomationProperties.SetAutomationId(_sheetUrlBox, "sectionScheduleGoogleSheetField");
+        AutomationProperties.SetName(_sourceBox, WhereTheseCameFromName);
+        AutomationProperties.SetAutomationId(_sourceBox, "sectionScheduleSourceField");
+
         var main = new StackPanel { Spacing = 14, MinWidth = 460, MaxWidth = 560 };
 
         main.Children.Add(FormBuilders.DialogExplanation(
