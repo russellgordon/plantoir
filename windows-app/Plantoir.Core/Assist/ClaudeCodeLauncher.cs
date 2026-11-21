@@ -81,19 +81,73 @@ public static class ClaudeCodeLauncher
     /// existed, so the assistant reported that Plantoir's own tools could not
     /// be found — the one message that reads as "this feature is broken"
     /// rather than "this build is arranged differently".
+    /// <para>Two roots are searched (#971): the folder of the running program
+    /// (<see cref="Environment.ProcessPath"/>) and the folder the app's own
+    /// assemblies were loaded from (<see cref="AppContext.BaseDirectory"/>). In
+    /// the installed app they are the same folder, with <c>plantoir-mcp.exe</c>
+    /// beside <c>Plantoir.exe</c>. Under a test host on Windows ARM the running
+    /// program is <c>dotnet.exe</c> in <c>C:\Program Files\dotnet</c>, where
+    /// nothing of Plantoir's is, so only the base folder leads to the server.</para>
     /// </summary>
-    public static string? FindServer()
-    {
-        string? beside = Path.GetDirectoryName(Environment.ProcessPath);
-        if (beside is null) return null;
+    public static string? FindServer() =>
+        FindServer(Path.GetDirectoryName(Environment.ProcessPath), AppContext.BaseDirectory);
 
+    /// <summary>
+    /// The search itself, as a function of its two roots, so a test can give it
+    /// a process folder without the server and a base folder with it.
+    /// </summary>
+    internal static string? FindServer(string? processFolder, string? baseFolder)
+    {
+        List<string> roots = DistinctRoots(processFolder, baseFolder);
         var candidates = new List<string>();
-        string shipped = Path.Combine(beside, "plantoir-mcp.exe");
+        foreach (string root in roots)
+        {
+            AddServersUnder(root, candidates);
+        }
+
+        if (candidates.Count == 0) return null;
+
+        // Pick the most recently written binary so debug builds take precedence over stale release builds
+        string newest = candidates[0];
+        DateTime newestWritten = WrittenAt(newest);
+        foreach (string candidate in candidates)
+        {
+            DateTime written = WrittenAt(candidate);
+            if (written > newestWritten)
+            {
+                newest = candidate;
+                newestWritten = written;
+            }
+        }
+        return newest;
+    }
+
+    /// <summary>The two roots, each once, skipping one that is not known.</summary>
+    internal static List<string> DistinctRoots(string? processFolder, string? baseFolder)
+    {
+        var roots = new List<string>();
+        foreach (string? folder in new[] { processFolder, baseFolder })
+        {
+            if (string.IsNullOrWhiteSpace(folder)) continue;
+            string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+            bool alreadyListed = false;
+            foreach (string listed in roots)
+            {
+                if (string.Equals(listed, full, StringComparison.OrdinalIgnoreCase)) alreadyListed = true;
+            }
+            if (!alreadyListed) roots.Add(full);
+        }
+        return roots;
+    }
+
+    private static void AddServersUnder(string root, List<string> candidates)
+    {
+        string shipped = Path.Combine(root, "plantoir-mcp.exe");
         if (File.Exists(shipped)) candidates.Add(shipped);
 
         // Walk up looking for the sibling project's output, whatever the tree
         // between here and it happens to look like.
-        var directory = new DirectoryInfo(beside);
+        var directory = new DirectoryInfo(root);
         for (int up = 0; up < 8 && directory is not null; up++, directory = directory.Parent)
         {
             foreach (string configuration in new[] { "Debug", "Release" })
@@ -113,17 +167,12 @@ public static class ClaudeCodeLauncher
                 }
             }
         }
+    }
 
-        if (candidates.Count == 0) return null;
-
-        // Pick the most recently written binary so debug builds take precedence over stale release builds
-        return candidates
-            .OrderByDescending(f =>
-            {
-                try { return File.GetLastWriteTimeUtc(f); }
-                catch { return DateTime.MinValue; }
-            })
-            .FirstOrDefault();
+    private static DateTime WrittenAt(string path)
+    {
+        try { return File.GetLastWriteTimeUtc(path); }
+        catch { return DateTime.MinValue; }
     }
 
     private static string? OnPath(string name)
