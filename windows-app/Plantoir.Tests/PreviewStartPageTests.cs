@@ -203,6 +203,55 @@ public class LastViewedPagesTests : IDisposable
         try { Directory.Delete(_folder, true); } catch { }
     }
 
+    private string[] Temporaries() => Directory.GetFiles(_folder, "*.tmp");
+
+    /// <summary>#953: a reader without delete sharing holds the file through one Remember.</summary>
+    [Fact]
+    public void ARememberRefusedByAHeldFileSaysSoAndLeavesTheFileAsItWas()
+    {
+        Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "A"));
+        byte[] before = File.ReadAllBytes(LastViewedPages.FilePath);
+        var pauses = new List<int>();
+        using (HeldFiles.PausingWith(pauses.Add))
+        using (new FileStream(LastViewedPages.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.False(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "B"));
+        Assert.Equal(HeldFiles.Pauses, pauses);
+        Assert.Equal(before, File.ReadAllBytes(LastViewedPages.FilePath));
+        Assert.Empty(Temporaries());
+
+        var holder = new FileStream(LastViewedPages.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using (HeldFiles.PausingWith(_ => holder.Dispose()))
+            Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "B"));
+        Assert.Equal("B", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        Assert.Empty(Temporaries());
+    }
+
+    /// <summary>#953: a read refused (held whole) is never followed by a write that keeps only the new page.</summary>
+    [Fact]
+    public void ARefusedReadNeverReplacesTheListWithOneEntry()
+    {
+        Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "A"));
+        Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 2, "B"));
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new FileStream(LastViewedPages.FilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.False(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 3, "C"));
+            Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        }
+        Assert.Equal("A", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        Assert.Equal("B", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 2));
+        Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 3));
+    }
+
+    [Fact]
+    public void AFileThatIsNotValidJsonReadsAsNothingRememberedAndIsReplaced()
+    {
+        File.WriteAllText(LastViewedPages.FilePath, "{ not json");
+        Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        Assert.True(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 1, "A"));
+        Assert.Equal("A", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+    }
+
     [Fact]
     public void APageIsRememberedPerFolderCourseAndSection()
     {
