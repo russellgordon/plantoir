@@ -23,7 +23,7 @@ The row was a horizontal StackPanel, which gives its children all the width they
 
 ### Class Dates' keys (#1024, the mac's ruling Q-C)
 
-WinUI's TextBox has no accept-tab mode, so Tab already left the dates box. What was missing was where the keyboard starts: the dialog put its first focus on the route picker. `SectionScheduleDialog` now focuses the dates box on `Opened` (raised once the dialog has placed its own first focus, once per showing) while the route is Type or paste. Shift-Tab from the box goes to the route picker, as on the mac with Keyboard Navigation on.
+WinUI's TextBox has no accept-tab mode, so Tab already left the dates box. What was missing was where the keyboard starts: the dialog put its first focus on the route picker. `SectionScheduleDialog` now focuses the dates box on `Opened` while the route is Type or paste; and because the dialog was measured (VM B, 2026-11-20, one run in five) placing its own first focus AFTER `Opened`, taking the focus back from the box, `GettingFocus` redirects any focus the app or the dialog places (`FocusState.Programmatic`) to the box until the teacher first moves the focus by keyboard or pointer or changes the route (the mac's `takesTheFocusWhenShown`). `GettingFocus` with `TrySetNewFocusedElement` is WinUI's documented place to change where focus lands, so nothing waits. Two runs of the class in a row passed after the change. Shift-Tab from the box goes to the route picker, as on the mac with Keyboard Navigation on.
 
 ### What did not apply
 
@@ -31,3 +31,7 @@ WinUI's TextBox has no accept-tab mode, so Tab already left the dates box. What 
 - **The Backups total's margin (D45):** the Windows Backups row draws no total; the summary is the row's tooltip.
 - **The picker's column widths (D48):** already set widths, Folder 140 and Date 170 (`PageTableLayout.PickFolder`, `PickDate`), Page takes the rest.
 - **An empty state with a next step (D12):** the Planning tab is absent with no assistant installed (`PlanningTab.IsShown`, the shared `tabCases`), as on the mac.
+
+### How the tooltip was proven
+
+`ACourseCodeCutShortShowsTheWholeCode` reads the text's help text (the whole code on `WWWWWWWWWWWW`, none on `ICS3U`) and then rests the real pointer on the code with the harness's glide (`FixWithButtonsUiTests.RestThePointerOn`, now internal): FlaUI's `Mouse.MoveTo` places the cursor and WinUI opens no tooltip for that, which this test met too. The tooltip came up holding the whole code (capture `1024-cut-short-code-tooltip-rest1.png` in the private run folder `night3-c-captures`). With the row put back to a horizontal StackPanel the text never trims and the test fails at the help text. A bound on the text's rectangle against its row passed with the StackPanel too, so it was taken out.
