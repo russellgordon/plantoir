@@ -72,8 +72,12 @@ public sealed class AssistToolRunner
     /// <see cref="ShowPreviewInApp"/>, which does nothing while a preview is
     /// serving, and still answered "rebuilding" (the plan's finding 0.7). Null
     /// falls back to <see cref="ShowPreviewInApp"/>.
+    /// <para>Its answer (#928 review 2, M3): null when the start went ahead,
+    /// otherwise the sentence the window is showing under "Cannot Preview
+    /// Yet" (another window is previewing the section, say). The answer is
+    /// that sentence then, never "rebuilding".</para>
     /// </summary>
-    public Action? RebuildPreviewInApp { get; init; }
+    public Func<Task<string?>>? RebuildPreviewInApp { get; init; }
 
     public Action? StartDeployInApp { get; init; }
     public Func<Task<string?>>? StartDeployInAppAsync { get; init; }
@@ -239,7 +243,11 @@ public sealed class AssistToolRunner
         {
             // REBUILD, not show (#489, Q1): a serving preview is stopped and
             // started again, so "rebuilding" is true.
-            if (RebuildPreviewInApp is not null) RebuildPreviewInApp.Invoke();
+            if (RebuildPreviewInApp is not null)
+            {
+                if (await RebuildPreviewInApp.Invoke() is { } refused)
+                    return (AssistToolAnswer.Same(refused) with { ShownInTheWindow = true }, true);
+            }
             else ShowPreviewInApp!.Invoke();
             return Handed(AssistWording.PreviewIsRebuilding(_courseCode, _section.ToString()));
         }

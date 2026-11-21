@@ -67,7 +67,10 @@ public static class CourseActivity
     public static QuitConfirmation.UnderWay UnderWay()
     {
         lock (_gate)
-            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Count, 0);
+            // Each section once however many starts hold a claim on it
+            // (previewBuildRecord.rule, #928): a window's start beside the
+            // assistant's rebuild is one preview being built.
+            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Distinct().Count(), 0);
     }
 
     public static bool IsPreviewing(string folderPath, string courseCode) =>

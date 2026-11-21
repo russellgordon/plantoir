@@ -12,6 +12,333 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 76364b50b — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
+## 2026-11-21 — Lane F, Windows test reliability: #971, #964, #916 items 3 and 4, #770
+
+Branch `issue/770-win-test-reliability`. Issues #971, #964, #916 items 3 and 4, #770. All runs in the second Windows VM (B, Windows 11 ARM64, account `russellgordon`); logs on the main Mac under `vm-tools/runs/night4-f/`, the per-run test output in the VM under `C:\vm-setup\770f\`. Guest scripts `vm-tools/guest/770f-run.ps1` (named filter sets, repeats, hang bound, own TEMP, CPU spinners), `770f-build-ui.ps1`, `770f-cat.ps1`, `964-hang.ps1`.
+
+#### #971: four door tests that failed only in the VMs
+
+- **Pair A (`OutsideDoorRefusalTests.ALongNameIsCutInThePlainGreeting_AndTheDoorOpens`, `OutsideGreetingOpenTests.OpenReadsTheShelfAtTheClick`).** `ClaudeCodeLauncher.FindServer()` looked for `plantoir-mcp.exe` only beside `Environment.ProcessPath`, which under the Windows ARM test host is `C:\Program Files\dotnet\dotnet.exe`. It now searches two roots, the process folder and `AppContext.BaseDirectory`, each with the existing walk-up and nothing wider; in the installed app they are one folder. The search is `FindServer(processFolder, baseFolder)`, so `ServerLookupRootsTests` gives it a process folder without the server and a base folder with it on any machine, plus the installed case (`Plantoir.exe` and `plantoir-mcp.exe` side by side, with and without a trailing separator), process-only, neither, and the dev walk-up from a test `bin` folder. `LocalModel.FindServer` had the same shape and is decided the same way (same two roots via `ClaudeCodeLauncher.DistinctRoots`, then PATH as before), with two cases of its own.
+- **Pair B (`OutsideDoorTests.FixWithDropsRowsToTheShimsRealBound`, `…TheLongestShimLineAllowedArrivesWhole_AndOneMoreIsRefused`).** The deep shim folder was 180 characters below `%TEMP%`, so the account name decided the stub `node.exe`'s path length (257 under `russellgordon`, over the 252 the .NET Framework 4.8 stub starts from). The folder is now exactly `DeepShimFolderLength` = 240 characters (the length `ShimExpansionAllowance` was measured from), padded from a run-owned scratch root (`RunOwnedTempFolders.Create("plantoir-door-")`), and `StubShimIn` asserts the stub's path is within `StubStartsFromAtMost` = 252 with the reason in the constant's comment. No product change.
+- **Before** (`origin/dev` da5af161e, VM B, run `base-doors`): filter `FullyQualifiedName~OutsideDoor|FullyQualifiedName~OutsideGreetingOpen`, **4 failed of 91** (the four above: "nothing arrived" twice, "Claude's door did not open" twice). Log `runs/night4-f/base-doors.log`.
+- **After** (branch 43fa8b150, VM B): **0 failed of 91, 10 runs in a row** (run `br4-doors`, 45 to 68 s each); after merging `origin/dev` (c16f6cc89) the lane's whole filter, 227 tests, passed (run `fin1-lane`). TEMP and TMP 40 characters longer than the default (`C:\Users\russellgordon\AppData\Local\Temp\plantoir-971-a-temp-forty-longer-0123456`, 81 characters, made and removed by the run, 20-minute hang bound): pair B's class **84 of 84 passed** (run `br4-longtemp`, 46 s; TEMP removed afterwards). Must-fail (scratch branch `scratch/770f-mustfail`, not pushed for merge): with the base folder ignored, `TheToolsServerIsFoundBesideTheBaseFolderWhenTheProcessIsTheDotnetHost` fails ("No tools server was found although one sits in the base folder …", line 52) and `TheLocalAssistantsServerIsFoundBesideTheBaseFolder…` fails (expected the path, actual null, line 107); with `DeepShimFolderLength` 250, `FixWithDropsRowsToTheShimsRealBound` fails at `StubShimIn` ("the stub node.exe's path is 259 characters, over the 252 it can start from", line 289), run `mf1`. Log `runs/night4-f/br4.log`.
+
+#### #964: CopyAPageFuzzTests hung where it should fail
+
+- `oracle.py` imports `build_site` and `frontmatter` in the parent before it makes the pool, and exits naming the package (`python -m pip install python-frontmatter`). `BuildFrontmatterOracle.Ask` reads both streams in the background (a pool's workers inherit them, so reading stderr to its end waited on the workers, not the parent) and takes an optional hang bound, used only by the new test.
+- `BuildFrontmatterOracleTests.APythonWithoutFrontmatterFailsByItselfNamingThePackage` makes the missing package on demand: a run-owned folder on `PYTHONPATH` whose `sitecustomize.py` puts a finder at the front of `sys.meta_path` that refuses `frontmatter`, in the parent and every spawned worker. It reads that the oracle exited by itself with "No module named 'frontmatter'" and "python-frontmatter". The 5-minute bound only turns the old hang into a failure.
+- **Hang shown on `origin/dev`:** `vm-tools/guest/964-hang.ps1` runs da5af161e's own `oracle.py` with the same refusing `sitecustomize.py` (run `mf1`, 01:03): 15 s apart the `--multiprocessing-fork` children were 6328,12128, then 1240,11372,672,6136, then 10984,10676,9212,10852 (recreated), the parent never exited, stderr had 755 "No module named 'frontmatter'" in 45 s; the tree was ended by hand, `taskkill /T /F /PID 2680`. Must-fail on the branch's test with the parent import removed: `Assert.Throws() Failure … Actual: typeof(System.TimeoutException) … had not exited after 00:05:00: it hung (#964)` (run `mf1`). After: the test passes in every lane run (`br4-lane`, `fin1-lane`).
+- CLAUDE.md ("Setting up on a new machine", Windows app) and WINDOWS-BOOTSTRAP.md section 6 now name `python-frontmatter` for PATH's Python and Developer Mode (or the symbolic-link privilege another way, WinError 1314). Claude Code's CLI on PATH: **not written**: in the second VM `where claude` finds nothing, and with #971 fixed the three door classes pass there (91 of 91, ten times), so Claude Code's CLI is not a prerequisite of the suite and the issue's third item was the pair A fault.
+
+#### #916 items 3 and 4: two shared temp paths
+
+- **Item 3.** `TestAppDataRedirect.ScratchRoot` is `%TEMP%\plantoir-tests-<pid>-<start ticks>` (`RunOwnedTempFolders.OwnerTag`), removed at process exit (`AppDomain.ProcessExit`), with no sweep of any other folder. `TwoRunsWithOneProcessIdAndDifferentStartsGetTwoFolders` gives two runs one process id and two start times and gets two folders; `ThisRunsFoldersCarryItsProcessIdAndStartTime` pins the live names.
+- **Item 4.** `TestTrailRedirect.ScratchTrailPath` is `%TEMP%\plantoir-tests-trail-<pid>-<start ticks>\activity.txt`, removed with the settings folder. Its many users (they only restore it) are unchanged.
+- **Before** (`origin/dev`, run `base-doors`): `%TEMP%` held `plantoir-tests`, `plantoir-tests-9364`; after the filtered run it also held `plantoir-tests-1052`, that run's own, left behind.
+- **After** (branch, runs `br2`, `br4-doors` and `fin1-lane`): the listing before and after every run is the same three entries (`plantoir-tests`, `plantoir-tests-1052`, `plantoir-tests-9364`, none of them this branch's): no `plantoir-tests-<pid>-<ticks>` and no `plantoir-tests-trail-…` left behind. The shared `plantoir-tests\activity.txt` was last written 16:06:32 (an older run) and not touched since.
+- **#916 items 3 and 4 are done, and #916 can close** (items 1 and 2 merged 2026-11-19 at 4e7c1d84d). For the director: old `plantoir-tests-<pid>` folders on a machine (1,603 on the PC in November) are not this code's to sweep; delete them by hand once if wanted.
+
+#### #770
+
+- **Item 3, `ObsidianFigureAddOnsTests.ASecondPassChangesNoByteAndWritesNoLine`.** History (`git log -L`): the `< 5000` ms check on the FIRST pass came in with the test itself, 6252bf239 (#581, 2026-10-22), with no reason recorded; documentation 12 measured that pass at 74 ms (second pass 87 ms), and #770 saw 9,258 ms on a loaded PC. It held nothing the name says (no byte, no date, no line on the second pass). What the first pass is for is now checked instead: every pinned file at `.obsidian\plugins\<id>\<name>` has the pinned length and SHA-256. The `< 3000` ms in `TwoThousandPagesAreScannedQuickly` is a declared performance test and is the one wall-clock bound left in the class. Fail on demand on `origin/dev`: **not shown.** Run alone on da5af161e: passed idle (`dev-idle`), and passed 2 of 2 with the test host pinned to one core shared with three spinning processes (`dev-load`, `-Affinity 1 -Spinners 3`); a first attempt with twelve spinners at High priority starved the whole VM and was stopped (the VM was restarted). The must-fail for the new check does bite: with the add-on's first file written one byte short, the test fails at the new length check, "Expected: 7861284 Actual: 7861283", line 147 (run `mf2`). Under invariant 3 the old failure's cause is not shown on demand, so **item 3 stays open** even though the wall-clock bound is gone.
+- **Item 2, `NativeFiguresTests.ABuildWithADiagram…`.** The test's own wait is the `Run` helper's `WaitForExit(600_000)` on the build's exit; no 5 s is in the test. Not run: no time left after item 3. The 5 s in the issue is not a wait in the test (its `Run` helper waits up to 600 s for the build's exit), so it is the time the build took to FAIL, or a wait inside the build (`scripts/figures.py` has `process.wait(timeout=5)` when it stops the drawing engine, lines 381, 392, 417); which one is not found. **Item 2 stays open**; if it is `figures.py`, it is outside this lane.
+- **Item 1, `AcceleratorUnderDialogUiTests`.** Not run (stopping rule). **Item 1 stays open**; nothing recorded beyond the issue.
+- **The `UpdateInstallQuitUiTests` message.** Every failure's evidence now ends with each running `plantoir-mcp.exe`, its process id and path (`ToolsServersRunning`). With a copy of `plantoir-mcp.exe` running from `C:\vm-setup\stray-mcp` (pid 1812, serving a folder of its own), both tests failed "the installer was never started" (run `fin3`, c16f6cc89), which shows the hold; the last lines of the message, where the new list is printed, were cut by the runner (`770f-ui.ps1` prints 14 lines per failure) and the VM was parked before the full log was read, so **the new lines themselves were not seen**. Without the stray copy both pass (runs `fin1-update`, `fin2-update`). To see it: the same run with the whole message printed.
+- Items done: none. The `UpdateInstallQuitUiTests` message's new lines were never seen in a run, so it is not counted as done. Items 1, 2 and 3 stay open, so **#770 does not close**.
+
+#### Last item: the two other VM-only failures
+
+Written as a new issue, **#1034** (v2.0.0). (1) `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel` is not a machine fault: "line 1472 is inside run_token_mode() … does not start with assert_can_ask" (run `dev-1899`); `deploy.sh`'s `read -rsp "Paste the token: "` behind `[[ -t 0 ]]` came in with 72355843d (#696, 2026-11-13), and `File.ReadAllLines` reads CRLF and LF alike, so it should fail everywhere since then; the fix is in `deploy.sh` or the test's rule, not this lane. (2) `scripts/test_deploy_sh_destination.py` alone: 22 failures, 3 skipped, on PATH's and on the runtime's Python; first failing case answers `UNREADABLE` where two `REFUSED` lines are expected. Ruled out: `deploy.sh`'s CRLF in the VM's checkout (`core.autocrlf=true`; rewritten with LF, still 22 failures, run `fin2`). Seen: no `bash` on the VM's PATH. Cause not found.
+
+#### For the machines skill
+
+On the branch in the second VM: the four #971 door tests now pass (91 of 91, ten runs; pair B also with TEMP 40 characters longer). `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel` still fails, and is not VM-only: a `deploy.sh` content fault since 72355843d (#1034). `test_deploy_sh_destination.py` still fails in the VM, cause not found; not the checkout's CRLF (#1034). Also for the skill: a reviewer's `park` returns B to snapshot 02 (checkout ce8e7bc1a), so every lock session must `sync` and `refetch-runtime.ps1` again; twelve spinning processes at High priority froze B until a `prlctl restart`. Not mine but seen: after merging `origin/dev` c16f6cc89, `HarnessSourceRuleTests` fails twice (a key down with no key up, lines 424 and 429 of `StopByKeyboardUiTests.cs`; and the `KEY_K` rule, which fails at `MenuBarUiTests.cs:478`). Both `HarnessSourceRuleTests` failures are on `dev` and are issue #1035; this branch does not touch them
+
+## 2026-11-21 — Lane G, a file another program holds for a moment: #953, #874
+
+Branch `issue/874-win-held-files`. Windows only; nothing under `mac-app/`, `contracts/` or `scripts/` changed.
+
+#### #953 (a write by rename refused silently)
+
+- New `Plantoir.Core/Models/HeldFiles.cs`: ONE bounded retry (`Pauses` 50, 100, 200, 400 ms, about 0.75 s, the shape `ObsidianFigureAddOns.Retrying` already uses, #1016 row 45), a delete-access probe (`IsHeld`), a three-way read (`ReadBytes`: Read, NotThere, CouldNotReadNow), `TemporaryBeside` (hidden, unique, `.tmp`) and `FileInUseException` (message `HeldFiles.InUseSentence`, HResult the sharing violation). The pause is a parameter; `PausingWith` sets a test's pause for its own async flow only.
+- `AgentGuidance.WriteAtomically` renames through `HeldFiles.Replace`; still held after the bound it throws `FileInUseException`, the file unchanged and its temporary removed. `SystemReason` then gives the system's sentence for a sharing violation ("The process cannot access the file because it is being used by another process."), not "Access is denied.".
+- `LastViewedPages.Load` and `AgentGuidanceDeclined.Load` read three ways. After "could not read just now": `PageFor` and `SignatureFor` answer null; `Remember`, `Forget` write nothing and answer false. `AgentGuidanceDeclined.Remember` and `Forget` now return whether they wrote (`ToolchainReadiness` passes `Forget` through a lambda; `Answer` otherwise unchanged).
+- A file that is there but not valid JSON keeps today's behaviour: it reads as nothing remembered and is replaced on the next write.
+- Owed items: the bounded retry in `WriteAtomically` DONE; `Load` telling "could not read" from "empty" DONE (both files); the root-file write and `AppendAfterYes` report as before through `ApplyGuidance`, now with the true reason, DONE. The other renames: surveyed below, none changed (next piece of #953).
+- Not done: a trail line for a refused save of the app's own records (parked as a question for Russell: no `mustRecord` event says it truly).
+
+#### #874 (the app's readers and writer of course_config.json)
+
+- `CourseConfiguration.ReadBytes(path)` is the one reader of the file's bytes (through `HeldFiles.ReadBytes`). `Load` throws `FileNotFoundException` (not there), `FileInUseException` (held past the bound) or a JSON / `InvalidDataException` (not valid JSON).
+- `Write`: a held merge read REFUSES the Save (`FileInUseException`, message "course_config.json is in use by another program, so it was not changed."); not valid JSON keeps the whole-object write. The fixed `path + ".tmp"` became a hidden temporary of its own (`ReplaceWith`), removed on every failure; the rename asks again; still held, it throws the same sentence with the file unchanged. `RecordOnDisk` reads through the one reader and replaces through `ReplaceWith`; its three-tries compare-and-swap is unchanged in meaning.
+- `RevertToFile` now returns bool: false on a held file, the window's copy (edits included) kept; `CourseSettingsExclusions.Revert` returns false then and writes no `exclusions reverted` line. `ReferenceCourseUpkeep.SetSchoolYear` discards its own year change when the revert is refused, as it did before. `RereadIfNothingUnsaved` answers false on a held file without touching the copy.
+- `Workspace.DiscoverCourses(path)` keeps this run's LAST GOOD READ of every `course_config.json` (by full path, in Core), and a course whose settings could not be read just now is listed with those settings. Round 1 passed the caller's list as `previous`, and `WorkspaceViewModel.Reload` had cleared it first (review 1, H1), so the course vanished on every reload; the memory now lives in discovery, so the reload, the assistant's lists and every door hold the same answer and no caller can hand over the wrong list. On a folder's FIRST read in a run there is no earlier read, and a course refused past the bound is not listed until the next read (showing it with no settings would need a "not read" course through every view).
+- The reference doors FAIL CLOSED (review 1, low 3): `Workspace.CourseIsKeptForReference(folder, code)` (now used by `MainWindow.Verbs.cs` and `AssistWindow.xaml.cs`) and `ReferenceCourse.KeptOnDisk` answer, for settings that could not be read just now, as this run last read them, and with no earlier read, as kept. Known limit: a never-read ordinary course refused for the bound is then refused at Deploy with the reference sentence ("… is kept for reference …"), which is untrue for that moment; the MCP gate's "cannot tell" sentence would be truer, but `KeptOnDisk`'s callers include `SectionDetailView.xaml.cs` (lane D's tonight) and take only a code.
+- Every reader treats ACCESS DENIED on a file that is there as "cannot tell now" (review 1, H2): asked again for the same bound, then "could not read just now"; after the bound, the probe decides the words: held, `HeldFiles.InUseSentence`; not held, `HeldFiles.NotReadSentence` ("course_config.json could not be read, so it was not changed. Windows said: Access is denied."). Any other IO refusal of a file that is there is "could not read just now" at once, in the system's words. `HeldFiles.ReadBytes` no longer throws for a file that is there; `Write`'s `catch { read = NotThere }`, `RevertToFile`'s `catch { DiscardChanges() }` and `RecordOnDisk`'s `catch (IOException) { unchanged }` are gone (`RecordOnDisk` still counts a file that has GONE since its first read as unchanged, as before). A Save merges or refuses; it never writes the window's whole copy over a file it could not read.
+- Revert on a file that could not be read says so in the Settings window's status line, where a Save's failure shows (review 1, low 2): "course_config.json is in use by another program, so nothing was reverted." (or "… could not be read, so nothing was reverted. Windows said: …"), red, and the form keeps the edits (`CourseConfiguration.RevertToFile(path, out notReverted)`, `CourseSettingsExclusions.Revert(…, out notReverted)`).
+- Temporaries (review 1, low 5): `course_config.json`'s and the guidance writer's temporaries are `HeldFiles.TemporaryBeside` (leading dot, unique, `.tmp`) and carry Windows' Hidden attribute while they exist (`HeldFiles.Hide`; the Hidden temporary is renamed onto the real file and `Unhide` runs after the rename, so a kill between the two can leave the settings file Hidden until the next write by the app or a build). Every failure removes the temporary. A kill between write and rename still leaves one (the app has no sweep; the build's `_remove_stale_config_temporaries`, prefix `.course_config.`, older than 60 s, does remove it).
+- `ScheduledRun`'s course read went from `File.ReadAllBytes` to `CourseConfiguration.Load`. Every other listed reader already called `Load` and now asks again: `SavedSettings.Read` (refuses with its "could not be read just now" sentence), `DeployedFolderOffer.LookUp` (absent), `ReferenceCourse.KeptOnDisk` (fails closed since round 2, see below), `ReferenceImport.Measure` (settings could not be read), `ReferenceCopier.MakeIntoAReferenceCourse` (the exception goes up, with the sentence), `CoursePageCopy` (falls back to the window's sections), `Plantoir.Mcp/ReferenceWriteGate` (refuses as cannot tell).
+- `CourseRestorer.cs:173` (restore's `Load`) is left for the restore batch (#873, #805, #911); it gets the retry through `Load` already and was not otherwise read for behaviour.
+- `CourseSettingsView.xaml.cs`'s Save before-read now uses `CourseConfiguration.Load` (round 2; the view was opened for Revert's sentence anyway), so the source-text test excepts only `CourseRestorer.cs`.
+- #874's "left" list: the C# readers retry and never take a hold as "no settings" DONE; the access-denied open during a build's replace DONE (every access denied on a file that is there is asked again, then refused truly; proved against a real second process replacing the file in a loop with `MoveFileExW(…, MOVEFILE_REPLACE_EXISTING)`, `CourseSettingsHeldFileTests.ABuildReplacingTheSettingsInALoopNeverLosesTheCourseOrItsChange`); the app's writes against a build reading DONE (a reader with `FileShare.Read` in a second process, refused past the bound, landing when released); every Windows C# reader asks again DONE.
+
+### Every place that shows the sentence
+
+The sentence is `HeldFiles.InUseSentence(name)` = "{name} is in use by another program, so it was not changed." ("it" is the file; "nothing was changed" was rejected because after a folder rename something HAS changed.) Where a `FileInUseException` from these calls reaches words:
+
+- `CourseSettingsView.xaml.cs` Save: status line "Could not save: course_config.json is in use by another program, so it was not changed."; trail `settings could not be saved` "could not save the settings for ICS3U — course_config.json is in use by another program, so it was not changed."
+- `CourseSettingsView.xaml.cs` folder rename (RecordOnDisk): "“Tasks” was renamed to “Assignments”, but Plantoir could not write the change to this course's settings: course_config.json is in use by another program, so it was not changed." The folder HAS moved, which is why the sentence says the FILE "was not changed" rather than "nothing was changed": it must read truly after every caller's lead-in.
+- `UnitWordRenamer` (RecordOnDisk): `UnitWordRenameWording.SettingsNotWritten(to, message)`.
+- `CourseRenamer.cs:105`: "The course's settings could not be saved: course_config.json is in use by another program, so it was not changed."
+- `ReferenceCopier.MakeIntoAReferenceCourse` (Load and Write): the exception goes to its caller's existing message path.
+- `CourseArchiver.cs:276`, `SectionAdder.cs:90`: the exception goes to their callers as before, with the new message instead of .NET's.
+- The guidance notice: `couldNotWrite` with "The process cannot access the file because it is being used by another process" (the system's words, as the contract says); trail line "…first: AGENTS.md: The process cannot access…".
+- `Revert` in Course Settings: the status line shows "course_config.json is in use by another program, so nothing was reverted." (or the not-read form); the window keeps its edits.
+- A read refused by a rule (not a hold), after the bound: "course_config.json could not be read, so it was not changed. Windows said: Access is denied." after "Could not save: " and on the trail; the folder rename's lead-in reads "… could not write the change to this course's settings: course_config.json could not be read, so it was not changed. Windows said: Access is denied." (true: the folder moved, the file did not).
+
+### The rename survey (#953)
+
+Every other `File.Move(…, overwrite: true)` in `Plantoir.Core` and `Plantoir` outside `Undo/` and `CourseRestorer.cs`:
+
+| Place | File it writes | Who else may hold it | Asks again | A refusal |
+|---|---|---|---|---|
+| `LaterClassesKept.cs:94` | the later-classes record in the course's `.internal` | a scanner, another window | no | `return false` (caller told, teacher not) |
+| `LinksChecklist.cs:317` | moves a fragment back into the checklist record | a scanner | no | throws to the undo's caller |
+| `ScheduledPublishOutcome.cs:279` | a scheduled run's outcome record | the window's watcher reading it | no | caught, temporary removed, swallowed |
+| `ScheduledPublishOutcome.cs:793-794` | sweeps outcome records | the watcher | no | swallowed ("left for the next sweep") |
+| `TaskScheduling.cs:52` | puts the kept job file back | Task Scheduler | no | swallowed |
+| `ReferenceCopier.cs:197` | `.obsidian/app.json` (fixed `.tmp`) | OBSIDIAN, which the teacher has open | no | `return false` |
+| `ReferenceStaging.cs:166` | a staging lease | another window | no | swallowed (in-app set still holds) |
+| `SectionPublishState.cs:402` | a section's publish state | a build, the watcher | no | `return false` |
+| `ToolchainMirror.cs:361` | `.toolchain/` files | a running launcher, a scanner | no | throws (counted as Failed) |
+| `ToolchainReadiness.cs:713` | the readiness marker | a scanner | its own marker retry elsewhere | `(null, null)` |
+| `ProblemsAcknowledgements.cs:117` | acknowledgements | a scanner | yes, `Patiently` (IOException only) | swallowed |
+| `ObsidianFigureAddOns.cs:487` | the add-ons' files | Obsidian | yes, `Retrying` | reported (couldNotWrite) |
+
+None was changed tonight. The next piece of #953: `ReferenceCopier.cs:197` first (a file a teacher's Obsidian holds, with a fixed `.tmp`), then `SectionPublishState` and `LaterClassesKept`. Shapes that should fold onto `HeldFiles` then: `ObsidianFigureAddOns.Retrying`, `ProblemsAcknowledgements.Patiently`, `ToolchainReadiness`'s marker retry and `UndoJournal`'s.
+
+### Where this meets the Undo door
+
+`UndoWriterScanTests` lists `AgentGuidance.cs` and `CourseConfiguration.cs` as `waitsFor: W8` (the Windows mirror of the mac's U4: settings, renames, New Course). When W8 routes those writes through `UndoDoor`, the door's staged swap and its `fileIsInUse` refusal take over the final rename. At that point the door should use this lane's held-file test (`HeldFiles.IsHeld`, the delete-access probe, and `HeldFiles.Replace`'s bound), or the two become one in whichever place the door's owner chooses; and the teacher's sentence for a held settings file (`HeldFiles.InUseSentence`) and the door's "is in use by another program" must stay the same words. Nothing tonight calls into `Undo/`, and the merge, the per-key rule and the trail lines stay where they were. Counts changed in `UndoWriterScanTests`: `CourseConfiguration.cs` 6 → 5 (the two writes now share `ReplaceWith`, which adds the temporary's removal), `HeldFiles.cs` new at 3 (the probe opens for delete access; `Hide` and `Unhide` set the Hidden attribute of a caller's own temporary).
+
+### Must-fail lines
+
+Each behaviour reverted in a scratch branch (`scratch/874-mf-*`, deleted after), the four classes (`HeldFilesTests`, `CourseSettingsHeldFileTests`, `AgentGuidanceTests`, `LastViewedPagesTests`) run on the first VM, Debug, tests-only build. Real branch: 45 of 45 passed before and after.
+
+| Reverted | Failing test, line, assertion as printed |
+|---|---|
+| A: `LastViewedPages.Load` takes a refused read as empty | `LastViewedPagesTests.ARefusedReadNeverReplacesTheListWithOneEntry`, PreviewStartPageTests.cs:252, `Assert.False() Failure Expected: False Actual: True` |
+| B: `AgentGuidanceDeclined.Load` takes a refused read as empty | `AgentGuidanceTests.NotNowAnswersAreNeverReplacedByOneAndARefusedWriteSaysSo`, AgentGuidanceTests.cs:484, `Assert.False() Failure Expected: False Actual: True` |
+| C: `Write` takes a refused merge read as "unreadable" (whole-object write) | `CourseSettingsHeldFileTests.ASaveWhoseMergeReadWasRefusedNeverWritesTheWholeCopy`, CourseSettingsHeldFileTests.cs:133, `Assert.Throws() Failure: No exception was thrown` |
+| K: a file that is not valid JSON refuses instead of the whole write | `AFileThatIsNotValidJsonStillTakesTheWholeCopy`, :189 (the thrown `InvalidDataException`) |
+| I: `ReplaceWith` no longer removes its temporary | `HeldByAReaderTheRenameIsRefusedPastTheBoundAndTheFileIsUnchanged`, :153 and `HeldWhole…`, :112, `Assert.Empty() Failure: Collection was not empty` |
+| H: `ScheduledRun` reads with `File.ReadAllBytes(config)` again | `EveryReaderOfTheSettingsGoesThroughTheOneReader`, :232 (`Assert.True` with the file named) |
+| D: the probe never sees a hold | `HeldFilesTests.ARenameOntoAHeldFile…`, HeldFilesTests.cs:49, `Expected: FileInUseException Actual: UnauthorizedAccessException`; `TheProbeSees…`, :87; `AHoldThatEnds…`, :64; `LastViewedPagesTests.ARememberRefused…`, :218 `Expected [50, 100, 200, 400] Actual []`; `AgentGuidanceTests.AddOntoAHeldFile…`, :518 `Expected "The process cannot access the file…" Actual "Access is denied."`; `NotNowAnswers…`, :489; `CourseSettingsHeldFileTests.AReaderThatLetsGo…`, :170; `HeldByAReader…`, :148 |
+| F: `RevertToFile` discards the edits on a held file | `HeldWhole…`, CourseSettingsHeldFileTests.cs:100, `Assert.False() Failure Expected: False Actual: True` |
+| E: `FileInUseException` without the sharing-violation code | `ARenameOntoAHeldFile…`, HeldFilesTests.cs:51 `Expected: -2147024864 Actual: -2146232800`; `AddOntoAHeldFile…`, AgentGuidanceTests.cs:518 `Actual: "could not be written"` |
+| G: `DiscoverCourses` drops a held course | `HeldWhole…`, :106, `Assert.Single() Failure: The collection was empty` |
+| J: every access-denied rename asked again (no probe) | `AReadOnlyFileIsAPermission…`, HeldFilesTests.cs:76 `Value is the exact type FileInUseException`; `AgentGuidanceTests.APermissionIsRefusedAtOnce…`, :551 `Assert.Empty() Failure` |
+
+Not reverted: `ATemporaryIsHiddenUniqueAndBesideItsFile` (reads the name's shape), `TheScanSeesBothShapesOfAReader` (the scan's own self-test; H proves the scan), `AFileThatIsNotValidJsonReadsAsNothingRememberedAndIsReplaced` (pins today's behaviour, unchanged). A first version of the refused-read tests used a holder sharing delete; it passed under A and B (Windows refuses a replace onto ANY open file without POSIX rename, so the write could not land either way), and was replaced by the race the issue names, driven by the pause.
+
+### Review 1's lows not done in round 2 (one line each)
+
+- Low 4: `HeldFiles.Replace` names the TARGET when only the temporary was held; naming the temporary would put ".tmp" in front of a teacher, so it stays, and the "was not changed" half is true.
+- Low 6: a Save or reload on a held file waits up to the bound on the UI thread (about 0.75 s per read, 1.5 s for a Save); moving it off the thread is #986's Save rewrite.
+- Low 7: a holder that shares delete makes the rename refuse with access denied while the probe sees no hold; said as "Access is denied." and not retried. The probe is the brief's; for the Undo door.
+- Low 8: `AgentGuidance.Write` and `AppendAfterYes` read the root files with `ReadStrict`, not asked again; outside the lines this lane may touch in `AgentGuidance.cs` tonight (lane E's file), and nothing is written after a failed read there.
+- `HeldFiles.cs` 119 to 122 carries the same wrong 'access denied' comment, and `CourseConfiguration.cs` 120 to 145 has two `</summary>` closings; for the next piece on this code.
+
+- For W8 (the Undo door): a retried rename replays a merge made before the pause, so a build's replace during that pause is put back; the fix is a compare-and-swap before each retry (review 2).
+
+### Must-fail lines, round 2 (review 1's fixes)
+
+Scratch branches `scratch/874-mf-s1` to `s5` (deleted after), `HeldFilesTests` and `CourseSettingsHeldFileTests` run on the first VM with `874-run.ps1 -TestsOnly`. Real branch: 21 of 21 in those two classes.
+
+| Reverted | Failing test, line, assertion as printed |
+|---|---|
+| s1: an access-denied read asked again only when the probe sees a hold (round 1); and the reference door failing open with no earlier read | `HeldFilesTests.AnAccessDeniedReadIsAskedAgain…`, HeldFilesTests.cs:129 (the read threw); `CourseSettingsHeldFileTests.AReadDeniedByARuleRefuses…`, :326 `Expected: typeof(FileRefusedException) Actual: typeof(System.UnauthorizedAccessException)`; `AHeldCourseNeverReadBeforeIsTreatedAsKeptForReference`, :296 `Assert.True() Failure Expected: True Actual: False` |
+| s2: `Write` takes "could not read just now" as not there (whole-object write); `KeptOnDisk` fails open; Revert gives no sentence; `RecordOnDisk` counts a refused second read as unchanged | `ARecordWhoseSecondReadWasRefusedWritesNothing`, :361 `Assert.Throws() Failure: No exception was thrown`; `ASaveWhoseMergeReadWasRefused…`, :194 the same; `AReadDeniedByARule…`, :326 the same; `ARevertOnAHeldFileSaysNothingWasRevertedAndWhy`, :384 `Expected: "course_config.json is in use by another p"… Actual: null`; `AHeldCourseNeverRead…`, :297 `Expected: "ICS3U" Actual: null`; `ABuildReplacingTheSettingsInALoop…`, :470 "1 of 82 rounds (a reader that does not ask again was refused 0 times with access denied, 4 with a sharing violation, 0 otherwise): a Save put the window's whole copy over the build's" (in an earlier run of the same revert the loop did not meet a refusal that outlasted the bound, and passed: this case is caught by `ASaveWhoseMergeReadWasRefused…` every time, by the loop only when the race lasts) |
+| s3: discovery drops a course it could not read (H1's outcome) | `HeldWhole…`, :165 `Assert.Single() Failure: The collection was empty`; `TheReloadsOwnCallKeepsAHeldCourseAndItsDoorsStayShut`, :281 `Expected ["ICS3U", "MPM2D"] Actual []` |
+| s4: no read asked again at all and no last good read (the code before this lane), and no Hide | `ABuildReplacingTheSettingsInALoop…`, :470 "78 of 476 rounds (… refused 0 times with access denied, 86 with a sharing violation, 0 otherwise): the course vanished from a reload"; `TheTemporaryIsHiddenWhileItExists…`, :409; and every bound test (`Expected [50, 100, 200, 400] Actual []`, HeldFilesTests.cs:104 and :138, CourseSettingsHeldFileTests.cs:153, :328; `Expected 4 Actual 0` :198, :369) |
+| s5: the settings file not unhidden after the rename | `TheTemporaryIsHiddenWhileItExistsAndTheSettingsAreNot`, :410 `Assert.False() Failure Expected: False Actual: True` |
+
+**What the real replace loop measured (VM A, Windows 11 ARM64, Plantoir x64 under emulation, 2026-11-21).** A second PowerShell process replacing `course_config.json` with `MoveFileExW(…, MOVEFILE_REPLACE_EXISTING)` (CPython's `os.replace` on Windows) while the app read, listed and saved: a C# reader that does not ask again was refused 86 times in 476 rounds and 4 in 82, every one a SHARING VIOLATION, none ACCESS DENIED. So review 1's H2 mechanism (an access-denied open of a delete-pending file) was not reproduced here; #874's "access denied" was Python's `PermissionError`, which CPython raises for a sharing violation too. Round 1 already asked a sharing violation again; what the loop proves is the whole path: without asking again and without the last good read, the course vanishes from a reload (s4), and a Save that takes a refused read as "not there" puts the window's whole copy back (s2). Access denied on a file that is there is asked again all the same, because a deny rule and a delete-pending file cannot be told apart by the probe, and the cost is only the bound; `AReadDeniedByARule…` and `AnAccessDeniedRead…` prove that branch.
+
+## 2026-11-21 — Lane D, Windows preview starts and stops: #928, #1026, #1022 item 1
+
+Branch `issue/928-win-preview-starts`. #1022 item 1 is done here; #1022 item 2
+(the 13 timed waits) is not touched, so #1022 stays open for it.
+
+#### #928 (the mac's #812 and #813)
+
+- The decisions are in `Plantoir.Core/Models/PreviewStarts.cs`
+  (`HowTheRunStands`, `AStartIsUnderWay`, `TheStartStillBelongs`, `Begin`,
+  `CouldNotStartLine`) and `PreviewAgainPresses` in the same file; the view
+  only asks them.
+- A start asked for while the window's own start waits in
+  `WaitForStopsToFinish` or builds does nothing and writes
+  `preview already starting`, in `PressPreviewAsync` (after the Stop branch)
+  and FIRST in `StartAutomatedPreview`. The second press used to reach
+  `PreviewLeases.Take` and show the other-window sentence;
+  `StartAutomatedPreview` used to release that start's lease and overwrite its
+  `_previewBuildRecord` (quit then asked for ever).
+- Both starts take through `PreviewStarts.Begin` (lease, then this start's
+  own record) and `TookTheStart`; the view no longer calls
+  `CourseActivity.BeginPreviewBuild` itself. `StartAutomatedPreview`'s
+  folder-keyed `PreviewLeases.Release(workspacePath, …)` is now the view's own
+  `ReleaseLease()` (it also let go a `WorkLease` the old code leaked when it
+  re-took `_previewWork`).
+- A parked start runs its launcher only if it still holds its own lease (by
+  reference), is the window's latest start (`_latestPreviewStart`), the page
+  is not torn down and the quit has not gone ahead
+  (`Plantoir.Core.Models.QuitGoingAhead`). Since review 1 (M1) the closing
+  handler runs one `QuitGoingAhead.Pass` per run: the quit goes ahead in one
+  place (`pass.GoAhead()`, which also abandons every repair press) and is
+  taken back in one place, the pass's end, unless the pass said the close
+  went through, was handed to the next pass, or was no quit. Keep Working
+  when asked again after the wait for a tools copy used to leave it set, and
+  Preview then started nothing until relaunch.
+- A press while the window's own stop finishes (`StopPreviewAsync`, counted
+  by `_stopsUnderWay`) does nothing and writes a true line to the diagnostic
+  log ("…while this window's preview was still stopping: nothing was
+  started"), not `preview already starting` (review 1, L1). No trail event
+  names it and adding one needs a contract key, so it is the diagnostic log.
+- An exception escaping either start after it took its lease hands back what
+  that start still holds (`HandBackAfterAFailure`: stopped the way Stop
+  stops it, only if `PreviewStarts.TheStartStillHoldsItsOwn`) (L2). The
+  repair's refusal after the stop is shown through its own catch (L5).
+- `AssistWorkspace`'s refusal for a folder that is not set up, which Section ▸
+  Rebuild Preview shows a teacher, no longer names `preview.ps1` or the full
+  path (`AssistWorkspace.NotAWorkingFolderYet`, the folder by its name) (L6).
+- A run that never started (`HowTheRunStands` → `CouldNotStart`: not running,
+  `LaunchProblem` set, asked before the exit code) ends the wait at once
+  (`AbandonWait`: wait, record, lease), writes `preview could not start` with
+  the sentence and `LaunchProblemDetail`, and shows the sentence under
+  "Cannot Preview Yet". The console stays up with the sentence
+  (`RefreshChrome`'s `showConsole` counts `LaunchProblem`).
+- The repair's Preview Again records its press at once
+  (`PreviewAgainPresses.Shared.Press`), is abandoned in `OnUnloaded` and on
+  quit, starts only through `CarryOutAsync` if the press survived the stop,
+  and writes `preview again abandoned` with "replaced" kept apart.
+- `CourseActivity.UnderWay` counts each section once however many claims
+  (`whatCountsAsUnderWay`).
+- Sentences (items 8, 9): `ScriptRunner.CouldNotGetStarted` ("Could not get
+  started. Try again, or restart this computer if it happens again.") and
+  `ScriptRunner.FolderIsMissingAPiece` (no file name); the system's text and
+  the file name go to `ScriptRunner.LaunchProblemDetail`, trail only.
+  `TaskScheduling.NothingToSchedule` replaces the refusal that named
+  `deploy.ps1` and the full folder path.
+- Trail lines, in the mac's words: `preview already starting` writes "asked
+  to preview while this window's preview was still starting: the start
+  already under way goes on, and nothing else was started"; `preview could
+  not start` writes "the preview could not start, and the teacher was told
+  why: <sentence> (<detail>)" (`PreviewStarts.CouldNotStartLine`).
+- Ledger: the `Owed(ActivityTrailEvents, 928, …)` entry and `Reason928` are
+  removed; the three events are in `ActivityTrail.Event`.
+- Tests: `PreviewStartRecordTests` (every `pressCases` and `previewAgainCases`
+  case from the JSON, with windows A and B as two lease owners, the
+  per-section count, `HowTheRunStands`, `TheStartStillBelongs`, a replaced
+  press, two owners on one section, release by reference, a press during a
+  stop, and source readings that both starts ask the model in order, release
+  only their window's rows and hand back on a failure),
+  `QuitGoingAheadTests` (every way out of the quit question, and a reading
+  that the handler uses one pass), `LaunchProblemWordingTests` (refuses
+  ".sh", ".ps1", ".py", "launcher", "script" in every launch problem and in
+  the folder-not-set-up refusal; a missing launcher met for real). Review 1's
+  L3: the two vacuous tests (`TwoStartsThenTheEnd…`, `TheViewRecordsABuild…`)
+  are removed; the pressCase "a second press while the first waits for its
+  stop" and the source-order theory cover item 4.
+- Not met for real: the ConPTY launch failure (`CouldNotGetStarted`); the
+  runner always launches `powershell.exe`, so the test reads the constant.
+  The mac's test points its shell at a missing program.
+
+- Must-fail (review 1), all reverts at once in scratch commit bd4b1bb5c (local only), each test failing on its own revert: VM B, 2026-11-21 00:31, 11 of 28 failed, the other 17 passed:
+  - `QuitGoingAheadTests.KeepWorkingWhenAskedAgainAfterTheWait` line 56 and `AWindowOpenedDuringTheWait` line 71: the pass's default ending reverted from TakenBack (M1).
+  - `QuitGoingAheadTests.TheClosingHandlerUsesOnePass` line 148: `LetHeldCopiesGo()` put back on the handler's Keep Working path.
+  - `PreviewStartRecordTests.AnotherWindowsStartNeverEndsThisWindowsLease` line 258: `ReleaseLeftBehind` made to ignore the owner (M2).
+  - `PreviewStartRecordTests.TheViewReleasesOnlyItsOwnWindowsLeases` line 381: `ReleaseLease`'s sweep put back to `PreviewLeases.Release(wp, …)` (M2).
+  - `PreviewStartRecordTests.AReleaseRemovesOnlyTheLeaseItsStartTook` line 281: `Release(lease)` put back to `_active.Remove(lease)` (value equality).
+  - `PreviewStartRecordTests.AStartHoldsItsOwnLeaseByReference` line 292: `TheStartStillHoldsItsOwn` made to compare with `Equals`.
+  - `PreviewStartRecordTests.APressDuringAStopIsNotAStartUnderWay` line 301: the stop branch of `WhatAPressMeets` removed (L1).
+  - `PreviewStartRecordTests.ThePressAsksWhetherTheWindowsStopIsUnderWay` line 392: `_stopsUnderWay++` removed from `StopPreviewAsync` (L1).
+  - `PreviewStartRecordTests.AFailedStartHandsBackWhatItHolds` line 404: `HandBackAfterAFailure` removed from `StartAutomatedPreview`'s catch (L2).
+  - `LaunchProblemWordingTests.TheFolderNotSetUpRefusalNamesNoFileOrPath` line 84 (via line 21): the old sentence naming `preview.ps1` put back (L6).
+- Proven on VM B, head 90598c6b9 (dev 10d04bfbd merged): the piece's classes and every class that reads a changed file as source text, 44 classes in batches, all green except `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel` (deploy.sh line 1472 inside `run_token_mode()`; `deploy.sh` is untouched by this branch, so it is dev's, unrelated). `DialogTitleScanTests` needed the census at 17 for the "Cannot Preview Yet" alert. `PreviewThatCannotStartUiTests` passed twice.
+
+- Review 2 (`vm-tools/briefs/2026-11-21-lane-d-review-2.md`), fixed:
+  - M3: `StartAutomatedPreview` now answers its caller once the start is
+    decided (`Task<string?>`: null went ahead, otherwise the sentence shown).
+    `PreviewStarts.Begin` stays the one place that decides; a lease refusal
+    (and an outside build's decline, and this section's deploy) is shown under
+    "Cannot Preview Yet" through `ShowPreviewRefusal`, the press's own way,
+    and the answer goes back through `RebuildPreviewAsync`,
+    `MainWindow.RebuildPreviewFor` and the `RebuildPreviewInApp` seam (now
+    `Func<Task<string?>>`). The runner answers that sentence
+    (`ShownInTheWindow`, so the Section menu does not show it a second time),
+    the trail ends "not rebuilt", and the assistant's two own rebuild routes
+    (card and plain words) say it instead of "is opening". The runner now
+    waits for the stop before it answers, as the Mac's `bringThePreviewUpToDate` does.
+    Census: `SectionDetailView.xaml.cs` 17 to 15, the four "Cannot Preview
+    Yet" dialogs of the start (press refusal, press decline, run that never
+    started, and the new automated one) being one `ShowPreviewRefusal`.
+  - Left as they were (each already shows its own dialog; `RebuildPreviewFor` asks the
+    same thing first, but the runner does not: the third review found this): the folder getting ready,
+    no folder, a view replaced during the stop. Those still answer null.
+  - Mac difference (not touched, Windows only): the Mac's
+    `bringThePreviewUpToDate` returns `previewIsRebuilding` after
+    `startPreview()` whatever it did, and `SectionVerbs` writes "rebuilt", so
+    on the Mac the assistant and the trail are wrong for a refused start
+    while the window does show "Cannot Preview Yet".
+  - L10: `MainWindow.Closed`, after the view lets go, sweeps and releases by
+    reference every row the window still holds (`PreviewLeases.HeldBy`), so
+    a replaced view's row cannot outlive its window. A crashed process takes
+    its table with it; a replaced view in a live window is swept by that
+    window's next start of the section, as before.
+  - L11: not measured (whether `Close()` raises `AppWindow.Closing` at once
+    or later). The model showed the state reachable whenever it is later, so
+    it is made impossible either way: a pass handed the quit by its own
+    window's earlier pass, finding the close no longer quits, takes the quit
+    back (`QuitGoingAhead.BeginPass(..., window:)`).
+- Must-fail (review 2), all six reverts at once in scratch commit 7ffbb49e2 (local only, deleted after), VM B 2026-11-21 01:42, 6 of 6 failed. The log names the tests, not lines; the line given is the first assertion each revert reaches:
+  - `SectionVerbsTests.ARebuildTheWindowRefuses_IsAnsweredWithItsSentence_NeverRebuilding` line 514: the runner put back to ignore the window's answer (M3).
+  - `SectionVerbsTests.ThePlainRebuildTheWindowRefuses_SaysTheWindowsSentence` line 531: the plain route put back to "is opening" (M3).
+  - `PreviewStartRecordTests.TheAutomatedStartAnswersWithTheRefusalItShows` line 423: the automated start's answer and dialog removed (M3).
+  - `PreviewStartRecordTests.AClosingWindowHandsBackEveryRowItHolds` line 284: `HeldBy` made to return nothing (L10).
+  - `PreviewStartRecordTests.TheClosingWindowLetsGoOfWhatItStillHolds` line 438: the call in `Closed` removed (L10).
+  - `QuitGoingAheadTests.AHandedOnQuitThatIsNoLongerAQuitIsTakenBack` line 93: `NotAQuit` made unconditional again (L11).
+- Proven on VM B, head ad119f41b (dev 10d04bfbd in): 31 classes (the piece's and every class that reads a changed file as source text), 470 of 470 passed; `PreviewThatCannotStartUiTests` passed.
+
+#### #1022 item 1
+
+Done. Both shapes go one way: a `preview.ps1` missing before the press used to
+throw inside today's-class question (`new AssistWorkspace` outside its try)
+and the press did nothing, logged only. The construction is now inside the
+try, the press goes on, the run cannot start, and the wait shows "Cannot
+Preview Yet" with `FolderIsMissingAPiece` (see #928 above); a launcher gone
+after the press's checks meets the same wait. Proven in the window by
+`PreviewThatCannotStartUiTests` in the second VM (launcher moved aside before
+the press; the alert's sentence read through UI Automation, the console
+keeps it, the trail has `preview could not start`, and a second Preview after
+the launcher is back starts).
+
+#### #1026
+
+`ScriptRunner.CancelByUser`'s fallback remembers its run's number and process
+and terminates only while that run is still current and running; it returns
+the fallback's completion. Control-C's two seconds stay (behaviour,
+`ControlCGrace`). `StopFallbackOwnsItsRunTests`: a second run started inside
+the grace is still running after the first's fallback has completed; a run
+that ignores Control-C is still terminated by its own fallback. (Review 1, L4: the first test's `IsRunning` assertion was dropped, since staged runs have no process and it held under the old code too; `FallbackTerminations` is what fails on revert.)
+
+The mac's `ScriptRunner.swift` has the same shape (`DispatchQueue.main.asyncAfter`
+near line 583, no run check); not touched here (Windows only tonight). #1015
+probably holds it.
+
+#### Left out
+
+- Four ways out, and a stop already under way, still answer the assistant "rebuilding" with nothing rebuilt (review 3, L14); recorded on #1022.
+
 ## 2026-11-21 — Undo and Redo, W7a (part): the step for a daily action, and Publish Pages and Hide Pages through it (#899, #949)
 
 Branch `issue/899-w7a-publish-through-the-door`, from W4c (2e10771f6) with `origin/dev` c446f5f64 merged in (3dc806224).

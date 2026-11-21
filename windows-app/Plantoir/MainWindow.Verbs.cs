@@ -87,8 +87,7 @@ public sealed partial class MainWindow
                 && lease.SectionNumber == section),
             StopPreviewInAppAsync = () => StopPreviewForAsync(folder, code, section),
             SectionIsBeingDeployed = () => CourseActivity.IsPublishingSection(folder, code, section),
-            CourseIsKeptForReference = () => Plantoir.Core.Models.Workspace.DiscoverCourses(folder)
-                .Any(c => c.Code.Equals(code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
+            CourseIsKeptForReference = () => Plantoir.Core.Models.Workspace.CourseIsKeptForReference(folder, code),
             CourseIsBeingCopied = () => WorkLease.IsHeld(folder, code, WorkLease.Copying) || SidebarPane.IsZipping(folder, code),
         };
 
@@ -172,8 +171,9 @@ public sealed partial class MainWindow
                     var rebuilt = await verbs.Perform(SectionVerbs.RebuildPreview(code, number),
                                                       SectionVerbDialog.MenuPath(item, course.Configuration.ClassNoun), code, number,
                                                       SubjectMenuLayout.MenuContaining(item));
-                    // Rebuilding is watched happening; only a refusal is said.
-                    if (rebuilt.Summary != AssistWording.PreviewIsRebuilding(code, number.ToString()))
+                    // Rebuilding is watched happening; only a refusal is said,
+                    // and one the window has already shown is not said twice (M3).
+                    if (rebuilt.Summary != AssistWording.PreviewIsRebuilding(code, number.ToString()) && !rebuilt.ShownInTheWindow)
                         await SectionVerbDialog.ShowAnswer(root, verbs, course, number, item,
                                                            AssistWording.MenuRebuildPreviewTitle, rebuilt.Summary);
                     break;
@@ -256,9 +256,16 @@ public sealed partial class MainWindow
     /// to promise and not do. Used by Rebuild Preview and by the in-app
     /// assistant's rebuild_preview alike.
     /// </summary>
-    public void RebuildPreviewFor(string courseCode, int section)
+    /// <returns>
+    /// The start's answer, once it is decided (#928 review 2, M3): null when it
+    /// went ahead, otherwise the sentence the window is showing under "Cannot
+    /// Preview Yet", which the menu and the assistant then say instead of
+    /// "rebuilding".
+    /// </returns>
+    public Task<string?> RebuildPreviewFor(string courseCode, int section)
     {
-        DispatcherQueue.TryEnqueue(async () =>
+        var decided = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool queued = DispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
@@ -269,13 +276,21 @@ public sealed partial class MainWindow
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
-                if (DetailHost.Content is SectionDetailView detail) await detail.RebuildPreviewAsync();
+                string? refused = null;
+                if (DetailHost.Content is SectionDetailView detail) refused = await detail.RebuildPreviewAsync();
                 ComeForwardIfHidden();
+                decided.TrySetResult(refused);
             }
             catch (Exception ex)
             {
                 App.LogDiagnostic($"RebuildPreviewFor exception: {ex}");
             }
+            finally
+            {
+                decided.TrySetResult(null);
+            }
         });
+        if (!queued) decided.TrySetResult(null);
+        return decided.Task;
     }
 }

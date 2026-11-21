@@ -22,8 +22,12 @@ namespace Plantoir.Core.Models;
 /// renamed starts with nothing remembered, and Preview at Last Viewed then
 /// opens the front page and says why on the trail. Nothing is pruned when a
 /// folder is missing — it may be on a drive that is not plugged in (#320).
-/// Written only on a change, through a temporary file; an unreadable file
-/// reads as nothing remembered.</para>
+/// Written only on a change, through a temporary file. A file that is not
+/// valid JSON reads as nothing remembered (and is replaced on the next
+/// write); one another program held past the bound (<see cref="HeldFiles"/>,
+/// #953) could not be read just now: nothing is remembered for that call and
+/// NOTHING is written, so a refused read never replaces the list with one
+/// entry.</para>
 /// </remarks>
 public static class LastViewedPages
 {
@@ -52,7 +56,7 @@ public static class LastViewedPages
     {
         lock (Gate)
         {
-            foreach (var page in Load())
+            foreach (var page in Load() ?? [])
                 if (Matches(page, folder, course, section)) return page.Path;
             return null;
         }
@@ -61,7 +65,8 @@ public static class LastViewedPages
     /// <summary>
     /// Remembers <paramref name="path"/> for a section. Refuses anything that
     /// is not a path below a root (an address, a leading slash). False when
-    /// nothing was written — unchanged, refused, or the write failed.
+    /// nothing was written — unchanged, refused, the pages could not be read
+    /// just now, or the write failed.
     /// </summary>
     public static bool Remember(string folder, string course, int section, string path, DateTime? now = null)
     {
@@ -69,7 +74,7 @@ public static class LastViewedPages
         if (path.Contains("://", StringComparison.Ordinal) || path.StartsWith('/')) return false;
         lock (Gate)
         {
-            var pages = Load();
+            if (Load() is not { } pages) return false;
             var existing = pages.FirstOrDefault(page => Matches(page, folder, course, section));
             if (existing is not null && existing.Path == path) return false;
             if (existing is not null) pages.Remove(existing);
@@ -91,12 +96,17 @@ public static class LastViewedPages
         && string.Equals(page.Course, course, StringComparison.OrdinalIgnoreCase)
         && WorkingFolder.IsTheSame(page.Folder, folder);
 
-    private static List<Page> Load()
+    /// <summary>The remembered pages, newest first; null when the file could not be read just now.</summary>
+    private static List<Page>? Load()
     {
+        HeldFiles.FileBytes read;
+        try { read = HeldFiles.ReadBytes(FilePath); }
+        catch { return null; }
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) return null;
+        if (read.Outcome == HeldFiles.ReadOutcome.NotThere) return [];
         try
         {
-            if (!File.Exists(FilePath)) return [];
-            var root = JObject.Parse(File.ReadAllText(FilePath));
+            var root = JObject.Parse(System.Text.Encoding.UTF8.GetString(read.Data!).TrimStart('\uFEFF'));
             var pages = root["pages"]?.ToObject<List<Page>>() ?? [];
             // Newest first, whatever order the file holds them in.
             return pages.Where(page => page.Folder.Length > 0 && page.Course.Length > 0 && page.Section > 0)

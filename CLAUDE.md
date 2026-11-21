@@ -693,7 +693,13 @@ prerequisites are the **.NET 9 SDK** and a Python: the fetched runtime's own
 uses for the shared `scripts/test_*.py` files since #764, or a **`python` on
 PATH** when no runtime is fetched; the suite FAILS rather than skips without an
 interpreter, deliberately, because a suite that is green having run nothing is
-the failure mode that change was made to close. It targets `net9.0-windows10.0.19041.0` /
+the failure mode that change was made to close. Two more things a fresh
+machine needs before its suite matches the development PC's (#964): the
+**`python-frontmatter` package for PATH's `python`** (`CopyAPageFuzzTests`
+asks the builder's own code on that Python, and fails naming the package
+without it), and **Developer Mode** or another way to hold the symbolic-link
+privilege (`scripts/test_site_files.py` fails with WinError 1314 without it);
+`WINDOWS-BOOTSTRAP.md` §6. It targets `net9.0-windows10.0.19041.0` /
 `win-x64` and ships self-contained, Windows App SDK included, so a teacher
 installs no runtime.
 

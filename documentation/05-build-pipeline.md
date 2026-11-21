@@ -4423,11 +4423,18 @@ mac and in the container `os.replace` is called once, as before. The writer
 now also RETURNS whether it wrote (`True`/`False`); the build's own caller
 does not read it, so a build behaves as before, and the test counts lost
 writes with it. A reader on Windows still meets a few refused opens per run
-(the file being swapped in), so the test's reader asks again there. **Left
-for #874:** the app's own readers of `course_config.json`
-(`CourseConfiguration.Load` and `Write`'s merge read use `File.ReadAllBytes`
-with no retry, and an access-denied open arrives as
-`UnauthorizedAccessException`).
+(the file being swapped in), so the test's reader asks again there. **The
+app's own readers (#874, 2026-11-21):** every Windows reader of
+`course_config.json` goes through `CourseConfiguration.ReadBytes`, which asks
+again (`HeldFiles`, the same bounded pauses as `ObsidianFigureAddOns`), and a
+read still refused is "could not read just now", never "no settings": a Save
+then refuses rather than writing its whole copy over the build's, and the
+course stays in the sidebar with the settings last read. Measured on the
+first Windows VM (Windows 11 ARM64) against a second process replacing the
+file with `MoveFileExW(…, MOVEFILE_REPLACE_EXISTING)`, `os.replace`'s call: a
+C# reader that does not ask again met only sharing violations (86 in 476
+rounds), never access denied; Python's `PermissionError` covers both, which
+is where "access denied" in the step-0 notes came from.
 
 **The date pass (F3).** Two sections dating one shared page each write their
 own `createdSection<N>` (`_replace_the_page_safely`). Its last look at the page
