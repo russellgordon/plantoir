@@ -1288,13 +1288,15 @@ the sidebar, the title and the trail — was the follow-up, and is #780
 (v2.0.0): no, and the name is cleaned where it is READ, by
 `contracts/shared-rules.json` → `courseNameCharacters`, which also spaces out
 C1 and U+2028/2029 and removes the bidi controls. The mac and the shared
-Python did their half in v2.0.0;
-this app's `CourseConfiguration.CourseName` and its trail writer are owed (the
-`windows` issue for #780). **`OutsideDoor.Clean` stays as it is** after that
-lands: a course name will reach it already clean, but it also cleans the page
-names and the working folder a door carries, which are not course names, and
-it is the last layer before `cmd`. Update this paragraph when the Windows half
-lands.
+Python did their half in v2.0.0, and this app did
+its half in #821: `CourseConfiguration.CourseName` cleans the name in its
+getter and setter, every Save writes it cleaned, the New Course window
+cleans before it trims (`OneLineText`, the mac's rule code point for code
+point), and every trail line is cleaned and redacted by
+`ActivityTrail.SafeTrailLine`. **`OutsideDoor.Clean` stays as it is:** a
+course name now reaches it already clean, but it also cleans the page names
+and the working folder a door carries, which are not course names, and it
+is the last layer before `cmd`. Its tests stay.
 
 **The caret set includes `(` and `)`**, and an OLD npm shim shape proves it:
 `cmd-shim`'s older form runs `%*` INSIDE an `IF (…) ELSE (…)` block, where an
@@ -8113,6 +8115,12 @@ compared, R read in full, S s`. Time
 from launch to window is `App.OnLaunched starting` (or `Program.Main starting`)
 to `MainWindow.Activate called`; launch to a usable Preview is the same start to
 `tools copy finished`.
+
+Every trail line about a course gets its place from
+`ActivityTrail.Place` (`placeCases`, #946), and `plantoir-mcp.exe` writes
+`task started` / `task finished` for every launcher it runs (#774), in the
+window's words, exit 3 as "stopped at a question nobody was there to answer
+(exit 3)".
 
 ### Testing it
 
