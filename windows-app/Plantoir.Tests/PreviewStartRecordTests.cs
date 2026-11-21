@@ -279,6 +279,15 @@ public class PreviewStartRecordTests : IDisposable
         PreviewLeases.Release(first);
 
         Assert.Equal(new[] { second }, PreviewLeases.Active.ToArray());
+    }
+
+    /// <summary>A start holds its own only by reference and while it is the latest.</summary>
+    [Fact]
+    public void AStartHoldsItsOwnLeaseByReference()
+    {
+        var window = new object();
+        var first = new PreviewLeases.Lease(8081, Folder, Course, Section, window);
+        var second = new PreviewLeases.Lease(8081, Folder, Course, Section, window);
         Assert.True(PreviewStarts.TheStartStillHoldsItsOwn(second, second, Guid.Empty, Guid.Empty));
         Assert.False(PreviewStarts.TheStartStillHoldsItsOwn(second, first, Guid.Empty, Guid.Empty));
         Assert.False(PreviewStarts.TheStartStillHoldsItsOwn(second, second, Guid.NewGuid(), Guid.Empty));
@@ -363,22 +372,31 @@ public class PreviewStartRecordTests : IDisposable
         Assert.DoesNotContain("CourseActivity.BeginPreviewBuild(", body);
     }
 
-    /// <summary>
-    /// The view's side of M2, L1 and L2: its one release sweeps only this
-    /// window's rows, both starts take as this window, the press asks about a
-    /// stop under way, and an exception in either start hands back what that
-    /// start still holds.
-    /// </summary>
+    /// <summary>The view's side of M2: its one release sweeps only this window's rows, and both starts take as this window.</summary>
     [Fact]
-    public void TheViewReleasesOnlyItsOwnAndHandsBackOnAFailure()
+    public void TheViewReleasesOnlyItsOwnWindowsLeases()
     {
         string code = ViewSource();
         string release = Body(code, "private void ReleaseLease(");
         Assert.Contains("PreviewLeases.ReleaseLeftBehind(_window,", release);
         Assert.DoesNotMatch(@"PreviewLeases\.Release\(\s*wp", release);
         Assert.Equal(2, Regex.Matches(code, @"PreviewStarts\.Begin\([^;]*owner:\s*_window\)").Count);
+    }
+
+    /// <summary>The view's side of L1: the press asks about a stop under way, which the stop counts.</summary>
+    [Fact]
+    public void ThePressAsksWhetherTheWindowsStopIsUnderWay()
+    {
+        string code = ViewSource();
         Assert.Contains("aStopIsUnderWay: _stopsUnderWay > 0", Body(code, "private bool SaidAStartIsAlreadyUnderWay("));
         Assert.Contains("_stopsUnderWay++", Body(code, "public async Task StopPreviewAsync("));
+    }
+
+    /// <summary>The view's side of L2 and L5: an exception in either start hands back what it holds, and the repair's refusal after the stop is caught.</summary>
+    [Fact]
+    public void AFailedStartHandsBackWhatItHolds()
+    {
+        string code = ViewSource();
         foreach (string header in new[] { "private async Task PressPreviewAsync(", "private async void StartAutomatedPreview(" })
         {
             string body = Body(code, header);
@@ -386,6 +404,7 @@ public class PreviewStartRecordTests : IDisposable
             Assert.True(caught >= 0 && body.IndexOf("HandBackAfterAFailure(heldLease, heldStart)", caught, StringComparison.Ordinal) > caught,
                         $"{header}: an exception does not hand back what the start holds");
         }
+        Assert.DoesNotContain("_ = PresentRepairOutcomeAsync(", Body(code, "private void StartPreviewAgainAfterTheStop("));
     }
 
     [Fact]
