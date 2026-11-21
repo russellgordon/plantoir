@@ -9,7 +9,7 @@ namespace Plantoir.Core.Undo;
 // what each one's content is, how it is checked against what is there now,
 // and how it is moved one way or the other. The rule is
 // contracts/file-formats.json → undoJournal.opKinds; the cases are
-// shared-rules.json → undo.checkCases, listingCases and editJSONCases.
+// shared-rules.json → undo.checkCases and listingCases, and undo-json-cases.json → editJSONCases.
 // Content, never times (ruling 4).
 
 // ---- replaceText ------------------------------------------------------------------

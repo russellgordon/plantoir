@@ -209,7 +209,7 @@ internal abstract class UndoJson
     /// <c>Ａ</c> beside <c>A</c>), takes keys that are canonically equivalent
     /// for one (<c>é</c> as one character and as <c>e</c> with a combining
     /// accent; the Kelvin sign and <c>K</c>), and reads text without a
-    /// byte-order mark at its start (<c>undo.editJSONCases</c>,
+    /// byte-order mark at its start (<c>undo-json-cases.json</c> → <c>editJSONCases</c>,
     /// <c>undo.checkCases</c>, held here by name in <c>NamedGapLedger</c>).
     /// </summary>
     internal bool IsMeasured
@@ -296,7 +296,7 @@ internal abstract class UndoJson
     /// but what JSON requires (a quote, a backslash, a control character), a
     /// whole number without a decimal part, any other number as C's
     /// <c>%.17g</c> spells it (<see cref="SpellNumber"/>). Only the NEW value
-    /// of a member is ever spelled by the app (<c>undo.editJSONCases</c>, whose
+    /// of a member is ever spelled by the app (<c>undo-json-cases.json</c> → <c>editJSONCases</c>, whose
     /// key-order and number rows were taken from the mac's own code on
     /// 2026-11-20). Null for a value that is not exact (<see cref="IsExact"/>):
     /// never written approximately; and null for a value this app is not
@@ -486,7 +486,7 @@ internal abstract class UndoJson
     /// random spellings, the mac's reader on macOS 26.7.3, #899 W6 review 3). So
     /// 0.00012339999999999999, the spelling of 0.0001234, reads as
     /// 0.00012340000000000002 there, and a member set to 0.0001234 is refused
-    /// on both platforms (<c>undo.editJSONCases</c>).
+    /// on both platforms (<c>undo-json-cases.json</c> → <c>editJSONCases</c>).
     /// </summary>
     internal static double ReadAsTheMacReads(string spelling, double nearest)
     {

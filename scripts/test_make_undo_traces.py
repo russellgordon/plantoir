@@ -38,6 +38,48 @@ def shared_undo():
         return json.load(handle)["undo"]
 
 
+def json_cases():
+    # undo-json-cases.json: the editJSON byte cases, kept out of
+    # shared-rules.json because Windows PowerShell 5.1 cannot read them (#899 W6).
+    with open(REPO / "contracts" / "undo-json-cases.json", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+# The one contract file no PowerShell reads, because some of its rows must hold
+# keys that differ only by case (ContractFilesWindowsPowerShellReadsTests).
+NOT_FOR_WINDOWS_POWERSHELL = ["undo-json-cases.json"]
+
+
+def windows_powershell_problems(text):
+    """What would stop Windows PowerShell 5.1's ConvertFrom-Json reading this
+    JSON text: an object with two keys equal ignoring case (it builds each
+    object as a case-insensitive dictionary, comparing character by character
+    as .NET's OrdinalIgnoreCase does), or an empty key. A model of the rule
+    for this Mac; Windows runs the real ConvertFrom-Json on every file."""
+    problems = []
+
+    def fold(key):
+        folded = ""
+        for character in key:
+            upper = character.upper()
+            folded += upper if len(upper) == 1 else character
+        return folded
+
+    def look(pairs):
+        seen = {}
+        for key, _ in pairs:
+            if key == "":
+                problems.append("an empty key")
+            folded = fold(key)
+            if folded in seen and seen[folded] != key:
+                problems.append("keys %r and %r differ only by case" % (seen[folded], key))
+            seen[folded] = key
+        return dict(pairs)
+
+    json.loads(text, object_pairs_hook=look)
+    return problems
+
+
 def committed():
     with open(REPO / "contracts" / "undo-traces.json", encoding="utf-8") as handle:
         return json.load(handle)
@@ -527,7 +569,7 @@ class ContractCaseTests(unittest.TestCase):
 
     def test_edit_json_cases(self):
         # The bytes of an editJSON move (the hard review of U2b, LOW a).
-        cases = shared_undo()["editJSONCases"]
+        cases = json_cases()["editJSONCases"]
         self.assertGreaterEqual(len(cases), 6)
         for case in cases:
             with self.subTest(case=case["name"]):
@@ -540,7 +582,7 @@ class ContractCaseTests(unittest.TestCase):
 
     def test_every_held_case_is_still_in_the_contract(self):
         names = set()
-        for case in shared_undo()["checkCases"] + shared_undo()["editJSONCases"]:
+        for case in shared_undo()["checkCases"] + json_cases()["editJSONCases"]:
             names.add(case["name"])
         for name in REFUSED_HERE_EDIT_JSON + REFUSED_HERE_CHECK:
             self.assertIn(name, names)
@@ -1000,6 +1042,34 @@ class ContractCaseTests(unittest.TestCase):
         events = set(journal["events"])
         self.assertEqual(events, {"begin", "applied", "rolledBack", "interrupted", "undoing", "undone",
                                   "redoing", "redone", "failed", "dropped", "pruned", "cleared", "note"})
+
+
+class ContractFileReadabilityTests(unittest.TestCase):
+    """Every contract file that Windows PowerShell reads, or may, stays
+    readable by its ConvertFrom-Json (#899 W6: shared-rules.json once held
+    keys X1 and x1, and windows-app/test_launcher_rules.ps1 could not start)."""
+
+    def test_the_rule_sees_what_windows_powershell_refuses(self):
+        self.assertEqual(len(windows_powershell_problems('{"a": {"X1": 1, "x1": 2}}')), 1)
+        self.assertEqual(len(windows_powershell_problems('{"a": [{"": 1}]}')), 1)
+        self.assertEqual(windows_powershell_problems('{"a": {"X1": 1, "x2": 2, "\u212a": 3, "k": 4}}'), [])
+
+    def test_every_other_contract_file_is_readable_by_windows_powershell(self):
+        names = []
+        for path in sorted((REPO / "contracts").glob("*.json")):
+            names.append(path.name)
+            if path.name in NOT_FOR_WINDOWS_POWERSHELL:
+                continue
+            with self.subTest(path.name):
+                self.assertEqual(windows_powershell_problems(path.read_text(encoding="utf-8")), [])
+        self.assertIn("shared-rules.json", names)
+        for name in NOT_FOR_WINDOWS_POWERSHELL:
+            self.assertIn(name, names)
+
+    def test_the_edit_json_cases_live_only_in_their_own_file(self):
+        self.assertNotIn("editJSONCases", shared_undo())
+        self.assertNotIn("editJSONCasesHow", shared_undo())
+        self.assertGreaterEqual(len(json_cases()["editJSONCases"]), 16)
 
 
 if __name__ == "__main__":

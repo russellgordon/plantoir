@@ -306,13 +306,13 @@ internal static class NamedGapLedger
     internal const string UndoCheckCasesRefusedHere = "shared-rules.json → undo.checkCases (refused here as cannot tell)";
 
     /// <summary>
-    /// <c>shared-rules.json</c> → <c>undo.editJSONCases</c>, by case
+    /// <c>undo-json-cases.json</c> → <c>editJSONCases</c>, by case
     /// <c>name</c>: a move whose bytes the mac writes and this app is not
     /// measured to write the same (#899 W6 review 2). A held case must be
     /// REFUSED here (no bytes at all, never bytes of its own), and the
     /// contract's result must still be bytes (<c>UndoOpKindsContractTests.EveryEditJsonCase</c>).
     /// </summary>
-    internal const string UndoEditJsonCasesRefusedHere = "shared-rules.json → undo.editJSONCases (refused here)";
+    internal const string UndoEditJsonCasesRefusedHere = "undo-json-cases.json → editJSONCases (refused here)";
 
     /// <summary>
     /// <c>shared-rules.json</c> → <c>undo.stackCases</c>, by case <c>name</c>:

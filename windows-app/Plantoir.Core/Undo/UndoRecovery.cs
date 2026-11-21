@@ -79,17 +79,18 @@ internal static class UndoTrail
     /// </summary>
     internal static void ToTheActivityTrail(UndoTrailLine line)
     {
-        switch (line.Event)
+        // Each event Undo writes, named on the right of an arm so the trail's
+        // wiring scan (ActivityTrailWiringTests) sees its writer: a case label
+        // alone, with the event passed on as line.Event, is not seen.
+        ActivityTrail.Event written = line.Event switch
         {
-            case ActivityTrail.Event.UndoRolledBack:
-            case ActivityTrail.Event.UndoFoundAFolderSetAside:
-                if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(line.Event, line.Words);
-                else if (line.Section is { } section and >= 0 and <= int.MaxValue) ActivityTrail.Note(line.Event, line.Words, line.Course, (int)section);
-                else ActivityTrail.Note(line.Event, line.Course + " · " + line.Words);
-                break;
-            default:
-                throw new ArgumentException("An event Undo does not write: " + line.Event, nameof(line));
-        }
+            ActivityTrail.Event.UndoRolledBack => ActivityTrail.Event.UndoRolledBack,
+            ActivityTrail.Event.UndoFoundAFolderSetAside => ActivityTrail.Event.UndoFoundAFolderSetAside,
+            _ => throw new ArgumentException("An event Undo does not write: " + line.Event, nameof(line)),
+        };
+        if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(written, line.Words);
+        else if (line.Section is { } section and >= 0 and <= int.MaxValue) ActivityTrail.Note(written, line.Words, line.Course, (int)section);
+        else ActivityTrail.Note(written, line.Course + " · " + line.Words);
     }
 }
 

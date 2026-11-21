@@ -7,7 +7,7 @@ namespace Plantoir.Tests;
 
 /// <summary>
 /// #899 W6: <c>shared-rules.json</c> → <c>undo.listingCases</c> (a folder's
-/// listing, byte for byte) and <c>undo.editJSONCases</c> (an editJSON move on
+/// listing, byte for byte) and <c>undo-json-cases.json</c> → <c>editJSONCases</c> (an editJSON move on
 /// a file's bytes, byte for byte), every case from the JSON; and the Windows
 /// points the contract leaves to the platform: a move that changes only case,
 /// a folder another program holds open, a tree made inside OneDrive's
@@ -26,10 +26,10 @@ public sealed class UndoOpKindsContractTests : IDisposable
         UndoContract.Undo.GetProperty("listingCases").EnumerateArray().Select(row => new object[] { row.GetProperty("name").GetString()! });
 
     public static IEnumerable<object[]> EditJsonCases() =>
-        UndoContract.Undo.GetProperty("editJSONCases").EnumerateArray().Select(row => new object[] { row.GetProperty("name").GetString()! });
+        UndoContract.JsonCases.GetProperty("editJSONCases").EnumerateArray().Select(row => new object[] { row.GetProperty("name").GetString()! });
 
     private static JsonElement Named(string list, string name) =>
-        UndoContract.Undo.GetProperty(list).EnumerateArray().Single(row => row.GetProperty("name").GetString() == name);
+        (list == "editJSONCases" ? UndoContract.JsonCases : UndoContract.Undo).GetProperty(list).EnumerateArray().Single(row => row.GetProperty("name").GetString() == name);
 
     private static void OnlyKeys(JsonElement row, params string[] keys)
     {
@@ -40,7 +40,9 @@ public sealed class UndoOpKindsContractTests : IDisposable
     public void TheContractHoldsTheListingAndEditJsonCases()
     {
         Assert.True(UndoContract.Undo.GetProperty("listingCases").GetArrayLength() >= 5);
-        Assert.True(UndoContract.Undo.GetProperty("editJSONCases").GetArrayLength() >= 16);
+        Assert.True(UndoContract.JsonCases.GetProperty("editJSONCases").GetArrayLength() >= 16);
+        // Moved, not copied: one list in one place.
+        Assert.False(UndoContract.Undo.TryGetProperty("editJSONCases", out _), "editJSONCases is in undo-json-cases.json, not shared-rules.json");
     }
 
     /// <summary>The listing made from the case's tree is the case's text and hash, and reads back as itself; and the same folder made on the disk lists the same.</summary>
@@ -103,7 +105,7 @@ public sealed class UndoOpKindsContractTests : IDisposable
     /// New text that starts with a byte-order mark is never written: the mac's
     /// reader drops the mark when it reads the result back (measured
     /// 2026-11-20), so the mac refuses the move, and so does this app. A mark
-    /// inside the text is written as it is, on both (<c>undo.editJSONCases</c>).
+    /// inside the text is written as it is, on both (<c>undo-json-cases.json</c> → <c>editJSONCases</c>).
     /// Not a contract row: the mac's contract runner reads each case through
     /// <c>JSONSerialization</c>, which drops the mark, so no row can carry one.
     /// </summary>
