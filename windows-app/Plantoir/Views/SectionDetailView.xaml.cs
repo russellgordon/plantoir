@@ -324,6 +324,8 @@ public sealed partial class SectionDetailView : UserControl
         // #514: the pointer has to reach the button, or focus it, to press
         // it — so Alt is read again there too (MainWindow.Modifier.cs).
         PreviewButton.PointerEntered += (_, _) => _window.ReadTheModifierAgain();
+        // #889 offeredWhen: the pointer reaches the button (lane B review, low 2).
+        BrowserButton.PointerEntered += (_, _) => ReadTheOfferAgain();
         PreviewButton.GotFocus += (_, _) => _window.ReadTheModifierAgain();
         // Anything last night's scheduled deploy found. It ran with the app
         // closed, so this is the first moment there is anywhere to say it.
@@ -367,6 +369,7 @@ public sealed partial class SectionDetailView : UserControl
         // #889: a deployed folder shown or stopped (from any place, or on its own).
         DeployedFolderShows.Shared.Changed -= OnDeployedFolderShowsChanged;
         DeployedFolderShows.Shared.Changed += OnDeployedFolderShowsChanged;
+        ReadTheOfferAgain();   // #889 offeredWhen: the section shows
         ShowTheProblems();
         ReadTheProblems();
         RefreshChrome();
@@ -427,7 +430,11 @@ public sealed partial class SectionDetailView : UserControl
     private void OnDeployRunChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
         if (_isTornDown) return;
-        if (args.PropertyName == nameof(SectionDeployRun.Endings)) TakeWhatTheDeployLeft();
+        if (args.PropertyName == nameof(SectionDeployRun.Endings))
+        {
+            TakeWhatTheDeployLeft();
+            ReadTheOfferAgain();   // #889 offeredWhen: a deploy ends
+        }
         RefreshChrome();
     }
 
@@ -2880,16 +2887,21 @@ public sealed partial class SectionDetailView : UserControl
     /// 2026-11-13): the preview while one shows, the section's deployed folder
     /// otherwise. Its tooltip and Narrator name say which, or why it is
     /// dimmed (<c>deployedFolderInBrowser.offeredCases</c>). Read on events,
-    /// never on a clock: the section showing, a deploy ending, a show starting
-    /// or stopping, the window's chrome redrawn.
+    /// never on a clock: the section showing, a deploy ending, a menu opening,
+    /// the pointer reaching the button, a show starting or stopping
+    /// (<see cref="ReadTheOfferAgain"/>). A redraw only draws the last answer
+    /// read, so a deploy folder on a share that does not answer never stalls
+    /// the window (lane B review, low 3). Named "Open in Browser" for
+    /// Narrator, as the Mac labels it, with the sentence as its help text
+    /// (lane B review, low 7).
     /// </summary>
     private void RefreshOpenInBrowser(bool previewShown)
     {
         string help = DeployedFolderWording.PreviewHelp;
         bool enabled = previewShown;
-        if (!previewShown && _window.Workspace.WorkspacePath is { } folder)
+        if (!previewShown && _offer is { } read)
         {
-            var decision = DeployedFolderOpening.Offer(_course, _sectionNumber, folder).Decision;
+            var decision = read.Decision;
             if (decision.Kind == DeployedFolderOffer.Kind.Offered)
             {
                 enabled = true;
@@ -2900,14 +2912,59 @@ public sealed partial class SectionDetailView : UserControl
         }
         BrowserButton.IsEnabled = enabled;
         ToolTipService.SetToolTip(BrowserButton, help);
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(BrowserButton, help);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(BrowserButton, DeployedFolderWording.MenuItem);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(BrowserButton, help);
         RefreshDeployedFolderNotice();
     }
 
-    /// <summary>Whether Open in Browser opens the deployed folder now (no preview shows, and it is offered).</summary>
+    /// <summary>The offer as last read, off the window's thread; null until the first read ends.</summary>
+    private DeployedFolderOffer.Lookup? _offer;
+    private bool _offerReading;
+    private bool _offerAgain;
+
+    /// <summary>
+    /// Reads the deployed folder's offer again, off the window's thread
+    /// (it opens the folder's handles and reads the settings and leases), then
+    /// redraws. Called on <c>deployedFolderInBrowser.offeredWhen</c>'s events
+    /// only, never on a clock; a call while a read is under way asks for one
+    /// more read after it, so the last event is always the one drawn.
+    /// </summary>
+    internal void ReadTheOfferAgain()
+    {
+        if (_isTornDown || _window.Workspace.WorkspacePath is not { } folder) return;
+        if (_offerReading)
+        {
+            _offerAgain = true;
+            return;
+        }
+        _offerReading = true;
+        var course = _course;
+        int section = _sectionNumber;
+        _ = Task.Run(() =>
+        {
+            try { return DeployedFolderOpening.Offer(course, section, folder); }
+            catch (Exception ex) { App.LogDiagnostic($"Open in Browser could not read the offer: {ex.Message}"); return null; }
+        }).ContinueWith(reading => DispatcherQueue?.TryEnqueue(() =>
+        {
+            _offerReading = false;
+            if (_isTornDown) return;
+            _offer = reading.Result;
+            if (_offerAgain)
+            {
+                _offerAgain = false;
+                ReadTheOfferAgain();
+            }
+            RefreshChrome();
+            _window.ApplyMenuEnablement();
+        }), TaskScheduler.Default);
+    }
+
+    /// <summary>Whether the section's deployed folder can be opened, as last read (<c>deployedFolderReady</c>).</summary>
+    internal bool DeployedFolderReadyAsLastRead => _offer?.Decision.Kind == DeployedFolderOffer.Kind.Offered;
+
+    /// <summary>Whether Open in Browser opens the deployed folder now (no preview shows, and the last read offers it).</summary>
     internal bool DeployedFolderIsOffered =>
-        _previewUrl is null && _window.Workspace.WorkspacePath is { } folder
-        && DeployedFolderOpening.Offer(_course, _sectionNumber, folder).Decision.Kind == DeployedFolderOffer.Kind.Offered;
+        _previewUrl is null && _offer?.Decision.Kind == DeployedFolderOffer.Kind.Offered;
 
     /// <summary>The notice: shown with Stop while the folder is shown; stoppedFolderGone with Dismiss once it went away.</summary>
     private void RefreshDeployedFolderNotice()
@@ -2935,6 +2992,7 @@ public sealed partial class SectionDetailView : UserControl
     private void OnDeployedFolderShowsChanged() => DispatcherQueue?.TryEnqueue(() =>
     {
         if (_isTornDown) return;
+        ReadTheOfferAgain();   // #889 offeredWhen: a show starts or stops
         RefreshChrome();
         _window.ApplyMenuEnablement();
     });

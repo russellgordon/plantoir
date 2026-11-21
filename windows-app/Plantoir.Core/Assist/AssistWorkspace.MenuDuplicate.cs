@@ -167,10 +167,17 @@ public sealed partial class AssistWorkspace
                 writer.Write(request.CopyText);
             }
         }
-        catch (IOException) when (!created)
+        catch (IOException) when (!created && File.Exists(request.NewPath))
         {
             // A page appeared at that name meanwhile: never written over.
             throw new AssistRefusal(AssistWording.MenuTheNextPageIsAlreadyThere(request.NewTitle));
+        }
+        catch (IOException error) when (!created)
+        {
+            // Not there, and still not made (a path too long, a cloud-file
+            // error, a drive gone): said as what it is, never "already there"
+            // (lane B review, low 4; the mac matches only fileWriteFileExists).
+            throw new AssistRefusal($"Nothing was created: {error.Message}");
         }
         catch (Exception error) when (created)
         {

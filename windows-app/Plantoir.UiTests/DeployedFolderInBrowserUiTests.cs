@@ -55,7 +55,9 @@ public class DeployedFolderInBrowserUiTests
             var button = app.Find("openInBrowserButton", "Open in Browser");
             Assert.True(Retry.WhileFalse(() => button.IsEnabled, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250)).Result,
                         "Open in Browser stayed dimmed for a section deployed to a folder");
-            Assert.Equal(Plantoir.Core.Models.DeployedFolderWording.Help, button.Name);
+            // Named as the Mac labels it, the sentence its help text (lane B review, low 7).
+            Assert.Equal(Plantoir.Core.Models.DeployedFolderWording.MenuItem, button.Name);
+            Assert.Equal(Plantoir.Core.Models.DeployedFolderWording.Help, button.HelpText);
             var closed = MenuBar.Open(app, "Section", "sectionOpenInBrowser");
             Assert.True(closed["sectionOpenInBrowser"].IsEnabled, "Section > Open in Browser was dimmed");
             Assert.False(closed["sectionStopShowingDeployedFolder"].IsEnabled, "Stop Showing Deployed Folder was live before anything was shown");

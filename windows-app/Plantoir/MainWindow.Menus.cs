@@ -155,7 +155,14 @@ public sealed partial class MainWindow
         // Enablement ahead of the flyout: measured to fire before it draws.
         foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ClassesMenu, ViewMenu, HelpMenu })
         {
-            title.PointerEntered += (_, _) => ApplyMenuEnablement();
+            title.PointerEntered += (_, _) =>
+            {
+                // #889 offeredWhen: a menu opens. The selected section's view
+                // reads the offer off this thread and redraws the menus when
+                // it has it (lane B review, low 3).
+                SelectedSectionDetail()?.ReadTheOfferAgain();
+                ApplyMenuEnablement();
+            };
             title.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => ApplyMenuEnablement()), true);
         }
         AppMenuBar.GotFocus += (_, _) => ApplyMenuEnablement();   // opened from the keyboard
@@ -534,8 +541,10 @@ public sealed partial class MainWindow
                             && AVerbIsRunningOn(folder, course.Code, runningIn),
             // #889: read now, from the saved settings and the disk (offeredWhen:
             // a menu opening is one of its events), and this app's shows.
-            DeployedFolderReady = folder is not null && course is not null && sectionNumber is int offeredIn
-                                  && DeployedFolderOpening.Offer(course, offeredIn, folder).Decision.Kind == DeployedFolderOffer.Kind.Offered,
+            // The selected section's view holds the offer as last read off the
+            // window's thread (lane B review, low 3); a menu's opening asks it
+            // to read again. No view, no offer: dimmed.
+            DeployedFolderReady = detail?.DeployedFolderReadyAsLastRead == true,
             DeployedFolderShown = folder is not null && course is not null && sectionNumber is int shownIn
                                   && DeployedFolderOpening.IsShown(course, shownIn, folder),
             CanGoBack = detail?.CanGoBack == true,
