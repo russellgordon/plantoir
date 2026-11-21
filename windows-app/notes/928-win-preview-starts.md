@@ -48,6 +48,11 @@ Branch `issue/928-win-preview-starts`. #1022 item 1 is done here; #1022 item 2
   the file name go to `ScriptRunner.LaunchProblemDetail`, trail only.
   `TaskScheduling.NothingToSchedule` replaces the refusal that named
   `deploy.ps1` and the full folder path.
+- Trail lines, in the mac's words: `preview already starting` writes "asked
+  to preview while this window's preview was still starting: the start
+  already under way goes on, and nothing else was started"; `preview could
+  not start` writes "the preview could not start, and the teacher was told
+  why: <sentence> (<detail>)" (`PreviewStarts.CouldNotStartLine`).
 - Ledger: the `Owed(ActivityTrailEvents, 928, …)` entry and `Reason928` are
   removed; the three events are in `ActivityTrail.Event`.
 - Tests: `PreviewStartRecordTests` (every `pressCases` and `previewAgainCases`
@@ -59,6 +64,12 @@ Branch `issue/928-win-preview-starts`. #1022 item 1 is done here; #1022 item 2
 - Not met for real: the ConPTY launch failure (`CouldNotGetStarted`); the
   runner always launches `powershell.exe`, so the test reads the constant.
   The mac's test points its shell at a missing program.
+
+- Known and left: Section ▸ Rebuild Preview in a folder with no
+  `preview.ps1` is refused earlier, by `AssistWorkspace`'s constructor, whose
+  sentence names the folder and `preview.ps1` ("isn't a Plantoir working
+  folder"). That sentence is the assistant's and the menu's, not a launch
+  problem, so it is not changed here.
 
 ### #1022 item 1
 
