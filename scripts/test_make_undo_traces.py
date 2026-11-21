@@ -514,6 +514,7 @@ class ContractCaseTests(unittest.TestCase):
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
                   "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
+                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
                   "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
@@ -773,6 +774,33 @@ class ContractCaseTests(unittest.TestCase):
                         last = ("applied", seq)
                     elif call == "removeContent":
                         model.content_removed = True
+                    elif call == "contentCannotBeStored":
+                        model.content_cannot_be_stored = True
+                    elif call == "beforeContentGoneAndCannotBeStored":
+                        # Only the newest step's before text of p1 is gone
+                        # from the list, and the list will not take it again.
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.removed_texts.add(op["beforeText"])
+                                model.unstorable_texts.add(op["beforeText"])
+                    elif call == "keepTheOriginal":
+                        # The newest step's kept original of p1: what p1
+                        # held before its whole-file op (U3c).
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.kept.setdefault(p1, []).append(op["beforeText"])
+                    elif call == "makeTheKeptOriginalUnreadable":
+                        model.kept_unreadable = True
+                    elif call == "changeTheKeptOriginal":
+                        for path in model.kept:
+                            model.kept[path] = [text + "A line added to the kept original.\n" for text in model.kept[path]]
+                    elif call == "foreignKeptOriginal":
+                        # Another list's kept original under the next step's
+                        # name: the model's pages and list never see it; the
+                        # Swift replay checks it is untouched.
+                        pass
                     elif call == "begin:dead@B":
                         path = folder_b + p1
                         after = flipped(path)
@@ -870,6 +898,11 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:
                     self.assertEqual(model.rederived, case["rederived"])
+                if "keptOriginalLeft" in case:
+                    foreign = "foreignKeptOriginal" in case["calls"]
+                    self.assertEqual(bool(model.kept) or foreign, case["keptOriginalLeft"])
+                if "keptWhatItReplacedLines" in case:
+                    self.assertEqual(model.kept_what_it_replaced_lines, case["keptWhatItReplacedLines"])
                 if "leftApart" in case:
                     self.assertEqual(list(last[2]) if len(last) > 2 else [], case["leftApart"])
                 if "schoolYear" in case:

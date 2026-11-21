@@ -2384,11 +2384,20 @@ final class AssistToolRunner {
     /// where each page's earlier content is kept, and counted as a write
     /// with no new undo entry (#531), so the Section menu's trail does not
     /// say "changed nothing".
+    ///
+    /// `aSectionsCopyPutsItBack` is false for a page a copy of a section
+    /// does not hold (How I Teach, a course page saved under a stand-in
+    /// section): no Restore Section or backup pointer is added, because it
+    /// would not put that page back (the third review of U3a, LOW 4).
     private func saidWhenTheStepStopped(
-        _ error: Error, nothing: String = "Nothing was changed", what: String, sectionNumber: Int
+        _ error: Error, nothing: String = "Nothing was changed", what: String, sectionNumber: Int,
+        aSectionsCopyPutsItBack: Bool = true
     ) -> String {
         if case JournaledStepError.leftPartWay = error {
             writesWithNoNewUndoEntry += 1
+            if !aSectionsCopyPutsItBack {
+                return AssistWording.publishStoppedPartWay(what: what, problem: error.localizedDescription)
+            }
             return publishStoppedPartWay(what: what, problem: error.localizedDescription, sectionNumber: sectionNumber)
         }
         return "\(nothing): \(error.localizedDescription)"
@@ -6898,7 +6907,7 @@ final class AssistToolRunner {
         do {
             try howITeachStep.make()
         } catch {
-            return AssistToolOutcome.refused(saidWhenTheStepStopped(error, nothing: "Nothing was saved", what: "the How I Teach page", sectionNumber: standInSection))
+            return AssistToolOutcome.refused(saidWhenTheStepStopped(error, nothing: "Nothing was saved", what: "the How I Teach page", sectionNumber: standInSection, aSectionsCopyPutsItBack: false))
         }
 
         // `after` is the file as the undo will READ it back — Foundation's

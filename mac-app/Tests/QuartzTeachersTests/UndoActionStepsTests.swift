@@ -874,7 +874,117 @@ final class UndoActionStepsTests: XCTestCase {
         let outcome: TodaysClassOnTheFrontPage.Outcome = TodaysClassOnTheFrontPage.show(offer, in: today.course)
         let after: String = try String(contentsOf: indexURL, encoding: .utf8)
         XCTAssertTrue(after.contains("Unit 2, Day 5"), "the page was put back, so this proves nothing: \(after)")
-        XCTAssertEqual(outcome, .shown(from: "Unit 2, Day 4", to: "Unit 2, Day 5"))
+        // What the page held just before is named, never a silent `.shown`
+        // (the third review of U3a, LOW 3; MUST FAIL answering `.shown`).
+        guard case .shownKeepingWhatItHeld(let from, let to, let kept, let folder) = outcome else {
+            XCTFail("said as \(outcome)")
+            return
+        }
+        // Where the alert's Show in Finder looks: beside the front page.
+        XCTAssertEqual(folder.standardizedFileURL.path, indexURL.deletingLastPathComponent().standardizedFileURL.path)
+        XCTAssertEqual(from, "Unit 2, Day 4")
+        XCTAssertEqual(to, "Unit 2, Day 5")
+        XCTAssertEqual(kept.count, 1)
+        let keptURL: URL = indexURL.deletingLastPathComponent().appendingPathComponent(kept.first ?? "")
+        let keptText: String = try String(contentsOf: keptURL, encoding: .utf8)
+        XCTAssertTrue(keptText.contains("Edited in Obsidian."), "the named file does not hold the edit: \(keptText)")
+        let line: String = TodaysClassOnTheFrontPage.trailLine(for: outcome, offer: offer).what
+        XCTAssertTrue(line.contains(kept.first ?? "?"), line)
+    }
+
+    /// Class dates left part way (an edit raced the swap and the put-back
+    /// failed) are in the file, so they are said as remembered, naming where
+    /// what the file held is kept, never "NOT remembered" (the third review
+    /// of U3a, LOW 2). MUST FAIL with the error wrapped into
+    /// `Problem.couldNotWrite`.
+    func testClassDatesLeftPartWayAreSaidAsRemembered() throws {
+        let today: AssistFixture.Made = try morning()
+        let firstPlan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08"], source: "", forSection: 1, in: today.course,
+            today: try XCTUnwrap(CalendarDay(text: "2026-09-01"))
+        )
+        try SectionTimetableStore.applyRememberTimetable(firstPlan)
+        let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08", "2026-09-10"], source: "", forSection: 1, in: today.course,
+            today: try XCTUnwrap(CalendarDay(text: "2026-09-01"))
+        )
+        let fileName: String = plan.fileURL.lastPathComponent
+        UndoKillPoints.beforeTheRename = { _, url in
+            guard url.lastPathComponent == fileName, let handle = try? FileHandle(forWritingTo: url) else {
+                return
+            }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(" ".utf8))
+            try? handle.close()
+        }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        defer {
+            UndoKillPoints.beforeTheRename = nil
+            UndoKillPoints.putBackFailsAt = nil
+        }
+        var thrown: Error? = nil
+        do {
+            try SectionTimetableStore.applyRememberTimetable(plan)
+        } catch {
+            thrown = error
+        }
+        guard case JournaledStepError.leftPartWay(_, _, let kept)? = thrown else {
+            XCTFail("thrown: \(String(describing: thrown))")
+            return
+        }
+        let onDisk: String = try String(contentsOf: plan.fileURL, encoding: .utf8)
+        XCTAssertTrue(onDisk.contains("2026-09-10"), "the dates are not in the file, so this proves nothing: \(onDisk)")
+        let said: String = SectionTimetableStore.Problem.savedWithWhatItHeldKept(plan.courseCode, plan.sectionNumber, kept).localizedDescription
+        XCTAssertTrue(said.contains("are remembered"), said)
+        XCTAssertTrue(said.contains(kept.first ?? "?"), said)
+    }
+
+    /// The Class Dates sheet, on dates that went in part way, carries on as
+    /// a plain save does: it hands back the remembered timetable (so a verb
+    /// waiting on the dates continues once the alert closes) and its one
+    /// alert names the kept file, never a blocking line (the first review of
+    /// U3c, LOW 6). MUST FAIL with the part-way case answered as
+    /// `.notRemembered`, as the sheet's blocking line was.
+    func testTheClassDatesSheetCarriesOnWhenTheDatesWentInPartWay() throws {
+        let today: AssistFixture.Made = try morning()
+        let firstPlan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08"], source: "", forSection: 1, in: today.course,
+            today: try XCTUnwrap(CalendarDay(text: "2026-09-01"))
+        )
+        try SectionTimetableStore.applyRememberTimetable(firstPlan)
+        let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08", "2026-09-10"], source: "", forSection: 1, in: today.course,
+            today: try XCTUnwrap(CalendarDay(text: "2026-09-01"))
+        )
+        let fileName: String = plan.fileURL.lastPathComponent
+        UndoKillPoints.beforeTheRename = { _, url in
+            guard url.lastPathComponent == fileName, let handle = try? FileHandle(forWritingTo: url) else {
+                return
+            }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(" ".utf8))
+            try? handle.close()
+        }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        defer {
+            UndoKillPoints.beforeTheRename = nil
+            UndoKillPoints.putBackFailsAt = nil
+        }
+        guard case .rememberedKeeping(let remembered) = SectionScheduleSheet.save(plan) else {
+            XCTFail("the part-way save was not carried on as remembered")
+            return
+        }
+        XCTAssertEqual(remembered.timetable.dates, plan.dates)
+        XCTAssertEqual(remembered.title, "The class dates for \(plan.courseCode) Section \(plan.sectionNumber) are remembered.")
+        var keptOnDisk: [String] = []
+        let folder: URL = plan.fileURL.deletingLastPathComponent()
+        for name in try FileManager.default.contentsOfDirectory(atPath: folder.path) where name.hasSuffix("-orig") {
+            keptOnDisk.append(name)
+        }
+        XCTAssertEqual(keptOnDisk.count, 1, "\(keptOnDisk)")
+        XCTAssertTrue(remembered.message.contains(keptOnDisk.first ?? "?"), remembered.message)
+        // The alert's Show in Finder shows exactly the kept file on the disk.
+        XCTAssertEqual(remembered.keptFiles, [folder.appendingPathComponent(keptOnDisk.first ?? "?")])
     }
 
     /// A press that went in part way (a page could not be put back after the

@@ -735,5 +735,37 @@ final class HowITeachTests: XCTestCase {
             }
         }
     }
-}
 
+    /// A How I Teach write left part way (a page that could not be put back
+    /// after an edit raced its swap) is said as part way, with no pointer at
+    /// a copy of a section: the page belongs to the course, saved under a
+    /// stand-in section, and Restore Section would not put it back (the third
+    /// review of U3a, LOW 4). Run in the in-app assistant, where the pointer
+    /// is otherwise added. MUST FAIL with `aSectionsCopyPutsItBack` true.
+    func testALeftPartWayWriteAddsNoRestorePointer() async throws {
+        try prepare(surface: .local)
+        try Data("My own words.\n".utf8).write(to: pageURL)
+        let mark: String = HowITeachPage.mark(of: Data("My own words.\n".utf8))
+        _ = await run("plan_write_how_i_teach", ["course": "ICS4U", "text": "New."])
+        let pageName: String = pageURL.lastPathComponent
+        UndoKillPoints.beforeTheRename = { _, url in
+            guard url.lastPathComponent == pageName, let handle = try? FileHandle(forWritingTo: url) else {
+                return
+            }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data("Edited in Obsidian.\n".utf8))
+            try? handle.close()
+        }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        defer {
+            UndoKillPoints.beforeTheRename = nil
+            UndoKillPoints.putBackFailsAt = nil
+        }
+        let outcome: AssistToolOutcome = await run("write_how_i_teach", ["course": "ICS4U", "text": "New.", "replacing": mark])
+        let partWay: String = AssistWording.publishStoppedPartWay(what: "the How I Teach page", problem: "")
+        XCTAssertTrue(outcome.detail.hasPrefix(partWay), outcome.detail)
+        let pointer: String = AssistWording.restoreSectionPutsItBack(section: "1")
+        XCTAssertFalse(outcome.detail.contains(pointer), outcome.detail)
+        XCTAssertFalse(outcome.detail.contains(AssistWording.restoreFromBackupPutsItBack), outcome.detail)
+    }
+}

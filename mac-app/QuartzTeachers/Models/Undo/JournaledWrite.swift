@@ -1127,6 +1127,13 @@ nonisolated enum UndoKillPoints {
     /// (`UndoSwap.keep`); nil lets it go ahead. Set only by tests.
     nonisolated(unsafe) static var keepingTheOriginalFails: ((Int) -> Int32?)?
 
+    /// Called with a file's index and the name its original is about to be
+    /// kept under, after that name was found free and before the original
+    /// is kept there: a test puts a file at that name, as another Mac
+    /// syncing the folder could in that instant (the first review of U3c,
+    /// LOW 4). Set only by tests.
+    nonisolated(unsafe) static var beforeKeepingTheOriginal: ((Int, URL) -> Void)?
+
     /// Called with a file's index and place just after its original is kept
     /// and before the new content is renamed in: a test edits the file IN
     /// PLACE there, as another program racing the swap would. Set only by
@@ -1166,6 +1173,42 @@ nonisolated enum UndoTrailHook {
     /// way: the course and section, what it ended, how many files were put
     /// back and how many were in the way. The list was cleared.
     nonisolated(unsafe) static var interruptedLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ putBack: Int, _ inTheWay: Int) -> Void)?
+
+    /// Recovery could not put back a step left part way, because content it
+    /// needs is gone from the list and no kept original beside its page
+    /// matches: the course and section, what it ended, how many files were
+    /// left part way, and the hidden name of every kept original still
+    /// beside its page (never removed: the only copy of what it held). The
+    /// list was cleared.
+    nonisolated(unsafe) static var couldNotPutBackLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ leftPartWay: Int, _ keptOriginals: [String]) -> Void)?
+
+    /// Recovery settled a step left part way (made, nothing taken effect, or
+    /// put back) and kept beside a page a kept original that the list does
+    /// not hold, such as an edit another program made as the swap went in:
+    /// the course and section, what it ended, and each kept original's
+    /// hidden name. Never removed: the only copy of what it holds.
+    /// `noLongerInTheList` names those whose bytes are exactly what the list
+    /// recorded for the page, kept because the list no longer holds that
+    /// content (its blob gone, or the list would not take it); every other
+    /// one differs from what the list recorded (the first review of U3c,
+    /// LOW 2).
+    nonisolated(unsafe) static var keptAnOriginalLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ keptOriginals: [String], _ noLongerInTheList: [String]) -> Void)?
+
+    /// An Undo (`isUndo`) or a Redo put a page back from its kept original
+    /// and the list would not take all it needs for the step: the course
+    /// and section, the hidden name what each page held a moment before is
+    /// kept under beside it (`keptOriginals`, the first review of U3c,
+    /// MEDIUM), and the hidden name of each kept original it put back whose
+    /// bytes the list would not take, which stays beside its page
+    /// (`keptOfWhatItHoldsNow`, the second review's MEDIUM). The step stays
+    /// on the list with both directions offered: the next Undo or Redo of it
+    /// uses those files (Russell's ruling of 2026-11-20, night).
+    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String], _ keptOfWhatItHoldsNow: [String]) -> Void)?
+
+    /// An Undo (`isUndo`) or a Redo was refused because the newest step is
+    /// a gone process's that recovery has just tried and left: the course
+    /// and section, and the refusal, which names the file. The list is kept.
+    nonisolated(unsafe) static var leftNewestLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ refusal: UndoRefusal) -> Void)?
 
     /// Recovery found a teacher's folder set aside by a dead process and is
     /// about to put it back in its place though it changed while aside

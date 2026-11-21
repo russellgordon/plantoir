@@ -25,6 +25,28 @@ enum FolderActions {
         NSWorkspace.shared.activateFileViewerSelecting([folderURL])
     }
 
+    /// Shows these files in their folder, selected: the kept-file alerts'
+    /// Show in Finder (#899 U3c, Russell's ruling of 2026-11-20, night).
+    /// Measured that night on this Mac with Finder not showing hidden
+    /// files: a file whose name starts with a dot is shown, greyed, and
+    /// selected. Finder's settings are never changed.
+    static func showInFinder(files: [URL]) {
+        #if DEBUG
+        if let showInFinderRecorder = FolderActions.showInFinderRecorder {
+            showInFinderRecorder(files)
+            return
+        }
+        #endif
+        NSWorkspace.shared.activateFileViewerSelecting(files)
+    }
+
+    #if DEBUG
+    /// A test through the real window records what Show in Finder was asked
+    /// to show, rather than bringing Finder to the front
+    /// (`UndoUITestSeam.showInFinderRecord`). Debug builds only.
+    static var showInFinderRecorder: (([URL]) -> Void)?
+    #endif
+
     /// Opens a new Terminal window whose working directory is the folder
     /// (the same behaviour as dropping the folder onto Terminal's icon).
     static func openTerminal(at folderURL: URL) {

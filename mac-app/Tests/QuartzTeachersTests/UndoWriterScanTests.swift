@@ -135,7 +135,7 @@ final class UndoWriterScanTests: XCTestCase {
     /// why. Paths are under `QuartzTeachers/`.
     static let allowed: [String: (calls: Int, reason: String)] = [
         "App/ProblemReportCommands.swift": (5, "notAStep: a problem report, built and saved outside every course"),
-        "App/QuartzTeachersApp.swift": (1, "notAStep: the app's own state folder for `--state-dir`"),
+        "App/QuartzTeachersApp.swift": (2, "notAStep: the app's own state folder for `--state-dir`, and a debug build's test seam writing what Show in Finder was asked to show into a file the test names, only with --state-dir (#899 U3c, Russell's second ruling of 2026-11-20, night)"),
         "Models/AgentGuidance.swift": (2, "waitsFor: U4"),
         "Models/Assist/AppRulesContract.swift": (1, "notAStep: writes the contract files for `--write-contracts`, a developer's command"),
         "Models/Assist/AssistChangeHistory.swift": (2, "waitsFor: U7 (today's undo itself; kept as an adapter when the switch flips)"),
@@ -193,12 +193,13 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/ToolchainFingerprints.swift": (7, "notAStep: the toolchain mirror's index"),
         "Models/Undo/JournaledStep.swift": (1, "door: an action's step (U3), written through JournaledWrite, and the front page's rule (UndoKeptFiles); a step that cannot be named is staged and swapped through UndoSwap since U3a's second round"),
         "Models/Undo/JournaledWrite.swift": (4, "door: the notes of a shadow swap made without the list, in the list's own folder (UndoShadowStaging, U3a's second round), never in a working folder"),
-        "Models/Undo/UndoCheck.swift": (16, "door: the staged swaps of an undo, a redo and recovery, and U2's rename that never replaces, a folder renamed aside and one made beside its place, a folder taken out deleted only after its rename to -gone"),
+        "Models/Undo/UndoCheck.swift": (15, "door: the staged swaps of an undo, a redo and recovery, and U2's rename that never replaces, a folder renamed aside and one made beside its place, a folder taken out deleted only after its rename to -gone"),
         "Models/Undo/UndoJournal.swift": (19, "door: the list itself, outside every working folder"),
         "Models/Undo/UndoLock.swift": (1, "door: the list's own lock file"),
         "Models/Undo/UndoOpKinds.swift": (4, "door: a folder a redo of createTree (or an undo of removeTree) makes under its staged name, from the list's content"),
         "Models/Undo/UndoScheduledDeploys.swift": (11, "door: a deploy set for later as an external op (U3b), its LaunchAgent plist and script, outside every working folder"),
         "Models/Undo/UndoRecovery.swift": (2, "door: pruning the list's own content and segments"),
+        "Models/Undo/UndoUITestSeam.swift": (1, "notAStep: a debug build's test seam, only with --state-dir, which edits a page in place as another program racing a swap would (#899 U3c, the real-window test of Russell's ruling of 2026-11-20, night)"),
         "Models/UnitWordRenamer.swift": (6, "waitsFor: U4"),
         "Models/WorkLeaseFiles.swift": (3, "notAStep: work leases"),
         "Models/WorkLeaseRegistry.swift": (3, "notAStep: work leases"),
