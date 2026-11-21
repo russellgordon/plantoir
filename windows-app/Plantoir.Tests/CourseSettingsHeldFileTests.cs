@@ -343,6 +343,34 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
         Assert.Empty(Temporaries());
     }
 
+    /// <summary>
+    /// Review 1, low 1: RecordOnDisk's SECOND read (its compare-and-swap) is
+    /// refused, and the holder lets go on the first pause after that read's
+    /// four, which only a write that followed the refused read reaches. The
+    /// change must be refused, the file left as it was.
+    /// </summary>
+    [Fact]
+    public void ARecordWhoseSecondReadWasRefusedWritesNothing()
+    {
+        var window = CourseConfiguration.Load(ConfigPath);
+        byte[] before = File.ReadAllBytes(ConfigPath);
+        SecondProcessHold? holder = null;
+        int pauses = 0;
+        using (HeldFiles.PausingWith(_ => { if (++pauses == HeldFiles.Pauses.Count + 1) holder!.Release(); }))
+        {
+            Assert.Throws<FileInUseException>(() => window.RecordOnDisk(values =>
+            {
+                holder ??= new SecondProcessHold(ConfigPath, FileShare.None);   // between the two reads
+                values["unit_word"] = "Topic";
+                return values;
+            }, ConfigPath));
+        }
+        holder?.Dispose();
+        Assert.Equal(HeldFiles.Pauses.Count, pauses);
+        Assert.Equal(before, File.ReadAllBytes(ConfigPath));
+        Assert.Empty(Temporaries());
+    }
+
     /// <summary>Revert on a held file: the sentence the Settings window shows, and the edits kept.</summary>
     [Fact]
     public void ARevertOnAHeldFileSaysNothingWasRevertedAndWhy()
