@@ -279,6 +279,8 @@ public sealed class UndoCheckContractTests : IDisposable
     {
         JsonElement checkCase = CaseNamed(name);
         if (checkCase.GetProperty("undo").GetString() != "canUndo") return;
+        // A case this app refuses as cannot tell (held, and checked to be refused, by EveryCheckCase) is never undone here.
+        if (NamedGapLedger.Holding(NamedGapLedger.UndoCheckCasesRefusedHere, name) is not null) return;
         UndoOp op = OpOf(checkCase);
         if (op.Kind is not (UndoOp.EditLine or UndoOp.ReplaceText or UndoOp.EditJson)) return;   // writeFile needs its blob, recompute has no check, whole ops are the stack cases
         string path = Path.Combine(_folder, Guid.NewGuid().ToString("N"), "page.md");

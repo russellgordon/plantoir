@@ -16,7 +16,9 @@ Branch `issue/899-w6-op-kinds` (on W4 with its review fixes, `dev` 2ba8490e7 in 
 - Contract from the JSON: all 110 `checkCases` (move sides, trees, links, preferences placed on the disk), the 5 `listingCases` and 16 `editJSONCases` (new, `UndoOpKindsContractTests`; 8 added by the fix round), U2's 19 `stackCases`, the 15 traces holding a `move`, U2's 21 `recoveryCases`. Every W6 entry left `NamedGapLedger`, `undo found a folder set aside` with them.
 - PC `899w6-c3` (head 400083f60): the Undo classes 665 passed, 1 not run (the `[DenyBitesFact]` that cannot bite over SSH), 0 failed. Must-fail (`vm-tools/guest/899-w6-mustfail.json`, 20 sabotages): all red (`899w6-c1`, and `899w6-c3` for three made real: the contract's link rows and its key-written-twice row pass a reader that follows links or picks the first duplicate only because the content they lead to differs or the read-back refuses, so `AJunctionToTheVeryContentIsStillNeverFollowed` was added and the duplicate sabotage picks the last one). Killed-step harness (`Plantoir.UndoHarness kinds-kill`): 132 runs, every one whole, outside and inside OneDrive: `documentation/12-windows-app.md` → "What Windows has built: W6, the op kinds".
 
-- **Fix round (the first review of W6, NOT CLEAN; and the final sweep of W3 and W4).** MEDIUM: `UndoAppSettingsPlaces` reads `settings.json` as it is on the disk and sets one member by replacing it exactly (lists and dictionaries whole), checked before a temporary file and one rename, nothing written on a mismatch, the running copy then given the member; the kill harness's preference is now `AcceptedSyncedFolders` in the real store (`UndoAppSettingsPlacesTests`, 6). LOW 1: editJSON byte for byte with the mac (`UndoMacKeyOrder`, `UndoJson.SpellNumber`, `UndoJson.ReadAsTheMacReads`), measured through the mac's own code and pinned as 8 new contract rows the mac's `UndoJournalContractTests` passes (this piece now touches `contracts/`). LOW 2: a file starting with a byte-order mark judged as on the mac. LOWs 3 and 4 and W4's front-page note: "For W7" below. The sweep: pruning stops at a step kept for a re-deriving recovery; the launch-call comments say W4; the owed-pieces table's corrections are below. PC `899w6f-a3` (head 6c5d2281a, `dev` 6b2a48a99 merged in): the Undo classes 681 passed, 1 not run (the `[DenyBitesFact]`), 0 failed; must-fail (`vm-tools/guest/899-w6f-mustfail.json`, 14 sabotages) all red, restored green; `kinds-kill` 132 runs, every one whole, the settings file's other member kept and no `settings.json.undo-writing` left in all 132, outside and inside OneDrive (settled as before: done 26, undone 22, rolled back 14, failed 4 in each place; 0.6 to 2.0 s a run). Mac (this Mac, macOS 26.7.3, Xcode 27.0): `UndoJournalContractTests` 17 of 17 with the 16 editJSON rows, and red when one new row's result is changed.
+- **Fix round (the first review of W6, NOT CLEAN; and the final sweep of W3 and W4).** MEDIUM: `UndoAppSettingsPlaces` reads `settings.json` as it is on the disk and sets one member by replacing it exactly (lists and dictionaries whole), checked before a temporary file and one rename, nothing written on a mismatch, the running copy then given the member; the kill harness's preference is now `AcceptedSyncedFolders` in the real store (`UndoAppSettingsPlacesTests`, 6). LOW 1: editJSON byte for byte with the mac (`UndoMacKeyOrder`, `UndoJson.SpellNumber`, `UndoJson.ReadAsTheMacReads`), measured through the mac's own code and pinned as 8 new contract rows the mac's `UndoJournalContractTests` passes (this piece now touches `contracts/`). LOW 2: a file starting with a byte-order mark judged as on the mac. LOWs 3 and 4 and W4's front-page note: "For W7" below. The sweep: pruning stops at a step kept for a re-deriving recovery; the launch-call comments say W4; the owed-pieces table's corrections are below. PC `899w6f-a3` (head 6c5d2281a, `dev` 6b2a48a99 merged in): the Undo classes 681 passed, 1 not run (the `[DenyBitesFact]`), 0 failed; must-fail (`vm-tools/guest/899-w6f-mustfail.json`, 14 sabotages) all red, restored green; `kinds-kill` 132 runs, every one whole, the settings file's other member kept and no `settings.json.undo-writing` left in all 132 (no kill point falls inside the settings write itself, so this says nothing about a kill between its temporary and its rename: see fix round two), outside and inside OneDrive (settled as before: done 26, undone 22, rolled back 14, failed 4 in each place; 0.6 to 2.0 s a run). Mac (this Mac, macOS 26.7.3, Xcode 27.0): `UndoJournalContractTests` 17 of 17 with the 16 editJSON rows, and red when one new row's result is changed.
+
+- **Fix round two (the second review of W6, NOT CLEAN: two MEDIUMs, three LOWs).** The rule now is: for an editJSON op, Windows writes exactly the bytes the mac would write, proven by a contract row run on both, or it writes nothing. M1: a key beyond printable ASCII (a new value's, a key path part, or any key of an object the path passes through) and text starting with a byte-order mark are refused (`UndoJson.IsMeasured`, `UndoJsonMember.PathIsMeasured`): cannot tell when judged, never written. M2: a file's number spelled with an exponent and more than 17 digits, or more than 38 without, makes the whole file cannot tell (`UndoJson.SpellingIsMeasured`). Also measured and matched: a negative number beyond a double's range is minus infinity on the mac (cannot tell when it is the member, judged as usual beside it); a positive one, and text holding half a surrogate pair, make the file unreadable on both (half a pair used to throw out of Windows' reader). 18 contract rows (7 `editJSONCases`, 11 `checkCases`), every result and verdict measured through the mac's own code; 13 of them carry what the mac does and Windows refuses, held by name in `NamedGapLedger` (`UndoEditJsonCasesRefusedHere`, `UndoCheckCasesRefusedHere`), where each must be REFUSED. The Python reference model (`scripts/make_undo_traces.py`) follows the same rules and holds the same 13: its test had failed on round one's 8 rows since that round (ordinal keys, Python's shortest numbers, no read-back), unseen because only the Undo classes ran. LOWs 2 and 3: tests for a stale `settings.json.undo-writing` (never read, gone after the next set) and a rename refused while the file is held open (nothing changed). LOW 1 is W8's ("For W8" below). RUNS-PLACEHOLDER
 
 ## For documentation 12
 
@@ -78,8 +80,8 @@ before W7 (U3) and W8 (U4).
     lowercase letter before its capital and a run with fewer zeros in front
     first (`1A`, `01a`; `ab`, `aB`, `Ab`). 6,000 random sets of printable ASCII
     keys came out in exactly this order. Rejected: ordinal (`"10","9","B","a"`
-    where the mac writes `"9","10","a","B"`). Not pinned: a key with a
-    character beyond ASCII.
+    where the mac writes `"9","10","a","B"`). A key with anything beyond
+    printable ASCII is refused (fix round two, below).
   - **Numbers** are C's `%.17g` (`UndoJson.SpellNumber`): 0.1 is
     `0.10000000000000001`, 1e-07 `9.9999999999999995e-08`, a whole number below
     2^53 its digits, negative zero `0`. Rejected: .NET's shortest round trip
@@ -92,8 +94,8 @@ before W7 (U3) and W8 (U4).
     nearest double). So a member set to 0.0001234 (spelled
     `0.00012339999999999999`, read back there as `0.00012340000000000002`) is
     refused on both platforms, as changed since; 0.08129913717470501 is written.
-    A file's numbers are read the same way when a member is judged. Not pinned:
-    a spelling with an exponent and more than 17 digits.
+    A file's numbers are read the same way when a member is judged. A spelling
+    past the measured digits is refused (fix round two, below).
 - **A file starting with a UTF-8 byte-order mark** is read as the mac reads it
   (Foundation passes over the mark; measured), so its member is judged as on
   the mac (the verdict before a write), and it is never moved, as on the mac,
@@ -144,6 +146,111 @@ put-back swap (42 of the 66 were killed there) and a third recovering:
 Settled as, in each place: done 26, undone 22, rolled back 14, failed 4 (no step was left in flight or interrupted). A run's
 three processes took 0.5 to 1.3 s end to end. The scratch folders were
 removed after the run.
+
+### editJSON refuses what is not measured to match the mac (fix round two)
+
+The rule: **for an editJSON op, Windows either writes exactly the bytes the mac
+would write, proven by a contract row run on both platforms, or it does not
+write at all.** `UndoMacKeyOrder`, `SpellNumber` and `ReadAsTheMacReads` are
+re-implementations of Foundation, so anything they have not been MEASURED to
+match is refused before a byte is written: "cannot tell" when the member is
+judged (the list is kept), and no bytes when it is moved. Measured on this
+Mac (macOS 26.7.3, 2026-11-20) through the mac's own code
+(`vm-tools/guest/899-w6-mac-editjson-runner.swift`, the mac's `UndoJSON`,
+`UndoJSONMember` and `UndoJSONBytes` verbatim, and `JSONSerialization` itself):
+
+- **Keys beyond printable ASCII.** The mac sorts them by Unicode collation
+  (`😀, 9, 10, １０, a, A, Ａ, a<tab>b, ab, e, E, é, f, ss, ß, z, Ω, 日本`: an
+  emoji first, `é` between `E` and `f`, a full-width `Ａ` beside `A`, `ß` after
+  `ss`, a tab passed over). It takes canonically equivalent keys for one (`é`
+  as one character and as `e` with a combining accent; the Kelvin sign and
+  `K`), so a key path part can find a member Windows would call missing and add
+  beside it; and it reads a key starting with a byte-order mark as the key
+  without it. So Windows refuses a new value holding such a key, a key path
+  part holding one, and any object on the path holding one (the top level
+  included). The app's own `settings.json` (`external`), which the mac never
+  touches, still takes them.
+- **Text starting with a byte-order mark.** The mac's reader drops the mark
+  (escaped or not; one inside the text stays), so the mac reads such a member
+  as the text without it and refuses to write such text (its read-back
+  disagrees). Windows answers cannot tell, and refuses to write it, which is
+  what the mac does there. No row can carry a new value with the mark (the
+  mac's runner drops it when it reads the contract), so a Windows test pins it.
+- **Numbers.** With an exponent: at most 17 digits read as the nearest double
+  (4,000 random spellings, exponents -330 to 310, every one), and more than 17
+  are a decimal number there (`1.2345678901234567890123e-5` is
+  `1.2345678901234573e-05`, not the nearest). Without an exponent: 18 to 38
+  digits agree with `ReadAsTheMacReads` (30,000 random spellings, every one);
+  from 39 they disagree, and with 120 or more digits after the point the mac
+  cannot read the file at all. Digits are counted from the first that is not a
+  leading zero of the integer part. A spelling past those counts makes the
+  whole file cannot tell, because the mac may not read the file at all. A
+  negative number beyond a double's range (`-1e400`, `-1.8e308`) is minus
+  infinity on the mac, which is not exact: cannot tell as the member, and
+  judged as usual beside it, the same here. A positive one (`1e400`) and text
+  holding half a surrogate pair (`\ud800`) make the file unreadable on both:
+  changed since.
+
+18 contract rows, every result and verdict measured: 7 in `undo.editJSONCases`
+(the six refusals below and one pinning how new text is written: UTF-8, a
+control character escaped as `\b`, `\f`, `\u0001`, DEL and the line and
+paragraph separators as they are) and 11 in `undo.checkCases`. **13 rows carry
+what the mac does and Windows refuses**, held in `NamedGapLedger` by name
+(`UndoEditJsonCasesRefusedHere`: 6, each must be refused, never bytes of its
+own; `UndoCheckCasesRefusedHere`: 7, each must be answered cannot tell both
+ways), with the reason that Windows refuses these until its key order and
+number reading are measured to match. The Python reference model holds the
+same 13 (`REFUSED_HERE_EDIT_JSON`, `REFUSED_HERE_CHECK` in
+`scripts/test_make_undo_traces.py`). They are held on v2.0.0 like every #899
+entry; closing them means measuring Foundation's collation and decimal reading
+on Windows, or a ruling that Windows may refuse them in the release.
+
+One limit of the mac's own runner, found while proving the rows: it compares a
+row's result with Swift's `!=` on strings, which is canonical equivalence, so
+it cannot tell the Kelvin sign from `K` or a decomposed `é` from a precomposed
+one (a sabotaged Kelvin row stayed green). Those rows' exact bytes come from
+the scratch runner, which prints them through `JSONSerialization` with every
+scalar kept; the mac's runner went red on a changed collation row and on a
+changed verdict.
+
+**What a teacher on Windows would meet** (from W7 and W8 on, when actions
+record editJSON steps): an Undo or Redo of a settings change refused as
+"cannot tell", the list kept and the file untouched, where the mac would undo
+it, when the course's settings file holds such a key or number. **Which of
+Plantoir's own files could hold one:** the editJSON targets the mac's U4 plans
+are `course_config.json` (Course Settings, Set School Year, renames, New
+Course, Keep a Copy for Reference). Every key its schema names
+(`contracts/file-formats.json` → `courseConfigKeys`) is printable ASCII, the
+keys of its maps included (`section1` and on; `shared`, `per_section`;
+destination types), and the apps write whole numbers and booleans there,
+never an exponent. So no file Plantoir writes holds one: only a file a person
+or another tool edited by hand (an accented key added, a number pasted with 20
+digits, a mark in front of a value) can. Folder, page and course names with
+accents are values there, never keys, so they are unaffected.
+
+### For W8: the settings write and `AppSettings.Save` (the second review of W6, LOW 1)
+
+`AppSettings.Save` is a plain `File.WriteAllText` that swallows every error,
+called from about 24 places on the app's thread; the undo settings write
+(`UndoAppSettingsPlaces.Write`) holds the undo lock, which `Save` does not
+take. Three windows follow: an app save between the write's read and its
+rename is lost on the disk until the app's next save; an app save between the
+rename and the running copy being given the member writes the old member back
+while the write says it succeeded (the file then disagrees with the journal's
+`applied`, and an Undo of that step would read changed since and clear the
+list); and while the write reads the file, an app `Save` cannot open it and is
+silently dropped. None of this is reachable before W8 (no action writes an
+external op, and recovery acts only on journal ops). **W8 owes one settings
+lock taken by `AppSettings.Save` and by this write, or the write done on the
+app's thread through the running copy**, together with the cross-process point
+above. Also W8's: populating the running copy bypasses `ChangePreviewOpensAt`
+and `ChangeCloudflareAccountId` and their events, so an open Settings pane or
+a window title would not follow an undone preference. And a write killed
+between its temporary and its rename leaves `settings.json.undo-writing`:
+harmless (nothing reads it, and the next set writes over it and renames it in,
+`UndoAppSettingsPlacesTests.ATemporaryLeftByAKilledWriteIsNeverReadAndGoesWithTheNextSet`),
+but no harness kill point falls inside the write, so W8's harness adds one
+there.
 
 ### For W7: shadow leftovers (the first review of W6, LOW 3)
 
