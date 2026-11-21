@@ -213,7 +213,7 @@ public static class UnitWordRenamer
         catch (UnitWordRenameProblem problem) when (problem.ChangedTheCourse)
         {
             ActivityTrail.Note(ActivityTrail.Event.WordForAUnitRenamed,
-                $"{course.Code} · " + StoppedTrailLine(plan, problem) + $"; backup {Path.GetFileName(backup)}");
+                ActivityTrail.Place(course.Code, 0) + StoppedTrailLine(plan, problem) + $"; backup {Path.GetFileName(backup)}");
             throw;
         }
     }
@@ -304,7 +304,7 @@ public static class UnitWordRenamer
 
     /// <summary>The trail line for <c>word for a unit renamed</c>: counts and the backup's name, never a page's content.</summary>
     public static string TrailLine(UnitWordRenamePlan plan, UnitWordRenameOutcome outcome) =>
-        $"{plan.CourseCode} · renamed the word for a unit from “{plan.From}” to “{plan.To}”: {outcome.PagesRenamed} class " +
+        ActivityTrail.Place(plan.CourseCode, 0) + $"renamed the word for a unit from “{plan.From}” to “{plan.To}”: {outcome.PagesRenamed} class " +
         $"{(outcome.PagesRenamed == 1 ? "page" : "pages")} renamed, {outcome.LinksRewritten} " +
         $"{(outcome.LinksRewritten == 1 ? "link" : "links")} updated" +
         (outcome.PagesNotWritten > 0 ? $", {outcome.PagesNotWritten} {(outcome.PagesNotWritten == 1 ? "page" : "pages")} not written" : "") +

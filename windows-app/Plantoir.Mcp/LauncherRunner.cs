@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Mcp;
 
@@ -30,14 +31,15 @@ public sealed class LauncherRunner : ILauncherRunner
                                          CancellationToken cancellation)
     {
         string script = Path.Combine(workingFolder, launcher + (OperatingSystem.IsWindows() ? ".ps1" : ".sh"));
+        var task = new TrailedTask(Path.GetFileName(script), arguments);
         if (!File.Exists(script))
-            return new LaunchOutcome(false, $"This working folder has no {Path.GetFileName(script)}.");
+            return task.CouldNotStart(new LaunchOutcome(false, $"This working folder has no {Path.GetFileName(script)}."));
         // #473: Plantoir is copying its tools into this folder right now (the
         // first window after an update does, in the background), so a build
         // started here would read a half-copied folder. The app's marker file
         // says so; a marker whose program is gone counts for nothing.
         if (Plantoir.Core.Models.ToolchainReadiness.AnotherProgramIsGettingReady(workingFolder))
-            return new LaunchOutcome(false, Plantoir.Core.Models.ToolchainReadiness.GettingReadyMessage);
+            return task.CouldNotStart(new LaunchOutcome(false, Plantoir.Core.Models.ToolchainReadiness.GettingReadyMessage));
 
         var info = new ProcessStartInfo
         {
@@ -74,7 +76,7 @@ public sealed class LauncherRunner : ILauncherRunner
         lock (RunningGate) { RunningNow.Add(running); }
         try
         {
-            return await RunStarted(process, script, progress, cancellation);
+            return await RunStarted(process, script, task, progress, cancellation);
         }
         finally
         {
@@ -150,8 +152,8 @@ public sealed class LauncherRunner : ILauncherRunner
         }
     }
 
-    private async Task<LaunchOutcome> RunStarted(Process process, string script, IProgress<string>? progress,
-                                                 CancellationToken cancellation)
+    private async Task<LaunchOutcome> RunStarted(Process process, string script, TrailedTask task,
+                                                 IProgress<string>? progress, CancellationToken cancellation)
     {
         var capture = new OutputCapture(progress);
 
@@ -159,7 +161,8 @@ public sealed class LauncherRunner : ILauncherRunner
         process.ErrorDataReceived += (_, e) => capture.Take(e.Data);
 
         try { process.Start(); }
-        catch (Exception error) { return new LaunchOutcome(false, $"{Path.GetFileName(script)} could not be started: {error.Message}"); }
+        catch (Exception error) { return task.CouldNotStart(new LaunchOutcome(false, $"{Path.GetFileName(script)} could not be started: {error.Message}")); }
+        task.Started();
 
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
@@ -172,14 +175,66 @@ public sealed class LauncherRunner : ILauncherRunner
         catch (OperationCanceledException)
         {
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+            task.Finished(ActivityTrail.StoppedBeforeItFinished);
             return new LaunchOutcome(false, "This was stopped before it finished.");
         }
+        task.Finished(ActivityTrail.HeadlessOutcome(process.ExitCode));
 
         var (transcript, found, linksChecklist) = capture.Snapshot();
 
         return process.ExitCode == 0
             ? new LaunchOutcome(true, transcript, found, 0, linksChecklist)
             : new LaunchOutcome(false, Explain(process.ExitCode, transcript), found, process.ExitCode, linksChecklist);
+    }
+
+    /// <summary>
+    /// <c>task started</c> and <c>task finished</c> for one headless run (#774,
+    /// <c>activityTrail.mustRecord</c>): the window writes both through its
+    /// <c>ScriptRunner</c>, and before this an assistant's deploy or build
+    /// through <c>plantoir-mcp.exe</c> left neither. The words are the
+    /// window's (<see cref="ActivityTrail.TaskStartedWords"/>,
+    /// <see cref="ActivityTrail.TaskFinishedWords"/>), each line carries the
+    /// course and section the arguments name through
+    /// <see cref="ActivityTrail.Place"/>, and the arguments are redacted with
+    /// the line on the way in, so <c>--account</c> and a token never reach
+    /// the file. A run that never started writes "could not start …", as the
+    /// window does for a missing launcher.
+    /// </summary>
+    private sealed class TrailedTask
+    {
+        // MARK: - Stored properties
+        private readonly string _launcherFile;
+        private readonly IReadOnlyList<string> _arguments;
+        private readonly string _course;
+        private readonly int _section;
+        private readonly Stopwatch _clock = new();
+
+        // MARK: - Initializer
+        public TrailedTask(string launcherFile, IReadOnlyList<string> arguments)
+        {
+            _launcherFile = launcherFile;
+            _arguments = arguments;
+            (_course, _section) = ActivityTrail.PlaceOfLauncherArguments(arguments);
+        }
+
+        // MARK: - Functions
+        public void Started()
+        {
+            _clock.Start();
+            ActivityTrail.Note(ActivityTrail.Event.TaskStarted,
+                ActivityTrail.TaskStartedWords(_launcherFile, _arguments), _course, _section);
+        }
+
+        public void Finished(string outcome) =>
+            ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
+                ActivityTrail.TaskFinishedWords(_launcherFile, outcome, _clock.Elapsed), _course, _section);
+
+        public LaunchOutcome CouldNotStart(LaunchOutcome outcome)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
+                $"could not start {_launcherFile} — {outcome.Message}", _course, _section);
+            return outcome;
+        }
     }
 
     /// <summary>
