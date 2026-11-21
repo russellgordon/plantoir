@@ -140,13 +140,9 @@ public class PlaceholderFieldNamesUiTests
         using var app = new DrivenApp(WriteCourses);
 
         var longTitle = app.Find($"sidebar-{LongCode}-title", "the long code's text");
-        // The text stays inside its own row, so nothing after it is pushed out
-        // of sight past the sidebar's edge.
-        var courseRow = app.Find($"sidebar-{LongCode}", "the long code's row");
-        var text = longTitle.BoundingRectangle;
-        Assert.True(text.Right <= courseRow.BoundingRectangle.Right,
-                    $"the long code's text ends at {text.Right}, past its row's edge at {courseRow.BoundingRectangle.Right}");
-
+        // With the row back to a horizontal StackPanel the text never trims,
+        // so this fails there too (measured, must-fail 3): a bound on the
+        // text's rectangle passed either way and was taken out.
         Assert.True(Retry.WhileFalse(() => longTitle.Properties.HelpText.ValueOrDefault == LongCode,
                                      TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
                     $"the cut-short code's text carries \"{longTitle.Properties.HelpText.ValueOrDefault}\", not the whole code");
