@@ -937,6 +937,7 @@ class Model:
         self.kept = {}
         self.content_cannot_be_stored = False
         self.kept_what_it_replaced_lines = 0
+        self.kept_unreadable = False   # every kept original cannot be read now
         self.maintainer_registered = True   # UndoMaintainers has a runner
         self.linked_outside = set()   # folders replaced by a link to outside
         self.rederived = 0   # how many times a recompute's runner ran
@@ -1200,6 +1201,10 @@ class Model:
         used = []
         result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed,
                       self.available, used)
+        if result[0] == "contentMissing" and self.kept_unreadable and self.kept.get(result[1]):
+            # A kept original that cannot be read may be the one: cannot
+            # tell now, the list kept (the first review of U3c, LOW 5).
+            return ("cannotTellNow", result[1])
         if result[0] == "contentMissing" and not UNDO_REFUSED_FOR_MISSING_CONTENT_CLEARS:
             return result
         if result[0] in ("changedSince", "contentMissing"):
@@ -1266,8 +1271,11 @@ class Model:
 
     def available(self, path, text):
         """Content the list's content no longer holds that can still be had:
-        written back since, or a kept original beside its page."""
-        return text in self.stored or text in self.kept.get(path, [])
+        written back since, or a kept original beside its page that can be
+        read now."""
+        if text in self.stored:
+            return True
+        return not self.kept_unreadable and text in self.kept.get(path, [])
 
     def store_what_kept_originals_give(self, used):
         """Before the swap (the first review of U3c, MEDIUM): the kept

@@ -685,6 +685,8 @@ class ContractCaseTests(unittest.TestCase):
                         for op in newest["ops"]:
                             if op["kind"] == "writeFile" and op["path"] == p1:
                                 model.kept.setdefault(p1, []).append(op["beforeText"])
+                    elif call == "makeTheKeptOriginalUnreadable":
+                        model.kept_unreadable = True
                     elif call == "changeTheKeptOriginal":
                         for path in model.kept:
                             model.kept[path] = [text + "A line added to the kept original.\n" for text in model.kept[path]]

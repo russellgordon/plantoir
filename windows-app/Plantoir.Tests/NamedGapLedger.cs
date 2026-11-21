@@ -659,6 +659,7 @@ internal static class NamedGapLedger
              "U3c: an Undo whose content is missing, with the page's kept original matching what the journal recorded, is undone from it and leaves nothing beside the page (Russell's ruling of 2026-11-20, 15:20)",
              "U3c: and the Redo it offers then goes forward from the list: the page is as the step left it, nothing beside it",
              "U3c: the same Undo when the list cannot keep a copy of what the page held a moment before: undone, Redo not offered, what the page held kept beside it under its hidden name, and the trail line says so",
+             "U3c: the same Undo with the kept original there but unreadable just now (a cloud placeholder not downloaded): refused as cannot tell now, the list kept, never refused for content missing",
              "U3c: the same with the kept original no longer matching: refused once with its reason, the list cleared, and the kept original left beside the page",
              "U3c: a kept original another Mac or an earlier list left under the very name the next step's swap would use is never removed or reused: the step keeps its own original under the next free name and goes in (the third review of U3a, LOW 6: step numbers are not unique across two Macs syncing one folder, or after a list is started again)"),
         Owed(UndoTraces, 899, V200, Reason899W6Traces,

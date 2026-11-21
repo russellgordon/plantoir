@@ -51030,6 +51030,26 @@
         "why": "contentCannotBeStored leaves the list's content folder taking no new file. The page is put back from its kept original, but the content the Redo needs is then in no file the list holds: the swap keeps it beside the page under its own `-undo-orig` name instead of tidying it, the redo branch is dropped so no offer is made that cannot work, and the 'undo kept what it replaced' line names the hidden file."
       },
       {
+        "name": "U3c: the same Undo with the kept original there but unreadable just now (a cloud placeholder not downloaded): refused as cannot tell now, the list kept, never refused for content missing",
+        "calls": [
+          "step",
+          "wholeFileStep",
+          "keepTheOriginal",
+          "removeContent",
+          "makeTheKeptOriginalUnreadable",
+          "undo"
+        ],
+        "expectLast": "cannotTellNow",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ],
+        "keptOriginalLeft": true,
+        "why": "The first review of U3c, LOW 5. A kept original that cannot be read may be the one whose hash matches, so 'content missing', which clears the list, would be a guess: the answer is cannotTellNow and the next Undo tries again."
+      },
+      {
         "name": "U3c: the same with the kept original no longer matching: refused once with its reason, the list cleared, and the kept original left beside the page",
         "calls": [
           "step",
@@ -51604,6 +51624,19 @@
           "first"
         ],
         "why": "The first page was swapped, so its original is kept beside it under its staged `-orig` name; its hash is the op's beforeSha, which is exactly what the put-back needs and the list no longer holds. Before the ruling the step was closed couldNotPutBack and the kept original, the only copy, was removed. Both of the page's contents are written back into the list before the put-back's swap (the first review of U3c, MEDIUM): nothing the swap sets aside is the only copy."
+      },
+      {
+        "name": "a step left part way whose first page's kept original holds exactly what the list gives for it: the tidy before the plan keeps it, and only once the step is put back does it go",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "recoveryStopsAfterTheTidy": true,
+        "keptOriginalsAfterTheTidy": [
+          "first"
+        ],
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "why": "The first review of U3c, LOW 1. Before the plan is known to be ready, another page may yet stop the put-back and the list be cleared, and then the first page's kept original is the only copy of what it held: so recovery's first tidy keeps every kept original that differs from its page, and tidies those the list gives only once the plan is ready."
       },
       {
         "name": "the same, with the kept original there but unreadable just now (a cloud placeholder not downloaded): cannot tell now, so the step is left for the next recovery, never closed, the list kept, and an Undo is refused naming the page",

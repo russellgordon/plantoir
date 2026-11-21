@@ -744,6 +744,7 @@ nonisolated enum UndoContractReplay {
             var foreignBlob: String? = nil
             var foreignKept: (url: URL, bytes: Data)? = nil
             var contentFolderMadeReadOnly: URL? = nil
+            var unreadableKeptOriginals: [URL] = []
             var keptWhatItReplacedLines: Int = 0
             let keptWhatItReplacedHookBefore = UndoTrailHook.keptWhatItReplacedLine
             UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _ in
@@ -753,6 +754,9 @@ nonisolated enum UndoContractReplay {
                 UndoTrailHook.keptWhatItReplacedLine = keptWhatItReplacedHookBefore
                 if let contentFolderMadeReadOnly {
                     try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: contentFolderMadeReadOnly.path)
+                }
+                for keptURL in unreadableKeptOriginals {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: keptURL.path)
                 }
             }
             let folderOfB: String = rootB.path
@@ -1017,6 +1021,14 @@ nonisolated enum UndoContractReplay {
                     let foreignBytes: Data = Data("What another Mac's list kept.\n".utf8)
                     try foreignBytes.write(to: foreignURL)
                     foreignKept = (url: foreignURL, bytes: foreignBytes)
+                } else if value == "makeTheKeptOriginalUnreadable" {
+                    // There and unreadable just now, as a cloud placeholder
+                    // not downloaded is.
+                    for staged in UndoContractKinds.stagedLeftovers(in: root) where staged.hasSuffix("-orig") {
+                        let keptURL: URL = root.appendingPathComponent(staged)
+                        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: keptURL.path)
+                        unreadableKeptOriginals.append(keptURL)
+                    }
                 } else if value == "changeTheKeptOriginal" {
                     for staged in UndoContractKinds.stagedLeftovers(in: root) where staged.hasSuffix("-orig") {
                         let keptURL: URL = root.appendingPathComponent(staged)
@@ -1257,6 +1269,7 @@ nonisolated enum UndoContractReplay {
         "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
+        "keptOriginalsAfterTheTidy",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1597,6 +1610,24 @@ nonisolated enum UndoContractReplay {
                     let stands: String = (try survivor.read()).records[workSeq]?.phase.rawValue ?? "missing"
                     if stands == UndoStepPhase.interrupted.rawValue {
                         failures.append("recoveryCases '\(name)': the stopped recovery wrote to the list (\(stands))")
+                    }
+                    if let pages = testCase["keptOriginalsAfterTheTidy"] as? [String] {
+                        // The tidy before the plan kept each named page's
+                        // kept original, though the list gives its bytes.
+                        var keptPlaces: [String] = []
+                        for staged in UndoContractKinds.stagedLeftovers(in: root) {
+                            let stagedName: String = (staged as NSString).lastPathComponent
+                            if stagedName.hasSuffix("-orig"), let keptPlace = UndoSwap.placeOfStagedName(stagedName) {
+                                keptPlaces.append(keptPlace)
+                            }
+                        }
+                        var wantedPlaces: [String] = []
+                        for page in pages {
+                            wantedPlaces.append(((pathOf[page] ?? page) as NSString).lastPathComponent)
+                        }
+                        if keptPlaces.sorted() != wantedPlaces.sorted() {
+                            failures.append("recoveryCases '\(name)': the tidy before the plan left kept originals beside \(keptPlaces), not \(wantedPlaces)")
+                        }
                     }
                 }
                 await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in reachable ? root : nil }, places: places)
