@@ -7,3 +7,9 @@
 ## For documentation 12
 
 - The menus' item titles in a club come from one function per platform, checked against `subjectMenus.layout.itemTitles`; nothing else retypes them. A sentence with no course of its own (Undo Last Change's nothing-to-undo) learns the selected section's course from the call's `_meta` key `plantoirCourse`, never a tool argument, so no schema changes. Still saying class in a club, outside #1027: the Class Dates dialog's body (`SectionScheduleDialog`'s purpose line). Roll Over to a New Year… (still a named gap here) needs no club title.
+
+## Lane B review lows, fixed on this branch (#927/#889)
+
+For PROGRESS: Open in Browser's offer (`SectionDetailView.ReadTheOfferAgain`) is read off the window's thread, only on `offeredWhen`'s events (the section showing, a deploy ending, a menu opening, the pointer reaching the button, a show starting or stopping); a chrome redraw and `ApplyMenuEnablement` draw the last answer, so a deploy folder on a share that does not answer never stalls the window. The button is named "Open in Browser" for Narrator, the sentence its help text. A create that fails at `CreateNew` is "already there" only when the file is there; otherwise "Nothing was created: …". The ledger's `Reason899MenuCopy` says Undo Last Change after a copy takes back the change before it, until W7. UI test `OpenInBrowserIsReadAgainWhenThePointerReachesIt`.
+
+For documentation 12: the offer is not read on a clock or on a redraw; an event asks for one read, a second event during a read asks for one more after it, so the last event is the one drawn. The section row's right-click menu still looks the offer up as it opens (an event), on the window's thread.
