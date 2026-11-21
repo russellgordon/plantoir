@@ -359,6 +359,8 @@ public static class FormBuilders
         // field always had: .md appended to a file, Media refused, duplicates ignored.
         var field = new TextBox { PlaceholderText = hidesMarkdownExtension ? "New file name" : "New folder name", MinWidth = 220 };
         AutomationProperties.SetAutomationId(field, "addField:" + title);
+        // A name of its own, the placeholder's words (the mac's, #1012, #1020).
+        AutomationProperties.SetName(field, hidesMarkdownExtension ? "New file name" : "New folder name");
         var confirm = new Button { Content = "Add" };
         var addPanel = new StackPanel { Spacing = 8 };
         addPanel.Children.Add(field);

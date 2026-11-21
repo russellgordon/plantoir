@@ -729,6 +729,9 @@ public sealed class NewCourseDialog : ContentDialog
             FontFamily = new FontFamily("Consolas"),
             PlaceholderText = "For example: This site is licensed under <a href=\"…\">CC BY 4.0</a>.",
         };
+        // Named by its section's heading, as the mac's footer box is (#1012, #1020).
+        AutomationProperties.SetName(footerBox, "Footer");
+        AutomationProperties.SetAutomationId(footerBox, "footerEditor");
         footerBox.TextChanged += (_, _) => _footerHtml = footerBox.Text;
         form.Children.Add(footerBox);
 
