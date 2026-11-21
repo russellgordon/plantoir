@@ -330,8 +330,7 @@ internal sealed class UndoActionStep
             if (Same(_before[path], _after[path])) continue;
             // A link is written through, as File.WriteAllText wrote it: the
             // swap goes in at the file it leads to.
-            string place = UndoLinks.Look(path) == UndoLinks.What.Link && File.ResolveLinkTarget(path, returnFinalTarget: true) is { } final
-                ? final.FullName : path;
+            string place = PlaceWritten(path);
             // Named by its full path: no working folder is there to name it
             // inside, and the refusal's sentence checks the page it names.
             targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
@@ -406,6 +405,8 @@ internal sealed class UndoActionStep
             // Room and permission are one refusal (couldNotWrite): the
             // sentence names both, so a folder denied by its permissions is
             // never told only that the disk may be full (review 1, LOW).
+            UndoRefusalKind.CouldNotWrite when refusal.EveryKeptNameTaken =>
+                $"nothing could be written beside {file}: every name Plantoir keeps an earlier copy of it under is already taken there.",
             UndoRefusalKind.CouldNotWrite => $"nothing could be written beside {file} (the disk may be full, or Plantoir may not have permission to write there).",
             _ => $"{file} could not be saved.",
         };
@@ -416,7 +417,9 @@ internal sealed class UndoActionStep
         var kept = new List<string>();
         foreach (string name in KeptOriginalsNow())
         {
-            if (!keptBefore.Contains(name)) kept.Add(name);
+            if (keptBefore.Contains(name)) continue;
+            kept.Add(name);
+            UndoSwap.HideAKeptFileLeft(name);
         }
         var said = new StringBuilder(Reason(refusal));
         foreach (string name in kept)
@@ -432,11 +435,33 @@ internal sealed class UndoActionStep
     internal static string KeptSentence(string place, string kept) =>
         $"What {place} held before is kept beside it as the hidden file “{kept}”.";
 
-    /// <summary>Every kept original (<c>.&lt;name&gt;.plantoir-undo-…-orig</c>) beside a planned file now.</summary>
+    /// <summary>Where the plain write puts a planned file: the file a link leads to, or the planned path itself.</summary>
+    private static string PlaceWritten(string path)
+    {
+        try
+        {
+            return UndoLinks.Look(path) == UndoLinks.What.Link && File.ResolveLinkTarget(path, returnFinalTarget: true) is { } final
+                ? final.FullName : path;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return path; }
+    }
+
+    /// <summary>
+    /// Every kept original (<c>.&lt;name&gt;.plantoir-undo-…-orig</c>) beside a
+    /// planned file now, and beside the file a planned link leads to, where
+    /// the plain write keeps it (W7a part two, review 1, LOW 5).
+    /// </summary>
     private HashSet<string> KeptOriginalsNow()
     {
         var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (string path in _order)
+        var places = new List<string>();
+        foreach (string planned in _order)
+        {
+            places.Add(planned);
+            string written = PlaceWritten(planned);
+            if (!string.Equals(written, planned, StringComparison.OrdinalIgnoreCase)) places.Add(written);
+        }
+        foreach (string path in places)
         {
             string? folder = Path.GetDirectoryName(path);
             if (folder is null || !Directory.Exists(folder)) continue;

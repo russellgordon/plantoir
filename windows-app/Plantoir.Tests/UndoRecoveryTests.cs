@@ -292,6 +292,34 @@ public sealed class UndoRecoveryTests
             Assert.DoesNotContain(scribe.TrailLines, line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatAPageHeld);
     }
 
+    /// <summary>
+    /// W7a part two, review 1, LOW 2: a kept original that recovery leaves and
+    /// names as "the hidden file" is Hidden, though the process died before
+    /// its swap could hide it (laid here without the attribute): the word is
+    /// true on that path too, and the page itself is never hidden.
+    /// </summary>
+    [Fact]
+    public void AKeptOriginalRecoveryLeavesAndNamesIsHiddenAndThePageIsNot()
+    {
+        using UndoScribe scribe = Scribe();
+        scribe.WritePage("A", First, Old(First));
+        long seq = scribe.Fold().NextSeq;
+        scribe.Append(scribe.BeginLine(seq, scribe.OpsFor(First, Old(First), New(First)), "A", pid: UndoScribe.AProcessThatIsGone));
+        scribe.WritePage("A", First, New(First));
+        string kept = UndoSwap.BesidePath(scribe.FullPath("A", First), $"{seq}-apply", "orig");
+        File.WriteAllBytes(kept, Encoding.UTF8.GetBytes("What the teacher wrote, which the list never recorded.\n"));
+        Assert.False(File.GetAttributes(kept).HasFlag(FileAttributes.Hidden));
+
+        scribe.Door().Recover();
+
+        Assert.True(File.Exists(kept), "a kept original that is the only copy of what it holds was removed");
+        lock (scribe.TrailLines)
+            Assert.Contains(scribe.TrailLines, line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatAPageHeld
+                                                       && line.Words.Contains(Path.GetFileName(kept), StringComparison.Ordinal));
+        Assert.True(File.GetAttributes(kept).HasFlag(FileAttributes.Hidden), "a kept original named as the hidden file is not Hidden");
+        Assert.False(File.GetAttributes(scribe.FullPath("A", First)).HasFlag(FileAttributes.Hidden), "the page was hidden");
+    }
+
     // ---- The closed-step tidy -----------------------------------------------------------
 
     /// <summary>

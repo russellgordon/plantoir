@@ -625,6 +625,8 @@ internal sealed class UndoDoor
                 if (keptOfWhatItHeld.Contains(name) || keptOfWhatItHoldsNow.Contains(name)) continue;
                 if (notTaken.OutgoingOf.Contains(path) && UndoSwap.IsStaged(name, label)) keptOfWhatItHeld.Add(name);
                 else if (UndoSwap.HoldsAnyOf(notTaken.KeptOriginalsHolding, kept)) keptOfWhatItHoldsNow.Add(name);
+                else continue;
+                UndoSwap.HideAKeptFileLeft(kept);
             }
         }
         _trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoKeptWhatItReplaced, step.Course, step.Section,

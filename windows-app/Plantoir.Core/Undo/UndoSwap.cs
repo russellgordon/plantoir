@@ -25,6 +25,9 @@ internal enum UndoRefusalKind
 /// <summary>A refusal and the first page it names, with how many others were found in the way.</summary>
 internal sealed record UndoRefusal(UndoRefusalKind Kind, string? Path = null, int Others = 0)
 {
+    /// <summary>A couldNotWrite because every name a kept original can take beside the file is taken: neither room nor permission, so its sentence says so (W7a part two, review 1, LOW 4).</summary>
+    internal bool EveryKeptNameTaken { get; init; }
+
     /// <summary>The word the contract spells it with (<c>stepCases</c>' <c>undo</c>, the traces' <c>expect</c>).</summary>
     internal string Word => Kind switch
     {
@@ -458,7 +461,7 @@ internal static class UndoSwap
                 }
                 if (aside is null)
                 {
-                    if (everyNameTaken) return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath);
+                    if (everyNameTaken) return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath) { EveryKeptNameTaken = true };
                     return UndoTreeReading.Read(target.FullPath).ListingSha == take.ListingSha
                         ? new UndoRefusal(UndoRefusalKind.FileIsInUse, target.RelativePath)
                         : new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
@@ -527,6 +530,31 @@ internal static class UndoSwap
             if (now.HasFlag(FileAttributes.Hidden)) return;
             File.SetAttributes(kept.Path, now | FileAttributes.Hidden);
             kept.HiddenByTheSwap = true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>
+    /// Marks a kept original Hidden where it is left and named as "the hidden
+    /// file" (recovery's lines, a step left part way, a kept file the list
+    /// could not take), so the word is true on every path: a kept file made
+    /// before a kill, before the swap hid it, or written fresh inside a tree
+    /// brought back (W7a part two, review 1, LOW 2). Only a file with one
+    /// name: a kept original that is still a hard link to its page (a kill
+    /// between keeping it and the page's rename) is left as it is, so a page
+    /// is never hidden. Best effort.
+    /// </summary>
+    internal static void HideAKeptFileLeft(string fullPath)
+    {
+        try
+        {
+            FileAttributes now = File.GetAttributes(fullPath);
+            if (now.HasFlag(FileAttributes.Hidden) || now.HasFlag(FileAttributes.Directory)) return;
+            using (var handle = File.OpenHandle(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                if (UndoFileIdentity.LinksOf(handle) != 1) return;
+            }
+            File.SetAttributes(fullPath, now | FileAttributes.Hidden);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
@@ -638,7 +666,8 @@ internal static class UndoSwap
                 // staging write that fails (the mac's U2a review, LOW 1). Every
                 // kept name taken is could not write too, never "in use" (the
                 // mac's UndoCheck couldNotWrite; W4c review 1, LOW 2).
-                return new UndoRefusal(everyNameTaken || IsRoomOrPermission(failure) ? UndoRefusalKind.CouldNotWrite : UndoRefusalKind.FileIsInUse, target.RelativePath);
+                if (everyNameTaken) return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath) { EveryKeptNameTaken = true };
+                return new UndoRefusal(IsRoomOrPermission(failure) ? UndoRefusalKind.CouldNotWrite : UndoRefusalKind.FileIsInUse, target.RelativePath);
             }
             originals[index] = kept;
         }

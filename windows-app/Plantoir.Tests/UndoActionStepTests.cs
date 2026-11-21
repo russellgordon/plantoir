@@ -249,6 +249,105 @@ public sealed class UndoActionStepTests : IDisposable
         Assert.Equal(UndoTrail.CouldNotRecordWords("publishPages", "the list could not be written", UndoUnrecordedChange.StoppedPartWay), line.Words);
     }
 
+    /// <summary>
+    /// Part two, review 1, LOW 5: a step that cannot be named (no working
+    /// folder above its pages) is written plainly, all or none; left part way
+    /// there, it is said as part way, names the kept file, and its trail line
+    /// says it stopped part way. Once with the first page a symbolic link to a
+    /// file outside, where the plain write goes in at the file the link leads
+    /// to and keeps the original beside THAT file, which is the one named.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void APlainWriteLeftPartWayIsSaidAsPartWayAndNamesTheKeptFile(bool throughALink)
+    {
+        string plain = Path.Combine(_root, "plain");
+        Directory.CreateDirectory(plain);
+        string first = Path.Combine(plain, "a.md");
+        string second = Path.Combine(plain, "b.md");
+        string firstWritten = first;
+        if (throughALink)
+        {
+            string outside = Path.Combine(_root, "outside");
+            Directory.CreateDirectory(outside);
+            firstWritten = Path.Combine(outside, "a.md");
+            File.WriteAllText(firstWritten, "old a");
+            File.CreateSymbolicLink(first, firstWritten);
+        }
+        else File.WriteAllText(first, "old a");
+        File.WriteAllText(second, "old b");
+        File.SetAttributes(second, FileAttributes.ReadOnly);
+        var step = new UndoActionStep(new UndoStepMaker("menu", "publishPages"), plain, null, null, undo: List(),
+                                      plainSeams: PutBackOfTheFirstPageFails());
+        step.Write(first, "new a");
+        step.Write(second, "new b");
+
+        var partWay = Assert.Throws<UndoStepLeftPartWayException>(step.Make);
+
+        File.SetAttributes(second, FileAttributes.Normal);
+        Assert.Equal("new a", File.ReadAllText(firstWritten));
+        Assert.Equal("old b", File.ReadAllText(second));
+        if (throughALink) Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(first));
+        string kept = Assert.Single(partWay.KeptOriginals);
+        Assert.Equal(Path.GetDirectoryName(firstWritten), Path.GetDirectoryName(kept));
+        Assert.Equal("old a", File.ReadAllText(kept));
+        Assert.Contains(UndoActionStep.KeptSentence("“a.md”", Path.GetFileName(kept)), partWay.Message, StringComparison.Ordinal);
+        Assert.True(File.GetAttributes(kept).HasFlag(FileAttributes.Hidden), "the kept file is not Hidden");
+        Assert.DoesNotContain("Nothing was", partWay.Message, StringComparison.Ordinal);
+        UndoTrailLine line = Assert.Single(_trail);
+        Assert.Equal(UndoTrail.CouldNotRecordWords("publishPages", "a file it writes cannot be named in a step", UndoUnrecordedChange.StoppedPartWay), line.Words);
+    }
+
+    /// <summary>
+    /// The sweep of W4c and W7a, item 1 (the invariant: with the switch off
+    /// nothing behaves differently from before Undo): a page inside the
+    /// working folder that is a symbolic link is written THROUGH the link, as
+    /// File.WriteAllText wrote it, and the link stays a link; the change goes
+    /// ahead and one trail line says the step could not be recorded.
+    /// </summary>
+    [Fact]
+    public void WithTheSwitchOffALinkedPageIsWrittenThroughItsLinkAndStaysALink()
+    {
+        ACourse();
+        string outside = Path.Combine(_root, "outside");
+        Directory.CreateDirectory(outside);
+        string target = Path.Combine(outside, "Unit 1, Day 2.md");
+        File.WriteAllText(target, Class(2, draft: true));
+        File.Delete(Full(Day2));
+        File.CreateSymbolicLink(Full(Day2), target);
+        UndoActionStep step = Step(List());
+        step.Write(Full(Day2), Class(2, draft: false));
+
+        step.Make();
+
+        Assert.Equal(UndoLinks.What.Link, UndoLinks.Look(Full(Day2)));
+        Assert.Equal(Class(2, draft: false), File.ReadAllText(target));
+        Assert.Empty(Begins());
+        UndoTrailLine line = Assert.Single(_trail);
+        Assert.Equal(UndoTrail.CouldNotRecordWords("publishPages", "a file it writes cannot be named in a step", UndoUnrecordedChange.WentAhead), line.Words);
+    }
+
+    /// <summary>
+    /// Part two, review 1, LOW 4: a page whose every kept name is taken is
+    /// refused with a sentence that says so, never "the disk may be full, or
+    /// … permission", and nothing is written.
+    /// </summary>
+    [Fact]
+    public void APageWhoseEveryKeptNameIsTakenIsSaidSoAndNothingIsWritten()
+    {
+        ACourse();
+        for (int number = 1; number <= UndoSwap.KeptNames; number++)
+            File.WriteAllText(UndoSwap.BesidePath(Full(Day2), "1-apply", number == 1 ? "orig" : number + "-orig"), "taken");
+        UndoActionStep step = Step(List());
+        step.Write(Full(Day2), Class(2, draft: false));
+
+        var refused = Assert.Throws<UndoStepRefusedException>(step.Make);
+
+        Assert.Equal("nothing could be written beside “Unit 1, Day 2.md”: every name Plantoir keeps an earlier copy of it under is already taken there.", refused.Message);
+        Assert.Equal(Class(2, draft: true), File.ReadAllText(Full(Day2)));
+    }
+
     private sealed class ThrowingMaintainers : IUndoMaintainers
     {
         public bool CanRun(string maintainer) => true;

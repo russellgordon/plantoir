@@ -691,7 +691,9 @@ internal static class UndoRecovery
             foreach (string kept in KeptOriginalFiles(step, UndoDoor.FullPath(root, path)))
             {
                 string name = Path.GetFileName(kept);
-                if (!names.Contains(name)) names.Add(name);
+                if (names.Contains(name)) continue;
+                names.Add(name);
+                UndoSwap.HideAKeptFileLeft(kept);
             }
         }
         return names;

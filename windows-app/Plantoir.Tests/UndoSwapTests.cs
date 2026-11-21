@@ -481,7 +481,7 @@ public sealed class UndoSwapTests : IDisposable
         UndoSwapResult result = UndoSwap.Swap([FolderTakenOut("courses/A/extra")], "1-apply", _root);
 
         var refused = Assert.IsType<UndoSwapResult.Refused>(result);
-        Assert.Equal(new UndoRefusal(UndoRefusalKind.CouldNotWrite, "courses/A/extra"), refused.Refusal);
+        Assert.Equal(new UndoRefusal(UndoRefusalKind.CouldNotWrite, "courses/A/extra") { EveryKeptNameTaken = true }, refused.Refusal);
         Assert.Equal(Old, File.ReadAllBytes(Path.Combine(folder, "x.md")));
     }
 
@@ -496,7 +496,7 @@ public sealed class UndoSwapTests : IDisposable
         UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New)], "1-undo", _root);
 
         var refused = Assert.IsType<UndoSwapResult.Refused>(result);
-        Assert.Equal(new UndoRefusal(UndoRefusalKind.CouldNotWrite, "courses/A/a.md"), refused.Refusal);
+        Assert.Equal(new UndoRefusal(UndoRefusalKind.CouldNotWrite, "courses/A/a.md") { EveryKeptNameTaken = true }, refused.Refusal);
         Assert.Equal(Old, File.ReadAllBytes(page));
     }
 
