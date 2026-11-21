@@ -634,6 +634,27 @@ class _Unmeasured(float):
 _PUNCTUATION = " _-,;:!?.'\"()[]{}@*/\\&#%`^+<=>|~$"
 
 
+# undo.numberSpellingRule (measured through the mac's reader, macOS 26.7.3,
+# 2026-11-20, #899 W6 review 3): the most characters the mac reads after a
+# number's e or E, its sign and leading zeros included (1e0005, 1e+005 and
+# 1e-999 are read; 1e00005, 1e+0005, 1e-0001 and 0e99999 make the file one it
+# cannot read), and the most digits read as it reads them, with an exponent
+# and without. Windows' UndoJson holds the same three.
+MAC_EXPONENT_CHARACTERS_AT_MOST = 4
+MEASURED_DIGITS_WITH_AN_EXPONENT = 17
+MEASURED_DIGITS_WITHOUT_AN_EXPONENT = 38
+
+
+def _exponent_read_by_the_mac(spelling):
+    """A spelling with no exponent, or at most MAC_EXPONENT_CHARACTERS_AT_MOST
+    characters after its e or E. A file holding any other is not JSON."""
+    marker = max(spelling.find("e"), spelling.find("E"))
+    if marker < 0:
+        return True
+    characters_after_it = len(spelling) - marker - 1
+    return characters_after_it <= MAC_EXPONENT_CHARACTERS_AT_MOST
+
+
 def _spelling_measured(spelling):
     """At most 17 digits with an exponent, 38 without, counted from the
     first digit that is not a leading zero of the integer part."""
@@ -642,14 +663,19 @@ def _spelling_measured(spelling):
     mantissa = unsigned[:marker] if marker >= 0 else unsigned
     whole, _, fraction = mantissa.partition(".")
     digits = len(whole.lstrip("0")) + len(fraction)
-    return digits <= 17 if marker >= 0 else digits <= 38
+    if marker >= 0:
+        return digits <= MEASURED_DIGITS_WITH_AN_EXPONENT
+    return digits <= MEASURED_DIGITS_WITHOUT_AN_EXPONENT
 
 
 def _read_number(spelling):
     """The double the mac's reader takes from a measured spelling: a fixed
     spelling with a point and more than 17 digits is a decimal number, its
     digits summed in 16-bit pieces and divided by ten once per place; minus
-    infinity beyond the range below zero; refused (not JSON) above it."""
+    infinity beyond the range below zero; refused (not JSON) above it, and
+    for an exponent the mac does not read."""
+    if not _exponent_read_by_the_mac(spelling):
+        raise ValueError("an exponent the mac does not read")
     nearest = float(spelling)
     if not _spelling_measured(spelling):
         return _Unmeasured(0.0 if math.isinf(nearest) else nearest)
