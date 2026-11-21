@@ -65,6 +65,40 @@ public static class PreviewStarts
         return latestStart == start;
     }
 
+    /// <summary>
+    /// Whether a start still holds what it took: its own lease, by reference
+    /// (two leases of one section on one port are equal in every field), and
+    /// it is still the window's latest start. Only then may it hand anything
+    /// back (#928 item 4); a stop or a later start has already dealt with the rest.
+    /// </summary>
+    public static bool TheStartStillHoldsItsOwn(PreviewLeases.Lease? heldLease, PreviewLeases.Lease ownLease,
+                                                Guid? latestStart, Guid start) =>
+        ReferenceEquals(heldLease, ownLease) && latestStart == start;
+
+    /// <summary>What a press of Preview meets in its own window.</summary>
+    public enum PressMeets
+    {
+        /// <summary>Nothing of the window's own is under way: the press goes on.</summary>
+        Nothing,
+        /// <summary>The window's own start waits for a stop or builds: the press does nothing (<c>preview already starting</c>).</summary>
+        AStartUnderWay,
+        /// <summary>The window's own stop is still finishing: the press does nothing, and nothing was starting.</summary>
+        AStopUnderWay,
+    }
+
+    /// <summary>
+    /// What a press meets (#928). A stop under way is asked first: while it
+    /// finishes, the stopped start still holds its lease and its wait, so
+    /// <see cref="AStartIsUnderWay"/> alone would call it a start (the
+    /// review's L1).
+    /// </summary>
+    public static PressMeets WhatAPressMeets(bool aStopIsUnderWay, bool startHasBegun, PreviewLeases.Lease? heldLease)
+    {
+        if (aStopIsUnderWay) return PressMeets.AStopUnderWay;
+        if (AStartIsUnderWay(startHasBegun, heldLease)) return PressMeets.AStartUnderWay;
+        return PressMeets.Nothing;
+    }
+
     /// <summary>What a start took, or why it was refused.</summary>
     public sealed record Outcome(PreviewLeases.Lease? Lease, IDisposable? Record, string? Refusal);
 
@@ -73,12 +107,12 @@ public static class PreviewStarts
     /// #231: a refused lease writes no record, so it ends nobody's). The
     /// record is this start's own token.
     /// </summary>
-    public static Outcome Begin(string folderPath, string courseCode, int sectionNumber)
+    public static Outcome Begin(string folderPath, string courseCode, int sectionNumber, object owner)
     {
         PreviewLeases.Lease lease;
         try
         {
-            lease = PreviewLeases.Take(folderPath, courseCode, sectionNumber);
+            lease = PreviewLeases.Take(folderPath, courseCode, sectionNumber, owner);
         }
         catch (PreviewLeases.LeaseRefusedException refusal)
         {

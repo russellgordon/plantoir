@@ -420,23 +420,11 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The teacher's quit has gone ahead (#928 items 6 and 7, the mac's
-    /// <c>isTerminating</c>): a preview start parked while old stops finish
-    /// starts nothing, and every repair's Preview Again is abandoned. Taken
-    /// back only when the close turns out not to quit (another window opened
-    /// while it waited for a tools copy).
+    /// The teacher's quit has gone ahead (#928 items 6 and 7): see
+    /// <see cref="Plantoir.Core.Models.QuitGoingAhead"/>, which the closing
+    /// handler sets and clears through one pass per close.
     /// </summary>
-    public static bool QuitHasGoneAhead { get; private set; }
-
-    /// <summary>The quit goes ahead: see <see cref="QuitHasGoneAhead"/>.</summary>
-    public static void LetThePreviewStartsGo()
-    {
-        QuitHasGoneAhead = true;
-        Plantoir.Core.Models.PreviewAgainPresses.Shared.AbandonEvery();
-    }
-
-    /// <summary>The close did not quit after all.</summary>
-    public static void TheQuitWasTakenBack() => QuitHasGoneAhead = false;
+    public static bool QuitHasGoneAhead => Plantoir.Core.Models.QuitGoingAhead.Shared.HasGoneAhead;
 
     /// <summary>Whether closing this window quits the app: it is the last one still open (#231).</summary>
     public static bool ClosingThisQuits(MainWindow window) =>

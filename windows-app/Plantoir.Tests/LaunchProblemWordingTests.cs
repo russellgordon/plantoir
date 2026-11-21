@@ -67,4 +67,27 @@ public class LaunchProblemWordingTests
         SaysNoMachinery(TaskScheduling.NothingToSchedule, "the scheduled deploy's refusal");
         Assert.DoesNotContain(":\\", TaskScheduling.NothingToSchedule);
     }
+
+    /// <summary>
+    /// The review's L6: Section ▸ Rebuild Preview in a folder that is not set
+    /// up shows <c>AssistWorkspace</c>'s refusal to the teacher, so it names
+    /// no file and not the folder's full path. Met for real, on an empty folder.
+    /// </summary>
+    [Fact]
+    public void TheFolderNotSetUpRefusalNamesNoFileOrPath()
+    {
+        string emptyFolder = Path.Combine(Path.GetTempPath(), $"plantoir-928-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(emptyFolder);
+        try
+        {
+            var refusal = Assert.Throws<AssistRefusal>(() => new AssistWorkspace(emptyFolder, new FakeLauncher()));
+            SaysNoMachinery(refusal.Message, "the folder-not-set-up refusal");
+            Assert.DoesNotContain(":\\", refusal.Message);
+            Assert.Contains(Path.GetFileName(emptyFolder), refusal.Message);
+        }
+        finally
+        {
+            try { Directory.Delete(emptyFolder, true); } catch { }
+        }
+    }
 }

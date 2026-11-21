@@ -178,6 +178,15 @@ public sealed partial class AssistWorkspace
     /// back without restoring a whole course. Optional: without it every write
     /// still happens, just unrecorded.
     /// </param>
+    /// <summary>
+    /// The refusal for a folder that is not set up: the folder by its name,
+    /// no file named and no system text, since the Section menu's Rebuild
+    /// Preview shows it to a teacher (#928 invariant 3).
+    /// </summary>
+    public static string NotAWorkingFolderYet(string folderName) =>
+        $"“{folderName}” isn’t a Plantoir working folder yet: it is missing a piece it needs. " +
+        "Open the folder in Plantoir once to set it up.";
+
     public AssistWorkspace(string workspacePath, ILauncherRunner launcher, string? lockedCourse = null,
                            UndoHistory? undo = null)
     {
@@ -186,9 +195,9 @@ public sealed partial class AssistWorkspace
         _undo = undo;
         _lockedCourse = string.IsNullOrWhiteSpace(lockedCourse) ? null : lockedCourse.Trim();
         if (Workspace.Classify(_folder) != WorkspaceState.Ready)
-            throw new AssistRefusal(
-                $"“{_folder}” isn’t a Plantoir working folder — it has no {Workspace.MarkerLauncher}. " +
-                "Open the folder in Plantoir once to set it up.");
+            // Plantoir's own words, no file named (#928 invariant 3, the
+            // review's L6): Section ▸ Rebuild Preview shows this to a teacher.
+            throw new AssistRefusal(NotAWorkingFolderYet(Path.GetFileName(_folder)));
 
         if (_lockedCourse is not null &&
             !Workspace.DiscoverCourses(_folder).Any(

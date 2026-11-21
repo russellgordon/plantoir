@@ -9,7 +9,12 @@ public static class PreviewLeases
 {
     public static readonly IReadOnlyList<int> AvailablePorts = new[] { 8081, 8082, 8083, 8084 };
 
-    public sealed record Lease(int Port, string FolderPath, string CourseCode, int SectionNumber);
+    /// <summary>
+    /// One start's hold on a port. <paramref name="Owner"/> is the window that
+    /// took it (#928 item 4): a sweep for rows left behind takes only its own
+    /// window's, never another window's preview of the same section.
+    /// </summary>
+    public sealed record Lease(int Port, string FolderPath, string CourseCode, int SectionNumber, object? Owner = null);
 
     public sealed class LeaseRefusedException(string message) : Exception(message);
 
@@ -18,7 +23,7 @@ public static class PreviewLeases
 
     public static IReadOnlyList<Lease> Active { get { lock (_gate) return _active.ToList(); } }
 
-    public static Lease Take(string folderPath, string courseCode, int sectionNumber)
+    public static Lease Take(string folderPath, string courseCode, int sectionNumber, object? owner = null)
     {
         lock (_gate)
         {
@@ -37,7 +42,7 @@ public static class PreviewLeases
             foreach (int port in AvailablePorts)
             {
                 if (taken.Contains(port)) continue;
-                var lease = new Lease(port, folderPath, courseCode, sectionNumber);
+                var lease = new Lease(port, folderPath, courseCode, sectionNumber, owner);
                 _active.Add(lease);
                 return lease;
             }
@@ -46,9 +51,35 @@ public static class PreviewLeases
         }
     }
 
+    /// <summary>
+    /// Give back exactly this lease, the one its start took (#928 item 4):
+    /// compared by reference, so a start that has already let go never
+    /// removes a later lease that happens to be equal in every field (the
+    /// same window, section and port, taken again).
+    /// </summary>
     public static void Release(Lease lease)
     {
-        lock (_gate) _active.Remove(lease);
+        lock (_gate)
+        {
+            int at = _active.FindIndex(held => ReferenceEquals(held, lease));
+            if (at >= 0) _active.RemoveAt(at);
+        }
+    }
+
+    /// <summary>
+    /// The rows for this section that <paramref name="owner"/>'s window left
+    /// behind (a replaced view's), and only those: another window's lease of
+    /// the same section is that window's preview, still running (#928 item 4).
+    /// </summary>
+    public static void ReleaseLeftBehind(object owner, string folderPath, string courseCode, int sectionNumber)
+    {
+        lock (_gate)
+        {
+            _active.RemoveAll(l => ReferenceEquals(l.Owner, owner) &&
+                                  l.FolderPath == folderPath &&
+                                  string.Equals(l.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) &&
+                                  l.SectionNumber == sectionNumber);
+        }
     }
 
     public static void Release(string folderPath, string courseCode, int sectionNumber)

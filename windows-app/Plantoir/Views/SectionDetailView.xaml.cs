@@ -1418,7 +1418,7 @@ public sealed partial class SectionDetailView : UserControl
     {
         // Recorded AT ONCE, before anything is awaited (#928 item 7, the
         // mac's #813): the press is this page's token, which leaving the page
-        // abandons (OnUnloaded), the quit abandons (App.LetThePreviewStartsGo)
+        // abandons (OnUnloaded), the quit abandons (QuitGoingAhead's pass)
         // and a later press replaces. The start after the stop runs only if
         // the token survived it; a press that starts nothing says why on the
         // trail (preview again abandoned).
@@ -1460,6 +1460,16 @@ public sealed partial class SectionDetailView : UserControl
         }
     }
 
+    /// <summary>
+    /// The refusal after the stop, shown without holding up the press's end
+    /// (the review's L5): its own catch, since nothing awaits it.
+    /// </summary>
+    private async Task PresentTheRepairsRefusalAsync(SiteHealthRepair.Outcome outcome)
+    {
+        try { await PresentRepairOutcomeAsync(outcome); }
+        catch (Exception ex) { App.LogDiagnostic($"Preview Again's refusal could not be shown: {ex}"); }
+    }
+
     /// <summary>The repair's start, once its press has survived the stop.</summary>
     private void StartPreviewAgainAfterTheStop()
     {
@@ -1471,7 +1481,7 @@ public sealed partial class SectionDetailView : UserControl
         // downstream would stop a build landing on top of the assistant's.
         if (WhyTheRepairCannotBePreviewedNow() is { } nowInstead)
         {
-            _ = PresentRepairOutcomeAsync(nowInstead);
+            _ = PresentTheRepairsRefusalAsync(nowInstead);
             return;
         }
         StartAutomatedPreview();
@@ -1546,6 +1556,9 @@ public sealed partial class SectionDetailView : UserControl
 
     private async void StartAutomatedPreview()
     {
+        // What this start took, for the catch below (the review's L2).
+        PreviewLeases.Lease? heldLease = null;
+        Guid heldStart = Guid.Empty;
         try
         {
             // FIRST (#928, the mac's #812): the window's own start, waiting
@@ -1565,13 +1578,15 @@ public sealed partial class SectionDetailView : UserControl
             // its own) is its own to clear; a start under way returned above.
             ReleaseLease();
 
-            var began = PreviewStarts.Begin(workspacePath, _course.Code, _sectionNumber);
+            var began = PreviewStarts.Begin(workspacePath, _course.Code, _sectionNumber, owner: _window);
             if (began.Refusal is { } refusal)
             {
                 App.LogDiagnostic($"StartAutomatedPreview refused for {_course.Code} Section {_sectionNumber}: {refusal}");
                 return;
             }
             if (!TookTheStart(workspacePath, began, "the assistant's rebuild", out var ownLease, out Guid thisStart, out _)) return;
+            heldLease = ownLease;
+            heldStart = thisStart;
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
@@ -1596,6 +1611,7 @@ public sealed partial class SectionDetailView : UserControl
         catch (Exception ex)
         {
             App.LogDiagnostic($"StartAutomatedPreview exception: {ex}");
+            HandBackAfterAFailure(heldLease, heldStart);
         }
     }
 
@@ -1791,6 +1807,9 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>A teacher's press of Preview (or of Stop Preview), asking for the page last viewed or not.</summary>
     private async Task PressPreviewAsync(bool atLastViewed)
     {
+        // What this start took, for the catch below (the review's L2).
+        PreviewLeases.Lease? heldLease = null;
+        Guid heldStart = Guid.Empty;
         try
         {
             if (_previewRunner.IsRunning) { StopPreview(); return; }
@@ -1821,7 +1840,7 @@ public sealed partial class SectionDetailView : UserControl
 
             // The lease, then this start's own build record (PreviewStarts.Begin):
             // a refused lease writes no record, so it ends nobody's.
-            var began = PreviewStarts.Begin(workspacePath, _course.Code, _sectionNumber);
+            var began = PreviewStarts.Begin(workspacePath, _course.Code, _sectionNumber, owner: _window);
             if (began.Refusal is { } refusal)
             {
                 App.LogDiagnostic($"Preview refused for {_course.Code} Section {_sectionNumber}: {refusal}");
@@ -1847,6 +1866,8 @@ public sealed partial class SectionDetailView : UserControl
                 }
                 return;
             }
+            heldLease = ownLease;
+            heldStart = thisStart;
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
@@ -1871,6 +1892,7 @@ public sealed partial class SectionDetailView : UserControl
         catch (Exception ex)
         {
             App.LogDiagnostic($"PressPreviewAsync exception: {ex}");
+            HandBackAfterAFailure(heldLease, heldStart);
         }
     }
 
@@ -1882,7 +1904,18 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     private bool SaidAStartIsAlreadyUnderWay()
     {
-        if (!PreviewStarts.AStartIsUnderWay(_previewBuildRecord is not null || _isWaitingForServer, _lease)) return false;
+        var meets = PreviewStarts.WhatAPressMeets(aStopIsUnderWay: _stopsUnderWay > 0,
+                                                  startHasBegun: _previewBuildRecord is not null || _isWaitingForServer,
+                                                  heldLease: _lease);
+        if (meets == PreviewStarts.PressMeets.Nothing) return false;
+        if (meets == PreviewStarts.PressMeets.AStopUnderWay)
+        {
+            // The window's own stop still holds the lease and the wait until
+            // it has finished; nothing is starting (the review's L1). No trail
+            // event names this, so the line goes to the diagnostic log.
+            App.LogDiagnostic($"asked to preview {_course.Code} Section {_sectionNumber} while this window's preview was still stopping: nothing was started");
+            return true;
+        }
         ActivityTrail.Note(ActivityTrail.Event.PreviewAlreadyStarting,
                            "asked to preview while this window's preview was still starting: the start already under way goes on, and nothing else was started",
                            _course.Code, _sectionNumber);
@@ -1942,12 +1975,27 @@ public sealed partial class SectionDetailView : UserControl
                                                                   appIsQuitting: App.QuitHasGoneAhead))
             return true;
         App.LogDiagnostic($"a parked preview start of {_course.Code} Section {_sectionNumber} started nothing: it no longer belonged");
-        if (holdsItsOwnLease && _latestPreviewStart == thisStart)
+        if (PreviewStarts.TheStartStillHoldsItsOwn(_lease, ownLease, _latestPreviewStart, thisStart))
         {
             ReleaseLease();
             if (!_isTornDown) RefreshChrome();
         }
         return false;
+    }
+
+    /// <summary>
+    /// An exception escaped a start after it took its lease (the review's L2):
+    /// if the start still holds what it took, it is stopped the way Stop
+    /// stops it, so the run, the wait, the record and the lease all go back
+    /// and the next press is not swallowed. A start a stop or a later start
+    /// has already dealt with is left alone.
+    /// </summary>
+    private void HandBackAfterAFailure(PreviewLeases.Lease? ownLease, Guid thisStart)
+    {
+        if (ownLease is null || !PreviewStarts.TheStartStillHoldsItsOwn(_lease, ownLease, _latestPreviewStart, thisStart)) return;
+        App.LogDiagnostic($"a preview start of {_course.Code} Section {_sectionNumber} failed part way: what it held was handed back");
+        try { StopPreview(); }
+        catch (Exception ex) { App.LogDiagnostic($"HandBackAfterAFailure: {ex.Message}"); }
     }
 
     /// <summary>
@@ -2340,6 +2388,18 @@ public sealed partial class SectionDetailView : UserControl
 
     public async Task StopPreviewAsync()
     {
+        // Counted while the stop finishes, so a press meanwhile is not read
+        // as a start under way (the review's L1).
+        _stopsUnderWay++;
+        try { await StopPreviewAndWaitAsync(); }
+        finally { _stopsUnderWay--; }
+    }
+
+    /// <summary>The stops still finishing in this window; see <see cref="StopPreviewAsync"/>.</summary>
+    private int _stopsUnderWay;
+
+    private async Task StopPreviewAndWaitAsync()
+    {
         bool hadPreview = _previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null;
         _serverWait?.Cancel();
         // Sweep first, registered synchronously, THEN stop the host runner
@@ -2395,14 +2455,17 @@ public sealed partial class SectionDetailView : UserControl
 
     /// <summary>
     /// Give the preview lease back, both the exact row and any row for this
-    /// section that a previous view left behind.
+    /// section that a previous view IN THIS WINDOW left behind.
     ///
     /// <para>The exact release already names the right folder on its own —
     /// <c>PreviewLeases.Lease</c> carries the <c>FolderPath</c> it was taken
-    /// with. The folder-keyed sweep beside it cannot, so it is filed under
+    /// with — and removes that lease by reference, so a start that already let
+    /// go never removes a later, equal one. The sweep beside it is filed under
     /// the folder this view was REGISTERED in rather than under the window's
-    /// current one: under the current one it would delete another window's
-    /// lease row in a folder this section was never previewed in.</para>
+    /// current one, and takes only rows this window owns (#928 item 4, the
+    /// review's M2): another window's lease of the same section is that
+    /// window's preview, still running, and sweeping it let Rebuild Preview
+    /// here take its port.</para>
     /// </summary>
     private void ReleaseLease()
     {
@@ -2412,7 +2475,7 @@ public sealed partial class SectionDetailView : UserControl
         if (_lease is { } lease) PreviewLeases.Release(lease);
         if (_folderThisSectionRegisteredIn is { } wp)
         {
-            PreviewLeases.Release(wp, _course.Code, _sectionNumber);
+            PreviewLeases.ReleaseLeftBehind(_window, wp, _course.Code, _sectionNumber);
         }
         _lease = null;
     }

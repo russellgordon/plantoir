@@ -28,7 +28,8 @@ public class StopFallbackOwnsItsRunTests
 
         await fallback;
 
-        Assert.True(runner.IsRunning, "the second run was ended by the first stop's fallback");
+        // The staged runs have no process, so IsRunning would stay true under
+        // the old fallback too (the review's L4): the count is what tells.
         Assert.Equal(0, runner.FallbackTerminations);
     }
 

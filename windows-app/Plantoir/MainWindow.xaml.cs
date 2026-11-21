@@ -539,11 +539,18 @@ public sealed partial class MainWindow : Window
     private async void AskBeforeQuittingThroughWork(Microsoft.UI.Windowing.AppWindow sender,
                                                     Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
+        // One pass of this close (#928, the review's M1): the quit goes ahead
+        // in ONE place (pass.GoAhead) and is taken back in ONE place, the
+        // pass's end. A pass that does not say the close went through, was
+        // handed to the next pass, or was no quit at all takes the quit back
+        // (and lets held copies go), so no way out that leaves the window up
+        // can leave Preview starting nothing.
+        using var pass = Plantoir.Core.Models.QuitGoingAhead.Shared.BeginPass(whenTakenBack: LetHeldCopiesGo);
         try
         {
             // A second close while this one waits does nothing new.
-            if (_waitingForCopies) { args.Cancel = true; return; }
-            if (!App.ClosingThisQuits(this)) return;
+            if (_waitingForCopies) { args.Cancel = true; pass.NotAQuit(); return; }
+            if (!App.ClosingThisQuits(this)) { pass.NotAQuit(); return; }
 
             if (!_quitConfirmed)
             {
@@ -582,14 +589,14 @@ public sealed partial class MainWindow : Window
                     ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
                     if (!quit)
                     {
-                        // Asked again after the wait (a preview began meanwhile)
-                        // and the teacher kept working: the copies held back
-                        // for that quit go ahead, and a later close waits again
-                        // (the batch 4 review's M1).
-                        LetHeldCopiesGo();
+                        // Kept working, on the first pass or when asked again
+                        // after the wait (a preview began meanwhile): the pass
+                        // ends taking the quit back, and the copies held back
+                        // for it go ahead (the batch 4 review's M1).
                         return;
                     }
                     _quitConfirmed = true;
+                    pass.HandOnToTheNextPass();
                     Close();   // comes back through here, past the question, to the wait
                     return;
                 }
@@ -598,10 +605,13 @@ public sealed partial class MainWindow : Window
             // Past the question: the quit goes ahead (#928). A preview start
             // parked behind an old stop, or a repair's Preview Again, starts
             // nothing from here on.
-            App.LetThePreviewStartsGo();
+            pass.GoAhead();
             if (!ToolchainReadiness.ClosingWaitsForTheCopy(closingQuits: true, ToolchainReadiness.AnyCopyIsWriting,
                                                            Services.SessionEnding.IsEnding, _copiesWaitedFor))
+            {
+                pass.TheCloseGoesThrough();
                 return;
+            }
 
             // Cancelled synchronously, before any await, or the close goes ahead.
             args.Cancel = true;
@@ -617,8 +627,9 @@ public sealed partial class MainWindow : Window
             _waitingForCopies = false;   // before Close(), or the close below cancels itself (the review's H2)
             App.LogDiagnostic("closing: the tools copy has finished");
             // A window opened while this one waited: this close no longer
-            // quits, so copies held back for the quit go ahead after all.
-            if (!App.ClosingThisQuits(this)) { App.TheQuitWasTakenBack(); LetHeldCopiesGo(); }
+            // quits, so the pass ends taking the quit back and the copies held
+            // back for it go ahead after all. Otherwise the next pass decides.
+            if (App.ClosingThisQuits(this)) pass.HandOnToTheNextPass();
             Close();
         }
         catch (Exception ex)
@@ -627,8 +638,7 @@ public sealed partial class MainWindow : Window
             // Whatever failed, the window is still up: a hold left set would
             // keep every later copy waiting for the life of the process.
             _waitingForCopies = false;
-            App.TheQuitWasTakenBack();
-            LetHeldCopiesGo();
+            pass.TakeBack();
         }
     }
 

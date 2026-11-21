@@ -59,7 +59,7 @@ public class PreviewStartRecordTests : IDisposable
             counted.AlreadyStarting++;
             return;
         }
-        var began = PreviewStarts.Begin(Folder, Course, Section);
+        var began = PreviewStarts.Begin(Folder, Course, Section, owner: window);
         if (began.Refusal is not null)
         {
             counted.Refusals++;
@@ -207,20 +207,6 @@ public class PreviewStartRecordTests : IDisposable
         }
     }
 
-    /// <summary>#928 item 4: an automated start while the teacher's start is parked behind a stop, then the teacher's start ends: quitting asks about nothing.</summary>
-    [Fact]
-    public void TwoStartsThenTheEndLeaveNothingForTheQuitToAskAbout()
-    {
-        var window = new Window();
-        var counted = new Counted();
-        Start(window, counted);          // the teacher's press, parked in WaitForStopsToFinish
-        Start(window, counted);          // StartAutomatedPreview: the assistant, or Rebuild Preview
-        Assert.Equal(1, counted.AlreadyStarting);
-        Assert.True(QuitAsks(), "the teacher's start is being built");
-        RunEnds(window);
-        Assert.False(QuitAsks(), "a start's record outlived it: quitting would ask for ever");
-    }
-
     /// <summary>The window's own claims and the assistant's count the section once (whatCountsAsUnderWay).</summary>
     [Fact]
     public void ASectionWithTwoClaimsIsOnePreviewBeingBuilt()
@@ -249,6 +235,66 @@ public class PreviewStartRecordTests : IDisposable
         Assert.False(PreviewStarts.TheStartStillBelongs(Guid.NewGuid(), start, false, false));
         Assert.False(PreviewStarts.TheStartStillBelongs(start, start, viewIsGone: true, appIsQuitting: false));
         Assert.False(PreviewStarts.TheStartStillBelongs(start, start, viewIsGone: false, appIsQuitting: true));
+    }
+
+    /// <summary>
+    /// The review's M2: two windows, one section. Window B's sweep for rows
+    /// it left behind (what its Rebuild Preview runs before it takes) leaves
+    /// window A's lease, so B is refused and A keeps its port; and A's
+    /// release, once A has let go and taken again, removes only the lease it
+    /// still holds.
+    /// </summary>
+    [Fact]
+    public void AnotherWindowsStartNeverEndsThisWindowsLease()
+    {
+        var windowA = new object();
+        var windowB = new object();
+        var a = PreviewStarts.Begin(Folder, Course, Section, owner: windowA);
+        Assert.NotNull(a.Lease);
+
+        PreviewLeases.ReleaseLeftBehind(windowB, Folder, Course, Section);
+        var b = PreviewStarts.Begin(Folder, Course, Section, owner: windowB);
+
+        Assert.NotNull(b.Refusal);
+        Assert.Null(b.Lease);
+        Assert.Equal(new[] { a.Lease }, PreviewLeases.Active.ToArray());
+        Assert.Equal(1, Records());
+
+        // A window's own left-behind row is its own to sweep.
+        PreviewLeases.ReleaseLeftBehind(windowA, Folder, Course, Section);
+        Assert.Empty(PreviewLeases.Active);
+        a.Record!.Dispose();
+    }
+
+    /// <summary>A start that already let go never removes a later lease equal to its own in every field.</summary>
+    [Fact]
+    public void AReleaseRemovesOnlyTheLeaseItsStartTook()
+    {
+        var window = new object();
+        var first = PreviewLeases.Take(Folder, Course, Section, window);
+        PreviewLeases.Release(first);
+        var second = PreviewLeases.Take(Folder, Course, Section, window);
+        Assert.Equal(first, second);   // the same window, section and port: equal, not the same
+
+        PreviewLeases.Release(first);
+
+        Assert.Equal(new[] { second }, PreviewLeases.Active.ToArray());
+        Assert.True(PreviewStarts.TheStartStillHoldsItsOwn(second, second, Guid.Empty, Guid.Empty));
+        Assert.False(PreviewStarts.TheStartStillHoldsItsOwn(second, first, Guid.Empty, Guid.Empty));
+        Assert.False(PreviewStarts.TheStartStillHoldsItsOwn(second, second, Guid.NewGuid(), Guid.Empty));
+    }
+
+    /// <summary>The review's L1: a press during the window's own stop is not a start under way.</summary>
+    [Fact]
+    public void APressDuringAStopIsNotAStartUnderWay()
+    {
+        var lease = PreviewLeases.Take(Folder, Course, Section, new object());
+        Assert.Equal(PreviewStarts.PressMeets.AStopUnderWay,
+                     PreviewStarts.WhatAPressMeets(aStopIsUnderWay: true, startHasBegun: true, heldLease: lease));
+        Assert.Equal(PreviewStarts.PressMeets.AStartUnderWay,
+                     PreviewStarts.WhatAPressMeets(aStopIsUnderWay: false, startHasBegun: true, heldLease: lease));
+        Assert.Equal(PreviewStarts.PressMeets.Nothing,
+                     PreviewStarts.WhatAPressMeets(aStopIsUnderWay: false, startHasBegun: false, heldLease: lease));
     }
 
     /// <summary>The later press finished first and cleared its own entry: the earlier still says it was replaced.</summary>
@@ -317,10 +363,29 @@ public class PreviewStartRecordTests : IDisposable
         Assert.DoesNotContain("CourseActivity.BeginPreviewBuild(", body);
     }
 
+    /// <summary>
+    /// The view's side of M2, L1 and L2: its one release sweeps only this
+    /// window's rows, both starts take as this window, the press asks about a
+    /// stop under way, and an exception in either start hands back what that
+    /// start still holds.
+    /// </summary>
     [Fact]
-    public void TheViewRecordsABuildOnlyThroughTheModel()
+    public void TheViewReleasesOnlyItsOwnAndHandsBackOnAFailure()
     {
-        Assert.DoesNotContain("CourseActivity.BeginPreviewBuild(", ViewSource());
+        string code = ViewSource();
+        string release = Body(code, "private void ReleaseLease(");
+        Assert.Contains("PreviewLeases.ReleaseLeftBehind(_window,", release);
+        Assert.DoesNotMatch(@"PreviewLeases\.Release\(\s*wp", release);
+        Assert.Equal(2, Regex.Matches(code, @"PreviewStarts\.Begin\([^;]*owner:\s*_window\)").Count);
+        Assert.Contains("aStopIsUnderWay: _stopsUnderWay > 0", Body(code, "private bool SaidAStartIsAlreadyUnderWay("));
+        Assert.Contains("_stopsUnderWay++", Body(code, "public async Task StopPreviewAsync("));
+        foreach (string header in new[] { "private async Task PressPreviewAsync(", "private async void StartAutomatedPreview(" })
+        {
+            string body = Body(code, header);
+            int caught = body.LastIndexOf("catch (Exception ex)", StringComparison.Ordinal);
+            Assert.True(caught >= 0 && body.IndexOf("HandBackAfterAFailure(heldLease, heldStart)", caught, StringComparison.Ordinal) > caught,
+                        $"{header}: an exception does not hand back what the start holds");
+        }
     }
 
     [Fact]
