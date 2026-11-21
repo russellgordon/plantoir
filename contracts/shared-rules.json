@@ -52995,9 +52995,120 @@
         "markers": "moved",
         "rederived": 0,
         "why": "The third hard review of U2b, LOW 1: the plain door's recovery cannot re-derive, so it leaves the step in flight; a write landing over it would be settled later as a hand edit and clear the list."
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies before anything is swapped in: nothing took effect, the folder where it was",
+        "work": "step",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:0",
+        "files": "before",
+        "phase": "failed",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies with the folder moved and nothing else in: the folder goes back, the edit inside judged where its folder now is",
+        "work": "step",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:1",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies with the folder and both pages in and the edit inside not: everything goes back",
+        "work": "step",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:3",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies with every change in but before applied: completed, the folder judged as if its edit were taken back and nothing staged left inside it",
+        "work": "step",
+        "withAMovedFolder": true,
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "movedFolder": "renamed, new"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies with only the edit inside taken back: put forward again, the kept copy of the page inside the folder never judged part of it",
+        "work": "undo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:1",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "movedFolder": "renamed, new"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies with the edit inside and both pages back and the folder not: put forward again",
+        "work": "undo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:3",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "movedFolder": "renamed, new"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies with everything back but before undone: completed, the edit judged in the folder's old place and no kept copy left inside it",
+        "work": "undo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeUndone",
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies the same way with the undo's kept copy of the page still inside the folder at its old place, as a tidy that could not remove it leaves it: completed, the copy never judged part of the folder, and removed, since the list holds what it holds",
+        "work": "undo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeUndone",
+        "keptCopyLeftInsideTheFolder": true,
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder moved again and nothing else: put back",
+        "work": "redo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:1",
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder and both pages in and the edit inside not: put back",
+        "work": "redo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:3",
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with every change in but before redone: completed",
+        "work": "redo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeRedone",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "movedFolder": "renamed, new"
       }
     ],
-    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared. withATree: the step also removes courses/TST1O/extra (a.md, sub/b.md: one removeTree, its content in the list) and moves the marker, so it swaps first, second, the folder aside, then the move (an undo: second, first, the move back, then the folder made); folderKept whether the folder is there after recovery. withAPreference: the step also sets the preference undoCasesPreference from a to b (one external op, its place after the pages); preference is its value after recovery. recoveredBy: who recovers: recovery (the default: the app's recovery, which re-derives what it settles), theNextWrite (the next step through the door for ops, which recovers and re-derives first), or anOrdinaryWrite (a step through U1's door, whose recovery inside its lock leaves a step that keeps a file true by a rule in flight, for a recovery that will re-derive it). changeTheFolderSetAside: before recovery a file is saved into the folder the stopped work set aside (under its hidden staged name); keptAside whether a folder is still kept aside after recovery. somethingInItsPlace: before recovery a different folder is made at the place of the folder set aside. visibleNameTaken: before recovery a folder is made at the visible name `courses/TST1O/extra (kept by Undo)` too. keptVisibleAs: the path of the visible name the folder set aside is kept under after recovery (it holds a.md). recoveryStopsAfterTheTidy: the first recovery stops at the kill point afterRecoveryTidied, once it has tidied and before it writes to the list (it must not have recorded the step interrupted), and a second recovery then runs. folderLines: how many 'undo found a folder set aside' trail lines the recoveries wrote. stopAt whileDeletingAFolder: the work stops after a folder it took out has been renamed to its `-gone` name and before its delete ends; halfDeleteTheGoneFolder then removes a.md from that `-gone` folder, as a delete that died part way leaves it. ordinaryWriteOn: first makes that write set the first page's title (the very file the stopped work left), otherwise a third page's; nextWrite is what that write comes to (anotherChangeIsUnderWay: refused, nothing changed). U3c: changeTheKeptOriginal: after the content is removed and before recovery, a line is added to every kept original (`-orig`) the stopped work left beside a page, so its hash no longer matches what the journal recorded; keptOriginalsBeside: the pages beside which a kept original of the step is still on the disk after recovery, and nothing else staged, which is also exactly what the 'undo could not put back a change that stopped' trail line names (when absent, nothing staged may be left). editRacesTheSwap: instead of stopping at stopAt, the step is made while another program appends a line to that page IN PLACE between its swap's re-read and its rename, and putting the original back then fails, so the step answers part way (leftPartWay) and is left in flight; keptOriginalsBeside then also matches what the 'undo kept what a page held' line names. fileInUseAtTheUndo: the final `undo` is made while every swap is still refused as a file in use; leftLines: how many 'undo refused for a change left part way' trail lines that undo wrote.",
+    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared. withATree: the step also removes courses/TST1O/extra (a.md, sub/b.md: one removeTree, its content in the list) and moves the marker, so it swaps first, second, the folder aside, then the move (an undo: second, first, the move back, then the folder made); folderKept whether the folder is there after recovery. withAPreference: the step also sets the preference undoCasesPreference from a to b (one external op, its place after the pages); preference is its value after recovery. recoveredBy: who recovers: recovery (the default: the app's recovery, which re-derives what it settles), theNextWrite (the next step through the door for ops, which recovers and re-derives first), or anOrdinaryWrite (a step through U1's door, whose recovery inside its lock leaves a step that keeps a file true by a rule in flight, for a recovery that will re-derive it). changeTheFolderSetAside: before recovery a file is saved into the folder the stopped work set aside (under its hidden staged name); keptAside whether a folder is still kept aside after recovery. somethingInItsPlace: before recovery a different folder is made at the place of the folder set aside. visibleNameTaken: before recovery a folder is made at the visible name `courses/TST1O/extra (kept by Undo)` too. keptVisibleAs: the path of the visible name the folder set aside is kept under after recovery (it holds a.md). recoveryStopsAfterTheTidy: the first recovery stops at the kill point afterRecoveryTidied, once it has tidied and before it writes to the list (it must not have recorded the step interrupted), and a second recovery then runs. folderLines: how many 'undo found a folder set aside' trail lines the recoveries wrote. stopAt whileDeletingAFolder: the work stops after a folder it took out has been renamed to its `-gone` name and before its delete ends; halfDeleteTheGoneFolder then removes a.md from that `-gone` folder, as a delete that died part way leaves it. ordinaryWriteOn: first makes that write set the first page's title (the very file the stopped work left), otherwise a third page's; nextWrite is what that write comes to (anotherChangeIsUnderWay: refused, nothing changed). U3c: changeTheKeptOriginal: after the content is removed and before recovery, a line is added to every kept original (`-orig`) the stopped work left beside a page, so its hash no longer matches what the journal recorded; keptOriginalsBeside: the pages beside which a kept original of the step is still on the disk after recovery, and nothing else staged, which is also exactly what the 'undo could not put back a change that stopped' trail line names (when absent, nothing staged may be left). editRacesTheSwap: instead of stopping at stopAt, the step is made while another program appends a line to that page IN PLACE between its swap's re-read and its rename, and putting the original back then fails, so the step answers part way (leftPartWay) and is left in flight; keptOriginalsBeside then also matches what the 'undo kept what a page held' line names. fileInUseAtTheUndo: the final `undo` is made while every swap is still refused as a file in use; leftLines: how many 'undo refused for a change left part way' trail lines that undo wrote. U4b: withAMovedFolder makes the step the same two pages through JournaledWrite.perform(ops:) plus courses/TST1O/media (a.md holding the lines `Intro.`, `Line one: old.` and `End.`; b.md holding `B`) moved to courses/TST1O/renamed and a `replaceText` naming courses/TST1O/renamed/a.md that turns `Line one: old.` into `new`, in that order, so it swaps the folder first, then first, second, then the edit inside (an undo: the edit inside, second, first, then the folder back); movedFolder is what stackCases' movedFolder says after recovery. keptCopyLeftInsideTheFolder: before recovery a file is written inside the folder at its old place under the undo's kept-original name for a.md (`.a.md.plantoir-undo-<seq>-undo-orig`), holding what a.md held before the undo (`Line one: new.`). No staged file or kept original may be left anywhere in the working folder, the moved folder included.",
     "deployedCases": [
       {
         "name": "never deployed: no fragment, no offer",

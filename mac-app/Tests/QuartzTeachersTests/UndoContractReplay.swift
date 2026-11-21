@@ -1387,7 +1387,7 @@ nonisolated enum UndoContractReplay {
         "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
-        "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored",
+        "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored", "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1459,6 +1459,21 @@ nonisolated enum UndoContractReplay {
             let withAMove: Bool = testCase["withAMove"] as? Bool == true
             let withATree: Bool = testCase["withATree"] as? Bool == true
             let withAPreference: Bool = testCase["withAPreference"] as? Bool == true
+            // U4b: the same two pages, plus a folder moved and a page inside
+            // it edited at its new place (opKinds.wholeOps' order).
+            let withAMovedFolder: Bool = testCase["withAMovedFolder"] as? Bool == true
+            var folderOps: [UndoOp] = []
+            if withAMovedFolder {
+                for (fileName, content) in UndoContractKinds.mediaFiles {
+                    try write(content, to: UndoContractKinds.mediaFolder + "/" + fileName, in: root)
+                }
+                if let listingSha = UndoTreeReading.read(at: root.appendingPathComponent(UndoContractKinds.mediaFolder)).listingSha {
+                    folderOps.append(UndoOp.moveFolder(from: UndoContractKinds.mediaFolder, to: UndoContractKinds.renamedFolder, listingSha: listingSha))
+                    folderOps.append(UndoOp.replaceText(
+                        path: UndoContractKinds.renamedFolder + "/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+                    ))
+                }
+            }
             let places: UndoMemoryPlaces = UndoMemoryPlaces()
             _ = places.write(UndoContractKinds.preference, .string("a"))
             var treeBlobs: [Data] = []
@@ -1476,7 +1491,7 @@ nonisolated enum UndoContractReplay {
                 }
             }
             func makeTheStep() -> JournaledWriteOutcome {
-                if !withAMove && !withATree && !withAPreference {
+                if !withAMove && !withATree && !withAPreference && !withAMovedFolder {
                     return JournaledWrite.perform(stepDraft, in: dying, mode: mode)
                 }
                 var ops: [UndoOp] = []
@@ -1508,6 +1523,9 @@ nonisolated enum UndoContractReplay {
                         from: UndoContractKinds.markerFrom, to: UndoContractKinds.markerTo,
                         sha: UndoHash.sha256(of: Data(UndoContractKinds.oldMarker.utf8))
                     ))
+                }
+                for folderOp in folderOps {
+                    ops.append(folderOp)
                 }
                 if withAMove {
                     ops.append(UndoOp.recompute(path: "courses/TST1O/Section 1/index.md", maintainer: "sectionFrontPage", section: 1))
@@ -1678,6 +1696,13 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': no folder under its -gone name to half delete")
                 }
             }
+            if testCase["keptCopyLeftInsideTheFolder"] as? Bool == true {
+                // As a tidy that could not remove it leaves it: the undo's
+                // kept copy of a.md, inside the folder moved back (U4b).
+                let page: URL = root.appendingPathComponent(UndoContractKinds.mediaFolder + "/a.md")
+                let held: String = (UndoContractKinds.mediaFiles["a.md"] ?? "").replacingOccurrences(of: "Line one: old.", with: "Line one: new.")
+                try Data(held.utf8).write(to: UndoSwap.besideURL(for: page, label: "\(workSeq)-undo", role: "orig"))
+            }
             if testCase["visibleNameTaken"] as? Bool == true {
                 try write("earlier\n", to: UndoContractKinds.extraFolder + " (kept by Undo)/earlier.md", in: root)
             }
@@ -1798,6 +1823,9 @@ nonisolated enum UndoContractReplay {
             }
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("recoveryCases '\(name)': the folder is there: \(!kept)")
+            }
+            if let wanted = string(testCase["movedFolder"]), UndoContractKinds.movedFolder(in: root) != wanted {
+                failures.append("recoveryCases '\(name)': the moved folder is \(UndoContractKinds.movedFolder(in: root)), not \(wanted)")
             }
             if let wanted = string(testCase["preference"]), places.read(UndoContractKinds.preference) != .value(.string(wanted)) {
                 failures.append("recoveryCases '\(name)': the preference is \(places.read(UndoContractKinds.preference)), not \(wanted)")

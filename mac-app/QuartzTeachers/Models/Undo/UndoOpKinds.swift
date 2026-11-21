@@ -1006,13 +1006,21 @@ nonisolated extension UndoCheck {
     /// free, either holding something else) is a change since, so an undo
     /// leaves BOTH where they are and takes nothing back, and never deletes
     /// the destination alone.
-    static func wholeState(of op: UndoOp, root: URL, places: UndoExternalPlaces, overridingTo: [String: UndoItem] = [:]) -> UndoOpState {
+    ///
+    /// `overridingTo` and `overridingFrom` give, for paths inside the place
+    /// on that side, what they would hold once the step's own edits there
+    /// are taken back, and `.absent` for the step's own staged files and
+    /// kept originals (U4b, opKinds.wholeOps): see `UndoMoveSide.read`.
+    static func wholeState(
+        of op: UndoOp, root: URL, places: UndoExternalPlaces,
+        overridingTo: [String: UndoItem] = [:], overridingFrom: [String: UndoItem] = [:]
+    ) -> UndoOpState {
         switch op.knownKind {
         case .move, .moveApart, .setAside:
             guard let from = op.from, let to = op.to else {
                 return .neither
             }
-            let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(from))
+            let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
             let atTo: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)
             if atFrom == .cannotRead || atTo == .cannotRead {
                 return .cannotTell

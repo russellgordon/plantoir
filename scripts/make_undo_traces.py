@@ -911,6 +911,120 @@ def carried_edits(ops):
     return found
 
 
+def swap_groups(ops, backward):
+    """The order a swap makes a step's changes in (UndoCheck.plan's targets),
+    one group of ops per target: forward, each move that carries edits
+    first, then each file in the order the ops first name it, then every
+    other whole op; backward, each file in the reversed ops' order, then
+    every whole op, reversed (U4b, opKinds.wholeOps' order)."""
+    ordered = list(reversed(ops)) if backward else list(ops)
+    carriers = carried_edits(ops)
+    carrying = [op for op in ordered if any(carrier is op for carrier in carriers.values())]
+    leading = [] if backward else [[op] for op in carrying]
+    files, by_path, wholes = [], {}, []
+    for op in ordered:
+        if op["kind"] == "recompute" or any(group[0] is op for group in leading):
+            continue
+        if op["kind"] in WHOLE_KINDS:
+            wholes.append([op])
+            continue
+        if op["path"] not in by_path:
+            by_path[op["path"]] = []
+            files.append(by_path[op["path"]])
+        by_path[op["path"]].append(op)
+    return leading + files + wholes
+
+
+def stopped_part_way(ops, backward, pages, swapped):
+    """What a step's swap leaves when its process is killed before the
+    target numbered `swapped` (None: every target in): each group made in
+    turn, judged and moved on its own."""
+    pages = dict(pages)
+    groups = swap_groups(ops, backward)
+    for group in groups[:len(groups) if swapped is None else swapped]:
+        result = plan(group, backward, pages)
+        assert result[0] == "ready", result
+        for path, text in result[1].items():
+            if text is None:
+                pages.pop(path, None)
+            else:
+                pages[path] = text
+    return pages
+
+
+def move_is_at_its_old_place(move, pages):
+    """Nothing at a move's `to` and something at its `from`."""
+    def there(place):
+        return pages.get(place) is not None or folder_of_pages(pages, place) is not None
+    return not there(move["to"]) and there(move["from"])
+
+
+def recovery_states(ops, pages):
+    """UndoRecovery.fileStates: where each place of a step stands now. An
+    edit a move carries is read where its folder is now, and the move is
+    judged as if the step's edits inside it were taken back (U4b). The
+    model holds no staged files, so it cannot show the swap's own kept
+    originals inside the folder being left out: only the Swift replay
+    shows that."""
+    carriers = carried_edits(ops)
+    states = {}
+    for op in ops:
+        kind = op["kind"]
+        if kind == "recompute":
+            continue
+        if kind in WHOLE_KINDS:
+            place = op.get("path") or op.get("from") or op.get("target")
+            seen = pages
+            if any(carrier is op for carrier in carriers.values()):
+                old_place = move_is_at_its_old_place(op, pages)
+                seen = dict(pages)
+                for path, carrier in carriers.items():
+                    if carrier is not op:
+                        continue
+                    side = carrier["from"] + path[len(carrier["to"]):] if old_place else path
+                    edits = [dict(edit, path=side) for edit in ops if edit.get("path") == path]
+                    taken_back = plan(edits, True, seen)
+                    if taken_back[0] == "ready" and side in taken_back[1]:
+                        seen[side] = taken_back[1][side]
+            states[place] = whole_state(op, seen)
+            continue
+        path = op["path"]
+        read_path = path
+        carrier = carriers.get(path)
+        if carrier is not None and move_is_at_its_old_place(carrier, pages):
+            read_path = carrier["from"] + path[len(carrier["to"]):]
+        state = op_state(op, pages.get(read_path))
+        earlier = states.get(path)
+        states[path] = state if earlier in (None, state) else "neither"
+    return states
+
+
+def recover(ops, pages, started_from_before):
+    """UndoRecovery.settle, live: nothing took effect, completed, or what
+    took effect put back, judged by content alone; anything neither is in
+    the way. Answers (outcome, pages)."""
+    start, end = ("before", "after") if started_from_before else ("after", "before")
+    states = recovery_states(ops, pages)
+    if any(state == "neither" for state in states.values()):
+        return ("interrupted", pages)
+    if all(state == start for state in states.values()):
+        return ("nothingTookEffect", pages)
+    if all(state == end for state in states.values()):
+        return ("completed", pages)
+    at_end = [op for op in ops if op["kind"] != "recompute"
+              and states.get(op.get("path") or op.get("from") or op.get("target")) == end]
+    result = plan(at_end, started_from_before, pages)
+    if result[0] != "ready":
+        return ("interrupted", pages)
+    pages = dict(pages)
+    for path, text in result[1].items():
+        if text is None:
+            pages.pop(path, None)
+        else:
+            pages[path] = text
+    return ("rolledBack", pages)
+
+
 def folder_of_pages(pages, place):
     """A folder the model holds as its files (U4b): the files under `place`
     as a tree, or None when it holds none."""

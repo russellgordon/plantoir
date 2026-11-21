@@ -1007,6 +1007,42 @@ class ContractCaseTests(unittest.TestCase):
                 if "schoolYear" in case:
                     self.assertEqual(json.loads(model.pages[self.SETTINGS])["school_year"], case["schoolYear"])
 
+    def test_recovery_cases_with_a_moved_folder(self):
+        """undo.recoveryCases' U4b rows (withAMovedFolder): a step killed
+        between its move and the edits it carries settles whole, judged by
+        content. The model holds no staged files, so
+        keptCopyLeftInsideTheFolder is the Swift replay's alone."""
+        cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAMovedFolder")]
+        self.assertEqual(len(cases), 11)
+        first, second = "courses/TST1O/Section 1/Classes/A.md", "courses/TST1O/Section 1/Classes/B.md"
+        before_text = "---\ntitle: A\npublish: false\n---\nBody.\n"
+        texts = {first: before_text, second: before_text.replace("title: A", "title: B")}
+        pages = dict(texts)
+        for name, text in self.MEDIA_FILES.items():
+            pages[self.MEDIA + "/" + name] = text
+        ops = []
+        for path, text in texts.items():
+            ops += traces.ops_for_change(path, text, text.replace("publish: false", "publish: true"))
+        tree = traces.folder_of_pages(pages, self.MEDIA)
+        ops.append({"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)})
+        ops.append({"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"})
+        after_pages = traces.stopped_part_way(ops, False, pages, None)
+        phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
+                  ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done",
+                  ("redo", "nothingTookEffect"): "undone", ("redo", "completed"): "done", ("redo", "rolledBack"): "undone"}
+        for case in cases:
+            with self.subTest(case["name"]):
+                work, stop = case["work"], case["stopAt"]
+                swapped = int(stop.split(":")[1]) if stop.startswith("beforeSwap:") else None
+                starting = after_pages if work == "undo" else pages
+                left = traces.stopped_part_way(ops, work == "undo", starting, swapped)
+                outcome, settled = traces.recover(ops, left, work != "undo")
+                self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
+                wanted = pages if case["files"] == "before" else after_pages
+                self.assertEqual((settled.get(first), settled.get(second)), (wanted[first], wanted[second]))
+                self.assertEqual(self.moved_folder(type("Settled", (), {"pages": settled})), case["movedFolder"])
+
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;
         # the director's rulings 1 and 3 on U1's third round added the flip
