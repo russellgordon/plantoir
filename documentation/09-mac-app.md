@@ -21314,8 +21314,9 @@ that takes every kind (`JournaledWrite.perform(ops:)`, from
    `links-checklist-answered.json`, `later-classes-kept.json`) and each
    published-pages fragment moved into `…published-pages.previous-<stamp>/`
    (`move`), planned by `PublishedPagesRecord.release(…, into: step)`;
-3. with "new", each site marker moved aside (`moveApart`), planned by
-   `DeployCommand.planSiteRelease`;
+3. with "new", each site marker a deploy reads moved aside (`moveApart`),
+   and each leftover no deploy reads set aside on its own (`setAside`),
+   planned by `DeployCommand.planSiteRelease`;
 4. with "new", each deploy set for later in this working folder for the
    section turned off (`external`, target `scheduledDeploy:<label>`);
 5. the front page (`recompute`, `sectionFrontPage`), repointed by the runner
@@ -21361,44 +21362,100 @@ changed). Two exceptions are deliberate, each true:
   (`load_netlify_marker`): the current record (`.netlify_sites/section<N>.json`)
   is the one read; only when there is none is a legacy record that reads as
   JSON written there (its bytes, mode 0600) and the legacy one removed.
-  **A legacy record a deploy would NOT read** (a current record is there
-  and holds other bytes, or it is not JSON) is a stale leftover, and the
-  rollover is never stopped by it (Russell's ruling of 2026-11-20,
-  evening, replacing the fix round's refusal): it is brought in beside the
-  current record as `.netlify_sites/section<N>.from-built-output.json`, a
-  name deploy.py never reads, and `planSiteRelease` sets it aside in the
-  step as one more `moveApart` (kept as
-  `section<N>.from-built-output.previous-<stamp>.json`), one of the
-  section's records that move as a group. It is gone from the built output,
-  so a later deploy cannot migrate it back in; Undo puts it back byte for
-  byte at the place the step found it, beside the current record (a step
-  cannot name the built output), and Redo sets it aside again. Beside the
-  SAME bytes, the legacy record is what a migration that stopped before its
-  removal leaves, and it is only removed (the migration finished). The
-  only refusal left is a record that cannot be read, written or removed,
-  said as "Nothing was changed: the website record
-  “.merged_output/section1/.netlify_site.json” could not be moved to
-  “.netlify_sites/section1.json”." (`LegacyMarkerNotMovedIn`; the place
-  written, and a `.netlify_sites` folder the bring-in made, are removed
-  again, so the folder is as it was). Every record is placed WHOLE
+
+  **One question decides every record: which one would `deploy.py` read
+  right now?** (the review of U3b's fixes, round three, MEDIUM 1). It is
+  answered in one place, `DeployCommand.netlifyRecordADeployReads`, with
+  exactly `load_netlify_marker`'s rule: a current record that parses as JSON
+  wins, whatever it holds (`null` included, which names no site, so a
+  deploy starts a new website and does not migrate); else a legacy record
+  that parses, which a deploy would migrate; else none. "Parses" is
+  Python's `json.loads(path.read_text(encoding="utf-8"))`: strict UTF-8, no
+  byte order mark (Python's `json` refuses one), any JSON value
+  (`DeployCommand.parsedRecord`). The rule is pinned by
+  `contracts/shared-rules.json` → `undo.netlifyRecordCases`, 13 states, run
+  through deploy.py's OWN function by
+  `scripts/test_netlify_record_a_deploy_reads.py` and through the Swift by
+  `UndoRolloverStepTests.testWhichRecordADeployReadsIsTheContracts`; one
+  table drives both. Known to differ only on what no tool writes: Python's
+  `json` also takes `NaN` and `Infinity`, and numbers too large for a
+  double. The record a deploy reads is the section's website; **every other
+  record is a LEFTOVER that no deploy reads, and a leftover never decides
+  anything**. So:
+
+  - the legacy record is the one read (no current record, or one that does
+    not parse): it is written in the current record's place and removed
+    from the built output, as a deploy's migration does. A current record
+    there that does not parse (a migration's `write_text` killed part way,
+    the state the review found) is the leftover: it is first moved out of
+    the way to `.netlify_sites/section<N>.unreadable.json`, where the
+    migration would have written over it. Before this round the bring-in
+    asked only whether a current record EXISTED, took the good legacy
+    record for a stale leftover, and after Rollover and Undo a deploy found
+    no record and made a new website;
+  - the current record is the one read: the legacy record is a leftover.
+    When it says the same as the current record (compared PARSED, never by
+    bytes: `deploy.py` rewrites a record it migrates with
+    `json.dumps(indent=2)`, so a byte comparison never matched one, LOW 7),
+    it is what a migration that stopped before its removal leaves, and it
+    is only removed. Otherwise it is brought in as
+    `.netlify_sites/section<N>.from-built-output.json`, gone from the built
+    output so a later deploy cannot migrate it back in;
+  - neither parses: the legacy record is a leftover, brought in the same
+    way, and the section was on no website: the reply is the one for a
+    section that had none (`menuRollOverNotDeployedYet`,
+    `rolloverHadNoWebsiteYet`), never "started a new website… last year's
+    details are kept at…" for a junk file (LOW 4). A leftover is never in
+    `SiteRelease.keptFiles`; its two halves are in `savedFiles`, so today's
+    undo puts it back.
+
+  A leftover name already taken never stops a rollover (Russell, 2026-11-20,
+  evening; LOW 5): the next free name is taken
+  (`section<N>.from-built-output.2.json`, `.3`, and so on;
+  `DeployCommand.nextFreeLeftoverURL`), and a legacy record whose bytes a
+  leftover already there holds (a bring-in that died before its removal) is
+  only removed. The step (`planSiteRelease`) sets every leftover aside, kept
+  as its name with `.previous-<stamp>` before `.json` (a current record that
+  does not parse, with no good legacy record, as
+  `section<N>.unreadable.previous-<stamp>.json`), each as a **`setAside`**
+  op: judged and moved as `move` is, standing apart from its step ON ITS
+  OWN, never one of the group of records (below). Undo puts a leftover back
+  byte for byte where the step found it; a leftover that cannot be set
+  aside is left where it is, since no deploy reads it. Before the rollover
+  and after its Undo a deploy reads the same site, in every state
+  (`testEveryRecordStateRolledOverUndoneAndRedoneLeavesADeployOnTheSameSite`:
+  each of the 13 states, and each again with a `.from-built-output.json`
+  already there, rolled over, undone and redone).
+
+  The only refusal left is a record that cannot be read, written, moved or
+  removed (or a current record that is there and cannot be read at all, so
+  what a deploy reads cannot be known), said as "Nothing was changed: the
+  website record “.merged_output/section1/.netlify_site.json” could not be
+  moved to “.netlify_sites/section1.json”." (`LegacyMarkerNotMovedIn`; what
+  the bring-in changed is changed back, and a `.netlify_sites` folder it
+  made removed, so the folder is as it was). Every record is placed WHOLE
   (`DeployCommand.placeWhole`: written beside its place as
   `.<name>.bringing-in-<id>`, its mode set, then renamed in, never over
   anything), so a death mid-write leaves no partial record where a deploy
-  reads one (a partial current record would have made the next rollover
-  set the good legacy record aside as stale); the next bring-in removes
-  any such half-written copy. This code lives in
+  reads one; the next bring-in removes any such half-written copy of any
+  of the section's records. This code lives in
   `Models/LegacyNetlifyRecord.swift`, which the writer scan lists as
   `notAStep` (the built output is outside the working folder, and the
   bring-in is a deploy's own migration), so U4 does not take it as work.
 
   **A step refused after the record was brought in puts it back**
   (`LegacyMarkerBroughtIn.putBack`, from `makeTheRolloverStep`: never over
-  anything, and only while its new place still holds the same bytes), so
-  "Nothing was changed" is true. If it cannot be put back, the reply says
-  what moved instead: "Nothing else was changed: … The website record “…”
-  is now at “…”, where a deploy reads it; it names the same website." (for
-  a stale leftover: "The old website record “…” is now at “…”, where no
-  deploy reads it.") (`RolloverStoppedAfterARecordMoved`, `saidWhenTheRolloverStopped`). A
+  anything, and only while its new place still holds the same bytes; a
+  current record moved out of its way is moved back; the `.netlify_sites`
+  folder the bring-in made is removed once it is empty again, LOW 6), so
+  "Nothing was changed" is true. If any of it cannot be put back, the reply
+  says what is still moved instead: "Nothing else was changed: … The
+  website record “…” is now at “…”, where a deploy reads it; it names the
+  same website." (for a leftover: "The old website record “…” is now at
+  “…”, where no deploy reads it."; for a current record moved out of the
+  way: "The website record “…”, which no deploy could read, is now at “…”,
+  where no deploy reads it either.") (`RolloverStoppedAfterARecordMoved`,
+  `saidWhenTheRolloverStopped`). A
   step left part way, or a process that dies, leaves it where it is: the
   step's own `before` names it there, and recovery settles the step from
   that. Gone with the fix round's design: the move outside the step,
@@ -21461,7 +21518,15 @@ put one back and leave the other: the section split across two websites.
 So `UndoCheck.plan` first asks whether any `moveApart` of the step is
 changed since (`aWebsiteRecordIsChangedSince`); if one is, every one not
 already where it is wanted is left apart and named, and U7 says once that
-the section stays on its new website. Redo the same way.
+the section stays on its new website. Redo the same way. **The group is the
+records a deploy reads, never a leftover** (the review of U3b's fixes,
+LOW 3): a leftover is a `setAside`, so a teacher who deletes or edits a
+leftover, or its kept copy, has it skipped and named at Undo or Redo while
+the records go back (or forward); and a record changed since keeps only the
+records apart, while the leftover goes back with the rest
+(`testALeftoverChangedOrMissingIsSkippedAndNamedAndTheRecordGoesBack`).
+`setAside` is a kind of its own for `moveApart`'s reason: a key on
+`moveApart` would be read by an older reader as a group member.
 
 The schedule stands apart too, by its family: an `external` op on
 `scheduledDeploy:` that an Undo cannot set back because the job's moment
@@ -21477,8 +21542,20 @@ named after what the check left apart, never a refusal of the whole Undo
 that stayed loaded would otherwise block its step, and every step under
 it, for good (the review of U3b, LOW 3). If launchd refuses and the plist
 just written cannot be taken away again, it stays in LaunchAgents and loads
-at the next login, so the schedule IS set back: `write` answers true and
-the Undo does not name it as left apart (the re-review, LOW 4). Undone while its moment is ahead, the plist and its script
+at the next login: it is neither back (it will not run at its moment unless
+the teacher logs out and in before it) nor left apart (it will run). It has
+its own answer (the review of U3b's fixes, round three, LOW 2):
+`UndoExternalPlaces.writeSaying` answers `.startsAtTheNextLogin`, the swap
+names its target in `UndoOutcome.undone(seq:, leftApart:,
+startsAtTheNextLogin:)` (or `redone`), U7 says
+`AssistWording.undoScheduleStartsAtTheNextLogin` ("The deploy set for later
+is back, but it could not be started now. It starts the next time you log
+in, so it will not run at its time unless you log out and back in before
+then."), and the trail says `scheduled deploy could not be set` with "put
+back a scheduled deploy for <moment>, but macOS would not start it now; it
+starts the next time you log in to this Mac, and will not run at its time
+unless you log out and in before then"
+(`testAScheduleWhosePlistCannotBeTakenAwayAgainStartsAtTheNextLoginAndIsSaidSo`). Undone while its moment is ahead, the plist and its script
 come back byte for byte and the job is loaded again (`UndoScheduledDeploys`,
 through the action's own `LaunchControlRunning`, never the real
 `launchctl` under the suite). That runner is the main actor's, so a write
@@ -21488,12 +21565,16 @@ or give the runner a nonisolated form, and must pass `UndoAppPlaces` (not
 the core's default `UndoAppPreferences`) as `places` to every Undo, Redo
 and recovery.
 
-Cases: `checkCases` (4 `moveApart` rows), `stackCases` (8 U3b rows: the
-calls `rollOverOntoANewWebsite`, `rollOverOntoNewWebsitesOnTwoHosts`,
-`rollOverTurningOffASchedule` and `theScheduleCannotBeSetNow`, keys
-`leftApart`, `schoolYear` and `cloudflareMarkers`), both replayed by the
-Mac and the Python model (`plan(…, leaves_apart=True)`, its group rule, and
-`set_or_leave_apart` for a schedule the swap cannot set). The group rule
+Cases: `checkCases` (4 `moveApart` rows, 3 `setAside` rows), `stackCases`
+(13 U3b rows: the calls `rollOverOntoANewWebsite`,
+`rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`,
+`theScheduleCannotBeSetNow`, `rollOverSettingALeftoverAside`,
+`removeTheKeptLeftover` and `theScheduleStartsOnlyAtTheNextLogin`, keys
+`leftApart`, `schoolYear`, `cloudflareMarkers`, `leftoverMarkers` and
+`startsAtTheNextLogin`), both replayed by the Mac and the Python model
+(`plan(…, leaves_apart=True)`, its group rule, and `set_or_leave_apart` for
+a schedule the swap cannot set or that starts at the next login), and
+`netlifyRecordCases` (13 rows, above). The traces are byte-identical. The group rule
 is a rule of a step, not of one op, so it has no `checkCases` row: a check
 case holds a single op.
 
@@ -21512,7 +21593,7 @@ death between bringing in the legacy record and the step's begin leaves
 the record in its current place and the legacy one gone (or, between the
 write and the removal, both holding the same bytes): a deploy reads the
 current one, the same website, and the next rollover finishes the removal
-(`testACrashBetweenBringingInTheLegacyRecordAndTheStepLeavesAFolderADeployReads`). A stale leftover brought in and then killed at
+(`testACrashBetweenBringingInTheLegacyRecordAndTheStepLeavesAFolderADeployReads`). A leftover brought in and then killed at
 any point is the same: after the bring-in or between the swaps it is beside
 the current record (the step closed `failed` or `rolledBack`), after the
 last swap it is set aside (`done`), and never back in the built output
