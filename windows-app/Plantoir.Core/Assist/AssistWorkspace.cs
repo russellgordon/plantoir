@@ -4025,7 +4025,10 @@ public sealed partial class AssistWorkspace
         created = new List<string>();
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
-        if (plan.ChangesNothing)
+        // A plan that adds nothing because the dates ran out also changes
+        // nothing; its reason is the one actionable sentence, so it is said
+        // first (the mac's makeRoomForClasses; #1027 review 2, M2).
+        if (plan.ChangesNothing && plan.Problems.Count == 0)
             return new AssistResult(true, "Nothing needed moving.", null);
         if (plan.Added.Count == 0)
             throw new AssistRefusal(string.Join(" ", plan.Problems),
