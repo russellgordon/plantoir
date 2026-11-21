@@ -29,6 +29,10 @@ public sealed class UndoRecoveryContractTests
         "withAMove", "deployBeforeRecovery", "markers", "rederived", "withATree", "withAPreference", "folderKept", "preference",
         "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace", "nextWrite", "ordinaryWriteOn",
         "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
+        // U3c's (W4c)
+        "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
+        "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
+        "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored",
     };
 
     private const string First = "courses/TST1O/Section 1/Classes/first.md";
@@ -82,12 +86,14 @@ public sealed class UndoRecoveryContractTests
             Assert.True(KeysChecked.Contains(key.Name), "a key this replay does not check: " + key.Name);
 
         string work = recoveryCase.GetProperty("work").GetString()!;
-        string stopAt = recoveryCase.GetProperty("stopAt").GetString()!;
+        // editRacesTheSwap's row has no kill point: the step is left part way by the race itself.
+        string stopAt = recoveryCase.TryGetProperty("stopAt", out JsonElement stop) ? stop.GetString()! : "none";
         bool shadow = recoveryCase.TryGetProperty("mode", out JsonElement mode) && mode.GetString() == "shadow";
         bool wholeFile = Flag(recoveryCase, "wholeFile");
         UndoMode undoMode = shadow ? UndoMode.Shadow : UndoMode.Live;
 
         using var scribe = new UndoScribe();
+        using var denials = new UndoDenials();
         byte[] Before(string path) => Encoding.UTF8.GetBytes(Page(Path.GetFileNameWithoutExtension(path), false, wholeFile));
         byte[] After(string path) => Encoding.UTF8.GetBytes(Page(Path.GetFileNameWithoutExtension(path), true, wholeFile));
         foreach (string path in new[] { First, Second, Third }) scribe.WritePage("A", path, Before(path));
@@ -153,7 +159,28 @@ public sealed class UndoRecoveryContractTests
 
         UndoOutcome stopped;
         long seq;
-        if (work == "step")
+        string? raced = recoveryCase.TryGetProperty("editRacesTheSwap", out JsonElement racedPage) ? PathOf(racedPage.GetString()!) : null;
+        if (work == "step" && raced is not null)
+        {
+            // Another program edits the page IN PLACE between the swap's keep
+            // and its rename (into the file the kept original is a link to),
+            // and putting the original back fails: the step is left part way.
+            string racedFull = scribe.FullPath("A", raced);
+            var racing = new UndoSeams
+            {
+                BetweenKeepingAndRenaming = (_, full) =>
+                {
+                    if (!string.Equals(full, racedFull, StringComparison.OrdinalIgnoreCase)) return;
+                    using var stream = new FileStream(full, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                    stream.Write("Edited in Obsidian.\n"u8);
+                },
+                PutBackFailsAt = index => index == 0,
+            };
+            stopped = MakeTheStep(scribe.Door(racing, workPid, undoMode));
+            seq = scribe.Fold().Steps.Keys.Max();
+            Assert.True(stopped.Kind == UndoOutcomeKind.Refused, "the raced step was not left part way: " + stopped.Word);
+        }
+        else if (work == "step")
         {
             stopped = MakeTheStep(scribe.Door(stopping, workPid, undoMode));
             seq = scribe.Fold().Steps.Keys.Max();
@@ -166,7 +193,7 @@ public sealed class UndoRecoveryContractTests
             if (work == "redo") Assert.Equal(UndoOutcomeKind.Undone, scribe.Door(mode: undoMode).Undo().Kind);
             stopped = work == "undo" ? scribe.Door(stopping, workPid, undoMode).Undo() : scribe.Door(stopping, workPid, undoMode).Redo();
         }
-        Assert.True(stopped.Kind == UndoOutcomeKind.StoppedByATest, $"the work did not stop at {stopAt}: {stopped.Word}");
+        if (raced is null) Assert.True(stopped.Kind == UndoOutcomeKind.StoppedByATest, $"the work did not stop at {stopAt}: {stopped.Word}");
         if (otherSeq is { } other) Assert.Equal(other + 1, seq);
         Assert.True(scribe.Fold().Steps[seq].IsInFlight);
         var asLeft = new Dictionary<string, byte[]?> { [First] = scribe.Page("A", First), [Second] = scribe.Page("A", Second) };
@@ -179,6 +206,36 @@ public sealed class UndoRecoveryContractTests
         }
         var edits = new Dictionary<string, byte[]?> { [First] = scribe.Page("A", First), [Second] = scribe.Page("A", Second) };
         if (Flag(recoveryCase, "contentRemovedBeforeRecovery")) scribe.RemoveContent();
+        // U3c (W4c): the list's content folder taking no new file; one page's
+        // kept originals' content gone from the list, its folder taking no new
+        // file; the kept originals unreadable just now, or changed.
+        string content = Path.Combine(scribe.JournalFolder, "content");
+        if (Flag(recoveryCase, "contentCannotBeStored")) denials.FolderTakesNothingNew(content);
+        if (recoveryCase.TryGetProperty("keptContentGoneAndCannotBeStored", out JsonElement goneFor))
+        {
+            string place = scribe.FullPath("A", PathOf(goneFor.GetString()!));
+            int taken = 0;
+            foreach (string kept in KeptBeside(scribe, place))
+            {
+                string blob = scribe.Journal.BlobPath(UndoCheck.Sha(File.ReadAllBytes(kept)));
+                if (File.Exists(blob)) File.Delete(blob);
+                denials.FolderTakesNothingNew(Path.GetDirectoryName(blob)!);
+                taken++;
+            }
+            Assert.True(taken > 0, "no kept original beside the page whose content to take away");
+        }
+        if (Flag(recoveryCase, "keptOriginalUnreadable"))
+        {
+            List<string> kept = KeptOriginals(scribe);
+            Assert.NotEmpty(kept);
+            foreach (string file in kept) denials.FileCannotBeRead(file);
+        }
+        if (Flag(recoveryCase, "changeTheKeptOriginal"))
+        {
+            List<string> kept = KeptOriginals(scribe);
+            Assert.NotEmpty(kept);
+            foreach (string file in kept) File.AppendAllText(file, "A line added to the kept original.\n");
+        }
         bool away = Flag(recoveryCase, "moveFolderBeforeRecovery");
         if (away) scribe.MoveFolderAway("A");
         if (Flag(recoveryCase, "changeTheFolderSetAside"))
@@ -243,6 +300,14 @@ public sealed class UndoRecoveryContractTests
                     UndoRecoveryRun first = scribe.Door(new UndoSeams { StopsHere = (at, _) => at == "afterRecoveryTidied" }, mode: undoMode).Recover();
                     Assert.True(first.StoppedByATest);
                     Assert.NotEqual(UndoStepState.Interrupted, scribe.Fold().Steps[seq].State);
+                    if (recoveryCase.TryGetProperty("keptOriginalsAfterTheTidy", out JsonElement keptAfter))
+                    {
+                        // The tidy before the plan kept each named page's kept
+                        // original, though the list gives its bytes.
+                        var wanted = keptAfter.EnumerateArray().Select(page => Path.GetFileName(PathOf(page.GetString()!))).OrderBy(name => name, StringComparer.Ordinal).ToList();
+                        var places = KeptOriginals(scribe).Select(file => UndoSwap.PlaceOfStagedName(Path.GetFileName(file))!).OrderBy(name => name, StringComparer.Ordinal).ToList();
+                        Assert.Equal(wanted, places);
+                    }
                 }
                 run = scribe.Door(mode: undoMode).Recover();
             }
@@ -271,6 +336,30 @@ public sealed class UndoRecoveryContractTests
             Assert.Equal(folderLines.GetInt32(), said);
         }
         List<string> leftovers = away ? [] : scribe.StagedLeftovers("A");
+        // U3c's (W4c): exactly one kept original beside each page named,
+        // nothing else staged, and the trail line names exactly those.
+        List<UndoTrailLine> keptLines;
+        lock (scribe.TrailLines)
+            keptLines = scribe.TrailLines.Where(line => line.Event is Plantoir.Core.Scripting.ActivityTrail.Event.UndoCouldNotPutBack
+                                                                  or Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatAPageHeld).ToList();
+        var keptNamedOnTheTrail = keptLines.SelectMany(line => line.Kept ?? []).OrderBy(name => name, StringComparer.Ordinal).ToList();
+        bool keptBeside = recoveryCase.TryGetProperty("keptOriginalsBeside", out JsonElement keptOriginalsBeside);
+        if (keptBeside)
+        {
+            var wanted = keptOriginalsBeside.EnumerateArray().Select(page => Path.GetFileName(PathOf(page.GetString()!))).OrderBy(name => name, StringComparer.Ordinal).ToList();
+            var found = leftovers.Select(file => Path.GetFileName(file))
+                                 .Select(name => name.EndsWith("-orig", StringComparison.Ordinal) ? UndoSwap.PlaceOfStagedName(name)! : name)
+                                 .OrderBy(name => name, StringComparer.Ordinal).ToList();
+            Assert.Equal(wanted, found);
+            Assert.Single(keptLines);
+            Assert.Equal(leftovers.Select(file => Path.GetFileName(file)).OrderBy(name => name, StringComparer.Ordinal).ToList(), keptNamedOnTheTrail);
+        }
+        if (recoveryCase.TryGetProperty("keptNoLongerInTheList", out JsonElement noLonger))
+        {
+            Assert.NotEmpty(keptNamedOnTheTrail);
+            var said = keptLines.SelectMany(line => line.NoLongerInTheList ?? []).OrderBy(name => name, StringComparer.Ordinal).ToList();
+            Assert.Equal(noLonger.GetBoolean() ? keptNamedOnTheTrail : [], said);
+        }
         if (recoveryCase.TryGetProperty("keptAside", out JsonElement keptAside))
             Assert.True(keptAside.GetBoolean() == leftovers.Count > 0, "a folder kept aside: " + string.Join(", ", leftovers));
         else if (withATree)
@@ -333,11 +422,46 @@ public sealed class UndoRecoveryContractTests
 
         // Nothing of the journal's is left in a course once the step is
         // closed (in shadow recovery never writes into a working folder).
-        if (!folded.Steps[seq].IsInFlight && !shadow && !away && !recoveryCase.TryGetProperty("keptAside", out _))
+        if (!folded.Steps[seq].IsInFlight && !shadow && !away && !recoveryCase.TryGetProperty("keptAside", out _) && !keptBeside)
             Assert.Empty(UndoStepContractTests.StagedFilesUnder(scribe.FullPath("A", "")));
 
         if (recoveryCase.TryGetProperty("undo", out JsonElement undo))
-            Assert.Equal(undo.GetString(), scribe.Door(mode: undoMode).Undo().Word);
+        {
+            var atTheUndo = new List<FileStream>();
+            try
+            {
+                if (Flag(recoveryCase, "fileInUseAtTheUndo"))
+                {
+                    foreach (string path in new[] { First, Second })
+                        atTheUndo.Add(new FileStream(scribe.FullPath("A", path), FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
+                }
+                lock (scribe.TrailLines) scribe.TrailLines.Clear();
+                Assert.Equal(undo.GetString(), scribe.Door(mode: undoMode).Undo().Word);
+            }
+            finally
+            {
+                foreach (FileStream holder in atTheUndo) holder.Dispose();
+            }
+        }
+        if (recoveryCase.TryGetProperty("leftLines", out JsonElement leftLines))
+        {
+            int said;
+            lock (scribe.TrailLines) said = scribe.TrailLines.Count(line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay);
+            Assert.Equal(leftLines.GetInt32(), said);
+        }
+        if (recoveryCase.TryGetProperty("contentInTheList", out JsonElement inTheList))
+        {
+            // Both of each named page's recorded contents are in the list
+            // again: what the kept original gave, and what the page held as it
+            // was put back.
+            foreach (JsonElement page in inTheList.EnumerateArray())
+            {
+                string path = PathOf(page.GetString()!);
+                denials.Dispose();
+                Assert.NotNull(scribe.Journal.Blob(UndoCheck.Sha(Before(path))));
+                Assert.NotNull(scribe.Journal.Blob(UndoCheck.Sha(After(path))));
+            }
+        }
         if (away) scribe.PutFolderBack("A");
     }
 
@@ -353,6 +477,15 @@ public sealed class UndoRecoveryContractTests
         Assert.Fail("no interrupted line for step " + seq);
         return [];
     }
+
+    /// <summary>Every kept original (a staged <c>-orig</c> file) anywhere in the working folder.</summary>
+    private static List<string> KeptOriginals(UndoScribe scribe) =>
+        scribe.StagedLeftovers("A").Where(file => file.EndsWith("-orig", StringComparison.Ordinal) && File.Exists(file)).ToList();
+
+    /// <summary>Every kept original beside one page.</summary>
+    private static List<string> KeptBeside(UndoScribe scribe, string place) =>
+        KeptOriginals(scribe).Where(file => UndoSwap.PlaceOfStagedName(Path.GetFileName(file)) == Path.GetFileName(place)
+                                            && string.Equals(Path.GetDirectoryName(file), Path.GetDirectoryName(place), StringComparison.OrdinalIgnoreCase)).ToList();
 
     private static bool Flag(JsonElement element, string key) => element.TryGetProperty(key, out JsonElement value) && value.GetBoolean();
 

@@ -38,13 +38,21 @@ public static class LaterClassesKept
         Path.Combine(courseDirectory, ".publish_state", $"section{section}.later-classes-kept.json");
 
     /// <summary>The kept rows on disk; empty when there is no record or it cannot be read.</summary>
-    public static IReadOnlyList<Row> Read(string courseDirectory, int section)
+    public static IReadOnlyList<Row> Read(string courseDirectory, int section) => Read(courseDirectory, section, null);
+
+    /// <summary>
+    /// The kept rows as <paramref name="read"/> gives the record's text (null:
+    /// no record), so an action planning through an Undo step reads the record
+    /// as the step will leave it (#899 W7a); the disk's when it is null.
+    /// </summary>
+    internal static IReadOnlyList<Row> Read(string courseDirectory, int section, Func<string, string?>? read)
     {
         try
         {
             string path = PathFor(courseDirectory, section);
-            if (!File.Exists(path)) return Array.Empty<Row>();
-            if (JsonNode.Parse(File.ReadAllText(path))?["kept"] is not JsonArray rows) return Array.Empty<Row>();
+            string? text = read is not null ? read(path) : File.Exists(path) ? File.ReadAllText(path) : null;
+            if (text is null) return Array.Empty<Row>();
+            if (JsonNode.Parse(text)?["kept"] is not JsonArray rows) return Array.Empty<Row>();
             var kept = new List<Row>();
             foreach (var row in rows)
             {
@@ -68,32 +76,45 @@ public static class LaterClassesKept
     public static bool Keep(string courseDirectory, int section, IEnumerable<ClassesDatedLater.Page> pages,
                             DateTime? now = null)
     {
-        var adding = pages.Where(page => page.Date is not null)
-                          .Select(page => new Row(page.Place, DateText.Iso(page.Date!.Value)))
-                          .ToList();
-        if (adding.Count == 0) return true;
-        var rows = Read(courseDirectory, section)
-            .Where(row => !adding.Any(page => page.Place == row.Place))
-            .Concat(adding)
-            .ToList();
+        if (RecordKeeping(Read(courseDirectory, section), pages, now) is not { } record) return true;
         try
         {
             string path = PathFor(courseDirectory, section);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var kept = new JsonArray();
-            foreach (var row in rows) kept.Add(new JsonObject { ["place"] = row.Place, ["date"] = row.Date });
-            var record = new JsonObject
-            {
-                ["version"] = 1,
-                ["answeredAt"] = (now ?? DateTime.UtcNow).ToUniversalTime()
-                    .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture),
-                ["kept"] = kept,
-            };
             string temporary = path + ".tmp";
-            File.WriteAllText(temporary, record.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(temporary, record);
             File.Move(temporary, path, overwrite: true);
             return true;
         }
         catch { return false; }
+    }
+
+    /// <summary>
+    /// The record's text once <paramref name="pages"/> are added to
+    /// <paramref name="existing"/> (as <see cref="Keep"/> writes it), or null
+    /// when there is nothing dated to add. An Undo step plans this text
+    /// (#899 W7a: Publish Class for a Date).
+    /// </summary>
+    internal static string? RecordKeeping(IReadOnlyList<Row> existing, IEnumerable<ClassesDatedLater.Page> pages,
+                                          DateTime? now = null)
+    {
+        var adding = pages.Where(page => page.Date is not null)
+                          .Select(page => new Row(page.Place, DateText.Iso(page.Date!.Value)))
+                          .ToList();
+        if (adding.Count == 0) return null;
+        var rows = existing
+            .Where(row => !adding.Any(page => page.Place == row.Place))
+            .Concat(adding)
+            .ToList();
+        var kept = new JsonArray();
+        foreach (var row in rows) kept.Add(new JsonObject { ["place"] = row.Place, ["date"] = row.Date });
+        var record = new JsonObject
+        {
+            ["version"] = 1,
+            ["answeredAt"] = (now ?? DateTime.UtcNow).ToUniversalTime()
+                .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture),
+            ["kept"] = kept,
+        };
+        return record.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
 }

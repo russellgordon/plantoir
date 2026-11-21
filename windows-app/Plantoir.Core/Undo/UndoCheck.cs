@@ -4,6 +4,29 @@ using System.Text;
 namespace Plantoir.Core.Undo;
 
 /// <summary>
+/// One page a check puts back from a kept original (<see cref="UndoCheck.Plan"/>'s
+/// <c>keptOriginalUsed</c>; the mac's <c>UndoKeptOriginalUse</c>): the content
+/// taken from it, the hash the other direction wants there (null: no file),
+/// and what the page holds at that op, which the swap sets aside.
+/// </summary>
+internal sealed record UndoKeptOriginalUse(string Path, byte[] Kept, string? OtherSha, UndoCurrent Outgoing);
+
+/// <summary>
+/// What a put-back from kept originals could not write back into the list
+/// (<see cref="UndoRecovery.StoreWhatKeptOriginalsGive"/>): the pages whose
+/// outgoing content the list did not take (the swap keeps it beside them), and
+/// the hashes of kept originals' bytes it did not take (no tidy removes a kept
+/// original holding one; the second review of U3c, MEDIUM).
+/// </summary>
+internal sealed record UndoWhatTheListCouldNotTake(IReadOnlySet<string> OutgoingOf, IReadOnlySet<string> KeptOriginalsHolding)
+{
+    internal static readonly UndoWhatTheListCouldNotTake Nothing = new(new HashSet<string>(), new HashSet<string>());
+
+    /// <summary>Whether the list took everything.</summary>
+    internal bool IsEmpty => OutgoingOf.Count == 0 && KeptOriginalsHolding.Count == 0;
+}
+
+/// <summary>
 /// What is at an op's path now, as the check sees it (#899, W1).
 ///
 /// <para><see cref="CannotReadNow"/> is Windows' own case and the reason this
@@ -317,9 +340,14 @@ internal static class UndoCheck
     /// <param name="whole">Where a whole op (a move, a tree, an external target) is read and changed: the working folder's
     /// root and the external places. Needed by a step that holds one (U2's kinds, W6); without it such a step is not readable here.
     /// With it, every place every op names is checked inside the working folder, links resolved, before anything is read through it.</param>
+    /// <param name="keptOriginal">For a <c>writeFile</c> whose blob the list no longer holds: the step's own kept original beside
+    /// that page whose bytes hash to exactly the sha wanted (page path and sha in), or null when none matches (the mac's U3c,
+    /// Russell's ruling of 2026-11-20, 15:20; <see cref="UndoRecovery.KeptOriginal"/>).</param>
+    /// <param name="keptOriginalUsed">Told of each page put back from a kept original, with what the page holds at that op.</param>
     internal static PlanResult Plan(IReadOnlyList<UndoOp> ops, bool backward,
                                     Func<string, UndoCurrent> read, Func<string, byte[]?> blob,
-                                    Func<bool>? folderIsReachable = null, UndoWholeReads? whole = null)
+                                    Func<bool>? folderIsReachable = null, UndoWholeReads? whole = null,
+                                    Func<string, string, byte[]?>? keptOriginal = null, Action<UndoKeptOriginalUse>? keptOriginalUsed = null)
     {
         foreach (UndoOp op in ops)
         {
@@ -390,6 +418,15 @@ internal static class UndoCheck
                 byte[]? content = blob(targetSha);
                 if (content is null || !string.Equals(Sha(content), targetSha, StringComparison.Ordinal))
                 {
+                    // A blob the list no longer holds: put back from the kept
+                    // original beside the page when its hash is the one wanted.
+                    if (keptOriginal?.Invoke(path, targetSha) is { } kept)
+                    {
+                        keptOriginalUsed?.Invoke(new UndoKeptOriginalUse(path, kept, backward ? op.AfterSha : op.BeforeSha, working[path]));
+                        working[path] = new UndoCurrent.Bytes(kept);
+                        continue;
+                    }
+                    // None matches. The check goes on, so every page in the way is reported first.
                     missing ??= path;
                     continue;
                 }

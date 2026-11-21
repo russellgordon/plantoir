@@ -310,6 +310,37 @@ public static class ActivityTrail
         /// </summary>
         UndoFoundAFolderSetAside,
         /// <summary>
+        /// Undo's recovery closed a step that stopped part way and could not
+        /// be put back (what it needs is no longer in the list, and no kept
+        /// original matches), and cleared the list: naming each kept original
+        /// left beside its page, read after the tidy (#899 W4c, the mac's U3c).
+        /// </summary>
+        UndoCouldNotPutBack,
+        /// <summary>
+        /// Undo's recovery settled a step and left a kept original beside a
+        /// page because it is the only copy of what it holds, each with its
+        /// page, its hidden name and why (#899 W4c). Never page text.
+        /// </summary>
+        UndoKeptWhatAPageHeld,
+        /// <summary>
+        /// An Undo or Redo put a page back from what was kept beside it, and
+        /// the list would not take all the step needs, so what it could not
+        /// keep stays beside the page, named (#899 W4c). Never page text.
+        /// </summary>
+        UndoKeptWhatItReplaced,
+        /// <summary>
+        /// An Undo or Redo refused because the newest step is one recovery
+        /// has just tried and left part way (a file in use, a page it cannot
+        /// read now), naming the file; the list kept (#899 W4c, W3's LOW 4).
+        /// </summary>
+        UndoRefusedForAChangeLeftPartWay,
+        /// <summary>
+        /// The list could not take a daily action's step, or a file it writes
+        /// cannot be named in one: the action's key, the course and section, a
+        /// word for why, and what became of the change (#899 W7a). Never page text.
+        /// </summary>
+        UndoCouldNotRecordAStep,
+        /// <summary>
         /// A whole course was put back, from one of its backups (Restore…) or
         /// from Archived: the code it shows, its folder, the zip's FILE NAME,
         /// what became of the course as it was first (the archive made of it,
@@ -903,6 +934,11 @@ public static class ActivityTrail
         Event.SectionRestored => "section restored",
         Event.UndoRolledBack => "undo rolled back",
         Event.UndoFoundAFolderSetAside => "undo found a folder set aside",
+        Event.UndoCouldNotPutBack => "undo could not put back a change that stopped",
+        Event.UndoKeptWhatAPageHeld => "undo kept what a page held",
+        Event.UndoKeptWhatItReplaced => "undo kept what it replaced",
+        Event.UndoRefusedForAChangeLeftPartWay => "undo refused for a change left part way",
+        Event.UndoCouldNotRecordAStep => "undo could not record a step",
         Event.CourseRestoredFromABackup => "course restored from a backup",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
