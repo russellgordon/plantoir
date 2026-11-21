@@ -63,7 +63,10 @@ public static class CourseRestorer
         if (!Directory.Exists(destination))
         {
             Extract(item.FilePath, item.CourseCode, coursesDirectory);
-            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
+            // The built sites go and the kept copies of geogebra.org sketches
+            // stay (#805, the mac's discardBuiltSites): a copy is named by its
+            // fence, so it is right for the pages that come back.
+            CourseArchiver.DiscardBuiltSites(coursesDirectory, item.CourseCode);
             LockAgainIfKeptForReference(destination);
             return;
         }
@@ -96,8 +99,10 @@ public static class CourseRestorer
             // Whatever happened to the contents, the built site no longer
             // matches them: a backup's pages are by definition older than the
             // ones just replaced, so a build left standing would read as newer
-            // and publish what the course used to say.
-            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
+            // and publish what the course used to say. The kept copies of
+            // geogebra.org sketches stay (#805): each is named by the fence
+            // that asked for it, which no restore can make older.
+            CourseArchiver.DiscardBuiltSites(coursesDirectory, item.CourseCode);
             // A restored course no longer holds what a stopped rename of its
             // word for a unit was part way through (#158, as the mac does).
             UnitWordRenamer.ClearRenameRecord(destination);
