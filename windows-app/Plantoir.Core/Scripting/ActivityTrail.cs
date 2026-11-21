@@ -518,6 +518,25 @@ public static class ActivityTrail
         /// </summary>
         PreviewDidNotAppear,
         /// <summary>
+        /// A preview start asked for while the same window's own start was
+        /// still waiting for a stop or still building did nothing (#928, the
+        /// mac's #812). Carries the course and the section.
+        /// </summary>
+        PreviewAlreadyStarting,
+        /// <summary>
+        /// A repair's Preview Again started nothing: its page went away or
+        /// Plantoir was quitting before the old preview had stopped, or a later
+        /// Preview Again took its place (#928, the mac's #813). Carries which.
+        /// </summary>
+        PreviewAgainAbandoned,
+        /// <summary>
+        /// A preview's run never started (#928, #1022 item 1, the mac's #812
+        /// review): the sentence the teacher was shown under "Cannot Preview
+        /// Yet", then what they were not shown (the launcher's file, or the
+        /// system's description of the error).
+        /// </summary>
+        PreviewCouldNotStart,
+        /// <summary>
         /// deploy.py made a section's Cloudflare Pages project again because it
         /// was gone from the account (#395). Carries the project and the
         /// address the site answers at now — the address can change.
@@ -923,6 +942,9 @@ public static class ActivityTrail
         Event.ClassCopyNotMade => "class copy not made",
         Event.WordForAUnitRenamed => "word for a unit renamed",
         Event.PreviewDidNotAppear => "preview did not appear",
+        Event.PreviewAlreadyStarting => "preview already starting",
+        Event.PreviewAgainAbandoned => "preview again abandoned",
+        Event.PreviewCouldNotStart => "preview could not start",
         Event.CloudflareProjectMadeAgain => "cloudflare project made again",
         Event.CourseKeptForReference => "course kept for reference",
         Event.CourseCouldNotBeKeptForReference => "course could not be kept for reference",

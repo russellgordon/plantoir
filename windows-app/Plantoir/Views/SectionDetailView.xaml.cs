@@ -106,6 +106,14 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     private IDisposable? _previewBuildRecord;
     /// <summary>
+    /// The window's latest preview start (#928, the mac's
+    /// <c>previewStartID</c>): a start parked while old stops finish runs its
+    /// launcher only if it is still this one.
+    /// </summary>
+    private Guid? _latestPreviewStart;
+    /// <summary>This page's own key in <see cref="PreviewAgainPresses"/> (#928 item 7, the mac's <c>previewAgainOwner</c>).</summary>
+    private readonly Guid _previewAgainOwner = Guid.NewGuid();
+    /// <summary>
     /// The site's ROOT, as the launcher announced it, while it is shown —
     /// never the page on screen (#514): the capture resolves pages against
     /// it, and the remembered path is cut from it. (The mac calls its root
@@ -390,6 +398,9 @@ public sealed partial class SectionDetailView : UserControl
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         _isTornDown = true;
+        // The page's repair press first (#928 item 7): a Preview Again waiting
+        // on its stop must start nothing on a page that has gone.
+        PreviewAgainPresses.Shared.Abandon(_previewAgainOwner);
         ToolchainReadiness.Changed -= OnReadinessChanged;
         AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
         _deployRun.PropertyChanged -= OnDeployRunChanged;
@@ -631,7 +642,10 @@ public sealed partial class SectionDetailView : UserControl
         // ending already shown elsewhere leaves the section's ordinary state.
         bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || (showDeploy && deployRunner.HasAnyOutput)
                          || _previewRunner.Transcript.CurrentLine.Length > 0;
-        bool showConsole = _isWaitingForServer || _previewRunner.IsRunning || showDeploy || anyOutput;
+        // A run that never started keeps its sentence on screen (#1022 item 1):
+        // it has no output, and the console used to come down with it.
+        bool showConsole = _isWaitingForServer || _previewRunner.IsRunning || showDeploy || anyOutput
+                           || _previewRunner.LaunchProblem is not null;
         Progress.Visibility = showConsole ? Visibility.Visible : Visibility.Collapsed;
         NoPreviewState.Visibility = showConsole ? Visibility.Collapsed : Visibility.Visible;
         // #734: while the Problems tab shows, what is under it is COLLAPSED as
@@ -1231,10 +1245,16 @@ public sealed partial class SectionDetailView : UserControl
     private async Task<bool> OfferTodaysClassAsync(string folder)
     {
         var askedOn = DateOnly.FromDateTime(DateTime.Now);
-        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
-            { Surface = AssistSurface.LocalWindow };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
+        AssistWorkspace workspace;
         TodaysClassOnTheFrontPage.Offering? offer;
-        try { offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn); }
+        try
+        {
+            // Inside the try (#1022 item 1): a folder whose launcher went since
+            // the press's check is refused here, and the start then says so.
+            workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
+                { Surface = AssistSurface.LocalWindow };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
+            offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn);
+        }
         catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
         if (offer is null) return false;
 
@@ -1393,6 +1413,13 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     private async Task PreviewAgainAfterRepairAsync()
     {
+        // Recorded AT ONCE, before anything is awaited (#928 item 7, the
+        // mac's #813): the press is this page's token, which leaving the page
+        // abandons (OnUnloaded), the quit abandons (App.LetThePreviewStartsGo)
+        // and a later press replaces. The start after the stop runs only if
+        // the token survived it; a press that starts nothing says why on the
+        // trail (preview again abandoned).
+        Guid press = PreviewAgainPresses.Shared.Press(_previewAgainOwner);
         try
         {
             // Asked AGAIN, at the press. The button was offered when the
@@ -1408,32 +1435,43 @@ public sealed partial class SectionDetailView : UserControl
                 return;
             }
 
-            if (_lease is not null || _previewRunner.IsRunning) await StopPreviewAsync();
-
             // The stop can take ~20 seconds with the dialog already gone, and
             // the teacher is free to click another section meanwhile — which
-            // replaces this view. Starting a preview from a view nobody can
-            // see leaves a running preview.ps1 on a runner with no window and
-            // a lease that refuses the section's own Preview button
-            // afterwards.
-            if (_isTornDown || !IsLoaded) return;
-
-            // Asked AGAIN after the stop, for the reason DeployAsync gives at
-            // the same point in its own sequence: the leases came off with the
-            // preview and the stop takes long enough for somebody else to
-            // start. WorkLease is an announcement, not a refusal, so nothing
-            // downstream would stop a build landing on top of the assistant's.
-            if (WhyTheRepairCannotBePreviewedNow() is { } nowInstead)
-            {
-                await PresentRepairOutcomeAsync(nowInstead);
-                return;
-            }
-            StartAutomatedPreview();
+            // replaces this view and abandons the press. Starting a preview
+            // from a view nobody can see leaves a running preview.ps1 on a
+            // runner with no window and a lease that refuses the section's
+            // own Preview button afterwards.
+            bool previewIsUp = _lease is not null || _previewRunner.IsRunning;
+            await PreviewAgainPresses.CarryOutAsync(PreviewAgainPresses.Shared, _previewAgainOwner, press,
+                                                    _course.Code, _sectionNumber, previewIsUp,
+                                                    stop: StopPreviewAsync,
+                                                    start: StartPreviewAgainAfterTheStop);
         }
         catch (Exception ex)
         {
             App.LogDiagnostic($"PreviewAgainAfterRepairAsync exception: {ex}");
         }
+        finally
+        {
+            PreviewAgainPresses.Shared.Finish(press, _previewAgainOwner);
+        }
+    }
+
+    /// <summary>The repair's start, once its press has survived the stop.</summary>
+    private void StartPreviewAgainAfterTheStop()
+    {
+        if (_isTornDown || !IsLoaded) return;
+        // Asked AGAIN after the stop, for the reason DeployAsync gives at
+        // the same point in its own sequence: the leases came off with the
+        // preview and the stop takes long enough for somebody else to
+        // start. WorkLease is an announcement, not a refusal, so nothing
+        // downstream would stop a build landing on top of the assistant's.
+        if (WhyTheRepairCannotBePreviewedNow() is { } nowInstead)
+        {
+            _ = PresentRepairOutcomeAsync(nowInstead);
+            return;
+        }
+        StartAutomatedPreview();
     }
 
     /// <summary>
@@ -1507,37 +1545,35 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
+            // FIRST (#928, the mac's #812): the window's own start, waiting
+            // for a stop or building, is the build; this start does nothing.
+            // It used to release that start's lease and overwrite its build
+            // record, which nothing then ended, so quitting asked for ever.
+            if (SaidAStartIsAlreadyUnderWay()) return;
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
-            // FIRST, before any lease is released or taken (#386).
+            // Before any lease is released or taken (#386).
             if (await RefusedWhileThisSectionDeploys(workspacePath)) return;
             if (await _window.RefusedWhileTheFolderIsGettingReady(workspacePath, "Cannot Preview Yet")) return;   // #473
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
 
-            // Clear any prior lease for this section before starting anew
-            PreviewLeases.Release(workspacePath, _course.Code, _sectionNumber);
-            _lease = null;
+            // A lease this window left behind (a served preview that ended on
+            // its own) is its own to clear; a start under way returned above.
+            ReleaseLease();
 
-            try
+            var began = PreviewStarts.Begin(workspacePath, _course.Code, _sectionNumber);
+            if (began.Refusal is { } refusal)
             {
-                _lease = PreviewLeases.Take(workspacePath, _course.Code, _sectionNumber);
-                // BUILD first, then preview, then look (#289, takeThenCheck):
-                // a Preview and an outside build that race cannot both back off.
-                _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
-                _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
-            }
-            catch (PreviewLeases.LeaseRefusedException refusal)
-            {
-                App.LogDiagnostic($"StartAutomatedPreview refused for {_course.Code} Section {_sectionNumber}: {refusal.Message}");
+                App.LogDiagnostic($"StartAutomatedPreview refused for {_course.Code} Section {_sectionNumber}: {refusal}");
                 return;
             }
-            if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "the assistant's rebuild") is not null) return;
-            _previewBuildRecord = CourseActivity.BeginPreviewBuild(workspacePath, _course.Code, _sectionNumber);
+            if (!TookTheStart(workspacePath, began, "the assistant's rebuild", out var ownLease, out Guid thisStart, out _)) return;
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
             await PreviewStopper.WaitForStopsToFinish(_course.Code, _sectionNumber);
+            if (!TheParkedStartStillBelongs(thisStart, ownLease)) return;
 
             _previewUrl = null;
             _lastLoadedUrl = null;
@@ -1545,7 +1581,7 @@ public sealed partial class SectionDetailView : UserControl
             _previewRunner.Milestones = TaskMilestones.Preview;
             ShowAnotherProgramsDeployAsAClosing(workspacePath);
             _previewRunner.Run("preview.ps1",
-                new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
+                new[] { _course.Code, _sectionNumber.ToString(), "--port", ownLease.Port.ToString() },
                 workspacePath);
             // The section's last preview start, for a view that comes back with
             // none of its own: a later preview wins over a finished deploy (#728).
@@ -1755,7 +1791,12 @@ public sealed partial class SectionDetailView : UserControl
         try
         {
             if (_previewRunner.IsRunning) { StopPreview(); return; }
-            // FIRST, before any lease is taken or anything stopped (#386).
+            // #928 (the mac's #812): a second press while this window's own
+            // start waits for a stop or builds does nothing. It used to reach
+            // PreviewLeases.Take and be refused by the window's own lease with
+            // the sentence about another window.
+            if (SaidAStartIsAlreadyUnderWay()) return;
+            // Before any lease is taken or anything stopped (#386).
             if (_window.Workspace.WorkspacePath is { } deployingFolder &&
                 await RefusedWhileThisSectionDeploys(deployingFolder)) return;
             // #473: the folder's tools still being copied — also before any
@@ -1763,6 +1804,10 @@ public sealed partial class SectionDetailView : UserControl
             if (await _window.RefusedWhileTheFolderIsGettingReady(_window.Workspace.WorkspacePath, "Cannot Preview Yet")) return;
             if (await AnotherProgramStandsInTheWay("Preview", "Cannot Preview Yet") is not null) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            // #1022 item 1: a folder with no launcher says so, under "Cannot
+            // Preview Yet", before any question; it used to be refused inside
+            // today's-class question and only logged.
+            if (await SaidTheLauncherIsMissing(workspacePath)) return;
 
             // #406 (mac #397): today's class for the front page — asked HERE,
             // on the Preview button and nowhere else, after the refusals above
@@ -1775,44 +1820,39 @@ public sealed partial class SectionDetailView : UserControl
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
 
-            try
+            // The lease, then this start's own build record (PreviewStarts.Begin):
+            // a refused lease writes no record, so it ends nobody's.
+            var began = PreviewStarts.Begin(workspacePath, _course.Code, _sectionNumber);
+            if (began.Refusal is { } refusal)
             {
-                _lease = PreviewLeases.Take(workspacePath, _course.Code, _sectionNumber);
-                // Say so on disk as well as in memory: an assistant is a separate
-                // process and cannot see the in-memory lease. The BUILD lease
-                // first, then the preview's (#289, takeThenCheck), so a Preview
-                // and an outside build that race cannot both back off.
-                // Dropped as soon as the server answers — see ReleaseBuildClaim.
-                _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
-                _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
-            }
-            catch (PreviewLeases.LeaseRefusedException refusal)
-            {
-                App.LogDiagnostic($"Preview refused for {_course.Code} Section {_sectionNumber}: {refusal.Message}");
+                App.LogDiagnostic($"Preview refused for {_course.Code} Section {_sectionNumber}: {refusal}");
                 var dialog = new ContentDialog
                 {
                     Title = "Cannot Preview Yet",
-                    Content = refusal.Message,
+                    Content = refusal,
                     CloseButtonText = "OK",
                 };
                 await ShowDialogSafelyAsync(dialog);
                 return;
             }
-            if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "Preview") is { } declinedBy)
+            if (!TookTheStart(workspacePath, began, "Preview", out var ownLease, out Guid thisStart, out string? declinedBy))
             {
-                await ShowDialogSafelyAsync(new ContentDialog
+                if (declinedBy is not null)
                 {
-                    Title = "Cannot Preview Yet",
-                    Content = WorkLease.DeclinedInTheWindow(_course.Code, declinedBy),
-                    CloseButtonText = "OK",
-                });
+                    await ShowDialogSafelyAsync(new ContentDialog
+                    {
+                        Title = "Cannot Preview Yet",
+                        Content = WorkLease.DeclinedInTheWindow(_course.Code, declinedBy),
+                        CloseButtonText = "OK",
+                    });
+                }
                 return;
             }
-            _previewBuildRecord = CourseActivity.BeginPreviewBuild(workspacePath, _course.Code, _sectionNumber);
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
             await PreviewStopper.WaitForStopsToFinish(_course.Code, _sectionNumber);
+            if (!TheParkedStartStillBelongs(thisStart, ownLease)) return;
 
             _previewUrl = null;
             _lastLoadedUrl = null;
@@ -1820,7 +1860,7 @@ public sealed partial class SectionDetailView : UserControl
             _previewRunner.Milestones = TaskMilestones.Preview;
             ShowAnotherProgramsDeployAsAClosing(workspacePath);
             _previewRunner.Run("preview.ps1",
-                new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
+                new[] { _course.Code, _sectionNumber.ToString(), "--port", ownLease.Port.ToString() },
                 workspacePath);
             // The section's last preview start, for a view that comes back with
             // none of its own: a later preview wins over a finished deploy (#728).
@@ -1833,6 +1873,93 @@ public sealed partial class SectionDetailView : UserControl
         {
             App.LogDiagnostic($"PressPreviewAsync exception: {ex}");
         }
+    }
+
+    /// <summary>
+    /// The window's own start is under way (#928, the mac's
+    /// <c>aStartIsUnderWay</c>): it has begun, by its build record or its wait
+    /// for the page, and holds its own lease. Then this start does nothing
+    /// and the trail says so.
+    /// </summary>
+    private bool SaidAStartIsAlreadyUnderWay()
+    {
+        if (!PreviewStarts.AStartIsUnderWay(_previewBuildRecord is not null || _isWaitingForServer, _lease)) return false;
+        ActivityTrail.Note(ActivityTrail.Event.PreviewAlreadyStarting,
+                           "a preview start did nothing: this window's own start was still waiting for a stop or building",
+                           _course.Code, _sectionNumber);
+        return true;
+    }
+
+    /// <summary>
+    /// A working folder with no launcher, at the press (#1022 item 1): the
+    /// sentence names no file (#928 item 9), the trail says which.
+    /// </summary>
+    private async Task<bool> SaidTheLauncherIsMissing(string workspacePath)
+    {
+        if (PreviewStarts.MissingLauncher(workspacePath) is not { } detail) return false;
+        await SayThePreviewCouldNotStart(ScriptRunner.FolderIsMissingAPiece, detail);
+        return true;
+    }
+
+    /// <summary>The teacher's sentence under "Cannot Preview Yet", and the trail's line with what they were not shown.</summary>
+    private async Task SayThePreviewCouldNotStart(string sentence, string? detail)
+    {
+        ActivityTrail.Note(ActivityTrail.Event.PreviewCouldNotStart,
+                           PreviewStarts.CouldNotStartLine(sentence, detail), _course.Code, _sectionNumber);
+        await ShowDialogSafelyAsync(new ContentDialog
+        {
+            Title = "Cannot Preview Yet",
+            Content = sentence,
+            CloseButtonText = "OK",
+        });
+    }
+
+    /// <summary>
+    /// Hold what <see cref="PreviewStarts.Begin"/> took — the lease and this
+    /// start's own build record — then the work leases, then look (#289,
+    /// takeThenCheck). False when an outside build declined it, with every
+    /// one of them handed back. The start becomes the window's latest.
+    /// </summary>
+    private bool TookTheStart(string workspacePath, PreviewStarts.Outcome began, string asked,
+                              out PreviewLeases.Lease ownLease, out Guid thisStart, out string? declinedBy)
+    {
+        ownLease = began.Lease!;
+        thisStart = Guid.NewGuid();
+        _lease = ownLease;
+        _previewBuildRecord = began.Record;
+        _latestPreviewStart = thisStart;
+        // Say so on disk as well as in memory: an assistant is a separate
+        // process and cannot see the in-memory lease. The BUILD lease
+        // first, then the preview's (#289, takeThenCheck), so a Preview
+        // and an outside build that race cannot both back off.
+        // Dropped as soon as the server answers — see ReleaseBuildClaim.
+        _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
+        _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
+        declinedBy = DeclinedAfterTaking(workspacePath, _buildWork.Claim, asked);
+        return declinedBy is null;
+    }
+
+    /// <summary>
+    /// A start parked in <c>WaitForStopsToFinish</c> runs its launcher only
+    /// while it still belongs (#928 item 6, the mac's
+    /// <c>theStartStillBelongs</c>): the page is still there, the quit has not
+    /// gone ahead, it still holds its own lease and it is the window's latest
+    /// start. Otherwise it hands back only what is still its own.
+    /// </summary>
+    private bool TheParkedStartStillBelongs(Guid thisStart, PreviewLeases.Lease ownLease)
+    {
+        bool holdsItsOwnLease = ReferenceEquals(_lease, ownLease);
+        if (holdsItsOwnLease && PreviewStarts.TheStartStillBelongs(_latestPreviewStart, thisStart,
+                                                                  viewIsGone: _isTornDown,
+                                                                  appIsQuitting: App.QuitHasGoneAhead))
+            return true;
+        App.LogDiagnostic($"a parked preview start of {_course.Code} Section {_sectionNumber} started nothing: it no longer belonged");
+        if (holdsItsOwnLease && _latestPreviewStart == thisStart)
+        {
+            ReleaseLease();
+            if (!_isTornDown) RefreshChrome();
+        }
+        return false;
     }
 
     /// <summary>
@@ -1873,6 +2000,21 @@ public sealed partial class SectionDetailView : UserControl
                 // Watched BEFORE the state is read (#1016), so a change that
                 // lands between the reading and the wait below is not lost.
                 using var watch = _previewRunner.WatchTheStanding();
+                // A run that never started is an ending (#928 item 5, #1022
+                // item 1, the mac's howTheRunStands): the wait, the record and
+                // the lease go back at once and the teacher is told, the
+                // console keeping its sentence. It used to wait on with them
+                // held, and the next press did nothing.
+                if (!_previewRunner.WasStoppedByUser &&
+                    PreviewStarts.HowTheRunStands(_previewRunner.IsRunning, _previewRunner.LastExitCode,
+                                                  _previewRunner.LaunchProblem) == PreviewStarts.RunStanding.CouldNotStart)
+                {
+                    string sentence = _previewRunner.LaunchProblem!;
+                    string? detail = _previewRunner.LaunchProblemDetail;
+                    AbandonWait();
+                    await SayThePreviewCouldNotStart(sentence, detail);
+                    return;
+                }
                 bool runIsOver = _previewRunner.WasStoppedByUser ||
                                  (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null);
                 // Both lines are collected by the runner as they arrive

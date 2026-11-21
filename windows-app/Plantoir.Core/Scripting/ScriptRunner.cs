@@ -56,6 +56,24 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     public bool IsRunning { get; private set; }
     public int? LastExitCode { get; private set; }
     public string? LaunchProblem { get; private set; }
+
+    /// <summary>
+    /// What a teacher never reads about a run that could not start: the
+    /// launcher's file name, or the system's own description of the error
+    /// (#928 items 8 and 9, the mac's <c>launchProblemDetail</c>). The
+    /// section's preview writes it to the trail after the sentence
+    /// (<c>preview could not start</c>); <see cref="LaunchProblem"/> names no
+    /// file and carries no system text.
+    /// </summary>
+    public string? LaunchProblemDetail { get; private set; }
+
+    /// <summary>The launch itself failed (a pseudo console that would not open, a process that would not start), in Plantoir's words for Windows.</summary>
+    public const string CouldNotGetStarted =
+        "Could not get started. Try again, or restart this computer if it happens again.";
+
+    /// <summary>The launcher a run needs is not in the working folder; the file's name goes to <see cref="LaunchProblemDetail"/>.</summary>
+    public const string FolderIsMissingAPiece =
+        "This working folder is missing a piece it needs. Try choosing your working folder again from the File menu.";
     public DateTime LastOutputAt { get; private set; }
     public DateTime? StartedAt { get; private set; }
     public bool IsAwaitingInput { get; private set; }
@@ -232,6 +250,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         if (!keepTranscript) { Transcript = new TranscriptBuilder(); Notify(nameof(Transcript)); }
         LastExitCode = null;
         LaunchProblem = null;
+        LaunchProblemDetail = null;
         WasCancelled = false;
         WasStoppedByUser = false;
         WasClosedForADeploy = false;
@@ -287,13 +306,14 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         string scriptPath = Path.Combine(workingDirectory, scriptName);
         if (!File.Exists(scriptPath))
         {
-            LaunchProblem = $"This working folder is missing a piece it needs ({scriptName}). Try choosing your working folder again from the File menu.";
+            LaunchProblem = FolderIsMissingAPiece;
+            LaunchProblemDetail = "the working folder has no " + scriptName;
             Notify(nameof(LaunchProblem));
             // A task that never started still happened to the teacher — a
             // launch that fails silently is how a problem report arrives
             // carrying "the last 0 tasks" after three visible failures.
             ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
-                $"could not start {scriptName} — {LaunchProblem}");
+                $"could not start {scriptName} — {LaunchProblemDetail}");
             IsBetweenPhases = false;
             return;
         }
@@ -324,7 +344,8 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         }
         catch (Exception error)
         {
-            LaunchProblem = $"Could not get started: {error.Message}";
+            LaunchProblem = CouldNotGetStarted;
+            LaunchProblemDetail = "the system said: " + error.Message;
             Notify(nameof(LaunchProblem));
             IsBetweenPhases = false;
             return;

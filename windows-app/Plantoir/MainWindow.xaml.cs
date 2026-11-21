@@ -595,6 +595,10 @@ public sealed partial class MainWindow : Window
                 }
             }
 
+            // Past the question: the quit goes ahead (#928). A preview start
+            // parked behind an old stop, or a repair's Preview Again, starts
+            // nothing from here on.
+            App.LetThePreviewStartsGo();
             if (!ToolchainReadiness.ClosingWaitsForTheCopy(closingQuits: true, ToolchainReadiness.AnyCopyIsWriting,
                                                            Services.SessionEnding.IsEnding, _copiesWaitedFor))
                 return;
@@ -614,7 +618,7 @@ public sealed partial class MainWindow : Window
             App.LogDiagnostic("closing: the tools copy has finished");
             // A window opened while this one waited: this close no longer
             // quits, so copies held back for the quit go ahead after all.
-            if (!App.ClosingThisQuits(this)) LetHeldCopiesGo();
+            if (!App.ClosingThisQuits(this)) { App.TheQuitWasTakenBack(); LetHeldCopiesGo(); }
             Close();
         }
         catch (Exception ex)
@@ -623,6 +627,7 @@ public sealed partial class MainWindow : Window
             // Whatever failed, the window is still up: a hold left set would
             // keep every later copy waiting for the life of the process.
             _waitingForCopies = false;
+            App.TheQuitWasTakenBack();
             LetHeldCopiesGo();
         }
     }
