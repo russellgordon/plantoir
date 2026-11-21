@@ -471,7 +471,7 @@ public sealed partial class AssistWorkspace
     public static DateOnly? DateOf(Course course, int sectionNumber, string pagePath)
     {
         bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, pagePath);
-        try { return PageFrontmatter.CreatedOn(ReadPlanned(pagePath), sectionNumber, sectionLocal); }
+        try { return PageFrontmatter.CreatedOn(File.ReadAllText(pagePath), sectionNumber, sectionLocal); }
         catch { return null; }
     }
 
