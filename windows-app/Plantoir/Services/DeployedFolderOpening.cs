@@ -51,7 +51,7 @@ internal static class DeployedFolderOpening
         {
             XamlRoot = root,
             Title = DeployedFolderWording.CouldNotOpenTitle,
-            Content = new TextBlock { Text = DeployedFolderWording.CouldNotOpen, TextWrapping = TextWrapping.Wrap },
+            Content = Views.FormBuilders.DialogExplanation(DeployedFolderWording.CouldNotOpen),
             CloseButtonText = DeployedFolderWording.CouldNotOpenButton,
             DefaultButton = ContentDialogButton.Close,
         };
