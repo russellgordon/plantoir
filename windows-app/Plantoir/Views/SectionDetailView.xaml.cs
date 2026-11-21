@@ -1249,8 +1249,11 @@ public sealed partial class SectionDetailView : UserControl
         TodaysClassOnTheFrontPage.Offering? offer;
         try
         {
-            // Inside the try (#1022 item 1): a folder whose launcher went since
-            // the press's check is refused here, and the start then says so.
+            // Inside the try (#1022 item 1): a folder with no launcher was
+            // refused here and only logged, and the press did nothing. Now the
+            // press goes on, the run cannot start, and the wait says so under
+            // "Cannot Preview Yet" (WaitForPreviewServer), one path for a
+            // launcher gone before the press and one gone after its checks.
             workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
                 { Surface = AssistSurface.LocalWindow };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
             offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn);
@@ -1804,10 +1807,6 @@ public sealed partial class SectionDetailView : UserControl
             if (await _window.RefusedWhileTheFolderIsGettingReady(_window.Workspace.WorkspacePath, "Cannot Preview Yet")) return;
             if (await AnotherProgramStandsInTheWay("Preview", "Cannot Preview Yet") is not null) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
-            // #1022 item 1: a folder with no launcher says so, under "Cannot
-            // Preview Yet", before any question; it used to be refused inside
-            // today's-class question and only logged.
-            if (await SaidTheLauncherIsMissing(workspacePath)) return;
 
             // #406 (mac #397): today's class for the front page — asked HERE,
             // on the Preview button and nowhere else, after the refusals above
@@ -1887,17 +1886,6 @@ public sealed partial class SectionDetailView : UserControl
         ActivityTrail.Note(ActivityTrail.Event.PreviewAlreadyStarting,
                            "a preview start did nothing: this window's own start was still waiting for a stop or building",
                            _course.Code, _sectionNumber);
-        return true;
-    }
-
-    /// <summary>
-    /// A working folder with no launcher, at the press (#1022 item 1): the
-    /// sentence names no file (#928 item 9), the trail says which.
-    /// </summary>
-    private async Task<bool> SaidTheLauncherIsMissing(string workspacePath)
-    {
-        if (PreviewStarts.MissingLauncher(workspacePath) is not { } detail) return false;
-        await SayThePreviewCouldNotStart(ScriptRunner.FolderIsMissingAPiece, detail);
         return true;
     }
 

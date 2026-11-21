@@ -50,10 +50,8 @@ public class LaunchProblemWordingTests
             Assert.Equal(PreviewStarts.RunStanding.CouldNotStart,
                          PreviewStarts.HowTheRunStands(runner.IsRunning, runner.LastExitCode, runner.LaunchProblem));
 
-            // The press's own check, before anything is taken (#1022 item 1).
-            Assert.Equal("the working folder has no preview.ps1", PreviewStarts.MissingLauncher(emptyFolder));
             Assert.Equal(ScriptRunner.FolderIsMissingAPiece + " (the working folder has no preview.ps1)",
-                         PreviewStarts.CouldNotStartLine(ScriptRunner.FolderIsMissingAPiece, PreviewStarts.MissingLauncher(emptyFolder)));
+                         PreviewStarts.CouldNotStartLine(runner.LaunchProblem!, runner.LaunchProblemDetail));
         }
         finally
         {

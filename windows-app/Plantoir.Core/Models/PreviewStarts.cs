@@ -88,17 +88,6 @@ public static class PreviewStarts
         return new Outcome(lease, record, null);
     }
 
-    /// <summary>
-    /// What the trail says when the working folder has no preview launcher
-    /// at the press (#1022 item 1), or null when it has one. The teacher
-    /// reads <see cref="ScriptRunner.FolderIsMissingAPiece"/>, which names no
-    /// file.
-    /// </summary>
-    public static string? MissingLauncher(string workspacePath) =>
-        File.Exists(Path.Combine(workspacePath, Workspace.MarkerLauncher))
-            ? null
-            : "the working folder has no " + Workspace.MarkerLauncher;
-
     /// <summary>The trail line for a run that never started: the sentence shown, then the detail nobody was shown.</summary>
     public static string CouldNotStartLine(string sentence, string? detail) =>
         detail is null ? sentence : sentence + " (" + detail + ")";
