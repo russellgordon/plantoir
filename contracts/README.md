@@ -385,7 +385,7 @@ Two things make that failure read as a request instead of as damage:
   `generated` block because it is generated in FULL and says so in its `note`;
   `undo-traces.json` has none for the same reason (it is generated in full,
   by `scripts/make_undo_traces.py` rather than by the app, and its `note` says
-  so: change the generator and run it, never the file); the seven authored
+  so: change the generator and run it, never the file); the eight authored
   files have none because there is no generated half to mark. So the question "is this key generated?" is answered by
   `generated.keys` in exactly the two files where it can be asked.
 
