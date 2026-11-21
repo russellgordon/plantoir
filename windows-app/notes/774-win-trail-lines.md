@@ -161,3 +161,53 @@ window's words, exit 3 as "stopped at a question nobody was there to answer
   Visual C++ runtime (`vm-tools/guest/774-app-build.ps1`). The VM was parked
   on its dev snapshot afterwards, so the next writer meets the same refusal;
   the dev snapshot wants refreshing once.
+
+## Round 2 (review 1: M1, L1, L2)
+
+- **M1.** `ActivityTrail.PromptRecord` cleaned the teacher's sentence before
+  redacting it, so a NUL inside a token wrote the token's tail. Each of the
+  record's two lines now goes through `SafeTrailLine` on its raw text
+  (`trailLines.order`), then the joined record once more keeping its line
+  break. Every other writer was checked: the two `Note` overloads and the
+  lock-wait `Note` pass the raw line to `SafeTrailLine`; no caller cleans a
+  line before handing it over (`UnitPlans.OneLine` and the course-name
+  cleaning are stored values, the contract's own rule). New tests:
+  `APromptIsRedactedOnItsRawTextAsEveryLineIs` (the 13 one-line
+  `trailLines.cases` asked as prompts, from the JSON) and
+  `ASecretSplitInsideAPromptDoesNotGetPast` (NUL inside a Bearer token,
+  U+202E before an email's `@`, LF inside a token: the LF tail is the
+  contract's `knownLimits`, so only the head's removal is pinned).
+- **L1.** `AssistWorkspace.HowITeach.cs` (both lines) and `UnitWordRenamer.cs`
+  (both lines) take their place from `ActivityTrail.Place(code, 0)`; output
+  unchanged. `ActivityTrailWiringTests.NoCallerBuildsACoursesPlaceByHand`
+  scans every product file for `{…Code} · `. Not caught by that scan, and not
+  this lane's: `Undo/UndoRecovery.cs:93` (`line.Course + " · " + …`, the Undo
+  line's) and `SectionDetailView.xaml.cs:1266` (`{code}/{section} · `).
+- **L2 left as it is.** The contract (`activityTrail.mustRecord` → `task
+  finished` → `why`) says the outcome tells a stop made on purpose from a
+  failure but gives no words for a run ended because the client left, so the
+  headless line still reads the window's "failed (exit code -1)" there.
+- **Mac parity (for a mac issue, not made tonight):** `origin/dev`
+  `mac-app/QuartzTeachers/Models/Assist/AssistTurnRecord.swift:107`
+  (`askedLines`) cleans the prompt (`OneLineText.cleaned(prompt)`) before the
+  record is redacted, the same leak.
+
+### Runs, round 2 (first VM, bd11f7444; dev 10d04bfbd already merged)
+
+- App x64 and unit tests build. 74 of 74 passed in `TrailLinesContractTests`,
+  `ActivityTrailWiringTests`, `ActivityTrailWritersTests`,
+  `HeadlessTaskLinesTests`, `UndoWriterScanTests`, `BuildMachineLinesTests`,
+  `HowITeachTests`, `UnitWordRenameContractTests`, `LogRedactorTests`
+  (`vm-tools/guest/774-r2.ps1`, `774-r2b.ps1`).
+- Must-fail, each reverted on the VM with `git checkout`:
+  - prompt cleaned before redacted: `APromptIsRedactedOnItsRawTextAsEveryLineIs`
+    "a NUL inside a Bearer token does not let its tail through" (`… [removed: token] SECRETTAIL`)
+    and `ASecretSplitInsideAPromptDoesNotGetPast` "NUL".
+  - prompt redacted once on its raw text, then cleaned, no pass over the
+    record: `APromptIsRedactedOnItsRawTextAsEveryLineIs` "a NUL after Bearer
+    does not hide the token" and `ASecretSplitInsideAPromptDoesNotGetPast`
+    "bidi" (`teacher@school.on.ca` written).
+  - prompt keeping its line breaks: both new tests ("a line break inside a
+    page title …", "newline") and `APromptIsOneLineBehindItsPrefix`.
+  - `UnitWordRenamer.cs:216` built by hand again:
+    `NoCallerBuildsACoursesPlaceByHand` "UnitWordRenamer.cs:216".
