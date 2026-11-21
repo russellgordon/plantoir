@@ -74,4 +74,20 @@ None was changed tonight. The next piece of #953: `ReferenceCopier.cs:197` first
 
 ## Must-fail lines
 
-(filled in below from the VM runs)
+Each behaviour reverted in a scratch branch (`scratch/874-mf-*`, deleted after), the four classes (`HeldFilesTests`, `CourseSettingsHeldFileTests`, `AgentGuidanceTests`, `LastViewedPagesTests`) run on the first VM, Debug, tests-only build. Real branch: 45 of 45 passed before and after.
+
+| Reverted | Failing test, line, assertion as printed |
+|---|---|
+| A: `LastViewedPages.Load` takes a refused read as empty | `LastViewedPagesTests.ARefusedReadNeverReplacesTheListWithOneEntry`, PreviewStartPageTests.cs:252, `Assert.False() Failure Expected: False Actual: True` |
+| B: `AgentGuidanceDeclined.Load` takes a refused read as empty | `AgentGuidanceTests.NotNowAnswersAreNeverReplacedByOneAndARefusedWriteSaysSo`, AgentGuidanceTests.cs:484, `Assert.False() Failure Expected: False Actual: True` |
+| C: `Write` takes a refused merge read as "unreadable" (whole-object write) | `CourseSettingsHeldFileTests.ASaveWhoseMergeReadWasRefusedNeverWritesTheWholeCopy`, CourseSettingsHeldFileTests.cs:133, `Assert.Throws() Failure: No exception was thrown` |
+| K: a file that is not valid JSON refuses instead of the whole write | `AFileThatIsNotValidJsonStillTakesTheWholeCopy`, :189 (the thrown `InvalidDataException`) |
+| I: `ReplaceWith` no longer removes its temporary | `HeldByAReaderTheRenameIsRefusedPastTheBoundAndTheFileIsUnchanged`, :153 and `HeldWhole…`, :112, `Assert.Empty() Failure: Collection was not empty` |
+| H: `ScheduledRun` reads with `File.ReadAllBytes(config)` again | `EveryReaderOfTheSettingsGoesThroughTheOneReader`, :232 (`Assert.True` with the file named) |
+| D: the probe never sees a hold | `HeldFilesTests.ARenameOntoAHeldFile…`, HeldFilesTests.cs:49, `Expected: FileInUseException Actual: UnauthorizedAccessException`; `TheProbeSees…`, :87; `AHoldThatEnds…`, :64; `LastViewedPagesTests.ARememberRefused…`, :218 `Expected [50, 100, 200, 400] Actual []`; `AgentGuidanceTests.AddOntoAHeldFile…`, :518 `Expected "The process cannot access the file…" Actual "Access is denied."`; `NotNowAnswers…`, :489; `CourseSettingsHeldFileTests.AReaderThatLetsGo…`, :170; `HeldByAReader…`, :148 |
+| F: `RevertToFile` discards the edits on a held file | `HeldWhole…`, CourseSettingsHeldFileTests.cs:100, `Assert.False() Failure Expected: False Actual: True` |
+| E: `FileInUseException` without the sharing-violation code | `ARenameOntoAHeldFile…`, HeldFilesTests.cs:51 `Expected: -2147024864 Actual: -2146232800`; `AddOntoAHeldFile…`, AgentGuidanceTests.cs:518 `Actual: "could not be written"` |
+| G: `DiscoverCourses` drops a held course | `HeldWhole…`, :106, `Assert.Single() Failure: The collection was empty` |
+| J: every access-denied rename asked again (no probe) | `AReadOnlyFileIsAPermission…`, HeldFilesTests.cs:76 `Value is the exact type FileInUseException`; `AgentGuidanceTests.APermissionIsRefusedAtOnce…`, :551 `Assert.Empty() Failure` |
+
+Not reverted: `ATemporaryIsHiddenUniqueAndBesideItsFile` (reads the name's shape), `TheScanSeesBothShapesOfAReader` (the scan's own self-test; H proves the scan), `AFileThatIsNotValidJsonReadsAsNothingRememberedAndIsReplaced` (pins today's behaviour, unchanged). A first version of the refused-read tests used a holder sharing delete; it passed under A and B (Windows refuses a replace onto ANY open file without POSIX rename, so the write could not land either way), and was replaced by the race the issue names, driven by the pause.
