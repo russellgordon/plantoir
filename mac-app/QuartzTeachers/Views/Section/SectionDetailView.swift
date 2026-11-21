@@ -406,7 +406,8 @@ struct SectionDetailView: View {
         if previewRunner.isRunning {
             return true
         }
-        return !(isBusy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+        return !(isBusy || workspace.isBeingCopied(course.code) || workspace.isRenamingAFolder(course.code)
+            || workspace.folderIsGettingReady)
     }
 
     /// The Deploy button's enablement — read by the button and by Section ▸
@@ -417,7 +418,10 @@ struct SectionDetailView: View {
             folderPath: workspace.workspaceURL?.path,
             courseCode: course.code,
             sectionNumber: sectionNumber,
-            isBeingCopied: workspace.isBeingCopied(course.code),
+            // A Rename folder of the course (#899 U4b) holds Deploy as a
+            // copy being zipped does: the site would be built from a course
+            // half renamed.
+            isBeingCopied: workspace.isBeingCopied(course.code) || workspace.isRenamingAFolder(course.code),
             folderIsGettingReady: workspace.folderIsGettingReady,
             heldElsewhere: courseIsHeldElsewhere
         )
@@ -2423,7 +2427,8 @@ struct SectionDetailView: View {
             return
         }
         // Every way in, not only the button (#351): see its `.disabled`.
-        if workspace.isBeingCopied(course.code) {
+        // A Rename folder of the course too (#899 U4b).
+        if workspace.isBeingCopied(course.code) || workspace.isRenamingAFolder(course.code) {
             return
         }
         // A preview of this section cannot start while this same section is
@@ -2941,6 +2946,12 @@ struct SectionDetailView: View {
         if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
             return AssistSiteWorkResult(
                 succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
+            )
+        }
+        // Nor while a folder of the course is being renamed (#899 U4b).
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: CourseActivity.folderRenameIsUnderWay(course: course.code)
             )
         }
 

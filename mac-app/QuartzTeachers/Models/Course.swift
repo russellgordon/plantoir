@@ -17,14 +17,23 @@ class Course: Identifiable {
     /// The loaded `course_config.json` for this course.
     let configuration: CourseConfiguration
 
-    /// Whether a Rename folder is under way for this course (#899 U4b): its
-    /// check and swap run off the main actor, so the window stays live while
-    /// every file in the moved folders is read. While it is true, Save
-    /// (button and ⌘S) and a second rename are disabled, visibly, and the
-    /// rename sheet's Cancel with them: a rename cannot be halted part way.
-    var isRenamingAFolder: Bool = false
-
     // MARK: - Computed properties
+
+    /// The working folder this course sits in (`<workspace>/courses/<code>`).
+    var workingFolderPath: String {
+        return directoryURL.deletingLastPathComponent().deletingLastPathComponent().path
+    }
+
+    /// Whether a Rename folder is under way for this course, in ANY window
+    /// (#899 U4b): read from `CourseActivity`, because each window holds its
+    /// own copy of the course. Its plan, check and swap run off the main
+    /// actor, so the window stays live while every file in the moved folders
+    /// is read. While it is true, Save (button and ⌘S) and a second rename
+    /// are disabled, visibly, in every window; the rename sheet's Cancel is
+    /// disabled once the swap begins.
+    var isRenamingAFolder: Bool {
+        return CourseActivity.courseIsRenamingAFolder(folderPath: workingFolderPath, courseCode: code)
+    }
 
     var id: String {
         return code

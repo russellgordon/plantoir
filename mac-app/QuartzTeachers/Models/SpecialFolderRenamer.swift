@@ -586,17 +586,21 @@ enum SpecialFolderRenamer {
             + "Still called “\(newName)”: \(joined). \(said)"
     }
 
-    /// Each planned folder that is at its new name and not at its old one
-    /// now, by its path inside the course: what a rename stopped part way
-    /// left renamed.
+    /// Each planned folder that is at its new name now, by its path inside
+    /// the course: what a rename stopped part way left renamed. Whatever is
+    /// at the OLD name does not count (U4b part six's review, L1): the
+    /// likeliest reason a move back fails is that something appeared there,
+    /// and the folder is then still at its new name. The plan refused a new
+    /// name that was taken, so what is at `to` is the moved folder.
+    ///
+    /// Presence only, by `lstat` (part six's review, L2): nothing is read
+    /// or hashed, so it costs nothing on the main actor.
     nonisolated static func foldersLeftAtTheirNewName(_ moves: [FolderRenamePlan.Move], courseDirectory: URL) -> [String] {
         var result: [String] = []
         let prefix: String = courseDirectory.standardizedFileURL.path + "/"
         for move in moves {
             let isCaseOnly: Bool = move.from.lastPathComponent.caseInsensitiveCompare(move.to.lastPathComponent) == .orderedSame
-            let atTo: Bool = UndoTreeReading.read(at: move.to) != .absent
-            let atFrom: Bool = UndoTreeReading.read(at: move.from) != .absent
-            var leftRenamed: Bool = atTo && !atFrom
+            var leftRenamed: Bool = somethingIsThere(at: move.to)
             if isCaseOnly {
                 let listed: [String] = (try? FileManager.default.contentsOfDirectory(atPath: move.to.deletingLastPathComponent().path)) ?? []
                 leftRenamed = listed.contains(move.to.lastPathComponent)
@@ -608,6 +612,18 @@ enum SpecialFolderRenamer {
             result.append(path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : move.to.lastPathComponent)
         }
         return result
+    }
+
+    /// Whether anything is at the path, a link included and never followed.
+    nonisolated static func somethingIsThere(at url: URL) -> Bool {
+        var information: stat = stat()
+        let found: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &information)
+        }
+        return found == 0
     }
 
     /// Where a page is once the folders move: under a move's `to` when it

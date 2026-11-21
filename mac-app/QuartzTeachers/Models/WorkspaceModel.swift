@@ -2391,6 +2391,16 @@ class WorkspaceModel {
         return CourseActivity.courseIsBeingCopied(folderPath: workspacePath, courseCode: courseCode)
     }
 
+    /// Whether a Rename folder of this course is under way, in any window
+    /// (#899 U4b). While it is, the course's Preview and Deploy are greyed
+    /// and refuse, as for a copy being zipped.
+    func isRenamingAFolder(_ courseCode: String) -> Bool {
+        guard let workspacePath = workspaceURL?.path else {
+            return false
+        }
+        return CourseActivity.courseIsRenamingAFolder(folderPath: workspacePath, courseCode: courseCode)
+    }
+
     /// Saves a copy of a whole course, then reloads so the Backups group
     /// shows it — opened, so the new row is visible feedback.
     ///
@@ -2498,6 +2508,11 @@ class WorkspaceModel {
     func structuralRefusal(courseCode: String, act: String, whenBusy: String) -> String? {
         guard let workspacePath = workspaceURL?.path else {
             return nil
+        }
+        // A Rename folder of the course under way in any window (#899 U4b):
+        // said as itself, since `whenBusy` names a preview or a deploy.
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workspacePath, courseCode: courseCode) {
+            return CourseActivity.folderRenameIsUnderWay(course: courseCode)
         }
         if CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: courseCode) {
             return whenBusy

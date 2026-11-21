@@ -228,6 +228,11 @@ struct CourseSettingsView: View {
                         onRename: { oldName, newName in
                             return await renameFolder(oldName, to: newName, scope: .shared)
                         },
+                        renameCanNoLongerBeHalted: {
+                            return CourseActivity.folderRenameIsSwapping(
+                                folderPath: course.workingFolderPath, courseCode: course.code
+                            )
+                        },
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
                         }
@@ -288,6 +293,11 @@ struct CourseSettingsView: View {
                         },
                         onRename: { oldName, newName in
                             return await renameFolder(oldName, to: newName, scope: .perSection)
+                        },
+                        renameCanNoLongerBeHalted: {
+                            return CourseActivity.folderRenameIsSwapping(
+                                folderPath: course.workingFolderPath, courseCode: course.code
+                            )
                         },
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .perSection)
@@ -419,6 +429,14 @@ struct CourseSettingsView: View {
                 if let saveProblem {
                     StatusColour.blocking.sentence(saveProblem)
                         .font(.callout)
+                } else if course.isRenamingAFolder && course.configuration.hasUnsavedChanges {
+                    // Save is disabled while a Rename folder of this course
+                    // runs, in any window (#899 U4b): said beside it, as a
+                    // destination problem is.
+                    Text(CourseActivity.availableOnceTheFolderIsRenamed)
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                        .accessibilityIdentifier("saveWaitsForTheRename")
                 } else if saveIsHeldBack, let holdingProblem {
                     // It stops Save, so the stopping red and its symbol (#994).
                     StatusColour.blocking.sentence(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
@@ -783,8 +801,10 @@ struct CourseSettingsView: View {
 
     func save() {
         if course.isRenamingAFolder {
-            // Every control that saves is disabled meanwhile; this is the
-            // same rule for any path that reaches here anyway.
+            // Every control that saves is disabled meanwhile, in every
+            // window; this is the same rule for any path that reaches here
+            // anyway, said beside Save.
+            saveProblem = CourseActivity.folderRenameIsUnderWay(course: course.displayCode)
             return
         }
         saveProblem = nil
@@ -1086,6 +1106,11 @@ struct CourseSettingsView: View {
         case .perSection:
             namesInScope = course.configuration.perSectionFolders
         }
+        // A rename of this course under way in any window (#899 U4b): the
+        // sheet's Rename is disabled, and says why.
+        if course.isRenamingAFolder {
+            return CourseActivity.folderRenameIsUnderWay(course: course.displayCode)
+        }
         // `finishing` is settled once when the sheet opens, not here: it
         // touches the filesystem, and this runs on every keystroke.
         return SpecialFolderRenamer.problem(
@@ -1103,17 +1128,28 @@ struct CourseSettingsView: View {
     /// know, which is what the old order (disk first, settings after) could
     /// leave behind.
     func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) async -> RenameResult {
-        // One rename at a time per course, and no Save meanwhile: every
-        // control that starts either is disabled while this is true, so this
-        // guard is reached only by a path that is not a control.
-        if course.isRenamingAFolder {
+        // One rename at a time per course FOLDER, from any window, and no
+        // Save meanwhile (U4b part six's review, M2): the claim is recorded in
+        // `CourseActivity`, which every window and ⌘Q read, so a second
+        // rename can neither overwrite nor clear this one's record. Every
+        // control that starts either is disabled while it is held, so this
+        // refusal is reached only by a path that is not a control.
+        guard let claim = CourseActivity.beginFolderRename(
+            folderPath: course.workingFolderPath, courseCode: course.code
+        ) else {
             return .failed(SpecialFolderRenamer.nothingWasChanged(
                 renaming: oldName, said: JournaledStepError.anotherChangeIsUnderWay.localizedDescription
             ))
         }
-        course.isRenamingAFolder = true
         defer {
-            course.isRenamingAFolder = false
+            CourseActivity.endFolderRename(claim)
+        }
+        // Nor while a copy of the course is being zipped (#351): a removal
+        // or restore waiting on that zip would take a course half renamed.
+        if CourseActivity.courseIsBeingCopied(folderPath: course.workingFolderPath, courseCode: course.code) {
+            return .failed(SpecialFolderRenamer.nothingWasChanged(
+                renaming: oldName, said: JournaledStepError.anotherChangeIsUnderWay.localizedDescription
+            ))
         }
         let courseDirectory: URL = course.directoryURL
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
@@ -1162,6 +1198,16 @@ struct CourseSettingsView: View {
                     renaming: oldName, said: error.localizedDescription
                 ))
             }
+            // Halted at Cancel while it was only planning (the plan writes
+            // nothing): nothing is made. Asked here, on the main actor, in the
+            // same turn as the swap is marked begun, so a Cancel lands either
+            // before this (and halts it) or after (and is disabled).
+            if Task.isCancelled {
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: CancellationError().localizedDescription
+                ))
+            }
+            CourseActivity.folderRenameSwapBegins(claim)
             // Recorded BEFORE the step is made, so that a rename killed part
             // way can be recognised and finished: with the switch off, recovery
             // records and repairs nothing (`interruptedRenameTarget`).
@@ -1173,8 +1219,13 @@ struct CourseSettingsView: View {
             do {
                 // The check and the swap read and hash every file in each
                 // moved folder: OFF the main actor, so the window stays live
-                // (U4b part four's review, M1). The list's one lock is taken
-                // inside, as for every step, so the order of steps holds.
+                // (U4b part four's review, M1). The list's one lock is held
+                // only while the step is begun and finished; the check and
+                // the swap run outside it, so what keeps another step of this
+                // course out meanwhile is this rename's claim in
+                // `CourseActivity` (every Save, rename and structural act of
+                // the course, in every window, is refused while it is held)
+                // and, for anything else, the swap's content checks.
                 try await SpecialFolderRenamer.make(step)
             } catch JournaledStepError.refused(.changedSince, _) where attempts < 3 {
                 // A page or a setting the step changes was changed between the

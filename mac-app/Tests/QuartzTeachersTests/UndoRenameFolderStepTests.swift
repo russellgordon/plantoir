@@ -634,6 +634,157 @@ final class UndoRenameFolderStepTests: XCTestCase {
         let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: record.path), "the record is left after a refused re-plan")
     }
+
+    // MARK: - Part six: one piece of work the whole app knows about
+
+    /// A second window's copy of the same course, as `WorkspaceModel`
+    /// makes one per window.
+    func anotherWindowsCopy(of course: Course) throws -> Course {
+        let loaded: CourseConfiguration = try CourseConfiguration(contentsOf: course.configFileURL)
+        return Course(code: course.code, directoryURL: course.directoryURL, configuration: loaded)
+    }
+
+    /// While a rename runs in one window, ANOTHER window's copy of the
+    /// course knows (U4b part six's review, M2): its Save is disabled and
+    /// says why, its own rename is refused with nothing changed and the
+    /// first rename's record left as it was, and every structural act,
+    /// removal and replacement is refused with a sentence naming the
+    /// rename. A Cancel that lands once the swap has begun does not halt it.
+    /// MUST FAIL with the busy mark kept on one window's `Course`.
+    func testWhileARenameRunsAnotherWindowsCopyOfTheCourseIsHeldToo() async throws {
+        let course: Course = try course()
+        let other: Course = try anotherWindowsCopy(of: course)
+        other.configuration.courseName = "Computer Science"
+        let otherView: CourseSettingsView = CourseSettingsView(course: other)
+        XCTAssertTrue(otherView.saveIsEnabled)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the swap reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        UndoKillPoints.beforeTheRename = { @Sendable (index: Int, place: URL) in
+            gate.arrive()
+        }
+        let first: Task<RenameResult, Never> = Task { @MainActor in
+            return await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        }
+        await fulfillment(of: [reached])
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        let recorded: Data = try Data(contentsOf: record)
+
+        XCTAssertTrue(other.isRenamingAFolder, "the other window's copy does not know")
+        XCTAssertTrue(CourseActivity.folderRenameIsSwapping(folderPath: root.path, courseCode: "ICS3U"))
+        XCTAssertFalse(otherView.saveIsEnabled, "the other window's Save is enabled")
+        let sentence: String = CourseActivity.folderRenameIsUnderWay(course: "ICS3U")
+        XCTAssertEqual(otherView.folderRenameProblem("Concepts", to: "Ideas", scope: .shared), sentence)
+        let second: RenameResult = await otherView.renameFolder("Concepts", to: "Ideas", scope: .shared)
+        XCTAssertNotNil(failed(second), "\(second)")
+        XCTAssertTrue(listed(course.directoryURL).contains("Concepts"), "the second rename changed something")
+        XCTAssertEqual(try Data(contentsOf: record), recorded, "the second rename touched the first's record")
+        XCTAssertEqual(
+            CourseActivity.structuralHoldReason(folderPath: root.path, courseCode: "ICS3U", revisedElsewhere: false),
+            CourseActivity.availableOnceTheFolderIsRenamed
+        )
+        let removal: ScheduledDeployCleanup.RemovalResult = await ScheduledDeployCleanup.removeCourse(
+            other, coursesDirectoryURL: root.appendingPathComponent("courses")
+        )
+        XCTAssertFalse(removal.didRemove)
+        XCTAssertEqual(removal.problem, sentence)
+        XCTAssertEqual(
+            ReferenceReplacer.Problem.folderBeingRenamed(course: "ICS3U").errorDescription, sentence
+        )
+        first.cancel()
+        gate.open()
+        let result: RenameResult = await first.value
+
+        XCTAssertNotNil(renamed(result), "a Cancel after the swap began halted it: \(result)")
+        XCTAssertFalse(other.isRenamingAFolder)
+        XCTAssertNil(CourseActivity.structuralHoldReason(folderPath: root.path, courseCode: "ICS3U", revisedElsewhere: false))
+        XCTAssertEqual(try journal().read().records.count, 1, "one step: the second rename never began")
+    }
+
+    /// ⌘Q during a rename waits for it (U4b part six's review, M1), as it
+    /// waits for a tools copy (#476): the quit's wait resumes only once the
+    /// step is made and the rename's claim has ended. MUST FAIL with the
+    /// rename left out of the quit's wait.
+    func testAQuitDuringARenameWaitsForItToFinish() async throws {
+        let course: Course = try course()
+        let reached: XCTestExpectation = XCTestExpectation(description: "the swap reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        UndoKillPoints.beforeTheRename = { @Sendable (index: Int, place: URL) in
+            gate.arrive()
+        }
+        let first: Task<RenameResult, Never> = Task { @MainActor in
+            return await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        }
+        await fulfillment(of: [reached])
+
+        XCTAssertTrue(AppDelegate.quitWaitsForWorkUnderWay(
+            toolchainCopying: false, renamingAFolder: CourseActivity.anyFolderRenameIsUnderWay
+        ), "the quit does not wait for the rename")
+        let quit: Task<(Bool, Int), Never> = Task { @MainActor in
+            await CourseActivity.waitForAllFolderRenames()
+            let steps: Int = (try? self.journal().read().records.count) ?? -1
+            return (CourseActivity.anyFolderRenameIsUnderWay, steps)
+        }
+        // Until the quit's wait is registered: a bound on turns, not a time.
+        var turns: Int = 0
+        while CourseActivity.store.folderRenameWaiters.isEmpty && turns < 10_000 {
+            await Task.yield()
+            turns += 1
+        }
+        XCTAssertEqual(CourseActivity.store.folderRenameWaiters.count, 1, "the quit is not waiting for the rename")
+        gate.open()
+        let (stillUnderWay, steps): (Bool, Int) = await quit.value
+        let result: RenameResult = await first.value
+
+        XCTAssertFalse(stillUnderWay, "the quit went on while the rename ran")
+        XCTAssertEqual(steps, 1, "the quit went on before the step was made")
+        XCTAssertNotNil(renamed(result), "\(result)")
+    }
+
+    /// A rename halted at Cancel while it is only planning (the plan writes
+    /// nothing) makes nothing (U4b part six's review, L3): no step, no
+    /// record, the folders as they were, and the course free again. MUST
+    /// FAIL with the halt not asked before the swap.
+    func testARenameCancelledWhileItPlansChangesNothing() async throws {
+        let course: Course = try course()
+        let before: [String: Data] = pages(of: course)
+        let halted: Task<RenameResult, Never> = Task { @MainActor in
+            return await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        }
+        halted.cancel()
+        let result: RenameResult = await halted.value
+
+        XCTAssertNotNil(failed(result), "\(result)")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+        XCTAssertFalse(course.isRenamingAFolder)
+    }
+
+    /// A move back that fails because something appeared at the old name
+    /// still names the folder left at its new name (U4b part six's review,
+    /// L1). MUST FAIL with a folder counted only when its old name is free.
+    func testAMoveBackBlockedAtTheOldNameStillSaysWhichFolderIsRenamed() async throws {
+        let course: Course = try course()
+        let appeared: URL = course.directoryURL.appendingPathComponent("section1/Tasks/Other.md")
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in
+            if index != 1 {
+                return false
+            }
+            try? FileManager.default.createDirectory(
+                at: appeared.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try? "Other.\n".write(to: appeared, atomically: true, encoding: .utf8)
+            return true
+        }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        let said: String = try XCTUnwrap(failed(result), "\(result)")
+        XCTAssertNotNil(pages(of: course)["section1/Assessments/Quiz 1.md"], "the first section's folder was put back")
+        XCTAssertTrue(said.hasPrefix("“Tasks” was renamed only in part"), said)
+        XCTAssertTrue(said.contains("“section1/Assessments”"), said)
+    }
 }
 
 /// Holds a rename's swap at its first page until the main actor opens it,
