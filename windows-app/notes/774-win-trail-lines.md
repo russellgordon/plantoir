@@ -130,3 +130,34 @@ Add to the trail section: every trail line about a course gets its place from
 `task started` / `task finished` for every launcher it runs (#774), in the
 window's words, exit 3 as "stopped at a question nobody was there to answer
 (exit 3)".
+
+## Runs (first Windows VM, 2026-11-21)
+
+- Merged `origin/dev` at 2dcc9a722 (before proving: up to date at da5af161e)
+  and again at e18157a2a (dev 10d04bfbd, Undo W6; clean merge, its new event
+  untouched). At e18157a2a: the app (x64), the unit tests and the UI tests
+  build; 127 + 136 tests in the touched and source-reading classes, all
+  passed (`TrailLinesContractTests`, `HeadlessTaskLinesTests`,
+  `OutsideGreetingContractTests`, `AgentGuidanceTests`, `LogRedactorTests`,
+  `LauncherRunnerCaptureTests`, `ActivityTrailWritersTests`,
+  `ActivityTrailWiringTests`, `OutsideAssistantWhilePreviewingTests`,
+  `NamedGapLedgerTests`, `UnitPlansGreetingTests`, `TodaysClassContractTests`,
+  `UndoWriterScanTests`, `BuildMachineLinesTests`, `ContractTests`, the
+  `NewCourseDialog.cs` source scanners, `StopQuestionsContractTests`,
+  `TwoWindowSettingsTests`).
+- Must-fail: three sabotage commits (local branches `sab774-1`, `-2`, `-3`,
+  never pushed; delete with `git branch -D`). Every new or changed test failed
+  on its revert, with the case named: the place without `{course} · `
+  ("no section was named"), U+202A not removed, the getter and the Save not
+  cleaning ("a NUL at the end becomes a trailing space, which is kept: read" /
+  ": saved unedited"), the prompt not cleaned, askFound's old words, a
+  greeting saying "marks" (caught by `greetingMustNotSay`, and by `where:
+  last`), exit 3 in the old words, the started line without its place, the
+  unit plan's name not cleaned, and both single orders of the trail writer
+  (clean-then-redact: "a NUL inside a Bearer token does not let its tail
+  through"; redact-then-clean: "a NUL after Bearer does not hide the token").
+- The first VM's fetched runtime predated #965, so the app build refused
+  (`CheckNativeRuntimeManifest`) until `fetch-runtime.ps1` placed the
+  Visual C++ runtime (`vm-tools/guest/774-app-build.ps1`). The VM was parked
+  on its dev snapshot afterwards, so the next writer meets the same refusal;
+  the dev snapshot wants refreshing once.
