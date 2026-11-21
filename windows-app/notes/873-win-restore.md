@@ -215,7 +215,7 @@ mac's reason: a rename should not cost a teacher their website.
   here; `RestoreSectionDialogUiTests` sends only `Keyboard.Type` of ESCAPE and
   RETURN, both watched.
 
-## Tests added tonight for steps 3 and 4 (first VM, 185 of 185 over the brief's run rule at db6ab3354, 02:25)
+## Tests added tonight for steps 3 and 4 (first VM: 186 of 186 over the brief's run rule, both builds and the UI test green at b9540f26b, `dev` 8117678f8 merged, 02:33)
 
 - `MenuSectionRestoreTests` (14): every `filesOutsideTheSection` case from
   the JSON against a fixture holding every listed path for Sections 1 and 2;
@@ -290,6 +290,8 @@ branch head: 207 of 207 over every class named in the brief's run rule.
 | h3 | the menu route puts back no per-section key | `ThisSectionsKeyOnASharedPage…` :206, `ASharedPageMadeSince…` :174, `BusyAfterTheArchive…` :147 and two more |
 | h4 | a way back that did not finish read as finished | both sweeps (`AssertToldTruly` :156), `AWayBackThatDoesNotFinish…` :166 and :302, `WithOnlyHiddenFiles…` :194, `WhenEvenTheKeep…` :215 |
 | h4 | the website record compared over the wrong files | passed every test: the gap is closed by `ADifferentWebsiteRecordIsSaidAndTheLiveOneIsKept`, proved by h5 below |
+| h5 | the same, on 4162141d4 | `MenuSectionRestoreTests.ADifferentWebsiteRecordIsSaidAndTheLiveOneIsKept` :167 |
+| h2 (UI) | the default Restore Whole Course | `RestoreSectionDialogUiTests` failed after its 60 s wait for the finished dialog (1 m 15 s; Enter ran the whole-course restore), first VM 02:30 |
 
 h1 to h4 were built on db6ab3354 and run on the first VM at 02:28 over
 `MenuSectionRestoreClickTests`, `MenuSectionRestoreTests`,
