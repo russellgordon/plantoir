@@ -95,7 +95,7 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
 
             var refused = Assert.Throws<FileInUseException>(() => window.Write(ConfigPath));
             Assert.Equal(HeldFiles.InUseSentence("course_config.json"), refused.Message);
-            Assert.Equal("course_config.json is in use by another program, so nothing was changed.", refused.Message);
+            Assert.Equal("course_config.json is in use by another program, so it was not changed.", refused.Message);
 
             Assert.False(window.RevertToFile(ConfigPath));
             Assert.True(window.Values["show_reading_time"]!.Value<bool>());   // the edit is kept

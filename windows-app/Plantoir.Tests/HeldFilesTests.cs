@@ -47,7 +47,7 @@ public sealed class HeldFilesTests : IDisposable
         using (Hold(target, FileShare.Read))
         {
             var refused = Assert.Throws<FileInUseException>(() => RenameOnto(target, "after", pauses.Add));
-            Assert.Equal("target.json is in use by another program, so nothing was changed.", refused.Message);
+            Assert.Equal("target.json is in use by another program, so it was not changed.", refused.Message);
             Assert.Equal(unchecked((int)0x80070020), refused.HResult);
         }
         Assert.Equal(HeldFiles.Pauses, pauses);

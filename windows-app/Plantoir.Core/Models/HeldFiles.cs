@@ -66,7 +66,7 @@ public static class HeldFiles
 
     /// <summary>The words a teacher reads for a held file; the Undo line's own phrase, "is in use by another program".</summary>
     public static string InUseSentence(string fileName) =>
-        fileName + " is in use by another program, so nothing was changed.";
+        fileName + " is in use by another program, so it was not changed.";
 
     /// <summary>What a read found: the bytes, nothing there, or a hold that outlasted the bound.</summary>
     public enum ReadOutcome { Read, NotThere, CouldNotReadNow }
