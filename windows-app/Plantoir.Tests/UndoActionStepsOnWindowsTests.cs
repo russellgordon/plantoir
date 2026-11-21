@@ -157,6 +157,50 @@ internal static class WindowsActionsOnTheMacFixture
         return string.Join("\n", answered.Content.OfType<TextContentBlock>().Select(block => block.Text));
     }
 
+    /// <summary>
+    /// The held steps whose Windows action exists and runs on this fixture:
+    /// each is run, the way <see cref="Run"/> runs a converted one, with the
+    /// mac's arguments, so a held row is proven to fall short for its named
+    /// reason (it writes its files and leaves no step of its own), never by a
+    /// guard that can only throw.
+    /// </summary>
+    internal static readonly IReadOnlyList<string> HeldButRunnable =
+    [
+        "makeRoomForClasses", "duplicateClass", "reDateClasses", "writeHowITeach", "getReadyForTheStartOfTheYear",
+    ];
+
+    /// <summary>Runs the REAL Windows action of a held step that has one here (<see cref="HeldButRunnable"/>), with the mac's arguments.</summary>
+    internal static string RunHeld(string stepName, AssistWorkspace workspace)
+    {
+        var tools = new PlantoirTools(workspace);
+        CallToolResult answered = stepName switch
+        {
+            "makeRoomForClasses" => tools.MakeRoomForClasses(Course, 1, unit: 1, atDay: 2),
+            "duplicateClass" => tools.AddNextClass(Course, 1, duplicate: "Unit 1, Day 1"),
+            "reDateClasses" => tools.ReDateClasses(Course, 1).GetAwaiter().GetResult(),
+            "writeHowITeach" => tools.WriteHowITeach(Course, "I start every class with a question."),
+            "getReadyForTheStartOfTheYear" => tools.PrepareForStartOfYear(Course, 1, workspace.PlanStartOfYear(Course, 1).Code),
+            _ => throw new InvalidOperationException($"{stepName}: not a held step this fixture can run"),
+        };
+        return string.Join("\n", answered.Content.OfType<TextContentBlock>().Select(block => block.Text));
+    }
+
+    /// <summary>The action keys of every begin line in a list folder, oldest first.</summary>
+    internal static List<string> BeginKeys(string journalFolder)
+    {
+        var keys = new List<string>();
+        if (!Directory.Exists(journalFolder)) return keys;
+        foreach (string segment in Directory.EnumerateFiles(journalFolder, "journal-*.jsonl").Order(StringComparer.Ordinal))
+        {
+            foreach (string line in File.ReadAllLines(segment))
+            {
+                if (JsonNode.Parse(line) is JsonObject read && (string?)read["event"] == "begin")
+                    keys.Add((string?)read["step"]?["action"]?["key"] ?? "");
+            }
+        }
+        return keys;
+    }
+
     /// <summary>The newest begin line in a list folder, or null.</summary>
     internal static JsonObject? NewestBegin(string journalFolder)
     {
@@ -229,6 +273,8 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
     {
         foreach (string name in WindowsActionsOnTheMacFixture.Converted)
             Assert.Null(NamedGapLedger.Holding(NamedGapLedger.UndoActionStepsOnWindows, name));
+        foreach (string name in WindowsActionsOnTheMacFixture.HeldButRunnable)
+            Assert.True(NamedGapLedger.Holding(NamedGapLedger.UndoActionStepsOnWindows, name) is not null, $"{name} is run as held and is not held");
     }
 
     /// <summary>The fixture's pages are the mac's wherever a recorded step names one: never a page this class made up.</summary>
@@ -286,10 +332,50 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
     {
         if (NamedGapLedger.Holding(NamedGapLedger.UndoActionStepsOnWindows, name) is { } held)
         {
-            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => MakeAndMatch(name), "no Windows action is converted for it yet", "named ");
+            if (WindowsActionsOnTheMacFixture.HeldButRunnable.Contains(name))
+                NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => HeldStillWritesWithoutItsStep(name), "wrote its files with no step of its own");
+            else
+                NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => MakeAndMatch(name), "no Windows action is converted for it yet");
             return;
         }
         MakeAndMatch(name);
+    }
+
+    /// <summary>
+    /// A held step whose Windows action exists here: run it on the mac's
+    /// fixture with the mac's arguments. It falls short for the reason the
+    /// ledger names only when it CHANGED one of the recorded step's files and
+    /// left no begin line under the recorded key. An action that changed
+    /// nothing fails for another reason (a real failure); one that now makes
+    /// the recorded step returns, which the ledger reads as the gap closing.
+    /// </summary>
+    private void HeldStillWritesWithoutItsStep(string name)
+    {
+        JsonElement recorded = WindowsActionsOnTheMacFixture.Recorded(name);
+        WindowsActionsOnTheMacFixture.Lay(Folder, recorded);
+        string key = recorded.GetProperty("action").GetString()!;
+        var workspace = new AssistWorkspace(Folder, new FakeLauncher())
+        {
+            Surface = WindowsActionsOnTheMacFixture.SurfaceFor(recorded.GetProperty("madeBy").GetString()!.Split(':')[0]),
+            UndoList = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null),
+        };
+        int keyedBefore = WindowsActionsOnTheMacFixture.BeginKeys(ListFolder).Count(made => made == key);
+        string answered = WindowsActionsOnTheMacFixture.RunHeld(name, workspace);
+        if (WindowsActionsOnTheMacFixture.BeginKeys(ListFolder).Count(made => made == key) > keyedBefore) return;
+
+        var changed = new List<string>();
+        foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
+        {
+            string path = file.GetProperty("path").GetString()!;
+            string full = UndoDoor.FullPath(Folder, path);
+            byte[]? before = WindowsActionsOnTheMacFixture.Bytes(file.GetProperty("before"));
+            byte[]? now = File.Exists(full) ? File.ReadAllBytes(full) : null;
+            bool same = before is null ? now is null : now is not null && before.AsSpan().SequenceEqual(now);
+            if (!same) changed.Add(path);
+        }
+        if (changed.Count == 0)
+            throw new InvalidOperationException($"{name}: the Windows action changed none of the recorded step's files: {answered}");
+        throw new InvalidOperationException($"{name}: wrote its files with no step of its own ({string.Join(" | ", changed)})");
     }
 
     private void MakeAndMatch(string name)
