@@ -381,9 +381,6 @@ public sealed class ClubNounTests : IDisposable
 
     // ---- #1027 round 3 (review 2).
 
-    private static bool SaysClass(string text) =>
-        System.Text.RegularExpressions.Regex.IsMatch(text, @"\b[Cc]lass(es)?\b");
-
     /// <summary>
     /// Every key of the contract whose words say class has a club twin
     /// (<c>…ForAMeeting</c>, or <c>…FromTheMeetingsMenu</c> for a
@@ -401,7 +398,7 @@ public sealed class ClubNounTests : IDisposable
         foreach (var (key, value) in wording)
         {
             if (key.EndsWith("ForAMeeting") || key.EndsWith("FromTheMeetingsMenu")) continue;
-            if (value is not JsonValue || !SaysClass(value.ToString())) continue;
+            if (value is not JsonValue || !SaysClass.IsMatch(value.ToString())) continue;
             saidInClass++;
             bool hasATwin = wording.ContainsKey(key + "ForAMeeting")
                 || (key.EndsWith("FromTheMenu") && wording.ContainsKey(key[..^"FromTheMenu".Length] + "FromTheMeetingsMenu"));
@@ -412,7 +409,7 @@ public sealed class ClubNounTests : IDisposable
         foreach (var (key, reason) in staysClass)
         {
             Assert.True(wording.ContainsKey(key), $"staysClass names no key {key}");
-            Assert.True(SaysClass(wording[key]!.ToString()), $"{key} no longer says class");
+            Assert.True(SaysClass.IsMatch(wording[key]!.ToString()), $"{key} no longer says class");
             Assert.False(wording.ContainsKey(key + "ForAMeeting"), $"{key} has a twin, so it is not an exception");
             Assert.False(string.IsNullOrWhiteSpace(reason!.ToString()), key);
         }
@@ -452,7 +449,7 @@ public sealed class ClubNounTests : IDisposable
 
         var write = tools.MakeRoomForClasses("ICS3U", 1, 1, 2, 40);
         Assert.Contains("meeting date", TeacherCopy(write));
-        Assert.False(SaysClass(TeacherCopy(write)), TeacherCopy(write));
+        Assert.False(SaysClass.IsMatch(TeacherCopy(write)), TeacherCopy(write));
         Assert.Contains("class date", ModelCopy(write));
     }
 
