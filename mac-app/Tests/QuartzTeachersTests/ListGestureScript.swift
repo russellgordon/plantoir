@@ -143,7 +143,7 @@ enum CourseSettingsGestureScript {
     /// folder-removal tests in `GradedFolderChoicesTests` (the contract's
     /// `gradedFolders.removingAFolder` runner among them) and
     /// `SpecialFoldersProtectionTests`, which remove through
-    /// `removeItem(named:)` so the ORDER they check is the shipped one.
+    /// `takeOutOfTheList(named:)` so the ORDER they check is the shipped one.
     ///
     /// It is still a hand copy of `body`'s wiring: if `body` ever wired a
     /// folder list differently — another method than `folderWasRemoved`, the

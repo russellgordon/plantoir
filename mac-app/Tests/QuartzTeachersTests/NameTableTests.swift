@@ -103,7 +103,7 @@ final class NameTableTests: XCTestCase {
         XCTAssertEqual(callers, 3, "A removal control no longer goes through requestRemoval(of:)")
         var directRemovals: Int = 0
         searchRange = source.startIndex..<source.endIndex
-        while let range = searchRange, let found = source.range(of: "removeItem(named: ", range: range) {
+        while let range = searchRange, let found = source.range(of: "takeOutOfTheList(named: ", range: range) {
             directRemovals = directRemovals + 1
             searchRange = found.upperBound..<source.endIndex
         }

@@ -864,7 +864,7 @@
       "final": {"p1": null, "p2": "e1a799983d5bdf234689bb042ed2bb39633a71f79930aff006bdec24dc0ba712", "p3": "1163d98ddd2ee3a86f580921392d37e6f08d32bbd3cfd9016141535868ecbe0c", "p4": "7aa02bdedca1f66255fbac672555079e4eaf79e79accfbe35724fa7e499c09da", "p5": "191d430b59e1d11165de9ac7a1b85cb95ce7665ade8d891d2498c87a23c9a69b", "p6": "1d885cec3fc46dbcc113e8a78427f9afe2bcb30804c96f74dda292c8d191fe34", "p7": "e063a28c9708626812045524fb2f553f7e72ea648627b18c594f13bc80b92fd4", "p8": null}
     }
   ],
-  "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
+  "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A step recorded with `members` (U4a, Course Settings) has each file they name made as those editJSON ops, in the order recorded, instead of the door's rule (the member moved by the member rule's bytes, undo.editJSONCases); one recorded with `trees` (U4a, Add folder) also makes each folder as one `createTree` (its listing and every file's bytes in the list), after the moves; a folder is hashed as its listing's SHA-256 in `afterUndoingAll` and `final`, and only a `deletePage` hand edit changes one. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
   "actionTraces": [
     {
       "name": "action-001",
@@ -3396,6 +3396,336 @@
       ],
       "afterUndoingAll": {"courses/ICS3U/section1/All Classes/Unit 1, Day 1.md": "d55eb6c08fe3e84fc6ed2186ad7af60f014b81438a758dfdde3811982f058b06", "courses/ICS3U/.publish_state/section1.links-checklist-answered.json": "7e0aff0dd294cad513150045ca629f65b1ba59510ed43c173f1c5e3b39bddca8", "courses/ICS3U/.publish_state/section1.published-pages/20260601T120000Z-netlify.json": "32391df436a176a957b0cb424ef1f5378894e90f45fc0d4ac7ddb8eb33a82bfb", "courses/ICS3U/.publish_state/section1.published-pages.previous-2026-09-08_070000/20260601T120000Z-netlify.json": null},
       "final": {"courses/ICS3U/section1/All Classes/Unit 1, Day 1.md": "8e525d42636b56313ee3c64e8e918e85fba6e32d071a1985f153255241f6d7c7", "courses/ICS3U/.publish_state/section1.links-checklist-answered.json": null, "courses/ICS3U/.publish_state/section1.published-pages/20260601T120000Z-netlify.json": null, "courses/ICS3U/.publish_state/section1.published-pages.previous-2026-09-08_070000/20260601T120000Z-netlify.json": "32391df436a176a957b0cb424ef1f5378894e90f45fc0d4ac7ddb8eb33a82bfb"}
+    },
+    {
+      "name": "action-133",
+      "step": "saveCourseSettings",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "saveCourseSettings", "expect": "applied", "seq": 1, "ops": ["editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "body", "path": "courses/ICS3U/course_config.json", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": "e8ad97ad68bce6ecede94889dd48f1af0111bb28886dc5522ffbce1b79d507f9"},
+      "final": {"courses/ICS3U/course_config.json": "e8ad97ad68bce6ecede94889dd48f1af0111bb28886dc5522ffbce1b79d507f9"}
+    },
+    {
+      "name": "action-134",
+      "step": "saveCourseSettings",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "saveCourseSettings", "expect": "applied", "seq": 1, "ops": ["editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "body", "path": "courses/ICS3U/course_config.json", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "handEdit", "kind": "body", "path": "courses/ICS3U/course_config.json", "head": null, "redo": null},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/course_config.json", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": null},
+      "final": {"courses/ICS3U/course_config.json": null}
+    },
+    {
+      "name": "action-135",
+      "step": "saveCourseSettings",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "saveCourseSettings", "expect": "applied", "seq": 1, "ops": ["editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/course_config.json", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "note", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "note", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": null},
+      "final": {"courses/ICS3U/course_config.json": null}
+    },
+    {
+      "name": "action-136",
+      "step": "saveCourseSettings",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "saveCourseSettings", "expect": "applied", "seq": 1, "ops": ["editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "body", "path": "courses/ICS3U/course_config.json", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": "e8ad97ad68bce6ecede94889dd48f1af0111bb28886dc5522ffbce1b79d507f9"},
+      "final": {"courses/ICS3U/course_config.json": "e8ad97ad68bce6ecede94889dd48f1af0111bb28886dc5522ffbce1b79d507f9"}
+    },
+    {
+      "name": "action-137",
+      "step": "saveCourseSettings",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "saveCourseSettings", "expect": "applied", "seq": 1, "ops": ["editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/course_config.json", "head": null, "redo": 1},
+        {"call": "note", "head": null, "redo": 1},
+        {"call": "redo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "droppedTheRedo": true, "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": null},
+      "final": {"courses/ICS3U/course_config.json": null}
+    },
+    {
+      "name": "action-138",
+      "step": "saveCourseSettings",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "saveCourseSettings", "expect": "applied", "seq": 1, "ops": ["editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": "b99021d0be04624f4a893ace36d0eec0413f399a2309b2f4653fc7029cc424dc"},
+      "final": {"courses/ICS3U/course_config.json": "4067158bd13aeec9f9ba11b7d4fa82b67d424fe7f7996d97f5f0e6e6c9cb495a"}
+    },
+    {
+      "name": "action-139",
+      "step": "addFolder",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "addFolder", "expect": "applied", "seq": 1, "ops": ["createTree"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "note", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Labs": null},
+      "final": {"courses/ICS3U/Labs": "4e1aa622c0aa07231a83a33a95928b00f7dc6e9e2477d0e58628d7449491fe0d"}
+    },
+    {
+      "name": "action-140",
+      "step": "addFolder",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "addFolder", "expect": "applied", "seq": 1, "ops": ["createTree"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Labs": null},
+      "final": {"courses/ICS3U/Labs": "4e1aa622c0aa07231a83a33a95928b00f7dc6e9e2477d0e58628d7449491fe0d"}
+    },
+    {
+      "name": "action-141",
+      "step": "addFolder",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "addFolder", "expect": "applied", "seq": 1, "ops": ["createTree"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Labs": null},
+      "final": {"courses/ICS3U/Labs": "4e1aa622c0aa07231a83a33a95928b00f7dc6e9e2477d0e58628d7449491fe0d"}
+    },
+    {
+      "name": "action-142",
+      "step": "addFolder",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "addFolder", "expect": "applied", "seq": 1, "ops": ["createTree"], "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Labs": null},
+      "final": {"courses/ICS3U/Labs": "4e1aa622c0aa07231a83a33a95928b00f7dc6e9e2477d0e58628d7449491fe0d"}
+    },
+    {
+      "name": "action-143",
+      "step": "addFolder",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "addFolder", "expect": "applied", "seq": 1, "ops": ["createTree"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/Labs", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Labs": null},
+      "final": {"courses/ICS3U/Labs": "4e1aa622c0aa07231a83a33a95928b00f7dc6e9e2477d0e58628d7449491fe0d"}
+    },
+    {
+      "name": "action-144",
+      "step": "addFolder",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "addFolder", "expect": "applied", "seq": 1, "ops": ["createTree"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "note", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Labs": null},
+      "final": {"courses/ICS3U/Labs": "4e1aa622c0aa07231a83a33a95928b00f7dc6e9e2477d0e58628d7449491fe0d"}
+    },
+    {
+      "name": "action-145",
+      "step": "setSchoolYear",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "setSchoolYear", "expect": "applied", "seq": 1, "ops": ["editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": "485febf304b0a0739d31c0ee8b27e593123b5172d8118cba57605f6e90fd3146"},
+      "final": {"courses/ICS3U/course_config.json": "5c02de074425937bf46d17e8433d3791aa4a1cc24360e181f03cb50fd77248b8"}
+    },
+    {
+      "name": "action-146",
+      "step": "setSchoolYear",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "setSchoolYear", "expect": "applied", "seq": 1, "ops": ["editJSON"], "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/course_config.json", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "note", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": null},
+      "final": {"courses/ICS3U/course_config.json": null}
+    },
+    {
+      "name": "action-147",
+      "step": "setSchoolYear",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "setSchoolYear", "expect": "applied", "seq": 1, "ops": ["editJSON"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "handEdit", "kind": "body", "path": "courses/ICS3U/course_config.json", "head": null, "redo": 1},
+        {"call": "note", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "droppedTheRedo": true, "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": "de0a9cf0dd395b0e73400b282795b762c86bed23f81afc20d088485a2f0280c5"},
+      "final": {"courses/ICS3U/course_config.json": "de0a9cf0dd395b0e73400b282795b762c86bed23f81afc20d088485a2f0280c5"}
+    },
+    {
+      "name": "action-148",
+      "step": "setSchoolYear",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "setSchoolYear", "expect": "applied", "seq": 1, "ops": ["editJSON"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/course_config.json", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": null},
+      "final": {"courses/ICS3U/course_config.json": null}
+    },
+    {
+      "name": "action-149",
+      "step": "setSchoolYear",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "setSchoolYear", "expect": "applied", "seq": 1, "ops": ["editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": "485febf304b0a0739d31c0ee8b27e593123b5172d8118cba57605f6e90fd3146"},
+      "final": {"courses/ICS3U/course_config.json": "5c02de074425937bf46d17e8433d3791aa4a1cc24360e181f03cb50fd77248b8"}
+    },
+    {
+      "name": "action-150",
+      "step": "setSchoolYear",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "setSchoolYear", "expect": "applied", "seq": 1, "ops": ["editJSON"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/course_config.json", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "changedSince", "path": "courses/ICS3U/course_config.json", "others": 0, "droppedTheRedo": true, "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/course_config.json": null},
+      "final": {"courses/ICS3U/course_config.json": null}
     }
   ]
 }

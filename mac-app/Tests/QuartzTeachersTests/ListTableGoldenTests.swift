@@ -237,7 +237,7 @@ final class TableCourseSettingsGestures: ListGestureAdapter {
         let editor: StringListEditorView = CourseSettingsGestureScript.editor(for: list, of: view)
         if let question = editor.requestRemoval(of: item) {
             // The alert's Remove.
-            editor.removeItem(named: question.item)
+            editor.takeOutOfTheList(named: question.item)
         }
     }
 
@@ -284,7 +284,7 @@ final class TableWizardGestures: ListGestureAdapter {
     func remove(_ item: String, from list: GestureList) {
         let editor: StringListEditorView = state.editor(for: list)
         if let question = editor.requestRemoval(of: item) {
-            editor.removeItem(named: question.item)
+            editor.takeOutOfTheList(named: question.item)
         }
     }
 

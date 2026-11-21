@@ -1296,7 +1296,7 @@ contract drives it.** Since #266 both folder lists' removal is one method,
 `CourseSettingsView.folderWasRemoved(_:scope:)` — `excluded_items`, then the
 pool, then the trail line (written on the click, saved or not —
 `excludedItems.recordedOnClick`) — called from the list editor's
-`StringListEditorView.removeItem(named:)` after the editor has written the copy
+`StringListEditorView.takeOutOfTheList(named:)` after the editor has written the copy
 list. Until #183 the mac's contract runner (and three other tests) REPLAYED
 those steps by hand in the order they were believed to run, so a reorder inside
 `folderWasRemoved` left every case green. Measured before the change: moving the
@@ -1307,7 +1307,7 @@ says the tables changed the saved bytes rather than that the order broke, a
 golden is re-captured whenever a legitimate change moves the file (a re-capture
 on a mutated tree takes the regression in silently), and it covers one removal
 in one scope. Now the runner removes through the editor
-(`CourseSettingsGestureScript.editor(for:of:).removeItem(named:)`), and each of
+(`CourseSettingsGestureScript.editor(for:of:).takeOutOfTheList(named:)`), and each of
 four mutations — pool above exclusion, exclusion left out, pool left out, or
 `onRemove` called before the editor writes the list — turns cases 3 and 4 red:
 the same pair as on Windows. Cases 1, 2, 5, 6 and 7 (and 8, added by #152) stay green under a reorder,

@@ -72,6 +72,14 @@ final class UndoActionStepsTests: XCTestCase {
         let opKinds: [String]
 
         let phase: UndoStepPhase
+
+        /// Each `editJSON` op (U4a: a Save of Course Settings, Set School
+        /// Year), in op order: its file, key path and values (nil: absent).
+        var members: [(path: String, keyPath: [String], before: UndoJSON?, after: UndoJSON?)] = []
+
+        /// Each folder made (U4a: Add folder's `createTree`), in op order:
+        /// where, the folders inside it and every file's bytes.
+        var trees: [(path: String, folders: [String], files: [String: Data])] = []
     }
 
     /// Points the list at a folder of its own, snapshots the working folder,
@@ -99,8 +107,19 @@ final class UndoActionStepsTests: XCTestCase {
         var kinds: [String] = []
         var recomputes: [(path: String, maintainer: String, section: Int?)] = []
         var moves: [(from: String, to: String, content: Data, standsApart: Bool)] = []
+        var members: [(path: String, keyPath: [String], before: UndoJSON?, after: UndoJSON?)] = []
+        var trees: [(path: String, folders: [String], files: [String: Data])] = []
         for op in record.step.ops {
             kinds.append(op.kind)
+            if op.knownKind == .createTree, let path = op.path {
+                if case .tree(let listing, let contents) = UndoTreeReading.read(at: root.appendingPathComponent(path), keepingContents: true) {
+                    trees.append((path: path, folders: listing.folders, files: contents))
+                }
+                continue
+            }
+            if op.knownKind == .editJSON, let path = op.path {
+                members.append((path: path, keyPath: op.keyPath ?? [], before: op.valueBefore, after: op.valueAfter))
+            }
             if op.knownKind == .move || op.knownKind == .moveApart {
                 let from: String = op.from ?? ""
                 moves.append((
@@ -125,10 +144,13 @@ final class UndoActionStepsTests: XCTestCase {
                 after: UndoItem.read(at: root.appendingPathComponent(path)).data
             ))
         }
-        return Recorded(
+        var recorded: Recorded = Recorded(
             name: name, action: record.step.action?.key ?? "", madeBy: record.step.madeBy ?? "",
             files: files, recomputes: recomputes, moves: moves, opKinds: kinds, phase: record.phase
         )
+        recorded.members = members
+        recorded.trees = trees
+        return recorded
     }
 
     /// Every file under the folder, by its path inside it.
@@ -353,6 +375,9 @@ final class UndoActionStepsTests: XCTestCase {
             _ = await AssistFixture.run("re_date_classes", with: ["rollover": "yes", "website": "same"], on: sameWebsite.runner)
         })
 
+        // U4a: Course Settings' Save, Add folder and Set School Year.
+        recorded.append(contentsOf: try await recordTheCourseSettingsActions())
+
         return recorded
     }
 
@@ -381,7 +406,7 @@ final class UndoActionStepsTests: XCTestCase {
     /// `undo-action-steps.json` (written from here, never by hand).
     func testEveryDailyActionIsOneStepThroughTheDoor() async throws {
         let recorded: [Recorded] = try await recordEveryAction()
-        XCTAssertEqual(recorded.count, 22)
+        XCTAssertEqual(recorded.count, 25)
         let expectedMakers: [String: String] = [
             "publishPages": "menu", "hidePages": "builtInAssistant:", "publishPagesAWholeUnit": "menu",
             "publishClassForADate": "builtInAssistant:", "addNextClass": "builtInAssistant:",
@@ -393,6 +418,7 @@ final class UndoActionStepsTests: XCTestCase {
             "getReadyForTheStartOfTheYear": "builtInAssistant:", "showTodaysClassOnTheFrontPage": "sheet",
             "notTodayOnTheFrontPage": "sheet", "answerTheLinksChecklist": "sheet", "keepClassesDatedLater": "sheet",
             "rollOverOntoANewWebsite": "menu", "rollOverKeepingTheWebsite": "builtInAssistant:",
+            "saveCourseSettings": "sheet", "addFolder": "sheet", "setSchoolYear": "sheet",
         ]
         let expectedKeys: [String: String] = [
             "publishPagesAWholeUnit": "publishPages",
@@ -402,7 +428,7 @@ final class UndoActionStepsTests: XCTestCase {
             XCTAssertEqual(step.phase, .done, "\(step.name): the step was not closed applied")
             XCTAssertEqual(step.action, expectedKeys[step.name] ?? step.name, "\(step.name): action key")
             XCTAssertTrue(step.madeBy.hasPrefix(expectedMakers[step.name] ?? "?"), "\(step.name): made by \(step.madeBy)")
-            XCTAssertFalse(step.files.isEmpty, "\(step.name): no file")
+            XCTAssertFalse(step.files.isEmpty && step.trees.isEmpty, "\(step.name): no file")
             for file in step.files {
                 XCTAssertNotEqual(file.before, file.after, "\(step.name): \(file.path) did not change")
             }
@@ -1128,10 +1154,35 @@ final class UndoActionStepsTests: XCTestCase {
                 }
                 entry["moves"] = moves
             }
+            if !step.members.isEmpty {
+                var members: [[String: Any]] = []
+                for member in step.members {
+                    var written: [String: Any] = ["path": member.path, "keyPath": member.keyPath]
+                    if let before = member.before {
+                        written["before"] = before.foundation()
+                    }
+                    if let after = member.after {
+                        written["after"] = after.foundation()
+                    }
+                    members.append(written)
+                }
+                entry["members"] = members
+            }
+            if !step.trees.isEmpty {
+                var trees: [[String: Any]] = []
+                for tree in step.trees {
+                    var files: [String: Any] = [:]
+                    for (path, data) in tree.files {
+                        files[path] = text(data)
+                    }
+                    trees.append(["path": tree.path, "folders": tree.folders, "files": files])
+                }
+                entry["trees"] = trees
+            }
             steps.append(entry)
         }
         let object: [String: Any] = [
-            "note": "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `moves` (U3b, only when there are any) every file it moved, in op order, from and to (the moment in a kept copy's name set to one fixed moment), its text, and whether it stands apart from the step (moveApart) or not (move); `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
+            "note": "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `moves` (U3b, only when there are any) every file it moved, in op order, from and to (the moment in a kept copy's name set to one fixed moment), its text, and whether it stands apart from the step (moveApart) or not (move); `members` (U4a, only when there are any) every editJSON op, in op order, its file, keyPath and before and after (left out: absent); `trees` (U4a, only when there are any) every folder made (createTree), in op order, its path, the folders inside it and every file's text by its path inside it; `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
             "steps": steps,
         ]
         var data: Data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
@@ -1247,6 +1298,37 @@ final class UndoActionStepsTests: XCTestCase {
                 }
                 changes.append(UndoFileChange(relativePath: path, before: before, after: after))
             }
+            // U4a: a JSON file planned member by member, and folders made.
+            var memberOps: [String: [UndoOp]] = [:]
+            for member in step["members"] as? [[String: Any]] ?? [] {
+                let path: String = member["path"] as? String ?? ""
+                var before: UndoJSON? = nil
+                if let value = member["before"] {
+                    before = UndoJSON.from(foundation: value)
+                }
+                var after: UndoJSON? = nil
+                if let value = member["after"] {
+                    after = UndoJSON.from(foundation: value)
+                }
+                memberOps[path, default: []].append(UndoOp.editJSON(
+                    path: path, keyPath: member["keyPath"] as? [String] ?? [], before: before, after: after
+                ))
+            }
+            var treeOps: [UndoOp] = []
+            var treeBlobs: [Data] = []
+            for tree in step["trees"] as? [[String: Any]] ?? [] {
+                let path: String = tree["path"] as? String ?? ""
+                var files: [UndoTreeListing.File] = []
+                for (inside, value) in tree["files"] as? [String: Any] ?? [:] {
+                    let data: Data = Data((value as? String ?? "").utf8)
+                    files.append(UndoTreeListing.File(path: inside, sha: UndoHash.sha256(of: data)))
+                    treeBlobs.append(data)
+                }
+                let listing: UndoTreeListing = UndoTreeListing(folders: tree["folders"] as? [String] ?? [], files: files)
+                treeBlobs.append(listing.data)
+                treeOps.append(UndoOp.tree(.createTree, path: path, listing: listing))
+                paths.append(path)
+            }
             var moveOps: [UndoOp] = []
             for moved in step["moves"] as? [[String: Any]] ?? [] {
                 let from: String = moved["from"] as? String ?? ""
@@ -1296,7 +1378,7 @@ final class UndoActionStepsTests: XCTestCase {
                         changes: changes, recomputes: recomputes
                     )
                     let outcome: JournaledWriteOutcome
-                    if moveOps.isEmpty {
+                    if moveOps.isEmpty && memberOps.isEmpty && treeOps.isEmpty {
                         outcome = JournaledWrite.perform(draft, in: journal, mode: .live)
                     } else {
                         // U3b: a step with moves goes through the door that
@@ -1304,6 +1386,12 @@ final class UndoActionStepsTests: XCTestCase {
                         var ops: [UndoOp] = []
                         var blobs: [Data] = []
                         for change in changes where change.before != change.after {
+                            if let members = memberOps[change.relativePath] {
+                                for op in members {
+                                    ops.append(op)
+                                }
+                                continue
+                            }
                             for op in JournaledWrite.ops(for: change) {
                                 ops.append(op)
                                 if op.knownKind == .writeFile {
@@ -1318,6 +1406,12 @@ final class UndoActionStepsTests: XCTestCase {
                         }
                         for op in moveOps {
                             ops.append(op)
+                        }
+                        for op in treeOps {
+                            ops.append(op)
+                        }
+                        for blob in treeBlobs {
+                            blobs.append(blob)
                         }
                         for op in recomputes {
                             ops.append(op)
