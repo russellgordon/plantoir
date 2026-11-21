@@ -3308,14 +3308,29 @@ public sealed partial class AssistWorkspace
 
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         int moved = 0;
-        foreach (var date in plan.Changing)
+        // ONE step through the door (#899 W7b1), Windows' own key
+        // syncPageDates: the mac has no Bring Pages into Date, so no recorded
+        // step holds it (U7's to settle). Each page read through the step, so
+        // a page named twice is moved from what the step already planned;
+        // no recompute, since this never rewrote the front page.
+        var step = NewUndoStep("syncPageDates", course.Code, section);
+        try
         {
-            string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-            var (updated, changed) = PageFrontmatter.SetCreated(
-                File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-            if (!changed) continue;
-            Save(full, updated);
-            moved++;
+            foreach (var date in plan.Changing)
+            {
+                string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                var (updated, changed) = PageFrontmatter.SetCreated(
+                    step.ReadText(full), date.FrontmatterKey, date.New, tail);
+                if (!changed) continue;
+                step.Write(full, updated);
+                moved++;
+            }
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
+            throw;
         }
         recording.Done();
 

@@ -592,6 +592,57 @@ public class ReDateTests : IDisposable
         Assert.Equal(new DateOnly(2026, 11, 3), Assert.Single(plan.Changing).New);
     }
 
+    /// <summary>
+    /// #899 W7b1: Bring Pages into Date is ONE step under Windows' own key
+    /// syncPageDates (the mac has no such action), each moved page an op, no
+    /// recompute (it never rewrote the front page); a page that cannot be
+    /// written stops every page, said as "Nothing was changed".
+    /// </summary>
+    [Fact]
+    public void SyncingIsOneStepUnderWindowsOwnKey()
+    {
+        Class("Unit 1, Day 1", "2026-10-13", "Concept: [[Variables]] and [[Loops]]");
+        Material("Concepts/Variables.md", "2026-02-01");
+        Material("Concepts/Loops.md", "2026-02-01");
+        string list = Path.Combine(_folder, "state-undo");
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher())
+        {
+            UndoList = new Plantoir.Core.Undo.UndoForThisProcess(list, Plantoir.Core.Undo.UndoMode.Shadow, null),
+        };
+        var plan = workspace.PlanSyncDates("ICS3U", 1, new[] { "Unit 1, Day 1" });
+        Assert.Equal(2, plan.Changing.Count);
+        string loops = Path.Combine(_folder, "courses", "ICS3U", "Concepts", "Loops.md");
+        string loopsBefore = File.ReadAllText(loops);
+        File.SetAttributes(loops, FileAttributes.ReadOnly);
+        try
+        {
+            var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplySyncDates(plan));
+            Assert.StartsWith("Nothing was changed: ", refused.Message);
+            Assert.Contains("createdSection1: 2026-02-01", Read("Concepts/Variables.md"));
+            Assert.Equal(loopsBefore, File.ReadAllText(loops));
+        }
+        finally { File.SetAttributes(loops, FileAttributes.Normal); }
+
+        workspace.ApplySyncDates(plan);
+
+        var begins = new List<System.Text.Json.Nodes.JsonObject>();
+        foreach (string segment in Directory.EnumerateFiles(list, "journal-*.jsonl"))
+        {
+            foreach (string line in File.ReadAllLines(segment))
+            {
+                if (System.Text.Json.Nodes.JsonNode.Parse(line) is System.Text.Json.Nodes.JsonObject read && (string?)read["event"] == "begin")
+                    begins.Add(read);
+            }
+        }
+        var step = Assert.Single(begins)["step"]!;
+        Assert.Equal("syncPageDates", (string?)step["action"]!["key"]);
+        var kinds = new List<string>();
+        foreach (var op in step["ops"]!.AsArray()) kinds.Add((string)op!["kind"]!);
+        Assert.Equal(2, kinds.Count);
+        Assert.DoesNotContain("recompute", kinds);
+        Assert.Contains("createdSection1: 2026-10-13", Read("Concepts/Loops.md"));
+    }
+
     [Fact]
     public void SyncingWritesTheDateAndLeavesTheRestOfTheFileAlone()
     {
