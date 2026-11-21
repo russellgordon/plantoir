@@ -266,7 +266,9 @@ public sealed class UndoDoorTests : IDisposable
     /// leaves it) and c.md, sixty-one days old; <paramref name="afterRecoveryTidied"/>
     /// lays what pruning's own tidy must find once recovery's tidy has run (so
     /// it is pruning's tidy, not recovery's, that meets it); then a step on
-    /// b.md prunes, and step 1 is closed unsettled.
+    /// b.md prunes, and step 1 is closed unsettled. Recovery may tidy more
+    /// than once in the action's holds, so it is laid after EVERY tidy of
+    /// recovery's: what is laid the last time only pruning can meet.
     /// </summary>
     private (UndoJournal Journal, List<UndoTrailLine> Trail) PruneADeadStepAfter(Action afterRecoveryTidied)
     {
@@ -280,7 +282,7 @@ public sealed class UndoDoorTests : IDisposable
         {
             StopsHere = (point, _) =>
             {
-                if (point == "afterRecoveryTidied" && !laid) { laid = true; afterRecoveryTidied(); }
+                if (point == "afterRecoveryTidied") { laid = true; afterRecoveryTidied(); }
                 return false;
             },
         };
@@ -336,17 +338,24 @@ public sealed class UndoDoorTests : IDisposable
     {
         string section = Path.Combine(Folder, "courses", "TST1O", "Section 1");
         string aside = UndoSwap.BesidePath(Path.Combine(section, "extra"), "1-apply", "orig");
+        int laidCount = 0;
         var (_, trail) = PruneADeadStepAfter(() =>
         {
+            if (Directory.Exists(aside)) return;
+            laidCount++;
             Directory.CreateDirectory(aside);
             File.WriteAllBytes(Path.Combine(aside, "x.md"), Old);
             Directory.CreateDirectory(Path.Combine(section, "extra"));
         });
-        string kept = Path.Combine(section, UndoSwap.VisibleName("extra", 1));
-        Assert.Equal(Old, File.ReadAllBytes(Path.Combine(kept, "x.md")));
+        // The folder laid last only pruning met: it is kept under its visible
+        // name, and every folder laid has its one line (recovery's for the
+        // earlier ones, pruning's for the last).
         Assert.False(Directory.Exists(aside));
-        UndoTrailLine line = Assert.Single(trail, each => each.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoFoundAFolderSetAside);
-        Assert.Equal(UndoTrail.FoundAFolderSetAsideWords("courses/TST1O/Section 1/extra", "courses/TST1O/Section 1/extra (kept by Undo)", ""), line.Words);
+        string kept = Path.Combine(section, UndoSwap.VisibleName("extra", laidCount));
+        Assert.Equal(Old, File.ReadAllBytes(Path.Combine(kept, "x.md")));
+        var lines = trail.Where(each => each.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoFoundAFolderSetAside).ToList();
+        Assert.Equal(laidCount, lines.Count);
+        Assert.Equal(UndoTrail.FoundAFolderSetAsideWords("courses/TST1O/Section 1/extra", "courses/TST1O/Section 1/" + UndoSwap.VisibleName("extra", laidCount), ""), lines[^1].Words);
     }
 
     /// <summary>
