@@ -110,8 +110,14 @@ nonisolated enum UndoContractReplay {
         try Data(text.utf8).write(to: url)
     }
 
+    /// A file's SHA-256, or a folder's listing's (U4a: Add folder's tree);
+    /// nil when there is neither.
     static func hash(of relativePath: String, in root: URL) -> String? {
-        guard let data = UndoItem.read(at: root.appendingPathComponent(relativePath)).data else {
+        let url: URL = root.appendingPathComponent(relativePath)
+        guard let data = UndoItem.read(at: url).data else {
+            if case .tree(let listing, _) = UndoTreeReading.read(at: url) {
+                return listing.sha
+            }
             return nil
         }
         return UndoHash.sha256(of: data)

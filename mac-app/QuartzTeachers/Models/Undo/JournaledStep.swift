@@ -171,6 +171,17 @@ nonisolated final class JournaledStep {
     /// for later (`UndoAppPlaces`).
     var places: UndoExternalPlaces = UndoAppPreferences()
 
+    /// Each JSON file planned MEMBER BY MEMBER (U4a: `course_config.json`),
+    /// by its key: the `editJSON` ops' key paths and values, in order. The
+    /// file is still in `plannedOrder` with the bytes the members leave it
+    /// holding (`plannedAfter`), so a step that cannot be recorded writes
+    /// those bytes whole, all or none, exactly as the ops would have.
+    private var plannedMembers: [String: [(keyPath: [String], before: UndoJSON?, after: UndoJSON?)]] = [:]
+
+    /// Each folder planned to be MADE with what is in it (U4a: Add folder's
+    /// folder and its two pages), as one `createTree`, in the order planned.
+    private(set) var plannedTrees: [(url: URL, listing: UndoTreeListing, contents: [String: Data])] = []
+
 
     // MARK: - Computed properties
 
@@ -184,13 +195,14 @@ nonisolated final class JournaledStep {
 
     /// Whether nothing has been planned.
     var isEmpty: Bool {
-        return plannedOrder.isEmpty && plannedMoves.isEmpty && plannedExternals.isEmpty
+        return plannedOrder.isEmpty && plannedMoves.isEmpty && plannedExternals.isEmpty && plannedTrees.isEmpty
     }
 
-    /// Whether the step holds a move or an external op, and so is made as
-    /// ops (`JournaledWrite.perform(ops:)`) rather than as files.
+    /// Whether the step holds a move, an external op, a JSON file planned
+    /// member by member or a folder to make, and so is made as ops
+    /// (`JournaledWrite.perform(ops:)`) rather than as files.
     var isMixed: Bool {
-        return !plannedMoves.isEmpty || !plannedExternals.isEmpty
+        return !plannedMoves.isEmpty || !plannedExternals.isEmpty || !plannedMembers.isEmpty || !plannedTrees.isEmpty
     }
 
     /// The working folder: the folder holding the course's `courses` folder,
@@ -339,6 +351,53 @@ nonisolated final class JournaledStep {
             kept.append(op)
         }
         plannedExternals = kept
+    }
+
+    /// Plans a JSON file's change as one `editJSON` per member it changes
+    /// (#899 U4a), from the bytes the caller's plan was built from (`read`,
+    /// the step's `before` for the file: read when planned, never at
+    /// `make()`, the U3a trap) to the bytes those members leave it holding
+    /// (`after`, which the caller worked out with `UndoJSONMember.moved`).
+    /// Made, each member is moved in the file as it is THEN, so a member
+    /// another window or a build changed meanwhile is kept, and one of this
+    /// step's members changed meanwhile refuses the step (`changedSince`).
+    /// A file already planned in this step is planned whole instead.
+    func editJSON(
+        at url: URL, read: Data, members: [(keyPath: [String], before: UndoJSON?, after: UndoJSON?)], leaving after: Data
+    ) {
+        let key: String = JournaledStep.key(of: url)
+        if plannedURL[key] != nil {
+            plan(after, at: url)
+            return
+        }
+        plannedOrder.append(key)
+        plannedURL[key] = url
+        plannedBefore[key] = .file(read)
+        plannedAfter[key] = after
+        if !members.isEmpty {
+            plannedMembers[key] = members
+        }
+    }
+
+    /// Plans a NEW folder at `url` holding exactly these folders and files
+    /// (paths inside it, forward slashes), made whole as one `createTree`
+    /// (#899 U4a): built beside its place and renamed in, never over
+    /// anything, so a place taken by the time the step is made refuses it.
+    func makeTree(at url: URL, folders: [String], files: [String: Data]) {
+        var listed: [UndoTreeListing.File] = []
+        var paths: [String] = []
+        for (path, _) in files {
+            paths.append(path)
+        }
+        paths.sort { first, second in
+            return first.utf8.lexicographicallyPrecedes(second.utf8)
+        }
+        for path in paths {
+            if let data = files[path] {
+                listed.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: data)))
+            }
+        }
+        plannedTrees.append((url: url, listing: UndoTreeListing(folders: folders, files: listed), contents: files))
     }
 
     /// Records that a file kept true by a rule (`sectionFrontPage`) follows
@@ -539,7 +598,8 @@ nonisolated final class JournaledStep {
         let currentMode: UndoMode = mode
         guard let root = workingFolderURL,
               let changes = recordableChanges(under: root),
-              let moveOps = recordableMoves(under: root) else {
+              let moveOps = recordableMoves(under: root),
+              let treeOps = recordableTrees(under: root) else {
             if currentMode == .live {
                 throw JournaledStepError.couldNotRecordTheStep
             }
@@ -552,8 +612,23 @@ nonisolated final class JournaledStep {
         var ops: [UndoOp] = []
         var blobs: [Data] = []
         var changedFiles: Int = 0
-        for change in changes where change.before != change.after {
+        var changeIndex: Int = -1
+        for change in changes {
+            changeIndex += 1
+            if change.before == change.after {
+                continue
+            }
             changedFiles += 1
+            // A JSON file planned member by member: its `editJSON` ops, and
+            // no blob (U4a).
+            if let members = plannedMembers[plannedOrder[changeIndex]] {
+                for member in members {
+                    ops.append(UndoOp.editJSON(
+                        path: change.relativePath, keyPath: member.keyPath, before: member.before, after: member.after
+                    ))
+                }
+                continue
+            }
             for op in JournaledWrite.ops(for: change) {
                 ops.append(op)
                 if op.knownKind != .writeFile {
@@ -570,6 +645,13 @@ nonisolated final class JournaledStep {
         for op in moveOps {
             ops.append(op)
             changedFiles += 1
+        }
+        for tree in treeOps {
+            ops.append(tree.op)
+            changedFiles += 1
+            for blob in tree.blobs {
+                blobs.append(blob)
+            }
         }
         for op in plannedExternals {
             ops.append(op)
@@ -638,6 +720,26 @@ nonisolated final class JournaledStep {
         return result
     }
 
+    /// Each folder to make as a `createTree` op inside the working folder,
+    /// with the blobs it needs (its listing and every file's bytes); nil
+    /// when any cannot be named in a step.
+    func recordableTrees(under root: URL) -> [(op: UndoOp, blobs: [Data])]? {
+        var result: [(op: UndoOp, blobs: [Data])] = []
+        for tree in plannedTrees {
+            guard let path = UndoFolderPlaces.relativePath(of: tree.url, under: root) else {
+                return nil
+            }
+            var blobs: [Data] = [tree.listing.data]
+            for file in tree.listing.files {
+                if let data = tree.contents[file.path] {
+                    blobs.append(data)
+                }
+            }
+            result.append((op: UndoOp.tree(.createTree, path: path, listing: tree.listing), blobs: blobs))
+        }
+        return result
+    }
+
     /// A step with moves or external ops made in shadow with no record:
     /// every change staged and swapped in together by `UndoSwap`, all or
     /// none, exactly as the door would have made it, so a sentence saying
@@ -675,6 +777,12 @@ nonisolated final class JournaledStep {
             targets.append(UndoSwapTarget(
                 url: planned.to, relativePath: planned.to.lastPathComponent,
                 change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op)
+            ))
+        }
+        for tree in plannedTrees {
+            targets.append(UndoSwapTarget(
+                url: tree.url, relativePath: tree.url.lastPathComponent,
+                change: .makeTree(tree.listing, contents: tree.contents)
             ))
         }
         for op in plannedExternals {

@@ -929,22 +929,15 @@ def hunk_moved(op, backward, text):
 
 
 def json_moved(op, backward, text):
-    """The member set (or taken out); the model writes sorted JSON, since
-    only what it holds is compared, never its bytes."""
+    """The member moved by the member rule (json_bytes_moved): only its own
+    bytes change, as on both apps, so an action trace's settings file
+    (U4a, Course Settings) hashes the same after an Undo on every side."""
     if text is None:
         return None
-    top = json.loads(text)
-    wanted = "before" if backward else "after"
-    current = top
-    for part in op["keyPath"][:-1]:
-        if not isinstance(current.get(part), dict):
-            return None
-        current = current[part]
-    if wanted in op:
-        current[op["keyPath"][-1]] = op[wanted]
-    else:
-        current.pop(op["keyPath"][-1], None)
-    return json.dumps(top, sort_keys=True, indent=2) + "\n"
+    moved = json_bytes_moved(op, backward, text.encode("utf-8"))
+    if moved is None:
+        return None
+    return moved.decode("utf-8")
 
 
 # --------------------------------------------------------------------------
@@ -1117,7 +1110,7 @@ class Model:
         self.finish(seq)
         return ("applied", seq)
 
-    def files_step(self, changes, recomputes, moves=()):
+    def files_step(self, changes, recomputes, moves=(), members=(), trees=()):
         """JournaledWrite.perform(UndoStepDraft): one action's files, each
         before and after, as ops (lines where they reproduce the change,
         otherwise the whole file), in the order the action planned them,
@@ -1126,11 +1119,25 @@ class Model:
         for path, before, after in changes:
             if before == after:
                 continue
+            # U4a: a JSON file planned member by member is its editJSON ops,
+            # in the order recorded.
+            file_members = [member for member in members if member["path"] == path]
+            if file_members:
+                for member in file_members:
+                    op = {"kind": "editJSON", "path": path, "keyPath": member["keyPath"]}
+                    for side in ("before", "after"):
+                        if side in member:
+                            op[side] = member[side]
+                    ops.append(op)
+                continue
             ops.extend(ops_for_change(path, before, after))
         for moved in moves:
             # U3b: each file moved, after the files (JournaledStep's order).
             ops.append({"kind": "moveApart" if moved.get("standsApart") else "move",
                         "from": moved["from"], "to": moved["to"], "sha": sha(moved["content"])})
+        for tree in trees:
+            # U4a: each folder made, after the moves (JournaledStep's order).
+            ops.append({"kind": "createTree", "path": tree["path"], "listingSha": listing_sha(tree)})
         if not ops:
             return ("changedNothing",)
         for kept in recomputes:
@@ -1144,6 +1151,8 @@ class Model:
                 self.pages[path] = after
         for moved in moves:
             self.pages[moved["to"]] = self.pages.pop(moved["from"])
+        for tree in trees:
+            self.pages[tree["path"]] = ("tree", listing_sha(tree))
         self.finish(seq)
         return ("applied", seq, ops)
 
@@ -1307,6 +1316,9 @@ class Model:
         text = self.pages.get(path)
         if text is None:
             return False
+        if not isinstance(text, str) and kind != "deletePage":
+            # A folder (U4a, Add folder's tree): only removing it changes it.
+            return False
         if kind == "body":
             self.pages[path] = text + "A line the teacher wrote in Obsidian.\n"
             return True
@@ -1464,6 +1476,9 @@ def action_trace(rng, recorded, number):
     files = recorded["files"]
     paths = [entry["path"] for entry in files]
     moves = recorded.get("moves", [])
+    members = recorded.get("members", [])
+    trees = recorded.get("trees", [])
+    paths.extend(tree["path"] for tree in trees)
     pages = {}
     for entry in files:
         if entry["before"] is not None:
@@ -1475,7 +1490,7 @@ def action_trace(rng, recorded, number):
     model = Model(pages=dict(pages))
     calls = []
     changes = [(entry["path"], entry["before"], entry["after"]) for entry in files]
-    outcome = model.files_step(changes, recorded.get("recomputes", []), moves)
+    outcome = model.files_step(changes, recorded.get("recomputes", []), moves, members, trees)
     call = {"call": "action", "step": recorded["name"], "expect": outcome[0]}
     if outcome[0] == "applied":
         call["seq"] = outcome[1]
@@ -1570,10 +1585,14 @@ def action_trace(rng, recorded, number):
 
 
 def path_hashes(model, paths):
+    """Each path's SHA-256 (null: absent); a folder's is its listing's."""
     result = {}
     for path in paths:
         text = model.pages.get(path)
-        result[path] = None if text is None else sha(text)
+        if isinstance(text, tuple):
+            result[path] = text[1]
+        else:
+            result[path] = None if text is None else sha(text)
     return result
 
 
