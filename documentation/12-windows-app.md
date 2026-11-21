@@ -6895,10 +6895,12 @@ Windows".
 ### The unit suite keeps its state in a scratch folder (#285, #179)
 
 `Plantoir.Tests/TestAppDataRedirect.cs` is a `[ModuleInitializer]`: before any
-test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>)`. Settings,
+test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>-<start ticks>)`. Settings,
 models, builds and scheduled-publish state a test touches land there, not in
-the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id, so two worktrees'
-suites do not share a settings file. `AppDataRedirectTests` pins it. The redirect has one documented limit: during
+the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id and start time, so
+two worktrees' suites do not share a settings file and a recycled process id
+does not inherit an earlier run's state; the folder is removed at process
+exit (a crashed run's is left, and no run removes another's). `AppDataRedirectTests` pins it. The redirect has one documented limit: during
 a redirected UI test the launchers (`preview.ps1:512`) still write their trail
 lines to the real `Logs` folder, because they resolve it themselves.
 
@@ -7027,12 +7029,12 @@ became `OutsideDoor.StartGrace` (same 400 ms, same behaviour), and
 for is still asserted. Alone, 10 times each: 10 of 10 passed before and 10 of
 10 after, because the failure needs a loaded PC.
 
-**Two shared temp paths are left as they are** and filed as findings, because
-neither is this sweep: `TestTrailRedirect.ScratchTrailPath` is one fixed
-`%TEMP%\plantoir-tests\activity.txt` that every run appends to, and
-`TestAppDataRedirect`'s `plantoir-tests-<pid>` is never deleted, so a recycled
-id inherits ANY earlier run's settings and state, not only a crashed run's (a
-review counted 1,603 such folders in `%TEMP%` on this PC, back to 2026-10-01).
+**The suite's two temp paths are the run's own (#916 items 3 and 4).**
+`TestAppDataRedirect`'s `plantoir-tests-<pid>-<start ticks>` and
+`TestTrailRedirect`'s `plantoir-tests-trail-<pid>-<start ticks>\activity.txt`
+sit under `%TEMP%` and are removed at process exit, so a run leaves no folder
+behind and a recycled process id inherits nothing. A crashed run's are left,
+and no run removes another's.
 
 ### Same-second backups wait for the next second (#187)
 
