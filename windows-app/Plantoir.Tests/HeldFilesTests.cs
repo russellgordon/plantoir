@@ -109,6 +109,37 @@ public sealed class HeldFilesTests : IDisposable
         Assert.Equal("before", Encoding.UTF8.GetString(released.Data!));
     }
 
+    /// <summary>
+    /// ACCESS DENIED on a file that is there is asked again for the bound (a
+    /// build's replace leaves the old file delete-pending for a moment, #874),
+    /// then "could not read just now" in the system's words; never "not there".
+    /// </summary>
+    [Fact]
+    public void AnAccessDeniedReadIsAskedAgainThenCouldNotReadNowInTheSystemsWords()
+    {
+        string target = Target();
+        var me = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
+        var deny = new System.Security.AccessControl.FileSystemAccessRule(me,
+            System.Security.AccessControl.FileSystemRights.ReadData, System.Security.AccessControl.AccessControlType.Deny);
+        var security = new FileInfo(target).GetAccessControl();
+        security.AddAccessRule(deny);
+        new FileInfo(target).SetAccessControl(security);
+        var pauses = new List<int>();
+        HeldFiles.FileBytes read;
+        try { read = HeldFiles.ReadBytes(target, pauses.Add); }
+        finally
+        {
+            var undo = new FileInfo(target).GetAccessControl();
+            undo.RemoveAccessRuleSpecific(deny);
+            new FileInfo(target).SetAccessControl(undo);
+        }
+        Assert.Equal(HeldFiles.ReadOutcome.CouldNotReadNow, read.Outcome);
+        Assert.Equal("Access is denied.", read.SystemWords);
+        Assert.Equal(HeldFiles.Pauses, pauses);
+        Assert.Equal("target.json could not be read, so it was not changed. Windows said: Access is denied.",
+                     HeldFiles.Refusal(target, read).Message);
+    }
+
     [Fact]
     public void ATemporaryIsHiddenUniqueAndBesideItsFile()
     {

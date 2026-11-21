@@ -265,11 +265,17 @@ public static class AgentGuidance
     /// temporary is gone. A permission refusal is thrown at once.</remarks>
     internal static void WriteAtomically(string path, string text, Action<int>? pause = null)
     {
-        string temporary = path + ".plantoir-" + Guid.NewGuid().ToString("N")[..8] + ".tmp";
+        string temporary = HeldFiles.TemporaryBeside(path);
         try
         {
             File.WriteAllBytes(temporary, new UTF8Encoding(false).GetBytes(text));
-            HeldFiles.Replace(temporary, path, () => File.Move(temporary, path, overwrite: true), pause);
+            HeldFiles.Hide(temporary);
+            HeldFiles.Replace(temporary, path, () =>
+            {
+                HeldFiles.Unhide(temporary);
+                try { File.Move(temporary, path, overwrite: true); }
+                catch { HeldFiles.Hide(temporary); throw; }
+            }, pause);
         }
         finally
         {

@@ -57,6 +57,65 @@ internal sealed class SecondProcessHold : IDisposable
 }
 
 /// <summary>
+/// A SECOND PROCESS doing what a build's Python does to course_config.json
+/// (<c>build_site._atomic_write_json_with_backup</c>): write a temporary
+/// beside it, then <c>os.replace</c>, which on Windows is
+/// <c>MoveFileExW(temporary, target, MOVEFILE_REPLACE_EXISTING)</c>, a
+/// refused replace being tried again on the next round. It says "replacing"
+/// after its first replace that landed and "done" after <c>count</c> rounds.
+/// </summary>
+internal sealed class BuildReplacingInALoop : IDisposable
+{
+    private readonly Process _process;
+
+    /// <summary>The replacer's last line, "done", once it has finished.</summary>
+    public Task<string?> Done { get; }
+
+    public BuildReplacingInALoop(string target, int count)
+    {
+        var start = new ProcessStartInfo("powershell.exe")
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        start.ArgumentList.Add("-NoProfile");
+        start.ArgumentList.Add("-Command");
+        start.ArgumentList.Add(
+            "Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public static class BuildReplace { " +
+            "[DllImport(\"kernel32.dll\", CharSet = CharSet.Unicode, SetLastError = true)] " +
+            "public static extern bool MoveFileExW(string from, string to, int flags); }'; " +
+            "$said = $false; $t = $env:PLANTOIR_REPLACE_TARGET; $d = Split-Path $t; $n = [int]$env:PLANTOIR_REPLACE_COUNT; " +
+            "for ($i = 1; $i -le $n; $i++) { " +
+            "  $tmp = Join-Path $d ('.course_config.json.build-' + $i + '.tmp'); " +
+            "  [System.IO.File]::WriteAllText($tmp, '{\"hidden\":[\"Media\"],\"show_reading_time\":false,\"build_count\":' + $i + '}'); " +
+            "  if (-not [BuildReplace]::MoveFileExW($tmp, $t, 1)) { [System.IO.File]::Delete($tmp) } " +
+            "  elseif (-not $said) { $said = $true; [Console]::Out.WriteLine('replacing'); [Console]::Out.Flush() } " +
+            "} " +
+            "[Console]::Out.WriteLine('done'); [Console]::Out.Flush()");
+        start.Environment["PLANTOIR_REPLACE_TARGET"] = target;
+        start.Environment["PLANTOIR_REPLACE_COUNT"] = count.ToString();
+        _process = Process.Start(start)!;
+        string? line = _process.StandardOutput.ReadLine();
+        if (line != "replacing")
+        {
+            Dispose();
+            throw new InvalidOperationException("the replacer did not start: " + line);
+        }
+        Done = _process.StandardOutput.ReadLineAsync();
+    }
+
+    public void Dispose()
+    {
+        try { _process.StandardInput.Close(); } catch { }
+        // A bound on a broken replacer, not a wait for timing: the exit is the event.
+        if (!_process.WaitForExit(120_000)) _process.Kill();
+        _process.Dispose();
+    }
+}
+
+/// <summary>
 /// #874: the app's own readers and writer of <c>course_config.json</c> ask
 /// again while another program holds it, and a read refused past the bound is
 /// "could not read just now", never "no settings" or "unreadable": nothing is
@@ -102,8 +161,10 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
             Assert.True(window.HasUnsavedChanges);
             Assert.False(window.RereadIfNothingUnsaved(ConfigPath));
 
-            var again = Workspace.DiscoverCourses(_workspace, listed);
-            Assert.Same(listed[0], Assert.Single(again));                     // still listed
+            // The window's own reload makes exactly this call (WorkspaceViewModel.Reload).
+            var again = Assert.Single(Workspace.DiscoverCourses(_workspace)); // still listed
+            Assert.Equal(listed[0].Code, again.Code);
+            Assert.True(JToken.DeepEquals(listed[0].Configuration.Values, again.Configuration.Values));
 
             Assert.Throws<FileInUseException>(() =>
                 window.RecordOnDisk(values => { values["unit_word"] = "Topic"; return values; }, ConfigPath));
@@ -197,13 +258,192 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
     }
 
     /// <summary>
+    /// H1 of review 1: the window's reload cleared its list before it handed it
+    /// over as "previous", so a held course vanished on every reload. The
+    /// last good read is now kept by discovery itself, so the reload's own
+    /// call (<c>Workspace.DiscoverCourses(folder)</c>, nothing passed in)
+    /// keeps the course, and a reference course's doors stay shut.
+    /// </summary>
+    [Fact]
+    public void TheReloadsOwnCallKeepsAHeldCourseAndItsDoorsStayShut()
+    {
+        File.WriteAllText(ConfigPath, """{"course_code":"ICS3U","kept_for_reference":true,"hidden":[]}""");
+        string other = Path.Combine(_workspace, "courses", "MPM2D");
+        Directory.CreateDirectory(other);
+        string otherConfig = Path.Combine(other, "course_config.json");
+        File.WriteAllText(otherConfig, """{"hidden":[]}""");
+        Assert.Equal(2, Workspace.DiscoverCourses(_workspace).Count);   // the folder's first read
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new SecondProcessHold(ConfigPath, FileShare.None))
+        using (new SecondProcessHold(otherConfig, FileShare.None))
+        {
+            var listed = Workspace.DiscoverCourses(_workspace);
+            Assert.Equal(new[] { "ICS3U", "MPM2D" }, listed.Select(c => c.Code));
+            Assert.True(listed[0].Configuration.KeptForReference);
+            Assert.True(Workspace.CourseIsKeptForReference(_workspace, "ICS3U"));
+            Assert.False(Workspace.CourseIsKeptForReference(_workspace, "MPM2D"));   // read before: ordinary
+            Assert.Equal("ICS3U", ReferenceCourse.KeptOnDisk(CourseDir));
+        }
+    }
+
+    /// <summary>A course this run has never read, held: the doors cannot tell, so they FAIL CLOSED.</summary>
+    [Fact]
+    public void AHeldCourseNeverReadBeforeIsTreatedAsKeptForReference()
+    {
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new SecondProcessHold(ConfigPath, FileShare.None))
+        {
+            Assert.True(Workspace.CourseIsKeptForReference(_workspace, "ICS3U"));
+            Assert.Equal("ICS3U", ReferenceCourse.KeptOnDisk(CourseDir));
+        }
+        Assert.False(Workspace.CourseIsKeptForReference(_workspace, "ICS3U"));
+        Assert.Null(ReferenceCourse.KeptOnDisk(CourseDir));
+    }
+
+    /// <summary>
+    /// A deny-read rule (not a hold): the read is asked again for the bound
+    /// (it cannot be told from a build's replace in flight), then refused in
+    /// the system's words; Save writes nothing, Revert reverts nothing and
+    /// says why, RecordOnDisk writes nothing.
+    /// </summary>
+    [Fact]
+    public void AReadDeniedByARuleRefusesTheSaveAndTheRevertInTheSystemsWords()
+    {
+        var window = CourseConfiguration.Load(ConfigPath);
+        window.Values["show_reading_time"] = true;
+        byte[] before = File.ReadAllBytes(ConfigPath);
+        var me = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
+        var deny = new System.Security.AccessControl.FileSystemAccessRule(me,
+            System.Security.AccessControl.FileSystemRights.ReadData, System.Security.AccessControl.AccessControlType.Deny);
+        var security = new FileInfo(ConfigPath).GetAccessControl();
+        security.AddAccessRule(deny);
+        new FileInfo(ConfigPath).SetAccessControl(security);
+        var pauses = new List<int>();
+        try
+        {
+            using (HeldFiles.PausingWith(pauses.Add))
+            {
+                var refused = Assert.Throws<FileRefusedException>(() => window.Write(ConfigPath));
+                Assert.Equal("course_config.json could not be read, so it was not changed. Windows said: Access is denied.", refused.Message);
+                Assert.Equal(HeldFiles.Pauses, pauses);
+                Assert.False(window.RevertToFile(ConfigPath, out string? notReverted));
+                Assert.Equal("course_config.json could not be read, so nothing was reverted. Windows said: Access is denied.", notReverted);
+                Assert.True(window.HasUnsavedChanges);
+                Assert.Throws<FileRefusedException>(() =>
+                    window.RecordOnDisk(values => { values["unit_word"] = "Topic"; return values; }, ConfigPath));
+            }
+        }
+        finally
+        {
+            var undo = new FileInfo(ConfigPath).GetAccessControl();
+            undo.RemoveAccessRuleSpecific(deny);
+            new FileInfo(ConfigPath).SetAccessControl(undo);
+        }
+        Assert.Equal(before, File.ReadAllBytes(ConfigPath));
+        Assert.Empty(Temporaries());
+    }
+
+    /// <summary>Revert on a held file: the sentence the Settings window shows, and the edits kept.</summary>
+    [Fact]
+    public void ARevertOnAHeldFileSaysNothingWasRevertedAndWhy()
+    {
+        var window = CourseConfiguration.Load(ConfigPath);
+        window.Values["show_reading_time"] = true;
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new SecondProcessHold(ConfigPath, FileShare.None))
+        {
+            Assert.False(CourseSettingsExclusions.Revert(window, "ICS3U", ConfigPath, out string? notReverted));
+            Assert.Equal("course_config.json is in use by another program, so nothing was reverted.", notReverted);
+        }
+        Assert.True(window.Values["show_reading_time"]!.Value<bool>());
+    }
+
+    /// <summary>
+    /// The temporary is HIDDEN while it exists (a leading dot hides nothing
+    /// on Windows), and the file it becomes is not. Looked at on the rename's
+    /// first pause, while a reader holds the target, then let go.
+    /// </summary>
+    [Fact]
+    public void TheTemporaryIsHiddenWhileItExistsAndTheSettingsAreNot()
+    {
+        var window = CourseConfiguration.Load(ConfigPath);
+        window.Values["show_reading_time"] = true;
+        var seen = new List<FileAttributes>();
+        var holder = new SecondProcessHold(ConfigPath, FileShare.Read);
+        using (HeldFiles.PausingWith(_ =>
+        {
+            foreach (string temporary in Temporaries()) seen.Add(File.GetAttributes(temporary));
+            holder.Release();
+        }))
+            window.Write(ConfigPath);
+        holder.Dispose();
+        var attributes = Assert.Single(seen);
+        Assert.True(attributes.HasFlag(FileAttributes.Hidden), attributes.ToString());
+        Assert.False(File.GetAttributes(ConfigPath).HasFlag(FileAttributes.Hidden));
+        Assert.Empty(Temporaries());
+        Assert.Empty(Workspace.DiscoverCourses(_workspace).Where(c => c.Code.StartsWith('.')));
+    }
+
+    /// <summary>
+    /// #874's measured case, FOR REAL: a second process replaces
+    /// course_config.json in a loop with the call a build's <c>os.replace</c>
+    /// makes on Windows (<c>MoveFileExW</c> with <c>MOVEFILE_REPLACE_EXISTING</c>),
+    /// each copy carrying a new <c>build_count</c>, while the app reads,
+    /// lists and saves against it. The two are lined up by a handshake: the
+    /// replacer says "replacing" after its first replace and "done" after its
+    /// last, and the app works until it reads "done". Every read is a read or
+    /// "could not read just now", never "not there" and never a raw refusal;
+    /// the course is listed on every reload; and a Save that lands has merged
+    /// (it keeps a build's count), never put the window's whole copy back.
+    /// </summary>
+    [Fact]
+    public void ABuildReplacingTheSettingsInALoopNeverLosesTheCourseOrItsChange()
+    {
+        File.WriteAllText(ConfigPath, """{"hidden":["Media"],"show_reading_time":false,"build_count":0}""");
+        byte[] windowsCopy = File.ReadAllBytes(ConfigPath);
+        Assert.Single(Workspace.DiscoverCourses(_workspace));
+        int pauses = 0, reads = 0, saves = 0, savesLanded = 0;
+        var failures = new List<string>();
+        using (HeldFiles.PausingWith(milliseconds => { Interlocked.Increment(ref pauses); HeldFiles.Sleep(milliseconds); }))
+        using (var build = new BuildReplacingInALoop(ConfigPath, 3000))
+        {
+            while (!build.Done.IsCompleted)
+            {
+                reads++;
+                try
+                {
+                    var read = CourseConfiguration.ReadBytes(ConfigPath);
+                    if (read.Outcome == HeldFiles.ReadOutcome.NotThere) failures.Add("a read answered not there");
+                }
+                catch (Exception error) { failures.Add("a read threw " + error.GetType().Name); }
+
+                if (Workspace.DiscoverCourses(_workspace).Count != 1) failures.Add("the course vanished from a reload");
+
+                var window = CourseConfiguration.FromBytes(windowsCopy);
+                window.Values["show_reading_time"] = true;
+                saves++;
+                try
+                {
+                    window.Write(ConfigPath);
+                    savesLanded++;
+                    if (window.Values["build_count"]!.Value<int>() == 0) failures.Add("a Save put the window's whole copy over the build's");
+                }
+                catch (IOException) { }                    // refused: nothing written, said in the sentence
+                catch (UnauthorizedAccessException) { }    // the rename refused in the system's words: nothing written
+            }
+            Assert.Equal("done", build.Done.Result);
+        }
+        Assert.True(failures.Count == 0, $"{failures.Count} of {reads} rounds: " + string.Join("; ", failures.Distinct()));
+        Assert.True(pauses > 0, $"the replace was never met in {reads} rounds: nothing was proved");
+        Assert.True(savesLanded > 0, $"no Save of {saves} landed");
+    }
+
+    /// <summary>
     /// ONE reader of course_config.json's bytes: no product file reads one
     /// with File.ReadAllBytes or File.ReadAllText except
     /// <see cref="CourseConfiguration.ReadBytes"/> (through
     /// <see cref="HeldFiles.ReadBytes"/>). Excepted by name: CourseRestorer.cs
-    /// (the restore batch, #873/#805/#911) and CourseSettingsView.xaml.cs,
-    /// whose Save is rewritten by #986 (its before-read only chooses what the
-    /// trail compares with; the Save itself goes through Write).
+    /// (the restore batch, #873/#805/#911).
     /// </summary>
     [Fact]
     public void EveryReaderOfTheSettingsGoesThroughTheOneReader()
@@ -212,7 +452,6 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
         var excepted = new HashSet<string>(StringComparer.Ordinal)
         {
             "Plantoir.Core/Models/CourseRestorer.cs",
-            "Plantoir/Views/CourseSettingsView.xaml.cs",
         };
         var call = new Regex(@"\bFile\.ReadAll(?:Bytes|Text|Lines)\w*\s*\(\s*([^;]*?)\)\s*[;),]", RegexOptions.CultureInvariant);
         var found = new List<string>();

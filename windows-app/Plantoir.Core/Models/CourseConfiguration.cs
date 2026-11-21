@@ -31,7 +31,9 @@ public sealed class CourseConfiguration
     /// Reads and parses a course_config.json. Throws
     /// <see cref="FileNotFoundException"/> when it is not there,
     /// <see cref="FileInUseException"/> when another program held it past the
-    /// bound (could not read just now — never "no settings"), and
+    /// bound, <see cref="FileRefusedException"/> when it is there and could
+    /// not be read for another reason (could not read just now — never "no
+    /// settings"), and
     /// <see cref="InvalidDataException"/> or a JSON reader's exception when it
     /// is not valid JSON (#874).
     /// </summary>
@@ -55,7 +57,7 @@ public sealed class CourseConfiguration
         {
             HeldFiles.ReadOutcome.Read => read.Data!,
             HeldFiles.ReadOutcome.NotThere => throw new FileNotFoundException("course_config.json is not there.", Path.GetFileName(path)),
-            _ => throw new FileInUseException(Path.GetFileName(path)),
+            _ => throw HeldFiles.Refusal(path, read),
         };
     }
 
@@ -143,12 +145,11 @@ public sealed class CourseConfiguration
     public SaveReport Write(string path)
     {
         JObject? onDisk = null;
-        HeldFiles.FileBytes read;
-        // A refusal that is not a hold (a permission) keeps today's path: the
-        // write below meets the same refusal and says it in the system's words.
-        try { read = ReadBytes(path); }
-        catch { read = new HeldFiles.FileBytes(HeldFiles.ReadOutcome.NotThere, null); }
-        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw new FileInUseException(Path.GetFileName(path));
+        // Any refusal of a file that is there (held, a build's replace in
+        // flight, a deny rule) refuses the Save: nothing is written blind over
+        // what is on disk (#874).
+        var read = ReadBytes(path);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw HeldFiles.Refusal(path, read);
         try { if (read.Outcome == HeldFiles.ReadOutcome.Read) onDisk = ParseObject(read.Data!); }
         catch { onDisk = null; }   // not valid JSON: this copy is the only truth left
         JObject? lastRead = null;
@@ -215,12 +216,22 @@ public sealed class CourseConfiguration
     /// edits included, and the answer is false: the teacher's edits are never
     /// thrown away because a build was swapping the file.
     /// </summary>
-    public bool RevertToFile(string path)
+    public bool RevertToFile(string path) => RevertToFile(path, out _);
+
+    /// <summary>
+    /// <see cref="RevertToFile(string)"/>, saying why nothing was reverted:
+    /// <paramref name="notReverted"/> is the sentence a teacher reads (the
+    /// file's name, why, and that nothing was reverted), null when it reverted.
+    /// </summary>
+    public bool RevertToFile(string path, out string? notReverted)
     {
-        HeldFiles.FileBytes read;
-        try { read = ReadBytes(path); }
-        catch { DiscardChanges(); return true; }
-        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) return false;
+        notReverted = null;
+        var read = ReadBytes(path);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow)
+        {
+            notReverted = NotRevertedSentence(Path.GetFileName(path), read.SystemWords);
+            return false;
+        }
         try
         {
             if (read.Outcome != HeldFiles.ReadOutcome.Read) throw new FileNotFoundException();
@@ -285,7 +296,9 @@ public sealed class CourseConfiguration
             before = BytesOnDisk(path);
             written = Serialize(change(ParseObject(before)));
             byte[] nowOnDisk;
-            try { nowOnDisk = BytesOnDisk(path); } catch (IOException) { nowOnDisk = before; }
+            // A second read that is refused refuses the write (#874); only a
+            // file that has gone since the first read counts as unchanged.
+            try { nowOnDisk = BytesOnDisk(path); } catch (FileNotFoundException) { nowOnDisk = before; }
             if (nowOnDisk.AsSpan().SequenceEqual(before)) break;
             attempts++;
             if (attempts < 3) continue;
@@ -311,13 +324,25 @@ public sealed class CourseConfiguration
         try
         {
             File.WriteAllBytes(temporary, data);
-            HeldFiles.Replace(temporary, path, () => File.Move(temporary, path, overwrite: true));
+            HeldFiles.Hide(temporary);
+            HeldFiles.Replace(temporary, path, () =>
+            {
+                HeldFiles.Unhide(temporary);
+                try { File.Move(temporary, path, overwrite: true); }
+                catch { HeldFiles.Hide(temporary); throw; }
+            });
         }
         finally
         {
             try { if (File.Exists(temporary)) File.Delete(temporary); } catch { }
         }
     }
+
+    /// <summary>The words a teacher reads when Revert could not read the file: why, and that nothing was reverted.</summary>
+    public static string NotRevertedSentence(string fileName, string? systemWords) =>
+        systemWords is null
+            ? fileName + " is in use by another program, so nothing was reverted."
+            : fileName + " could not be read, so nothing was reverted. Windows said: " + systemWords;
 
     private static JObject ParseObject(byte[] data) =>
         JToken.Parse(Encoding.UTF8.GetString(data)) as JObject

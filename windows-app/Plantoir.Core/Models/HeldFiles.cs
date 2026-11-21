@@ -68,22 +68,62 @@ public static class HeldFiles
     public static string InUseSentence(string fileName) =>
         fileName + " is in use by another program, so it was not changed.";
 
-    /// <summary>What a read found: the bytes, nothing there, or a hold that outlasted the bound.</summary>
+    /// <summary>
+    /// The words for a file that is there and could not be read for another
+    /// reason (a deny rule, a cloud provider's refusal): the system's own
+    /// words, after the bound, and that nothing was changed.
+    /// </summary>
+    public static string NotReadSentence(string fileName, string systemWords) =>
+        fileName + " could not be read, so it was not changed. Windows said: " + systemWords;
+
+    /// <summary>What a read found: the bytes, nothing there, or a file that is there and could not be read just now.</summary>
     public enum ReadOutcome { Read, NotThere, CouldNotReadNow }
 
-    /// <summary>A read's answer; <see cref="Data"/> is set only for <see cref="ReadOutcome.Read"/>.</summary>
-    public readonly record struct FileBytes(ReadOutcome Outcome, byte[]? Data);
+    /// <summary>
+    /// A read's answer; <see cref="Data"/> is set only for <see cref="ReadOutcome.Read"/>.
+    /// For <see cref="ReadOutcome.CouldNotReadNow"/>, <see cref="SystemWords"/>
+    /// is null when another program held the file, else the system's own
+    /// sentence for the refusal.
+    /// </summary>
+    public readonly record struct FileBytes(ReadOutcome Outcome, byte[]? Data, string? SystemWords = null);
+
+    /// <summary>The refusal a caller throws for a read that could not be made: the sentence of the kind it was.</summary>
+    public static FileRefusedException Refusal(string path, FileBytes read)
+    {
+        string name = Path.GetFileName(path);
+        return read.SystemWords is null
+            ? new FileInUseException(name)
+            : new FileRefusedException(name, NotReadSentence(name, read.SystemWords));
+    }
 
     /// <summary>True for a sharing or lock violation, the system's words for "another program has it open".</summary>
     public static bool IsSharingViolation(Exception error) =>
         error is IOException && (error.HResult & unchecked((int)0xFFFF0000)) == unchecked((int)0x80070000)
         && (error.HResult & 0xFFFF) is SharingViolation or LockViolation;
 
+    /// <summary>The system's own sentence for a refusal, without the path .NET puts in its message.</summary>
+    public static string SystemWords(Exception error)
+    {
+        int code = error.HResult;
+        if ((code & unchecked((int)0xFFFF0000)) == unchecked((int)0x80070000))
+        {
+            string said = new System.ComponentModel.Win32Exception(code & 0xFFFF).Message;
+            if (!string.IsNullOrWhiteSpace(said) && !said.Contains(":\\", StringComparison.Ordinal)) return said;
+        }
+        return "The file could not be opened.";
+    }
+
     /// <summary>
-    /// Reads a whole file, asking again while it is held. A file that is not
-    /// there is <see cref="ReadOutcome.NotThere"/>; one still held after the
-    /// bound is <see cref="ReadOutcome.CouldNotReadNow"/>, never "empty". Any
-    /// other refusal (a permission) is thrown as the system raised it.
+    /// Reads a whole file, asking again while it cannot be read. A file that
+    /// is not there is <see cref="ReadOutcome.NotThere"/>. A sharing violation
+    /// and an ACCESS DENIED on a file that is there are both asked again for
+    /// the bound: a build's <c>os.replace</c> leaves the old file
+    /// delete-pending for a moment, and an open then gets access denied (#874,
+    /// measured: 2 to 8 per run). The probe cannot tell that from a deny rule,
+    /// so neither is ever read as "absent" or "unchanged": after the bound it
+    /// is <see cref="ReadOutcome.CouldNotReadNow"/>, with the system's words
+    /// when the probe sees no other program. Any other refusal of a file that
+    /// is there is <see cref="ReadOutcome.CouldNotReadNow"/> at once.
     /// </summary>
     public static FileBytes ReadBytes(string path, Action<int>? pause = null)
     {
@@ -96,10 +136,18 @@ public static class HeldFiles
             }
             catch (FileNotFoundException) { return new FileBytes(ReadOutcome.NotThere, null); }
             catch (DirectoryNotFoundException) { return new FileBytes(ReadOutcome.NotThere, null); }
-            catch (Exception error) when (IsSharingViolation(error) || (error is UnauthorizedAccessException && IsHeld(path)))
+            catch (Exception error) when (IsSharingViolation(error) || error is UnauthorizedAccessException)
             {
-                if (attempt >= Pauses.Count) return new FileBytes(ReadOutcome.CouldNotReadNow, null);
+                if (attempt >= Pauses.Count)
+                {
+                    bool held = IsSharingViolation(error) || IsHeld(path);
+                    return new FileBytes(ReadOutcome.CouldNotReadNow, null, held ? null : SystemWords(error));
+                }
                 PauseFor(pause, Pauses[attempt]);
+            }
+            catch (IOException error)
+            {
+                return new FileBytes(ReadOutcome.CouldNotReadNow, null, SystemWords(error));
             }
         }
     }
@@ -134,6 +182,21 @@ public static class HeldFiles
     public static string TemporaryBeside(string path) =>
         Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path))!,
                      "." + Path.GetFileName(path) + ".plantoir-" + Guid.NewGuid().ToString("N")[..8] + ".tmp");
+
+    /// <summary>
+    /// Gives a temporary Windows' Hidden attribute, so Explorer and a sync
+    /// client do not show it while it exists (a leading dot hides nothing on
+    /// Windows). Call it after the temporary is written.
+    /// </summary>
+    public static void Hide(string temporary) =>
+        File.SetAttributes(temporary, File.GetAttributes(temporary) | FileAttributes.Hidden);
+
+    /// <summary>
+    /// Takes the Hidden attribute off a temporary just before its rename, so
+    /// the file it becomes is not hidden (a rename keeps the attributes).
+    /// </summary>
+    public static void Unhide(string temporary) =>
+        File.SetAttributes(temporary, File.GetAttributes(temporary) & ~FileAttributes.Hidden);
 
     /// <summary>
     /// Whether another program holds <paramref name="path"/> open without
@@ -171,15 +234,30 @@ public static class HeldFiles
 /// <see cref="AgentGuidance.SystemReason"/> gives the system's own sentence
 /// for it, never "Access is denied.".
 /// </summary>
-public sealed class FileInUseException : IOException
+public sealed class FileInUseException : FileRefusedException
 {
-    /// <summary>The held file's name, without its folder.</summary>
+    public FileInUseException(string fileName, Exception? inner = null)
+        : base(fileName, HeldFiles.InUseSentence(fileName), inner)
+    {
+        HResult = unchecked((int)0x80070020);
+    }
+}
+
+/// <summary>
+/// A file that is there and could not be read or replaced just now: nothing
+/// was changed. Its <see cref="Exception.Message"/> is the plain sentence a
+/// teacher reads. <see cref="FileInUseException"/> is the kind where another
+/// program held it.
+/// </summary>
+public class FileRefusedException : IOException
+{
+    /// <summary>The file's name, without its folder.</summary>
     public string FileName { get; }
 
-    public FileInUseException(string fileName, Exception? inner = null)
-        : base(HeldFiles.InUseSentence(fileName), inner)
+    public FileRefusedException(string fileName, string sentence, Exception? inner = null)
+        : base(sentence, inner)
     {
         FileName = fileName;
-        HResult = unchecked((int)0x80070020);
+        HResult = unchecked((int)0x80070005);
     }
 }

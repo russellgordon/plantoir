@@ -50,10 +50,14 @@ public static class CourseSettingsExclusions
     /// when there were any. False, with nothing taken back and no line, when
     /// the file could not be read just now (#874): the window keeps its edits.
     /// </summary>
-    public static bool Revert(CourseConfiguration config, string courseCode, string configPath)
+    public static bool Revert(CourseConfiguration config, string courseCode, string configPath) =>
+        Revert(config, courseCode, configPath, out _);
+
+    /// <summary><see cref="Revert(CourseConfiguration, string, string)"/>, with the sentence the window shows when nothing was reverted.</summary>
+    public static bool Revert(CourseConfiguration config, string courseCode, string configPath, out string? notReverted)
     {
         int count = config.ExclusionChangesSinceLastRead();
-        if (!config.RevertToFile(configPath)) return false;
+        if (!config.RevertToFile(configPath, out notReverted)) return false;
         if (count == 0) return true;
         ActivityTrail.Note(ActivityTrail.Event.ExclusionsReverted,
             $"{courseCode}: Revert put back {count} unsaved {(count == 1 ? "change" : "changes")} to what this course's site leaves out");

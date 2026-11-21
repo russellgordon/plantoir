@@ -87,8 +87,7 @@ public sealed partial class MainWindow
                 && lease.SectionNumber == section),
             StopPreviewInAppAsync = () => StopPreviewForAsync(folder, code, section),
             SectionIsBeingDeployed = () => CourseActivity.IsPublishingSection(folder, code, section),
-            CourseIsKeptForReference = () => Plantoir.Core.Models.Workspace.DiscoverCourses(folder)
-                .Any(c => c.Code.Equals(code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
+            CourseIsKeptForReference = () => Plantoir.Core.Models.Workspace.CourseIsKeptForReference(folder, code),
             CourseIsBeingCopied = () => WorkLease.IsHeld(folder, code, WorkLease.Copying) || SidebarPane.IsZipping(folder, code),
         };
 
