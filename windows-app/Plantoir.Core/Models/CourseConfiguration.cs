@@ -27,7 +27,37 @@ public sealed class CourseConfiguration
         _lastSavedData = lastSavedData;
     }
 
-    public static CourseConfiguration Load(string path) => FromBytes(File.ReadAllBytes(path));
+    /// <summary>
+    /// Reads and parses a course_config.json. Throws
+    /// <see cref="FileNotFoundException"/> when it is not there,
+    /// <see cref="FileInUseException"/> when another program held it past the
+    /// bound (could not read just now — never "no settings"), and
+    /// <see cref="InvalidDataException"/> or a JSON reader's exception when it
+    /// is not valid JSON (#874).
+    /// </summary>
+    public static CourseConfiguration Load(string path) => FromBytes(BytesOnDisk(path));
+
+    /// <summary>
+    /// THE one reader of course_config.json's bytes (#874): every reader in
+    /// the product comes through here, so each asks again while a build, an
+    /// editor, a scanner or another window holds the file
+    /// (<see cref="HeldFiles.ReadBytes"/>), and answers read, not there, or
+    /// could not read just now. A source-text test holds every other reader
+    /// to it (<c>CourseSettingsHeldFileTests</c>).
+    /// </summary>
+    public static HeldFiles.FileBytes ReadBytes(string path) => HeldFiles.ReadBytes(path);
+
+    /// <summary>The file's bytes, or the exception that says which of the other two answers it was.</summary>
+    private static byte[] BytesOnDisk(string path)
+    {
+        var read = ReadBytes(path);
+        return read.Outcome switch
+        {
+            HeldFiles.ReadOutcome.Read => read.Data!,
+            HeldFiles.ReadOutcome.NotThere => throw new FileNotFoundException("course_config.json is not there.", Path.GetFileName(path)),
+            _ => throw new FileInUseException(Path.GetFileName(path)),
+        };
+    }
 
     public static CourseConfiguration FromBytes(byte[] data)
     {
@@ -101,11 +131,22 @@ public sealed class CourseConfiguration
     /// window A had just saved — the mac's reported failure, reproduced by
     /// <c>TwoWindowSettingsTests.TheOldWholeFileWriteLostTheOtherWindowsHides</c>.</para>
     /// </summary>
+    ///
+    /// <para><b>A held file (#874).</b> A merge read that could not be made
+    /// just now REFUSES the Save — nothing written, <see cref="FileInUseException"/>,
+    /// whose message is the sentence the status line shows — rather than
+    /// writing this whole copy over what a build may just have written. The
+    /// write goes through a hidden temporary of its own beside the file and
+    /// one rename, asked again while the file is held; still refused, the
+    /// file is as it was and the temporary is gone.</para>
+    /// </summary>
     public SaveReport Write(string path)
     {
         JObject? onDisk = null;
-        try { if (File.Exists(path)) onDisk = ParseObject(File.ReadAllBytes(path)); }
-        catch { onDisk = null; }   // unreadable: this copy is the only truth left
+        var read = ReadBytes(path);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) throw new FileInUseException(Path.GetFileName(path));
+        try { if (read.Outcome == HeldFiles.ReadOutcome.Read) onDisk = ParseObject(read.Data!); }
+        catch { onDisk = null; }   // not valid JSON: this copy is the only truth left
         JObject? lastRead = null;
         try { if (_lastSavedData.Length > 0) lastRead = ParseObject(_lastSavedData); } catch { lastRead = null; }
 
@@ -113,9 +154,7 @@ public sealed class CourseConfiguration
             ? ((JObject)_values.DeepClone(), new List<string>(), new List<string>())
             : Merged(lastRead, onDisk, _values);
         byte[] data = Serialize(written);
-        string temp = path + ".tmp";
-        File.WriteAllBytes(temp, data);
-        File.Move(temp, path, overwrite: true);
+        ReplaceWith(path, data);
         _values = written;
         _lastSavedData = data;
         return new SaveReport(kept, replaced);
@@ -161,31 +200,43 @@ public sealed class CourseConfiguration
     /// Revert reads the FILE (#272 / mac #265, 3a), not this copy's
     /// remembered last save: with two windows, B reverting to its own old copy
     /// showed A's saved hides as gone and "nothing unsaved", and B's next hide
-    /// then wrote them away. Falls back to the remembered copy only when the
-    /// file cannot be read.
+    /// then wrote them away. Falls back to the remembered copy when the file
+    /// is not there or is not valid JSON. When it could not be read JUST NOW
+    /// (held past the bound, #874) the window's copy is kept exactly as it is,
+    /// edits included, and the answer is false: the teacher's edits are never
+    /// thrown away because a build was swapping the file.
     /// </summary>
-    public void RevertToFile(string path)
+    public bool RevertToFile(string path)
     {
+        HeldFiles.FileBytes read;
+        try { read = ReadBytes(path); }
+        catch { DiscardChanges(); return true; }
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) return false;
         try
         {
-            byte[] data = File.ReadAllBytes(path);
-            _values = ParseObject(data);
-            _lastSavedData = data;
+            if (read.Outcome != HeldFiles.ReadOutcome.Read) throw new FileNotFoundException();
+            _values = ParseObject(read.Data!);
+            _lastSavedData = read.Data!;
         }
         catch { DiscardChanges(); }
+        return true;
     }
 
     /// <summary>
     /// After ANOTHER copy saved this course: read the file again, unless this
     /// copy holds unsaved changes — those are left alone, and its own Save
-    /// follows the merge rule. True when it re-read.
+    /// follows the merge rule. True when it re-read; false, with this copy
+    /// left as it is, when the file is not there, not valid JSON, or could
+    /// not be read just now (#874: a held file is not a file that has gone).
     /// </summary>
     public bool RereadIfNothingUnsaved(string path)
     {
         if (HasUnsavedChanges) return false;
         try
         {
-            byte[] data = File.ReadAllBytes(path);
+            var read = ReadBytes(path);
+            if (read.Outcome != HeldFiles.ReadOutcome.Read) return false;
+            byte[] data = read.Data!;
             _values = ParseObject(data);
             _lastSavedData = data;
             return true;
@@ -221,22 +272,42 @@ public sealed class CourseConfiguration
         int attempts = 0;
         while (true)
         {
-            before = File.ReadAllBytes(path);
+            // Held past the bound: nothing is written, and the caller hears it (#874).
+            before = BytesOnDisk(path);
             written = Serialize(change(ParseObject(before)));
             byte[] nowOnDisk;
-            try { nowOnDisk = File.ReadAllBytes(path); } catch (IOException) { nowOnDisk = before; }
+            try { nowOnDisk = BytesOnDisk(path); } catch (IOException) { nowOnDisk = before; }
             if (nowOnDisk.AsSpan().SequenceEqual(before)) break;
             attempts++;
             if (attempts < 3) continue;
             written = Serialize(change(ParseObject(nowOnDisk)));
             break;
         }
-        string temp = path + ".tmp";
-        File.WriteAllBytes(temp, written);
-        File.Move(temp, path, overwrite: true);
+        ReplaceWith(path, written);
 
         _values = change(_values);
         _lastSavedData = written;
+    }
+
+    /// <summary>
+    /// The one replace of course_config.json: a hidden temporary of its own
+    /// beside it (<see cref="HeldFiles.TemporaryBeside"/>), then one rename,
+    /// asked again while the file is held (<see cref="HeldFiles.Replace"/>).
+    /// On any failure the temporary is removed and the file is as it was; a
+    /// hold that outlasts the bound throws <see cref="FileInUseException"/>.
+    /// </summary>
+    private static void ReplaceWith(string path, byte[] data)
+    {
+        string temporary = HeldFiles.TemporaryBeside(path);
+        try
+        {
+            File.WriteAllBytes(temporary, data);
+            HeldFiles.Replace(temporary, path, () => File.Move(temporary, path, overwrite: true));
+        }
+        finally
+        {
+            try { if (File.Exists(temporary)) File.Delete(temporary); } catch { }
+        }
     }
 
     private static JObject ParseObject(byte[] data) =>

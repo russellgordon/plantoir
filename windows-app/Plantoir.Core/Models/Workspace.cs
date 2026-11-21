@@ -45,8 +45,15 @@ public static class Workspace
     /// Courses = subfolders of courses/ holding a course_config.json, sorted
     /// by code. A malformed config is skipped silently — it must not hide
     /// every other course.
+    ///
+    /// <para>A config another program held past the bound (a build swapping
+    /// it in, a scanner; #874) is not malformed: the course whose settings
+    /// could not be read just now keeps the copy <paramref name="previous"/>
+    /// holds for it, so it never vanishes from the sidebar for a moment. With
+    /// no earlier copy (the folder's first read) there is nothing true to show
+    /// for it, and it is listed at the next read.</para>
     /// </summary>
-    public static List<Course> DiscoverCourses(string workspacePath)
+    public static List<Course> DiscoverCourses(string workspacePath, IReadOnlyList<Course>? previous = null)
     {
         var courses = new List<Course>();
         string coursesDir = CoursesDirectory(workspacePath);
@@ -60,10 +67,23 @@ public static class Workspace
             string configPath = Path.Combine(dir, "course_config.json");
             if (!File.Exists(configPath)) continue;
             try { courses.Add(new Course(name, dir, CourseConfiguration.Load(configPath))); }
+            catch (FileInUseException)
+            {
+                if (EarlierCopy(previous, dir) is { } kept) courses.Add(kept);
+            }
             catch { }
         }
         courses.Sort((a, b) => string.CompareOrdinal(a.Code, b.Code));
         return courses;
+    }
+
+    private static Course? EarlierCopy(IReadOnlyList<Course>? previous, string directory)
+    {
+        if (previous is null) return null;
+        foreach (var course in previous)
+            if (string.Equals(Path.GetFullPath(course.DirectoryPath), Path.GetFullPath(directory), StringComparison.OrdinalIgnoreCase))
+                return course;
+        return null;
     }
 
     /// <summary>

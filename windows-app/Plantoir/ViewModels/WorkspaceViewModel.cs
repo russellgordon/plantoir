@@ -377,7 +377,7 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
             else
             {
                 App.LogDiagnostic("WorkspaceViewModel.Reload: DiscoverCourses starting");
-                Courses = Workspace.DiscoverCourses(_state.FolderPath);
+                Courses = Workspace.DiscoverCourses(_state.FolderPath, Courses);
                 App.LogDiagnostic($"WorkspaceViewModel.Reload: DiscoverCourses found {Courses.Count} courses");
                 ArchivedItems = Workspace.FindArchivedItems(_state.FolderPath);
                 BackupItems = Workspace.FindBackups(_state.FolderPath);

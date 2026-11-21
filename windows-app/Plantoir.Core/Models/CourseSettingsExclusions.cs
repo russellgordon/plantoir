@@ -47,14 +47,16 @@ public static class CourseSettingsExclusions
     /// <summary>
     /// The Revert button. Counts this copy's unsaved exclusion changes BEFORE
     /// reading the file back, and writes one <c>exclusions reverted</c> line
-    /// when there were any.
+    /// when there were any. False, with nothing taken back and no line, when
+    /// the file could not be read just now (#874): the window keeps its edits.
     /// </summary>
-    public static void Revert(CourseConfiguration config, string courseCode, string configPath)
+    public static bool Revert(CourseConfiguration config, string courseCode, string configPath)
     {
         int count = config.ExclusionChangesSinceLastRead();
-        config.RevertToFile(configPath);
-        if (count == 0) return;
+        if (!config.RevertToFile(configPath)) return false;
+        if (count == 0) return true;
         ActivityTrail.Note(ActivityTrail.Event.ExclusionsReverted,
             $"{courseCode}: Revert put back {count} unsaved {(count == 1 ? "change" : "changes")} to what this course's site leaves out");
+        return true;
     }
 }
