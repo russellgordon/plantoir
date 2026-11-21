@@ -1113,8 +1113,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     $"dates from {DateText.Iso(TimetableMemory.EarliestBelievable)} to " +
                     $"{TimetableMemory.YearsAheadBelievable} years from today; check the year and try again.");
 
-            if (!TimetableMemory.Write(workspace.FolderPath, found.Code, number, parsed, source,
-                                       DateOnly.FromDateTime(DateTime.Now)))
+            if (!workspace.RememberTimetable(found.Code, number, parsed, source, DateOnly.FromDateTime(DateTime.Now)))
                 throw new AssistRefusal(
                     "Those dates couldn't be saved, so they aren't remembered. Tell the teacher they may be " +
                     "asked again — don't claim otherwise.");

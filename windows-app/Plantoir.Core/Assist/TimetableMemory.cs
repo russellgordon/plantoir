@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -168,8 +169,18 @@ public sealed class TimetableMemory
     /// a teacher told their timetable was remembered, who is then asked for it
     /// again tomorrow, has learnt not to trust what the assistant tells them.
     /// </summary>
+    /// <param name="madeBy">Who makes the step (#899 W7b1; the mac's <c>applyRememberTimetable(_:by:)</c>): the
+    /// Class Dates dialog's <c>sheet</c> by default, the tool's caller's surface (<c>AssistWorkspace.UndoMadeBy</c>) otherwise.</param>
     public static bool Write(string workspacePath, string courseCode, int sectionNumber,
-                             IEnumerable<DateOnly> dates, string source, DateOnly today)
+                             IEnumerable<DateOnly> dates, string source, DateOnly today,
+                             string? madeBy = null)
+        => Write(workspacePath, courseCode, sectionNumber, dates, source, today,
+                 new UndoStepMaker(madeBy ?? "sheet", "rememberTimetable"), undo: null);
+
+    /// <summary>The same, with the step's maker and a test's own list (this process's when null).</summary>
+    internal static bool Write(string workspacePath, string courseCode, int sectionNumber,
+                               IEnumerable<DateOnly> dates, string source, DateOnly today,
+                               UndoStepMaker by, UndoForThisProcess? undo)
     {
         var ordered = dates.Distinct().OrderBy(date => date).ToList();
         if (ordered.Count == 0) return false;
@@ -179,16 +190,25 @@ public sealed class TimetableMemory
         try
         {
             string path = FileFor(workspacePath, courseCode, sectionNumber);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, JsonSerializer.Serialize(new Stored
+            // ONE step through the door (#899 W7b1; the mac's
+            // applyRememberTimetable): the section's timetable file, its
+            // folder made by the swap, all or none; never told to today's
+            // undo (it never was). The bytes are Windows' own, as before.
+            var step = new UndoActionStep(by, workspacePath, courseCode, sectionNumber, undo: undo);
+            step.Write(path, JsonSerializer.Serialize(new Stored
             {
                 Section = sectionNumber,
                 Dates = ordered.Select(date => DateText.Iso(date)).ToList(),
                 Source = source,
                 Recorded = DateText.Iso(today),
             }, new JsonSerializerOptions { WriteIndented = true }));
+            step.Make();
             return true;
         }
+        // The dates went in and what the file held is kept beside it: they
+        // ARE remembered, so it is said as remembered (the mac's sheet,
+        // savedWithWhatItHeldKept), never as not saved.
+        catch (UndoStepLeftPartWayException) { return true; }
         catch { return false; }
     }
 

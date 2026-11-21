@@ -31,8 +31,20 @@ internal static class WindowsActionsOnTheMacFixture
     internal static readonly IReadOnlyList<string> Converted =
     [
         "publishPages", "hidePages", "publishPagesAWholeUnit", "publishClassForADate",
-        "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions",
+        "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
     ];
+
+    /// <summary>
+    /// A converted step whose file is JSON Windows writes in its own way,
+    /// measured: by step name, the members that must be the mac's and why the
+    /// rest differ. Its traces make the recorded step's draft.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, (string[] SameMembers, string Why)> WindowsOwnJson =
+        new Dictionary<string, (string[], string)>(StringComparer.Ordinal)
+        {
+            ["rememberTimetable"] = (["section", "dates"],
+                "Windows writes the timetable as it always has (System.Text.Json, indented two spaces, \"key\": value, its members section, dates, source, recorded in that order, no newline at the end), where the mac's JSONSerialization writes sorted keys with \" : \" and a closing newline; recorded is the day it is written (the mac's test fixed it at 2026-09-08), and a source not given is Windows' \"the teacher\" where the mac's is \"not recorded\". Both readers look members up by name"),
+        };
 
     /// <summary>
     /// A converted step whose Windows after differs from the mac's for a
@@ -139,6 +151,7 @@ internal static class WindowsActionsOnTheMacFixture
             "addNextClassInANewUnit" => tools.AddNextClass(Course, 1, unit: "next"),
             "addClasses" => tools.AddClasses(Course, 1, unit: 2, howMany: 2),
             "addCurriculumMentions" => tools.AddCurriculumMentions(Course, 1, page: "Loops", codes: "A1.1"),
+            "rememberTimetable" => tools.RememberTimetable(Course, 1, "2026-09-08; 2026-09-10; 2026-09-14"),
             _ => throw new InvalidOperationException($"{stepName}: no Windows action is converted for it yet"),
         };
         return string.Join("\n", answered.Content.OfType<TextContentBlock>().Select(block => block.Text));
@@ -331,6 +344,17 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             string full = UndoDoor.FullPath(Folder, path);
             byte[]? want = WindowsActionsOnTheMacFixture.Bytes(file.GetProperty("after"));
             byte[]? have = File.Exists(full) ? File.ReadAllBytes(full) : null;
+            if (WindowsActionsOnTheMacFixture.WindowsOwnJson.TryGetValue(name, out var json))
+            {
+                Assert.NotNull(want);
+                Assert.NotNull(have);
+                Assert.False(want!.AsSpan().SequenceEqual(have), $"{name}: {path} is now the mac's bytes: the measured difference closed");
+                JsonNode mac = JsonNode.Parse(want)!;
+                JsonNode windows = JsonNode.Parse(have!)!;
+                foreach (string member in json.SameMembers)
+                    Assert.True(JsonNode.DeepEquals(mac[member], windows[member]), $"{name}: {path}'s {member} is {windows[member]?.ToJsonString()}");
+                continue;
+            }
             if (WindowsActionsOnTheMacFixture.WindowsOwnLine.TryGetValue(name, out var own))
             {
                 // Measured: the same lines but ONE, the line after the named

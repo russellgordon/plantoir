@@ -650,7 +650,7 @@ internal static class NamedGapLedger
         // yet, before any door is asked (part three, review 1, LOW 2): they can
         // pass only once that guard is taken out for their kind.
         Owed(UndoActionStepsOnWindows, 899, V200, Reason899W7b2,
-             "makeRoomForClasses", "duplicateClass", "reDateClasses", "rememberTimetable",
+             "makeRoomForClasses", "duplicateClass", "reDateClasses",
              "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear", "showTodaysClassOnTheFrontPage",
              "notTodayOnTheFrontPage", "answerTheLinksChecklist", "keepClassesDatedLater"),
         Owed(UndoActionStepsOnWindows, 899, V200, Reason899NoDuplicateAsNextClass, "duplicateAsTheNextClass"),
