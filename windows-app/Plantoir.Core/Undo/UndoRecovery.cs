@@ -318,7 +318,14 @@ internal static class UndoRecovery
                 journal.Memory.NoteARefusedSwap(key, now);
             }
         }
-        if (mode == UndoMode.Live) TidyClosedSteps(writer, journal, trail);
+        // In shadow too, since U3 (rule.recovery): a shadow step is staged
+        // beside its pages like a live one, so one closed interrupted would
+        // otherwise leave its dot-files in the course until the switch flips.
+        // Shadow removes only the journal's own staged FILES of a step whose
+        // every op changes a file in place, never a folder set aside (the
+        // mac's tidyClosedSteps(onlyStepsOfFiles:)), and keeps a kept
+        // original that differs from its page.
+        TidyClosedSteps(writer, journal, trail, onlyStepsOfFiles: mode == UndoMode.Shadow);
         return new UndoRecoveryRun(settled, StoppedByATest: false, left);
     }
 
@@ -515,11 +522,14 @@ internal static class UndoRecovery
     /// the director's ruling 6 on U1's third round). Once per process; one
     /// whose file could not be removed is looked for again at the next lock.
     /// </summary>
-    internal static void TidyClosedSteps(UndoJournalWriter writer, UndoJournal journal, Action<UndoTrailLine>? trail = null)
+    /// <param name="onlyStepsOfFiles">Shadow's: only a step whose every op changes a file in place (<see cref="ChangesOnlyFiles"/>).</param>
+    internal static void TidyClosedSteps(UndoJournalWriter writer, UndoJournal journal, Action<UndoTrailLine>? trail = null,
+                                         bool onlyStepsOfFiles = false)
     {
         foreach (UndoFoldedStep record in writer.Folded.Steps.Values)
         {
             if (record.State != UndoStepState.Interrupted) continue;
+            if (onlyStepsOfFiles && !ChangesOnlyFiles(record.Step)) continue;
             string key = UndoProcessMemory.KeyOf(journal.Folder) + "#" + record.Seq;
             if (journal.Memory.HasTidied(key)) continue;
             if (RootOf(record.Step, journal) is not { } root) continue;
@@ -536,6 +546,16 @@ internal static class UndoRecovery
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { allGone = false; }
             if (allGone) journal.Memory.NoteTidied(key);
         }
+    }
+
+    /// <summary>Whether every op of the step changes a file in place (<c>writeFile</c>, <c>editLine</c>, <c>replaceText</c>, <c>editJSON</c>) or is a <c>recompute</c>: nothing it stages is a folder or a moved item (the mac's <c>changesOnlyFiles</c>).</summary>
+    internal static bool ChangesOnlyFiles(UndoStep step)
+    {
+        foreach (UndoOp op in step.Ops)
+        {
+            if (op.Kind is not (UndoOp.WriteFile or UndoOp.EditLine or UndoOp.ReplaceText or UndoOp.EditJson or UndoOp.Recompute)) return false;
+        }
+        return true;
     }
 
     // ---- Kept originals (the mac's U3c) --------------------------------------------

@@ -331,6 +331,15 @@ internal static class NamedGapLedger
     internal const string UndoTraces = "undo-traces.json → traces";
 
     /// <summary>
+    /// <c>undo-traces.json</c> → <c>actionTraces</c>, by trace <c>name</c>: a
+    /// trace whose recorded step has <c>moves</c> (U3b's rollover, W7c) or
+    /// <c>members</c> and <c>trees</c> (U4a's Course Settings and Add folder,
+    /// W8), which this replay does not make yet. A held trace must still stop
+    /// at its step (<c>UndoActionTraceContractTests.EveryCallOfEveryActionTrace</c>).
+    /// </summary>
+    internal const string UndoActionTraces = "undo-traces.json → actionTraces";
+
+    /// <summary>
     /// <c>shared-rules.json</c> → <c>undo.recoveryCases</c>, by case <c>name</c>:
     /// a case that needs a key this replay does not check yet (U2b's
     /// <c>withAMove</c>, <c>withATree</c>, <c>withAPreference</c>,
@@ -445,6 +454,7 @@ internal static class NamedGapLedger
     private const string Reason899Measured = "Windows refuses these editJSON cases until its key order and number reading are measured to match the mac's Foundation (#899 W6 review 2): the mac sorts keys beyond ASCII by Unicode collation, takes canonically equivalent keys (an accent written two ways, the Kelvin sign and K) and a key or text with a byte-order mark in front for one, and reads a number with an exponent and more than 17 digits, or more than 38 without, as a decimal number or not at all; Windows answers cannot tell, or refuses to write, rather than guess";
     private const string Reason899W4cKeptAlert = "the mac's U3c for #899 (Russell's rulings of 2026-11-20, night): when Show on Front Page goes in while another program edits the page at that instant, what the page held is kept in a hidden file beside it and ONE alert names it (keptTitle, kept), with OK, the default, and a button that shows the kept file selected in its folder (showKept: Show in Finder on the mac, Show in File Explorer here, as workingFolderPathBar's reveal; what File Explorer does for a hidden file is to be measured before it is built). When the kept file is gone by the time the button is pressed, keptGone is said instead and nothing is shown (the mac's U4a, from U3c review 3). Windows' W4c builds the part-way outcome this alert reports; until it lands Windows has no part-way front page to report and says none of these";
     private const string Reason899W4cWithW7 = "the merge of the mac's U3b and U3c for #899 (2026-11-20): a rollover's Undo needs no content from the list, so no kept original is looked for for a moveApart or a setAside, and a rollover's Undo that leaves its record apart never touches another step's kept original, which is still used by its hash; Windows runs these once both W4c (kept-original recovery) and W7 (the rollover as a step) have landed, whichever is later; until then this replay does not know the calls and keys those cases use";
+    private const string Reason899W8U4a = "the mac's U4a for #899 (2026-11-20): Course Settings and Set School Year as editJSON ops made member by member (members, the member rule's bytes of undo-json-cases.json → editJSONCases) and Add folder as one createTree (trees); Windows' W8 makes those steps from its own actions, and until then this replay makes no step with members or trees";
     private const string Reason899W7U3b = "the mac's U3b for #899 (2026-11-20): the rollover as one step, whose site markers are the op kind moveApart (judged as move, but an Undo or Redo that finds it changed since leaves it and goes on with the rest: Russell's ruling of 2026-11-19 on Q3, #959), and a step's moveApart ops move as a group, all left apart when any one is changed since (the director's decision of 2026-11-20), as is a deploy set for later the swap cannot set at an Undo or Redo (the U3b review's LOW 3); a leftover no deploy reads is the op kind setAside, judged as move and standing apart ON ITS OWN, never one of that group, and a deploy set for later put back whose job will start only at the next login is named in startsAtTheNextLogin with its own sentence, undoScheduleStartsAtTheNextLogin (U3b's fix round three, 2026-11-20; which record a deploy reads is undo.netlifyRecordCases, which W7 runs as well); Windows' W7 for #899 builds it (documentation 12, the W7 row); until it lands this app's reader takes moveApart for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
 
     /// <summary>
@@ -625,6 +635,13 @@ internal static class NamedGapLedger
              "U3b, a leftover: with nothing changed between, Undo puts the record and the leftover back with the rest and leaves nothing apart",
              "U3b: a deploy set for later put back at Undo whose job the computer will not start now, and which cannot be taken away again, starts at the next login: named as such, never as left apart and never as simply back (the re-review of U3b's fixes, LOW 2); the rest is taken back"),
         Owed(AssistWordingKeys, 899, V200, Reason899W7U3b, "undoScheduleStartsAtTheNextLogin"),
+        Owed(UndoActionTraces, 899, V200, Reason899W7U3b,
+             "action-121", "action-122", "action-123", "action-124", "action-125", "action-126",
+             "action-127", "action-128", "action-129", "action-130", "action-131", "action-132"),
+        Owed(UndoActionTraces, 899, V200, Reason899W8U4a,
+             "action-133", "action-134", "action-135", "action-136", "action-137", "action-138",
+             "action-139", "action-140", "action-141", "action-142", "action-143", "action-144",
+             "action-145", "action-146", "action-147", "action-148", "action-149", "action-150"),
         Owed(UndoStackCases, 899, V200, Reason899W4cWithW7,
              "U3b with U3c: the Undo of a rollover of only its records, a leftover and the year, with the list's content gone, needs nothing from it (each record and leftover is a rename judged by its hash, the school year a member derived from the file), so no kept original is looked for and the Undo goes, never refused for content missing",
              "U3c with U3b: a later rollover's Undo that leaves its record apart keeps an earlier page's kept original beside it, untouched",

@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Models;
 using Plantoir.Core.Undo;
 using Plantoir.Mcp;
 
