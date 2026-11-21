@@ -7973,9 +7973,9 @@ selected course's noun in `SidebarMenuCommands.classNoun` (beside the
 situation, not in it, since it greys nothing), and `SectionMenu`'s
 `CommandMenu` title reads it, Classes with no window in front. Every sentence
 that names the menu for a club follows: the two club sentences ("Add them
-from the Meetings menu"), `sectionIsChangingFromTheMeetingsMenu` ("the
+with Meetings ▸ Meeting Dates…" since #1027), `sectionIsChangingFromTheMeetingsMenu` ("the
 Section or Meetings menu"), the trail's backup lines and "ran from a menu"
-paths ("Meetings ▸ Make Room for Classes…"), and the Backups list's
+paths ("Meetings ▸ Make Room for Meetings…" since #1027), and the Backups list's
 sentences, which read the noun of the backup's course when drawn
 (`WorkspaceModel.classNoun(ofCourse:)`; a backup of a course no longer in
 the folder is read by its code, a club's code meaning meetings). The file
