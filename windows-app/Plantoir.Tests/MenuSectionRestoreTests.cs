@@ -264,7 +264,7 @@ public sealed class MenuSectionRestoreTests : IDisposable
         Assert.StartsWith(OneSectionRestoreWording.LeftAsItWas(2, ""), message);
         Assert.Equal(courseBefore, SectionSwapFixture.Snapshot(_fixture.CourseDir));
         Assert.False(Directory.Exists(Path.Combine(_fixture.CoursesDir, ".internal")), "nothing left in .internal\\restoring");
-        Assert.DoesNotContain("section restored", _fixture.Trail());
+        Assert.DoesNotContain("put the section back from", _fixture.Trail());
     }
 
     [Fact]

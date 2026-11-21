@@ -64,9 +64,8 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
         string archive = Assert.Single(Archived().Except(before));
         Assert.Equal(archive, result.ArchivePath);
         Assert.Equal("a, as backed up", File.ReadAllText(Path.Combine(_fixture.Section2, "a.md")));
-        Assert.Contains("section restored", _fixture.Trail());
-        Assert.Contains(ActivityTrail.RestoredOneSectionFromTheMenuLine(Path.GetFileName(backup.FilePath), Path.GetFileName(archive), 0, 0), _fixture.Trail());
-        Assert.DoesNotContain("page settings left as they were", _fixture.Trail());
+                Assert.Contains(ActivityTrail.RestoredOneSectionFromTheMenuLine(Path.GetFileName(backup.FilePath), Path.GetFileName(archive), 0, 0), _fixture.Trail());
+        Assert.DoesNotContain("left the settings of", _fixture.Trail());
     }
 
     [Fact]
@@ -81,7 +80,6 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
 
         Assert.True(result.Finished, result.Message);
         Assert.Contains(ActivityTrail.PageSettingsLeftAsTheyWereLine("putting the section back from a backup", 1), _fixture.Trail());
-        Assert.Contains("page settings left as they were", _fixture.Trail());
     }
 
     // ---- a refused click archives nothing ------------------------------------
@@ -101,7 +99,7 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
         Assert.Equal(OneSectionRestoreWording.Busy(2, "ICS3U"), result.Message);
         Assert.Equal(before, Archived());
         Assert.Equal(sectionBefore, SectionSwapFixture.Snapshot(_fixture.Section2));
-        Assert.DoesNotContain("section restored", _fixture.Trail());
+        Assert.DoesNotContain("put the section back from", _fixture.Trail());
     }
 
     [Fact]
@@ -152,7 +150,7 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
         Assert.NotNull(result.ArchivePath);
         Assert.True(File.Exists(result.ArchivePath));
         Assert.Equal(sectionBefore, SectionSwapFixture.Snapshot(_fixture.Section2));
-        Assert.DoesNotContain("section restored", _fixture.Trail());
+        Assert.DoesNotContain("put the section back from", _fixture.Trail());
     }
 
     // ---- the dialog, as the source builds it ---------------------------------
@@ -168,7 +166,7 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
     public void TheOfferedDialogDefaultsToRestoreSectionN()
     {
         string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SidebarPane.xaml.cs"));
-        var block = Regex.Match(source, @"if \(offered is int section\)\s*\{(?<body>.*?)\n        \}\n", RegexOptions.Singleline);
+        var block = Regex.Match(source, @"if \(offered is int section\)\s*\{(?<body>.*?)\r?\n        \}\r?\n", RegexOptions.Singleline);
         Assert.True(block.Success, "the offered dialog is not where the scan looks");
         string body = block.Groups["body"].Value;
         Assert.Contains("Title = OneSectionRestoreWording.Title(item.CourseCode)", body);
