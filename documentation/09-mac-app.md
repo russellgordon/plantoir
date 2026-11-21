@@ -21236,19 +21236,50 @@ what it replaced", from the first review's fix round).
   blob and the outgoing bytes as the other direction's blob when they hash
   to the recorded sha. When the list will not take the outgoing content (a
   full or read-only disk: the contract's `contentCannotBeStored`), the swap
-  is told to keep that page's original (`keepingTheOriginalsOf`), the other
-  direction is never offered (after an Undo the redo branch is dropped,
-  after a Redo the list is cleared, reason `contentMissing`, as the refusal
-  of its Undo would clear it), and "undo kept what it replaced" names the
-  hidden file. Recovery does the same before its put-back's swap; it keeps
-  the outgoing content only for a step that stays on the list (an undo or a
-  redo ending where it began: a change rolled back leaves the list, and what
-  it set aside is its own new content), naming it with "undo kept what a
-  page held". Rejected: leaving the Redo offered because the kept outgoing
-  file would let a later put-back find it by hash (it is a hidden file the
-  list does not own, which a sync or a tidy-minded teacher can remove; an
-  offer must not rest on it); writing the blobs after the swap (a death
-  between the two would lose them).
+  is told to keep that page's original (`keepingTheOriginalsOf`), and "undo
+  kept what it replaced" names the hidden file. Recovery does the same
+  before its put-back's swap; it keeps the outgoing content only for a step
+  that stays on the list (an undo or a redo ending where it began: a change
+  rolled back leaves the list, and what it set aside is its own new
+  content), naming it with "undo kept what a page held". Rejected: writing
+  the blobs after the swap (a death between the two would lose them).
+- **A kept original whose own bytes the list will not take stays (the
+  second review of U3c, MEDIUM).** `storeWhatKeptOriginalsGive` ignored a
+  failed write of the kept bytes. With only that blob gone and its folder
+  taking no new file (the contract's `beforeContentGoneAndCannotBeStored`;
+  `contentCannotBeStored` could not see it, since it takes the whole folder
+  and the other blob is then always missing too), the Undo put the page back
+  from the kept `-apply-orig`, the tidy removed it as a copy of its page, the
+  Redo was real, and the Redo's swap tidied its own copy of the before bytes:
+  they were in no file, and the Undo the list offered came to
+  `contentMissing`. It now answers `UndoWhatTheListCouldNotTake`, whose
+  `keptOriginalsHolding` carries the hash of every kept original's bytes the
+  list did not take, and the door's tidy and recovery's settled tidy pass it
+  as `keepingCopiesHolding`: a kept original holding one of those hashes is
+  never removed for being a copy of its page. The next move that uses it
+  tries the write again, and once the list takes the bytes the kept
+  original goes as before. The line "undo kept what it replaced" names it as
+  what the page "holds now"; recovery names it with "undo kept what a page
+  held", "because the list no longer holds a copy of it".
+- **An offer may rest on a kept file (Russell's ruling of 2026-11-20,
+  night; the second review of U3c, LOWs 1 and 2).** After an Undo or a Redo
+  whose other side the list cannot store, the step stays on the list with
+  the other direction offered, resting on the files kept beside its pages,
+  exactly as recovery's offers already did (`-recover-orig`, found by hash).
+  If such a file is gone or changed when the Undo or Redo is chosen, it is
+  refused then with its true sentence, and the list answers that refusal as
+  any other (ruling 13 or 22 for an Undo, ruling 20 for a Redo). Rejected,
+  and replaced: the door dropping the Redo, or clearing the whole list after
+  a Redo, because "an offer must not rest on" a hidden file. Clearing after
+  a Redo that succeeded predicts a refusal that may never come and costs the
+  teacher the whole history on a full disk; withholding only that step's
+  Undo would strand every older step behind it on a linear list, a clearing
+  in all but name. Dropping that clearing also took the door's second lock
+  away (LOW 1: the drop or clear ran after the finish under a lock of its
+  own, so another process acting between the two left the trail line saying
+  "not offered" untruly, and a kill between them left the state the old
+  "Rejected" paragraph forbade): the move now writes once, and its trail
+  line says nothing of an offer withheld, because none is.
 - **A kept original that cannot be read just now (LOW 5)** (a cloud
   placeholder not downloaded, a permission) is "cannot tell now", never "no
   match": `UndoRecovery.keptOriginal(couldNotRead:)` reports it, recovery
@@ -21318,18 +21349,38 @@ what it replaced", from the first review's fix round).
   names the kept file. The Section window shows one alert naming it
   (Russell's ruling of 2026-11-20, night): "The front page now shows
   {class}." / "What the front page held a moment before is kept beside it,
-  hidden, as “{kept}”." with one OK, never "The Front Page Was Not
-  Changed" (`class-planning.json` → `todaysClassOnTheFrontPage.wording`,
-  `keptTitle` and `kept`). Apple's HIG Alerts page, read that night: a
-  title that is a complete sentence takes sentence-style capitals and a
-  full stop; "OK" only in a purely informational alert; one default
-  button. The alert is shown once the question has gone, before whatever
-  the preview then says, which waits behind it (`frontPageKept`,
+  hidden, as “{kept}”." with OK and Show in Finder, never "The Front Page
+  Was Not Changed" (`class-planning.json` → `todaysClassOnTheFrontPage.wording`,
+  `keptTitle`, `kept` and `showKept`). Apple's HIG Alerts page, read that
+  night: a title that is a complete sentence takes sentence-style capitals
+  and a full stop; "OK" for acceptance in an informational alert; a button
+  title is a verb phrase naming its result, title-style; the default button
+  on the trailing side of a row or at the top of a stack; and "avoid using
+  an alert merely to provide information … informative, but not
+  actionable", which the second review raised (LOW 3: the teacher could not
+  find the file the alert named). **Show in Finder (Russell's second ruling
+  of 2026-11-20, night)** is beside OK on both kept-file alerts, today's
+  class's and the Class Dates sheet's; OK stays the default
+  (`.keyboardShortcut(.defaultAction)`), and either button closes the alert
+  and carries on. It shows the kept files selected in their folder
+  (`FolderActions.showInFinder(files:)`, `NSWorkspace.activateFileViewerSelecting`).
+  Measured on this Mac that night before it was built, with Finder not
+  showing hidden files (no `AppleShowAllFiles`): asked to show a file whose
+  name starts with a dot, Finder opened its folder with the file listed,
+  greyed, and selected ("1 of 2 selected"), so the button never opens a
+  folder in which the file cannot be seen, and the app never changes
+  Finder's settings. The alert is shown once the question has gone, before
+  whatever the preview then says, which waits behind it (`frontPageKept`,
   `afterThePreviewAlert`). It is proved through the real window
-  (`TodaysClassOnTheFrontPageUITests.testShowGoingInPartWayNamesTheKeptFileInOneAlert`)
-  with the debug-only `--ui-test-edit-races-the-swap <file name>`
-  (`UndoUITestSeam`, honoured only beside `--state-dir`), which makes the
-  first swap of that file race an in-place edit with the put-back failing.
+  (`TodaysClassOnTheFrontPageUITests.testShowGoingInPartWayNamesTheKeptFileInOneAlert`,
+  which also checks OK is the default and trailing, and
+  `testShowInFinderShowsTheKeptFileItNames`) with the debug-only
+  `--ui-test-edit-races-the-swap <file name>` (`UndoUITestSeam`, honoured
+  only beside `--state-dir`), which makes the first swap of that file race
+  an in-place edit with the put-back failing, and
+  `--ui-test-record-show-in-finder <file>`, which writes what Show in
+  Finder was asked to show into that file instead of bringing Finder to
+  the front.
   The plain-words check of that wording runs with `{kept}` filled by a
   placeholder: the hidden name is the app's, and holds "index".
 - **How I Teach (LOW 4)** is said as part way with no pointer at a copy of a
