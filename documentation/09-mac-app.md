@@ -21209,7 +21209,8 @@ Russell's ruling of 2026-11-20, 15:20, and the third review of U3a's six
 lows. The contract is `undo.rule.recovery` (its "WHAT STAYS FOR GOOD"
 sentence and the kept-original sentences), `file-formats.json` →
 `undoJournal.stagedFiles`, the `recoveryCases` and `stackCases` rows marked
-U3c, and three `activityTrail.mustRecord` events.
+U3c, and four `activityTrail.mustRecord` events (the fourth, "undo kept
+what it replaced", from the first review's fix round).
 
 - **A kept original puts the page back.** `UndoCheck.plan(keptOriginal:)`
   asks, for a `writeFile` whose blob the list no longer holds, for a kept
@@ -21222,6 +21223,38 @@ U3c, and three `activityTrail.mustRecord` events.
   one used once the swap went in. A kept original that does not match is
   never used. Rejected: trusting a kept original by its name alone; a file
   someone edited is then put back as if it were the record.
+- **Nothing a put-back sets aside is lost (the first review of U3c,
+  MEDIUM).** The swap that puts a page back from its kept original keeps
+  what the page held a moment before as its own `-undo-orig`, `-redo-orig`
+  or `-recover-orig`, and its tidy deletes it; with the list's content gone,
+  that was the only copy of the step's other side, and the Redo the Undo
+  then offered came to contentMissing (the reviewer's probe: "offered [1],
+  not [1, 2]"). Now `UndoCheck.plan(keptOriginalUsed:)` reports each use
+  (`UndoKeptOriginalUse`: the kept bytes, the other direction's sha, and what
+  the page holds at that op), and `UndoRecovery.storeWhatKeptOriginalsGive`,
+  inside the lock and before the swap, writes the kept bytes back as their
+  blob and the outgoing bytes as the other direction's blob when they hash
+  to the recorded sha. When the list will not take the outgoing content (a
+  full or read-only disk: the contract's `contentCannotBeStored`), the swap
+  is told to keep that page's original (`keepingTheOriginalsOf`), the other
+  direction is never offered (after an Undo the redo branch is dropped,
+  after a Redo the list is cleared, reason `contentMissing`, as the refusal
+  of its Undo would clear it), and "undo kept what it replaced" names the
+  hidden file. Recovery does the same before its put-back's swap; it keeps
+  the outgoing content only for a step that stays on the list (an undo or a
+  redo ending where it began: a change rolled back leaves the list, and what
+  it set aside is its own new content), naming it with "undo kept what a
+  page held". Rejected: leaving the Redo offered because the kept outgoing
+  file would let a later put-back find it by hash (it is a hidden file the
+  list does not own, which a sync or a tidy-minded teacher can remove; an
+  offer must not rest on it); writing the blobs after the swap (a death
+  between the two would lose them).
+- **A kept original that cannot be read just now (LOW 5)** (a cloud
+  placeholder not downloaded, a permission) is "cannot tell now", never "no
+  match": `UndoRecovery.keptOriginal(couldNotRead:)` reports it, recovery
+  leaves the step for the next try (`leftByRecovery`, so an Undo answers
+  `cannotTellNow`), and the door answers `cannotTellNow` with the list kept
+  instead of `contentMissing`, which clears it.
 - **Nothing that is an only copy is deleted.** A kept original FILE is
   removed only when its bytes are its page's (`UndoSwap.isACopyOfItsPlace`)
   or exactly what the list gives for its page, undone or redone from what
@@ -21232,14 +21265,23 @@ U3c, and three `activityTrail.mustRecord` events.
   racing edit's only copy was tidied away when the step settled (LOW 1;
   `recoveryCases` "a step whose first page was edited in place by another
   program as the swap went in…"). Every tidy keeps such a file: recovery's
-  before it plans, after a step settles, at a `couldNotPutBack` closing, of
+  before it plans (which since the first review of U3c, LOW 1, keeps every
+  kept original that differs from its page, even one the list gives, and
+  tidies those only once the plan is ready: another page may yet stop the
+  put-back and the list be cleared, and then the first page's kept original
+  is the only copy), after a step settles, at a `couldNotPutBack` closing, of
   a step already closed (live too now, since nothing will put a closed
   step's page back and its content is pruned with it), and pruning's.
 - **What the trail says.** `couldNotPutBack` writes "undo could not put back
   a change that stopped" (no longer the "changed by hand since" line, which
   was untrue there), naming each kept original left, read after the tidy. A
-  step that settles with one left writes "undo kept what a page held". Both
-  give the page and the hidden name, never page text.
+  step that settles with one left writes "undo kept what a page held",
+  saying why for each: "because it differs from what the list recorded"
+  (its hash is nothing the journal recorded for the page: a racing edit), or
+  "because the list no longer holds a copy of it" (its hash is exactly a
+  recorded before or after whose content is gone; the first review of U3c,
+  LOW 2, where "it differs" was untrue). Both give the page and the hidden
+  name, never page text.
 - **An Undo or Redo refused for a step left part way (W3's LOW 4, from
   W4).** When the newest step is a gone process's that recovery, run at once
   by the Undo, tried and left (a file in use, a page it cannot read now),
@@ -21251,19 +21293,45 @@ U3c, and three `activityTrail.mustRecord` events.
   unique across two Macs syncing one folder or after a list is started
   again, and an earlier undo of the same step can leave its kept original
   for good. `swapAFile` no longer removes whatever holds the `-orig` name:
-  it keeps its original under the next free `-<n>-orig`. Rejected: a label
+  it keeps its original under the next free `-<n>-orig`
+  (`UndoSwap.freeKeptName`), and since the first review of U3c a folder a
+  tree op sets aside takes the next free name too (LOW 3: it was refused
+  `fileIsInUse` for good). A file that appears at the chosen name after it
+  was found free is never overwritten or removed (LOW 4): `keep` answers
+  `EEXIST` from `link` without falling back to a copy, the copy itself is
+  `COPYFILE_EXCL` (`keepByCopying`), and the swap takes the next free name.
+  Rejected: a label
   carrying a machine and list identity (it changes the staged-name format
   both platforms parse, for a case the next free name settles); refusing
   (a step whose undo once kept an edit could then never be undone again).
 - **Class dates and today's class left part way (LOWs 2 and 3).**
   `SectionTimetableStore.applyRememberTimetable` passes
   `JournaledStepError.leftPartWay` through; the class-dates sheet says the
-  dates ARE remembered and names the kept file
-  (`Problem.savedWithWhatItHeldKept`), the assistant says it as part way.
-  Today's class answers `.shownKeepingWhatItHeld`, and its trail line names
-  the kept file. What the Section window shows of that is held on a HIG
-  question (the HIG page could not be read that evening), so the window
-  behaves as for `.shown`.
+  dates ARE remembered and the assistant says it as part way. Since the
+  first review of U3c (LOW 6) the Class Dates sheet carries on exactly as a
+  plain save does (`SectionScheduleSheet.save` answers
+  `.rememberedKeeping`): one alert, "The class dates for … are
+  remembered." naming the kept file, whose OK calls `onRemembered` and
+  closes the sheet, so a verb waiting on the dates (`afterTheDates`)
+  continues; before, it was a `.blocking` status line and nothing waiting
+  ran. Today's class answers `.shownKeepingWhatItHeld`, and its trail line
+  names the kept file. The Section window shows one alert naming it
+  (Russell's ruling of 2026-11-20, night): "The front page now shows
+  {class}." / "What the front page held a moment before is kept beside it,
+  hidden, as “{kept}”." with one OK, never "The Front Page Was Not
+  Changed" (`class-planning.json` → `todaysClassOnTheFrontPage.wording`,
+  `keptTitle` and `kept`). Apple's HIG Alerts page, read that night: a
+  title that is a complete sentence takes sentence-style capitals and a
+  full stop; "OK" only in a purely informational alert; one default
+  button. The alert is shown once the question has gone, before whatever
+  the preview then says, which waits behind it (`frontPageKept`,
+  `afterThePreviewAlert`). It is proved through the real window
+  (`TodaysClassOnTheFrontPageUITests.testShowGoingInPartWayNamesTheKeptFileInOneAlert`)
+  with the debug-only `--ui-test-edit-races-the-swap <file name>`
+  (`UndoUITestSeam`, honoured only beside `--state-dir`), which makes the
+  first swap of that file race an in-place edit with the put-back failing.
+  The plain-words check of that wording runs with `{kept}` filled by a
+  placeholder: the hidden name is the app's, and holds "index".
 - **How I Teach (LOW 4)** is said as part way with no pointer at a copy of a
   section (documentation 10).
 

@@ -158,10 +158,21 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
         XCTAssertTrue(afterYes.contains("![[Unit 9, Day 2]]"), afterYes)
 
         // One button, OK; it closes the alert and the preview starts.
+        // The alert is the sheet (or dialog) holding the title: its buttons
+        // are exactly one, OK.
+        var alertButtons: [String] = []
+        for container in [application.sheets, application.dialogs] {
+            let holding: XCUIElement = container.containing(.staticText, identifier: "The front page now shows Unit 9, Day 2.").firstMatch
+            if holding.exists {
+                for index in 0..<holding.buttons.count {
+                    let button: XCUIElement = holding.buttons.element(boundBy: index)
+                    alertButtons.append(button.title.isEmpty ? button.label : button.title)
+                }
+            }
+        }
+        XCTAssertEqual(alertButtons, ["OK"], "the alert's buttons")
         let ok: XCUIElement = application.buttons["OK"].firstMatch
         XCTAssertTrue(ok.exists, "the alert has no OK")
-        XCTAssertFalse(application.buttons["Cancel"].firstMatch.exists, "the alert asks for a confirmation")
-        XCTAssertFalse(application.buttons["Show on Front Page"].firstMatch.exists)
         ok.click()
         XCTAssertTrue(application.webViews.firstMatch.waitForExistence(timeout: 90), "The preview did not start after OK")
         XCTAssertFalse(title.exists)
