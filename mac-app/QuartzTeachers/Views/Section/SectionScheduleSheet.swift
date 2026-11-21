@@ -113,6 +113,17 @@ struct SectionScheduleSheet: View {
 
     // MARK: - Computed properties
 
+    /// What this course calls a class: "meeting" in a club (#1027). Every
+    /// sentence the sheet says itself is said in it.
+    var noun: ClassNoun {
+        return course.configuration.classNoun
+    }
+
+    /// The line under the title: what giving the dates buys.
+    var purposeLine: String {
+        return AssistWording.classDatesPurpose(noun: noun)
+    }
+
     /// The types the file picker offers. A `.ics` has no built-in type on
     /// every Mac, so it is named by its extension as well.
     var readableFileTypes: [UTType] {
@@ -232,7 +243,7 @@ struct SectionScheduleSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             // The one sentence that has to be here: a teacher being asked
             // for a column of dates deserves to know what it buys them.
-            Text("Give Plantoir the class dates once, so it can date new class pages for you. They are kept inside the course folder, so they travel with it through backup, archive and restore.")
+            Text(purposeLine)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -393,7 +404,7 @@ struct SectionScheduleSheet: View {
 
     func confirmation(of plan: RememberTimetablePlan) -> some View {
         ScrollView {
-            Text(plan.description)
+            Text(plan.description(noun: noun))
                 .font(.callout)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -477,7 +488,7 @@ struct SectionScheduleSheet: View {
             }
         } catch {
             isFetching = false
-            failure = error.localizedDescription
+            failure = SectionScheduleSheet.sentence(for: error, noun: noun)
             return
         }
 
@@ -500,7 +511,7 @@ struct SectionScheduleSheet: View {
             self.question = nil
             propose(reading)
         } catch {
-            failure = error.localizedDescription
+            failure = SectionScheduleSheet.sentence(for: error, noun: noun)
         }
     }
 
@@ -520,7 +531,7 @@ struct SectionScheduleSheet: View {
                 in: course
             )
         } catch {
-            failure = error.localizedDescription
+            failure = SectionScheduleSheet.sentence(for: error, noun: noun)
         }
     }
 
@@ -555,7 +566,7 @@ struct SectionScheduleSheet: View {
     /// in part way are REMEMBERED (the first review of U3c, LOW 6): what
     /// waits on them carries on once the one alert naming the kept file
     /// closes, never held up by a blocking line.
-    static func save(_ plan: RememberTimetablePlan) -> Remembering {
+    static func save(_ plan: RememberTimetablePlan, noun: ClassNoun) -> Remembering {
         let timetable: SectionTimetable = SectionTimetable(
             sectionNumber: plan.sectionNumber,
             dates: plan.dates,
@@ -566,15 +577,27 @@ struct SectionScheduleSheet: View {
             try SectionTimetableStore.applyRememberTimetable(plan)
         } catch JournaledStepError.leftPartWay(_, _, let keptOriginals) {
             return .rememberedKeeping(RememberedKeeping(
-                title: SectionTimetableStore.Problem.rememberedTitle(plan.courseCode, plan.sectionNumber),
+                title: SectionTimetableStore.Problem.rememberedTitle(plan.courseCode, plan.sectionNumber, noun: noun),
                 message: SectionTimetableStore.Problem.keptMessage(keptOriginals),
                 timetable: timetable,
                 keptFiles: SectionScheduleSheet.keptFiles(keptOriginals, beside: plan.fileURL)
             ))
         } catch {
-            return .notRemembered(error.localizedDescription)
+            return .notRemembered(SectionScheduleSheet.sentence(for: error, noun: noun))
         }
         return .remembered(timetable)
+    }
+
+    /// A refusal as this sheet says it: in the course's noun when it is one
+    /// of the timetable's own (#1027), otherwise the error's own words.
+    static func sentence(for error: Error, noun: ClassNoun) -> String {
+        if let problem = error as? SectionTimetableStore.Problem {
+            return problem.sentence(noun: noun)
+        }
+        if let problem = error as? SectionScheduleSource.Problem {
+            return problem.sentence(noun: noun)
+        }
+        return error.localizedDescription
     }
 
     /// Each kept file's place: beside the file it was kept from.
@@ -587,7 +610,7 @@ struct SectionScheduleSheet: View {
     }
 
     func remember(_ plan: RememberTimetablePlan) {
-        switch SectionScheduleSheet.save(plan) {
+        switch SectionScheduleSheet.save(plan, noun: noun) {
         case .remembered(let timetable):
             onRemembered(timetable)
             dismiss()
@@ -809,9 +832,17 @@ struct SectionScheduleCourseMissingView: View {
 
     // MARK: - Computed properties
 
+    /// The course is gone, so its settings cannot be read: a club is known
+    /// by its code (`ClubCodeRule`), as `WorkspaceModel.classNoun(ofCourse:)`
+    /// knows one it cannot find (#1027).
+    var message: String {
+        let noun: ClassNoun = ClubCodeRule.isClub(courseCode) ? .meeting : .class
+        return AssistWording.classDatesCourseMissing(course: courseCode, noun: noun)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("\(courseCode) could not be found in this working folder, so there is nothing to record class dates against.")
+            Text(message)
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("sectionScheduleCourseMissing")

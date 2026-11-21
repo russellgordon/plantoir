@@ -62,6 +62,25 @@ public sealed class DeployedFolderOfferTests : IDisposable
                         $"{testCase["name"]}: {Spoken(DeployedFolderOffer.Decide(FactsOf(testCase["given"]!)))}");
     }
 
+    /// <summary>
+    /// #1027's review, low 2: a press of Open in Browser drawn live from the
+    /// last read, when the read at the press greys it, says the greyed
+    /// reason (the dimmed item's own sentence), never nothing; an offered or
+    /// absent decision says nothing. MUST FAIL with the press left silent.
+    /// </summary>
+    [Fact]
+    public void APressNoLongerOfferedSaysTheGreyedReason()
+    {
+        foreach (var reason in new[] { "deployIsRunning", "folderNotFound", "notDeployedYet" })
+        {
+            var greyed = new DeployedFolderOffer.Decision(DeployedFolderOffer.Kind.Greyed, reason);
+            Assert.Equal(DeployedFolderOffer.Sentence(reason), DeployedFolderOffer.SaidAtAPressNoLongerOffered(greyed));
+            Assert.NotNull(DeployedFolderOffer.SaidAtAPressNoLongerOffered(greyed));
+        }
+        Assert.Null(DeployedFolderOffer.SaidAtAPressNoLongerOffered(DeployedFolderOffer.Decision.Offered));
+        Assert.Null(DeployedFolderOffer.SaidAtAPressNoLongerOffered(DeployedFolderOffer.Decision.Absent));
+    }
+
     [Fact]
     public void TheDefaultsAreTheContracts()
     {

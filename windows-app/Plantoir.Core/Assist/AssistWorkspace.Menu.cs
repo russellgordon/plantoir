@@ -204,6 +204,16 @@ public sealed partial class AssistWorkspace
     internal static string NothingWasChanged(Exception error) => "Nothing was changed: " + ReasonItStopped(error);
 
     /// <summary>
+    /// A copy whose new page could not be made: nothing was created — the
+    /// mac's "Nothing was created: {error}" (its <c>saidWhenTheStepStopped</c>
+    /// with <c>nothing:</c>), the reason said as <see cref="ReasonItStopped"/>
+    /// says it, so a permission is plain words and never a .NET message
+    /// (#1027's review, low 3). In no contract on either side, as
+    /// <see cref="NothingWasChanged"/> is not.
+    /// </summary>
+    internal static string NothingWasCreated(Exception error) => "Nothing was created: " + ReasonItStopped(error);
+
+    /// <summary>
     /// A publish, hide or re-date that failed while writing (#550). After a
     /// write it is noted as a change with no undo entry and the caller
     /// rethrows, so the part-way sentence is said; before any write it is

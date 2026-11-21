@@ -177,14 +177,14 @@ public sealed partial class AssistWorkspace
             // Not there, and still not made (a path too long, a cloud-file
             // error, a drive gone): said as what it is, never "already there"
             // (lane B review, low 4; the mac matches only fileWriteFileExists).
-            throw new AssistRefusal($"Nothing was created: {error.Message}");
+            throw new AssistRefusal(NothingWasCreated(error));
         }
         catch (Exception error) when (created)
         {
             // This call made the file, so a half-written one goes; the copy
             // of the course saved first is the way back for anything else.
             try { File.Delete(request.NewPath); } catch { }
-            throw new AssistRefusal($"Nothing was created: {error.Message}");
+            throw new AssistRefusal(NothingWasCreated(error));
         }
         // Changed, with no entry on the old list (see the remarks above), so
         // the trail's "ran from a menu" line says "carried out".

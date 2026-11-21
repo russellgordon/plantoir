@@ -133,6 +133,7 @@ enum AssistContract {
         let course: String = coursePlaceholder
         let section: String = sectionPlaceholder
         let assistant: String = assistantPlaceholder
+        let place: String = "\(course) Section \(section)"
         let table: [String: String] = [
             "deployApproval": AssistWording.deployApproval,
             "deployQuestion": AssistWording.deployQuestion,
@@ -613,6 +614,31 @@ enum AssistContract {
             "datesToReplaceForAMeeting": AssistWording.datesToReplace(
                 for: "\(course) Section \(section)", noun: .meeting
             ),
+            // #1027: the Class Dates sheet's own sentences, each with its twin.
+            "classDatesPurpose": AssistWording.classDatesPurpose(),
+            "classDatesPurposeForAMeeting": AssistWording.classDatesPurpose(noun: .meeting),
+            "classDatesCourseMissing": AssistWording.classDatesCourseMissing(course: course),
+            "classDatesCourseMissingForAMeeting": AssistWording.classDatesCourseMissing(course: course, noun: .meeting),
+            "classDatesNoneGiven": AssistWording.classDatesNoneGiven(place: place),
+            "classDatesNoneGivenForAMeeting": AssistWording.classDatesNoneGiven(place: place, noun: .meeting),
+            "classDatesNotWrittenAsDates": AssistWording.classDatesNotWrittenAsDates(offenders: "2026-13-01", count: 1, place: place),
+            "classDatesNotWrittenAsDatesForAMeeting": AssistWording.classDatesNotWrittenAsDates(offenders: "2026-13-01", count: 1, place: place, noun: .meeting),
+            "classDatesOnFileUnreadable": AssistWording.classDatesOnFileUnreadable(offenders: "the file is not readable JSON", count: 1, place: place),
+            "classDatesOnFileUnreadableForAMeeting": AssistWording.classDatesOnFileUnreadable(offenders: "the file is not readable JSON", count: 1, place: place, noun: .meeting),
+            "classDatesTooFarFromToday": AssistWording.classDatesTooFarFromToday(offenders: "2569-09-08", count: 1, place: place),
+            "classDatesTooFarFromTodayForAMeeting": AssistWording.classDatesTooFarFromToday(offenders: "2569-09-08", count: 1, place: place, noun: .meeting),
+            "classDatesCouldNotBeSaved": AssistWording.classDatesCouldNotBeSaved(place: place, reason: "{reason}"),
+            "classDatesCouldNotBeSavedForAMeeting": AssistWording.classDatesCouldNotBeSaved(place: place, reason: "{reason}", noun: .meeting),
+            "classDatesAreRemembered": AssistWording.classDatesAreRemembered(place: place),
+            "classDatesAreRememberedForAMeeting": AssistWording.classDatesAreRemembered(place: place, noun: .meeting),
+            "classDatesSetAside": AssistWording.classDatesSetAside(naming: "2569-09-08"),
+            "classDatesSetAsideForAMeeting": AssistWording.classDatesSetAside(naming: "2569-09-08", noun: .meeting),
+            "classDatesAlreadyRecorded": AssistWording.classDatesAlreadyRecorded(count: 12, place: place),
+            "classDatesAlreadyRecordedForAMeeting": AssistWording.classDatesAlreadyRecorded(count: 12, place: place, noun: .meeting),
+            "classDatesToRemember": AssistWording.classDatesToRemember(count: 12, place: place, first: "2026-09-08 (Tuesday)", last: "2026-12-15 (Tuesday)"),
+            "classDatesToRememberForAMeeting": AssistWording.classDatesToRemember(count: 12, place: place, first: "2026-09-08 (Tuesday)", last: "2026-12-15 (Tuesday)", noun: .meeting),
+            "classDatesHalfRead": AssistWording.classDatesHalfRead(offenders: "2026-13-01", count: 1, from: "the pasted dates"),
+            "classDatesHalfReadForAMeeting": AssistWording.classDatesHalfRead(offenders: "2026-13-01", count: 1, from: "the pasted dates", noun: .meeting),
             "datesForTheNextPage": AssistWording.datesForTheNextPage(),
             "datesForTheNextPageForAMeeting": AssistWording.datesForTheNextPage(noun: .meeting),
             "datesToDuplicate": AssistWording.datesToDuplicate(),

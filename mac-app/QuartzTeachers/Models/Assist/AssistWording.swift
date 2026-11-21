@@ -1576,6 +1576,111 @@ nonisolated enum AssistWording {
         return "The next \(noun.singular) would fall on \(day)."
     }
 
+    // #1027: the Class Dates sheet's own sentences (Meetings ▸ Meeting Dates…
+    // in a club), each with a "meeting" twin. The sheet says them in the
+    // course's noun; every other caller (a tool result the model reads, the
+    // store's refusal to `remember_timetable`) keeps the default, class.
+
+    /// The line under the sheet's title: what giving the dates buys.
+    static func classDatesPurpose(noun: ClassNoun = .class) -> String {
+        return "Give Plantoir the \(noun.singular) dates once, so it can date new \(noun.singular) pages for you. "
+             + "They are kept inside the course folder, so they travel with it through backup, archive and restore."
+    }
+
+    /// Said in place of the sheet when the course it was opened for is gone.
+    static func classDatesCourseMissing(course: String, noun: ClassNoun = .class) -> String {
+        return "\(course) could not be found in this working folder, so there is nothing to record "
+             + "\(noun.singular) dates against."
+    }
+
+    /// A list with no dates in it.
+    static func classDatesNoneGiven(place: String, noun: ClassNoun = .class) -> String {
+        return "No \(noun.singular) dates were given for \(place), so there is nothing to remember."
+    }
+
+    /// A list holding something that is not a date written as 2026-09-08.
+    ///
+    /// - Parameter offenders: already listed, "2026-13-01 and 2026-14-01".
+    static func classDatesNotWrittenAsDates(
+        offenders: String, count: Int, place: String, noun: ClassNoun = .class
+    ) -> String {
+        let subject: String = count == 1 ? "isn’t a date" : "aren’t dates"
+        return "\(offenders) \(subject) written as 2026-09-08, so nothing was remembered for \(place). "
+             + "A half-remembered timetable would date the wrong \(noun.plural), so the whole list is refused "
+             + "— send it again with those corrected."
+    }
+
+    /// A remembered timetable on disk that cannot be read whole.
+    static func classDatesOnFileUnreadable(
+        offenders: String, count: Int, place: String, noun: ClassNoun = .class
+    ) -> String {
+        let entries: String = count == 1 ? "an entry" : "entries"
+        return "The remembered timetable for \(place) has \(entries) that cannot be read — \(offenders). "
+             + "It is being ignored rather than half-trusted. Record the \(noun.singular) dates again."
+    }
+
+    /// A list holding a date too far from today to be believed.
+    static func classDatesTooFarFromToday(
+        offenders: String, count: Int, place: String, noun: ClassNoun = .class
+    ) -> String {
+        let tooFar: String = count == 1
+            ? "is too far from today to be a \(noun.singular) date"
+            : "are too far from today to be \(noun.singular) dates"
+        let corrected: String = count == 1 ? "that date" : "those dates"
+        return "\(offenders) \(tooFar), so nothing was remembered for \(place). "
+             + "A half-remembered timetable would date the wrong \(noun.plural), so the whole list is refused "
+             + "— send it again with \(corrected) corrected."
+    }
+
+    /// The dates could not be written down.
+    static func classDatesCouldNotBeSaved(place: String, reason: String, noun: ClassNoun = .class) -> String {
+        return "The \(noun.singular) dates for \(place) could not be saved, so they are NOT remembered: \(reason)"
+    }
+
+    /// The dates are written down: the title of the alert said when they
+    /// went in part way, a complete sentence (the HIG's Alerts page).
+    static func classDatesAreRemembered(place: String, noun: ClassNoun = .class) -> String {
+        return "The \(noun.singular) dates for \(place) are remembered."
+    }
+
+    /// The trail line when a remembered timetable is set aside.
+    ///
+    /// - Parameter date: the date that could not be one, "2569-09-08".
+    static func classDatesSetAside(naming date: String, noun: ClassNoun = .class) -> String {
+        return "remembered \(noun.singular) dates set aside: they include \(date), which cannot be a "
+             + "\(noun.singular) date, so they will be asked for again"
+    }
+
+    /// The proposal, when the same dates from the same place are on file.
+    static func classDatesAlreadyRecorded(count: Int, place: String, noun: ClassNoun = .class) -> String {
+        return "\(place) already has exactly these \(count) \(noun.singular) dates recorded, "
+             + "so nothing would change."
+    }
+
+    /// The proposal's first line.
+    ///
+    /// - Parameters:
+    ///   - first: written "2026-09-08 (Tuesday)".
+    ///   - last: written the same way.
+    static func classDatesToRemember(
+        count: Int, place: String, first: String, last: String, noun: ClassNoun = .class
+    ) -> String {
+        let dates: String = count == 1 ? "date" : "dates"
+        return "Remember \(count) \(noun.singular) \(dates) for \(place), from \(first) to \(last)."
+    }
+
+    /// A column read with something in it that is not a date.
+    ///
+    /// - Parameter source: where the column came from, "the pasted dates".
+    static func classDatesHalfRead(
+        offenders: String, count: Int, from source: String, noun: ClassNoun = .class
+    ) -> String {
+        let subject: String = count == 1 ? "isn’t a date" : "aren’t dates"
+        return "\(offenders) \(subject) Plantoir can read, so nothing was taken from \(source). "
+             + "A half-read timetable would date the wrong \(noun.plural), so the whole list is refused "
+             + "— fix those and try again. Dates written 2026-09-08 always work."
+    }
+
     // Why the dates are being asked for — the line under the question on the
     // card, and on the sheet. The teacher's alone: none of these is ever part
     // of a tool result, so each has a "meeting" twin (#267).

@@ -311,6 +311,27 @@ public sealed class ClubNounTests : IDisposable
     /// course in the call's <c>_meta</c> (#1027). MUST FAIL with the sentence
     /// read in the ordinary noun.
     /// </summary>
+    /// <summary>
+    /// #1027's review, low 5: the window's <c>_meta</c> keys are read as text
+    /// or not at all. A number or an object under either key reads as absent
+    /// (the Section menu, the class form) rather than throwing before the call
+    /// begins. MUST FAIL with <c>GetValue&lt;string&gt;</c> put back.
+    /// </summary>
+    [Fact]
+    public void AMetaValueThatIsNotTextReadsAsAbsent()
+    {
+        var meta = new JsonObject
+        {
+            [AssistWorkspace.CourseMetaKey] = 42,
+            [AssistWorkspace.MenuMetaKey] = new JsonObject { ["menu"] = "Classes" },
+        };
+        Assert.Null(AssistWorkspace.MetaText(meta, AssistWorkspace.CourseMetaKey));
+        Assert.Null(AssistWorkspace.MetaText(meta, AssistWorkspace.MenuMetaKey));
+        Assert.Null(AssistWorkspace.MetaText(null, AssistWorkspace.CourseMetaKey));
+        Assert.Null(AssistWorkspace.MetaText(new JsonObject(), AssistWorkspace.CourseMetaKey));
+        Assert.Equal("ICS3U", AssistWorkspace.MetaText(new JsonObject { [AssistWorkspace.CourseMetaKey] = "ICS3U" }, AssistWorkspace.CourseMetaKey));
+    }
+
     [Fact]
     public void NothingToUndoOnAClubsSectionNamesTheMeetingsMenu()
     {
@@ -321,5 +342,40 @@ public sealed class ClubNounTests : IDisposable
         Assert.Contains("the Section or Meetings menu", workspace.NothingToUndoFromTheMenu());
         workspace.MenuCourseOfTheCall = null;
         Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class), workspace.NothingToUndoFromTheMenu());
+    }
+
+    /// <summary>
+    /// #1027's review, MEDIUM 1: Meetings ▸ Meeting Dates… opens the Class
+    /// Dates dialog, and in a club what it says itself is the contract's
+    /// <c>…ForAMeeting</c> twin: the purpose line, the status once the dates
+    /// are read, the refusal of a date too far from today and the refusal of
+    /// a half-read column. What the model reads stays the class form. MUST
+    /// FAIL with any of them said in the ordinary noun.
+    /// </summary>
+    [Fact]
+    public void TheClassDatesDialogSaysMeetingInAClub()
+    {
+        Club("meeting");
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        string Said(string key) => wording[key]!.ToString().Replace("{course}", "ICS3U").Replace("{section}", "1");
+        string folder = Path.Combine(_folder, "courses", "ICS3U");
+        var club = new Course("ICS3U", folder, CourseConfiguration.Load(Path.Combine(folder, "course_config.json")));
+        Assert.Equal(ClassNoun.Meeting, club.Configuration.ClassNoun);
+
+        Assert.Equal(Said("classDatesPurposeForAMeeting"), ClassDatesDialogWords.Purpose(club));
+        Assert.Equal(Said("classDatesTooFarFromTodayForAMeeting"),
+                     ClassDatesDialogWords.CannotBeADate(new DateOnly(2569, 9, 8), club, 1));
+
+        var tuesdays = Enumerable.Range(0, 12).Select(week => new DateOnly(2026, 9, 8).AddDays(7 * week)).ToList();
+        Assert.Equal(Said("classDatesToRememberForAMeeting").Replace("2026-12-15 (Tuesday)", "2026-11-24 (Tuesday)"),
+                     ClassDatesDialogWords.Found(tuesdays, club, 1));
+
+        const string Typed = "2026-09-08\nbanana\n2026-09-10";
+        var asTheDialogReads = Assert.Throws<AssistRefusal>(() => SectionScheduleSource.ReadTypedText(Typed, null, club.Configuration.ClassNoun));
+        Assert.Equal(Said("classDatesHalfReadForAMeeting").Replace("2026-13-01", "“banana”").Replace("the pasted dates", "what you pasted"),
+                     asTheDialogReads.Message);
+        var asTheModelReads = Assert.Throws<AssistRefusal>(() => SectionScheduleSource.ReadTypedText(Typed));
+        Assert.Equal(Said("classDatesHalfRead").Replace("2026-13-01", "“banana”").Replace("the pasted dates", "what you pasted"),
+                     asTheModelReads.Message);
     }
 }

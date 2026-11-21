@@ -326,6 +326,32 @@ public class ContractTests
         Assert.Equal(wording["menuNoVisiblePages"]!.ToString(), AssistWording.MenuNoVisiblePages("{course}", "{section}"));
         Assert.Equal(wording["menuSavingACopy"]!.ToString(), AssistWording.MenuSavingACopy("{course}"));
 
+        // #1027: the Class Dates dialog's own sentences, with the generator's examples.
+        Pair("classDatesPurpose", AssistWording.ClassDatesPurpose(), AssistWording.ClassDatesPurposeForAMeeting());
+        Pair("classDatesCourseMissing", AssistWording.ClassDatesCourseMissing("{course}"),
+             AssistWording.ClassDatesCourseMissingForAMeeting("{course}"));
+        Pair("classDatesNoneGiven", AssistWording.ClassDatesNoneGiven("{course}", "{section}"),
+             AssistWording.ClassDatesNoneGivenForAMeeting("{course}", "{section}"));
+        Pair("classDatesNotWrittenAsDates", AssistWording.ClassDatesNotWrittenAsDates(new[] { "2026-13-01" }, "{course}", "{section}"),
+             AssistWording.ClassDatesNotWrittenAsDatesForAMeeting(new[] { "2026-13-01" }, "{course}", "{section}"));
+        Pair("classDatesOnFileUnreadable",
+             AssistWording.ClassDatesOnFileUnreadable(new[] { "the file is not readable JSON" }, "{course}", "{section}"),
+             AssistWording.ClassDatesOnFileUnreadableForAMeeting(new[] { "the file is not readable JSON" }, "{course}", "{section}"));
+        Pair("classDatesTooFarFromToday", AssistWording.ClassDatesTooFarFromToday(new[] { "2569-09-08" }, "{course}", "{section}"),
+             AssistWording.ClassDatesTooFarFromTodayForAMeeting(new[] { "2569-09-08" }, "{course}", "{section}"));
+        Pair("classDatesCouldNotBeSaved", AssistWording.ClassDatesCouldNotBeSaved("{course}", "{section}", "{reason}"),
+             AssistWording.ClassDatesCouldNotBeSavedForAMeeting("{course}", "{section}", "{reason}"));
+        Pair("classDatesAreRemembered", AssistWording.ClassDatesAreRemembered("{course}", "{section}"),
+             AssistWording.ClassDatesAreRememberedForAMeeting("{course}", "{section}"));
+        Pair("classDatesSetAside", AssistWording.ClassDatesSetAside("2569-09-08"), AssistWording.ClassDatesSetAsideForAMeeting("2569-09-08"));
+        Pair("classDatesAlreadyRecorded", AssistWording.ClassDatesAlreadyRecorded(12, "{course}", "{section}"),
+             AssistWording.ClassDatesAlreadyRecordedForAMeeting(12, "{course}", "{section}"));
+        Pair("classDatesToRemember",
+             AssistWording.ClassDatesToRemember(12, "{course}", "{section}", "2026-09-08 (Tuesday)", "2026-12-15 (Tuesday)"),
+             AssistWording.ClassDatesToRememberForAMeeting(12, "{course}", "{section}", "2026-09-08 (Tuesday)", "2026-12-15 (Tuesday)"));
+        Pair("classDatesHalfRead", AssistWording.ClassDatesHalfRead(new[] { "2026-13-01" }, "the pasted dates"),
+             AssistWording.ClassDatesHalfReadForAMeeting(new[] { "2026-13-01" }, "the pasted dates"));
+
         // #927 (the mac's #897 piece A): Classes ▸ Add Class…'s dialog, with
         // the generator's examples (a module course's word; 2026-09-14).
         Pair("menuAddClassTitle", AssistWording.MenuAddClassTitle("{course}", "{section}"),

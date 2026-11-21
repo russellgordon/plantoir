@@ -2998,10 +2998,12 @@ public sealed partial class SectionDetailView : UserControl
     });
 
     /// <summary>Open the deployed folder from <paramref name="from"/> (the toolbar, the Section menu, the result).</summary>
-    internal Task OpenDeployedFolder(DeployedFolderFrom from) =>
-        _window.Workspace.WorkspacePath is { } folder
-            ? DeployedFolderOpening.OpenAsync(_course, _sectionNumber, folder, from, XamlRoot)
-            : Task.CompletedTask;
+    internal async Task OpenDeployedFolder(DeployedFolderFrom from)
+    {
+        if (_window.Workspace.WorkspacePath is not { } folder) return;
+        await DeployedFolderOpening.OpenAsync(_course, _sectionNumber, folder, from, XamlRoot);
+        ReadTheOfferAgain();   // a press is an event: a refused one redraws dimmed (#1027's review, low 2)
+    }
 
     private void OpenInBrowser_Click(object sender, RoutedEventArgs e)
     {

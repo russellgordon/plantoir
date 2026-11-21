@@ -157,9 +157,9 @@ builder.Services.AddMcpServer(options =>
         // so the copy saved before it names Section or Classes. One call at a
         // time on the menu's server, and back to Section after it.
         workspace.MenuOfTheChange = AssistWorkspace.MenuNamed(
-            context.Params?.Meta?[AssistWorkspace.MenuMetaKey]?.GetValue<string>());
+            AssistWorkspace.MetaText(context.Params?.Meta, AssistWorkspace.MenuMetaKey));
         // #1027: the selected section's course, for a sentence with no course of its own.
-        workspace.MenuCourseOfTheCall = context.Params?.Meta?[AssistWorkspace.CourseMetaKey]?.GetValue<string>();
+        workspace.MenuCourseOfTheCall = AssistWorkspace.MetaText(context.Params?.Meta, AssistWorkspace.CourseMetaKey);
         CallToolResult result;
         try
         {

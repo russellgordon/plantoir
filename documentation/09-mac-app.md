@@ -8008,9 +8008,26 @@ walks every item of the two menus against the contract list (an item not
 listed may not change with the noun nor say class), the list's
 `ranFromAMenuCases`, and every `…ForAMeeting` / `…FromTheMeetingsMenu`
 sentence whose class twin names an item. Help's club page quotes the titles
-with `say` tokens. Still saying class in a club, and outside this piece: the
-body of the Class Dates sheet (its purpose line and the timetable's own
-sentences, `SectionTimetable`).
+with `say` tokens.
+
+**The Class Dates sheet says meeting too** (#1027's first review, MEDIUM 1).
+Meeting Dates… opens `SectionScheduleSheet`, and every sentence it says
+itself has a `classDates…` key with its `…ForAMeeting` twin
+(`AssistWording.classDatesPurpose`, `…CourseMissing`, `…NoneGiven`,
+`…NotWrittenAsDates`, `…OnFileUnreadable`, `…TooFarFromToday`,
+`…CouldNotBeSaved`, `…AreRemembered`, `…SetAside`, `…AlreadyRecorded`,
+`…ToRemember`, `…HalfRead`). The sheet reads its course's noun
+(`SectionScheduleSheet.noun`) and says each refusal through
+`SectionScheduleSheet.sentence(for:noun:)`, which asks
+`SectionTimetableStore.Problem` or `SectionScheduleSource.Problem` for
+`sentence(noun:)`; their `errorDescription`, which every tool result the model
+reads is built from, stays the class form, as #267 requires. The proposal is
+`RememberTimetablePlan.description(noun:)` on the sheet and `.description`
+(class) in tool results. The trail line when remembered dates are set aside
+is said in the course's noun by the reader, which holds the course; the
+missing-course line knows a club by its code (`ClubCodeRule`), since the
+course's settings are gone. `ClubNounTests.testTheClassDatesSheetSaysMeetingInAClub`
+checks each against the contract.
 
 ### The shape: one focused value per OWNER of the state
 

@@ -155,17 +155,10 @@ public sealed partial class MainWindow
         // Enablement ahead of the flyout: measured to fire before it draws.
         foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ClassesMenu, ViewMenu, HelpMenu })
         {
-            title.PointerEntered += (_, _) =>
-            {
-                // #889 offeredWhen: a menu opens. The selected section's view
-                // reads the offer off this thread and redraws the menus when
-                // it has it (lane B review, low 3).
-                SelectedSectionDetail()?.ReadTheOfferAgain();
-                ApplyMenuEnablement();
-            };
-            title.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => ApplyMenuEnablement()), true);
+            title.PointerEntered += (_, _) => MenuIsOpening();
+            title.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => MenuIsOpening()), true);
         }
-        AppMenuBar.GotFocus += (_, _) => ApplyMenuEnablement();   // opened from the keyboard
+        AppMenuBar.GotFocus += (_, _) => MenuIsOpening();   // opened from the keyboard
         // And when a flyout DRAWS, whatever opened it (the keyboard, UI
         // Automation): its items are Loaded as it opens — measured 3 ms after
         // Tapped — which is still before anything in it can be pressed. The
@@ -174,7 +167,7 @@ public sealed partial class MainWindow
         foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ClassesMenu, ViewMenu })
             if (title.Items.FirstOrDefault() is FrameworkElement first)
             {
-                first.Loaded += (_, _) => ApplyMenuEnablement();
+                first.Loaded += (_, _) => MenuIsOpening();
                 // #514: a menu closing, however (Escape, a click outside, an
                 // item chosen) — measured, the first item's Unloaded fires on
                 // every close: Alt released inside it was never seen, so the
@@ -550,6 +543,21 @@ public sealed partial class MainWindow
             CanGoBack = detail?.CanGoBack == true,
             CanGoForward = detail?.CanGoForward == true,
         };
+    }
+
+    /// <summary>
+    /// #889 <c>offeredWhen</c>, "when a menu opens", by every route a menu
+    /// opens: the pointer reaching or pressing a title, the keyboard (the bar
+    /// takes the focus), and a flyout drawing however it was opened (UI
+    /// Automation, the keyboard). The selected section's view reads the offer
+    /// off this thread and redraws the menus when it has it (lane B review,
+    /// low 3; #1027's review, low 2: the keyboard route drew the cached
+    /// answer). A read under way coalesces the calls into one more.
+    /// </summary>
+    private void MenuIsOpening()
+    {
+        SelectedSectionDetail()?.ReadTheOfferAgain();
+        ApplyMenuEnablement();
     }
 
     /// <summary>Grey or ungrey every ruled item, and move the keys and titles that follow the selection.</summary>

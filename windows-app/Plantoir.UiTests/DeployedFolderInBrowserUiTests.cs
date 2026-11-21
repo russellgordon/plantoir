@@ -39,6 +39,53 @@ public class DeployedFolderInBrowserUiTests
     /// dimmed with no preview), or Stop Showing Deployed Folder not drawn in
     /// the Section menu.
     /// </summary>
+    /// <summary>
+    /// #1027's review, low 2, both halves. (1) <c>offeredWhen</c>, "when a
+    /// menu opens", by a route with no pointer: the deployed folder is made
+    /// behind the window's back (as a scheduled deploy would), and the
+    /// Section menu opened through UI Automation, as the keyboard opens it,
+    /// comes to offer Open in Browser. MUST FAIL with the offer read only on
+    /// the pointer route. (2) The folder taken away again behind the window,
+    /// a press of the still-live toolbar button says why in the could-not-open
+    /// dialog and the button then dims. MUST FAIL with the press left silent.
+    /// </summary>
+    [UiFact]
+    public void AMenuOpenedWithoutThePointerReadsTheOffer_AndAPressNoLongerOfferedSaysWhy()
+    {
+        string deployed = Path.Combine(Path.GetTempPath(), "plantoir-1027-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var app = new DrivenApp(courses =>
+                EndToEnd.WriteCourse(courses, Code, "Deployed Folder Course", new[] { "Concepts" }, EndToEnd.PublishesTo(deployed)));
+            app.SelectSection(Code, 1);
+            var button = app.Find("openInBrowserButton", "Open in Browser");
+            Assert.False(button.IsEnabled, "Open in Browser was live before the deployed folder existed");
+
+            Directory.CreateDirectory(Path.Combine(deployed, "section1"));
+            File.WriteAllText(Path.Combine(deployed, "section1", "index.html"), "<html><body>Deployed</body></html>");
+            var section = MenuBar.Open(app, "Section", "sectionOpenInBrowser");
+            Assert.True(Retry.WhileFalse(() => section["sectionOpenInBrowser"].IsEnabled, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250)).Result,
+                        "Section > Open in Browser stayed dimmed in a menu opened without the pointer, with the deployed folder there");
+            MenuBar.Close();
+            Assert.True(Retry.WhileFalse(() => button.IsEnabled, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250)).Result,
+                        "the toolbar's Open in Browser did not follow the menu's read");
+
+            Directory.Delete(deployed, recursive: true);
+            button.AsButton().Invoke();
+            var dialog = Retry.WhileNull(() => app.Window.FindFirstDescendant(cf => cf.ByAutomationId("deployedFolderCouldNotOpen")),
+                                         TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result
+                         ?? throw new Xunit.Sdk.XunitException("a press of Open in Browser with the folder gone said nothing");
+            string why = Plantoir.Core.Models.DeployedFolderWording.FolderNotFound;
+            Assert.True(dialog.FindAllDescendants().Any(element => element.Name == why),
+                        "the could-not-open dialog did not give the greyed reason: " +
+                        string.Join(" | ", dialog.FindAllDescendants().Select(element => element.Name)));
+            MenuBar.CloseDialog(app);
+            Assert.True(Retry.WhileFalse(() => !button.IsEnabled, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250)).Result,
+                        "Open in Browser stayed live after a press found the folder gone");
+        }
+        finally { try { Directory.Delete(deployed, recursive: true); } catch { } }
+    }
+
     [UiFact]
     public void OpenInBrowserShowsTheDeployedFolder_AndStopEndsIt()
     {

@@ -436,6 +436,23 @@ public class SectionAndClassesUiTests
         MenuBar.Close();
         CaptureIfAsked(app, "Meetings", "classesClassDates", "windows-meetings-menu.png");
 
+        // #1027's review, MEDIUM 1: Meeting Dates… opens the Class Dates
+        // dialog, and its purpose line, as RENDERED, says meeting
+        // (classDatesPurposeForAMeeting). MUST FAIL with the dialog's line
+        // written in the ordinary noun.
+        app.SelectSection(CourseFixtures.Club, 1);
+        EndToEnd.PressMenuBarItem(app, "Meetings", "classesClassDates");
+        var dates = MenuBar.Dialog(app, "Meetings > Meeting Dates…");
+        string purpose = Plantoir.Core.Assist.AssistWording.ClassDatesPurposeForAMeeting();
+        Assert.True(Retry.WhileFalse(() => dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Any(text => text.Name == purpose),
+                                     TimeSpan.FromSeconds(10)).Result,
+                    "the Meeting Dates dialog does not show its purpose line in the club's noun: " +
+                    string.Join(" | ", dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(text => text.Name)));
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") is { Length: > 0 } captures)
+            FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(captures, "windows-meeting-dates-dialog.png"));
+        MenuBar.CloseDialog(app);
+        Assert.Contains("Meetings ▸ Meeting Dates…", MenuBar.Trail(app));
+
         app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
         Assert.True(MenuBarComesToRead(app, ForACourse), $"back on a course the menu bar reads {MenuBarTitles(app)}");
     }

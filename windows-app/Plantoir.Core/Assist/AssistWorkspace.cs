@@ -3365,6 +3365,16 @@ public sealed partial class AssistWorkspace
     /// <summary>The key in a tools/call request's <c>_meta</c> that names the selected section's course.</summary>
     public const string CourseMetaKey = "plantoirCourse";
 
+    /// <summary>
+    /// A <c>_meta</c> value read as text: null when it is absent or is not a
+    /// string, never a throw (#1027's review, low 5: a number or an object
+    /// under <see cref="MenuMetaKey"/> or <see cref="CourseMetaKey"/> threw
+    /// before the call began). Absent and malformed mean the same: the
+    /// Section menu, and the class form.
+    /// </summary>
+    public static string? MetaText(System.Text.Json.Nodes.JsonObject? meta, string key) =>
+        meta?[key] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+
     /// <summary>Undo Last Change's nothing-to-undo from the menu, naming the menus as the selected section's course's menu bar does (#1027).</summary>
     public string NothingToUndoFromTheMenu() =>
         AssistWording.NothingToUndoFromTheMenu(MenuCourseOfTheCall is { } code ? NounForCourse(code) : ClassNoun.Class);

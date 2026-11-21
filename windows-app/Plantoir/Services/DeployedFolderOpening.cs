@@ -25,16 +25,24 @@ internal static class DeployedFolderOpening
         DeployedFolderOffer.LookUp(course, section, workingFolder);
 
     /// <summary>
-    /// Open the section's deployed folder. Nothing happens when it is not
-    /// offered now (the caller redraws). A failure shows the dialog; a Stop
-    /// pressed while it started shows nothing.
+    /// Open the section's deployed folder. When it is no longer offered at the
+    /// press (the item was drawn from the last read), the could-not-open
+    /// dialog gives the greyed reason, never a press that does nothing
+    /// (#1027's review, low 2); the caller then reads the offer again, so the
+    /// item redraws dimmed. A failure shows the dialog; a Stop pressed while
+    /// it started shows nothing.
     /// </summary>
     public static async Task OpenAsync(Course course, int section, string workingFolder, DeployedFolderFrom from, XamlRoot? root)
     {
         var lookup = Offer(course, section, workingFolder);
-        if (lookup.Decision.Kind != DeployedFolderOffer.Kind.Offered || lookup.SectionFolder is not { } sectionFolder) return;
+        if (lookup.Decision.Kind != DeployedFolderOffer.Kind.Offered || lookup.SectionFolder is not { } sectionFolder)
+        {
+            if (DeployedFolderOffer.SaidAtAPressNoLongerOffered(lookup.Decision) is { } why && root is not null)
+                await CouldNotOpen(root, why);
+            return;
+        }
         var outcome = await DeployedFolderShows.Shared.OpenAsync(sectionFolder, course.Code, section, workingFolder, from, ExternalLinks.Open);
-        if (outcome.Address is null && outcome.Why is not null && root is not null) await CouldNotOpen(root);
+        if (outcome.Address is null && outcome.Why is not null && root is not null) await CouldNotOpen(root, DeployedFolderWording.CouldNotOpen);
     }
 
     /// <summary>Stop showing every show of the section, and a start still under way.</summary>
@@ -45,13 +53,13 @@ internal static class DeployedFolderOpening
     public static bool IsShown(Course course, int section, string workingFolder) =>
         DeployedFolderShows.Shared.ShowFor(course.Code, section, workingFolder) is not null;
 
-    private static async Task CouldNotOpen(XamlRoot root)
+    private static async Task CouldNotOpen(XamlRoot root, string why)
     {
         var dialog = new ContentDialog
         {
             XamlRoot = root,
             Title = DeployedFolderWording.CouldNotOpenTitle,
-            Content = Views.FormBuilders.DialogExplanation(DeployedFolderWording.CouldNotOpen),
+            Content = Views.FormBuilders.DialogExplanation(why),
             CloseButtonText = DeployedFolderWording.CouldNotOpenButton,
             DefaultButton = ContentDialogButton.Close,
         };
