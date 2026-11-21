@@ -190,6 +190,20 @@ final class ClubNounTests: XCTestCase {
         }
     }
 
+    /// A club's menu bar titles the Classes menu Meetings (Russell's ruling
+    /// on #990, 2026-11-20 evening: "in a club the menu itself is titled
+    /// Meetings, on both platforms, so no sentence a club's teacher reads
+    /// says 'class'"), so the sentence that names both menus for a club says
+    /// neither "class" nor "Classes", and its ordinary twin says Classes.
+    func testTheSentenceNamingBothMenusSaysMeetingsInAClub() throws {
+        let wording: [String: Any] = try XCTUnwrap(AssistContract.wording()["wording"] as? [String: Any])
+        let club: String = try XCTUnwrap(wording["sectionIsChangingFromTheMeetingsMenu"] as? String)
+        XCTAssertFalse(saysClass(club), club)
+        XCTAssertTrue(club.contains("the Section or Meetings menu"), club)
+        let ordinary: String = try XCTUnwrap(wording["sectionIsChangingFromTheMenu"] as? String)
+        XCTAssertTrue(ordinary.contains("the Section or Classes menu"), ordinary)
+    }
+
     // MARK: - What the window offers a club
 
     /// The sentence the declined-dates answer tells a club to say is one the

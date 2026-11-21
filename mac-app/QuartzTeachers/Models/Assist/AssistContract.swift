@@ -186,6 +186,7 @@ enum AssistContract {
             "rolloverKeptTheSameWebsite": AssistWording.rolloverKeptTheSameWebsite,
             "rolloverWebsiteNotDecided": AssistWording.rolloverWebsiteNotDecided,
             "rolloverTurnedOffTheScheduledPublish": AssistWording.rolloverTurnedOffTheScheduledPublish,
+            "undoScheduleStartsAtTheNextLogin": AssistWording.undoScheduleStartsAtTheNextLogin,
             "noCoursesYet": AssistWording.noCoursesYet,
             "whatPublishingMeans": AssistWording.whatPublishingMeans,
             "publishingAlreadyExplained": AssistWording.publishingAlreadyExplained(
@@ -767,7 +768,7 @@ enum AssistContract {
             // leaves the contract in that piece, not before.
             "menuAddNextClassTitle": AssistWording.menuAddNextClassTitle(),
             "menuAddNextClassTitleForAMeeting": AssistWording.menuAddNextClassTitle(noun: .meeting),
-            // #897: Section ▸ Add Class…, in a new unit or as a copy of a class.
+            // #897: Classes ▸ Add Class…, in a new unit or as a copy of a class.
             "menuAddClassTitle": AssistWording.menuAddClassTitle(course: course, section: section),
             "menuAddClassTitleForAMeeting": AssistWording.menuAddClassTitle(
                 course: course, section: section, noun: .meeting
@@ -815,7 +816,7 @@ enum AssistContract {
             "menuTheNextPageIsAlreadyThere": AssistWording.menuTheNextPageIsAlreadyThere(page: copyPlaceholder),
             "menuUnitWordRenameUnfinished": AssistWording.menuUnitWordRenameUnfinished(),
             "menuUnitWordRenameUnfinishedForAMeeting": AssistWording.menuUnitWordRenameUnfinished(noun: .meeting),
-            // #897 piece B: Section ▸ Roll Over to a New Year….
+            // #897 piece B: Classes ▸ Roll Over to a New Year….
             "menuRollOverTitle": AssistWording.menuRollOverTitle(course: course, section: section),
             "menuRollOverIntro": AssistWording.menuRollOverIntro(),
             "menuRollOverIntroForAMeeting": AssistWording.menuRollOverIntro(noun: .meeting),
@@ -846,7 +847,10 @@ enum AssistContract {
             ),
             "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
-            "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),
+            "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section, noun: .class),
+            "sectionIsChangingFromTheMeetingsMenu": AssistWording.sectionIsChangingFromTheMenu(
+                course: course, section: section, noun: .meeting
+            ),
             // Classes dated after the next class (#475): the question asked
             // at Deploy (and, since #694, never at Section ▸ Publish
             // Pages…), and what an assistant is told when it cannot be asked.

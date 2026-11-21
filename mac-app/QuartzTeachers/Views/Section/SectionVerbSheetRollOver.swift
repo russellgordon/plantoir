@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Section ▸ Roll Over to a New Year…'s choosing stage (#897 piece B), in its
+/// Classes ▸ Roll Over to a New Year…'s choosing stage (#897 piece B), in its
 /// own file so the sheet's main file changes by a case or two
 /// (`SectionVerbSheet.swift`, which #900's tree of checkboxes rebuilds next).
 extension SectionVerbSheet {

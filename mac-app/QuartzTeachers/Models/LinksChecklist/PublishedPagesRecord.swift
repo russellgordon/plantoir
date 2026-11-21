@@ -68,21 +68,30 @@ nonisolated enum PublishedPagesRecord {
     /// On EVERY rollover, whichever website answer the teacher gave (plan
     /// review, finding 12): a new year's site has published nothing yet,
     /// so the pages Get Ready hid take this year's class dates.
-    static func release(courseDirectory: URL, section: Int, at moment: Date = Date()) -> [AssistSavedFile] {
+    ///
+    /// PLANNED into the rollover's ONE step, never written here (#899 U3b,
+    /// U3's by the decision in documentation 09): each answered record a
+    /// removal, each fragment one `move` (judged as a pair, so a fragment a
+    /// later deploy writes beside them is never touched by an undo). The
+    /// files are returned exactly as before for today's in-memory undo, as
+    /// they will be once the step is made; nothing is on disk until then.
+    static func release(
+        courseDirectory: URL, section: Int, at moment: Date = Date(), into step: JournaledStep
+    ) -> [AssistSavedFile] {
         var saved: [AssistSavedFile] = []
         // Last year's answers to the links checklist go too
         // (`linksChecklistAnswered`: removed on rollover).
         let answered: URL = LinksChecklistAnswered.fileURL(courseDirectory: courseDirectory, section: section)
-        if let contents = try? String(contentsOf: answered, encoding: .utf8),
-           (try? FileManager.default.removeItem(at: answered)) != nil {
+        if let contents = try? String(contentsOf: answered, encoding: .utf8) {
+            step.remove(answered)
             saved.append(AssistSavedFile(fileURL: answered, before: contents, after: nil))
         }
         // And the classes the teacher kept published at Deploy (#475,
         // `laterClassesKept`: removed on rollover) — last year's dates are
         // not this year's answers.
         let keptLater: URL = ClassesDatedLater.KeptRecord.fileURL(courseDirectory: courseDirectory, section: section)
-        if let contents = try? String(contentsOf: keptLater, encoding: .utf8),
-           (try? FileManager.default.removeItem(at: keptLater)) != nil {
+        if let contents = try? String(contentsOf: keptLater, encoding: .utf8) {
+            step.remove(keptLater)
             saved.append(AssistSavedFile(fileURL: keptLater, before: contents, after: nil))
         }
         let folder: URL = folderURL(courseDirectory: courseDirectory, section: section)
@@ -102,10 +111,7 @@ nonisolated enum PublishedPagesRecord {
             guard let contents = try? String(contentsOf: from, encoding: .utf8) else {
                 continue
             }
-            do {
-                try FileManager.default.createDirectory(at: kept, withIntermediateDirectories: true)
-                try FileManager.default.moveItem(at: from, to: to)
-            } catch {
+            if FileManager.default.fileExists(atPath: to.path) || !step.move(from, to: to) {
                 continue
             }
             saved.append(AssistSavedFile(fileURL: from, before: contents, after: nil))

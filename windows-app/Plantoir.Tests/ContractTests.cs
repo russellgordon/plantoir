@@ -309,7 +309,8 @@ public class ContractTests
                      AssistWording.PagesAChangeCouldNotFinishFromTheMenu(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
         Assert.Equal(wording["pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"]!.ToString(),
                      AssistWording.PagesAChangeCouldNotFinishFromTheMenuNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
-        Assert.Equal(wording["sectionIsChangingFromTheMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMenu("{course}", "{section}"));
+        Assert.Equal(wording["sectionIsChangingFromTheMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMenu("{course}", "{section}", ClassNoun.Class));
+        Assert.Equal(wording["sectionIsChangingFromTheMeetingsMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMeetingsMenu("{course}", "{section}"));
         Assert.Equal(wording["menuPublishPagesTitle"]!.ToString(), AssistWording.MenuPublishPagesTitle("{course}", "{section}"));
         Assert.Equal(wording["menuHidePagesTitle"]!.ToString(), AssistWording.MenuHidePagesTitle("{course}", "{section}"));
         Pair("menuPublishClassTitle", AssistWording.MenuPublishClassTitle("{course}", "{section}"),
@@ -679,8 +680,19 @@ public class ContractTests
                     }
                     else if (expectedMaker == "menu")
                     {
-                        Assert.IsType<BackupMaker.Menu>(backup!.Maker);
-                        Assert.Equal(c["section"]!.GetValue<int>(), ((BackupMaker.Menu)backup.Maker).SectionNumber);
+                        var menu = Assert.IsType<BackupMaker.Menu>(backup!.Maker);
+                        Assert.Equal(c["section"]!.GetValue<int>(), menu.SectionNumber);
+                        // #990: which menu made it rides in the name, and the Backups list says so.
+                        string menuName = c["menu"]?.ToString() ?? "section";
+                        Assert.Equal(menuName, SubjectMenuLayout.ContractName(menu.InMenu));
+                        if (c["description"]?.ToString() is { } words)
+                        {
+                            // In a course whose pages are meetings, a club, the menus are named as its menu bar titles them (#990).
+                            var noun = ClassPageSchemes.NounReading(c["noun"]?.ToString());
+                            Assert.Equal(words, menu.DescriptionFor(noun));
+                            Assert.Equal(c["kept"]!.ToString(), backup.KeptDescriptionFor(noun));
+                            Assert.Equal(name, "ICS3U_backup_2026-08-11_221530" + menu.NameSuffix + ".zip");
+                        }
                     }
                     else
                     {

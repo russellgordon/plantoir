@@ -17,12 +17,17 @@ enum BackupMaker: Hashable {
     /// conversation about this section.
     case assistant(sectionNumber: Int)
 
-    /// The Section menu made it, before one change it made to this section
-    /// (#457 batch B) — Publish Pages…, Hide Pages… and the rest of the
-    /// assistant's functions, run from the menu. One per change, so the menu
-    /// clears up after itself the way the assistant does: its five most
-    /// recent of a course are kept, counted apart from the assistant's.
-    case menu(sectionNumber: Int)
+    /// The Section or Classes menu made it, before one change it made to
+    /// this section (#457 batch B) — Publish Pages…, Hide Pages… and the rest
+    /// of the assistant's functions, run from the menu. One per change, so
+    /// the menus clear up after themselves the way the assistant does: their
+    /// five most recent of a course are kept, counted apart from the
+    /// assistant's. `inMenu` is the menu the item is in
+    /// (`SubjectMenuLayout`, #990, Russell's ruling "name the real menu"):
+    /// a Section copy is named `_menu-section<N>`, as every menu copy was
+    /// until #990, and a Classes copy `_classes-section<N>`. The menu has no
+    /// default: a caller that forgets to name it does not compile.
+    case menu(sectionNumber: Int, inMenu: SubjectMenuLayout.Menu)
 
     // MARK: - Computed properties
 
@@ -35,20 +40,23 @@ enum BackupMaker: Hashable {
             return ""
         case .assistant(let sectionNumber):
             return "_assistant-section\(sectionNumber)"
-        case .menu(let sectionNumber):
-            return "_menu-section\(sectionNumber)"
+        case .menu(let sectionNumber, let inMenu):
+            return "_" + BackupMaker.namePrefix(of: inMenu) + "\(sectionNumber)"
         }
     }
 
-    /// The end of the sentence a teacher reads in the Backups list.
-    var description: String {
+    /// The end of the sentence a teacher reads in the Backups list. `noun`
+    /// is what the backup's course calls its class pages, so a menu copy
+    /// names the menu by the title that course's menu bar gives it
+    /// (Meetings in a club, #990).
+    func description(noun: ClassNoun) -> String {
         switch self {
         case .teacher:
             return "made by you"
         case .assistant(let sectionNumber):
             return "before an assistant chat about Section \(sectionNumber)"
-        case .menu(let sectionNumber):
-            return "before a change from the Section menu to Section \(sectionNumber)"
+        case .menu(let sectionNumber, let inMenu):
+            return "before a change from the \(SubjectMenuLayout.title(of: inMenu, noun: noun)) menu to Section \(sectionNumber)"
         }
     }
 
@@ -64,13 +72,28 @@ enum BackupMaker: Hashable {
                 return .assistant(sectionNumber: sectionNumber)
             }
         }
-        let menuPrefix: String = "menu-section"
-        if piece.hasPrefix(menuPrefix) {
-            if let sectionNumber = Int(piece.dropFirst(menuPrefix.count)) {
-                return .menu(sectionNumber: sectionNumber)
+        for inMenu in SubjectMenuLayout.Menu.allCases {
+            let menuPrefix: String = namePrefix(of: inMenu)
+            if piece.hasPrefix(menuPrefix) {
+                if let sectionNumber = Int(piece.dropFirst(menuPrefix.count)) {
+                    return .menu(sectionNumber: sectionNumber, inMenu: inMenu)
+                }
             }
         }
         return nil
+    }
+
+    /// The piece of the name before the section number for a menu's copy:
+    /// "menu-section" for Section (every menu copy before #990 reads as
+    /// Section's, which is what it was written with) and "classes-section"
+    /// for Classes (`course-management.json` → `zipNames`).
+    static func namePrefix(of inMenu: SubjectMenuLayout.Menu) -> String {
+        switch inMenu {
+        case .section:
+            return "menu-section"
+        case .classes:
+            return "classes-section"
+        }
     }
 }
 
@@ -128,8 +151,8 @@ struct BackupItem: Identifiable, Hashable {
     /// "Backed up 11 August 2026 at 10:15 PM · before an assistant chat
     /// about Section 1" — because choosing between five copies of the same
     /// course is a choice about what each one was FOR.
-    var subtitle: String {
-        return "Backed up \(whenDescription) · \(maker.description)"
+    func subtitle(noun: ClassNoun) -> String {
+        return "Backed up \(whenDescription) · \(maker.description(noun: noun))"
     }
 
     /// A different mark for the assistant's own, so the two kinds can be
@@ -139,14 +162,18 @@ struct BackupItem: Identifiable, Hashable {
     /// Said per item rather than once for the list, because the two answers
     /// are genuinely different and a teacher deciding whether to keep their
     /// own copy needs THEIR answer, not the assistant's.
-    var keptDescription: String {
+    ///
+    /// `noun` is what the course calls its class pages: in a club the menus
+    /// are Section and Meetings (#990).
+    func keptDescription(noun: ClassNoun) -> String {
         switch maker {
         case .teacher:
             return "You made this one, so it is kept until you delete it."
         case .assistant:
             return "The assistant made this one; its five most recent are kept."
-        case .menu:
-            return "The Section menu made this one before a change; its five most recent are kept."
+        case .menu(_, let inMenu):
+            return "The \(SubjectMenuLayout.title(of: inMenu, noun: noun)) menu made this one before a change; "
+                + "the five most recent the \(SubjectMenuLayout.bothMenus(noun: noun)) menus made are kept."
         }
     }
 

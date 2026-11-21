@@ -68,6 +68,13 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     public List<ArchivedItem> ArchivedItems { get; private set; } = new();
     public List<BackupItem> BackupItems { get; private set; } = new();
 
+    /// <summary>
+    /// What the course with <paramref name="code"/> calls its class pages, for
+    /// a backup's sentence that names the Classes menu as that course's menu
+    /// bar titles it (Meetings in a club, #990).
+    /// </summary>
+    public ClassNoun ClassNounOf(string code) => SubjectMenuLayout.NounOfCourse(code, Courses, CourseNameCatalogs.Shared);
+
     public SidebarSelection? Selection
     {
         get => _state.Selection;

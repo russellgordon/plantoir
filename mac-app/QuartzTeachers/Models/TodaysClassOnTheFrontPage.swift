@@ -68,6 +68,14 @@ enum TodaysClassOnTheFrontPage {
     enum Outcome: Equatable {
         /// The line now names today's class.
         case shown(from: String, to: String)
+        /// The line names today's class, but the change went in part way:
+        /// what the front page held just before (an edit another program
+        /// made as it was saved) could not be put back over it and is kept
+        /// beside it under each hidden name in `keptOriginals` (the third
+        /// review of U3a, LOW 3). Said on the trail, naming the kept file;
+        /// `folder` is where they are, beside the front page, for the
+        /// alert's Show in Finder.
+        case shownKeepingWhatItHeld(from: String, to: String, keptOriginals: [String], folder: URL)
         /// The page already shows today's class — the teacher changed it
         /// while the question was up. Nothing was written.
         case alreadyRight
@@ -114,18 +122,22 @@ enum TodaysClassOnTheFrontPage {
         /// Written with a rename, so a reader never meets half a file. Last
         /// writer wins between two windows; the worst outcome is being asked
         /// once more.
+        ///
+        /// One step through the door (#899, U3): Not Today, answered.
         func write(courseDirectory: URL, section: Int) throws {
             let url: URL = NotToday.fileURL(courseDirectory: courseDirectory, section: section)
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(), withIntermediateDirectories: true
-            )
             let object: [String: Any] = [
                 "version": 1,
                 "day": day,
                 "class": classTitle
             ]
             let data: Data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-            try data.write(to: url, options: .atomic)
+            let step: JournaledStep = JournaledStep(
+                courseCode: courseDirectory.lastPathComponent, courseDirectory: courseDirectory,
+                section: section, maker: UndoStepMaker.sheet("notTodayOnTheFrontPage")
+            )
+            step.write(data, to: url)
+            try step.make()
         }
 
         /// Whether this record answers the question about `classTitle` today.
@@ -228,6 +240,13 @@ enum TodaysClassOnTheFrontPage {
         ) else {
             return nil
         }
+        // Either answer makes a step on the main actor (the front page, or
+        // Not Today's record): the list is read off it while the question is
+        // up, unawaited (#899, ruling 8 on U1's third round; the first review
+        // of U3a, LOW 6).
+        Task {
+            await JournaledStep.readTheListAhead()
+        }
         return Offer(
             classTitle: decision.todaysClass,
             shownTitle: decision.shown,
@@ -290,7 +309,21 @@ enum TodaysClassOnTheFrontPage {
         ) else {
             return .noLongerOffered
         }
-        guard (try? result.text.write(to: indexURL, atomically: true, encoding: .utf8)) != nil else {
+        // One step through the door (#899, U3): the teacher's own choice of
+        // class, so content of the step, not the front page's rule.
+        let step: JournaledStep = JournaledStep(
+            course: course, section: offer.sectionNumber, maker: UndoStepMaker.sheet("showTodaysClassOnTheFrontPage")
+        )
+        step.write(result.text, to: indexURL)
+        var keptOriginals: [String]? = nil
+        do {
+            try step.make()
+        } catch JournaledStepError.leftPartWay(_, _, let kept) {
+            // The page went in and could not be put back: the read-back
+            // below says what it shows now, which is what is true, and
+            // where what it held just before is kept is said with it.
+            keptOriginals = kept
+        } catch {
             return .couldNotSave
         }
         // Read back: the page on disk must now name the class.
@@ -298,6 +331,11 @@ enum TodaysClassOnTheFrontPage {
               let line = SectionIndexPointer.classLine(in: after, classTitles: classTitles),
               line.name == page.title else {
             return .couldNotSave
+        }
+        if let keptOriginals {
+            return .shownKeepingWhatItHeld(
+                from: decision.shown, to: page.title, keptOriginals: keptOriginals, folder: indexURL.deletingLastPathComponent()
+            )
         }
         return .shown(from: decision.shown, to: page.title)
     }
@@ -328,6 +366,12 @@ enum TodaysClassOnTheFrontPage {
         switch outcome {
         case .shown(let from, let to):
             return (.putTodaysClassOnTheFrontPage, "put today's class on the front page — \(to) in place of \(from)")
+        case .shownKeepingWhatItHeld(let from, let to, let keptOriginals, _):
+            var line: String = "put today's class on the front page — \(to) in place of \(from)"
+            for kept in keptOriginals {
+                line += ". What \(JournaledStepError.placeName(ofKept: kept)) held just before is kept beside it as the hidden file “\(kept)”"
+            }
+            return (.putTodaysClassOnTheFrontPage, line)
         case .alreadyRight:
             return (.frontPageLeftAsItWas, leftAsItWasLine(reason: "already showed today's class", offer: offer))
         case .noLongerOffered:

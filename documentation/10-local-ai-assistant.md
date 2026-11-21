@@ -4384,9 +4384,9 @@ the menus already did in full, 8 in part, and 3 gaps. Where each gap went:
 
 | Gap | Where it is now |
 |---|---|
-| Starting a new unit ("Start a new unit for the next class") | Section ▸ Add Class…, in a new unit (#897, [09 → "Add Class…"](09-mac-app.md#add-class-the-next-class-a-new-unit-or-a-copy-897)) |
-| Duplicating a class as the next one | Section ▸ Add Class…, as a copy of a class: at the END, by file, hidden; the window's own duplicate still lands after its source |
-| The rollover's website question | Section ▸ Roll Over to a New Year… (#897 piece B, [09 → "Roll Over to a New Year…"](09-mac-app.md#roll-over-to-a-new-year-the-rollovers-website-question-in-a-sheet-897-piece-b)): the same call, the question in a sheet with nothing chosen, asked only where there is a website a new one would not replace; refused when the copy of the course saved first cannot be made; one undo entry from the menu, which never deletes a kept marker, the window's two unchanged |
+| Starting a new unit ("Start a new unit for the next class") | Classes ▸ Add Class… (Section ▸ until #990), in a new unit (#897, [09 → "Add Class…"](09-mac-app.md#add-class-the-next-class-a-new-unit-or-a-copy-897)) |
+| Duplicating a class as the next one | Classes ▸ Add Class…, as a copy of a class: at the END, by file, hidden; the window's own duplicate still lands after its source |
+| The rollover's website question | Classes ▸ Roll Over to a New Year… (#897 piece B, [09 → "Roll Over to a New Year…"](09-mac-app.md#roll-over-to-a-new-year-the-rollovers-website-question-in-a-sheet-897-piece-b)): the same call, the question in a sheet with nothing chosen, asked only where there is a website a new one would not replace; refused when the copy of the course saved first cannot be made; one undo entry from the menu, which never deletes a kept marker, the window's two unchanged |
 
 Four were accepted as they are, unasked: one list of every page with its
 state, what a given page links to, a text list of what students see now, and
@@ -4449,15 +4449,48 @@ EVERY path that writes files without adding an entry, each pinned in
   whose every write failed says "changed nothing" (ruling L5);
 - **a partial undo**;
 - **a publish or hide that wrote pages and then stopped part way** (#412),
-  the page list and the whole unit: `AssistPublishPlanner.apply` throws
+  the page list and the whole unit: `AssistPublishPlanner.apply` threw
   `StoppedAfterWriting` only when at least one file was written, keeping the
   error's own words;
 - **Re-date Classes… that stopped part way** (ruling M3):
-  `SectionReDatePlanner.apply` writes page by page and now throws its own
-  `StoppedAfterWriting` with the pages written. The teacher is told
+  `SectionReDatePlanner.apply` wrote page by page and threw its own
+  `StoppedAfterWriting` with the pages written. The teacher was told
   `publishStoppedPartWay` ("Only part of the section's class dates was
   changed…") with the pages already re-dated listed — never "Nothing was
   changed", which it said until then although pages were written.
+
+**Since #899's U3 neither of those two can happen**: a publish, a whole unit
+and a re-date are each ONE step through the undo journal's door, staged and
+swapped in together or not at all (documentation 09, "U3: every daily page
+action through the door"). A page that cannot be written now writes
+nothing, so the menu's line says "changed nothing". A re-date says "Nothing
+was changed: …" with the file in the way, and so, since U3a's second
+round, does a publish, a hide and a whole unit: `publishStoppedPartWay`
+("Only part of … was changed") was true only while the write went page by
+page (the first review of U3a, MEDIUM 1). Since U3a's third round it is
+said on the Mac in ONE case, where it is true: a swap refused after some
+pages went in whose reversal could not put one back
+(`JournaledStepError.leftPartWay`), so a page holds the new content and
+what it held before is kept beside it under a hidden name the sentence
+names (the second review of U3a, MEDIUM a; documentation 09, "The third
+round"). Every action's "Nothing was …" catch says it through the runner's
+`saidWhenTheStepStopped`, which also counts the write as one with no new
+undo entry. `AssistWording` is unchanged; Windows still writes page by
+page. Where nothing was written ("Nothing was …") no Restore Section
+pointer is added: there is nothing to put back. On the part-way answer it
+IS added, as for any `publishStoppedPartWay` (in the in-app assistant when
+this conversation saved a copy; the menu's backup sentence on the menu),
+because the copy does put the section's pages back, except for the How I
+Teach page: it belongs to the course and is saved under a stand-in
+section, and Restore Section does not put it back, so its part-way answer
+is the sentence alone (`aSectionsCopyPutsItBack: false`; the third review
+of U3a, LOW 4; `PublishStoppedPartWayTests.testHowITeachLeftPartWayAddsNoRestorePointer`).
+`SectionVerbsEndingTests`' three tests for these paths pin
+this (`testAPublishThatCannotWriteEveryPageWritesNone`,
+`testAWholeUnitThatCannotWriteEveryPageWritesNone`,
+`testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`), and
+`PublishStoppedPartWayTests` pins the page list, the whole unit and an
+outside assistant. `StoppedAfterWriting` is kept and no longer thrown.
 
 A first write that fails is still "changed nothing", and "Nothing was
 changed". Until #531 the depth alone decided, so each of these was written as

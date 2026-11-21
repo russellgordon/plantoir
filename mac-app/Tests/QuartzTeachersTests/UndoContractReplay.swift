@@ -202,6 +202,26 @@ nonisolated enum UndoContractReplay {
         try Data(lines.joined(separator: "\n").utf8).write(to: url)
     }
 
+    /// What an undo or a redo left apart (U3b), or nothing.
+    static func leftApart(of outcome: UndoOutcome) -> [String] {
+        switch outcome {
+        case .undone(_, let leftApart, _), .redone(_, let leftApart, _):
+            return leftApart
+        default:
+            return []
+        }
+    }
+
+    /// What an undo or a redo named as starting at the next login.
+    static func startsAtTheNextLogin(of outcome: UndoOutcome) -> [String] {
+        switch outcome {
+        case .undone(_, _, let starts), .redone(_, _, let starts):
+            return starts
+        default:
+            return []
+        }
+    }
+
     static func outcomeWord(_ outcome: UndoOutcome) -> String {
         switch outcome {
         case .undone:
@@ -321,10 +341,10 @@ nonisolated enum UndoContractReplay {
                     if word != expect {
                         failures.append("\(where_): \(kind) came to \(word), not \(expect ?? "?")")
                     }
-                    if case .undone(let seq) = outcome, seq != int(call["seq"]) {
+                    if case .undone(let seq, _, _) = outcome, seq != int(call["seq"]) {
                         failures.append("\(where_): undid \(seq), not \(int(call["seq"]) ?? -1)")
                     }
-                    if case .redone(let seq) = outcome, seq != int(call["seq"]) {
+                    if case .redone(let seq, _, _) = outcome, seq != int(call["seq"]) {
                         failures.append("\(where_): redid \(seq), not \(int(call["seq"]) ?? -1)")
                     }
                     if case .refused(.changedSince(let first, let others), let cleared) = outcome {
@@ -514,7 +534,7 @@ nonisolated enum UndoContractReplay {
             let kind: String = string(given["kind"]) ?? ""
             let relativePath: String = string(given["path"]) ?? "page.md"
             let url: URL = place.root.appendingPathComponent(UndoOp.isSafeRelativePath(relativePath) ? relativePath : "page.md")
-            if kind == "move" {
+            if kind == "move" || kind == "moveApart" || kind == "setAside" {
                 if let from = string(given["from"]), UndoOp.isSafeRelativePath(from), let side = current["atFrom"] as? [String: Any] {
                     try self.place(side, at: place.root.appendingPathComponent(from))
                 }
@@ -676,6 +696,8 @@ nonisolated enum UndoContractReplay {
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
+        "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
+        "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -737,10 +759,29 @@ nonisolated enum UndoContractReplay {
             try write(pageText, to: secondPagePath, in: rootB)
             var clockDays: Double = 0
             var last: String = ""
+            var lastLeftApart: [String] = []
+            var lastStartsAtTheNextLogin: [String] = []
             var linesBeforeTheDeploy: Int = -1
             var linesAfterTheDeploy: Int = -1
             let held: HeldStep = HeldStep()
             var foreignBlob: String? = nil
+            var foreignKept: (url: URL, bytes: Data)? = nil
+            var contentFolderMadeReadOnly: URL? = nil
+            var unreadableKeptOriginals: [URL] = []
+            var keptWhatItReplacedLines: Int = 0
+            let keptWhatItReplacedHookBefore = UndoTrailHook.keptWhatItReplacedLine
+            UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _, _ in
+                keptWhatItReplacedLines += 1
+            }
+            defer {
+                UndoTrailHook.keptWhatItReplacedLine = keptWhatItReplacedHookBefore
+                if let contentFolderMadeReadOnly {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: contentFolderMadeReadOnly.path)
+                }
+                for keptURL in unreadableKeptOriginals {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: keptURL.path)
+                }
+            }
             let folderOfB: String = rootB.path
             let places: UndoMemoryPlaces = UndoMemoryPlaces()
             registerTheFrontPageMaintainer()
@@ -872,9 +913,15 @@ nonisolated enum UndoContractReplay {
                 } else if value.hasPrefix("clock:") {
                     clockDays = Double(value.dropFirst("clock:".count).replacingOccurrences(of: "+", with: "")) ?? 0
                 } else if value == "undo" {
-                    last = outcomeWord(await journal().undoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places))
+                    let outcome: UndoOutcome = await journal().undoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places)
+                    last = outcomeWord(outcome)
+                    lastLeftApart = leftApart(of: outcome)
+                    lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
                 } else if value == "redo" {
-                    last = outcomeWord(await journal().redoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places))
+                    let outcome: UndoOutcome = await journal().redoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places)
+                    last = outcomeWord(outcome)
+                    lastLeftApart = leftApart(of: outcome)
+                    lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
                 } else if UndoContractKinds.calls.contains(value) {
                     if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
                         last = answered
@@ -968,6 +1015,78 @@ nonisolated enum UndoContractReplay {
                     }
                 } else if value == "removeContent" {
                     try FileManager.default.removeItem(at: journal().contentFolderURL)
+                } else if value == "contentCannotBeStored" {
+                    // The list's content folder, empty and taking no new
+                    // file (a full or read-only disk, as far as the list can
+                    // tell): no blob can be written from here on.
+                    let contentURL: URL = journal().contentFolderURL
+                    if UndoItem.read(at: contentURL) == .absent {
+                        try FileManager.default.createDirectory(at: contentURL, withIntermediateDirectories: true)
+                    }
+                    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: contentURL.path)
+                    contentFolderMadeReadOnly = contentURL
+                } else if value == "beforeContentGoneAndCannotBeStored" {
+                    // Only the newest step's content for what p1 held before
+                    // is gone from the list, and the list's folder for it
+                    // takes no new file: what p1 held after is still there
+                    // (the second review of U3c, MEDIUM).
+                    let fold: UndoFold = try journal().read()
+                    var removedOne: Bool = false
+                    if let head = fold.offer(now: journal().now()).head {
+                        for op in head.step.ops where op.path == pagePath && op.knownKind == .writeFile {
+                            if let sha = op.beforeSha {
+                                let blobURL: URL = journal().blobURL(sha: sha)
+                                try FileManager.default.removeItem(at: blobURL)
+                                let prefixFolder: URL = blobURL.deletingLastPathComponent()
+                                try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: prefixFolder.path)
+                                contentFolderMadeReadOnly = prefixFolder
+                                removedOne = true
+                            }
+                        }
+                    }
+                    if !removedOne {
+                        failures.append("stackCases '\(name)': no whole-file step whose before content to take away")
+                    }
+                } else if value == "keepTheOriginal" {
+                    // The newest step's kept original of p1, as a swap whose
+                    // tidy could not remove it leaves it: what p1 held before.
+                    let fold: UndoFold = try journal().read()
+                    var keptOne: Bool = false
+                    if let head = fold.offer(now: journal().now()).head {
+                        for op in head.step.ops where op.path == pagePath && op.knownKind == .writeFile {
+                            if let sha = op.beforeSha, let before = try journal().blobContent(sha: sha) {
+                                let keptURL: URL = UndoSwap.besideURL(for: root.appendingPathComponent(pagePath), label: "\(head.step.seq)-apply", role: "orig")
+                                try before.write(to: keptURL)
+                                keptOne = true
+                            }
+                        }
+                    }
+                    if !keptOne {
+                        failures.append("stackCases '\(name)': no whole-file step to keep the original of")
+                    }
+                } else if value == "foreignKeptOriginal" {
+                    // A kept original left under the next step's own label by
+                    // another Mac or an earlier list.
+                    let next: Int = try journal().read().highestSeq + 1
+                    let foreignURL: URL = UndoSwap.besideURL(for: root.appendingPathComponent(pagePath), label: "\(next)-apply", role: "orig")
+                    let foreignBytes: Data = Data("What another Mac's list kept.\n".utf8)
+                    try foreignBytes.write(to: foreignURL)
+                    foreignKept = (url: foreignURL, bytes: foreignBytes)
+                } else if value == "makeTheKeptOriginalUnreadable" {
+                    // There and unreadable just now, as a cloud placeholder
+                    // not downloaded is.
+                    for staged in UndoContractKinds.stagedLeftovers(in: root) where staged.hasSuffix("-orig") {
+                        let keptURL: URL = root.appendingPathComponent(staged)
+                        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: keptURL.path)
+                        unreadableKeptOriginals.append(keptURL)
+                    }
+                } else if value == "changeTheKeptOriginal" {
+                    for staged in UndoContractKinds.stagedLeftovers(in: root) where staged.hasSuffix("-orig") {
+                        let keptURL: URL = root.appendingPathComponent(staged)
+                        if case .file(let data) = UndoItem.read(at: keptURL) {
+                            try (data + Data("A line added to the kept original.\n".utf8)).write(to: keptURL)
+                        }
+                    }
                 } else if value == "begin:held" {
                     try beginHeld()
                 } else if value == "finish:held" {
@@ -1061,6 +1180,44 @@ nonisolated enum UndoContractReplay {
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("stackCases '\(name)': the folder is there: \(!kept)")
             }
+            if let wanted = int(testCase["keptWhatItReplacedLines"]), keptWhatItReplacedLines != wanted {
+                failures.append("stackCases '\(name)': \(keptWhatItReplacedLines) 'undo kept what it replaced' lines, not \(wanted)")
+            }
+            if testCase["foreignKeptOriginalUntouched"] as? Bool == true {
+                if let foreignKept, UndoItem.read(at: foreignKept.url) != .file(foreignKept.bytes) {
+                    failures.append("stackCases '\(name)': the other list's kept original was changed or removed")
+                } else if foreignKept == nil {
+                    failures.append("stackCases '\(name)': no other list's kept original was made")
+                }
+            }
+            if let kept = testCase["keptOriginalLeft"] as? Bool {
+                var beside: Bool = false
+                for staged in UndoContractKinds.stagedLeftovers(in: root) {
+                    if staged.hasSuffix("-orig") {
+                        beside = true
+                    } else {
+                        failures.append("stackCases '\(name)': staged files left behind: \(staged)")
+                    }
+                }
+                if beside != kept {
+                    failures.append("stackCases '\(name)': a kept original beside p1 is \(beside)")
+                }
+            }
+            if let wanted = string(testCase["cloudflareMarkers"]), UndoContractKinds.cloudflareMarkers(in: root) != wanted {
+                failures.append("stackCases '\(name)': the second host's markers are \(UndoContractKinds.cloudflareMarkers(in: root)), not \(wanted)")
+            }
+            if let wanted = string(testCase["leftoverMarkers"]), UndoContractKinds.leftoverMarkers(in: root) != wanted {
+                failures.append("stackCases '\(name)': the leftover's places are \(UndoContractKinds.leftoverMarkers(in: root)), not \(wanted)")
+            }
+            if let wanted = testCase["startsAtTheNextLogin"] as? [String], lastStartsAtTheNextLogin != wanted {
+                failures.append("stackCases '\(name)': starts at the next login \(lastStartsAtTheNextLogin), not \(wanted)")
+            }
+            if let wanted = testCase["leftApart"] as? [String], lastLeftApart != wanted {
+                failures.append("stackCases '\(name)': left apart \(lastLeftApart), not \(wanted)")
+            }
+            if let wanted = string(testCase["schoolYear"]), UndoContractKinds.schoolYear(in: root) != wanted {
+                failures.append("stackCases '\(name)': the school year is \(UndoContractKinds.schoolYear(in: root) ?? "absent"), not \(wanted)")
+            }
             if testCase["nothingMovedOutside"] as? Bool == true {
                 let outsideNames: [String] = (try? FileManager.default.contentsOfDirectory(atPath: UndoContractKinds.outside(of: root).path)) ?? []
                 if !outsideNames.isEmpty {
@@ -1072,7 +1229,7 @@ nonisolated enum UndoContractReplay {
                 failures.append("stackCases '\(name)': the front page was re-derived \(rederived) times, not \(wanted)")
             }
             let leftovers: [String] = UndoContractKinds.stagedLeftovers(in: root)
-            if !leftovers.isEmpty {
+            if !leftovers.isEmpty && testCase["keptOriginalLeft"] as? Bool != true {
                 failures.append("stackCases '\(name)': staged files left behind: \(leftovers)")
             }
             if fold.ignoredEvents != 0 {
@@ -1176,6 +1333,9 @@ nonisolated enum UndoContractReplay {
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
         "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace", "nextWrite", "ordinaryWriteOn",
         "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
+        "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
+        "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
+        "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1307,7 +1467,33 @@ nonisolated enum UndoContractReplay {
                 try write(UndoContractKinds.oldMarker, to: UndoContractKinds.markerFrom, in: root)
             }
 
-            if work == "step" {
+            let racedPage: String? = string(testCase["editRacesTheSwap"])
+            if work == "step", let racedPage {
+                // Another program edits the page IN PLACE between the swap's
+                // re-read and its rename (into the inode the kept original
+                // is a link to), and putting the original back fails: the
+                // step answers part way and is left in flight.
+                let racedName: String = ((pathOf[racedPage] ?? racedPage) as NSString).lastPathComponent
+                UndoKillPoints.beforeTheRename = { _, url in
+                    guard url.lastPathComponent == racedName, let handle = try? FileHandle(forWritingTo: url) else {
+                        return
+                    }
+                    _ = try? handle.seekToEnd()
+                    try? handle.write(contentsOf: Data("Edited in Obsidian.\n".utf8))
+                    try? handle.close()
+                }
+                UndoKillPoints.putBackFailsAt = { index in index == 0 }
+                let outcome: JournaledWriteOutcome = makeTheStep()
+                UndoKillPoints.beforeTheRename = nil
+                UndoKillPoints.putBackFailsAt = nil
+                guard case .leftPartWay = outcome else {
+                    failures.append("recoveryCases '\(name)': the step was not left part way (\(outcome))")
+                    continue
+                }
+                for change in stepDraft.changes {
+                    afterHashes.append(UndoHash.sha256(ofOptional: change.after))
+                }
+            } else if work == "step" {
                 UndoKillPoints.hook = { point in point == stopAt }
                 let outcome: JournaledWriteOutcome = makeTheStep()
                 UndoKillPoints.hook = nil
@@ -1340,6 +1526,83 @@ nonisolated enum UndoContractReplay {
             let resolveRoot: (UndoWorkingFolder) -> URL? = { _ in reachable ? root : nil }
             if testCase["contentRemovedBeforeRecovery"] as? Bool == true {
                 try FileManager.default.removeItem(at: dying.contentFolderURL)
+            }
+            var unreadableKept: [URL] = []
+            defer {
+                for keptURL in unreadableKept {
+                    let mode: Int = keptURL == dying.contentFolderURL ? 0o755 : 0o644
+                    try? FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: keptURL.path)
+                }
+            }
+            if testCase["contentCannotBeStored"] as? Bool == true {
+                // The list's content folder, there and taking no new file.
+                let contentURL: URL = dying.contentFolderURL
+                if UndoItem.read(at: contentURL) == .absent {
+                    try FileManager.default.createDirectory(at: contentURL, withIntermediateDirectories: true)
+                }
+                try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: contentURL.path)
+                unreadableKept.append(contentURL)
+            }
+            var foldersMadeReadOnly: [URL] = []
+            defer {
+                for folder in foldersMadeReadOnly {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+                }
+            }
+            if let page = string(testCase["keptContentGoneAndCannotBeStored"]), let path = pathOf[page] {
+                // Only the content a page's kept originals hold is gone from
+                // the list, and the list's folder for it takes no new file;
+                // every other blob is still there (the second review of
+                // U3c, MEDIUM).
+                let place: URL = root.appendingPathComponent(path)
+                let folder: URL = place.deletingLastPathComponent()
+                let prefix: String = "." + place.lastPathComponent + UndoSwap.stagedMarker
+                for staged in try FileManager.default.contentsOfDirectory(atPath: folder.path)
+                where staged.hasPrefix(prefix) && staged.hasSuffix("-orig") {
+                    guard case .file(let data) = UndoItem.read(at: folder.appendingPathComponent(staged)) else {
+                        continue
+                    }
+                    let blobURL: URL = dying.blobURL(sha: UndoHash.sha256(of: data))
+                    if UndoItem.read(at: blobURL) != .absent {
+                        try FileManager.default.removeItem(at: blobURL)
+                    }
+                    let prefixFolder: URL = blobURL.deletingLastPathComponent()
+                    if UndoItem.read(at: prefixFolder) == .absent {
+                        try FileManager.default.createDirectory(at: prefixFolder, withIntermediateDirectories: true)
+                    }
+                    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: prefixFolder.path)
+                    foldersMadeReadOnly.append(prefixFolder)
+                }
+                if foldersMadeReadOnly.isEmpty {
+                    failures.append("recoveryCases '\(name)': no kept original beside \(page) whose content to take away")
+                }
+            }
+            if testCase["keptOriginalUnreadable"] as? Bool == true {
+                // A kept original that is there and cannot be read just now,
+                // as a cloud placeholder not downloaded cannot.
+                for staged in UndoContractKinds.stagedLeftovers(in: root) where staged.hasSuffix("-orig") {
+                    let keptURL: URL = root.appendingPathComponent(staged)
+                    try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: keptURL.path)
+                    unreadableKept.append(keptURL)
+                }
+                if unreadableKept.isEmpty {
+                    failures.append("recoveryCases '\(name)': no kept original to make unreadable")
+                }
+            }
+            if testCase["changeTheKeptOriginal"] as? Bool == true {
+                // A kept original that no longer hashes to what the journal
+                // recorded for its page.
+                var changed: Int = 0
+                for staged in UndoContractKinds.stagedLeftovers(in: root) where staged.hasSuffix("-orig") {
+                    let keptURL: URL = root.appendingPathComponent(staged)
+                    if case .file(let data) = UndoItem.read(at: keptURL) {
+                        try (data + Data("A line added to the kept original.\n".utf8)).write(to: keptURL)
+                        changed += 1
+                    }
+                }
+                if changed == 0 {
+                    failures.append("recoveryCases '\(name)': no kept original to change")
+                }
             }
             if testCase["changeTheFolderSetAside"] as? Bool == true {
                 // A file saved into the teacher's folder while the dead
@@ -1377,8 +1640,30 @@ nonisolated enum UndoContractReplay {
             UndoTrailHook.foundAFolderSetAsideLine = { _, _, _, _, _, _ in
                 folderLines += 1
             }
+            var keptNamedOnTheTrail: [String] = []
+            var couldNotPutBackLines: Int = 0
+            let couldNotPutBackHookBefore = UndoTrailHook.couldNotPutBackLine
+            UndoTrailHook.couldNotPutBackLine = { _, _, _, _, keptOriginals in
+                couldNotPutBackLines += 1
+                keptNamedOnTheTrail += keptOriginals
+            }
+            var keptAsNoLongerInTheList: [String] = []
+            let keptAnOriginalHookBefore = UndoTrailHook.keptAnOriginalLine
+            UndoTrailHook.keptAnOriginalLine = { _, _, _, keptOriginals, noLongerInTheList in
+                couldNotPutBackLines += 1
+                keptNamedOnTheTrail += keptOriginals
+                keptAsNoLongerInTheList += noLongerInTheList
+            }
+            var leftLines: Int = 0
+            let leftHookBefore = UndoTrailHook.leftNewestLine
+            UndoTrailHook.leftNewestLine = { _, _, _, _ in
+                leftLines += 1
+            }
             defer {
                 UndoTrailHook.foundAFolderSetAsideLine = trailHookBefore
+                UndoTrailHook.couldNotPutBackLine = couldNotPutBackHookBefore
+                UndoTrailHook.keptAnOriginalLine = keptAnOriginalHookBefore
+                UndoTrailHook.leftNewestLine = leftHookBefore
             }
 
             // Another process, which sees the first as gone, runs recovery.
@@ -1426,6 +1711,24 @@ nonisolated enum UndoContractReplay {
                     if stands == UndoStepPhase.interrupted.rawValue {
                         failures.append("recoveryCases '\(name)': the stopped recovery wrote to the list (\(stands))")
                     }
+                    if let pages = testCase["keptOriginalsAfterTheTidy"] as? [String] {
+                        // The tidy before the plan kept each named page's
+                        // kept original, though the list gives its bytes.
+                        var keptPlaces: [String] = []
+                        for staged in UndoContractKinds.stagedLeftovers(in: root) {
+                            let stagedName: String = (staged as NSString).lastPathComponent
+                            if stagedName.hasSuffix("-orig"), let keptPlace = UndoSwap.placeOfStagedName(stagedName) {
+                                keptPlaces.append(keptPlace)
+                            }
+                        }
+                        var wantedPlaces: [String] = []
+                        for page in pages {
+                            wantedPlaces.append(((pathOf[page] ?? page) as NSString).lastPathComponent)
+                        }
+                        if keptPlaces.sorted() != wantedPlaces.sorted() {
+                            failures.append("recoveryCases '\(name)': the tidy before the plan left kept originals beside \(keptPlaces), not \(wantedPlaces)")
+                        }
+                    }
                 }
                 await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in reachable ? root : nil }, places: places)
             } else {
@@ -1457,6 +1760,40 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': \(folderLines) 'undo found a folder set aside' lines, not \(wanted)")
             }
             let leftovers: [String] = UndoContractKinds.stagedLeftovers(in: root)
+            let keptBeside: [String]? = testCase["keptOriginalsBeside"] as? [String]
+            if let keptBeside {
+                // Exactly one kept original beside each page named, nothing
+                // else staged, and the trail line names exactly those.
+                var wantedFolders: [String] = []
+                for page in keptBeside {
+                    wantedFolders.append(((pathOf[page] ?? page) as NSString).lastPathComponent)
+                }
+                var foundPages: [String] = []
+                var foundNames: [String] = []
+                for staged in leftovers {
+                    let stagedName: String = (staged as NSString).lastPathComponent
+                    if stagedName.hasSuffix("-orig"), let place = UndoSwap.placeOfStagedName(stagedName) {
+                        foundPages.append(place)
+                        foundNames.append(stagedName)
+                    } else {
+                        foundPages.append(stagedName)
+                    }
+                }
+                if foundPages.sorted() != wantedFolders.sorted() {
+                    failures.append("recoveryCases '\(name)': kept beside \(foundPages), not \(wantedFolders) (\(leftovers))")
+                }
+                if couldNotPutBackLines != 1 || keptNamedOnTheTrail.sorted() != foundNames.sorted() {
+                    failures.append("recoveryCases '\(name)': the trail line naming kept originals named \(keptNamedOnTheTrail) in \(couldNotPutBackLines) lines, on the disk \(foundNames)")
+                }
+            }
+            if let noLonger = testCase["keptNoLongerInTheList"] as? Bool {
+                // Why each kept original is said to be kept: every one is
+                // exactly what the list recorded (true), or none is (false).
+                let wanted: [String] = noLonger ? keptNamedOnTheTrail.sorted() : []
+                if keptAsNoLongerInTheList.sorted() != wanted || keptNamedOnTheTrail.isEmpty {
+                    failures.append("recoveryCases '\(name)': said as no longer in the list \(keptAsNoLongerInTheList) of \(keptNamedOnTheTrail)")
+                }
+            }
             if let wanted = testCase["keptAside"] as? Bool {
                 let stillAside: Bool = !leftovers.isEmpty
                 if stillAside != wanted {
@@ -1537,12 +1874,33 @@ nonisolated enum UndoContractReplay {
                 }
             }
             if let undo = string(testCase["undo"]) {
+                if testCase["fileInUseAtTheUndo"] as? Bool == true {
+                    UndoKillPoints.fileInUseAtSwap = { _ in true }
+                }
                 let outcome: String = outcomeWord(survivor.undoNewest(resolveRoot: resolveRoot))
+                UndoKillPoints.fileInUseAtSwap = nil
                 if outcome != undo {
                     failures.append("recoveryCases '\(name)': undo came to \(outcome), not \(undo)")
                 }
             }
-            if mode == .live && !alive && reachable && testCase["keptAside"] as? Bool != true && staysBeside(root) {
+            if let wanted = int(testCase["leftLines"]), leftLines != wanted {
+                failures.append("recoveryCases '\(name)': \(leftLines) 'undo refused for a change left part way' lines, not \(wanted)")
+            }
+            if let pages = testCase["contentInTheList"] as? [String] {
+                // Both of each named page's recorded contents are in the
+                // list again: what the kept original gave, and what the page
+                // held as it was put back.
+                for page in pages {
+                    let index: Int = page == "second" ? 1 : 0
+                    for sha in [beforeHashes[index], afterHashes.count > index ? afterHashes[index] : nil] {
+                        if let sha, survivor.readBlob(sha: sha) == nil {
+                            failures.append("recoveryCases '\(name)': the list does not hold \(page)'s content \(sha.prefix(8))")
+                        }
+                    }
+                }
+            }
+            if mode == .live && !alive && reachable && testCase["keptAside"] as? Bool != true && keptBeside == nil
+                && testCase["keptOriginalUnreadable"] as? Bool != true && staysBeside(root) {
                 failures.append("recoveryCases '\(name)': recovery left a staged file beside a page")
             }
         }

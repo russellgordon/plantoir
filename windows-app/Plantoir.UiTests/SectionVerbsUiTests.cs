@@ -97,6 +97,39 @@ public class SectionVerbsUiTests
         Assert.Contains($"{Code}/1 · Section ▸ Undo Last Change — took the last change back", MenuBar.Trail(app));
     }
 
+    /// <summary>
+    /// #990 (Russell's ruling "name the real menu"), end to end through the
+    /// window and its own <c>plantoir-mcp</c>: Classes ▸ Add Next Class saves
+    /// its copy as the Classes menu's (<c>_classes-section1</c>, the menu sent
+    /// in the call's <c>_meta</c>), and the trail says "the Classes menu backed
+    /// up the course". MUST FAIL with the window not sending the menu.
+    /// </summary>
+    [UiFact]
+    public void AddNextClassFromClassesSavesTheClassesMenusCopy()
+    {
+        using var app = new DrivenApp(courses =>
+        {
+            EndToEnd.WriteCourse(courses, Code, "Section Menu Course", new[] { "Concepts" });
+            EndToEnd.WritePage(Path.Combine(courses, Code, "section1", "All Classes", "Unit 1, Day 1.md"),
+                               "title: Unit 1, Day 1\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400", "A class.");
+        });
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var dates = Enumerable.Range(0, 30).Select(offset => today.AddDays(offset)).ToList();
+        Assert.True(Plantoir.Core.Assist.TimetableMemory.Write(app.WorkspacePath, Code, 1, dates, "test", today));
+        app.SelectSection(Code, 1);
+
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesAddNextClass");
+        var result = WaitFor(app, "sectionVerbResult", "what Add Next Class did");
+        _output.WriteLine("result: " + result.Name);
+        MenuBar.CloseDialog(app);
+
+        string backups = Path.Combine(app.WorkspacePath, "courses", "_backups", Code);
+        Assert.Single(Directory.GetFiles(backups, $"{Code}_backup_*_classes-section1.zip"));
+        Assert.Empty(MenuCopies(app));
+        Assert.Contains($"{Code}/1 · the Classes menu backed up the course as ", MenuBar.Trail(app));
+        Assert.Contains($"{Code}/1 · Classes ▸ Add Next Class — carried out", MenuBar.Trail(app));
+    }
+
     [UiFact]
     public void RebuildPreviewRebuildsAServingPreview()
     {
