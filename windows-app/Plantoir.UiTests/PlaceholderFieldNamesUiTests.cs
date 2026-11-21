@@ -104,6 +104,7 @@ public class PlaceholderFieldNamesUiTests
 
         Assert.True(FocusArrivesAt(app, id => id == "sectionScheduleTypedField"),
                     $"the sheet opened with the keyboard on '{Focused(app)}', not in the dates box");
+        CaptureIfAsked("1024-class-dates-opens-in-the-box.png");
 
         Keyboard.Type("2026-09-08");
         Assert.True(Retry.WhileFalse(() => box.Patterns.Value.Pattern.Value.Value == "2026-09-08",
@@ -154,5 +155,25 @@ public class PlaceholderFieldNamesUiTests
 
         var shortTitle = app.Find($"sidebar-{CourseFixtures.Renamed}-title", "a short code's text");
         Assert.Equal("", shortTitle.Properties.HelpText.ValueOrDefault ?? "");
+
+        // What a person sees: a real hover over the cut-short code draws the
+        // tooltip, and it holds the whole code.
+        app.BringToFront();
+        Mouse.MoveTo(DrivenApp.MiddleOf(longTitle));
+        var tip = Retry.WhileNull(() =>
+        {
+            try { return app.Desktop.FindFirstDescendant(cf => cf.ByControlType(ControlType.ToolTip).And(cf.ByName(LongCode))); }
+            catch (System.Runtime.InteropServices.COMException) { return null; }
+        }, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result;
+        Assert.True(tip is not null, "hovering the cut-short code drew no tooltip holding the whole code");
+        CaptureIfAsked("1024-cut-short-code-tooltip.png");
+    }
+
+    /// <summary>With <c>PLANTOIR_UI_CAPTURE_DIR</c> set, a picture of the screen for the hand-back; otherwise nothing.</summary>
+    private static void CaptureIfAsked(string fileName)
+    {
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") is not { Length: > 0 } folder) return;
+        Directory.CreateDirectory(folder);
+        FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(folder, fileName));
     }
 }
