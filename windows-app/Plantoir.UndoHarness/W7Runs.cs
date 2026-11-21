@@ -105,6 +105,185 @@ internal static class W7Runs
         return failures == 0 ? 0 : 1;
     }
 
+    // ---- W7b1: new pages (Add Classes), and LOW 3's plain write ---------------------
+
+    private static readonly string[] NewPages =
+    [
+        "courses/ICS3U/section1/All Classes/Unit 2, Day 1.md",
+        "courses/ICS3U/section1/All Classes/Unit 2, Day 2.md",
+        "courses/ICS3U/section1/All Classes/Unit 2, Day 3.md",
+    ];
+
+    private static string NewPage(int day) =>
+        $"---\ntitle: Unit 2, Day {day}\npublish: false\ncreated: 2026-09-1{day}T07:00:00.000-0400\n---\n\n## Agenda\n\n1.\n";
+
+    /// <summary>Whether any file under the folder is Hidden that is not a kept copy (<c>-orig</c>).</summary>
+    private static int HiddenNotKept(string root)
+    {
+        int found = 0;
+        foreach (string entry in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            if (!File.GetAttributes(entry).HasFlag(FileAttributes.Hidden)) continue;
+            if (Path.GetFileName(entry).EndsWith("-orig", StringComparison.Ordinal)) continue;
+            found++;
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// Add Classes' step (W7b1): three NEW pages (writeFile, no before) in a
+    /// class folder that does not exist yet, made by the swap, killed at every
+    /// point of the door, shadow then live, then recovered by a second
+    /// process. Each page is absent or whole; live, all one way.
+    /// </summary>
+    internal static int AddClassesKill(string folder)
+    {
+        var points = new List<string> { "afterBegin" };
+        for (int index = 0; index < NewPages.Length; index++) points.Add("beforeSwap@" + index.ToString(CultureInfo.InvariantCulture));
+        points.Add("beforeApplied");
+        int failures = 0;
+        int total = 0;
+        foreach (UndoMode mode in new[] { UndoMode.Shadow, UndoMode.Live })
+        {
+            foreach (string point in points)
+            {
+                total++;
+                string run = Path.Combine(folder, "add-" + mode + "-" + point.Replace('@', '-'));
+                string course = Path.Combine(Root(run), "courses", "ICS3U");
+                Directory.CreateDirectory(Path.Combine(course, "section1"));
+                File.WriteAllText(Path.Combine(course, "course_config.json"),
+                    "{\"course_code\":\"ICS3U\",\"course_name\":\"A course\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
+                string said = Child(["child-w7-add-classes", run, mode.ToString(), point], kill: true);
+                string recovered = Child(["child-w7-recover", run, mode.ToString()], kill: false);
+                var states = new List<string>();
+                for (int index = 0; index < NewPages.Length; index++)
+                {
+                    string path = Full(run, NewPages[index]);
+                    states.Add(!File.Exists(path) ? "absent" : File.ReadAllText(path) == NewPage(index + 1) ? "after" : "NEITHER");
+                }
+                UndoFoldedStep? step = List(run, mode).Journal.Read().Folded.Steps.Values.LastOrDefault();
+                int stagedNew = 0;
+                foreach (string entry in Directory.EnumerateFileSystemEntries(Root(run), "*", SearchOption.AllDirectories))
+                {
+                    string name = Path.GetFileName(entry);
+                    if (name.Contains(UndoSwap.StagedMarker, StringComparison.Ordinal) && name.EndsWith("-new", StringComparison.Ordinal)) stagedNew++;
+                }
+                int hidden = HiddenNotKept(Root(run));
+                bool eachWhole = !states.Contains("NEITHER");
+                bool reachedItsPoint = said.StartsWith("AT ", StringComparison.Ordinal);
+                bool consistent;
+                if (mode == UndoMode.Live)
+                {
+                    string expected = step?.State == UndoStepState.Done ? "after" : "absent";
+                    consistent = reachedItsPoint && eachWhole && states.All(state => state == expected) && step is not null && !step.IsInFlight
+                                 && stagedNew == 0 && hidden == 0;
+                }
+                else
+                {
+                    consistent = reachedItsPoint && eachWhole && (step is null || !step.IsInFlight) && stagedNew == 0 && hidden == 0;
+                }
+                Console.WriteLine($"RESULT w7-add-classes-kill mode={mode} point={point} child=[{said}] recovered=[{recovered}] " +
+                                  $"step={step?.State.ToString() ?? "none"} pages={string.Join(",", states)} stagedNew={stagedNew} hidden={hidden} {(consistent ? "WHOLE" : "NOT-WHOLE")}");
+                if (!consistent) failures++;
+            }
+        }
+        Console.WriteLine($"RESULT w7-add-classes-kill total={total} failures={failures}");
+        return failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>The adding child: three new pages planned into ONE step, as ApplyAddClasses plans them, and made through the door.</summary>
+    internal static int ChildAddClasses(string run, string mode, string point)
+    {
+        Console.WriteLine("STARTED");
+        Console.Out.Flush();
+        UndoForThisProcess list = List(run, Enum.Parse<UndoMode>(mode));
+        var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: StopAt(point), trail: list.Trail);
+        var step = new UndoActionStep(new UndoStepMaker("outsideAssistant::harness", "addClasses"), Root(run), "ICS3U", 1, undo: list, door: door);
+        for (int index = 0; index < NewPages.Length; index++) step.Write(Full(run, NewPages[index]), NewPage(index + 1));
+        try
+        {
+            step.Make();
+            Console.WriteLine("DONE made");
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine("DONE " + error.GetType().Name + ": " + error.Message.Replace('\n', ' '));
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// The W7a final review's LOW 3: a plain write (no working folder, so no
+    /// list) of three pages killed before each swap and before its end; then a
+    /// second process's plain write of the same pages meets what the first
+    /// left. Nothing staged of the dead process may stay, a kept copy that is
+    /// an only copy stays, each page whole.
+    /// </summary>
+    internal static int PlainKill(string folder)
+    {
+        var points = new List<string>();
+        for (int index = 0; index < Pages.Length; index++) points.Add("beforeSwap@" + index.ToString(CultureInfo.InvariantCulture));
+        int failures = 0;
+        foreach (string point in points)
+        {
+            string run = Path.Combine(folder, "plain-" + point.Replace('@', '-'));
+            for (int index = 0; index < Pages.Length; index++)
+            {
+                string path = Path.Combine(run, Path.GetFileName(Pages[index]));
+                Directory.CreateDirectory(run);
+                File.WriteAllText(path, Page(index + 1, published: false));
+            }
+            string said = Child(["child-w7-plain", run, "killed", point], kill: true);
+            string again = Child(["child-w7-plain", run, "again", "none"], kill: false);
+            var states = new List<string>();
+            int leftNew = 0;
+            int leftOrigCopies = 0;
+            for (int index = 0; index < Pages.Length; index++)
+            {
+                string path = Path.Combine(run, Path.GetFileName(Pages[index]));
+                string text = File.ReadAllText(path);
+                states.Add(text == Page(index + 1, true) ? "after" : "NEITHER");
+                foreach (string entry in Directory.EnumerateFiles(run, "." + Path.GetFileName(path) + UndoSwap.StagedMarker + "*"))
+                {
+                    if (entry.EndsWith("-new", StringComparison.Ordinal)) leftNew++;
+                    else if (UndoSwap.IsACopyOfItsPlace(entry, path)) leftOrigCopies++;
+                }
+            }
+            bool whole = said.StartsWith("AT ", StringComparison.Ordinal) && !states.Contains("NEITHER") && leftNew == 0 && leftOrigCopies == 0
+                         && HiddenNotKept(run) == 0;
+            Console.WriteLine($"RESULT w7-plain-kill point={point} child=[{said}] again=[{again}] pages={string.Join(",", states)} leftNew={leftNew} leftCopies={leftOrigCopies} {(whole ? "WHOLE" : "NOT-WHOLE")}");
+            if (!whole) failures++;
+        }
+        Console.WriteLine($"RESULT w7-plain-kill total={points.Count} failures={failures}");
+        return failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>A plain-writing child: the three pages published through a step with no working folder (so no list), stopped at <paramref name="point"/> unless it is <c>none</c>.</summary>
+    internal static int ChildPlain(string run, string what, string point)
+    {
+        Console.WriteLine("STARTED");
+        Console.Out.Flush();
+        UndoForThisProcess list = new(Path.Combine(run, "..", "plain-undo"), UndoMode.Shadow, trail: null);
+        var step = new UndoActionStep(new UndoStepMaker("menu", "publishPages"), null, null, null, undo: list,
+                                      plainSeams: point == "none" ? null : StopAt(point));
+        for (int index = 0; index < Pages.Length; index++)
+        {
+            string path = Path.Combine(run, Path.GetFileName(Pages[index]));
+            // The second write plans the published page over whatever is there.
+            step.Write(path, Page(index + 1, published: true));
+        }
+        try
+        {
+            step.Make();
+            Console.WriteLine($"DONE {what} made");
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine($"DONE {what} " + error.GetType().Name + ": " + error.Message.Replace('\n', ' '));
+        }
+        return 0;
+    }
+
     /// <summary>Starts a child, waits for its first line after STARTED, kills it when it reached its point (and <paramref name="kill"/>), and returns that line.</summary>
     private static string Child(string[] arguments, bool kill)
     {
