@@ -167,15 +167,16 @@ internal sealed class UndoJournal
     /// door passes is <see cref="UndoDoor.FinishWait"/> (10 seconds, the mac's <c>UndoSwitch</c>).
     /// Returns whether it was written now.
     /// </summary>
-    /// <param name="thenPrune">Prune in the same hold, after the closing (the door's closing hold: the ONLY hold of a step that prunes, W2a's review LOW 2).</param>
-    internal bool WriteClosingOrKeep(System.Text.Json.Nodes.JsonObject line, TimeSpan wait, bool inShadow = false, bool thenPrune = false)
+    /// <param name="thenInTheSameHold">Run in the same hold, after the closing: the door's recovery then pruning (the door's closing hold is the ONLY hold of a step that prunes, W2a's review LOW 2).</param>
+    internal bool WriteClosingOrKeep(System.Text.Json.Nodes.JsonObject line, TimeSpan wait, bool inShadow = false,
+                                     Action<UndoJournalWriter>? thenInTheSameHold = null)
     {
         try
         {
             WithLock(writer =>
             {
                 WriteClosing(writer, line);
-                if (thenPrune) Prune(writer);
+                thenInTheSameHold?.Invoke(writer);
             }, inShadow, wait);
             return true;
         }
@@ -274,10 +275,19 @@ internal sealed class UndoJournal
     /// <remarks>
     /// A step closed <c>unsettled</c> here has its staged files removed in the
     /// same hold when its folder can be reached (W2b,
-    /// <see cref="TidyTheStagedFilesOf"/>).
+    /// <see cref="TidyTheStagedFilesOf"/>). Pruning refuses a hold in which
+    /// recovery has not run (W3): such a step was offered to recovery first,
+    /// tried at once since it is past the limits, and is closed here only when
+    /// recovery could not settle it (a file still in use, a step this version
+    /// cannot read, a recompute with no runner).
     /// </remarks>
     internal void Prune(UndoJournalWriter writer)
     {
+        // Recovery first, in this same hold, always (W2b's review, LOW 7): a
+        // step that died mid-swap is settled whole before pruning could close
+        // it unsettled and remove the originals its swap kept.
+        if (!writer.RecoveredThisHold)
+            throw new InvalidOperationException("Pruning runs only in a hold where recovery has run (UndoRecovery.Run).");
         try
         {
             foreach (UndoPruneAction action in UndoPruning.Decide(writer.Reading(), Now, IsAlive))
@@ -289,6 +299,9 @@ internal sealed class UndoJournal
                         {
                             ["seq"] = pruned.Seq, ["event"] = "pruned", ["reason"] = pruned.Reason,
                         });
+                        break;
+                    case UndoPruneAction.ClosedUnsettled closed when writer.LeftForARederivingRecovery.Contains(closed.Seq):
+                        // One more try can settle it: left in flight (W3's review, LOW 2).
                         break;
                     case UndoPruneAction.ClosedUnsettled closed:
                         var paths = new System.Text.Json.Nodes.JsonArray();
@@ -722,7 +735,7 @@ internal sealed class UndoJournal
     }
 }
 
-/// <summary>The checks the app's start-up will hand a journal (W4 and W11a); nothing calls them yet.</summary>
+/// <summary>The checks the app's start-up hands its journal (<see cref="UndoForThisProcess"/>, W4).</summary>
 internal static class UndoJournalChecks
 {
     /// <summary>

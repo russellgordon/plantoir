@@ -2376,6 +2376,26 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
+    /// The section's front page re-derived from the pages as they now stand
+    /// (#899 W4, the <c>sectionFrontPage</c> maintainer of
+    /// <c>undoJournal.opKinds.recompute</c>): pointed at its newest published
+    /// class and given that class's date, by the same rule a publish applies
+    /// (<see cref="IndexChangeFor"/>, <see cref="ApplyIndexChange"/>). False,
+    /// writing nothing, when <paramref name="namedPage"/> is not this section's
+    /// front page or there is no published class to point at. Idempotent.
+    /// </summary>
+    internal bool RederiveTheFrontPage(string courseCode, int section, string namedPage)
+    {
+        Course course = Course(courseCode);
+        string indexPath = SectionIndex.PathFor(course, section);
+        if (!string.Equals(Path.GetFullPath(indexPath), Path.GetFullPath(namedPage), StringComparison.OrdinalIgnoreCase)) return false;
+        if (!File.Exists(indexPath)) return false;
+        if (IndexChangeFor(course, section, [], []) is not { Pointer: { } } index) return false;
+        ApplyIndexChange(index, SiblingTimeAndOffset(course, section, ClassPages(course, section)));
+        return true;
+    }
+
+    /// <summary>
     /// What is actually true after a failure, said accurately.
     ///
     /// This used to read "The pages were changed and backed up" whatever

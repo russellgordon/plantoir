@@ -217,6 +217,9 @@ public sealed partial class SectionDetailView : UserControl
     public SectionDetailView(MainWindow window, Course course, int sectionNumber)
     {
         InitializeComponent();
+        // #1009: the console's visible Cancel holds Escape (a preview stops at
+        // once, a deploy asks "Stop the deploy?" first).
+        Progress.GiveCancelTheEscapeKey();
         _window = window;
         _course = course;
         _sectionNumber = sectionNumber;
@@ -619,7 +622,8 @@ public sealed partial class SectionDetailView : UserControl
                 string title = deployRunner.Legs.Count > 1
                     ? $"Deploying {TitleText} — destination {Math.Min(deployRunner.CurrentLegIndex + 1, deployRunner.Legs.Count)} of {deployRunner.Legs.Count}"
                     : $"Deploying {TitleText}";
-                Progress.Show(deployRunner.ActiveRunner, title, onCancel: CancelDeploy, multiRunner: deployRunner);
+                Progress.Show(deployRunner.ActiveRunner, title, onCancel: CancelDeploy, multiRunner: deployRunner,
+                              stopQuestion: StopQuestion.Deploy);
             }
         }
         else
@@ -646,6 +650,8 @@ public sealed partial class SectionDetailView : UserControl
                              == SectionProblems.Tab.Problems;
         BaseLayer.Visibility = problemsShown ? Visibility.Collapsed : Visibility.Visible;
         Preview.Visibility = previewShown && !problemsShown ? Visibility.Visible : Visibility.Collapsed;
+        // #1009: the site drawn over the console holds no stop key.
+        Progress.IsCovered = Preview.Visibility == Visibility.Visible;
         _problemsView.Visibility = problemsShown ? Visibility.Visible : Visibility.Collapsed;
 
         PreviewChromeChanged?.Invoke(this, EventArgs.Empty);

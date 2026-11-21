@@ -3,7 +3,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
@@ -58,7 +60,7 @@ public sealed partial class TaskProgressView : UserControl
         // Re-renders once a second while a task runs, so the "still working…"
         // timer keeps moving even when the script itself is momentarily quiet.
         _tick = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _tick.Tick += (_, _) => { if (_runner is { } r && (r.IsRunning || r.IsBetweenPhases)) Render(); };
+        _tick.Tick += (_, _) => { if (MultiDestinationDeployRunner.ShownTaskShowsAsWorking(_runner, _multiRunner)) Render(); };
         Loaded += (_, _) =>
         {
             _leaving = false;
@@ -81,6 +83,13 @@ public sealed partial class TaskProgressView : UserControl
         {
             _tick.Stop();
             _leaving = true;
+            // A stop question up as the view goes: it is taken down and counts
+            // as Cancel, so nothing is stopped or remembered unasked.
+            if (_openStopQuestion is { } stopQuestion)
+            {
+                _stopAsking?.ChooseCancel();
+                try { stopQuestion.Hide(); } catch { }
+            }
             QuestionAskers.LeftUnanswered -= AskIfStillWaiting;
             foreach (var (runner, handler) in _hooked) runner.PropertyChanged -= handler;
             _hooked.Clear();
@@ -150,6 +159,28 @@ public sealed partial class TaskProgressView : UserControl
     public Action? OnCancel { get; set; }
 
     /// <summary>
+    /// The question asked before the shown task stops (#1009, the mac's #988):
+    /// "Stop the deploy?" for a deploy, none for a preview, which stops at once.
+    /// </summary>
+    private StopQuestion? _stopQuestion;
+
+    /// <summary>The stop question this view has up, and its model, so a task that ends under it, or a view that leaves, takes it down.</summary>
+    private ContentDialog? _openStopQuestion;
+    private StopQuestionAsking? _stopAsking;
+
+    /// <summary>
+    /// True while something is drawn over this panel in its own place: a
+    /// section's preview site, once it serves, covers the console though the
+    /// preview still runs. Escape on a web page never stops the preview (the
+    /// mac's <c>progressPanelTakesTheCancelKeys</c>); the toolbar's Stop
+    /// Preview does.
+    /// </summary>
+    public bool IsCovered { get; set; }
+
+    /// <summary>The run a stop was last sent to, so a repeating key or a second press stops it once (the mac's <c>CancelOncePerRun</c>).</summary>
+    private (ScriptRunner Runner, DateTime? StartedAt)? _stopSentTo;
+
+    /// <summary>
     /// Choose which registered runner the panel displays.
     /// <paramref name="multiRunner"/>, when set and carrying more than one
     /// leg, adds the destination checklist, the combined console (every leg
@@ -159,14 +190,17 @@ public sealed partial class TaskProgressView : UserControl
     /// for every caller with a single runner: the wizard's preview, and a
     /// single-destination deploy behave byte-for-byte as before.
     /// </summary>
-    public void Show(ScriptRunner runner, string title, Action? onCancel = null, MultiDestinationDeployRunner? multiRunner = null)
+    public void Show(ScriptRunner runner, string title, Action? onCancel = null, MultiDestinationDeployRunner? multiRunner = null,
+                     StopQuestion? stopQuestion = null)
     {
+        _stopQuestion = stopQuestion;
         Register(runner);
         if (!ReferenceEquals(_runner, runner)) _renderedTranscriptVersion = -1;
         _runner = runner;
         _multiRunner = multiRunner is { Legs.Count: > 1 } ? multiRunner : null;
         _title = title;
         OnCancel = onCancel;
+        TakeDownTheStopQuestionIfTheTaskEnded();
         Render();
     }
 
@@ -196,6 +230,7 @@ public sealed partial class TaskProgressView : UserControl
         _runner = null;
         _multiRunner = null;
         OnCancel = null;
+        _stopQuestion = null;
         EnsureTicking(false);
 
         TitleText.Text = title;
@@ -232,7 +267,28 @@ public sealed partial class TaskProgressView : UserControl
         if (e.PropertyName == nameof(ScriptRunner.LastExitCode) && !runner.IsRunning
             && ReferenceEquals(runner, _runner))
             AutoExpandOnUnexplainedFailure();
+        // The task ended under its stop question: nothing is left to stop.
+        // Ended, not merely between its build and its deploy (#1009's
+        // review) or between two destinations (its second review): the
+        // question stays up across either change.
+        if (e.PropertyName is nameof(ScriptRunner.IsRunning) or nameof(ScriptRunner.IsBetweenPhases)
+            && ReferenceEquals(runner, _runner))
+            TakeDownTheStopQuestionIfTheTaskEnded();
         if (ReferenceEquals(runner, _runner)) Render();
+    }
+
+    /// <summary>
+    /// A stop question up over a task that can no longer be stopped is taken
+    /// down and counts as nothing chosen. Asked by the one rule
+    /// (<see cref="TaskIsUnderWay"/>) when the shown runner changes state, and
+    /// when the section shows the panel again: the whole deploy run ending
+    /// reaches this view only that way.
+    /// </summary>
+    private void TakeDownTheStopQuestionIfTheTaskEnded()
+    {
+        if (TaskIsUnderWay || _openStopQuestion is not { } stopQuestion) return;
+        _stopAsking?.TaskEnded();
+        try { stopQuestion.Hide(); } catch { }
     }
 
     private void Render()
@@ -245,10 +301,15 @@ public sealed partial class TaskProgressView : UserControl
         // IsBetweenPhases: this runner has already finished the build half
         // of a build-then-deploy leg (IsRunning is false) but the deploy
         // half is about to start on it — rendering the outcome branch here
-        // would flash "Done"/a failure for the gap the caller's polling
-        // wait takes to notice the deploy is still queued up on it. See
-        // ScriptRunner.IsBetweenPhases (row 318b).
-        if (_runner.IsRunning || _runner.IsBetweenPhases)
+        // would flash "Done"/a failure for the gap before the caller's wait
+        // resumes (a turn of the window's thread since #1016) and starts the
+        // deploy queued up on it. See
+        // ScriptRunner.IsBetweenPhases (row 318b). And while the whole
+        // deploy run can still be stopped (#1009's third review): in the gap
+        // between two destinations the shown runner is the leg that just
+        // ended, and drawing its outcome put a "Done" or "Something went
+        // wrong" badge beside a Cancel that still stops the deploy.
+        if (MultiDestinationDeployRunner.ShownTaskShowsAsWorking(_runner, _multiRunner))
         {
             OutcomeIcon.Visibility = Visibility.Collapsed;
             PhaseText.Text = hasMilestones ? _runner.StepDescription : "Working…";
@@ -287,7 +348,9 @@ public sealed partial class TaskProgressView : UserControl
                 // destination failed and second succeeded must never read
                 // as "Done" just because the last leg to run was fine.
                 var outcome = multi.CurrentOutcome;
-                if (_runner.WasCancelled) Outcome("Cancelled", Glyphs.Cancel, Caution(), $"{_title} was cancelled.");
+                // The run's own mark too: a cancel between two destinations
+                // reaches no leg's runner (#1009's second review).
+                if (_runner.WasCancelled || multi.WasCancelled) Outcome("Cancelled", Glyphs.Cancel, Caution(), $"{_title} was cancelled.");
                 else if (_runner.WasStoppedByUser) Outcome("Stopped", Glyphs.Stop, Secondary(), null);
                 else if (outcome.AllSucceeded) Outcome("Done", Glyphs.CheckMark, Success(), null);
                 else if (outcome.AnySucceeded)
@@ -334,13 +397,15 @@ public sealed partial class TaskProgressView : UserControl
             DestinationLinks.Visibility = Visibility.Collapsed;
         }
 
-        if (!_runner.IsRunning) EnsureTicking(false);
+        if (!MultiDestinationDeployRunner.ShownTaskShowsAsWorking(_runner, _multiRunner)) EnsureTicking(false);
 
-        RunningActionsRow.Visibility = (_runner.IsRunning && !_runner.WasCancelled) ? Visibility.Visible : Visibility.Collapsed;
+        // Under way, so Cancel stays on screen, and holds its key, between a
+        // leg's build and its deploy (#1009's review).
+        RunningActionsRow.Visibility = TaskIsUnderWay ? Visibility.Visible : Visibility.Collapsed;
         AwaitingNotice.Visibility = _runner.IsAwaitingInput ? Visibility.Visible : Visibility.Collapsed;
         LaunchProblemText.Text = _runner.LaunchProblem ?? "";
         LaunchProblemText.Visibility = _runner.LaunchProblem is null ? Visibility.Collapsed : Visibility.Visible;
-        ConsoleInputRow.Visibility = _runner.IsRunning ? Visibility.Visible : Visibility.Collapsed;
+        ConsoleInputRow.Visibility = _runner.IsUnderWay ? Visibility.Visible : Visibility.Collapsed;
 
         long combinedVersion = _multiRunner is { } forVersion
             ? forVersion.Legs.Sum(leg => leg.Runner.Transcript.Version)
@@ -676,12 +741,112 @@ public sealed partial class TaskProgressView : UserControl
         ConsoleInput.Text = "";
     }
 
-    private void ConsoleStop_Click(object sender, RoutedEventArgs e) => _runner?.Terminate();
+    /// <summary>
+    /// The console's own Stop, beside its answer box: the same path as Cancel
+    /// (#1009's review, ruled: stopping a deploy asks first by every route), so
+    /// a deploy asks "Stop the deploy?", is swept by the section's
+    /// <c>CancelDeploy</c> and ends "Cancelled"; a preview still stops at once.
+    /// </summary>
+    private void ConsoleStop_Click(object sender, RoutedEventArgs e) => _ = PressCancelAsync();
 
     private string? _publishedFolder;
 
-    private void TaskCancel_Click(object sender, RoutedEventArgs e)
+    private void TaskCancel_Click(object sender, RoutedEventArgs e) => _ = PressCancelAsync();
+
+    // ---- Stopping, by click, by UI Automation and by Escape (#1009) ---------
+
+    /// <summary>
+    /// Gives the visible Cancel the Escape key (#1009, the mac's #988): a
+    /// <c>KeyboardAccelerator</c> on the button itself, which WinUI shows in
+    /// the button's tooltip ("Cancel (Esc)"), and no hidden control or key
+    /// handler anywhere. Called once by a section's view; the New Course
+    /// wizard's panel keeps Escape for its dialog (#979).
+    /// </summary>
+    /// <remarks>
+    /// An app accelerator with no <c>ScopeOwner</c> is looked for only after
+    /// the key has bubbled from the focused element to the root unhandled
+    /// (Microsoft, "Keyboard accelerators", Resolving accelerators), so a
+    /// control that uses Escape itself (an open flyout, a dialog, a list's
+    /// drop-down) has it first. The key is then decided as it arrives
+    /// (<see cref="StopKey.GoesToCancel"/>). <c>Handled</c> is set whatever
+    /// is decided: an accelerator left unhandled goes on to press the button
+    /// through its Invoke pattern, which would stop the task from a text box.
+    /// </remarks>
+    public void GiveCancelTheEscapeKey()
     {
+        var escape = new KeyboardAccelerator { Key = VirtualKey.Escape };
+        escape.Invoked += (pressed, args) =>
+        {
+            args.Handled = true;
+            bool goesToCancel = StopKey.GoesToCancel(
+                cancelIsShown: !IsCovered && IsOnScreen(TaskCancelButton),
+                taskIsRunning: TaskIsUnderWay,
+                aDialogIsOpen: Plantoir.Services.DialogGate.IsOpen(XamlRoot),
+                anEditableTextBoxHasTheFocus: IsEditableText(XamlRoot is { } root ? FocusManager.GetFocusedElement(root) : null));
+            if (goesToCancel) _ = PressCancelAsync();
+        };
+        TaskCancelButton.KeyboardAccelerators.Add(escape);
+    }
+
+    /// <summary>An editable text box: the key is its own. Read-only text (the console's output) is not one.</summary>
+    internal static bool IsEditableText(object? focused) => focused switch
+    {
+        TextBox box => !box.IsReadOnly,
+        PasswordBox => true,
+        RichEditBox rich => !rich.IsReadOnly,
+        _ => false,
+    };
+
+    /// <summary>Whether an element and every one of its parents is shown.</summary>
+    private static bool IsOnScreen(UIElement element)
+    {
+        DependencyObject? at = element;
+        while (at is not null)
+        {
+            if (at is UIElement shown && shown.Visibility != Visibility.Visible) return false;
+            at = VisualTreeHelper.GetParent(at);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// The panel's Cancel, however it was pressed. A preview, or a task whose
+    /// question is off, stops at once; a deploy asks "Stop the deploy?" first
+    /// (<see cref="StopQuestionAsking"/>).
+    /// </summary>
+    private async System.Threading.Tasks.Task PressCancelAsync()
+    {
+        if (_openStopQuestion is not null) return;
+        var asking = new StopQuestionAsking(_stopQuestion, App.Settings);
+        if (asking.PressCancel(TaskIsUnderWay))
+        {
+            StopTheTask();
+            return;
+        }
+        if (asking.IsAsking && asking.Question is { } question) await AskBeforeStoppingAsync(asking, question);
+    }
+
+    /// <summary>
+    /// The one rule this panel's stopping decides by (#1009's reviews): the
+    /// shown task is under way (running, or between its build and its deploy)
+    /// and not already cancelled, or the whole deploy run is still going (the
+    /// gap between two destinations), as
+    /// <see cref="MultiDestinationDeployRunner.ShownTaskIsUnderWay"/> says.
+    /// The key, a click, the console's Stop, the question's Stop Deploy, the
+    /// Cancel row's showing and the question's taking down all read it.
+    /// </summary>
+    private bool TaskIsUnderWay => MultiDestinationDeployRunner.ShownTaskIsUnderWay(_runner, _multiRunner);
+
+    private void StopTheTask()
+    {
+        // Once per run: a held Escape repeats (Microsoft: an accelerator
+        // auto-repeats, and that cannot be changed), and a second stop of a
+        // run already stopping does nothing a teacher asked for.
+        if (_runner is { } runner)
+        {
+            if (_stopSentTo is { } sent && ReferenceEquals(sent.Runner, runner) && sent.StartedAt == runner.StartedAt) return;
+            _stopSentTo = (runner, runner.StartedAt);
+        }
         if (OnCancel is not null)
         {
             OnCancel.Invoke();
@@ -689,6 +854,75 @@ public sealed partial class TaskProgressView : UserControl
         else
         {
             _runner?.CancelByUser();
+        }
+    }
+
+    /// <summary>
+    /// "Stop the deploy?": Stop Deploy is the default, so Enter stops (the
+    /// mac's ruling 1, plain, not destructive), and Cancel is WinUI's Close
+    /// button, rightmost, which Escape presses (Windows' own order, ruled on
+    /// #979). The box counts only with Stop Deploy; Cancel remembers nothing.
+    /// </summary>
+    private async System.Threading.Tasks.Task AskBeforeStoppingAsync(StopQuestionAsking asking, StopQuestion question)
+    {
+        if (XamlRoot is null || Plantoir.Services.DialogGate.IsOpen(XamlRoot))
+        {
+            asking.ChooseCancel();
+            return;
+        }
+        var dontAskAgain = new CheckBox { Content = StopQuestionWording.DontAskAgain, IsChecked = false };
+        AutomationProperties.SetAutomationId(dontAskAgain, "stopQuestionDontAskAgain");
+        var content = new StackPanel();
+        content.Children.Add(FormBuilders.DialogExplanation(StopQuestionWording.Message(question)));
+        content.Children.Add(dontAskAgain);
+        var dialog = new ContentDialog
+        {
+            Title = StopQuestionWording.Title(question),
+            Content = content,
+            PrimaryButtonText = StopQuestionWording.StopButton(question),
+            CloseButtonText = StopQuestionWording.CancelButton,
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+        // A held Escape: the press that asked repeats while the key is held
+        // (Microsoft: an accelerator auto-repeats), and a repeat reaching the
+        // open question pressed its Cancel (measured in the VM, 1 run in 3).
+        // The question takes Escape only as a fresh press: a repeat
+        // (KeyStatus.WasKeyDown) is swallowed on its way down, as TickTable
+        // swallows a held Space's. On the visible question itself, for its
+        // own key; every other key, and a fresh Escape, is the dialog's as
+        // before.
+        dialog.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key == VirtualKey.Escape && args.KeyStatus.WasKeyDown) args.Handled = true;
+        };
+        _openStopQuestion = dialog;
+        _stopAsking = asking;
+        try
+        {
+            var result = await dialog.ShowAsync();
+            if (!asking.IsAsking) return;   // the task ended, or the view left, under it
+            if (result == ContentDialogResult.Primary)
+            {
+                asking.DontAskAgain = dontAskAgain.IsChecked == true;
+                asking.ChooseStop();
+                if (TaskIsUnderWay) StopTheTask();
+            }
+            else
+            {
+                asking.ChooseCancel();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Not shown (another dialog opened in the same beat): nothing stops.
+            App.LogDiagnostic($"The stop question could not be shown: {ex.Message}");
+            asking.ChooseCancel();
+        }
+        finally
+        {
+            _openStopQuestion = null;
+            _stopAsking = null;
         }
     }
 

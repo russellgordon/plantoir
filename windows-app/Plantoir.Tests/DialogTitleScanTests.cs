@@ -53,7 +53,7 @@ public class DialogTitleScanTests
         ["Views/SidebarPane.xaml.cs"] = 16,
         ["Views/SpecialFoldersHelpDialog.cs"] = 1,
         ["Views/StartOfYearDialog.cs"] = 2,
-        ["Views/TaskProgressView.xaml.cs"] = 2,
+        ["Views/TaskProgressView.xaml.cs"] = 3,   // +1 with #1009: "Stop the deploy?"
     };
 
     [Fact]

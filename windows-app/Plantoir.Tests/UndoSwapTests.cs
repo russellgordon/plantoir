@@ -237,21 +237,157 @@ public sealed class UndoSwapTests : IDisposable
         string folder = Path.Combine(root, "courses", "A");
         Directory.CreateDirectory(folder);
         File.WriteAllBytes(Path.Combine(folder, "a.md"), Old);
-        var seams = new UndoSeams
-        {
-            BeforeEachSwap = (_, _) =>
-            {
-                Directory.Move(folder, folder + "-moved");
-                MakeAJunction(folder, outside);
-            },
-        };
+        // Between the check and the swap (during the swap Windows will not
+        // move the folder at all while a staged file is open in it: W3's
+        // WhileASwapIsUnderWayTheFoldersOfItsPagesCannotBeMovedOrReplaced).
+        Directory.Move(folder, folder + "-moved");
+        MakeAJunction(folder, outside);
         var target = new UndoSwapTarget(Path.Combine(folder, "a.md"), "courses/A/a.md", Old, New);
-        UndoSwapResult result = UndoSwap.Swap([target], "1-undo", root, seams);
+        UndoSwapResult result = UndoSwap.Swap([target], "1-undo", root);
         var refused = Assert.IsType<UndoSwapResult.Refused>(result);
         Assert.Equal(UndoRefusalKind.ChangedSince, refused.Refusal.Kind);
         Assert.Equal(Old, File.ReadAllBytes(Path.Combine(outside, "a.md")));
         Assert.Equal(["a.md"], Directory.EnumerateFileSystemEntries(outside).Select(Path.GetFileName).ToArray());
         Directory.Delete(folder);   // the junction only
+    }
+
+    // ---- W2b's review LOWs 2, 3, 4 and 8 (fixed in W3) ---------------------------
+
+    /// <summary>
+    /// LOW 2, made impossible rather than detected: while a swap is under way
+    /// Windows refuses to move the folder of any of its pages (a staged file,
+    /// or for a page the step removes its kept original, is open in it), so no
+    /// junction can be put in its place between the re-read and the rename and
+    /// nothing of the swap can be left in a folder moved aside. Both kinds of
+    /// page, at both moments.
+    /// </summary>
+    [Fact]
+    public void WhileASwapIsUnderWayTheFoldersOfItsPagesCannotBeMovedOrReplaced()
+    {
+        string root = Path.Combine(_root, "wf");
+        string replaced = Path.Combine(root, "courses", "A");
+        string removed = Path.Combine(root, "courses", "B");
+        Directory.CreateDirectory(replaced);
+        Directory.CreateDirectory(removed);
+        File.WriteAllBytes(Path.Combine(replaced, "a.md"), Old);
+        File.WriteAllBytes(Path.Combine(removed, "b.md"), Old);
+        var refusedMoves = new List<string>();
+        void TryToMove(int index, string path)
+        {
+            string folder = Path.GetDirectoryName(path)!;
+            try
+            {
+                Directory.Move(folder, folder + "-moved");
+                Directory.Move(folder + "-moved", folder);
+            }
+            catch (IOException) { refusedMoves.Add(Path.GetFileName(folder)); }
+        }
+        var seams = new UndoSeams { BeforeEachSwap = TryToMove, BetweenKeepingAndRenaming = TryToMove };
+        UndoSwapResult result = UndoSwap.Swap(
+            [new UndoSwapTarget(Path.Combine(replaced, "a.md"), "courses/A/a.md", Old, New),
+             new UndoSwapTarget(Path.Combine(removed, "b.md"), "courses/B/b.md", Old, null)], "1-apply", root, seams);
+        Assert.IsType<UndoSwapResult.Swapped>(result);
+        // a.md's folder is held by its staged content at both moments; b.md's
+        // by its kept original only once it is kept.
+        Assert.Equal(["A", "A", "B"], refusedMoves);
+        Assert.Equal(New, File.ReadAllBytes(Path.Combine(replaced, "a.md")));
+        Assert.False(File.Exists(Path.Combine(removed, "b.md")));
+        Assert.Empty(StagedLeft());
+        // Once the swap has ended nothing holds either folder.
+        Directory.Move(replaced, replaced + "-moved");
+        Directory.Move(removed, removed + "-moved");
+    }
+
+    /// <summary>LOW 2: a kept original is removed by name only while the name is still that file; a name that now holds another file removes nothing.</summary>
+    [Fact]
+    public void AKeptOriginalWhoseNameNowHoldsAnotherFileIsNotRemoved()
+    {
+        string page = Page("courses/A/a.md", Old);
+        string kept = UndoSwap.BesidePath(page, "1-undo", "orig");
+        UndoStagedFile original = UndoStagedFile.Keep(page, kept, out _)!;
+        File.Delete(kept);
+        File.WriteAllBytes(kept, New);   // another file under the same name
+        Assert.False(original.Remove());
+        Assert.Equal(New, File.ReadAllBytes(kept));
+        Assert.Equal(Old, File.ReadAllBytes(page));
+        File.Delete(kept);
+    }
+
+    /// <summary>
+    /// LOW 3: an editor that saves by REPLACING the page (a new file renamed
+    /// over it) between the keep and the rename: the page is no longer the
+    /// file the original was kept from, so the swap is refused changed since
+    /// and the editor's save is kept. The kept link's hash cannot see it (it
+    /// is still the old bytes); only the file identity can.
+    /// </summary>
+    [Fact]
+    public void AnEditorThatSavesByReplacingThePageBeforeTheRenameKeepsItsSave()
+    {
+        string page = Page("courses/A/a.md", Old);
+        byte[] saved = Encoding.UTF8.GetBytes("---\ntitle: A\npublish: false\n---\nWhat the teacher saved.\n");
+        var seams = new UndoSeams
+        {
+            BetweenKeepingAndRenaming = (_, path) =>
+            {
+                string temporary = path + ".editor-tmp";
+                File.WriteAllBytes(temporary, saved);
+                File.Move(temporary, path, overwrite: true);
+            },
+        };
+        UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New)], "1-undo", _root, seams);
+        Assert.Equal(UndoRefusalKind.ChangedSince, Assert.IsType<UndoSwapResult.Refused>(result).Refusal.Kind);
+        Assert.Equal(saved, ReadShared(page));
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>
+    /// LOW 4: a page made read-only between the keep and the rename: the
+    /// rename is refused couldNotWrite, and removing the kept original (a hard
+    /// link, so it shares the page's attributes) leaves the page read-only:
+    /// its attribute is ignored for the delete, never cleared.
+    /// </summary>
+    [Fact]
+    public void RemovingAKeptOriginalNeverClearsThePagesReadOnlyBit()
+    {
+        string page = Page("courses/A/a.md", Old);
+        var seams = new UndoSeams { BetweenKeepingAndRenaming = (_, path) => File.SetAttributes(path, FileAttributes.ReadOnly) };
+        UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New)], "1-undo", _root, seams);
+        Assert.Equal(UndoRefusalKind.CouldNotWrite, Assert.IsType<UndoSwapResult.Refused>(result).Refusal.Kind);
+        Assert.True(File.GetAttributes(page).HasFlag(FileAttributes.ReadOnly));
+        Assert.Equal(Old, ReadShared(page));
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>LOW 4, the tidy: a kept original a stopped swap left (a link to the live, read-only page) is removed without clearing the page's read-only bit.</summary>
+    [Fact]
+    public void TheTidyOfALeftoverLinkNeverClearsThePagesReadOnlyBit()
+    {
+        string root = Path.Combine(_root, "wf");
+        string page = Path.Combine(root, "courses", "A", "a.md");
+        Directory.CreateDirectory(Path.GetDirectoryName(page)!);
+        File.WriteAllBytes(page, Old);
+        string kept = UndoSwap.BesidePath(page, "7-apply", "orig");
+        Assert.NotNull(UndoStagedFile.Keep(page, kept, out _));
+        File.SetAttributes(page, FileAttributes.ReadOnly);
+        Assert.True(UndoSwap.TidyLeftovers(7, ["courses/A/a.md"], root));
+        Assert.False(File.Exists(kept));
+        Assert.True(File.GetAttributes(page).HasFlag(FileAttributes.ReadOnly));
+        Assert.Equal(Old, ReadShared(page));
+    }
+
+    /// <summary>LOW 8: OneDrive's Pinned and Unpinned are attributes the page keeps across a swap (they stick on any NTFS file, measured).</summary>
+    [Theory]
+    [InlineData(0x00080000)]
+    [InlineData(0x00100000)]
+    public void ThePageKeepsItsOneDrivePinning(int attribute)
+    {
+        var pinning = (FileAttributes)attribute;
+        string page = Page("courses/A/a.md", Old);
+        File.SetAttributes(page, FileAttributes.Archive | pinning);
+        Assert.True(File.GetAttributes(page).HasFlag(pinning), "the attribute does not stick on this volume");
+        Assert.IsType<UndoSwapResult.Swapped>(UndoSwap.Swap([Target("courses/A/a.md", Old, New)], "1-undo", _root));
+        Assert.Equal(New, ReadShared(page));
+        Assert.True(File.GetAttributes(page).HasFlag(pinning));
     }
 
     internal static void MakeAJunction(string link, string target)

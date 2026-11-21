@@ -105,6 +105,13 @@ AppDomain.CurrentDomain.ProcessExit += (_, _) =>
     lease?.Dispose();
 };
 
+// Undo's list (#899 W4): recovery at launch, on a thread of its own, after
+// --state-dir is applied (above), so this server finds the same list as the
+// window that started it, or the default list when an outside door started
+// it with none. It never writes to stdout, never stops or slows the server,
+// and with the switch off only records what it finds.
+_ = Plantoir.Core.Undo.UndoAtLaunch.Recover();
+
 var builder = Host.CreateApplicationBuilder();
 
 // Every log line goes to stderr. stdout carries JSON-RPC frames and nothing
