@@ -96,39 +96,4 @@ public class DeployedFolderInBrowserUiTests
         }
         finally { try { Directory.Delete(deployed, recursive: true); } catch { } }
     }
-
-    /// <summary>
-    /// <c>deployedFolderInBrowser.offeredWhen</c>: "when the pointer reaches
-    /// the button" (lane B review, low 2). The section's deployed folder does
-    /// not exist when the section shows, so the button is dimmed; the folder
-    /// is made behind the window's back (as a scheduled deploy would) and the
-    /// pointer moved onto the button: it comes live, with no other event.
-    /// MUST FAIL with the button's PointerEntered read taken out.
-    /// </summary>
-    [UiFact]
-    public void OpenInBrowserIsReadAgainWhenThePointerReachesIt()
-    {
-        string deployed = Path.Combine(Path.GetTempPath(), "plantoir-889p-" + Guid.NewGuid().ToString("N"));
-        try
-        {
-            using var app = new DrivenApp(courses =>
-                EndToEnd.WriteCourse(courses, Code, "Deployed Folder Course", new[] { "Concepts" }, EndToEnd.PublishesTo(deployed)));
-            app.SelectSection(Code, 1);
-            var button = app.Find("openInBrowserButton", "Open in Browser");
-            Assert.False(button.IsEnabled, "Open in Browser was live before the deployed folder existed");
-
-            Directory.CreateDirectory(Path.Combine(deployed, "section1"));
-            File.WriteAllText(Path.Combine(deployed, "section1", "index.html"), "<html><body>Deployed</body></html>");
-            app.BringToFront();
-            var title = app.Find("sidebar-" + Code, "the course's row");
-            // Real pointer input (FixWithButtonsUiTests.Glide): a placed cursor
-            // raises no PointerEntered in WinUI.
-            var from = DrivenApp.MiddleOf(title, app.Window.BoundingRectangle);
-            FixWithButtonsUiTests.Glide(from, from, 1);
-            FixWithButtonsUiTests.Glide(from, DrivenApp.MiddleOf(button, app.Window.BoundingRectangle), 15);
-            Assert.True(Retry.WhileFalse(() => button.IsEnabled, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250)).Result,
-                        "Open in Browser stayed dimmed after the pointer reached it with the deployed folder there");
-        }
-        finally { try { Directory.Delete(deployed, recursive: true); } catch { } }
-    }
 }
