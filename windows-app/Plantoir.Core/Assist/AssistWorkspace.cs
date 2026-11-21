@@ -3116,71 +3116,60 @@ public sealed partial class AssistWorkspace
         // a date it could not set, and a hide it could not write.
         var undated = new List<string>();
         var notHidden = new List<string>();
-        // The pages already written, so a re-date that stops part way can name
-        // them (#550, the mac's #531).
-        var written = new List<string>();
 
+        // ONE step through the door (#899 W7b1; the mac's
+        // SectionReDatePlanner.apply): every page re-dated together, all or
+        // none, each read through the step at plan time, and the front page
+        // kept true by its rule after the step (recompute, sectionFrontPage),
+        // never written as a file of it. A rollover makes the same step under
+        // its own key; the record it releases (below) stays outside it until
+        // the rollover is one step (W7c). The timetable written above is its
+        // own rememberTimetable step, as before W7b1 it was its own write (the
+        // mac's re-date writes none: see the notes).
+        var step = NewUndoStep(isARollover ? "rollOver" : "reDateClasses", course.Code, section);
         try
         {
-            foreach (var date in plan.Changing)
+            PlanningThrough = step;
+            try
             {
-                string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                string fileText = File.ReadAllText(full);
-                var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
-                string updated = dateEdit.Text;
-                bool changed = dateEdit.Changed;
-                if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
-                if (date.Unpublishes)
+                foreach (var date in plan.Changing)
                 {
-                    bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
-                    string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-                    var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
-                        updated, pubKey, draft: true, section);
-                    updated = draftUpdated;
-                    if (draftEdit.Changed) changed = true;
-                    if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
+                    string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                    string fileText = step.ReadText(full);
+                    var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
+                    string updated = dateEdit.Text;
+                    bool changed = dateEdit.Changed;
+                    if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
+                    if (date.Unpublishes)
+                    {
+                        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+                        string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
+                        var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
+                            updated, pubKey, draft: true, section);
+                        updated = draftUpdated;
+                        if (draftEdit.Changed) changed = true;
+                        if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
+                    }
+                    if (!changed) continue;
+                    step.Write(full, updated);
+                    if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
                 }
-                if (!changed) continue;
-                Save(full, updated);
-                written.Add(full);
-                if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
+                step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
+            finally { PlanningThrough = null; }
+            MakeTheUndoStep(step);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            // Stopped part way: the pages before the failing one ARE re-dated
-            // and the undo entry is abandoned, so it is said as part way, with
-            // those pages named, and counted as a write (the mac's #531,
-            // ruling M3). Before any page was written it changed no page —
-            // though the timetable written above is already remembered.
-            // An AssistRefusal, so re_date_classes and roll_over_section both
-            // ANSWER it, each through its own catch (AssistRefusal); before
-            // #550 both let the IOException escape as a protocol error. Any
-            // OTHER IOException here (TimetableMemory.Write, say) still
-            // escapes; that predates #550.
-            if (written.Count == 0) throw new AssistRefusal(NothingWasChanged(error));
+            // All or none (#899 W7b1): "Nothing was changed" unless the door
+            // left a page holding its new date with its earlier content kept
+            // beside it, which is said as part way, naming each kept file
+            // (#550's list of pages written one by one is gone with the
+            // writing one by one). An AssistRefusal, so re_date_classes and
+            // roll_over_section both ANSWER it, each through its own catch.
+            if (error is not UndoStepLeftPartWayException) throw new AssistRefusal(NothingWasChanged(error));
             NoteAChangeWithNoUndoEntry();
-            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section) +
-                                    "\n\nThe pages already re-dated:\n" + ListingOf(written));
-        }
-
-        string indexPath = SectionIndex.PathFor(course, section);
-        if (File.Exists(indexPath))
-        {
-            try
-            {
-                string indexText = File.ReadAllText(indexPath);
-                string? newestPublished = SectionIndex.MostRecentPublished(course, section, ClassPages(course, section));
-                if (newestPublished is not null)
-                {
-                    if (SectionIndex.Repointed(indexText, PointerFor(course, section, newestPublished)) is { } newIndexText
-                        && newIndexText != indexText)
-                    {
-                        Save(indexPath, newIndexText);
-                    }
-                }
-            }
-            catch { }
+            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section));
         }
 
         // A ROLLOVER releases the published-pages record and the checklist's

@@ -343,31 +343,30 @@ public class SectionVerbsTests : IDisposable
     }
 
     /// <summary>
-    /// Re-date Classes… that stopped part way says so and names the pages
-    /// already re-dated — never "Nothing was changed", and never the
-    /// "couldn’t be read" a read failure gets — and the line says "carried out".
+    /// Re-date Classes… whose second page cannot be written is ONE step,
+    /// all or none (#899 W7b1): the page before it is not re-dated either,
+    /// so it says "Nothing was changed" (never #550's part-way sentence and
+    /// its list of pages already re-dated, which the writing one by one
+    /// made true), never the "couldn’t be read" a read failure gets, and
+    /// the line says "changed nothing".
     /// </summary>
     [Fact]
-    public async Task ReDateThatStoppedPartWay_SaysPartWayAndListsThePages()
+    public async Task ReDateWhoseSecondPageCannotBeWritten_ChangesNothing()
     {
         RememberOctoberDates();
         await using var verbs = Verbs(out _);
+        string dayOneBefore = File.ReadAllText(Page("Unit 1, Day 1"));
         AssistToolAnswer answer;
         using (HeldAgainstWriting(Page("Unit 1, Day 2")))
             answer = await verbs.Perform(SectionVerbs.ReDateClasses("ICS3U", 1, plan: false),
                                          "Classes ▸ Re-date Classes…", "ICS3U", 1, SubjectMenuLayout.Menu.Classes);
 
         string said = answer.Summary + "\n" + answer.Detail;
-        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the section's class dates", ""), answer.Summary);
-        Assert.Contains("The pages already re-dated:\n  courses/ICS3U/section1/All Classes/Unit 1, Day 1.md", said);
-        // The failure's own message names the page it stopped at; the LIST of
-        // pages already re-dated must not.
-        string listed = answer.Summary[answer.Summary.IndexOf("The pages already re-dated:", StringComparison.Ordinal)..];
-        Assert.DoesNotContain("Unit 1, Day 2.md", listed);
+        Assert.StartsWith("Nothing was changed: ", answer.Summary);
+        Assert.DoesNotContain("The pages already re-dated", said);
         Assert.DoesNotContain("couldn’t be read", said);
-        Assert.DoesNotContain("Nothing was changed", said);
-        Assert.Contains("2026-10-01", File.ReadAllText(Page("Unit 1, Day 1")));
-        Assert.Contains("ICS3U/1 · Classes ▸ Re-date Classes… — carried out", File.ReadAllText(_trail));
+        Assert.Equal(dayOneBefore, File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Contains("ICS3U/1 · Classes ▸ Re-date Classes… — changed nothing", File.ReadAllText(_trail));
     }
 
     /// <summary>

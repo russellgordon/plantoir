@@ -87,7 +87,8 @@ public sealed class UndoActionTraceContractTests
         string stepName = recorded.GetProperty("name").GetString()!;
         bool byTheWindowsAction = WindowsActionsOnTheMacFixture.Converted.Contains(stepName)
                                   && !WindowsActionsOnTheMacFixture.WindowsOwnLine.ContainsKey(stepName)
-                                  && !WindowsActionsOnTheMacFixture.WindowsOwnJson.ContainsKey(stepName);
+                                  && !WindowsActionsOnTheMacFixture.WindowsOwnJson.ContainsKey(stepName)
+                                  && !WindowsActionsOnTheMacFixture.WindowsOwnStepBefore.ContainsKey(stepName);
         if (byTheWindowsAction) WindowsActionsOnTheMacFixture.Lay(scribe.FullPath("A", ""), recorded);
         // A new class page of this build carries the checkout's line endings
         // (WindowsActionsOnTheMacFixture.NewClassPageSteps, measured there to

@@ -33,7 +33,25 @@ internal static class WindowsActionsOnTheMacFixture
     [
         "publishPages", "hidePages", "publishPagesAWholeUnit", "publishClassForADate",
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
+        "reDateClasses",
     ];
+
+    /// <summary>
+    /// A converted step whose Windows action makes one step of its own
+    /// BEFORE the recorded one, measured: by step name, that step's key and
+    /// why. Re-date Classes remembers the timetable it re-dated onto as its
+    /// own <c>rememberTimetable</c> step, as it wrote it on its own before
+    /// W7b1 (a timetable read from a school calendar's block is remembered
+    /// nowhere else); the mac's <c>SectionReDatePlanner.apply</c> writes none.
+    /// Its traces make the recorded step's draft, since their sequence
+    /// numbers are of one step.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, (string Key, string Why)> WindowsOwnStepBefore =
+        new Dictionary<string, (string, string)>(StringComparer.Ordinal)
+        {
+            ["reDateClasses"] = ("rememberTimetable",
+                "Windows' re-date has always written the timetable it re-dated onto (TimetableMemory.Write, source \"block <block>\"), so a block read from a school calendar is remembered for the next re-date; with the switch off a teacher meets nothing different from before, so it stays, as its own step made just before the re-date's"),
+        };
 
     /// <summary>
     /// A converted step whose file is JSON Windows writes in its own way,
@@ -154,6 +172,11 @@ internal static class WindowsActionsOnTheMacFixture
     /// </summary>
     internal static void Lay(string workingFolder, JsonElement recorded)
     {
+        if (recorded.GetProperty("name").GetString() == "reDateClasses")
+        {
+            LayTheSectionNeedingReDating(workingFolder, recorded);
+            return;
+        }
         string course = Path.Combine(workingFolder, "courses", Course);
         Directory.CreateDirectory(course);
         File.WriteAllText(Path.Combine(course, "course_config.json"),
@@ -162,6 +185,32 @@ internal static class WindowsActionsOnTheMacFixture
         JsonElement timetable = Recorded("rememberTimetable").GetProperty("files")[0];
         WriteAt(workingFolder, timetable.GetProperty("path").GetString()!, Bytes(timetable.GetProperty("before")));
         foreach ((string path, string text) in MacSection()) WriteAt(workingFolder, path, new UTF8Encoding(false).GetBytes(text));
+        foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
+            WriteAt(workingFolder, file.GetProperty("path").GetString()!, Bytes(file.GetProperty("before")));
+    }
+
+    /// <summary>
+    /// The mac's <c>AssistFixture.makeSectionNeedingReDating</c>: the course
+    /// with no class but the recorded step's own (from its before), and the
+    /// section's remembered dates 2026-09-08 and 2026-09-10 from
+    /// "timetable.xlsx, block H": <c>rememberTimetable</c>'s recorded before
+    /// with its dates the fixture's two, in the mac's own form.
+    /// </summary>
+    private static void LayTheSectionNeedingReDating(string workingFolder, JsonElement recorded)
+    {
+        string course = Path.Combine(workingFolder, "courses", Course);
+        Directory.CreateDirectory(Path.Combine(course, "section1", "All Classes"));
+        Directory.CreateDirectory(Path.Combine(course, "Concepts"));
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            "{\"course_code\":\"ICS3U\",\"course_name\":\"Introduction to Computer Science\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
+        File.WriteAllText(Path.Combine(workingFolder, Workspace.MarkerLauncher), "");
+        JsonElement timetable = Recorded("rememberTimetable").GetProperty("files")[0];
+        string remembered = timetable.GetProperty("before").GetString()!;
+        Assert.Contains("\"source\" : \"timetable.xlsx, block H\"", remembered);
+        string twoDates = System.Text.RegularExpressions.Regex.Replace(remembered, "\"dates\" : \\[[^\\]]*\\]",
+            "\"dates\" : [\n    \"2026-09-08\",\n    \"2026-09-10\"\n  ]");
+        Assert.NotEqual(remembered, twoDates);
+        WriteAt(workingFolder, timetable.GetProperty("path").GetString()!, new UTF8Encoding(false).GetBytes(twoDates));
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
             WriteAt(workingFolder, file.GetProperty("path").GetString()!, Bytes(file.GetProperty("before")));
     }
@@ -210,6 +259,7 @@ internal static class WindowsActionsOnTheMacFixture
             "addClasses" => tools.AddClasses(Course, 1, unit: 2, howMany: 2),
             "addCurriculumMentions" => tools.AddCurriculumMentions(Course, 1, page: "Loops", codes: "A1.1"),
             "rememberTimetable" => tools.RememberTimetable(Course, 1, "2026-09-08; 2026-09-10; 2026-09-14"),
+            "reDateClasses" => tools.ReDateClasses(Course, 1).GetAwaiter().GetResult(),
             _ => throw new InvalidOperationException($"{stepName}: no Windows action is converted for it yet"),
         };
         return string.Join("\n", answered.Content.OfType<TextContentBlock>().Select(block => block.Text));
@@ -224,7 +274,7 @@ internal static class WindowsActionsOnTheMacFixture
     /// </summary>
     internal static readonly IReadOnlyList<string> HeldButRunnable =
     [
-        "makeRoomForClasses", "duplicateClass", "reDateClasses", "writeHowITeach", "getReadyForTheStartOfTheYear",
+        "makeRoomForClasses", "duplicateClass", "writeHowITeach", "getReadyForTheStartOfTheYear",
     ];
 
     /// <summary>Runs the REAL Windows action of a held step that has one here (<see cref="HeldButRunnable"/>), with the mac's arguments.</summary>
@@ -235,7 +285,6 @@ internal static class WindowsActionsOnTheMacFixture
         {
             "makeRoomForClasses" => tools.MakeRoomForClasses(Course, 1, unit: 1, atDay: 2),
             "duplicateClass" => tools.AddNextClass(Course, 1, duplicate: "Unit 1, Day 1"),
-            "reDateClasses" => tools.ReDateClasses(Course, 1).GetAwaiter().GetResult(),
             "writeHowITeach" => tools.WriteHowITeach(Course, "I start every class with a question."),
             "getReadyForTheStartOfTheYear" => tools.PrepareForStartOfYear(Course, 1, workspace.PlanStartOfYear(Course, 1).Code),
             _ => throw new InvalidOperationException($"{stepName}: not a held step this fixture can run"),
@@ -449,9 +498,15 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             Surface = WindowsActionsOnTheMacFixture.SurfaceFor(madeBy),
             UndoList = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null),
         };
-        int beginsBefore = WindowsActionsOnTheMacFixture.Begins(ListFolder);
+        int beginsBefore = WindowsActionsOnTheMacFixture.BeginKeys(ListFolder).Count;
         string answered = WindowsActionsOnTheMacFixture.Run(name, workspace);
-        Assert.True(beginsBefore + 1 == WindowsActionsOnTheMacFixture.Begins(ListFolder), $"{name}: not one new step: {answered}");
+        // ONE new step, the recorded one; or, measured, Windows' own step
+        // just before it (WindowsOwnStepBefore) and then the recorded one.
+        var wantKeys = new List<string>();
+        if (WindowsActionsOnTheMacFixture.WindowsOwnStepBefore.TryGetValue(name, out var before)) wantKeys.Add(before.Key);
+        wantKeys.Add(recorded.GetProperty("action").GetString()!);
+        List<string> newKeys = WindowsActionsOnTheMacFixture.BeginKeys(ListFolder).Skip(beginsBefore).ToList();
+        Assert.True(wantKeys.SequenceEqual(newKeys), $"{name}: new steps {string.Join(", ", newKeys)}: {answered}");
         JsonObject step = WindowsActionsOnTheMacFixture.NewestBegin(ListFolder)!["step"]!.AsObject();
 
         Assert.Equal(recorded.GetProperty("action").GetString(), (string?)step["action"]!["key"]);
