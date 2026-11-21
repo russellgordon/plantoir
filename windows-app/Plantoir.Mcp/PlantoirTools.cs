@@ -1403,7 +1403,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 var remembered = TimetableMemory.Read(workspace.FolderPath, found.Code, number);
                 if (remembered is null || remembered.Dates.Count == 0)
                 {
-                    return Answering($"I don’t know when {found.Code} Section {number} meets, so I can’t re-date it. {AssistWording.MayIAskForYourDates}");
+                    return Answering(
+                        AssistWording.CannotReDateWithoutDates(found.Code, number, found.Configuration.ClassNoun),
+                        AssistWording.CannotReDateWithoutDates(found.Code, number));
                 }
                 parsed = Timetable.FromDates(remembered.Dates, remembered.Source);
             }

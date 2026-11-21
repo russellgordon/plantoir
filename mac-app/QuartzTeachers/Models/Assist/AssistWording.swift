@@ -2972,4 +2972,60 @@ nonisolated enum AssistWording {
     static func rememberedTheClassDates(count: Int, place: String, noun: ClassNoun = .class) -> String {
         return "Remembered \(count) \(noun.singular) \(count == 1 ? "date" : "dates") for \(place)."
     }
+
+    // MARK: - Planner refusals in the course's noun (#1027 round 4)
+
+    /// A plan asked for no pages at all (make room, add classes).
+    static func askForAtLeastOneClass(noun: ClassNoun = .class) -> String {
+        return "Ask for at least one \(noun.singular)."
+    }
+
+    /// Making room needs the section's dates, and none are remembered.
+    static func cannotMoveClassesWithoutDates(code: String, number: Int, noun: ClassNoun = .class) -> String {
+        return "I don’t know when \(code) Section \(number) meets, so I can’t move \(noun.plural) onto real "
+             + "days. Ask for the \(noun.singular) dates, then record them first."
+    }
+
+    /// Adding classes needs the section's dates, and none are remembered.
+    static func cannotDateNewClassesWithoutDates(code: String, number: Int, noun: ClassNoun = .class) -> String {
+        return "I don’t know when \(code) Section \(number) meets, so I can’t date new \(noun.plural). "
+             + "Ask for the \(noun.singular) dates, then record them first."
+    }
+
+    /// The next class needs the section's dates, and none are remembered.
+    static func cannotDateANewClassWithoutDates(code: String, number: Int, noun: ClassNoun = .class) -> String {
+        return "I don’t know when \(code) Section \(number) meets, so I can’t date a new \(noun.singular). "
+             + mayIAskForYourDates(for: noun)
+    }
+
+    /// Re-dating needs the section's dates, and none are remembered.
+    static func cannotReDateWithoutDates(code: String, number: Int, noun: ClassNoun = .class) -> String {
+        return "I don’t know when \(code) Section \(number) meets, so I can’t re-date it. "
+             + mayIAskForYourDates(for: noun)
+    }
+
+    /// Re-dating found no numbered pages to move.
+    static func noNumberedClassPagesToReDate(code: String, number: Int, noun: ClassNoun = .class) -> String {
+        return "\(code) Section \(number) has no numbered \(noun.singular) pages, so there is nothing "
+             + "to re-date."
+    }
+
+    /// A day asked for publishing has no page dated on it.
+    static func noClassOnThatDay(
+        weekday: String, date: String, code: String, number: Int, noun: ClassNoun = .class
+    ) -> String {
+        return "I can't find a \(noun.singular) on \(weekday), \(date), in \(code) "
+             + "Section \(number). Ask me what dates you are teaching to see the ones I know "
+             + "about, or tell me the name of the \(noun.singular) page you meant."
+    }
+
+    /// Copying a class as the next class found no date left for it.
+    static func noClassDateLeftForTheCopy(noun: ClassNoun = .class) -> String {
+        return "There is no \(noun.singular) date left for another \(noun.singular)."
+    }
+
+    /// Making room was asked for with no day to give the new page.
+    static func whichDayShouldTheNewClassTake(noun: ClassNoun = .class) -> String {
+        return "Which day should the new \(noun.singular) take?"
+    }
 }

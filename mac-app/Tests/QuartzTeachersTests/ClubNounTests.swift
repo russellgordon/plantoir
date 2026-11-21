@@ -699,4 +699,55 @@ final class ClubNounTests: XCTestCase {
         XCTAssertEqual(AccessibilityNames.makeRoomHowMany(), "Number of classes")
     }
 
+
+    // MARK: - #1027 round 4: the planners' refusals
+
+    /// Every club twin says meeting and never class: a twin that copied the
+    /// class form, or a key whose noun was typed in, fails here.
+    /// MUST FAIL with any `…ForAMeeting` sentence that still says class.
+    func testEveryClubTwinSaysMeetingAndNeverClass() throws {
+        let wording: [String: Any] = try XCTUnwrap(try wordingFile()["wording"] as? [String: Any])
+        var twinsSayingClass: [String] = []
+        var twinsRead: Int = 0
+        for (key, value) in wording where key.hasSuffix("ForAMeeting") || key.hasSuffix("FromTheMeetingsMenu") {
+            guard let sentence = value as? String else {
+                continue
+            }
+            twinsRead += 1
+            if saysClass(sentence) {
+                twinsSayingClass.append(key)
+            }
+        }
+        XCTAssertGreaterThan(twinsRead, 50)
+        XCTAssertEqual(twinsSayingClass.sorted(), [], "a club twin says class")
+    }
+
+    /// Each planner's refusal, which was typed in the planner until round 4,
+    /// is the contract's key in a course and its twin in a club; the model's
+    /// copy (`localizedDescription`) stays the class form (#267).
+    /// MUST FAIL with any planner refusal typed with the class word again.
+    func testThePlannersRefusalsSayMeetingInAClub() throws {
+        let wording: [String: Any] = try XCTUnwrap(try wordingFile()["wording"] as? [String: Any])
+        let refusals: [(key: String, problem: SaidInACoursesNoun & LocalizedError)] = [
+            ("askForAtLeastOneClass", ClassInsertionPlanner.Problem.countOutOfRange),
+            ("askForAtLeastOneClass", PlaceholderClassPlanner.Problem.countOutOfRange),
+            ("cannotMoveClassesWithoutDates", ClassInsertionPlanner.Problem.noTimetable("COMP", 2)),
+            ("cannotDateNewClassesWithoutDates", PlaceholderClassPlanner.Problem.noTimetable("COMP", 2)),
+            ("cannotDateANewClassWithoutDates", NextClassPlanner.Problem.noTimetable("COMP", 2)),
+            ("cannotReDateWithoutDates", SectionReDatePlanner.Problem.noTimetable("COMP", 2)),
+            ("noNumberedClassPagesToReDate", SectionReDatePlanner.Problem.noClasses("COMP", 2)),
+        ]
+        for refusal in refusals {
+            let classForm: String = try XCTUnwrap(wording[refusal.key] as? String, refusal.key)
+            let clubForm: String = try XCTUnwrap(wording[refusal.key + "ForAMeeting"] as? String, refusal.key)
+            XCTAssertEqual(refusal.problem.sentence(noun: .meeting), clubForm, refusal.key)
+            XCTAssertEqual(refusal.problem.sentence(noun: .class), classForm, refusal.key)
+            XCTAssertEqual(refusal.problem.errorDescription, classForm, "the model reads the class form: \(refusal.key)")
+        }
+        let noClassOn: String = try XCTUnwrap(wording["noClassOnThatDayForAMeeting"] as? String)
+        XCTAssertEqual(
+            AssistWording.noClassOnThatDay(weekday: "Tuesday", date: "2026-12-08", code: "COMP", number: 2, noun: .meeting),
+            noClassOn
+        )
+    }
 }

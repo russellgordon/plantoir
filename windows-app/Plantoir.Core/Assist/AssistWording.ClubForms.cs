@@ -88,4 +88,51 @@ public static partial class AssistWording
         $"Remembered {count} {One(noun)} {(count == 1 ? "date" : "dates")} for {place}.";
     public static string RememberedTheClassDatesForAMeeting(int count, string place) =>
         RememberedTheClassDates(count, place, ClassNoun.Meeting);
+
+    // #1027 round 4: the planners' refusals, each with its club twin.
+
+    private static string Ask(ClassNoun noun) => noun == ClassNoun.Meeting ? MayIAskForYourDatesForAMeeting : MayIAskForYourDates;
+
+    public static string AskForAtLeastOneClass(ClassNoun noun = ClassNoun.Class) => $"Ask for at least one {One(noun)}.";
+    public static string AskForAtLeastOneClassForAMeeting() => AskForAtLeastOneClass(ClassNoun.Meeting);
+
+    public static string CannotMoveClassesWithoutDates(string code, int number, ClassNoun noun = ClassNoun.Class) =>
+        $"I don’t know when {code} Section {number} meets, so I can’t move {Many(noun)} onto real " +
+        $"days. Ask for the {One(noun)} dates, then record them first.";
+    public static string CannotMoveClassesWithoutDatesForAMeeting(string code, int number) =>
+        CannotMoveClassesWithoutDates(code, number, ClassNoun.Meeting);
+
+    public static string CannotDateNewClassesWithoutDates(string code, int number, ClassNoun noun = ClassNoun.Class) =>
+        $"I don’t know when {code} Section {number} meets, so I can’t date new {Many(noun)}. " +
+        $"Ask for the {One(noun)} dates, then record them first.";
+    public static string CannotDateNewClassesWithoutDatesForAMeeting(string code, int number) =>
+        CannotDateNewClassesWithoutDates(code, number, ClassNoun.Meeting);
+
+    public static string CannotDateANewClassWithoutDates(string code, int number, ClassNoun noun = ClassNoun.Class) =>
+        $"I don’t know when {code} Section {number} meets, so I can’t date a new {One(noun)}. " + Ask(noun);
+    public static string CannotDateANewClassWithoutDatesForAMeeting(string code, int number) =>
+        CannotDateANewClassWithoutDates(code, number, ClassNoun.Meeting);
+
+    public static string CannotReDateWithoutDates(string code, int number, ClassNoun noun = ClassNoun.Class) =>
+        $"I don’t know when {code} Section {number} meets, so I can’t re-date it. " + Ask(noun);
+    public static string CannotReDateWithoutDatesForAMeeting(string code, int number) =>
+        CannotReDateWithoutDates(code, number, ClassNoun.Meeting);
+
+    public static string NoNumberedClassPagesToReDate(string code, int number, ClassNoun noun = ClassNoun.Class) =>
+        $"{code} Section {number} has no numbered {One(noun)} pages, so there is nothing to re-date.";
+    public static string NoNumberedClassPagesToReDateForAMeeting(string code, int number) =>
+        NoNumberedClassPagesToReDate(code, number, ClassNoun.Meeting);
+
+    public static string NoClassOnThatDay(string weekday, string date, string code, int number, ClassNoun noun = ClassNoun.Class) =>
+        $"I can't find a {One(noun)} on {weekday}, {date}, in {code} Section {number}. Ask me what dates you are " +
+        $"teaching to see the ones I know about, or tell me the name of the {One(noun)} page you meant.";
+    public static string NoClassOnThatDayForAMeeting(string weekday, string date, string code, int number) =>
+        NoClassOnThatDay(weekday, date, code, number, ClassNoun.Meeting);
+
+    public static string NoClassDateLeftForTheCopy(ClassNoun noun = ClassNoun.Class) =>
+        $"There is no {One(noun)} date left for another {One(noun)}.";
+    public static string NoClassDateLeftForTheCopyForAMeeting() => NoClassDateLeftForTheCopy(ClassNoun.Meeting);
+
+    public static string WhichDayShouldTheNewClassTake(ClassNoun noun = ClassNoun.Class) => $"Which day should the new {One(noun)} take?";
+    public static string WhichDayShouldTheNewClassTakeForAMeeting() => WhichDayShouldTheNewClassTake(ClassNoun.Meeting);
 }

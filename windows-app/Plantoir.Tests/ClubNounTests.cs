@@ -476,4 +476,46 @@ public sealed class ClubNounTests : IDisposable
         Assert.Contains("those dates corrected", said);
     }
 
+    /// <summary>
+    /// #1027 round 4: the planners' refusals were typed in code with the class
+    /// word. Each is now a contract key with its twin: the teacher reads the
+    /// club's, the model the class form (#267). MUST FAIL with any of them
+    /// thrown without the course's noun.
+    /// </summary>
+    [Fact]
+    public void ThePlannersRefusalsSayMeetingToAClubsTeacher()
+    {
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        var tools = Club("meeting");
+        var none = tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2, 0);
+        Assert.Equal(wording["askForAtLeastOneClassForAMeeting"]!.ToString(), TeacherCopy(none));
+        Assert.Equal(wording["askForAtLeastOneClass"]!.ToString(), ModelCopy(none));
+
+        File.Delete(Path.Combine(_folder, "courses", "ICS3U", ".internal", "timetable", "section1.json"));
+        var noDates = tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2, 1);
+        Assert.Equal(AssistWording.CannotMoveClassesWithoutDatesForAMeeting("ICS3U", 1), TeacherCopy(noDates));
+        Assert.Equal(AssistWording.CannotMoveClassesWithoutDates("ICS3U", 1), ModelCopy(noDates));
+    }
+
+    /// <summary>
+    /// The guard's other half: every club twin says meeting and never class, so
+    /// a twin typed by copying the class form fails here. MUST FAIL with a
+    /// <c>…ForAMeeting</c> key that still says class.
+    /// </summary>
+    [Fact]
+    public void EveryClubTwinSaysMeetingAndNeverClass()
+    {
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        var twinsSayingClass = new List<string>();
+        int twinsRead = 0;
+        foreach (var (key, value) in wording)
+        {
+            if (!key.EndsWith("ForAMeeting") && !key.EndsWith("FromTheMeetingsMenu")) continue;
+            if (value is not JsonValue) continue;
+            twinsRead++;
+            if (SaysClass.IsMatch(value.ToString())) twinsSayingClass.Add(key);
+        }
+        Assert.True(twinsRead > 50, $"only {twinsRead} twins read");
+        Assert.True(twinsSayingClass.Count == 0, "a club twin says class: " + string.Join(", ", twinsSayingClass));
+    }
 }

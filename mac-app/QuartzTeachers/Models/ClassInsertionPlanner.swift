@@ -25,7 +25,7 @@ enum ClassInsertionPlanner {
     // MARK: - Types
 
     /// Why an insertion could not be planned or carried out.
-    enum Problem: LocalizedError {
+    enum Problem: LocalizedError, SaidInACoursesNoun {
         case unitOutOfRange
         case dayOutOfRange
         case countOutOfRange
@@ -35,13 +35,19 @@ enum ClassInsertionPlanner {
         case wrongCourse(String, String)
 
         var errorDescription: String? {
+            return sentence(noun: .class)
+        }
+
+        /// The refusal in a course's own noun (#1027): "meeting" in a club.
+        /// The model is given `errorDescription`, the class form (#267).
+        func sentence(noun: ClassNoun) -> String {
             switch self {
             case .unitOutOfRange, .dayOutOfRange:
                 return "Unit and day numbers start at 1."
             case .countOutOfRange:
-                return "Ask for at least one class."
+                return AssistWording.askForAtLeastOneClass(noun: noun)
             case .noTimetable(let code, let number):
-                return "I don’t know when \(code) Section \(number) meets, so I can’t move classes onto real days. Ask for the class dates, then record them first."
+                return AssistWording.cannotMoveClassesWithoutDates(code: code, number: number, noun: noun)
             case .noNumberedClasses(let code, let number, let shape):
                 return "\(code) Section \(number) has no pages named “\(shape)”, so there is nothing to make room in."
             case .wouldNotFit(let reason):
@@ -1092,6 +1098,12 @@ struct ClassInsertionPlan {
 /// card shows the course's own ("meeting" in a club), and the model reads the
 /// class form, as it reads every detail (#267). Both come from one wording
 /// function, called once for each noun, so the sentence is typed once.
+/// A planner's refusal said in a course's own noun (#1027 round 4): the
+/// teacher's copy of a refusal whose model copy is `localizedDescription`.
+nonisolated protocol SaidInACoursesNoun {
+    func sentence(noun: ClassNoun) -> String
+}
+
 struct PlanProblem: Equatable, Sendable {
 
     // MARK: - Stored properties

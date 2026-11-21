@@ -678,6 +678,39 @@ enum AssistContract {
             ),
             "noDaysAfterTheLastPage": AssistWording.noDaysAfterTheLastPage(),
             "noDaysAfterTheLastPageForAMeeting": AssistWording.noDaysAfterTheLastPage(noun: .meeting),
+            // #1027 round 4: the planners' refusals, each with its club twin.
+            "askForAtLeastOneClass": AssistWording.askForAtLeastOneClass(),
+            "askForAtLeastOneClassForAMeeting": AssistWording.askForAtLeastOneClass(noun: .meeting),
+            "cannotMoveClassesWithoutDates": AssistWording.cannotMoveClassesWithoutDates(code: "COMP", number: 2),
+            "cannotMoveClassesWithoutDatesForAMeeting": AssistWording.cannotMoveClassesWithoutDates(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "cannotDateNewClassesWithoutDates": AssistWording.cannotDateNewClassesWithoutDates(code: "COMP", number: 2),
+            "cannotDateNewClassesWithoutDatesForAMeeting": AssistWording.cannotDateNewClassesWithoutDates(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "cannotDateANewClassWithoutDates": AssistWording.cannotDateANewClassWithoutDates(code: "COMP", number: 2),
+            "cannotDateANewClassWithoutDatesForAMeeting": AssistWording.cannotDateANewClassWithoutDates(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "cannotReDateWithoutDates": AssistWording.cannotReDateWithoutDates(code: "COMP", number: 2),
+            "cannotReDateWithoutDatesForAMeeting": AssistWording.cannotReDateWithoutDates(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "noNumberedClassPagesToReDate": AssistWording.noNumberedClassPagesToReDate(code: "COMP", number: 2),
+            "noNumberedClassPagesToReDateForAMeeting": AssistWording.noNumberedClassPagesToReDate(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "noClassOnThatDay": AssistWording.noClassOnThatDay(
+                weekday: "Tuesday", date: "2026-12-08", code: "COMP", number: 2
+            ),
+            "noClassOnThatDayForAMeeting": AssistWording.noClassOnThatDay(
+                weekday: "Tuesday", date: "2026-12-08", code: "COMP", number: 2, noun: .meeting
+            ),
+            "noClassDateLeftForTheCopy": AssistWording.noClassDateLeftForTheCopy(),
+            "noClassDateLeftForTheCopyForAMeeting": AssistWording.noClassDateLeftForTheCopy(noun: .meeting),
+            "whichDayShouldTheNewClassTake": AssistWording.whichDayShouldTheNewClassTake(),
+            "whichDayShouldTheNewClassTakeForAMeeting": AssistWording.whichDayShouldTheNewClassTake(noun: .meeting),
             "unusedDatesRunShort": AssistWording.unusedDatesRunShort(free: 1, undated: 2),
             "unusedDatesRunShortForAMeeting": AssistWording.unusedDatesRunShort(free: 1, undated: 2, noun: .meeting),
             "pagesNotNamedTheCoursesWay": AssistWording.pagesNotNamedTheCoursesWay(count: 2, shape: "Unit N, Day N"),

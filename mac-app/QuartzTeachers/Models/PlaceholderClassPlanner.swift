@@ -20,7 +20,7 @@ enum PlaceholderClassPlanner {
     // MARK: - Types
 
     /// Why placeholders could not be planned, in words a teacher can act on.
-    enum Problem: LocalizedError {
+    enum Problem: LocalizedError, SaidInACoursesNoun {
         case unitOutOfRange
         case dayOutOfRange
         case countOutOfRange
@@ -32,17 +32,23 @@ enum PlaceholderClassPlanner {
         case noUnitsInANumberedCourse(String, String)
 
         var errorDescription: String? {
+            return sentence(noun: .class)
+        }
+
+        /// The refusal in a course's own noun (#1027): "meeting" in a club.
+        /// The model is given `errorDescription`, the class form (#267).
+        func sentence(noun: ClassNoun) -> String {
             switch self {
             case .noUnitsInANumberedCourse(let code, let word):
-                return NextClassPlanner.Problem.noUnitsInANumberedCourse(code, word).errorDescription
+                return NextClassPlanner.Problem.noUnitsInANumberedCourse(code, word).sentence(noun: noun)
             case .unitOutOfRange:
                 return "A unit number starts at 1."
             case .dayOutOfRange:
                 return "A day number starts at 1."
             case .countOutOfRange:
-                return "Ask for at least one class."
+                return AssistWording.askForAtLeastOneClass(noun: noun)
             case .noTimetable(let code, let number):
-                return "I don’t know when \(code) Section \(number) meets, so I can’t date new classes. Ask for the class dates, then record them first."
+                return AssistWording.cannotDateNewClassesWithoutDates(code: code, number: number, noun: noun)
             case .wrongCourse(let planned, let given):
                 return "That plan is for \(planned), not \(given)."
             }

@@ -121,7 +121,7 @@ enum SectionTimetableStore {
 
     /// Why a timetable could not be remembered or trusted, in words a teacher
     /// can act on.
-    enum Problem: LocalizedError {
+    enum Problem: LocalizedError, SaidInACoursesNoun {
         case noDatesGiven(String, Int)
         case unreadableDates(String, Int, [String])
         case halfRemembered(String, Int, [String])

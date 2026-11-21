@@ -113,7 +113,6 @@ public static partial class ClassChangeWording
         $"“{title}” couldn’t be read, so nothing was changed.";
 
     /// <summary>The timetable has run out before the copy could be given a day.</summary>
-    public const string NoClassDateLeft = "There is no class date left for another class.";
 
     /// <summary>
     /// The copy's place is still occupied, so nothing was written over it.

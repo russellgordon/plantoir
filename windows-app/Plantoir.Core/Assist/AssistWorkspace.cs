@@ -3745,12 +3745,12 @@ public sealed partial class AssistWorkspace
         }
 
         if (unit < 1 || atDay < 1) throw new AssistRefusal("Unit and day numbers start at 1.");
-        if (count < 1) throw new AssistRefusal("Ask for at least one class.");
+        if (count < 1) throw new AssistRefusal(AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClass(course.Configuration.ClassNoun));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
             ?? throw new AssistRefusal(
-                $"I don't know when {course.Code} Section {section} meets, so I can't move classes onto real " +
-                "days. Ask the teacher for their class dates, then record them with remember_timetable.");
+                AssistWording.CannotMoveClassesWithoutDates(course.Code, section),
+                AssistWording.CannotMoveClassesWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         var classes = NumberedClasses(course, section, out int unnumbered);
         if (classes.Count == 0)
@@ -4244,7 +4244,11 @@ public sealed partial class AssistWorkspace
         if (insertion.Added.Count == 0)
         {
             string why = string.Join(" ", insertion.Problems);
-            throw new AssistRefusal(why.Length > 0 ? why : ClassChangeWording.NoClassDateLeft);
+            var nounOfTheCourse = course.Configuration.ClassNoun;
+            string whyForTheTeacher = string.Join(" ",
+                nounOfTheCourse == ClassNoun.Meeting && insertion.ProblemsForAMeeting is { } clubProblems ? clubProblems : insertion.Problems);
+            throw new AssistRefusal(why.Length > 0 ? why : AssistWording.NoClassDateLeftForTheCopy(),
+                whyForTheTeacher.Length > 0 ? whyForTheTeacher : AssistWording.NoClassDateLeftForTheCopy(nounOfTheCourse));
         }
 
         string sourceText;
@@ -4488,7 +4492,7 @@ public sealed partial class AssistWorkspace
 
         if (unit < 1) throw new AssistRefusal("A unit number starts at 1.");
         if (firstDay < 1) throw new AssistRefusal("A day number starts at 1.");
-        if (count < 1) throw new AssistRefusal("Ask for at least one class.");
+        if (count < 1) throw new AssistRefusal(AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClass(course.Configuration.ClassNoun));
         var naming = course.Configuration.Naming;
         // A numbered course has one run of pages and no units (#274): any
         // unit but the one it is held as is refused BEFORE the dates are asked for.
@@ -4497,11 +4501,13 @@ public sealed partial class AssistWorkspace
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
             ?? throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}");
+                AssistWording.CannotDateNewClassesWithoutDates(course.Code, section),
+                AssistWording.CannotDateNewClassesWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         if (remembered.Dates.Count == 0)
             throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}");
+                AssistWording.CannotDateNewClassesWithoutDates(course.Code, section),
+                AssistWording.CannotDateNewClassesWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         string folder = ClassFolder(course, section);
         var existing = ClassPages(course, section);
@@ -4581,11 +4587,13 @@ public sealed partial class AssistWorkspace
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
             ?? throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date a new class. {AssistWording.MayIAskForYourDates}");
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section),
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         if (remembered.Dates.Count == 0)
             throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date a new class. {AssistWording.MayIAskForYourDates}");
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section),
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         var existing = ClassPages(course, section);
         var existingTitles = existing.Select(p => Path.GetFileNameWithoutExtension(p) ?? "").ToList();

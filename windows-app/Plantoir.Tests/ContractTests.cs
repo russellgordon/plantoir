@@ -338,6 +338,16 @@ public class ContractTests
         Assert.Equal(wording["timetableTooShortAfter"]!.ToString(), AssistWording.TimetableTooShortAfter(3, "2026-12-08", 2));
         Assert.Equal(wording["timetableTooShortAfterForAMeeting"]!.ToString(), AssistWording.TimetableTooShortAfterForAMeeting(3, "2026-12-08", 2));
         Pair("noDaysAfterTheLastPage", AssistWording.NoDaysAfterTheLastPage(), AssistWording.NoDaysAfterTheLastPageForAMeeting());
+        // #1027 round 4: the planners' refusals.
+        Pair("askForAtLeastOneClass", AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClassForAMeeting());
+        Pair("cannotMoveClassesWithoutDates", AssistWording.CannotMoveClassesWithoutDates("COMP", 2), AssistWording.CannotMoveClassesWithoutDatesForAMeeting("COMP", 2));
+        Pair("cannotDateNewClassesWithoutDates", AssistWording.CannotDateNewClassesWithoutDates("COMP", 2), AssistWording.CannotDateNewClassesWithoutDatesForAMeeting("COMP", 2));
+        Pair("cannotDateANewClassWithoutDates", AssistWording.CannotDateANewClassWithoutDates("COMP", 2), AssistWording.CannotDateANewClassWithoutDatesForAMeeting("COMP", 2));
+        Pair("cannotReDateWithoutDates", AssistWording.CannotReDateWithoutDates("COMP", 2), AssistWording.CannotReDateWithoutDatesForAMeeting("COMP", 2));
+        Pair("noNumberedClassPagesToReDate", AssistWording.NoNumberedClassPagesToReDate("COMP", 2), AssistWording.NoNumberedClassPagesToReDateForAMeeting("COMP", 2));
+        Pair("noClassOnThatDay", AssistWording.NoClassOnThatDay("Tuesday", "2026-12-08", "COMP", 2), AssistWording.NoClassOnThatDayForAMeeting("Tuesday", "2026-12-08", "COMP", 2));
+        Pair("noClassDateLeftForTheCopy", AssistWording.NoClassDateLeftForTheCopy(), AssistWording.NoClassDateLeftForTheCopyForAMeeting());
+        Pair("whichDayShouldTheNewClassTake", AssistWording.WhichDayShouldTheNewClassTake(), AssistWording.WhichDayShouldTheNewClassTakeForAMeeting());
         Pair("unusedDatesRunShort", AssistWording.UnusedDatesRunShort(1, 2), AssistWording.UnusedDatesRunShortForAMeeting(1, 2));
         Assert.Equal(wording["pagesNotNamedTheCoursesWay"]!.ToString(), AssistWording.PagesNotNamedTheCoursesWay(2, "Unit N, Day N"));
         Assert.Equal(wording["pagesNotNamedTheCoursesWayForAMeeting"]!.ToString(), AssistWording.PagesNotNamedTheCoursesWayForAMeeting(2, "Week N"));
