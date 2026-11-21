@@ -1,36 +1,37 @@
 using System.Text.RegularExpressions;
 
-namespace Plantoir.UiTests;
+namespace Plantoir.Tests;
 
 /// <summary>
-/// #638, pinned WITHOUT a desktop (plain facts, like
-/// <see cref="AssertAbsentRuleTests"/>): no UI test sends a key DOWN with no
-/// key up. FlaUI's down-only call leaves the key held at the operating-system
+/// #638, pinned WITHOUT a desktop: no UI test sends a key DOWN with no key
+/// up. FlaUI's down-only call leaves the key held at the operating-system
 /// level for the rest of the run; <c>Keyboard.Type</c> sends both, and
 /// <c>using (Keyboard.Pressing(...))</c> sends the up on dispose.
 ///
+/// <para><b>Why it lives here, not in Plantoir.UiTests (#1035).</b> These read
+/// the UI test project's SOURCES and need nothing else, but in that project
+/// the merge gate, which runs this unit project only, never ran them, and two
+/// breaks sat on <c>dev</c> unseen. They read the sources from here, and the
+/// watched keys from <c>HeldKeys.cs</c>'s own <c>Watched</c> list, so there
+/// is still one copy of each.</para>
+///
 /// <para>One method is allowed the down-only call, by name:
-/// <c>PageTablesUiTests.HeldSpace</c> imitates a held key's auto-repeat
-/// (several downs, then ONE up in a <c>finally</c>), which neither safe form
-/// can send. The patterns are spelled in pieces here so this file does not
-/// trip its own rule.</para>
+/// <c>HeldKeys.HoldWithRepeats</c> imitates a held key's auto-repeat (several
+/// downs, then ONE up in a <c>finally</c>), which neither safe form can send.
+/// The patterns are spelled in pieces here so this file reads the same way a
+/// UI test source would.</para>
 /// </summary>
 public class HarnessSourceRuleTests
 {
     // Spaced either way: "Keyboard.Press (" is the same call.
     private static readonly Regex DownOnly = new(@"Keyboard\s*\.\s*Press" + @"\s*\(");
     private static readonly Regex Holding = new(@"Keyboard\s*\.\s*Pressing" + @"\s*\(");
+    private static readonly Regex KeyName = new(@"VirtualKeyShort\.([A-Z_0-9]+)");
 
     /// <summary>(file, method) pairs allowed the down-only call, each with a key-up in a finally.</summary>
-    private static readonly (string File, string Method)[] Allowed = { ("PageTablesUiTests.cs", "HeldSpace") };
+    private static readonly (string File, string Method)[] Allowed = { ("HeldKeys.cs", "HoldWithRepeats") };
 
-    private static string SourceFolder()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && dir.Name != "windows-app") dir = dir.Parent;
-        if (dir is null) throw new InvalidOperationException("Could not locate windows-app/ from " + AppContext.BaseDirectory);
-        return Path.Combine(dir.FullName, "Plantoir.UiTests");
-    }
+    private static string SourceFolder() => Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.UiTests");
 
     private static IEnumerable<(string Name, string Source)> Sources() =>
         Directory.EnumerateFiles(SourceFolder(), "*.cs").Select(file => (Path.GetFileName(file), File.ReadAllText(file)));
@@ -56,6 +57,18 @@ public class HarnessSourceRuleTests
         return declarations.Count == 0 ? "" : declarations[^1].Groups[1].Value;
     }
 
+    /// <summary>The keys <c>HeldKeys.Watched</c> lists, read from its source.</summary>
+    internal static HashSet<string> WatchedKeys()
+    {
+        string source = File.ReadAllText(Path.Combine(SourceFolder(), "HeldKeys.cs"));
+        var list = Regex.Match(source, @"VirtualKeyShort\[\]\s+Watched\s*=\s*\{(.*?)\};", RegexOptions.Singleline);
+        Assert.True(list.Success, "HeldKeys.cs no longer declares its Watched list as an array; this rule reads it");
+        var watched = new HashSet<string>();
+        foreach (Match key in KeyName.Matches(list.Groups[1].Value)) watched.Add(key.Groups[1].Value);
+        Assert.NotEmpty(watched);
+        return watched;
+    }
+
     [Fact]
     public void NoTestSendsAKeyDownWithNoKeyUp()
     {
@@ -70,7 +83,8 @@ public class HarnessSourceRuleTests
             }
         Assert.True(found.Count == 0,
             "These send a key DOWN and never UP, which leaves it held for the rest of the run (#638); " +
-            "use Keyboard.Type, or using (Keyboard.Pressing(...)): " + string.Join(", ", found));
+            "use Keyboard.Type, using (Keyboard.Pressing(...)), or HeldKeys.HoldWithRepeats for a held key's repeats: " +
+            string.Join(", ", found));
     }
 
     /// <summary>
@@ -99,19 +113,26 @@ public class HarnessSourceRuleTests
             "Keyboard.Pressing returns what releases the key; these throw it away (#638): " + string.Join(", ", found));
     }
 
-    /// <summary>Every key a test names is one <see cref="HeldKeys"/> watches, or one left down would go unseen.</summary>
+    /// <summary>
+    /// Every key a test names is one <c>HeldKeys</c> watches, or one left down
+    /// would go unseen. Compared by NAME, because FlaUI's key list cannot be
+    /// loaded by this project (it is Windows-only and this project is not):
+    /// a test spells a key the way <c>Watched</c> does (RETURN, not its
+    /// other name ENTER), and a second name for a watched key fails here
+    /// rather than slipping past.
+    /// </summary>
     [Fact]
     public void EveryKeyATestNamesIsWatched()
     {
-        // Compared by value: ENTER and RETURN, ALT and MENU name one key each.
-        var watched = HeldKeys.Watched.Select(key => (int)key).ToHashSet();
+        var watched = WatchedKeys();
         var missing = new SortedSet<string>();
-        foreach (var (_, source) in Sources())
-            foreach (Match match in Regex.Matches(source, @"VirtualKeyShort\.([A-Z_0-9]+)"))
-                if (Enum.TryParse<FlaUI.Core.WindowsAPI.VirtualKeyShort>(match.Groups[1].Value, out var key)
-                    && !watched.Contains((int)key))
-                    missing.Add(match.Groups[1].Value);
-        Assert.True(missing.Count == 0, "HeldKeys.Watched does not watch: " + string.Join(", ", missing));
+        foreach (var (name, source) in Sources())
+            foreach (Match match in KeyName.Matches(source))
+                if (!InAComment(source, match.Index) && !watched.Contains(match.Groups[1].Value))
+                    missing.Add($"{match.Groups[1].Value} ({name}:{LineOf(source, match.Index)})");
+        Assert.True(missing.Count == 0,
+            "HeldKeys.Watched does not watch these keys a test names (add the key there, spelled the same way): " +
+            string.Join(", ", missing));
     }
 
     [Fact]
@@ -122,18 +143,18 @@ public class HarnessSourceRuleTests
             string source = File.ReadAllText(Path.Combine(SourceFolder(), file));
             int start = source.IndexOf($" {method}(", StringComparison.Ordinal);
             Assert.True(start >= 0, $"{file} no longer has {method}; take it off the allowed list");
-            int next = source.IndexOf("\n    private ", start + 1, StringComparison.Ordinal);
+            int next = source.IndexOf("\n    p", start + 1, StringComparison.Ordinal);
             string body = next < 0 ? source[start..] : source[start..next];
             Assert.Contains("finally { Keyboard.Release(", body);
         }
     }
 
+    /// <summary>The rule reads the real list: a key it surely watches is in it.</summary>
     [Fact]
-    public void TheHeldKeyMessageNamesTheTestsAndTheFix()
+    public void TheWatchedListIsReadFromHeldKeys()
     {
-        string message = HeldKeys.FailureMessage(new[] { "PlanTableUiTests.Tab: TAB" });
-        Assert.Contains("PlanTableUiTests.Tab: TAB", message);
-        Assert.Contains("Keyboard.Type", message);
-        Assert.Contains("remote-desktop", message);
+        var watched = WatchedKeys();
+        Assert.Contains("ESCAPE", watched);
+        Assert.Contains("SHIFT", watched);
     }
 }
