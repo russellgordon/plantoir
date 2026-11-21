@@ -299,9 +299,12 @@ public class SectionVerbsTests : IDisposable
             answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
                                          "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "2 pages ticked");
 
-        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the pages you named", ""), answer.Summary);
-        Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
-        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — carried out, 2 pages ticked", File.ReadAllText(_trail));
+        // Since #899 W7a the publish is ONE step, all of it or none: the page
+        // in use stops it with nothing written, so the true sentence is
+        // "Nothing was changed" and Day 1 is untouched.
+        Assert.StartsWith("Nothing was changed: “Unit 1, Day 2.md” is in use by another program.", answer.Summary);
+        Assert.DoesNotContain("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.DoesNotContain("Section ▸ Publish Pages… — carried out", File.ReadAllText(_trail));
     }
 
     /// <summary>The same through a whole unit, which has its own write loop.</summary>

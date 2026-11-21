@@ -356,6 +356,12 @@ internal sealed class UndoActionStep
     private string Reason(UndoRefusal refusal)
     {
         string file = refusal.Path is { } path ? "“" + Path.GetFileName(path.Replace('/', Path.DirectorySeparatorChar)) + "”" : "a page";
+        // A page marked read-only refuses its rename: said as a permission,
+        // which is what it is, never as a full disk.
+        if (refusal.Kind == UndoRefusalKind.CouldNotWrite && refusal.Path is { } refused && _root is not null
+            && File.Exists(UndoDoor.FullPath(_root, refused))
+            && File.GetAttributes(UndoDoor.FullPath(_root, refused)).HasFlag(FileAttributes.ReadOnly))
+            return "Plantoir doesn’t have permission to change one of them.";
         return refusal.Kind switch
         {
             UndoRefusalKind.ChangedSince => $"{file} was changed by another program while it was being saved.",

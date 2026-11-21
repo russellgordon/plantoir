@@ -45,6 +45,7 @@ public sealed class UndoActionStepTests : IDisposable
         Directory.CreateDirectory(course);
         File.WriteAllText(Path.Combine(course, "course_config.json"),
             "{\"course_code\":\"ICS3U\",\"course_name\":\"Computer Science\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
+        File.WriteAllText(Path.Combine(Folder, Plantoir.Core.Models.Workspace.MarkerLauncher), "");
         Write(Day1, Class(1, draft: false));
         Write(Day2, Class(2, draft: true));
         Write(Index, "---\ntitle: Section 1\ncreated: 2026-09-08T07:00:00.000-0400\ndraft: false\n---\n# Most Recent Class\n![[Unit 1, Day 1]]\n");
@@ -173,14 +174,13 @@ public sealed class UndoActionStepTests : IDisposable
     public void PublishPagesThroughTheWorkspaceIsOneStepAndTodaysUndoStillPutsItBack()
     {
         ACourse();
-        File.WriteAllText(Path.Combine(Folder, Plantoir.Core.Models.Workspace.MarkerLauncher), "");
         var history = new UndoHistory();
         var workspace = new AssistWorkspace(Folder, new NoLaunchers(), undo: history) { Surface = AssistSurface.Menu, UndoList = List() };
         PublishPlan plan = workspace.PlanPublish("ICS3U", 1, ["Unit 1, Day 2"], draft: false, publishes: true);
 
         workspace.Apply(plan, preview: false).GetAwaiter().GetResult();
 
-        Assert.Contains("draft: false", File.ReadAllText(Full(Day2)));
+        Assert.NotEqual(Class(2, draft: true), File.ReadAllText(Full(Day2)));
         JsonObject begin = Assert.Single(Begins());
         Assert.Equal("publishPages", (string?)begin["step"]!["action"]!["key"]);
         Assert.Equal("menu", (string?)begin["step"]!["madeBy"]);

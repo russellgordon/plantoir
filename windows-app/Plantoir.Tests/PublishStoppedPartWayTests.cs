@@ -73,8 +73,17 @@ public class PublishStoppedPartWayTests : IDisposable
             var answer = await tools.PublishPages("ICS3U", 1, progress, default,
                                                   asked.Split('|'), preview: false);
             string said = answer.Summary();
-            Assert.StartsWith(AssistWording.PublishStoppedPartWay(what, ""), said);
             Assert.NotNull(workspace.ConversationBackupPath);
+            if (what != "Unit 1")
+            {
+                // Publish Pages is ONE step through the door since #899 W7a:
+                // all of it or none, so Day 1 is not written either and
+                // "Nothing was changed" is the true sentence.
+                Assert.Equal("Nothing was changed: Plantoir doesn’t have permission to change one of them.", said);
+                Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
+                return;
+            }
+            Assert.StartsWith(AssistWording.PublishStoppedPartWay(what, ""), said);
             if (inTheWindow)
                 Assert.EndsWith(AssistWording.RestoreSectionPutsItBack("1"), said);
             else
