@@ -29,8 +29,10 @@ as LF.
     python3 scripts/make_undo_traces.py --check    # exit 1 if it is stale
     PLANTOIR_UNDO_FUZZ=<seed> python3 scripts/make_undo_traces.py --print
 """
+import functools
 import hashlib
 import json
+import math
 import os
 import random
 import sys
@@ -478,10 +480,7 @@ def json_equal(first, second):
 def edit_json_state(op, data):
     if data is None:
         return "neither"
-    try:
-        top = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError):
-        return "neither"
+    top = _mac_read(data)
     if not isinstance(top, dict):
         return "neither"
     current = top
@@ -492,6 +491,13 @@ def edit_json_state(op, data):
             current = ABSENT_MEMBER
             break
         current = current[part]
+
+    # What the model is not measured to read as the mac's Foundation reads
+    # it (#899 W6 review 2): cannot tell, as on Windows.
+    if not _path_measured(op["keyPath"], top) or (
+            current is not ABSENT_MEMBER and not _measured(current)) or any(
+            side in op and not _measured(op[side]) for side in ("before", "after")):
+        return "cannotTell"
 
     # A whole number beyond 2^53, in the file or the record, cannot be
     # compared exactly through a double: cannot tell (the third hard review).
@@ -606,6 +612,8 @@ def _exact(value):
     if isinstance(value, bool):
         return True
     if isinstance(value, (int, float)):
+        if isinstance(value, float) and math.isinf(value):
+            return False
         return not (float(value).is_integer() and abs(value) >= 9007199254740992)
     if isinstance(value, list):
         return all(_exact(element) for element in value)
@@ -614,23 +622,321 @@ def _exact(value):
     return True
 
 
-def _spell(value):
-    if not _exact(value):
+# What the mac's Foundation does with an editJSON value, as far as it is
+# MEASURED (macOS 26.7.3, 2026-11-20, through the mac's own code; the same
+# rules as Windows' UndoJson and UndoMacKeyOrder). Anything not measured is
+# refused, never guessed at (#899 W6 review 2).
+
+class _Unmeasured(float):
+    """A number a file spells in a way not measured to read as the mac reads it."""
+
+
+_PUNCTUATION = " _-,;:!?.'\"()[]{}@*/\\&#%`^+<=>|~$"
+
+
+# undo.numberSpellingRule (measured through the mac's reader, macOS 26.7.3,
+# 2026-11-20, #899 W6 review 3): the most characters the mac reads after a
+# number's e or E, its sign and leading zeros included (1e0005, 1e+005 and
+# 1e-999 are read; 1e00005, 1e+0005, 1e-0001 and 0e99999 make the file one it
+# cannot read), and the most digits read as it reads them, with an exponent
+# and without. Windows' UndoJson holds the same three.
+MAC_EXPONENT_CHARACTERS_AT_MOST = 4
+MEASURED_DIGITS_WITH_AN_EXPONENT = 17
+MEASURED_DIGITS_WITHOUT_AN_EXPONENT = 38
+
+
+def _exponent_read_by_the_mac(spelling):
+    """A spelling with no exponent, or at most MAC_EXPONENT_CHARACTERS_AT_MOST
+    characters after its e or E. A file holding any other is not JSON."""
+    marker = max(spelling.find("e"), spelling.find("E"))
+    if marker < 0:
+        return True
+    characters_after_it = len(spelling) - marker - 1
+    return characters_after_it <= MAC_EXPONENT_CHARACTERS_AT_MOST
+
+
+def _spelling_measured(spelling):
+    """At most 17 digits with an exponent, 38 without, counted from the
+    first digit that is not a leading zero of the integer part."""
+    unsigned = spelling[1:] if spelling.startswith("-") else spelling
+    marker = max(unsigned.find("e"), unsigned.find("E"))
+    mantissa = unsigned[:marker] if marker >= 0 else unsigned
+    whole, _, fraction = mantissa.partition(".")
+    digits = len(whole.lstrip("0")) + len(fraction)
+    if marker >= 0:
+        return digits <= MEASURED_DIGITS_WITH_AN_EXPONENT
+    return digits <= MEASURED_DIGITS_WITHOUT_AN_EXPONENT
+
+
+def _read_number(spelling):
+    """The double the mac's reader takes from a measured spelling: a fixed
+    spelling with a point and more than 17 digits is a decimal number, its
+    digits summed in 16-bit pieces and divided by ten once per place; minus
+    infinity beyond the range below zero; refused (not JSON) above it, and
+    for an exponent the mac does not read."""
+    if not _exponent_read_by_the_mac(spelling):
+        raise ValueError("an exponent the mac does not read")
+    nearest = float(spelling)
+    if not _spelling_measured(spelling):
+        return _Unmeasured(0.0 if math.isinf(nearest) else nearest)
+    if math.isinf(nearest):
+        if nearest < 0:
+            return nearest
+        raise ValueError("beyond a double's range")
+    if "e" in spelling.lower() or "." not in spelling:
+        return int(spelling) if "." not in spelling and "e" not in spelling.lower() else nearest
+    negative = spelling.startswith("-")
+    unsigned = spelling[1:] if negative else spelling
+    whole, _, fraction = unsigned.partition(".")
+    whole = whole.lstrip("0")
+    if len(whole) + len(fraction) <= 17:
+        return nearest
+    mantissa = int(whole + fraction)
+    exponent = -len(fraction)
+    while mantissa != 0 and mantissa % 10 == 0:
+        mantissa //= 10
+        exponent += 1
+    pieces = []
+    while mantissa != 0:
+        pieces.append(mantissa & 0xFFFF)
+        mantissa >>= 16
+    read = 0.0
+    for piece in reversed(pieces):
+        read = read * 65536 + piece
+    for _ in range(-exponent):
+        read /= 10
+    for _ in range(exponent):
+        read *= 10
+    return -read if negative else read
+
+
+def _refuse_constant(name):
+    raise ValueError("not JSON: " + name)
+
+
+def _holds_half_a_pair(value):
+    if isinstance(value, str):
+        for character in value:
+            if 0xD800 <= ord(character) <= 0xDFFF:
+                return True
+        return False
+    if isinstance(value, list):
+        for element in value:
+            if _holds_half_a_pair(element):
+                return True
+        return False
+    if isinstance(value, dict):
+        for key, element in value.items():
+            if _holds_half_a_pair(key) or _holds_half_a_pair(element):
+                return True
+        return False
+    return False
+
+
+def _mac_read(data):
+    """The file as the mac's reader reads it, or None where it cannot (not
+    UTF-8, not JSON, a number above a double's range, half a surrogate pair)."""
+    try:
+        value = json.loads(data.decode("utf-8"), parse_float=_read_number, parse_int=_read_number,
+                           parse_constant=_refuse_constant)
+    except (UnicodeDecodeError, ValueError):
         return None
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    if _holds_half_a_pair(value):
+        return None
+    return value
+
+
+def _measured_key(key):
+    for character in key:
+        if not 0x20 <= ord(character) <= 0x7E:
+            return False
+    return True
+
+
+def _measured(value):
+    """Every key printable ASCII, no text starting with a byte-order mark,
+    every number read as measured."""
+    if isinstance(value, _Unmeasured):
+        return False
+    if isinstance(value, str):
+        return not value.startswith("\ufeff")
+    if isinstance(value, list):
+        for element in value:
+            if not _measured(element):
+                return False
+        return True
+    if isinstance(value, dict):
+        for key, element in value.items():
+            if not _measured_key(key) or not _measured(element):
+                return False
+        return True
+    return True
+
+
+def _numbers_measured(value):
+    if isinstance(value, _Unmeasured):
+        return False
+    if isinstance(value, list):
+        for element in value:
+            if not _numbers_measured(element):
+                return False
+        return True
+    if isinstance(value, dict):
+        for element in value.values():
+            if not _numbers_measured(element):
+                return False
+        return True
+    return True
+
+
+def _path_measured(key_path, top):
+    """Each part, and every key of each object on the way, printable ASCII;
+    and the file holding only numbers read as measured."""
+    if not _numbers_measured(top):
+        return False
+    current = top
+    for part in key_path:
+        if not _measured_key(part):
+            return False
+        if not isinstance(current, dict):
+            return True
+        for key in current:
+            if not _measured_key(key):
+                return False
+        if part not in current:
+            return True
+        current = current[part]
+    return True
+
+
+def _key_pieces(key):
+    pieces = []
+    index = 0
+    while index < len(key):
+        character = key[index]
+        if character.isdigit() and character.isascii():
+            end = index
+            while end < len(key) and key[end].isdigit() and key[end].isascii():
+                end += 1
+            run = key[index:end]
+            without_zeros = run.lstrip("0")
+            pieces.append((1, "%010d" % len(without_zeros) + without_zeros, len(run) - len(without_zeros)))
+            index = end
+            continue
+        if character in _PUNCTUATION:
+            pieces.append((0, "%02d" % _PUNCTUATION.index(character), 0))
+        elif "a" <= character <= "z":
+            pieces.append((2, character, 0))
+        elif "A" <= character <= "Z":
+            pieces.append((2, character.lower(), 1))
+        else:
+            pieces.append((3, "%06d" % ord(character), 0))
+        index += 1
+    return pieces
+
+
+def _ordinal(text):
+    return text.encode("utf-16-le")
+
+
+def _mac_key_order(first, second):
+    """Windows' UndoMacKeyOrder: the mac's order for printable ASCII keys."""
+    one, other = _key_pieces(first), _key_pieces(second)
+    shared = min(len(one), len(other))
+    for index in range(shared):
+        if one[index][0] != other[index][0]:
+            return -1 if one[index][0] < other[index][0] else 1
+        if one[index][1] != other[index][1]:
+            return -1 if one[index][1] < other[index][1] else 1
+    if len(one) != len(other):
+        return -1 if len(one) < len(other) else 1
+    for index in range(shared):
+        if one[index][2] != other[index][2]:
+            return -1 if one[index][2] < other[index][2] else 1
+    if first == second:
+        return 0
+    return -1 if _ordinal(first) < _ordinal(second) else 1
+
+
+def _spell_number(value):
+    if float(value).is_integer():
+        return str(int(value))
+    return "%.17g" % value
+
+
+def _spelled(value):
+    if value is None:
+        return "null"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, (int, float)):
+        return _spell_number(value)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, list):
+        parts = []
+        for element in value:
+            parts.append(_spelled(element))
+        return "[" + ",".join(parts) + "]"
+    names = sorted(value, key=functools.cmp_to_key(_mac_key_order))
+    parts = []
+    for name in names:
+        parts.append(json.dumps(name, ensure_ascii=False) + ":" + _spelled(value[name]))
+    return "{" + ",".join(parts) + "}"
+
+
+def _spell(value):
+    if not _exact(value) or not _measured(value):
+        return None
+    return _spelled(value).encode("utf-8")
+
+
+def _setting(key_path, value, tree, wanted):
+    """The tree with the member set (or taken out), or None when a part on
+    the way is missing or not an object."""
+    if not isinstance(tree, dict):
+        return None
+    copy = dict(tree)
+    first = key_path[0]
+    if len(key_path) == 1:
+        if wanted:
+            copy[first] = value
+        else:
+            copy.pop(first, None)
+        return copy
+    if first not in copy:
+        return None
+    inner = _setting(key_path[1:], value, copy[first], wanted)
+    if inner is None:
+        return None
+    copy[first] = inner
+    return copy
 
 
 def json_bytes_moved(op, backward, data):
     """opKinds.editJSON's move: only the member's bytes change (the hard
-    review of U2b, LOW a). None when it cannot be done safely."""
-    try:
-        data.decode("utf-8")
-        top = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError):
-        return None
-    if not isinstance(top, dict):
+    review of U2b, LOW a), and the result must read back, as the mac reads
+    it, as the file with that one member changed. None when it cannot be
+    done safely."""
+    top = _mac_read(data)
+    if not isinstance(top, dict) or not _path_measured(op["keyPath"], top):
         return None
     wanted_key = "before" if backward else "after"
+    expected = _setting(op["keyPath"], op.get(wanted_key), top, wanted_key in op)
+    if expected is None:
+        return None
+    moved = _json_bytes_moved(op, wanted_key, data)
+    if moved is None or moved is data:
+        return moved
+    read_back = _mac_read(moved)
+    if read_back is None or not json_equal(read_back, expected):
+        return None
+    return moved
+
+
+def _json_bytes_moved(op, wanted_key, data):
     key_path = op["keyPath"]
     start = _skip(data, 0)
     for depth, part in enumerate(key_path):
@@ -1736,7 +2042,7 @@ def generate(seed=SEED, count=TRACE_COUNT, steps=None):
                     for page_id, path, text, shape in FIXTURE],
         "fixtureHashes": {page_id: sha(START[page_id]) for page_id in PAGE_IDS},
         "traces": traces,
-        "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A step recorded with `members` (U4a, Course Settings) has each file they name made as those editJSON ops, in the order recorded, instead of the door's rule (the member moved by the member rule's bytes, undo.editJSONCases); one recorded with `trees` (U4a, Add folder) also makes each folder as one `createTree` (its listing and every file's bytes in the list), after the moves; a folder is hashed as its listing's SHA-256 in `afterUndoingAll` and `final`, and only a `deletePage` hand edit changes one. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
+        "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A step recorded with `members` (U4a, Course Settings) has each file they name made as those editJSON ops, in the order recorded, instead of the door's rule (the member moved by the member rule's bytes, undo-json-cases.json -> editJSONCases); one recorded with `trees` (U4a, Add folder) also makes each folder as one `createTree` (its listing and every file's bytes in the list), after the moves; a folder is hashed as its listing's SHA-256 in `afterUndoingAll` and `final`, and only a `deletePage` hand edit changes one. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
         "actionTraces": action_traces,
     }
 

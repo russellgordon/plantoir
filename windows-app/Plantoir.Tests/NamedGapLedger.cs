@@ -297,6 +297,24 @@ internal static class NamedGapLedger
     internal const string UndoCheckCases = "shared-rules.json → undo.checkCases";
 
     /// <summary>
+    /// <c>shared-rules.json</c> → <c>undo.checkCases</c>, by case <c>name</c>:
+    /// an editJSON case whose file or key path this app is not measured to
+    /// read as the mac's Foundation reads it (#899 W6 review 2). A held case
+    /// must be answered <c>cannotTell</c> both ways here, never judged, and
+    /// must still differ from the contract (<c>UndoCheckContractTests.EveryCheckCase</c>).
+    /// </summary>
+    internal const string UndoCheckCasesRefusedHere = "shared-rules.json → undo.checkCases (refused here as cannot tell)";
+
+    /// <summary>
+    /// <c>undo-json-cases.json</c> → <c>editJSONCases</c>, by case
+    /// <c>name</c>: a move whose bytes the mac writes and this app is not
+    /// measured to write the same (#899 W6 review 2). A held case must be
+    /// REFUSED here (no bytes at all, never bytes of its own), and the
+    /// contract's result must still be bytes (<c>UndoOpKindsContractTests.EveryEditJsonCase</c>).
+    /// </summary>
+    internal const string UndoEditJsonCasesRefusedHere = "undo-json-cases.json → editJSONCases (refused here)";
+
+    /// <summary>
     /// <c>shared-rules.json</c> → <c>undo.stackCases</c>, by case <c>name</c>:
     /// a case that needs a call or a key this replay does not know yet (U2's
     /// op kinds, W6). A held case must still stop at that call or key
@@ -423,13 +441,12 @@ internal static class NamedGapLedger
     // The same hold, brought up to dev 39d83a0a7 (2026-11-18): stack 14's #901 piece 901a and #952.
     private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
-    private const string Reason899W6 = "the six op kinds the mac's U2b defines (replaceText, editJSON, move, createTree, removeTree, external) and recompute run are Windows' W6 for #899, still to come (plans/899-plan.md, W6 to W11b); until it lands this app's reader takes each for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
+    private const string Reason899Measured = "Windows refuses these editJSON cases until its key order and number reading are measured to match the mac's Foundation (#899 W6 review 2): the mac sorts keys beyond ASCII by Unicode collation, takes canonically equivalent keys (an accent written two ways, the Kelvin sign and K) and a key or text with a byte-order mark in front for one, and reads a number with an exponent and more than 17 digits, or more than 38 without, as a decimal number or not at all; Windows answers cannot tell, or refuses to write, rather than guess";
     private const string Reason899W4c = "the mac's U3c for #899 (2026-11-20; Russell's ruling of 15:20): recovery and an Undo or Redo put a page back from the step's own kept original (-orig, or -<n>-orig) when its hash matches the journal's record, every tidy keeps a kept original that is the only copy of what it holds (its bytes neither its page's nor what the list gives for its page), a swap never removes or reuses a kept original's name, an Undo or Redo of a newest step recovery has just left answers that refusal, a put-back from a kept original first writes both of the page's contents back into the list (and when the list will not take the outgoing one, or the kept original's own bytes, keeps them beside the page and still offers the other direction, resting on those files: Russell's ruling of 2026-11-20, night), a kept original that cannot be read just now leaves the step for the next try, and four trail lines say what was kept or refused; Windows' W4c, kept-original recovery, builds it (UndoRecovery.Settle, UndoDoor.AnswerARefusal, UndoSwap, UndoTrail.ToTheActivityTrail); until it lands this replay does not know the calls and keys those cases use, and this app writes none of those lines";
     private const string Reason899W4cKeptAlert = "the mac's U3c for #899 (Russell's rulings of 2026-11-20, night): when Show on Front Page goes in while another program edits the page at that instant, what the page held is kept in a hidden file beside it and ONE alert names it (keptTitle, kept), with OK, the default, and a button that shows the kept file selected in its folder (showKept: Show in Finder on the mac, Show in File Explorer here, as workingFolderPathBar's reveal; what File Explorer does for a hidden file is to be measured before it is built). When the kept file is gone by the time the button is pressed, keptGone is said instead and nothing is shown (the mac's U4a, from U3c review 3). Windows' W4c builds the part-way outcome this alert reports; until it lands Windows has no part-way front page to report and says none of these";
     private const string Reason899W4cWithW7 = "the merge of the mac's U3b and U3c for #899 (2026-11-20): a rollover's Undo needs no content from the list, so no kept original is looked for for a moveApart or a setAside, and a rollover's Undo that leaves its record apart never touches another step's kept original, which is still used by its hash; Windows runs these once both W4c (kept-original recovery) and W7 (the rollover as a step) have landed, whichever is later; until then this replay does not know the calls and keys those cases use";
     private const string Reason899W7U3b = "the mac's U3b for #899 (2026-11-20): the rollover as one step, whose site markers are the op kind moveApart (judged as move, but an Undo or Redo that finds it changed since leaves it and goes on with the rest: Russell's ruling of 2026-11-19 on Q3, #959), and a step's moveApart ops move as a group, all left apart when any one is changed since (the director's decision of 2026-11-20), as is a deploy set for later the swap cannot set at an Undo or Redo (the U3b review's LOW 3); a leftover no deploy reads is the op kind setAside, judged as move and standing apart ON ITS OWN, never one of that group, and a deploy set for later put back whose job will start only at the next login is named in startsAtTheNextLogin with its own sentence, undoScheduleStartsAtTheNextLogin (U3b's fix round three, 2026-11-20; which record a deploy reads is undo.netlifyRecordCases, which W7 runs as well); Windows' W7 for #899 builds it (documentation 12, the W7 row); until it lands this app's reader takes moveApart for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
-    private const string Reason899W6Traces = Reason899W6 + ". COVERAGE LOST, for W6 to restore: until U2b's contract put a move in them, W1 replayed all 20 traces call by call to their final hashes; held, each of these 15 is asserted only up to its first move and must stop exactly there, and trace-002, trace-012 and trace-020 open with a move, so they check nothing at all here until W6 replays them whole";
-    private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) has no action wired on Windows yet (W7 wires them, with 'undo could not record a step'), and no op kind that sets a folder aside (W6, with 'undo found a folder set aside'); 'undo rolled back' is written by W3's recovery";
+    private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) has no action wired on Windows yet (W7 wires them, with 'undo could not record a step'); 'undo rolled back' is written by W3's recovery and 'undo found a folder set aside' by W6's";
 
     /// <summary>
     /// The outside doors the contract names that this app does not have,
@@ -567,106 +584,27 @@ internal static class NamedGapLedger
              "Cloudflare token end date learned"),
         Owed(ActivityTrailEvents, 936, V200, Reason936,
              "files for the site downloaded", "files for the site could not be downloaded"),
-        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo found a folder set aside"),
+        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step"),
         Owed(ActivityTrailEvents, 899, V200, Reason899W4c,
              "undo could not put back a change that stopped",
              "undo kept what a page held",
              "undo refused for a change left part way",
              "undo kept what it replaced"),
-        // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
-        // recompute run. This reader takes them for kinds it does not know
-        // until W6 (the Windows plan, plans/899-plan.md: W1 reads the
-        // reserved kinds as unknown and W6 builds them; "every undo key a
-        // Windows test walks starts held against #899, and each piece removes
-        // the entries it makes true"). A check case is held when its verdict
-        // is not notReadable both ways (60 of them). A case whose `current`
-        // this test cannot place yet (a move's two sides, a tree, a
-        // preference) is judged on a placeholder when its op cannot be read,
-        // since an unreadable op is settled before its path is read: the nine
-        // such rows that expect notReadable both ways are met here and are not
-        // held (the 2026-11-19 review's MEDIUM). U2b's two cannotBeRead rows
-        // on known kinds are W1's, and were built rather than held.
-        Owed(UndoCheckCases, 899, V200, Reason899W6,
-             "replaceText: the hunk as the step left it",
-             "replaceText: the hunk as it was before",
-             "replaceText: the rest of the page edited since, the hunk untouched",
-             "replaceText: the hunk itself changed since",
-             "replaceText: the hunk there twice: never a guess at which",
-             "replaceText: the old and the new text both there, in different places",
-             "replaceText: a new text that begins with the old one, as left",
-             "replaceText: a new text that begins with the old one, put back",
-             "replaceText: carriage returns taken out since: byte for byte, the hunk is not the one left",
-             "replaceText: the page is gone",
-             "replaceText: a folder where the page was",
-             "replaceText: the page is no longer UTF-8",
-             "editJSON: the member as the step left it",
-             "editJSON: the member as it was before",
-             "editJSON: another member changed since, this one untouched",
-             "editJSON: the member itself changed since",
-             "editJSON: the member taken out since",
-             "editJSON: a member the step added, still there",
-             "editJSON: a member the step added, taken out since: already back",
-             "editJSON: a member set to null is not a member taken out",
-             "editJSON: a member holding null where the step took it out",
-             "editJSON: numbers compared by value",
-             "editJSON: true is not the number 1",
-             "editJSON: an object compared by its members, whatever their order",
-             "editJSON: a member found through objects inside objects",
-             "editJSON: a part on the way that is not an object",
-             "editJSON: the file is not one JSON object any more",
-             "editJSON: the file is not JSON",
-             "editJSON: the file is gone",
-             "move: the place it left free, the place it went holding it: as the step left it",
-             "move: back where it was, the other place free",
-             "move: a deploy wrote a new marker where it was: both left, nothing taken back, the moved copy never deleted",
-             "move: the moved copy changed since",
-             "move: the moved copy gone and its place free",
-             "move: the same content in both places",
-             "move: a folder where the moved file is",
-             "move of a folder: as the step left it",
-             "move of a folder: a file added inside it since",
-             "createTree: the folder as the step made it",
-             "createTree: the folder gone: already back",
-             "createTree: a file added inside since",
-             "createTree: a file inside changed since",
-             "createTree: an empty folder added inside since",
-             "createTree: a file where the folder was",
-             "removeTree: the folder still gone, as the step left it",
-             "removeTree: the folder back as it was",
-             "removeTree: something else made in its place since",
-             "external: the preference as the step left it",
-             "external: the preference as it was before",
-             "external: the preference changed since",
-             "external: a preference the step set where none was, removed since: already back",
-             "external: a preference holding something JSON cannot (a date)",
-             "replaceText: the page cannot be read just now",
-             "editJSON: the file cannot be read just now",
-             "move: the moved copy cannot be read just now",
-             "createTree: the folder cannot be listed just now",
-             "createTree: a link inside the folder: changed since, never followed",
-             "move: a link where the moved copy is: changed since, never followed",
-             "editJSON: a whole number beyond 2^53 in the file cannot be compared exactly: cannot tell, never a guess",
-             "editJSON: a recorded value beyond 2^53: cannot tell"),
-        Owed(UndoStackCases, 899, V200, Reason899W6,
-             "U2, move: a rollover's marker moved aside is moved back by Undo",
-             "U2, move: and Redo moves it aside again",
-             "U2, move: a deploy wrote a new marker in its place: Undo takes nothing back, both markers kept, and the list is cleared (ruling 13)",
-             "U2, createTree: a folder made is taken out by Undo and made again by Redo",
-             "U2, createTree: a file added inside the folder since: Undo refuses, the folder kept whole, the list cleared",
-             "U2, removeTree: a folder removed is made again by Undo, everything in it from the list",
-             "U2, removeTree: and Redo removes it again",
-             "U2, editJSON: a settings member undone and redone",
-             "U2, editJSON: the member changed by hand since: refused, the list cleared",
-             "U2, replaceText: a hunk of a page undone and redone",
-             "U2, external: a preference set through the app, undone and redone, with no working folder",
-             "U2, external: the preference changed since: refused, the list cleared",
-             "U2: steps of every kind on one list, undone newest first (rulings 5 and 9)",
-             "U2, recompute: an Undo and a Redo each re-derive the section's front page",
-             "U2, recompute: with no runner for its maintainer, a step holding a recompute is not available, never undone with its re-derivation skipped",
-             "U2: another version's step that breaks wholeOps (a folder made inside a folder the same step makes) is a barrier: not available, never cleared",
-             "U2, createTree: an Undo whose content the list no longer holds is refused and the folder kept (the list is cleared, as for any content missing)",
-             "U2, removeTree: a Redo whose content the list no longer holds is refused, the folder kept, only the redo dropped",
-             "U2: the folder a page was moved out of, replaced since by a link to outside the working folder: Undo moves nothing out, refuses as changed since, and clears the list"),
+        Owed(UndoEditJsonCasesRefusedHere, 899, V200, Reason899Measured,
+             "a new object's keys beyond ASCII: the mac sorts them by Unicode collation (an emoji first, \u00e9 between E and f, a full-width \uff21 beside A, \u00df after ss, a tab passed over)",
+             "a new object holding \u00e9 written two ways (one character, and e with a combining accent): the mac takes them for one key",
+             "a key path part beyond ASCII finds the member the file spells another way (\u00e9 as one character in the op, e with a combining accent in the file)",
+             "a key path part beyond ASCII, spelled as the file spells it",
+             "the Kelvin sign in a file's key is the letter K to the mac: the member is found and its value moved",
+             "a file's key that starts with a byte-order mark (written \\ufeff) is the key without it to the mac: the member is found and its value moved"),
+        Owed(UndoCheckCasesRefusedHere, 899, V200, Reason899Measured,
+             "editJSON: a file's number spelled with an exponent and more than 17 digits is read by the mac as a decimal number, whose double is not the nearest one: the step's value is that double",
+             "editJSON: a file's number spelled with an exponent and more than 17 digits, the step's value its nearest double, which the mac does not read from it",
+             "editJSON: a member holding an object whose key is \u00e9 written as e with a combining accent, the step's value \u00e9 as one character",
+             "editJSON: a key path part \u00e9 as one character, the file's key e with a combining accent, the step having added the member",
+             "editJSON: a member holding text that starts with a byte-order mark (written \\ufeff), which the mac reads without it",
+             "editJSON: a file's key that is the Kelvin sign, the key path the letter K, the step having added the member",
+             "editJSON: another member's number written with 168 digits after the point, which the mac cannot read: the file is not JSON there"),
         Owed(UndoStackCases, 899, V200, Reason899W4c,
              "U3c: an Undo whose content is missing, with the page's kept original matching what the journal recorded, is undone from it and leaves nothing beside the page (Russell's ruling of 2026-11-20, 15:20)",
              "U3c: and the Redo it offers then goes forward from the list: the page is as the step left it, nothing beside it",
@@ -707,22 +645,6 @@ internal static class NamedGapLedger
              "U3b with U3c: the Undo of a rollover of only its records, a leftover and the year, with the list's content gone, needs nothing from it (each record and leftover is a rename judged by its hash, the school year a member derived from the file), so no kept original is looked for and the Undo goes, never refused for content missing",
              "U3c with U3b: a later rollover's Undo that leaves its record apart keeps an earlier page's kept original beside it, untouched",
              "U3c with U3b: an earlier page's kept original, the only copy of what it held, outlives a later rollover's Undo that leaves its record apart, and that page's Undo is then put back from it"),
-        Owed(UndoTraces, 899, V200, Reason899W6Traces,
-             "trace-002",
-             "trace-003",
-             "trace-004",
-             "trace-005",
-             "trace-006",
-             "trace-008",
-             "trace-010",
-             "trace-011",
-             "trace-012",
-             "trace-014",
-             "trace-015",
-             "trace-016",
-             "trace-017",
-             "trace-018",
-             "trace-020"),
         // The mac's U3 rows (U3a's third review, U3c's kept originals and
         // its two fix rounds) arrived with W3's reader already on dev: each
         // uses a key this replay does not check, and W4c builds them.
@@ -737,28 +659,10 @@ internal static class NamedGapLedger
              "the same undo when the list cannot keep a copy of what the page held as it went forward again: ended where it began, and that content kept beside the page under the put-back's hidden name, with the kept original it went forward from, and both named on the trail as no longer in the list",
              "the same undo when only the content its kept original holds is gone from the list and the list will not take it again: ended where it began, and the kept original stays beside the page, though the page now holds the same, and is named on the trail as no longer in the list",
              "the same undo, with the kept original no longer matching: closed as interrupted naming the page, the list cleared, and the kept original left beside its page and named on the trail"),
-        Owed(UndoRecoveryCases, 899, V200, Reason899W6,
-             "U2: a step with a marker move and the front page dies after every swap, before its re-derivation: completed, and recovery re-derives the front page",
-             "U2: the same step dies with its pages swapped and its marker not yet moved: the pages put back, rolled back, and the front page re-derived",
-             "U2: the same step dies before anything is swapped: failed, nothing to put back, and the front page re-derived all the same (re-deriving is idempotent)",
-             "U2: its undo dies after its swaps, before its re-derivation: completed, and re-derived",
-             "U2: its undo dies with the marker moved back and the pages not yet: the marker moved aside again, the undo ends where it began",
-             "U2: a deploy wrote a new marker after the step died with its marker moved: the pair is in the way, the pages are put back, both markers kept, the step interrupted and the list cleared",
-             "U2: a step that removes a folder dies with the folder set aside and its marker not yet moved: the folder put back from where it was set aside (its listing the step's), the pages put back, rolled back",
-             "U2: the same step dies after every change, before applied: completed, the folder gone, nothing staged left",
-             "U2: its undo dies with the pages and the marker back and the folder not yet made: the folder made beside its place is removed, and the undo rolled back",
-             "U2: a step that sets a preference dies with its pages swapped and the preference not yet set: rolled back, the preference as it was",
-             "U2: the same step dies after the preference is set, before applied: completed",
-             "U2: a step with the front page that died before applied is settled by the next write through the door for ops, and its front page re-derived",
-             "U2: the same step meets a write through U1's door first: the write is refused (another change is under way) and the step left in flight for a recovery that re-derives, never settled with its front page stale",
-             "U2: a step that removes a folder dies with the folder set aside, and a file is saved into it while it is aside: the folder is put back in its place, changed, and is in the way: the pages are put back, the step is interrupted naming the folder, and the list cleared",
-             "U2: the same, with something else made in the folder's place since: the folder set aside is kept under a visible name beside it, the step interrupted naming the folder, and the list cleared",
-             "U2: the same, with that visible name taken too: the folder is kept as '(kept by Undo 2)', the taken name untouched",
-             "U2: the same, with the recovery dying after the folder is kept under its visible name and before it writes to the list: the next recovery finds nothing hidden and settles the step as interrupted, the folder still kept, one trail line",
-             "U2: a step that removes a folder dies with the folder changed while aside and the recovery dying after putting it back, before it writes to the list: the next recovery finds the folder in its place, in the way, and settles the step as interrupted, one trail line",
-             "U2: a step that removes a folder dies part way through deleting it, every change in: the folder was renamed to its -gone name first, so recovery finishes the delete and the step is completed, never a half-emptied folder put back",
-             "U2: its redo dies the same way, part way through deleting the folder again: recovery finishes the delete and the redo is completed",
-             "U2: a write through U1's door on the very file a dead front-page step left part way is refused, never written over it"),
+        // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
+        // recompute run were held here from 2026-11-19 (60 checkCases, 19
+        // stackCases, 15 traces, 21 recoveryCases) and went when Windows' W6
+        // built them (2026-11-20).
         Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
         Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921, "cloudflareToken"),
         Owed(CredentialRequestsSaidDifferently, 920, V200, Reason920, "teacherSurname", "siteName", "siteNameConflict"),
