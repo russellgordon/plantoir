@@ -162,6 +162,22 @@ public sealed class TrailLinesContractTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// A unit plan's name is put on one line with the course-name rule first,
+    /// as the mac's is (<see cref="UnitPlans.OneLine"/>): every <c>cases</c>
+    /// entry gives its <c>expect</c> with white space runs made one space and
+    /// the ends trimmed.
+    /// </summary>
+    [Fact]
+    public void AUnitPlansNameIsCleanedByTheSameRuleFirst()
+    {
+        foreach (var testCase in CourseNameCharacters()["cases"]!.AsArray())
+        {
+            string expect = UnitPlans.OneLine(testCase!["expect"]!.ToString());
+            Assert.True(expect == UnitPlans.OneLine(testCase["raw"]!.ToString()), testCase["name"]!.ToString());
+        }
+    }
+
     // ---- trailLines (#821 items 2 and 4) --------------------------------------
 
     /// <summary>
