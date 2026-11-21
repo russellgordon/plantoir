@@ -22191,9 +22191,13 @@ the switch stays off. Rename folder through the door is NOT in this part
   just changed is what #265 forbids.
 - **Two contract rows for U3c review 3's kept-copy rules** (LOW 4):
   `stackCases` 'U4a, LOW 4 (a)' (the outgoing bytes kept beside the page
-  when the list takes no new file, and the Redo made from them; a row for
-  the bytes stored in the list was dropped, because on the Mac it passed
-  with the store taken out) and
+  when the list takes no new file, and the Redo made from them), 'U4a, LOW
+  4 (a), stored' (the same with the list taking the bytes: nothing kept,
+  the Redo made from the list; added in U4b, the part-one review's LOW 2,
+  and measured to fail with only the store branch of
+  `storeWhatTheOtherDirectionNeeds` taken out, the Redo coming to
+  `contentMissing`; an earlier row for it was dropped in 4cd1ccac4 because
+  that one passed either way) and
   'U4a, LOW 4 (b)' (seven moves, two kept files), with the call
   `afterContentGone` and the key `keptBesideThePage` (`stackCasesHow`). The
   Python model (`make_undo_traces.py`) now stores the outgoing bytes as the
@@ -22204,9 +22208,14 @@ the switch stays off. Rename folder through the door is NOT in this part
   beside it" whenever anything was kept, also when the page came from the
   list and only its outgoing bytes were kept
   (`storeWhatTheOtherDirectionNeeds`). The phrase is now said only when a
-  kept original was used (`fromAKeptOriginal`, set by the swap from the
-  check's uses); `activityTrail.mustRecord` says so
-  (`UndoKeptCopiesTests.testTheKeptLineSaysFromTheListWhenThePageCameFromTheList`).
+  kept original was used, decided page by page since U4b (the part-one
+  review's LOW 1: a step of two pages, one put back from the list with its
+  outgoing bytes kept and one from its kept original, said it of both):
+  `putBackFromAKeptOriginal` names the pages the check's uses name, and a
+  step with pages both ways says "put back “A.md”, and put back “B.md” from
+  what was kept beside it"; `activityTrail.mustRecord` says so
+  (`UndoKeptCopiesTests.testTheKeptLineSaysFromTheListWhenThePageCameFromTheList`,
+  `…testTheKeptLineIsDecidedPageByPage`).
 - **A settings file that is a link is saved again with the switch off** (the
   sweep, LOW 2, run, not only read): U4a planned the Save at the link's own
   place, the swap found a link there (`lstat`), refused it as changed since,
@@ -22220,6 +22229,21 @@ the switch stays off. Rename folder through the door is NOT in this part
   Measured: before U4a, `write(to:)`'s atomic write REPLACED the link with a
   plain file and left the teacher's real file as it was; rejected, for the
   reason `rule.shadow` gives for a daily page.
+  **Owed at U7, written down now (U4b part one's review, LOW 4):** a link
+  leading OUTSIDE the working folder is saved through `writePlainly` with
+  the switch off, since `UndoFolderPlaces.relativePath` cannot name it;
+  LIVE, `makeAsOps` throws `couldNotRecordTheStep` and that Save is refused.
+  That refusal is right by "live never writes outside what the step names",
+  but it is a Save the teacher could make before Undo, so U7 decides it
+  before the flip (keep the refusal with a sentence of its own, or save it
+  off the list as credentials are) and says it in `rule.shadow`.
+  **A dangling link** (the same review, LOW 5): `fileALinkLeadsTo` gives the
+  missing target, `before` is nil, and the Save makes a new file where the
+  link points, which with the switch off can be outside the working folder;
+  nothing is overwritten, and before U4a the link itself was replaced by a
+  file. A link that loops ends at a link after `MAXSYMLINKS` hops,
+  `UndoItem.read` answers not-a-file, and the Save is refused writing
+  nothing, its "Could not save" sentence true.
 - **Show in Finder's real path is read by a test** (the sweep's note): the
   alert and what Finder selects are worked out first
   (`FolderActions.showInFinderPlan`), and the app's path follows that plan

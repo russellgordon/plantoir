@@ -683,6 +683,7 @@ internal static class NamedGapLedger
              "U3c: the same with the kept original no longer matching: refused once with its reason, the list cleared, and the kept original left beside the page",
              "U3c: a kept original another Mac or an earlier list left under the very name the next step's swap would use is never removed or reused: the step keeps its own original under the next free name and goes in (the third review of U3a, LOW 6: step numbers are not unique across two Macs syncing one folder, or after a list is started again)"),
         Owed(UndoStackCases, 899, V200, Reason899W4c,
+             "U4a, LOW 4 (a), stored: a whole-file step whose after content is gone from the list: the Undo writes what it took off into the list before its swap, nothing is kept beside the page, and the Redo is made from the list",
              "U4a, LOW 4 (a): the same with the list taking no new file: what the Undo took off is kept beside the page, and the Redo is made from it",
              "U4a, LOW 4 (b): both contents gone and the list taking no new file, seven moves: one kept copy per content per page, two files in all"),
         Owed(UndoStackCases, 899, V200, Reason899W8U4b,

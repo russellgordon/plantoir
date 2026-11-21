@@ -2101,9 +2101,18 @@ nonisolated extension UndoJournal {
                     }
                 }
             }
+            // Page by page: "from what was kept beside it" only of a page a
+            // use names (U4b part one's review, LOW 1).
+            var putBackFromAKeptOriginal: [String] = []
+            for use in uses {
+                let page: String = (use.path as NSString).lastPathComponent
+                if !putBackFromAKeptOriginal.contains(page) {
+                    putBackFromAKeptOriginal.append(page)
+                }
+            }
             UndoTrailHook.keptWhatItReplacedLine?(
                 record.step.course ?? "", record.step.section, direction == .backward, keptOfWhatItHeld, keptOfWhatItHoldsNow,
-                !uses.isEmpty
+                putBackFromAKeptOriginal
             )
         }
         // Only now, the whole swap in and the step closed, the trail says a

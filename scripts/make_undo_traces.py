@@ -1506,6 +1506,7 @@ class Model:
             undo["phase"] = "undone"
             self.write_line()
             self.tidy_kept_copies()
+            self.remove_superseded_kept_copies()
             if not_whole:
                 # The Redo stays offered, resting on what is kept beside the
                 # page (Russell's ruling of 2026-11-20, night).
@@ -1548,6 +1549,7 @@ class Model:
             candidate["phase"] = "done"
             self.write_line()
             self.tidy_kept_copies()
+            self.remove_superseded_kept_copies()
             if not_whole:
                 # Its Undo stays offered, resting on what is kept beside the
                 # page; cleared only if it is refused then (Russell's ruling
@@ -1628,6 +1630,17 @@ class Model:
             self.kept.setdefault(path, []).append(other)
             kept_any = True
         return kept_any
+
+    def remove_superseded_kept_copies(self):
+        """UndoRecovery.removeSupersededKeptCopies (U3c review 3, LOW 1):
+        after each move, the kept copies beside a page thinned to one per
+        content, so Undo and Redo again and again never pile them up."""
+        for path in list(self.kept):
+            one_of_each = []
+            for text in self.kept[path]:
+                if text not in one_of_each:
+                    one_of_each.append(text)
+            self.kept[path] = one_of_each
 
     def tidy_kept_copies(self):
         """A kept original whose page holds the same text is a copy: gone,

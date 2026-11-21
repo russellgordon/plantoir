@@ -1422,7 +1422,7 @@
         "why": "#899, piece U3c (the third review of U3a, LOW 1). An edit another program made in place as a swap went in is kept only in the kept original, under a hidden name; recovery settles the step and never deletes that file, and this line is how anyone finds it. The second reason is the first review of U3c's LOW 2: a step that completes while its before content is missing from the list keeps the kept original, whose hash is exactly what was recorded, so 'it differs' would be untrue. Never page text. First written live at U7."
       },
       {
-        "carries": "the course and the section, Undo or Redo, the page put back (said as put back \"from what was kept beside it\" only when it was put back from a kept original; when the list gave its content and would not take the outgoing bytes, the line says only that it was put back: the U4a sweep, LOW 1), that the list could not keep a copy of all it needs for the change, so what it could not keep stays beside the page and the next Undo or Redo of the change uses it, and the hidden name of each such file: what the page held a moment before (the swap's own `-undo-orig` or `-redo-orig`), and a kept original it put back whose bytes the list would not take (what the page holds now)",
+        "carries": "the course and the section, Undo or Redo, the page put back (said as put back \"from what was kept beside it\" only when it was put back from a kept original; when the list gave its content and would not take the outgoing bytes, the line says only that it was put back: the U4a sweep, LOW 1; decided page by page, so a step of two pages, one of each, says \"put back “A.md”, and put back “B.md” from what was kept beside it\": U4b part one's review, LOW 1), that the list could not keep a copy of all it needs for the change, so what it could not keep stays beside the page and the next Undo or Redo of the change uses it, and the hidden name of each such file: what the page held a moment before (the swap's own `-undo-orig` or `-redo-orig`), and a kept original it put back whose bytes the list would not take (what the page holds now)",
         "event": "undo kept what it replaced",
         "line": "ICS3U/1 · Undo put back “A.md” from what was kept beside it, but the list could not keep a copy of all it needs for this change, so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it. What “A.md” held a moment before is kept beside it as the hidden file “.A.md.plantoir-undo-4-undo-orig”.",
         "why": "#899, U3c's first review, MEDIUM. An Undo or Redo that takes a page's content from its kept original writes both of the page's contents back into the list before the swap, so its other direction can be made; when the list will not take the outgoing content (a full or read-only disk), that content would be in no file at all once the swap tidied. It is kept beside the page instead, and this line is how anyone finds it. The second review of U3c: a kept original whose own bytes the list will not take is kept too (MEDIUM), and the step stays on the list with both directions offered, resting on those files, as recovery's does (Russell's ruling of 2026-11-20, night): if a file is gone or changed by the time it is needed, that Undo or Redo is refused then, with its true sentence. Nothing is dropped or cleared at the move, so the line says nothing of either (LOW 1). Never page text. First written live at U7."
@@ -52066,6 +52066,27 @@
         "cleared": "changedSince",
         "clearedSeq": 1,
         "nothingMovedOutside": true
+      },
+      {
+        "name": "U4a, LOW 4 (a), stored: a whole-file step whose after content is gone from the list: the Undo writes what it took off into the list before its swap, nothing is kept beside the page, and the Redo is made from the list",
+        "calls": [
+          "step",
+          "wholeFileStep",
+          "afterContentGone",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ],
+        "keptOriginalLeft": false,
+        "keptBesideThePage": 0,
+        "keptWhatItReplacedLines": 0,
+        "why": "U4b part one's review, LOW 2: dropping a row in 4cd1ccac4 left the row below saying \"the same\" of nothing, and no row was left for the branch of storeWhatTheOtherDirectionNeeds that stores the outgoing bytes in the list. Without that store the swap's tidy deletes the only copy of what the Undo took off, and the Redo comes to contentMissing."
       },
       {
         "name": "U4a, LOW 4 (a): the same with the list taking no new file: what the Undo took off is kept beside the page, and the Redo is made from it",

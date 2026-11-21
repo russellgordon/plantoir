@@ -999,7 +999,7 @@ class ContractCaseTests(unittest.TestCase):
                     foreign = "foreignKeptOriginal" in case["calls"]
                     self.assertEqual(bool(model.kept) or foreign, case["keptOriginalLeft"])
                 if "keptBesideThePage" in case:
-                    self.assertEqual(len(set(model.kept.get(p1, []))), case["keptBesideThePage"])
+                    self.assertEqual(len(model.kept.get(p1, [])), case["keptBesideThePage"])
                 if "keptWhatItReplacedLines" in case:
                     self.assertEqual(model.kept_what_it_replaced_lines, case["keptWhatItReplacedLines"])
                 if "leftApart" in case:
