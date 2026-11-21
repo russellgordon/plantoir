@@ -133,7 +133,38 @@ internal static class UndoJsonMember
             if (document.RootElement.ValueKind != JsonValueKind.Object) return null;
             return UndoJson.From(document.RootElement, asTheMacReadsAFile: true) as UndoJson.Members;
         }
-        catch (JsonException) { return null; }
+        // Text holding half of a surrogate pair (\ud800) cannot be read as a
+        // string here; the mac cannot read such a file either (measured
+        // 2026-11-20): not JSON there, changed since, on both.
+        catch (Exception error) when (error is JsonException or InvalidOperationException) { return null; }
+    }
+
+    /// <summary>
+    /// Whether the key path, and every object it passes through, is one this
+    /// app is measured to walk as the mac walks it (#899 W6 review 2): each
+    /// part, and every key of each object on the way (the top level included),
+    /// printable ASCII (<see cref="UndoJson.IsMeasuredKey"/>); and the file
+    /// holding only numbers read as measured. The mac takes canonically
+    /// equivalent keys for one, so a file's Kelvin sign is its <c>K</c>, and
+    /// a key starting with a byte-order mark is that key without it: a member
+    /// this app would call missing and add beside the one the mac finds.
+    /// </summary>
+    internal static bool PathIsMeasured(IReadOnlyList<string> keyPath, UndoJson tree)
+    {
+        if (!tree.HoldsOnlyMeasuredNumbers) return false;
+        UndoJson current = tree;
+        foreach (string part in keyPath)
+        {
+            if (!UndoJson.IsMeasuredKey(part)) return false;
+            if (current is not UndoJson.Members members) return true;
+            foreach (string key in members.Items.Keys)
+            {
+                if (!UndoJson.IsMeasuredKey(key)) return false;
+            }
+            if (!members.Items.TryGetValue(part, out UndoJson? next)) return true;
+            current = next;
+        }
+        return true;
     }
 
     internal static Reading ReadingOf(IReadOnlyList<string> keyPath, byte[] bytes) =>
@@ -154,8 +185,16 @@ internal static class UndoJsonMember
     internal static UndoOpState StateOf(UndoOp op, UndoCurrent current)
     {
         if (current is not UndoCurrent.Bytes bytes || op.KeyPath is not { } keyPath) return UndoOpState.Neither;
-        Reading found = ReadingOf(keyPath, bytes.Content);
+        if (TopLevel(bytes.Content) is not { } tree) return UndoOpState.Neither;
+        Reading found = ReadingOf(keyPath, tree);
         if (found.CannotTell) return UndoOpState.Neither;
+        // What this app is not measured to read as the mac reads it (a key
+        // beyond printable ASCII on the path or in a value, text starting with
+        // a byte-order mark, a number spelled beyond the measured digits):
+        // cannot tell, never a guess (#899 W6 review 2).
+        if (!PathIsMeasured(keyPath, tree)) return UndoOpState.CannotTell;
+        if (found.Value is { IsMeasured: false }) return UndoOpState.CannotTell;
+        if (op.ValueBefore is { IsMeasured: false } || op.ValueAfter is { IsMeasured: false }) return UndoOpState.CannotTell;
         // A whole number beyond 2^53, in the file or in the record, cannot be
         // compared exactly through a double: cannot tell, never a guess.
         if (found.Value is { IsExact: false }) return UndoOpState.CannotTell;
@@ -195,12 +234,17 @@ internal static class UndoJsonMember
     /// (which the plan reads as changed since) when that cannot be done safely:
     /// the file not UTF-8 or not one JSON object, a key written twice on the
     /// path, a part on the way missing when a value must be set, a new value
-    /// that is not exact, or a result that does not read back as exactly the
-    /// file with that one member changed.
+    /// that is not exact, a key path, file or new value this app is not
+    /// measured to treat as the mac does (<see cref="PathIsMeasured"/>,
+    /// <see cref="UndoJson.IsMeasured"/>), or a result that does not read back
+    /// as exactly the file with that one member changed.
     /// </summary>
     internal static byte[]? Moved(UndoOp op, byte[] bytes, bool backward)
     {
         if (op.KeyPath is not { Count: > 0 } keyPath || TopLevel(bytes) is not { } tree) return null;
+        // Never a byte written where this app is not measured to find the
+        // member as the mac finds it (#899 W6 review 2).
+        if (!PathIsMeasured(keyPath, tree)) return null;
         UndoJson? wanted = backward ? op.ValueBefore : op.ValueAfter;
         if (Setting(keyPath, 0, wanted, tree) is not { } expected) return null;
         if (UndoJsonBytes.Locate(keyPath, bytes) is not { } place) return null;
@@ -878,7 +922,7 @@ internal sealed class UndoAppSettingsPlaces : IUndoExternalPlaces
 
     public bool Write(string target, UndoJson? value)
     {
-        if (NameOf(target) is not { } name || value is null || value.Spelled() is not { } spelled) return false;
+        if (NameOf(target) is not { } name || value is null || value.Spelled(onlyAsTheMacIsMeasuredToWrite: false) is not { } spelled) return false;
         string temporary = SettingsFile + ".undo-writing";
         try
         {

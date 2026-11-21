@@ -155,4 +155,66 @@ public sealed class UndoAppSettingsPlacesTests : IDisposable
         Assert.Equal(["C:\\one", "C:\\two"], running.AcceptedSyncedFolders);
         Assert.Equal("C:\\w", OnTheDisk(file, "WorkspacePath").GetValue<string>());
     }
+
+    /// <summary>
+    /// A dictionary keyed beyond ASCII (a folder path with an accent) is still
+    /// set in the app's own settings file, which the mac never reads or writes:
+    /// only an editJSON on a file the mac shares refuses such a key (#899 W6
+    /// review 2, <see cref="UndoJson.IsMeasured"/>).
+    /// </summary>
+    [Fact]
+    public void ADictionaryKeyedBeyondAsciiIsStillSetInTheAppsOwnSettings()
+    {
+        string file = SettingsFile("{\"DeployedFolderPorts\": {\"C:\\\\a\": 8101}}");
+        AppSettings running = AppSettings.Load(file);
+        var places = new UndoAppSettingsPlaces(file, () => running);
+
+        Assert.True(places.Write("preference:DeployedFolderPorts", Value("{\"C:\\\\Fran\u00e7ais\": 8200}")));
+        Assert.Equal(new Dictionary<string, int> { ["C:\\Fran\u00e7ais"] = 8200 }, running.DeployedFolderPorts);
+        Assert.True(places.Read("preference:DeployedFolderPorts").Matches(Value("{\"C:\\\\Fran\u00e7ais\": 8200}")));
+    }
+
+    /// <summary>
+    /// The review's LOW 3 (#899 W6 review 2): while another program holds the
+    /// settings file open without letting it be replaced (as the app's own
+    /// <c>Save</c> does while it writes), the rename is refused: the set is
+    /// refused (couldNotWrite), the file byte for byte as it was, the running
+    /// copy unchanged, and no temporary file left beside it.
+    /// </summary>
+    [Fact]
+    public void ARenameRefusedBecauseTheFileIsOpenChangesNothing()
+    {
+        string file = SettingsFile("{\"AcceptedSyncedFolders\": [\"C:\\\\one\"]}");
+        byte[] before = File.ReadAllBytes(file);
+        AppSettings running = AppSettings.Load(file);
+        var places = new UndoAppSettingsPlaces(file, () => running);
+
+        using (var holder = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            Assert.False(places.Write("preference:AcceptedSyncedFolders", Value("[\"C:\\\\two\"]")));
+        }
+
+        Assert.Equal(before, File.ReadAllBytes(file));
+        Assert.Equal(["C:\\one"], running.AcceptedSyncedFolders);
+        Assert.False(File.Exists(file + ".undo-writing"));
+    }
+
+    /// <summary>
+    /// The review's LOW 2 (#899 W6 review 2): a write killed between its
+    /// temporary file and the rename leaves <c>settings.json.undo-writing</c>.
+    /// Nothing reads it (a read is the settings file's alone), and the next
+    /// set writes over it and renames it in, so none is left after.
+    /// </summary>
+    [Fact]
+    public void ATemporaryLeftByAKilledWriteIsNeverReadAndGoesWithTheNextSet()
+    {
+        string file = SettingsFile("{\"AcceptedSyncedFolders\": [\"C:\\\\one\"]}");
+        File.WriteAllText(file + ".undo-writing", "{\"AcceptedSyncedFolders\": [\"C:\\\\left\", \"over\"]}");
+        var places = new UndoAppSettingsPlaces(file, () => null);
+
+        Assert.True(places.Read("preference:AcceptedSyncedFolders").Matches(Value("[\"C:\\\\one\"]")));
+        Assert.True(places.Write("preference:AcceptedSyncedFolders", Value("[\"C:\\\\two\"]")));
+        Assert.Equal("[\"C:\\\\two\"]", OnTheDisk(file, "AcceptedSyncedFolders").ToJsonString());
+        Assert.False(File.Exists(file + ".undo-writing"));
+    }
 }

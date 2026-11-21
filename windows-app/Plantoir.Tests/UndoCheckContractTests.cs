@@ -153,8 +153,11 @@ public sealed class UndoCheckContractTests : IDisposable
 
     /// <summary>Every case held open by name is a case the contract still has (none since W6).</summary>
     [Fact]
-    public void EveryHeldCheckCaseIsStillInTheContract() =>
+    public void EveryHeldCheckCaseIsStillInTheContract()
+    {
         NamedGapLedger.StillNamed(NamedGapLedger.UndoCheckCases, Cases().Select(row => (string)row[0]));
+        NamedGapLedger.StillNamed(NamedGapLedger.UndoCheckCasesRefusedHere, Cases().Select(row => (string)row[0]));
+    }
 
     /// <summary>
     /// Every case, its undo and redo verdicts exactly as the contract gives
@@ -180,6 +183,16 @@ public sealed class UndoCheckContractTests : IDisposable
         (string undo, string redo) = judge(name, checkCase, op);
         string expectedUndo = checkCase.GetProperty("undo").GetString()!;
         string expectedRedo = checkCase.GetProperty("redo").GetString()!;
+        NamedGapLedger.Entry? refused = NamedGapLedger.Holding(NamedGapLedger.UndoCheckCasesRefusedHere, name, entries);
+        if (refused is not null)
+        {
+            // The mac acts on this file; this app is not measured to read it
+            // as the mac does, so it must answer cannot tell, never judge it.
+            Assert.False(undo == expectedUndo && redo == expectedRedo, NamedGapLedger.ClosedMessage(refused));
+            Assert.True(undo == "cannotTell" && redo == "cannotTell",
+                $"\"{name}\" is held open (#{refused.Issue}: {refused.Reason}), so it must be answered cannotTell both ways, never judged; it was answered {undo} and {redo}");
+            return;
+        }
         if (held is not null)
         {
             Assert.False(undo == expectedUndo && redo == expectedRedo, NamedGapLedger.ClosedMessage(held));

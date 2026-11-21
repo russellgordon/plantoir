@@ -32,9 +32,16 @@ internal abstract class UndoJson
         internal bool Value { get; } = value;
     }
 
-    internal sealed class Number(double value) : UndoJson
+    internal sealed class Number(double value, bool measured = true) : UndoJson
     {
         internal double Value { get; } = value;
+
+        /// <summary>
+        /// False for a number a file spells in a way this app is not measured
+        /// to read as the mac reads it (<see cref="ReadAsTheMacReads"/>): the
+        /// file holding it is "cannot tell" (<see cref="HoldsOnlyMeasuredNumbers"/>).
+        /// </summary>
+        internal bool Measured { get; } = measured;
     }
 
     internal sealed class Text(string value) : UndoJson
@@ -112,8 +119,21 @@ internal abstract class UndoJson
             case JsonValueKind.False:
                 return new Bool(false);
             case JsonValueKind.Number:
-                if (!element.TryGetDouble(out double number) || double.IsInfinity(number) || double.IsNaN(number)) return null;
-                return new Number(asTheMacReadsAFile ? ReadAsTheMacReads(element.GetRawText(), number) : number);
+            {
+                // A number beyond a double's range is an infinity here, whichever reader gives it.
+                if (!element.TryGetDouble(out double number)
+                    && !double.TryParse(element.GetRawText(), NumberStyles.Float, CultureInfo.InvariantCulture, out number)) return null;
+                if (double.IsNaN(number)) return null;
+                if (!asTheMacReadsAFile) return double.IsInfinity(number) ? null : new Number(number);
+                string spelling = element.GetRawText();
+                if (!SpellingIsMeasured(spelling)) return new Number(double.IsInfinity(number) ? 0 : number, measured: false);
+                // Measured (2026-11-20): the mac reads a number beyond a double's
+                // range as minus infinity when it is negative (-1e400, -1.8e308,
+                // -0.5e309) and cannot read the file when it is positive (1e400).
+                if (double.IsPositiveInfinity(number)) return null;
+                if (double.IsNegativeInfinity(number)) return new Number(double.NegativeInfinity);
+                return new Number(ReadAsTheMacReads(spelling, number));
+            }
             case JsonValueKind.String:
                 return new Text(element.GetString()!);
             case JsonValueKind.Array:
@@ -174,6 +194,97 @@ internal abstract class UndoJson
     }
 
     /// <summary>
+    /// Whether this value is one this app is MEASURED to read, compare and
+    /// spell exactly as the mac does (#899 W6 review 2): every key printable
+    /// ASCII (<see cref="IsMeasuredKey"/>), no text starting with a byte-order
+    /// mark, and every number read as measured. Anything else is refused
+    /// before a byte is written ("cannot tell" when judged, never written),
+    /// because the mac's Foundation does something this app has not been
+    /// measured to copy: it sorts keys beyond ASCII by Unicode collation (an
+    /// emoji first, <c>é</c> between <c>E</c> and <c>f</c>, a full-width
+    /// <c>Ａ</c> beside <c>A</c>), takes keys that are canonically equivalent
+    /// for one (<c>é</c> as one character and as <c>e</c> with a combining
+    /// accent; the Kelvin sign and <c>K</c>), and reads text without a
+    /// byte-order mark at its start (<c>undo.editJSONCases</c>,
+    /// <c>undo.checkCases</c>, held here by name in <c>NamedGapLedger</c>).
+    /// </summary>
+    internal bool IsMeasured
+    {
+        get
+        {
+            switch (this)
+            {
+                case Number number:
+                    return number.Measured;
+                case Text words:
+                    return !words.Value.StartsWith('\uFEFF');
+                case List list:
+                    foreach (UndoJson item in list.Items)
+                    {
+                        if (!item.IsMeasured) return false;
+                    }
+                    return true;
+                case Members members:
+                    foreach (KeyValuePair<string, UndoJson> member in members.Items)
+                    {
+                        if (!IsMeasuredKey(member.Key) || !member.Value.IsMeasured) return false;
+                    }
+                    return true;
+                default:
+                    return true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether every number anywhere in a file's value was read as measured
+    /// (<see cref="SpellingIsMeasured"/>). A file holding one that is not is
+    /// "cannot tell" as a whole: the mac cannot read some such files at all
+    /// (a number with 168 digits after the point), so even a member beside it
+    /// is never judged or moved here.
+    /// </summary>
+    internal bool HoldsOnlyMeasuredNumbers
+    {
+        get
+        {
+            switch (this)
+            {
+                case Number number:
+                    return number.Measured;
+                case List list:
+                    foreach (UndoJson item in list.Items)
+                    {
+                        if (!item.HoldsOnlyMeasuredNumbers) return false;
+                    }
+                    return true;
+                case Members members:
+                    foreach (UndoJson item in members.Items.Values)
+                    {
+                        if (!item.HoldsOnlyMeasuredNumbers) return false;
+                    }
+                    return true;
+                default:
+                    return true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A key made only of printable ASCII (U+0020 to U+007E), the only keys
+    /// whose order (<see cref="UndoMacKeyOrder"/>) and equality this app is
+    /// measured to share with the mac. A tab, an accent, a full-width letter,
+    /// an emoji or a byte-order mark makes a key one it is not.
+    /// </summary>
+    internal static bool IsMeasuredKey(string key)
+    {
+        foreach (char character in key)
+        {
+            if (character < 0x20 || character > 0x7E) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
     /// The value spelled compactly, byte for byte as the mac's
     /// <c>JSONSerialization</c> writes it (<c>.sortedKeys</c>,
     /// <c>.withoutEscapingSlashes</c>): keys in the mac's order
@@ -184,11 +295,17 @@ internal abstract class UndoJson
     /// of a member is ever spelled by the app (<c>undo.editJSONCases</c>, whose
     /// key-order and number rows were taken from the mac's own code on
     /// 2026-11-20). Null for a value that is not exact (<see cref="IsExact"/>):
-    /// never written approximately.
+    /// never written approximately; and null for a value this app is not
+    /// measured to spell as the mac does (<see cref="IsMeasured"/>: a key
+    /// beyond printable ASCII, text starting with a byte-order mark), unless
+    /// <paramref name="onlyAsTheMacIsMeasuredToWrite"/> is false, which only
+    /// the app's own settings file asks for (a file the mac never writes, so
+    /// its key order is this app's own; <c>external</c>).
     /// </summary>
-    internal string? Spelled()
+    internal string? Spelled(bool onlyAsTheMacIsMeasuredToWrite = true)
     {
         if (!IsExact) return null;
+        if (onlyAsTheMacIsMeasuredToWrite && !IsMeasured) return null;
         var text = new StringBuilder();
         Spell(this, text);
         return text.ToString();
@@ -287,21 +404,49 @@ internal abstract class UndoJson
     }
 
     /// <summary>
+    /// Whether a file's spelling of a number is one this app is measured to
+    /// read as the mac reads it (2026-11-20, on macOS 26.7.3, through the mac's
+    /// reader): at most 17 digits with an exponent, at most 38 without, digits
+    /// counted from the first one that is not a leading zero of the integer
+    /// part (so <c>0.00012339999999999999e0</c> has 20). Beyond that the mac
+    /// reads a decimal number this app does not copy: with an exponent and
+    /// more than 17 digits, <c>1.2345678901234567890123e-5</c> is
+    /// <c>1.2345678901234573e-05</c> there, not the nearest double; with more
+    /// than 38, its reads disagree, and with 120 or more digits after the point
+    /// (or an exponent far from zero) it cannot read the file at all. A
+    /// spelling that is not measured makes the file "cannot tell"
+    /// (<see cref="HoldsOnlyMeasuredNumbers"/>, <c>undo.checkCases</c>).
+    /// </summary>
+    internal static bool SpellingIsMeasured(string spelling)
+    {
+        string unsigned = spelling.StartsWith('-') ? spelling[1..] : spelling;
+        int marker = unsigned.IndexOfAny(['e', 'E']);
+        string mantissa = marker >= 0 ? unsigned[..marker] : unsigned;
+        int point = mantissa.IndexOf('.');
+        string whole = (point >= 0 ? mantissa[..point] : mantissa).TrimStart('0');
+        int fractionDigits = point >= 0 ? mantissa.Length - point - 1 : 0;
+        int digits = whole.Length + fractionDigits;
+        return marker >= 0 ? digits <= 17 : digits <= 38;
+    }
+
+    /// <summary>
     /// The double the mac's reader (Foundation's <c>JSONSerialization</c>)
     /// takes from a number as a file spells it, so a file's member is judged,
-    /// and a moved member read back, as the mac judges it. Measured on macOS
-    /// 26.7.3 (2026-11-20, 6,000 random spellings): a spelling in fixed
-    /// notation with a decimal point and more than 17 digits once the integer
-    /// part's leading zeros are dropped (<c>0.012345678901234567</c>, not
+    /// and a moved member read back, as the mac judges it; only for a spelling
+    /// <see cref="SpellingIsMeasured"/> passes. Measured on macOS 26.7.3
+    /// (2026-11-20, through the mac's reader): a spelling in fixed notation
+    /// with a decimal point and more than 17 digits once the integer part's
+    /// leading zeros are dropped (<c>0.012345678901234567</c>, not
     /// <c>0.12345678901234567</c>) becomes an <c>NSDecimalNumber</c>, whose
     /// double is its digits as a whole number (trailing zeros dropped), summed
     /// in 16-bit pieces as doubles, then divided by ten once per decimal place
-    /// (1,729 of 1,729 such spellings agreed bit for bit); every other spelling
-    /// is the nearest double (4,244 of 4,244). So 0.00012339999999999999, the
-    /// spelling of 0.0001234, reads as 0.00012340000000000002 there, and a
-    /// member set to 0.0001234 is refused on both platforms
-    /// (<c>undo.editJSONCases</c>). Not pinned: a spelling with an exponent and
-    /// more than 17 digits, read here as the nearest double.
+    /// (every one of 30,000 such spellings of 18 to 38 digits agreed, bit for
+    /// bit or, for a long spelling of zero, as the same number); every other
+    /// measured spelling is the nearest double (4,244 in fixed notation; 4,000
+    /// with an exponent and at most 17 digits, exponents -330 to 310). So
+    /// 0.00012339999999999999, the spelling of 0.0001234, reads as
+    /// 0.00012340000000000002 there, and a member set to 0.0001234 is refused
+    /// on both platforms (<c>undo.editJSONCases</c>).
     /// </summary>
     internal static double ReadAsTheMacReads(string spelling, double nearest)
     {
@@ -370,9 +515,12 @@ internal abstract class UndoJson
 /// before its capital, a run with fewer zeros in front before one with more
 /// (so <c>1A</c>, <c>01a</c>; <c>ab</c>, <c>aB</c>, <c>Ab</c>). Rejected:
 /// ordinal order, which wrote <c>"10","9","B","a"</c> where the mac writes
-/// <c>"9","10","a","B"</c>. Not pinned: a key holding a character beyond
-/// ASCII, placed here after every letter by its code (the contract leaves
-/// non-ASCII keys unpinned).
+/// <c>"9","10","a","B"</c>. A key holding anything beyond printable ASCII
+/// is never written to a file the mac also reads: the mac sorts such keys by
+/// Unicode collation, which this table does not copy (#899 W6 review 2), so
+/// <see cref="UndoJson.Spelled"/> refuses them (<see cref="UndoJson.IsMeasuredKey"/>);
+/// they are placed here after every letter by their code only for the app's
+/// own settings file.
 /// </summary>
 internal sealed class UndoMacKeyOrder : IComparer<string>
 {

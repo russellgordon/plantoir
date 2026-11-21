@@ -94,6 +94,33 @@ def deployed_answer(case):
     return "noOffer"
 
 
+# Cases the mac's Foundation acts on and this model, like Windows, is not
+# measured to copy (#899 W6 review 2): keys beyond ASCII (sorted by Unicode
+# collation there, canonically equivalent keys taken for one), a byte-order
+# mark at the start of a key or text, a number with an exponent and more than
+# 17 digits or more than 38 without. Held by name, as Windows'
+# NamedGapLedger holds them: the model must REFUSE each (no bytes; cannot
+# tell both ways), never give bytes or a verdict of its own, and the
+# contract's answer must still differ.
+REFUSED_HERE_EDIT_JSON = (
+    "a new object's keys beyond ASCII: the mac sorts them by Unicode collation (an emoji first, \u00e9 between E and f, a full-width \uff21 beside A, \u00df after ss, a tab passed over)",
+    "a new object holding \u00e9 written two ways (one character, and e with a combining accent): the mac takes them for one key",
+    "a key path part beyond ASCII finds the member the file spells another way (\u00e9 as one character in the op, e with a combining accent in the file)",
+    "a key path part beyond ASCII, spelled as the file spells it",
+    "the Kelvin sign in a file's key is the letter K to the mac: the member is found and its value moved",
+    "a file's key that starts with a byte-order mark (written \\ufeff) is the key without it to the mac: the member is found and its value moved",
+)
+REFUSED_HERE_CHECK = (
+    "editJSON: a file's number spelled with an exponent and more than 17 digits is read by the mac as a decimal number, whose double is not the nearest one: the step's value is that double",
+    "editJSON: a file's number spelled with an exponent and more than 17 digits, the step's value its nearest double, which the mac does not read from it",
+    "editJSON: a member holding an object whose key is \u00e9 written as e with a combining accent, the step's value \u00e9 as one character",
+    "editJSON: a key path part \u00e9 as one character, the file's key e with a combining accent, the step having added the member",
+    "editJSON: a member holding text that starts with a byte-order mark (written \\ufeff), which the mac reads without it",
+    "editJSON: a file's key that is the Kelvin sign, the key path the letter K, the step having added the member",
+    "editJSON: another member's number written with 168 digits after the point, which the mac cannot read: the file is not JSON there",
+)
+
+
 class GeneratorTests(unittest.TestCase):
 
     def test_two_runs_write_the_same_bytes(self):
@@ -429,6 +456,10 @@ class ContractCaseTests(unittest.TestCase):
                         state = traces.op_state(op, text)
                 undo = {"after": "canUndo", "before": "alreadyBack", "neither": "changedSince", "cannotTell": "cannotTell"}[state]
                 redo = {"before": "canRedo", "after": "alreadyRedone", "neither": "changedSince", "cannotTell": "cannotTell"}[state]
+                if case["name"] in REFUSED_HERE_CHECK:
+                    self.assertEqual((undo, redo), ("cannotTell", "cannotTell"), "held: refused as cannot tell, never judged")
+                    self.assertNotEqual((undo, redo), (case["undo"], case["redo"]), "held, and it now agrees: take it off the list")
+                    continue
                 self.assertEqual(undo, case["undo"])
                 self.assertEqual(redo, case["redo"])
 
@@ -439,7 +470,18 @@ class ContractCaseTests(unittest.TestCase):
         for case in cases:
             with self.subTest(case=case["name"]):
                 out = traces.json_bytes_moved(case["op"], case["direction"] == "undo", case["file"].encode("utf-8"))
+                if case["name"] in REFUSED_HERE_EDIT_JSON:
+                    self.assertIsNone(out, "held: refused, never bytes of its own")
+                    self.assertIsNotNone(case["result"], "held, and the contract now refuses it too: take it off the list")
+                    continue
                 self.assertEqual(None if out is None else out.decode("utf-8"), case["result"])
+
+    def test_every_held_case_is_still_in_the_contract(self):
+        names = set()
+        for case in shared_undo()["checkCases"] + shared_undo()["editJSONCases"]:
+            names.add(case["name"])
+        for name in REFUSED_HERE_EDIT_JSON + REFUSED_HERE_CHECK:
+            self.assertIn(name, names)
 
     def test_listing_cases(self):
         cases = shared_undo()["listingCases"]

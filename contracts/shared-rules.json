@@ -50043,6 +50043,204 @@
         },
         "undo": "cannotTell",
         "redo": "cannotTell"
+      },
+      {
+        "name": "editJSON: a file's number spelled with an exponent and more than 17 digits is read by the mac as a decimal number, whose double is not the nearest one: the step's value is that double",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1.2345678901234573e-05,
+          "after": 1
+        },
+        "current": {
+          "text": "{\"k\": 1.2345678901234567890123e-5}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a file's number spelled with an exponent and more than 17 digits, the step's value its nearest double, which the mac does not read from it",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1.2345678901234568e-05,
+          "after": 1
+        },
+        "current": {
+          "text": "{\"k\": 1.2345678901234567890123e-5}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a member holding an object whose key is \u00e9 written as e with a combining accent, the step's value \u00e9 as one character",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": {
+            "\u00e9": 1
+          },
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": {\"e\u0301\": 1}}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a key path part \u00e9 as one character, the file's key e with a combining accent, the step having added the member",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "\u00e9"
+          ],
+          "after": 2
+        },
+        "current": {
+          "text": "{\"e\u0301\": 2}\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a member holding text that starts with a byte-order mark (written \\ufeff), which the mac reads without it",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "text": "{\"k\": \"\\ufeffa\"}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a file's key that is the Kelvin sign, the key path the letter K, the step having added the member",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "K"
+          ],
+          "after": 2
+        },
+        "current": {
+          "text": "{\"\u212a\": 1}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: another member's number written with 168 digits after the point, which the mac cannot read: the file is not JSON there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": 0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000123456789012345678}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: a member written -1e400, which the mac reads as minus infinity, not a number a double holds exactly: cannot tell",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": -1e400}\n"
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: another member written -1e400, which the mac reads as minus infinity: the member is judged as usual",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": -1e400}\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: another member written 1e400, which the mac cannot read: the file is not JSON there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": 1e400}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
+      },
+      {
+        "name": "editJSON: text holding half of a surrogate pair (written \\ud800), which the mac cannot read: the file is not JSON there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": \"\\ud800\"}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
       }
     ],
     "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. Places, and the places two ops name, are compared without regard to case.",
@@ -50406,6 +50604,148 @@
         },
         "direction": "redo",
         "result": "{\"k\": 0.081299137174705008}\n"
+      },
+      {
+        "name": "a new object's keys beyond ASCII: the mac sorts them by Unicode collation (an emoji first, \u00e9 between E and f, a full-width \uff21 beside A, \u00df after ss, a tab passed over)",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": {
+            "z": 1,
+            "\u00e9": 1,
+            "E": 1,
+            "e": 1,
+            "f": 1,
+            "\uff21": 1,
+            "A": 1,
+            "a": 1,
+            "\u00df": 1,
+            "ss": 1,
+            "\ud83d\ude00": 1,
+            "\u65e5\u672c": 1,
+            "\u03a9": 1,
+            "a\tb": 1,
+            "ab": 1,
+            "\uff11\uff10": 1,
+            "9": 1,
+            "10": 1
+          }
+        },
+        "direction": "redo",
+        "result": "{\"k\": {\"\ud83d\ude00\":1,\"9\":1,\"10\":1,\"\uff11\uff10\":1,\"a\":1,\"A\":1,\"\uff21\":1,\"a\\tb\":1,\"ab\":1,\"e\":1,\"E\":1,\"\u00e9\":1,\"f\":1,\"ss\":1,\"\u00df\":1,\"z\":1,\"\u03a9\":1,\"\u65e5\u672c\":1}}\n"
+      },
+      {
+        "name": "a new object holding \u00e9 written two ways (one character, and e with a combining accent): the mac takes them for one key",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": {
+            "\u00e9": 1,
+            "e\u0301": 2
+          }
+        },
+        "direction": "redo",
+        "result": "{\"k\": {\"\u00e9\":1}}\n"
+      },
+      {
+        "name": "a key path part beyond ASCII finds the member the file spells another way (\u00e9 as one character in the op, e with a combining accent in the file)",
+        "file": "{\"e\u0301\": 1}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "\u00e9"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "direction": "redo",
+        "result": "{\"e\u0301\": 2}\n"
+      },
+      {
+        "name": "a key path part beyond ASCII, spelled as the file spells it",
+        "file": "{\"\u00e9\": 1}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "\u00e9"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "direction": "redo",
+        "result": "{\"\u00e9\": 2}\n"
+      },
+      {
+        "name": "the Kelvin sign in a file's key is the letter K to the mac: the member is found and its value moved",
+        "file": "{\"\u212a\": 1}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "K"
+          ],
+          "after": 2
+        },
+        "direction": "redo",
+        "result": "{\"\u212a\": 2}\n"
+      },
+      {
+        "name": "a file's key that starts with a byte-order mark (written \\ufeff) is the key without it to the mac: the member is found and its value moved",
+        "file": "{\"\\ufeffk\": 1}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "after": 2
+        },
+        "direction": "redo",
+        "result": "{\"\\ufeffk\": 2}\n"
+      },
+      {
+        "name": "new text beyond ASCII and control characters: written as UTF-8, a control character escaped (\\b, \\f, \\u0001), DEL and the line and paragraph separators as they are",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": [
+            "\u00e9",
+            "e\u0301",
+            "\ud83d\ude00",
+            "\u65e5\u672c",
+            "\u0001",
+            "\b",
+            "\f",
+            "\u001f",
+            "\u007f",
+            "\u2028",
+            "\u2029",
+            "\u0000",
+            "</script>",
+            "\"\\",
+            "\u00a0",
+            "a\ufeffb"
+          ]
+        },
+        "direction": "redo",
+        "result": "{\"k\": [\"\u00e9\",\"e\u0301\",\"\ud83d\ude00\",\"\u65e5\u672c\",\"\\u0001\",\"\\b\",\"\\f\",\"\\u001f\",\"\u007f\",\"\u2028\",\"\u2029\",\"\\u0000\",\"</script>\",\"\\\"\\\\\",\"\u00a0\",\"a\ufeffb\"]}\n"
       }
     ],
     "editJSONCasesHow": "An editJSON move on the bytes of a file (file-formats.json -> undoJournal.opKinds.editJSON): file is the file's text, op the op (its before and after any JSON, a missing one meaning no such member), direction undo (towards before) or redo (towards after), and result the file's exact text afterwards, or null when the move is refused (as changed since). Both platforms must produce these bytes exactly: only the member's own bytes change, and a new value is spelled compactly with keys sorted.",

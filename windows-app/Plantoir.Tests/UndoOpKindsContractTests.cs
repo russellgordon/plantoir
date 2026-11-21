@@ -80,8 +80,67 @@ public sealed class UndoOpKindsContractTests : IDisposable
         bool backward = row.GetProperty("direction").GetString() == "undo";
         byte[]? moved = UndoJsonMember.Moved(op, Encoding.UTF8.GetBytes(row.GetProperty("file").GetString()!), backward);
         JsonElement result = row.GetProperty("result");
+        NamedGapLedger.Entry? refused = NamedGapLedger.Holding(NamedGapLedger.UndoEditJsonCasesRefusedHere, name);
+        if (refused is not null)
+        {
+            // The mac writes these bytes; this app is not measured to write
+            // the same, so it must write nothing at all, never bytes of its own.
+            Assert.True(result.ValueKind == JsonValueKind.String, NamedGapLedger.ClosedMessage(refused));
+            Assert.True(moved is null,
+                $"\"{name}\" is held open (#{refused.Issue}: {refused.Reason}), so it must be refused here; it wrote {(moved is null ? "" : Encoding.UTF8.GetString(moved))}");
+            return;
+        }
         if (result.ValueKind == JsonValueKind.Null) Assert.Null(moved);
         else Assert.Equal(result.GetString(), moved is null ? null : Encoding.UTF8.GetString(moved));
+    }
+
+    /// <summary>Every editJSON case held open by name is a case the contract still has.</summary>
+    [Fact]
+    public void EveryHeldEditJsonCaseIsStillInTheContract() =>
+        NamedGapLedger.StillNamed(NamedGapLedger.UndoEditJsonCasesRefusedHere, EditJsonCases().Select(row => (string)row[0]));
+
+    /// <summary>
+    /// New text that starts with a byte-order mark is never written: the mac's
+    /// reader drops the mark when it reads the result back (measured
+    /// 2026-11-20), so the mac refuses the move, and so does this app. A mark
+    /// inside the text is written as it is, on both (<c>undo.editJSONCases</c>).
+    /// Not a contract row: the mac's contract runner reads each case through
+    /// <c>JSONSerialization</c>, which drops the mark, so no row can carry one.
+    /// </summary>
+    [Fact]
+    public void NewTextStartingWithAByteOrderMarkIsNeverWritten()
+    {
+        byte[] file = "{\"k\": 0}\n"u8.ToArray();
+        UndoOp Op(string after)
+        {
+            var given = new JsonObject { ["kind"] = "editJSON", ["path"] = "course_config.json", ["keyPath"] = new JsonArray("k"), ["before"] = 0, ["after"] = after };
+            using JsonDocument document = JsonDocument.Parse(given.ToJsonString());
+            return UndoFormat.ReadOp(document.RootElement);
+        }
+        Assert.Null(UndoJsonMember.Moved(Op("\uFEFFa"), file, backward: false));
+        Assert.Equal("{\"k\": \"a\uFEFFb\"}\n", Encoding.UTF8.GetString(UndoJsonMember.Moved(Op("a\uFEFFb"), file, backward: false)!));
+    }
+
+    /// <summary>
+    /// Where the digits this app is measured to read as the mac reads them end
+    /// (2026-11-20, through the mac's reader): 17 with an exponent, 38 without,
+    /// counted from the first digit that is not a leading zero of the integer
+    /// part. One more is a file this app answers cannot tell
+    /// (<c>undo.checkCases</c>).
+    /// </summary>
+    [Fact]
+    public void TheMeasuredDigitsEndAt17WithAnExponentAnd38Without()
+    {
+        Assert.True(UndoJson.SpellingIsMeasured("1.2345678901234567e-5"));
+        Assert.False(UndoJson.SpellingIsMeasured("1.23456789012345678e-5"));
+        Assert.True(UndoJson.SpellingIsMeasured("0.12345678901234567e3"));
+        Assert.False(UndoJson.SpellingIsMeasured("0.00012339999999999999e0"));
+        Assert.True(UndoJson.SpellingIsMeasured("0." + new string('1', 38)));
+        Assert.False(UndoJson.SpellingIsMeasured("0." + new string('1', 39)));
+        Assert.True(UndoJson.SpellingIsMeasured("-" + new string('9', 38)));
+        Assert.False(UndoJson.SpellingIsMeasured("-" + new string('9', 39)));
+        Assert.True(UndoJson.SpellingIsMeasured("12345678901234567890.123456789012345678"));
+        Assert.False(UndoJson.SpellingIsMeasured("12345678901234567890.1234567890123456789"));
     }
 
     /// <summary>
