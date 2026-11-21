@@ -333,15 +333,23 @@ public class SectionAndClassesUiTests
     /// across a separator. The split counts only when it is unambiguous: the
     /// jump must be wider than the spread inside either set (the spread being
     /// the device-pixel rounding of one drawn spacing), or the test fails
-    /// saying it cannot tell the two apart, rather than guess. All gaps equal:
-    /// no separator. A missing or extra separator then shows as a line out of
-    /// place against the layout, which is the assertion that fails.
+    /// saying it cannot tell the two apart, rather than guess. Gaps that are
+    /// all of ONE kind fail too (#990 review 3, low 2): gaps that span no more
+    /// than <see cref="OneSpacingSpan"/> can all be one spacing rounded to
+    /// device pixels, so whether they are all separators or none cannot be
+    /// read from them (4 and 5 with no separator, 7 and 8 with every gap one;
+    /// all equal likewise). Every menu read this way has both kinds. A missing
+    /// or extra separator then shows as a line out of place against the
+    /// layout, which is the assertion that fails.
     /// </summary>
     internal static HashSet<int> SeparatorGaps(IReadOnlyList<int> gaps)
     {
         var across = new HashSet<int>();
+        if (gaps.Count == 0) return across;
+        if (gaps.Max() - gaps.Min() <= OneSpacingSpan)
+            throw new Xunit.Sdk.XunitException(
+                $"the menu's gaps are all of one kind, so whether they are all separators or none cannot be read: {string.Join(", ", gaps)}");
         var sorted = gaps.Distinct().OrderBy(gap => gap).ToList();
-        if (sorted.Count < 2) return across;
         int widest = 0, splitAbove = 0;
         for (int index = 1; index < sorted.Count; index++)
             if (sorted[index] - sorted[index - 1] > widest) { widest = sorted[index] - sorted[index - 1]; splitAbove = sorted[index - 1]; }
@@ -355,6 +363,15 @@ public class SectionAndClassesUiTests
             if (gaps[index] > splitAbove) across.Add(index);
         return across;
     }
+
+    /// <summary>
+    /// The most the gaps of ONE drawn spacing differ once rounded to device
+    /// pixels: each gap is the difference of two rounded edges, and the rule
+    /// tests already take 7 and 9 as one spacing at a larger scaling (2
+    /// pixels apart), so gaps spanning no more than this may all be one kind.
+    /// Derived from that reading, not adjusted until a test passed.
+    /// </summary>
+    internal const int OneSpacingSpan = 2;
 
     /// <summary>
     /// With <c>PLANTOIR_UI_CAPTURE_DIR</c> set, a picture of the screen with the
@@ -402,7 +419,39 @@ public class SectionAndClassesUiTests
         var meetings = MenuBar.Open(app, "Meetings", "classesClassDates");
         Assert.Equal(Expected(Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes).Where(line => line != Separator).OrderBy(id => id),
                      meetings.Keys.OrderBy(id => id));
+        // #1027: its items say meeting too (subjectMenus.layout.itemTitles),
+        // and none says class. MUST FAIL with the items' words set once.
+        foreach (var (id, element) in meetings)
+        {
+            var item = Enum.GetValues<Plantoir.Core.Models.SubjectMenuRules.Item>()
+                .Single(i => Plantoir.Core.Models.SubjectMenuLayout.MenuContaining(i) == Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes
+                             && Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes, i) == id);
+            Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item, Plantoir.Core.Models.ClassNoun.Meeting), element.Name);
+            Assert.DoesNotMatch(@"\b[Cc]lass(es)?\b", element.Name);
+        }
         MenuBar.Close();
+        var section = MenuBar.Open(app, "Section", "sectionPublishPages");
+        Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(Plantoir.Core.Models.SubjectMenuRules.Item.PublishClassForADate, Plantoir.Core.Models.ClassNoun.Meeting),
+                     section["sectionPublishClassForADate"].Name);
+        MenuBar.Close();
+        CaptureIfAsked(app, "Meetings", "classesClassDates", "windows-meetings-menu.png");
+
+        // #1027's review, MEDIUM 1: Meeting Dates… opens the Class Dates
+        // dialog, and its purpose line, as RENDERED, says meeting
+        // (classDatesPurposeForAMeeting). MUST FAIL with the dialog's line
+        // written in the ordinary noun.
+        app.SelectSection(CourseFixtures.Club, 1);
+        EndToEnd.PressMenuBarItem(app, "Meetings", "classesClassDates");
+        var dates = MenuBar.Dialog(app, "Meetings > Meeting Dates…");
+        string purpose = Plantoir.Core.Assist.AssistWording.ClassDatesPurposeForAMeeting();
+        Assert.True(Retry.WhileFalse(() => dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Any(text => text.Properties.Name.ValueOrDefault == purpose),
+                                     TimeSpan.FromSeconds(10)).Result,
+                    "the Meeting Dates dialog does not show its purpose line in the club's noun: " +
+                    string.Join(" | ", dates.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(text => text.Properties.Name.ValueOrDefault ?? "")));
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") is { Length: > 0 } captures)
+            FlaUI.Core.Capturing.Capture.Screen().ToFile(Path.Combine(captures, "windows-meeting-dates-dialog.png"));
+        MenuBar.CloseDialog(app);
+        Assert.Contains("Meetings ▸ Meeting Dates…", MenuBar.Trail(app));
 
         app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
         Assert.True(MenuBarComesToRead(app, ForACourse), $"back on a course the menu bar reads {MenuBarTitles(app)}");
@@ -442,7 +491,7 @@ public class SectionAndClassesUiTests
                 var item = Enum.GetValues<Plantoir.Core.Models.SubjectMenuRules.Item>()
                     .Single(i => Plantoir.Core.Models.SubjectMenuLayout.MenuContaining(i) == menu
                                  && Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(menu, i) == line);
-                Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item), element.Name);
+                Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item, Plantoir.Core.Models.ClassNoun.Class), element.Name);
             }
             MenuBar.Close();
         }

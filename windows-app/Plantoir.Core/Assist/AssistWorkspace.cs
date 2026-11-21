@@ -1703,9 +1703,13 @@ public sealed partial class AssistWorkspace
             ActivityTrail.Note(ActivityTrail.Event.LaterClassesHeldADeployBack,
                 ClassesDatedLater.HeldBackLine(later.Count), course.Code, section);
             var titles = later.Select(page => page.Title).ToList();
+            var noun = course.Configuration.ClassNoun;
             throw new AssistRefusal(IsOutside
                 ? AssistWording.DeployHasClassesDatedLater(course.Code, section.ToString(), titles)
-                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles));
+                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles),
+                IsOutside
+                ? AssistWording.DeployHasClassesDatedLater(course.Code, section.ToString(), titles, noun)
+                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles, noun));
         }
 
         using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy", asker);
@@ -3199,15 +3203,25 @@ public sealed partial class AssistWorkspace
         // from a total: "Re-dated 14 classes and -4 pages they use" came from
         // (pages whose date changes) - (every class in the section).
         string summary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials);
-        if (undated.Count > 0) summary += " " + NewDatesCouldNotBeSet(undated);
-        if (notHidden.Count > 0) summary += " " + SettingsCannotBeAddedTo(notHidden);
+        // A club's teacher reads the counts in "meeting", the mac's
+        // reDated(noun:) (#1027 review 3, M1); the model keeps the class form.
+        var noun = NounForCourse(course.Code);
+        string teacherSummary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials, noun);
+        string leftAsTheyWere = "";
+        if (undated.Count > 0) leftAsTheyWere += " " + NewDatesCouldNotBeSet(undated);
+        if (notHidden.Count > 0) leftAsTheyWere += " " + SettingsCannotBeAddedTo(notHidden);
+        summary += leftAsTheyWere;
+        teacherSummary += leftAsTheyWere;
         NoteSettingsLeftAsTheyWere("re-dating classes", undated.Union(notHidden, StringComparer.OrdinalIgnoreCase).Count(),
             course.Code, section);
         string detail = summary +
                         $"\n\n{BackedUpNote}" +
                         "\n\nNothing was published or hidden, so students see no change until you deploy.";
 
-        return new AssistResult(true, detail, backup);
+        return new AssistResult(true, detail, backup)
+        {
+            ForTheTeacher = noun == ClassNoun.Meeting ? teacherSummary : null,
+        };
     }
 
     public const string BackedUpNote =
@@ -3398,6 +3412,30 @@ public sealed partial class AssistWorkspace
 
     /// <summary>The key in a tools/call request's <c>_meta</c> that names the menu (its contract name).</summary>
     public const string MenuMetaKey = "plantoirMenu";
+
+    /// <summary>
+    /// On the menu's server: the course of the section the running item was
+    /// chosen on (#1027), from the call's <c>_meta</c> (<see cref="CourseMetaKey"/>),
+    /// set for one call by <c>plantoir-mcp</c>'s filter; null otherwise.
+    /// </summary>
+    public string? MenuCourseOfTheCall { get; set; }
+
+    /// <summary>The key in a tools/call request's <c>_meta</c> that names the selected section's course.</summary>
+    public const string CourseMetaKey = "plantoirCourse";
+
+    /// <summary>
+    /// A <c>_meta</c> value read as text: null when it is absent or is not a
+    /// string, never a throw (#1027's review, low 5: a number or an object
+    /// under <see cref="MenuMetaKey"/> or <see cref="CourseMetaKey"/> threw
+    /// before the call began). Absent and malformed mean the same: the
+    /// Section menu, and the class form.
+    /// </summary>
+    public static string? MetaText(System.Text.Json.Nodes.JsonObject? meta, string key) =>
+        meta?[key] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+
+    /// <summary>Undo Last Change's nothing-to-undo from the menu, naming the menus as the selected section's course's menu bar does (#1027).</summary>
+    public string NothingToUndoFromTheMenu() =>
+        AssistWording.NothingToUndoFromTheMenu(MenuCourseOfTheCall is { } code ? NounForCourse(code) : ClassNoun.Class);
 
     /// <summary>The menu named by a <c>_meta</c> value, or Section.</summary>
     public static SubjectMenuLayout.Menu MenuNamed(string? contractName) =>
@@ -3761,12 +3799,15 @@ public sealed partial class AssistWorkspace
         }
 
         if (unit < 1 || atDay < 1) throw new AssistRefusal("Unit and day numbers start at 1.");
-        if (count < 1) throw new AssistRefusal("Ask for at least one class.");
+        if (count < 1) throw new AssistRefusal(AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClass(course.Configuration.ClassNoun));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
+            // The model's words are unchanged (#267: what the model is told
+            // stays); the teacher reads the mac's sentence in the course's noun.
             ?? throw new AssistRefusal(
                 $"I don't know when {course.Code} Section {section} meets, so I can't move classes onto real " +
-                "days. Ask the teacher for their class dates, then record them with remember_timetable.");
+                "days. Ask the teacher for their class dates, then record them with remember_timetable.",
+                AssistWording.CannotMoveClassesWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         var classes = NumberedClasses(course, section, out int unnumbered);
         if (classes.Count == 0)
@@ -3774,10 +3815,10 @@ public sealed partial class AssistWorkspace
                 $"{course.Code} Section {section} has no pages named “{naming.ShapeDescription}”, so there is nothing " +
                 "to make room in.");
 
-        var problems = new List<string>();
+        // Each in both nouns (#1027): the card reads the course's, the model the class form.
+        var problems = new List<PlanProblem>();
         if (unnumbered > 0)
-            problems.Add($"{unnumbered} class page{(unnumbered == 1 ? " is" : "s are")} not named " +
-                         $"“{naming.ShapeDescription}”, so I left it where it is — including its date.");
+            problems.Add(PlanProblem.Said(noun => AssistWording.PagesNotNamedTheCoursesWay(unnumbered, naming.ShapeDescription, noun)));
 
         if (naming.IsNumbered)
             return PlanNumberedInsert(course, section, naming, atDay, count, classes, remembered.Dates, problems);
@@ -3800,15 +3841,13 @@ public sealed partial class AssistWorkspace
         int needed = count + shifted.Count;
         if (runway.Count < needed)
         {
-            int short_ = needed - runway.Count;
-            problems.Add($"This needs {needed} class days from {DateText.Iso(firstFree)} onwards and the " +
-                         $"timetable only has {runway.Count}. Add {short_} more class " +
-                         $"date{(short_ == 1 ? "" : "s")} and ask again.");
+            int has = runway.Count;
+            problems.Add(PlanProblem.Said(noun => AssistWording.TimetableTooShortFrom(needed, DateText.Iso(firstFree), has, noun)));
             return new InsertPlan
             {
                 CourseCode = course.Code, SectionNumber = section, Unit = unit, AtDay = atDay, Naming = naming,
                 Added = Array.Empty<NewClass>(), Renames = Array.Empty<Rename>(),
-                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = problems,
+                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
             };
         }
 
@@ -3854,7 +3893,7 @@ public sealed partial class AssistWorkspace
             Renames = renames,
             Moves = moves,
             LinksToRewrite = CountLinksTo(course, section, renames.Select(r => r.From)),
-            Problems = problems,
+            Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
         };
     }
 
@@ -3887,7 +3926,7 @@ public sealed partial class AssistWorkspace
     /// and renamed two published meetings for a slot that was empty.
     /// </summary>
     private InsertPlan PlanNumberedInsert(Course course, int section, ClassPageNaming naming, int atNumber, int count,
-                                          List<ClassRef> numbered, IReadOnlyList<DateOnly> timetable, List<string> problems)
+                                          List<ClassRef> numbered, IReadOnlyList<DateOnly> timetable, List<PlanProblem> problems)
     {
         var shifted = numbered.Where(c => c.Day >= atNumber).OrderBy(c => c.Day).ToList();
         var untouched = numbered.Where(c => c.Day < atNumber).ToList();
@@ -3897,23 +3936,22 @@ public sealed partial class AssistWorkspace
         var runway = timetable.Where(d => !held.Contains(d) && (latestKept is null || d > latestKept.Value))
             .OrderBy(d => d).ToList();
 
-        InsertPlan Refused(string why)
+        InsertPlan Refused(PlanProblem why)
         {
             problems.Add(why);
             return new InsertPlan
             {
                 CourseCode = course.Code, SectionNumber = section, Unit = 1, AtDay = atNumber, Naming = naming,
                 Added = Array.Empty<NewClass>(), Renames = Array.Empty<Rename>(),
-                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = problems,
+                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
             };
         }
 
         if (runway.Count < count)
         {
-            int missing = count - runway.Count;
             string from = latestKept is { } kept ? DateText.Iso(kept) : "the start of the course";
-            return Refused($"This needs {count} class day{(count == 1 ? "" : "s")} after {from} and the timetable " +
-                           $"only has {runway.Count}. Add {missing} more class date{(missing == 1 ? "" : "s")} and ask again.");
+            int has = runway.Count;
+            return Refused(PlanProblem.Said(noun => AssistWording.TimetableTooShortAfter(count, from, has, noun)));
         }
 
         string folder = ClassFolder(course, section);
@@ -3940,8 +3978,7 @@ public sealed partial class AssistWorkspace
         var byDate = InDateOrder(shifted);
         var destinations = DestinationsKeepingGaps(byDate, runway, count);
         if (destinations is null)
-            return Refused("There are not enough class days after the last page to move it onto. " +
-                           "Add more class dates and ask again.");
+            return Refused(PlanProblem.Said(AssistWording.NoDaysAfterTheLastPage));
 
         var moves = new List<DateMove>();
         for (int i = 0; i < byDate.Count; i++)
@@ -3956,7 +3993,7 @@ public sealed partial class AssistWorkspace
             CourseCode = course.Code, SectionNumber = section, Unit = 1, AtDay = atNumber, Naming = naming,
             Added = added, Renames = upward, Moves = moves,
             LinksToRewrite = CountLinksTo(course, section, upward.Select(r => r.From)),
-            Problems = problems,
+            Problems = PlanProblem.In(problems, ClassNoun.Class), ProblemsForAMeeting = PlanProblem.In(problems, ClassNoun.Meeting),
         };
     }
 
@@ -4045,10 +4082,15 @@ public sealed partial class AssistWorkspace
         created = new List<string>();
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
-        if (plan.ChangesNothing)
+        // A plan that adds nothing because the dates ran out also changes
+        // nothing; its reason is the one actionable sentence, so it is said
+        // first (the mac's makeRoomForClasses; #1027 review 2, M2).
+        if (plan.ChangesNothing && plan.Problems.Count == 0)
             return new AssistResult(true, "Nothing needed moving.", null);
         if (plan.Added.Count == 0)
-            throw new AssistRefusal(string.Join(" ", plan.Problems));
+            throw new AssistRefusal(string.Join(" ", plan.Problems),
+                                    string.Join(" ", course.Configuration.ClassNoun == ClassNoun.Meeting
+                                        ? plan.ProblemsForAMeeting ?? plan.Problems : plan.Problems));
 
         RefuseIfPlantoirIsBuilding(course);
 
@@ -4198,15 +4240,19 @@ public sealed partial class AssistWorkspace
                 $"{notAdded} new not added",
                 course.Code, section);
 
+        // What could not be dated or finished, said to whoever asked.
+        string leftUndone = "";
+        if (undated.Count > 0) leftUndone += " " + NewDatesCouldNotBeSet(undated);
+        if (notFinished.Count > 0)
+            leftUndone += " " + ChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+
         string said =
             (created.Count > 0 ? AssistWording.MadeRoom(created.Count, plan.PositionTitle) + " " : "") +
             $"Renamed {renamed.Count}, moved {moved} onto " +
             $"later class days, and updated {linksUpdated} link" +
             $"{(linksUpdated == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
             AssistWording.LookTheSectionOverBeforePublishing;
-        if (undated.Count > 0) said += " " + NewDatesCouldNotBeSet(undated);
-        if (notFinished.Count > 0)
-            said += " " + ChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+        said += leftUndone;
 
         // Said because it is now TRUE and was not said before: this records no
         // undo entry, so "undo that" afterwards reaches back past it to
@@ -4219,7 +4265,15 @@ public sealed partial class AssistWorkspace
         // No undo entry says so, so the menu's trail line is told here (#489, M1).
         if (created.Count > 0 || renamed.Count > 0 || moved > 0 || linksUpdated > 0) NoteAChangeWithNoUndoEntry();
 
-        return new AssistResult(true, said, backup);
+        // A club's teacher reads the mac's line: how many meetings room was
+        // made for, and what was left undone (AssistToolRunner's
+        // makeRoomForClasses → madeRoom(noun:)). The counts sentence and
+        // OtherClassesMoved say "class", so they are the model's alone there
+        // (#1027 review 3, M1); the plan said the undo sentence before Go.
+        string? forAClubsTeacher = NounForCourse(course.Code) == ClassNoun.Meeting
+            ? AssistWording.MadeRoomForAMeeting(created.Count, plan.PositionTitle) + leftUndone
+            : null;
+        return new AssistResult(true, said, backup) { ForTheTeacher = forAClubsTeacher };
     }
 
     // ---- Duplicating a lesson as the next class ----------------------------
@@ -4250,7 +4304,8 @@ public sealed partial class AssistWorkspace
 
         var numbers = course.Configuration.Naming.Parse(sourceTitle)
             ?? throw new AssistRefusal(
-                ClassChangeWording.NotANumberedClassPage(sourceTitle));
+                ClassChangeWording.NotANumberedClassPage(sourceTitle),
+                ClassChangeWording.NotANumberedClassPage(sourceTitle, course.Configuration.ClassNoun));
 
         // The source's own next day. Throws the timetable refusal unchanged,
         // which is the sentence that asks for the class dates.
@@ -4258,7 +4313,11 @@ public sealed partial class AssistWorkspace
         if (insertion.Added.Count == 0)
         {
             string why = string.Join(" ", insertion.Problems);
-            throw new AssistRefusal(why.Length > 0 ? why : ClassChangeWording.NoClassDateLeft);
+            var nounOfTheCourse = course.Configuration.ClassNoun;
+            string whyForTheTeacher = string.Join(" ",
+                nounOfTheCourse == ClassNoun.Meeting && insertion.ProblemsForAMeeting is { } clubProblems ? clubProblems : insertion.Problems);
+            throw new AssistRefusal(why.Length > 0 ? why : AssistWording.NoClassDateLeftForTheCopy(),
+                whyForTheTeacher.Length > 0 ? whyForTheTeacher : AssistWording.NoClassDateLeftForTheCopy(nounOfTheCourse));
         }
 
         string sourceText;
@@ -4329,7 +4388,8 @@ public sealed partial class AssistWorkspace
                 "did not copy a class — the page the copy would have become still held a lesson, " +
                 "and other classes may already have moved", course.Code, section);
             throw new AssistRefusal(
-                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
+                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath),
+                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath, course.Configuration.ClassNoun));
         }
 
         progress?.Report($"Copying “{plan.SourceTitle}”…");
@@ -4357,7 +4417,9 @@ public sealed partial class AssistWorkspace
                 "did not copy a class — the copy could not be made certainly hidden, and a copy " +
                 "of a published lesson must never arrive where students can read it", course.Code, section);
             throw new AssistRefusal(
-                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath));
+                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath),
+                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath,
+                                                               course.Configuration.ClassNoun));
         }
 
         Save(newPath, copied);
@@ -4499,7 +4561,7 @@ public sealed partial class AssistWorkspace
 
         if (unit < 1) throw new AssistRefusal("A unit number starts at 1.");
         if (firstDay < 1) throw new AssistRefusal("A day number starts at 1.");
-        if (count < 1) throw new AssistRefusal("Ask for at least one class.");
+        if (count < 1) throw new AssistRefusal(AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClass(course.Configuration.ClassNoun));
         var naming = course.Configuration.Naming;
         // A numbered course has one run of pages and no units (#274): any
         // unit but the one it is held as is refused BEFORE the dates are asked for.
@@ -4507,12 +4569,10 @@ public sealed partial class AssistWorkspace
             throw new AssistRefusal(NextClassPlanner.NoUnitsInANumberedCourse(course.Code, naming.Word));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
-            ?? throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}");
+            ?? throw NoDatesToAddClassesTo(course, section);
 
         if (remembered.Dates.Count == 0)
-            throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}");
+            throw NoDatesToAddClassesTo(course, section);
 
         string folder = ClassFolder(course, section);
         var existing = ClassPages(course, section);
@@ -4592,11 +4652,13 @@ public sealed partial class AssistWorkspace
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
             ?? throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date a new class. {AssistWording.MayIAskForYourDates}");
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section),
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         if (remembered.Dates.Count == 0)
             throw new AssistRefusal(
-                $"I don’t know when {course.Code} Section {section} meets, so I can’t date a new class. {AssistWording.MayIAskForYourDates}");
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section),
+                AssistWording.CannotDateANewClassWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         var existing = ClassPages(course, section);
         var existingTitles = existing.Select(p => Path.GetFileNameWithoutExtension(p) ?? "").ToList();
@@ -4846,6 +4908,19 @@ public sealed partial class AssistWorkspace
         return Path.GetFileName(full);
     }
 
+    /// <summary>
+    /// add_classes with no dates: the model's words are unchanged (#267), and
+    /// they end with the question the window offers the dates sheet for. A
+    /// club's teacher reads the same in the club's noun, the contract's
+    /// <c>cannotDateANewClassWithoutDatesForAMeeting</c>, whose question the
+    /// window offers the sheet for too (#1027 round 4).
+    /// </summary>
+    private static AssistRefusal NoDatesToAddClassesTo(Course course, int section) =>
+        new($"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}",
+            course.Configuration.ClassNoun == ClassNoun.Meeting
+                ? AssistWording.CannotDateANewClassWithoutDatesForAMeeting(course.Code, section)
+                : null);
+
     private static string ClassFolder(Course course, int sectionNumber)
     {
         // The naming half of the shared rule
@@ -5018,10 +5093,26 @@ public sealed partial class AssistWorkspace
 /// A request that will not be carried out, with a reason a teacher can act on.
 /// Never a stack trace, never a code — the assistant reads this back aloud.
 /// </summary>
-public sealed class AssistRefusal(string message) : Exception(message);
+public sealed class AssistRefusal(string message, string? forTheTeacher = null) : Exception(message)
+{
+    /// <summary>
+    /// What the teacher reads when it differs from <see cref="Exception.Message"/>
+    /// by the course's noun (#1027): "meeting" in a club. The model reads the
+    /// message, the class form, in every course (#267).
+    /// </summary>
+    public string ForTheTeacher { get; } = forTheTeacher ?? message;
+}
 
 /// <summary>How an operation ended, and where the backup went.</summary>
-public sealed record AssistResult(bool Succeeded, string Message, string? BackupPath);
+public sealed record AssistResult(bool Succeeded, string Message, string? BackupPath)
+{
+    /// <summary>
+    /// What the teacher reads when it differs from <see cref="Message"/>, the
+    /// model's copy: a club's result line in "meeting" (#1027 review 3, M1).
+    /// Null when the teacher reads the message itself.
+    /// </summary>
+    public string? ForTheTeacher { get; init; }
+}
 
 /// <summary>
 /// Runs one of the working folder's launchers. Abstracted so the plan logic can

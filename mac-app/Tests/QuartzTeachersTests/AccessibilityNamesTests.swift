@@ -17,6 +17,13 @@ import XCTest
 @MainActor
 final class AccessibilityNamesTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    /// The names that say class in a course and meeting in a club (#1027).
+    static let namesTakingTheNoun: Set<String> = [
+        "classDate", "makeRoomClass", "makeRoomHowMany", "sourceTable", "laterClassesTable",
+    ]
+
     // MARK: - Functions
 
     /// The tab bar names its group (D16): before, the segmented control's
@@ -68,7 +75,10 @@ final class AccessibilityNamesTests: XCTestCase {
         ]
         for entry in expected {
             let view: String = try AccessibilityNamesTests.source(entry.file)
-            let named: String = ".accessibilityLabel(Text(AccessibilityNames.\(entry.name)))"
+            // A name that says class takes the course's noun (#1027).
+            let saysTheNoun: Bool = AccessibilityNamesTests.namesTakingTheNoun.contains(entry.name)
+            let call: String = saysTheNoun ? "\(entry.name)(noun: model.noun)" : entry.name
+            let named: String = ".accessibilityLabel(Text(AccessibilityNames.\(call)))"
             XCTAssertTrue(
                 AccessibilityNamesTests.modifier(named, comesJustBefore: entry.identifier, in: view),
                 "\(entry.identifier) in \(entry.file) is not named \(entry.name)"
@@ -77,9 +87,9 @@ final class AccessibilityNamesTests: XCTestCase {
         // The dates box is AppKit's text view since #997, named on the text
         // view itself (`ClassDatesTextBox`); the tree test reads the name.
         let schedule: String = try AccessibilityNamesTests.source("Views/Section/SectionScheduleSheet.swift")
-        XCTAssertNotNil(schedule.range(of: "accessibilityName: AccessibilityNames.classDates,\n                    identifier: \"sectionScheduleTypedField\""))
+        XCTAssertNotNil(schedule.range(of: "accessibilityName: AccessibilityNames.classDates(noun: noun),\n                    identifier: \"sectionScheduleTypedField\""))
         let verbSheet: String = try AccessibilityNamesTests.source("Views/Section/SectionVerbSheet.swift")
-        XCTAssertNotNil(verbSheet.range(of: ".flexibleTableHeight(laterClassesTableHeight)\n        .accessibilityLabel(Text(AccessibilityNames.laterClassesTable))"))
+        XCTAssertNotNil(verbSheet.range(of: ".flexibleTableHeight(laterClassesTableHeight)\n        .accessibilityLabel(Text(AccessibilityNames.laterClassesTable(noun: model.noun)))"))
     }
 
     /// The wizard's and Keep a Copy's text fields, drawn with an empty title

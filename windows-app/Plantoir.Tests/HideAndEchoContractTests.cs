@@ -82,7 +82,7 @@ public class HideAndEchoContractTests : IDisposable
             model.Then(new JsonObject { ["content"] = "Which page do you mean?" });
             var tools = new WindowBindingContractTests.RecordingTools();
             var agent = new AssistAgent(model, tools,
-                ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+                ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class };
             await agent.Say(input, CancellationToken.None);
             if (model.Asked.Count != 1 || tools.Calls.Count != 0 || agent.IsAwaitingApproval)
                 wrongly.Add(input);
@@ -108,7 +108,7 @@ public class HideAndEchoContractTests : IDisposable
             var model = new WindowBindingContractTests.ScriptedModel();
             var tools = new WindowBindingContractTests.RecordingTools();
             var agent = new AssistAgent(model, tools,
-                ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+                ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class };
             await agent.Say(input, CancellationToken.None);
             bool right = model.Asked.Count == 0 && tools.Calls.Count > 0 && tools.Calls.All(call =>
                 (call.Name == tool || call.Name == "plan_" + tool) &&
@@ -150,7 +150,7 @@ public class HideAndEchoContractTests : IDisposable
         var model = new WindowBindingContractTests.ScriptedModel();
         var agent = new AssistAgent(model, new WindowBindingContractTests.RecordingTools(),
             ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             Today = () => new DateOnly(2026, 9, 19),
         };
         // The echo, verbatim: date line and all, with a capital on it.
@@ -175,7 +175,7 @@ public class HideAndEchoContractTests : IDisposable
         var model = new WindowBindingContractTests.ScriptedModel();
         var tools = new WindowBindingContractTests.RecordingTools();
         var agent = new AssistAgent(model, tools,
-            ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+            ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class };
         model.Then(new JsonObject
         {
             ["tool_calls"] = new JsonArray(new JsonObject

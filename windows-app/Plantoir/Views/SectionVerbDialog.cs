@@ -135,7 +135,7 @@ internal sealed class SectionVerbDialog
     /// in a club), and the words it is drawn with there.
     /// </summary>
     internal static string MenuPath(Item item, ClassNoun noun) =>
-        SubjectMenuLayout.MenuContaining(item) is not null && SubjectMenuLayout.TitleHere(item) is { } title
+        SubjectMenuLayout.MenuContaining(item) is not null && SubjectMenuLayout.TitleHere(item, noun) is { } title
             ? SubjectMenuLayout.Path(item, title, noun)
             : item.ToString();
 
@@ -254,6 +254,194 @@ internal sealed class SectionVerbDialog
         return view.Show();
     }
 
+    // ---- Classes ▸ Add Class… (#927, the mac's #897 piece A) ---------------------
+
+    /// <summary>Add Class…'s way, chosen in the dialog; null for every other item.</summary>
+    private SubjectMenuRules.AddClassWay? _way;
+    private SubjectMenuRules.AddClassFacts _addClassFacts = new();
+    private readonly List<(string Path, string Title, ListViewItem Row)> _sourceRows = new();
+    private ListView? _sources;
+    private StackPanel? _copyPart;
+
+    /// <summary>How many classes the copy list shows before it scrolls: the mac's sheet shows 7.</summary>
+    internal const int SourceRowsShown = 7;
+
+    /// <summary>
+    /// Add Class…: how the class is added, one radio line per way in the
+    /// contract's order, a way this section cannot use drawn greyed (never
+    /// left out) with the reason lines under the ways
+    /// (<c>subjectMenus.addClassSheet</c>), the first usable way chosen. The
+    /// next class and a new unit add at once (Add); a copy is picked from a
+    /// searchable list of this section's class pages, then its plan, then
+    /// Duplicate. The facts are read now, when it opens, never when the menu
+    /// is drawn. No confirmation beyond this: each way can be undone.
+    /// </summary>
+    public static Task ChooseHowToAddAClass(XamlRoot root, SectionVerbs verbs, Course course, int section)
+    {
+        var noun = course.Configuration.ClassNoun;
+        string sectionText = section.ToString();
+        var view = new SectionVerbDialog(root, verbs, course, section, Item.AddClass,
+                                         AddClassWords.Title(course.Code, sectionText, noun));
+        view._addClassFacts = SectionVerbs.AddClassFacts(course, section);
+        var ways = SubjectMenuRules.AddClassWays(view._addClassFacts);
+        view._way = ways.Count > 0 ? ways[0] : null;
+        string unit = SectionVerbs.UnitWordInASentence(course.Configuration.Naming);
+
+        var panel = new StackPanel { Spacing = 12, MinWidth = 460 };
+        panel.Children.Add(Words(AddClassWords.HowToAdd(noun)));
+        var choices = new RadioButtons { MaxColumns = 1 };
+        AutomationProperties.SetName(choices, AddClassWords.HowToAdd(noun));
+        AutomationProperties.SetAutomationId(choices, "sectionVerbAddClassWay");
+        foreach (var way in Enum.GetValues<SubjectMenuRules.AddClassWay>())
+        {
+            string label = AddClassWords.Label(SubjectMenuRules.Label(way, view._addClassFacts), noun, unit);
+            var radio = new RadioButton
+            {
+                Content = label,
+                Tag = way,
+                IsEnabled = ways.Contains(way),
+                IsChecked = view._way == way,
+            };
+            AutomationProperties.SetAutomationId(radio, "sectionVerbAddClassWay-" + Camel(way.ToString()));
+            radio.Checked += (_, _) =>
+            {
+                view._way = way;
+                view.UpdateAddClassButton();
+            };
+            choices.Items.Add(radio);
+        }
+        panel.Children.Add(choices);
+        foreach (var line in SubjectMenuRules.ReasonLines(view._addClassFacts))
+        {
+            var reason = Words(AddClassWords.Reason(line, noun, unit));
+            if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out var grey) && grey is Brush secondary)
+                reason.Foreground = secondary;
+            AutomationProperties.SetAutomationId(reason, "sectionVerbAddClassGreyed-" + Camel(line.ToString()));
+            panel.Children.Add(reason);
+        }
+
+        // The copy's list: this section's class pages, Page and Date, one chosen.
+        var reader = Reader(verbs.Folder);
+        List<string> pages;
+        try { pages = reader.ClassPages(course, section); }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"Add Class… could not list the classes: {ex.Message}");
+            pages = new List<string>();
+        }
+        if (pages.Count > 0)
+        {
+            view._copyPart = new StackPanel { Spacing = 8 };
+            view._copyPart.Children.Add(Words(AddClassWords.PickClassToDuplicate(noun)));
+            var find = new TextBox { PlaceholderText = AssistWording.MenuFindAPage };
+            AutomationProperties.SetName(find, AssistWording.MenuFindAPage);
+            AutomationProperties.SetAutomationId(find, "sectionVerbFind");
+            view._copyPart.Children.Add(find);
+            var list = new ListView
+            {
+                SelectionMode = ListViewSelectionMode.Single,
+                BorderThickness = new Thickness(PageTableLayout.TableBorder),
+                CornerRadius = new CornerRadius(4),
+                Height = Math.Min(pages.Count, SourceRowsShown) * PlanTableLayout.RowPitch + 2 * PageTableLayout.TableBorder,
+            };
+            if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out var stroke) && stroke is Brush brush)
+                list.BorderBrush = brush;
+            AutomationProperties.SetName(list, AddClassWords.PickClassToDuplicate(noun));
+            AutomationProperties.SetAutomationId(list, "sectionVerbSourceTable");
+            for (int index = 0; index < pages.Count; index++)
+            {
+                string page = pages[index];
+                string title = System.IO.Path.GetFileNameWithoutExtension(page);
+                string day = AssistWorkspace.DateOf(course, section, page) is { } date ? AssistWording.LaterClassesDay(date) : "";
+                var grid = new Grid { ColumnSpacing = PageTableLayout.ColumnSpacing };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(PageTableLayout.PickDate) });
+                var name = new TextBlock { Text = title, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+                ToolTipService.SetToolTip(name, title);
+                var when = new TextBlock { Text = day, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(when, 1);
+                grid.Children.Add(name);
+                grid.Children.Add(when);
+                var row = new ListViewItem
+                {
+                    Content = grid,
+                    MinHeight = PlanTableLayout.RowPitch,
+                    Padding = new Thickness(PageTableLayout.RowPadding, 0, PageTableLayout.RowPadding, 0),
+                };
+                AutomationProperties.SetAutomationId(row, $"sectionVerbSource{index}");
+                AutomationProperties.SetName(row, day.Length > 0 ? $"{title}, {day}" : title);
+                view._sourceRows.Add((SectionVerbs.CoursePath(course.DirectoryPath, page), title, row));
+                list.Items.Add(row);
+            }
+            list.SelectionChanged += (_, _) => view.UpdateAddClassButton();
+            find.TextChanged += (_, _) =>
+            {
+                // A chosen class the search hides is let go, so Continue never
+                // copies a row the teacher cannot see.
+                string wanted = find.Text.Trim();
+                var chosen = list.SelectedItem;
+                list.Items.Clear();
+                foreach (var (_, title, row) in view._sourceRows)
+                    if (wanted.Length == 0 || title.Contains(wanted, StringComparison.CurrentCultureIgnoreCase))
+                        list.Items.Add(row);
+                if (chosen is not null && list.Items.Contains(chosen)) list.SelectedItem = chosen;
+                view.UpdateAddClassButton();
+            };
+            view._sources = list;
+            view._copyPart.Children.Add(list);
+            panel.Children.Add(view._copyPart);
+        }
+        view.ShowChoosing(panel);
+        view.UpdateAddClassButton();
+        return view.Show();
+    }
+
+    private static string Camel(string name) => char.ToLowerInvariant(name[0]) + name[1..];
+
+    /// <summary>The source the copy list has chosen, by its place in the course; null for none.</summary>
+    private string? ChosenSource()
+    {
+        if (_sources?.SelectedItem is not ListViewItem chosen) return null;
+        foreach (var (path, _, row) in _sourceRows)
+            if (ReferenceEquals(row, chosen)) return path;
+        return null;
+    }
+
+    /// <summary>
+    /// The button and the copy list follow the way: Add for a way that adds at
+    /// once, Continue for a copy (a plan follows), live only when the way can
+    /// be used and, for a copy, a class is chosen. The list shows for a copy only.
+    /// </summary>
+    private void UpdateAddClassButton()
+    {
+        if (_item != Item.AddClass || _stage != Stage.Choose) return;
+        bool copy = _way == SubjectMenuRules.AddClassWay.AsACopyOfAClass;
+        if (_copyPart is not null) _copyPart.Visibility = copy ? Visibility.Visible : Visibility.Collapsed;
+        _dialog.PrimaryButtonText = copy ? AssistWording.MenuContinueButton : AssistWording.MenuAddButton;
+        bool usable = _way is { } way && SubjectMenuRules.AddClassWays(_addClassFacts).Contains(way);
+        DialogButtons.EnablePrimary(_dialog, usable && (!copy || ChosenSource() is not null));
+    }
+
+    /// <summary>Add Class…'s button at Choose: the change at once, or the copy's plan.</summary>
+    private async Task AdvanceAddClass()
+    {
+        string code = _course.Code;
+        switch (_way)
+        {
+            case SubjectMenuRules.AddClassWay.NextInThisUnit:
+                await RunChange(SectionVerbs.AddNextClass(code, _section));
+                break;
+            case SubjectMenuRules.AddClassWay.InANewUnit:
+                await RunChange(SectionVerbs.AddNextClassInANewUnit(code, _section));
+                break;
+            case SubjectMenuRules.AddClassWay.AsACopyOfAClass when ChosenSource() is { } source:
+                _verbButton = AssistWording.MenuDuplicateButton;
+                _pendingCall = SectionVerbs.DuplicateAsNextClass(code, _section, source, plan: false);
+                await RunPlan(SectionVerbs.DuplicateAsNextClass(code, _section, source, plan: true));
+                break;
+        }
+    }
+
     /// <summary>Re-date Classes…: straight to the plan.</summary>
     public static Task PlanReDate(XamlRoot root, SectionVerbs verbs, Course course, int section)
     {
@@ -269,7 +457,7 @@ internal sealed class SectionVerbDialog
         return planning;
     }
 
-    /// <summary>Undo Last Change and Add Next Class: no plan; the dialog shows working, then what was done.</summary>
+    /// <summary>Undo Last Change: no plan; the dialog shows working, then what was done.</summary>
     public static Task RunAtOnce(XamlRoot root, SectionVerbs verbs, Course course, int section, Item item,
                                  JsonObject call, string title)
     {
@@ -809,7 +997,8 @@ internal sealed class SectionVerbDialog
         // Publish Pages… asks nothing about classes dated after the next class
         // (#726, the mac's #694; classesDatedLater.neverAskedFrom): publishing
         // changes only the preview, and the question is put at Deploy.
-        if (_stage == Stage.Choose && _planCall is not null) await RunPlan(_planCall());
+        if (_stage == Stage.Choose && _item == Item.AddClass) await AdvanceAddClass();
+        else if (_stage == Stage.Choose && _planCall is not null) await RunPlan(_planCall());
         else if (_stage == Stage.Plan && _pendingCall is not null) await RunChange(_pendingCall);
     }
 
@@ -872,7 +1061,7 @@ internal sealed class SectionVerbDialog
                                            new[] { page.Folder, day }, Ticked: false));
         }
         var table = new TickTable("sectionVerbPickerTable",
-                                  publishing ? AssistWording.MenuPickPagesToPublish : AssistWording.MenuPickPagesToHide,
+                                  publishing ? PickPagesToPublish(_course) : AssistWording.MenuPickPagesToHide,
                                   new[] { AssistWording.MenuPlanFolderColumn, AssistWording.MenuPickDateColumn },
                                   new[] { PageTableLayout.PickFolder, PageTableLayout.PickDate }, offers);
         for (int i = 0; i < pages.Count; i++) _rows.Add((pages[i], table.Rows[i].Box));
@@ -891,7 +1080,7 @@ internal sealed class SectionVerbDialog
                                   || pages[row.Index].Folder.Contains(wanted, StringComparison.CurrentCultureIgnoreCase));
         };
         var panel = new StackPanel { Spacing = 12, MinWidth = 460 };
-        panel.Children.Add(Words(publishing ? AssistWording.MenuPickPagesToPublish : AssistWording.MenuPickPagesToHide));
+        panel.Children.Add(Words(publishing ? PickPagesToPublish(_course) : AssistWording.MenuPickPagesToHide));
         panel.Children.Add(find);
         panel.Children.Add(table.Panel);
         // The table's height is counted from EVERY page offered, never the
@@ -916,11 +1105,18 @@ internal sealed class SectionVerbDialog
 
     private List<string> Ticked() => _rows.Where(row => row.Box.IsChecked == true).Select(row => row.Page.Name).ToList();
 
+    /// <summary>Publish Pages…' sentence above the ticks, in the course's noun (#1027).</summary>
+    internal static string PickPagesToPublish(Course course) =>
+        course.Configuration.ClassNoun == ClassNoun.Meeting
+            ? AssistWording.MenuPickPagesToPublishForAMeeting
+            : AssistWording.MenuPickPagesToPublish;
+
     /// <summary>The trail line's counts — never a title.</summary>
     private string? Counts() => _item switch
     {
         Item.PublishPages or Item.HidePages => Ticked().Count == 1 ? "1 page ticked" : $"{Ticked().Count} pages ticked",
         Item.MakeRoomForClasses when _howMany is not null => (int)_howMany.Value == 1 ? "room for 1" : $"room for {(int)_howMany.Value}",
+        Item.AddClass when _way is { } way => SectionVerbs.AddClassCounts(way, _course.Configuration.ClassNoun),
         _ => null,
     };
 }

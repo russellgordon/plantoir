@@ -44,7 +44,7 @@ enum NextClassPlanner {
     /// is missing and who is being asked, and leave the how alone. That also
     /// keeps them true on the MCP surface, where the client's tool list is
     /// different again.
-    enum Problem: LocalizedError {
+    enum Problem: LocalizedError, SaidInACoursesNoun {
         case noTimetable(String, Int)
 
         /// A numbered course (#267) — a club's "Week 1", "Week 2" — has one
@@ -56,10 +56,15 @@ enum NextClassPlanner {
         case noUnitsInANumberedCourse(String, String)
 
         var errorDescription: String? {
+            return sentence(noun: .class)
+        }
+
+        /// The refusal in a course's own noun (#1027): "meeting" in a club.
+        /// The model is given `errorDescription`, the class form (#267).
+        func sentence(noun: ClassNoun) -> String {
             switch self {
             case .noTimetable(let code, let number):
-                return "I don’t know when \(code) Section \(number) meets, so I can’t date a new class. "
-                     + AssistWording.mayIAskForYourDates
+                return AssistWording.cannotDateANewClassWithoutDates(code: code, number: number, noun: noun)
             case .noUnitsInANumberedCourse(let code, let word):
                 return "\(code) numbers its pages one after another — “\(word) 1”, “\(word) 2” — and has "
                      + "no units, so there is no unit to start or add days to. Ask for the next page "

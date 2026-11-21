@@ -1235,15 +1235,21 @@ public sealed partial class SidebarPane : UserControl
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishPages))));
         menu.Items.Add(MenuItem("Hide Pages…", "",
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.HidePages))));
-        menu.Items.Add(MenuItem("Publish Class for a Date…", "",
+        // Titled as the menu bar titles them: Publish Meeting for a Date… and
+        // Add Meeting… in a club (#1027).
+        var noun = course.Configuration.ClassNoun;
+        menu.Items.Add(MenuItem(SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.PublishClassForADate, noun)!, "",
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishClassForADate))));
-        menu.Items.Add(MenuItem("Add Next Class", "",
-            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddNextClass))));
+        // #927: Add Class… in the place Add Next Class had (ruled 2026-11-13
+        // on #897), opening the menu bar's dialog; its ways are not items here.
+        menu.Items.Add(MenuItem(SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.AddClass, noun)!, "",
+            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddClass))));
         menu.Items.Add(new MenuFlyoutSeparator());
 
         // The vault is the COURSE folder even for a section — the section is
         // a subfolder within it, and Obsidian reveals the SECTION's folder.
         menu.Items.Add(ObsidianItem(course, number, row));
+        AddDeployedFolderItems(menu, course, number, row);
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));

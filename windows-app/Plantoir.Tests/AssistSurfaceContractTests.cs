@@ -1202,7 +1202,7 @@ public class AssistSurfaceContractTests
         }, "length");
         var stoppedTools = new WindowBindingContractTests.RecordingTools();
         var stoppedAgent = new AssistAgent(stoppedModel, stoppedTools,
-            ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+            ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class };
         var stoppedLines = stoppedAgent.Say("put that up for me the way we said", CancellationToken.None)
             .GetAwaiter().GetResult();
         Assert.Empty(stoppedTools.Calls);

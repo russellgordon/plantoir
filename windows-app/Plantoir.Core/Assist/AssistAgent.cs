@@ -70,6 +70,13 @@ public interface IHearsTheMenu
 {
     /// <summary>The menu's contract name ("section", "classes"), or null to send none.</summary>
     string? MenuOfTheNextCalls { get; set; }
+
+    /// <summary>
+    /// The course of the section the item was chosen on (#1027), or null to
+    /// send none: a sentence with no course of its own, Undo Last Change's
+    /// nothing-to-undo, names the menus as that course's menu bar titles them.
+    /// </summary>
+    string? CourseOfTheNextCalls { get; set; }
 }
 
 public interface IToolServer
@@ -453,9 +460,10 @@ public sealed class AssistAgent
     /// What the window's course calls its class pages, for the one sentence
     /// that names the menus to the teacher (<see cref="AssistWording.SectionIsChangingFromTheMenu"/>):
     /// "the Section or Meetings menu" in a club (#990). Set by the window,
-    /// which has the course.
+    /// which has the course. REQUIRED, with no default (#990 review 3, low
+    /// 3): a second site that forgot it would still compile.
     /// </summary>
-    public ClassNoun CourseNoun { get; init; } = ClassNoun.Class;
+    public required ClassNoun CourseNoun { get; init; }
     private readonly int _section;
 
     public AssistAgent(IChatModel model, IToolServer tools, JsonArray schemas, string courseCode, int section)

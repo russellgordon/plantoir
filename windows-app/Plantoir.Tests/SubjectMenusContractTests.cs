@@ -174,6 +174,8 @@ public class SubjectMenusContractTests
             PreviewIsRunning = Flag("previewIsRunning"),
             LastChangeIsHere = Flag("lastChangeIsHere"),
             VerbIsRunning = Flag("verbIsRunning"),
+            DeployedFolderReady = Flag("deployedFolderReady"),
+            DeployedFolderShown = Flag("deployedFolderShown"),
             CanGoBack = Flag("canGoBack"),
             CanGoForward = Flag("canGoForward"),
         };

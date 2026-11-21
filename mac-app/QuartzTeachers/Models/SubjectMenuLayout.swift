@@ -106,6 +106,33 @@ nonisolated enum SubjectMenuLayout {
         }
     }
 
+    /// The title of an item whose title says class (#1027, Russell,
+    /// 2026-11-20 night): as a course titles it, or with meeting in its place
+    /// in a course whose class pages are meetings, a club, following #990's
+    /// "no sentence a club's teacher reads says 'class'". The same words in
+    /// the menu bar, a section row's right-click menu, the trail's "ran from
+    /// a menu" line and every sentence that names the item. nil for every
+    /// other item, whose title says neither and is the same in every course.
+    /// `subjectMenus.layout.itemTitles` holds the same words, and
+    /// `ClubNounTests` checks the two agree and that no other item of the
+    /// two menus says class.
+    static func titleSayingTheNoun(of item: SubjectMenuRules.Item, noun: ClassNoun) -> String? {
+        switch item {
+        case .publishClassForADate:
+            return noun == .meeting ? "Publish Meeting for a Date…" : "Publish Class for a Date…"
+        case .addClass:
+            return noun == .meeting ? "Add Meeting…" : "Add Class…"
+        case .classDates:
+            return noun == .meeting ? "Meeting Dates…" : "Class Dates…"
+        case .reDateClasses:
+            return noun == .meeting ? "Re-date Meetings…" : "Re-date Classes…"
+        case .makeRoomForClasses:
+            return noun == .meeting ? "Make Room for Meetings…" : "Make Room for Classes…"
+        default:
+            return nil
+        }
+    }
+
     /// The submenu's title.
     static func title(of submenu: Submenu) -> String {
         switch submenu {
