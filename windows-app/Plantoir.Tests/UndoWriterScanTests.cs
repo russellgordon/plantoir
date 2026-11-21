@@ -120,7 +120,7 @@ public sealed class UndoWriterScanTests
         ["Plantoir.Core/Models/DeployCommand.cs"] = (1, "notAStep: names deploy.ps1; the deploy is not counted (rulings 17 and 18)"),
         ["Plantoir.Core/Models/FolderContainers.cs"] = (1, "notAStep: names powershell.exe to stop a folder's previews; writes no course file"),
         ["Plantoir.Core/Models/FolderScaffold.cs"] = (1, W8 + " (a new working folder's scaffold, made with New Course)"),
-        ["Plantoir.Core/Models/HeldFiles.cs"] = (3, "notAStep: opens a file for delete access with full sharing only to ask whether another program holds it (#953, #874), and sets or clears the Hidden attribute of a caller's own temporary; writes no teacher's file"),
+        ["Plantoir.Core/Models/HeldFiles.cs"] = (3, "notAStep: opens a file for delete access with full sharing only to ask whether another program holds it (#953, #874), and sets the Hidden attribute of a caller's own temporary and clears it from the file that temporary became; writes no content"),
         ["Plantoir.Core/Models/HowITeachSettingsRow.cs"] = (1, W7 + " (the How I Teach page made from Course Settings, the mac's HowITeachPage)"),
         ["Plantoir.Core/Models/LastViewedPages.cs"] = (1, "notAStep: the app's own record of the pages last viewed, in its state folder"),
         ["Plantoir.Core/Models/ObsidianFigureAddOns.cs"] = (13, W8 + " (the mac's ObsidianFigureAddOns)"),

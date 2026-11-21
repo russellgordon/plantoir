@@ -325,12 +325,8 @@ public sealed class CourseConfiguration
         {
             File.WriteAllBytes(temporary, data);
             HeldFiles.Hide(temporary);
-            HeldFiles.Replace(temporary, path, () =>
-            {
-                HeldFiles.Unhide(temporary);
-                try { File.Move(temporary, path, overwrite: true); }
-                catch { HeldFiles.Hide(temporary); throw; }
-            });
+            HeldFiles.Replace(temporary, path, () => File.Move(temporary, path, overwrite: true));
+            HeldFiles.Unhide(path);
         }
         finally
         {

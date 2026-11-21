@@ -270,12 +270,8 @@ public static class AgentGuidance
         {
             File.WriteAllBytes(temporary, new UTF8Encoding(false).GetBytes(text));
             HeldFiles.Hide(temporary);
-            HeldFiles.Replace(temporary, path, () =>
-            {
-                HeldFiles.Unhide(temporary);
-                try { File.Move(temporary, path, overwrite: true); }
-                catch { HeldFiles.Hide(temporary); throw; }
-            }, pause);
+            HeldFiles.Replace(temporary, path, () => File.Move(temporary, path, overwrite: true), pause);
+            HeldFiles.Unhide(path);
         }
         finally
         {

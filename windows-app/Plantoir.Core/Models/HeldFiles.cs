@@ -192,11 +192,16 @@ public static class HeldFiles
         File.SetAttributes(temporary, File.GetAttributes(temporary) | FileAttributes.Hidden);
 
     /// <summary>
-    /// Takes the Hidden attribute off a temporary just before its rename, so
-    /// the file it becomes is not hidden (a rename keeps the attributes).
+    /// Takes the Hidden attribute off the file a temporary has just become (a
+    /// rename keeps the attributes). Best effort: a file another program has
+    /// already replaced again carries that program's attributes, not ours.
     /// </summary>
-    public static void Unhide(string temporary) =>
-        File.SetAttributes(temporary, File.GetAttributes(temporary) & ~FileAttributes.Hidden);
+    public static void Unhide(string path)
+    {
+        try { File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.Hidden); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
 
     /// <summary>
     /// Whether another program holds <paramref name="path"/> open without

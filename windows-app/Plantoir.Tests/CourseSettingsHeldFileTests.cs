@@ -387,9 +387,9 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
     }
 
     /// <summary>
-    /// The temporary is HIDDEN while it exists (a leading dot hides nothing
-    /// on Windows), and the file it becomes is not. Looked at on the rename's
-    /// first pause, while a reader holds the target, then let go.
+    /// The temporary is HIDDEN from the moment it is written (a leading dot
+    /// hides nothing on Windows), and the file it becomes is not. Looked at on
+    /// the rename's first pause, while a reader holds the target, then let go.
     /// </summary>
     [Fact]
     public void TheTemporaryIsHiddenWhileItExistsAndTheSettingsAreNot()
@@ -430,7 +430,7 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
         File.WriteAllText(ConfigPath, """{"hidden":["Media"],"show_reading_time":false,"build_count":0}""");
         byte[] windowsCopy = File.ReadAllBytes(ConfigPath);
         Assert.Single(Workspace.DiscoverCourses(_workspace));
-        int pauses = 0, reads = 0, saves = 0, savesLanded = 0;
+        int pauses = 0, reads = 0, saves = 0, savesLanded = 0, rawDenied = 0, rawSharing = 0, rawOther = 0;
         var failures = new List<string>();
         using (HeldFiles.PausingWith(milliseconds => { Interlocked.Increment(ref pauses); HeldFiles.Sleep(milliseconds); }))
         using (var build = new BuildReplacingInALoop(ConfigPath, 3000))
@@ -438,6 +438,11 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
             while (!build.Done.IsCompleted)
             {
                 reads++;
+                // What a reader that does not ask again meets, counted for the record (#874's measurement).
+                try { File.ReadAllBytes(ConfigPath); }
+                catch (UnauthorizedAccessException) { rawDenied++; }
+                catch (IOException error) when (HeldFiles.IsSharingViolation(error)) { rawSharing++; }
+                catch (IOException) { rawOther++; }
                 try
                 {
                     var read = CourseConfiguration.ReadBytes(ConfigPath);
@@ -461,8 +466,9 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
             }
             Assert.Equal("done", build.Done.Result);
         }
-        Assert.True(failures.Count == 0, $"{failures.Count} of {reads} rounds: " + string.Join("; ", failures.Distinct()));
-        Assert.True(pauses > 0, $"the replace was never met in {reads} rounds: nothing was proved");
+        string met = $"a reader that does not ask again was refused {rawDenied} times with access denied, {rawSharing} with a sharing violation, {rawOther} otherwise";
+        Assert.True(failures.Count == 0, $"{failures.Count} of {reads} rounds ({met}): " + string.Join("; ", failures.Distinct()));
+        Assert.True(pauses > 0, $"the replace was never met in {reads} rounds ({met}): nothing was proved");
         Assert.True(savesLanded > 0, $"no Save of {saves} landed");
     }
 
