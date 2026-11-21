@@ -421,7 +421,6 @@ internal static class NamedGapLedger
     // The same hold, brought up to dev 39d83a0a7 (2026-11-18): stack 14's #901 piece 901a and #952.
     private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
-    private const string Reason1009 = "stopping a running preview, deploy or plan share from the keyboard, with the two stop questions, their Don't ask again boxes and Settings > Deploying > Stopping (the mac's #988), is #1009's piece of v2.0.0; until it lands Windows asks no stop question and has no setting for one, so it has no change to record";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) has no action wired on Windows yet (W7 wires them, with 'undo could not record a step'); 'undo rolled back' is written by W3's recovery and 'undo found a folder set aside' by W6's";
 
     /// <summary>
@@ -561,7 +560,6 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 936, V200, Reason936,
              "files for the site downloaded", "files for the site could not be downloaded"),
         Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step"),
-        Owed(ActivityTrailEvents, 1009, V200, Reason1009, "stop question setting changed"),
         // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
         // recompute run were held here from 2026-11-19 (60 checkCases, 19
         // stackCases, 15 traces, 21 recoveryCases) and went when Windows' W6

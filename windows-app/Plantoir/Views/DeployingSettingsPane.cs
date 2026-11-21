@@ -53,6 +53,7 @@ public sealed class DeployingSettingsPane
         _idWhenNoted = settings.CloudflareAccountId;
 
         var panel = new StackPanel { Spacing = 8, MaxWidth = 560, HorizontalAlignment = HorizontalAlignment.Left };
+        AddStoppingSection(panel, settings);
         panel.Children.Add(FormBuilders.SectionHeaderWithCaption("Cloudflare Pages", null));
 
         _field = new TextBox
@@ -123,6 +124,58 @@ public sealed class DeployingSettingsPane
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Padding = new Thickness(0, 0, 20, 0),   // the scrollbar's gutter, as the Assistant section has
         };
+    }
+
+    /// <summary>
+    /// The Stopping section, first in the pane (#1009, the mac's
+    /// <c>StopQuestionSettingsSection</c>, #988 ruling 4): one checkbox per
+    /// stop question, each its own setting, both on by default, and the way
+    /// back from either question's Don't ask again. Shown as stored BEFORE
+    /// listening, so opening the pane writes nothing; each change writes one
+    /// "stop question setting changed" line. Checkboxes, as the Obsidian
+    /// section's own setting is. Every word is <c>stopQuestions</c>' (the
+    /// footer is <c>windowsWording.footer</c>: no Command-Period here).
+    /// </summary>
+    private static void AddStoppingSection(StackPanel panel, AppSettings settings)
+    {
+        panel.Children.Add(FormBuilders.SectionHeaderWithCaption(StopQuestionWording.SectionHeader, null));
+        foreach (var (question, automationId) in new[]
+                 {
+                     (StopQuestion.Deploy, "asksBeforeStoppingADeploySetting"),
+                     (StopQuestion.Share, "asksBeforeStoppingAShareSetting"),
+                 })
+        {
+            string label = StopQuestionWording.SettingLabel(question);
+            var box = new CheckBox
+            {
+                Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap },
+                IsChecked = settings.AsksBeforeStopping(question),
+            };
+            AutomationProperties.SetAutomationId(box, automationId);
+            AutomationProperties.SetName(box, label);
+            box.Checked += (_, _) => StopQuestionWording.SetAsked(question, true, settings, StopQuestionChangedFrom.Settings);
+            box.Unchecked += (_, _) => StopQuestionWording.SetAsked(question, false, settings, StopQuestionChangedFrom.Settings);
+            // A question's Don't ask again, ticked while this pane is open,
+            // shows here at once (#1009's review). Setting the box to what is
+            // stored already changes nothing, so it writes no second trail
+            // line. Listened to only while the box is on screen.
+            void ShowStored(StopQuestion changed)
+            {
+                if (changed != question) return;
+                box.DispatcherQueue.TryEnqueue(() => box.IsChecked = settings.AsksBeforeStopping(question));
+            }
+            box.Loaded += (_, _) =>
+            {
+                settings.StopQuestionSettingChanged -= ShowStored;
+                settings.StopQuestionSettingChanged += ShowStored;
+                box.IsChecked = settings.AsksBeforeStopping(question);
+            };
+            box.Unloaded += (_, _) => settings.StopQuestionSettingChanged -= ShowStored;
+            panel.Children.Add(box);
+        }
+        var footer = FormBuilders.ExampleCaption(StopQuestionWording.Footer);
+        AutomationProperties.SetAutomationId(footer, "stoppingSettingFooter");
+        panel.Children.Add(footer);
     }
 
     private void RefreshProblem()

@@ -1168,7 +1168,7 @@
         "event": "stop question setting changed",
         "carries": "which question (\"Ask before stopping a deploy\" or \"Ask before stopping a share of unit plans\"), on or off, and where: the question's own Don't ask again box, ticked with Stop Deploy or Stop Share (Cancel remembers nothing and writes nothing), or Settings > Deploying > Stopping. One line per change; opening the pane writes nothing.",
         "line": "Ask before stopping a deploy off, from Don't ask again in “Stop the deploy?”",
-        "why": "#988. While a question is off, Cancel, Escape and Command-Period stop that task at once, so \"Escape stopped my deploy without asking\" is answered by when, and where, the question was turned off. Windows owes it with the questions themselves (#1009), held there in NamedGapLedger until then."
+        "why": "#988. While a question is off, Cancel, Escape and Command-Period stop that task at once, so \"Escape stopped my deploy without asking\" is answered by when, and where, the question was turned off. Windows records it too since #1009 (the questions and the Settings rows there), off NamedGapLedger; the words of both lines are stopQuestions.trail."
       },
       {
         "event": "asked to close Obsidian to open a course",
@@ -52513,6 +52513,496 @@
     "rejected": [
       "Opening the course without adding it to the list: Obsidian's open link finds only vaults it knows, so it would show its own error.",
       "Adding the course to the list while Obsidian runs: Obsidian writes its in-memory list back on quit and the addition is lost (FolderActions.openInObsidian's measurement)."
+    ]
+  },
+  "stopQuestions": {
+    "note": "#988 (mac, landed in dev at 2125f5f5e) and #1009 (Windows): the two questions asked before a running task is stopped, their Don't ask again boxes, the two settings that turn them back on, and what each answer remembers. Every sentence is copied from the mac's DeployStopWording, ShareStopWording and StopQuestionSettingsWording (Russell's rulings on #988, 2026-11-19); this block was added from Windows with #1009 so both apps read one copy. Both apps run it: each pins its own words to `questions`, `wording` and `trail` and plays every one of `cases` and of `aStoppedDeploy.cases` (Windows: `Plantoir.Tests/StopQuestionsContractTests.cs`; the mac: `QuartzTeachersTests/StopQuestionsContractTests.swift`).",
+    "rule": "A running preview stops at once, with no question. Stopping a running deploy asks questions.deploy first, and stopping a running share of unit plans asks questions.share first, whether Cancel was clicked, pressed through the accessibility interface, or its key pressed. Each question's stopButton is plain (not destructive) and the default; its cancelButton backs out and lets the task run on. Each question carries a Don't ask again box (wording.dontAskAgain), unticked each time the question opens; it counts only when the teacher goes on to choose stopButton, and then turns off that question alone. Cancel remembers nothing, the box included. While a question is off, Cancel and its key stop that task at once, as a preview's do. Each question is turned back on by its own row in Settings ▸ Deploying ▸ Stopping (wording.sectionHeader, the question's settingLabel), on by default; the row and the box are the same setting. A question still open when its task ends goes away and changes nothing.",
+    "questions": {
+      "deploy": {
+        "title": "Stop the deploy?",
+        "message": "The website may be left partly updated until you deploy again.",
+        "stopButton": "Stop Deploy",
+        "cancelButton": "Cancel",
+        "settingLabel": "Ask before stopping a deploy"
+      },
+      "share": {
+        "title": "Stop this share?",
+        "message": "The unit plans may be left partly shared until you share them again.",
+        "messageOnceAllOrNothing": "The unit plans stay as they were before this share began.",
+        "messageOnceAllOrNothingWhy": "Russell's ruling 1 on #988: message is true today, since a stopped share may leave part of an upload; it becomes messageOnceAllOrNothing when #992's all-or-nothing share lands.",
+        "stopButton": "Stop Share",
+        "cancelButton": "Cancel",
+        "settingLabel": "Ask before stopping a share of unit plans"
+      }
+    },
+    "wording": {
+      "dontAskAgain": "Don't ask again",
+      "sectionHeader": "Stopping",
+      "footer": "When one is off, Cancel stops that task at once, and so do the Escape key and Command-Period."
+    },
+    "windowsWording": {
+      "note": "Where Windows says it differently: Windows has no Command-Period. Its counterpart for cancelling is Escape alone (a ContentDialog's Close button answers Escape; Microsoft's Dialog controls page lists Escape, the system back button and Gamepad B, and nothing like Command-Period), so the footer names Escape only. Every other key reads as `wording`.",
+      "footer": "When one is off, Cancel stops that task at once, and so does the Escape key."
+    },
+    "trail": {
+      "event": "stop question setting changed",
+      "fromSettings": "Settings ▸ Deploying — {settingLabel} {onOrOff}",
+      "fromDontAskAgain": "{settingLabel} {onOrOff}, from Don't ask again in “{title}”",
+      "onOrOff": {
+        "true": "on",
+        "false": "off"
+      },
+      "rule": "One line per change that changes something: setting a question to what it already is writes nothing, and opening the Settings pane writes nothing. {settingLabel} and {title} are the question's own, from `questions`."
+    },
+    "cases": [
+      {
+        "name": "a preview stops at once",
+        "question": null,
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel"
+        ],
+        "stopsAfterStep": [
+          true
+        ],
+        "asksAfterStep": [
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "a deploy asks first",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel"
+        ],
+        "stopsAfterStep": [
+          false
+        ],
+        "asksAfterStep": [
+          true
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "Cancel lets the deploy run on and remembers nothing",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel",
+          "tickDontAskAgain",
+          "chooseCancel",
+          "pressCancel"
+        ],
+        "stopsAfterStep": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "asksAfterStep": [
+          true,
+          true,
+          false,
+          true
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "Stop Deploy with the box unticked stops and remembers nothing",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel",
+          "chooseStop"
+        ],
+        "stopsAfterStep": [
+          false,
+          true
+        ],
+        "asksAfterStep": [
+          true,
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "Stop Deploy with the box ticked turns off the deploy's question only",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel",
+          "tickDontAskAgain",
+          "chooseStop"
+        ],
+        "stopsAfterStep": [
+          false,
+          false,
+          true
+        ],
+        "asksAfterStep": [
+          true,
+          true,
+          false
+        ],
+        "settingsAfter": {
+          "deploy": false,
+          "share": true
+        },
+        "trail": [
+          "Ask before stopping a deploy off, from Don't ask again in “Stop the deploy?”"
+        ]
+      },
+      {
+        "name": "Stop Share with the box ticked turns off the share's question only",
+        "question": "share",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel",
+          "tickDontAskAgain",
+          "chooseStop"
+        ],
+        "stopsAfterStep": [
+          false,
+          false,
+          true
+        ],
+        "asksAfterStep": [
+          true,
+          true,
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": false
+        },
+        "trail": [
+          "Ask before stopping a share of unit plans off, from Don't ask again in “Stop this share?”"
+        ]
+      },
+      {
+        "name": "the box is unticked each time the question opens",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel",
+          "tickDontAskAgain",
+          "chooseCancel",
+          "pressCancel",
+          "chooseStop"
+        ],
+        "stopsAfterStep": [
+          false,
+          false,
+          false,
+          false,
+          true
+        ],
+        "asksAfterStep": [
+          true,
+          true,
+          false,
+          true,
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "with the deploy's question off, Cancel stops at once",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": false,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel"
+        ],
+        "stopsAfterStep": [
+          true
+        ],
+        "asksAfterStep": [
+          false
+        ],
+        "settingsAfter": {
+          "deploy": false,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "the deploy's question off leaves the share's asked",
+        "question": "share",
+        "settingsBefore": {
+          "deploy": false,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel"
+        ],
+        "stopsAfterStep": [
+          false
+        ],
+        "asksAfterStep": [
+          true
+        ],
+        "settingsAfter": {
+          "deploy": false,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "a task that can no longer be stopped opens no question",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": false,
+        "steps": [
+          "pressCancel"
+        ],
+        "stopsAfterStep": [
+          false
+        ],
+        "asksAfterStep": [
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "a task that ends under its question takes the question away",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "pressCancel",
+          "tickDontAskAgain",
+          "taskEnded"
+        ],
+        "stopsAfterStep": [
+          false,
+          false,
+          false
+        ],
+        "asksAfterStep": [
+          true,
+          true,
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": []
+      },
+      {
+        "name": "Settings turns the deploy's question back on",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": false,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "settingsTurnOn"
+        ],
+        "stopsAfterStep": [
+          false
+        ],
+        "asksAfterStep": [
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": [
+          "Settings ▸ Deploying — Ask before stopping a deploy on"
+        ]
+      },
+      {
+        "name": "Settings turns the share's question off",
+        "question": "share",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "settingsTurnOff"
+        ],
+        "stopsAfterStep": [
+          false
+        ],
+        "asksAfterStep": [
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": false
+        },
+        "trail": [
+          "Settings ▸ Deploying — Ask before stopping a share of unit plans off"
+        ]
+      },
+      {
+        "name": "Settings setting a question to what it already is writes nothing",
+        "question": "deploy",
+        "settingsBefore": {
+          "deploy": true,
+          "share": true
+        },
+        "taskRunning": true,
+        "steps": [
+          "settingsTurnOn"
+        ],
+        "stopsAfterStep": [
+          false
+        ],
+        "asksAfterStep": [
+          false
+        ],
+        "settingsAfter": {
+          "deploy": true,
+          "share": true
+        },
+        "trail": []
+      }
+    ],
+    "howToRunACase": "Start with the two settings as settingsBefore and a model of the question being asked for `question` (null: a preview). Play each step in order: pressCancel (the task's Cancel, by click, by the accessibility interface or by its key; taskRunning says whether the task can still be stopped), tickDontAskAgain (tick the open question's box), chooseStop (the question's stopButton), chooseCancel (its cancelButton), taskEnded (the task ends while the question is open), settingsTurnOn / settingsTurnOff (the question's row in Settings ▸ Deploying ▸ Stopping). After each step, stopsAfterStep says whether that step stops the task now, and asksAfterStep whether the question is open. At the end the two settings are settingsAfter, and the trail lines written are exactly `trail`, in order.",
+    "aStoppedDeploy": {
+      "rule": "What a deploy that was stopped ends as, once Stop Deploy (or Cancel and its key with the question off) has stopped it (#1009's third review). A destination the stop kept the run from reaching did not get the site, so it is counted as not deployed, exactly as the destination the stop landed in is: a stopped run is never every destination deployed, writes no published stamp (the section keeps its “— Edited”), and the assistant is told the sentence for the destinations that did not get the site. A stop that lands once the last destination has finished stops nothing: there is no destination left to keep from the site, and the run ends as every destination deployed. The sentence is the one each app already says when a stop lands inside a destination: on the mac a stop between two destinations cannot land (its Cancel is not shown there), so the case that decided it is the stop during the second of two, where the mac says deployPartiallySucceeded naming the second. One sentence the mac says did change with this rule: stopped during the second of three, its deployPartiallySucceeded named only the second as not deployed, and now names the second and the third, since the third never got the site either (#1009's fourth review).",
+      "howToRunACase": "Make a deploy run with one leg per entry of `legs`, each to a destination of that `type`, in order: deployed (finished, and it went out), stoppedDuring (finished, not deployed: the stop landed in it), notReached (never started). `stopped` is the run's own mark that the teacher stopped it. Then the run's outcome is every destination deployed exactly when `everyDestinationDeployed` (the published stamp's own rule), the destinations not deployed are the 1-based `notDeployedTo`, in order, and the sentence the assistant is told is the assist wording named by `told` (deployed, deployDidNotFinish, deployedToMultipleDestinations, deployPartiallySucceeded with the not-deployed destinations' names joined, deployToMultipleDestinationsDidNotFinish) for that course and section.",
+      "cases": [
+        {
+          "name": "one destination, stopped during it",
+          "legs": [{ "type": "netlify", "state": "stoppedDuring" }],
+          "stopped": true,
+          "everyDestinationDeployed": false,
+          "notDeployedTo": [1],
+          "told": "deployDidNotFinish"
+        },
+        {
+          "name": "stopped during the first of two",
+          "legs": [{ "type": "netlify", "state": "stoppedDuring" }, { "type": "cloudflare_pages", "state": "notReached" }],
+          "stopped": true,
+          "everyDestinationDeployed": false,
+          "notDeployedTo": [1, 2],
+          "told": "deployToMultipleDestinationsDidNotFinish"
+        },
+        {
+          "name": "stopped between two destinations",
+          "legs": [{ "type": "netlify", "state": "deployed" }, { "type": "cloudflare_pages", "state": "notReached" }],
+          "stopped": true,
+          "everyDestinationDeployed": false,
+          "notDeployedTo": [2],
+          "told": "deployPartiallySucceeded"
+        },
+        {
+          "name": "stopped during the second of two",
+          "legs": [{ "type": "netlify", "state": "deployed" }, { "type": "cloudflare_pages", "state": "stoppedDuring" }],
+          "stopped": true,
+          "everyDestinationDeployed": false,
+          "notDeployedTo": [2],
+          "told": "deployPartiallySucceeded"
+        },
+        {
+          "name": "stopped during the second of three",
+          "legs": [{ "type": "netlify", "state": "deployed" }, { "type": "cloudflare_pages", "state": "stoppedDuring" }, { "type": "local_folder", "state": "notReached" }],
+          "stopped": true,
+          "everyDestinationDeployed": false,
+          "notDeployedTo": [2, 3],
+          "told": "deployPartiallySucceeded"
+        },
+        {
+          "name": "stopped between the second and the third of three",
+          "legs": [{ "type": "netlify", "state": "deployed" }, { "type": "cloudflare_pages", "state": "deployed" }, { "type": "local_folder", "state": "notReached" }],
+          "stopped": true,
+          "everyDestinationDeployed": false,
+          "notDeployedTo": [3],
+          "told": "deployPartiallySucceeded"
+        },
+        {
+          "name": "a stop once the last destination has finished stops nothing",
+          "legs": [{ "type": "netlify", "state": "deployed" }, { "type": "cloudflare_pages", "state": "deployed" }],
+          "stopped": true,
+          "everyDestinationDeployed": true,
+          "notDeployedTo": [],
+          "told": "deployedToMultipleDestinations"
+        },
+        {
+          "name": "not stopped, every destination deployed",
+          "legs": [{ "type": "netlify", "state": "deployed" }, { "type": "cloudflare_pages", "state": "deployed" }],
+          "stopped": false,
+          "everyDestinationDeployed": true,
+          "notDeployedTo": [],
+          "told": "deployedToMultipleDestinations"
+        }
+      ]
+    },
+    "knownLimits": [
+      "The keys are not carried here: which key presses Cancel, and when a focused text box keeps the key, are each app's mechanics (the mac: Escape and Command-Period through TaskCancelButton; Windows: Escape through a KeyboardAccelerator on the visible Cancel). Both apps rule that while an editable text box has the focus, the key belongs to the box, and a click or an accessibility press on Cancel still stops the task.",
+      "Windows has no share of unit plans yet (#824), so no panel there asks questions.share. Its setting is kept, and File ▸ Settings ▸ Deploying ▸ Stopping shows its row beside the deploy's, as the mac's Settings does, so the answer is in place when the share comes."
     ]
   }
 }
