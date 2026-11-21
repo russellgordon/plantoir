@@ -610,7 +610,7 @@ public class ReDateTests : IDisposable
             UndoList = new Plantoir.Core.Undo.UndoForThisProcess(list, Plantoir.Core.Undo.UndoMode.Shadow, null),
         };
         var plan = workspace.PlanSyncDates("ICS3U", 1, new[] { "Unit 1, Day 1" });
-        Assert.Equal(2, plan.Changing.Count);
+        Assert.Equal(2, plan.Changing.Count());
         string loops = Path.Combine(_folder, "courses", "ICS3U", "Concepts", "Loops.md");
         string loopsBefore = File.ReadAllText(loops);
         File.SetAttributes(loops, FileAttributes.ReadOnly);
