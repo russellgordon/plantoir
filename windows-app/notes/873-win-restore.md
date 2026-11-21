@@ -209,6 +209,39 @@ mac's reason: a rename should not cost a teacher their website.
   passes the busy question as a delegate, asked before and after the archive.
 - Facts are cached per zip path in the sidebar for the window's life (the
   mac's `backupFactsByPath`): a zip does not change.
+- Restore…'s question decides by the explicit answer only (review 2's
+  MEDIUM). `AskWhichRestore` returns a `RestoreChoice`: Primary is
+  `OneSection`, Secondary is `WholeCourse`, and every other answer (Cancel,
+  Escape, a closed dialog, and the `null` of a question that could not be
+  shown) is `Nothing`, which restores nothing and says nothing, as a
+  cancelled question says nothing. `ConfirmRestoreBackup` runs a restore
+  only from a `switch` that names both choices; there is no `else` and no
+  `default`.
+- From the press to the answer, `SidebarPane.IsAskingWhichRestore` is true
+  (a `finally` clears it) and every Restore… is greyed: the menu bar reads it
+  as a dialog up (`SheetIsUp`), the backup row's context menu reads it as it
+  opens, and the backup pane's Restore… button is drawn again greyed through
+  `AskingWhichRestoreChanged`. That covers the gap while the zip is read on
+  a worker thread before the question opens. The early return on the flag
+  only backs the greying up. The Backups group dialog's Restore… needs
+  nothing: that dialog is itself up until it hands over.
+- Another dialog taking the one slot in that gap (a problems alert, an
+  update offer) cannot be prevented by greying; the question then answers
+  `null`, which is `Nothing`.
+- Not changed (review 2, lows): "The course settings of X could not be
+  read: …" in `CourseRestorer.RestoreSectionFromTheMenu` has no contract key
+  and the mac has no such sentence (it lets the decode error through), so it
+  stays as Windows' own. The refusals asked before the dialog ("X is busy
+  right now", `AssistWording.CourseIsAlreadyBeingRevised`) keep their older
+  Windows titles, not the mac's `BackupProblemTitle.restoring`; the click's
+  second asking in `MenuSectionRestore.Run` already uses the mac's.
+- Searched the Windows app for the same shape (a dialog helper's `null`
+  reaching an acting `else`) around restore, archive, delete, replace and
+  deploy: none other. Every other confirmation tests `!= Primary` and
+  returns; `TaskProgressView`'s Stop question's `else` only cancels;
+  `SectionDetailView`'s problems alert maps an unshown dialog to "not
+  answered" and names Primary and Secondary explicitly; `UpdatePrompts` maps
+  `null` to `NotShown`.
 - The two `HarnessSourceRuleTests` facts that fail in the UI project
   (`NoTestSendsAKeyDownWithNoKeyUp`, `EveryKeyATestNamesIsWatched`) fail on
   `StopByKeyboardUiTests.cs`, another lane's file on `dev`, not on anything
@@ -306,6 +339,26 @@ the backup; none of the sabotages did that). It is kept as that check.
 `KeptCopiesTests.RestoringFromArchivedStillDiscardsEverything` passed either
 way at first (archiving had already discarded the build); it now plants a
 build after the archive and is proved by g7.
+
+### Review 2's MEDIUM (first VM, 02:47 to 02:55)
+
+Head b85971c6e (`dev` 2f50d1fa3 merged): all three builds; 230 of 230 unit
+over `MenuSectionRestore`, `OneSectionRestore`, `SubjectMenuRules` and every
+class that reads `SidebarPane.xaml.cs`, `MainWindow.xaml.cs` or
+`MainWindow.Menus.cs` as source; UI `RestoreSectionDialogUiTests` and
+`MenuGreysUnderADialog` 2 of 2. Scratch 231742282 (never pushed) put back
+three faults at once, each held by its own test: 3 of 10 failed.
+
+| Sabotage | Test | Failing line |
+|---|---|---|
+| `else if (answer != ContentDialogResult.None) chosen = RestoreChoice.WholeCourse;` (a `null` restores the whole course) | `TheOfferedDialogDefaultsToRestoreSectionN` | :182, `Assert.Contains("if (answer == ContentDialogResult.Secondary) …")` |
+| the `switch`'s `WholeCourse` and `Nothing` cases replaced by `default: await RestoreWholeCourse(item);` | `OnlyAnExplicitChoiceRestores` | :201, `Assert.Matches("case RestoreChoice\\.WholeCourse: …")` |
+| `SheetIsUp` without `\|\| Sidebar.IsAskingWhichRestore` (the menu bar not greyed while asking) | `EveryRestoreIsGreyedWhileTheQuestionIsAsked` | :225, `Assert.Contains("SheetIsUp = DialogGate.IsOpen(…) \|\| Sidebar.IsAskingWhichRestore,")` |
+
+The three are source tests, as the dialog's test before them: a question
+that cannot be shown (a second dialog in the one slot) is not reproducible
+in a UI test without a timed race, so the source pins the structure that
+makes the fall-through impossible.
 
 ## The double-failure sweep
 
