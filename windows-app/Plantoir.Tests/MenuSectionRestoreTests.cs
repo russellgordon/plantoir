@@ -154,6 +154,20 @@ public sealed class MenuSectionRestoreTests : IDisposable
         Assert.False(CourseRestorer.RestoreSectionFromTheMenu(2, backup, _fixture.CoursesDir).WebsiteRecordDiffers);
     }
 
+    /// <summary>Only the website markers decide it: the class dates are the same in both, the Netlify marker is not.</summary>
+    [Fact]
+    public void ADifferentWebsiteRecordIsSaidAndTheLiveOneIsKept()
+    {
+        WriteInCourse(".netlify_sites/section2.json", "{\"site_id\": \"last year\"}");
+        WriteInCourse(".internal/timetable/section2.json", "{\"dates\": []}");
+        _fixture.Write("a.md", "a");
+        var backup = _fixture.BackUp();
+        WriteInCourse(".netlify_sites/section2.json", "{\"site_id\": \"this year\"}");
+
+        Assert.True(CourseRestorer.RestoreSectionFromTheMenu(2, backup, _fixture.CoursesDir).WebsiteRecordDiffers);
+        Assert.Equal("{\"site_id\": \"this year\"}", File.ReadAllText(InCourse(".netlify_sites/section2.json")));
+    }
+
     // ---- shared pages: keys put back, a page made since hidden -------------
 
     [Fact]

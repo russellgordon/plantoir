@@ -66,28 +66,87 @@ Built tonight, each a commit:
    (step 4) is where it is asked, once per backup, when the dialog is about to
    open.
 
-**Not built tonight (the stopping rule):**
-- Step 3, the menu's one-section restore (`restoreSectionFromTheMenu`): the
-  swap over the outside files (the list and the swap's outside-file moves
-  exist and the list is pinned to the JSON, but no caller passes it), shared
-  pages made since hidden, the naming refusals asked of the unpacked backup,
-  the legacy marker kept, the `Outcome` counts, the Undo seam (the swap has
-  the `keepingWhatWasReplaced` parameter; nothing passes it).
-- Step 4, the dialog (three buttons, the order around it, the finished and
-  stopped sentences in the result dialog, the `section restored` line).
-- The wording keys steps 3 and 4 need (`title`, `message`, the buttons, the
-  done pieces, the refusals) are not yet in `OneSectionRestoreWording`.
+3. **Step 3, the menu's one-section restore** (`CourseRestorer.RestoreSectionFromTheMenu`,
+   the mac's `restoreSectionFromTheMenu`): the same staging and swap, now
+   over the section folder AND the nine `filesOutsideTheSection` (each
+   `fromTheBackup`, `discarded` or `leftAsItIs`; a `fromTheBackup` file the
+   backup lacks is removed, kept aside until the swap is good); the
+   per-section keys on shared pages as before; a shared page the backup
+   lacks hidden from this section unless the build already reads it hidden
+   (`HidingAPageMadeSinceTheBackup`, the ordinary `PageFrontmatter.SetDraft`
+   with `publishForSection<N>: false`; pages under `private\`, `templates\`,
+   `.obsidian\` or any dot folder never touched, `OneSectionRestore.IsPublishable`,
+   pinned to `geogebraFences.files.notPublished.folders`); the section-number,
+   reference and naming refusals asked again of the live settings and the
+   UNPACKED backup (`namingChanged`, `foldersChanged`, `sectionNotInCourse`,
+   the mac's `sectionMissingFromBackup` and `archiveUnreadable` sentences);
+   the legacy `.netlify_site.json` in the section's build root kept across the
+   discarded build; the `Outcome` (`PagesNotPutBack`, `PagesNotSaved`,
+   `PagesMadeSinceHidden`, `WebsiteRecordDiffers`, the markers compared as
+   parsed JSON); and the Undo seam `keepingWhatWasReplaced`, handed the aside
+   folder before it goes (no caller passes it; a test does).
+4. **Step 4, the dialog and the order around it.** `ConfirmRestoreBackup`
+   reads the zip once per backup (`_backupFacts`, off the interface thread)
+   when the dialog is about to open, asks `OneSectionRestore.OfferFor`, and
+   for an offered section shows ONE `ContentDialog`: title `wording.title`,
+   content `wording.message` (`BackupMaker.DescriptionFor` and
+   `WhenDescription`), Restore Section N (primary, `DefaultButton`), Restore
+   Whole Course (secondary: today's whole-course restore, unchanged, moved
+   into `RestoreWholeCourse`), Cancel (close, Escape). Otherwise today's
+   two-button dialog. The click is `MenuSectionRestore.Run`, the mac's
+   `restoreOneSection` in its order: the busy refusal (preview or deploy, in
+   the mac's words; an assistant's hold; the Section menu or the assistant
+   changing THIS section, `wording.busy`) and every offer condition asked
+   again (`RefusalAtTheClick`) BEFORE the archive; the whole course archived
+   (`ArchiveCourseWithoutRemoving`); the busy refusal asked again; the
+   restore; `section restored` (`RestoredOneSectionFromTheMenuLine`, the
+   mac's words) and, when pages could not take a key, `page settings left as
+   they were`; then `doneTitle` and `done` with its pieces in the one result
+   dialog (`ShowError`'s OK dialog, the backup alert's slot). A failure is
+   said under `BackupProblemTitle.Restoring` with the restorer's own sentence.
+   The busy refusals before the dialog keep their existing Windows titles.
 
-**#911's five "Windows owes" bullets:**
-- the third button and the offer rule: offer rule DONE (step 2); the button
-  NOT DONE (step 4);
-- the widened one-section restore: NOT DONE (step 3);
-- the staged swap with a way back for BOTH routes: DONE for the assistant
-  window's route; the dialog's route waits on step 3;
-- the archive first, the `section restored` line and the `page settings left
-  as they were` count: NOT DONE (step 4);
-- the finished line in its notice slot: NOT DONE (step 4).
-So #911 stays open.
+**HIG (Alerts, read 2026-11-21):** the page puts the default button on the
+trailing side and Cancel on the leading side, and says never to make Cancel
+the default; it gives no three-button macOS rule. Windows' ContentDialog
+lays out primary, secondary, close left to right, and every other
+three-button question in this app uses that order, so the brief's "the
+Windows order the app already uses" decides: Restore Section N (default,
+leftmost), Restore Whole Course, Cancel (rightmost, Escape). No control the
+Mac lacks; nothing invisible.
+
+**#911's five "Windows owes" bullets: all DONE** (the third button and the
+offer rule; the widened one-section restore; the staged swap with a way back
+for BOTH routes; the archive first, the `section restored` line and the
+`page settings left as they were` count; the finished line in its notice
+slot). #911 can close on its own once reviewed.
+
+**The review of steps 1 and 2 (`vm-tools/briefs/2026-11-21-lane-h-review-1.md`), lows fixed here:**
+- LOW 3: only WORK a backup leaves out keeps a replaced section aside:
+  `CourseRestorer.LeftOutWork` = `.git`, `node_modules`, `dist`, `build`,
+  `out` (a project's history, its packages, what its own tools made). The
+  rest of `ExcludedFromArchives` is litter made again on its own and never
+  keeps anything: `.DS_Store`, `__pycache__`, `.cache`, `.quartz-cache`,
+  `.merged_output`. Tests: `ADeeperFolderOfWorkABackupLeavesOutKeepsTheAsideCopy`,
+  `SystemLitterDeeperInTheSectionNeverKeepsTheAsideCopy`,
+  `TheLeftOutListSplitsIntoWorkAndLitter` (a name added to the list must be
+  decided).
+- LOW 1: `RestoreKillTests(staged)` (and the unpack kills) assert `section2\`
+  byte for byte and no `as-it-was` folder.
+- LOW 2: kills part way through the unpack (`unpack:2`, through a new
+  `SectionSwapHooks.UnpackedAnEntry`; the staging unpack now extracts entry by
+  entry with ExtractToDirectory's outside-the-folder guard), during the moves
+  in (assistant `move:5`, `move:6`; menu `move:7`, `move:10`), and during a way
+  back started by a REAL refusal (the harness holds `zz notes\n.md` without
+  delete sharing; `back:1`, `back:2`), on both routes: 18 kill cases.
+- LOW 4: every sweep case asserts what the teacher is told
+  (`SectionSwapFixture.AssertToldTruly`): `leftAsItWas` when the way back
+  finished, else `stoppedPartWay` naming the kept folder or
+  `stoppedPartWayNothingToOpen`, with the archive sentence on the menu's
+  route, and the trail line naming that folder.
+- LOW 5: the stacked summary tags in `ActivityTrail.cs`.
+- LOW 6 (a section on another volume) and LOW 7 (a kill leaves the unpacked
+  backup) are the brief's design, unchanged; said here only.
 
 ## For documentation 12
 
@@ -122,13 +181,66 @@ mac's reason: a rename should not cost a teacher their website.
   so both apps choose the same sentence for the same folder.
 - Measured on the first VM (Windows 11 ARM64 in Parallels, NTFS): see "The
   double-failure sweep" and "Must-fail lines".
-- A held `course_config.json` (lane G's `HeldFiles`) does not meet this route:
+- A held `course_config.json` (lane G's `HeldFiles`): the menu route (step 3)
+  reads the live settings and the unpacked backup's through
+  `CourseConfiguration.Load` (in `CourseRestorer.cs`), and `OfferFor` reads the
+  saved live settings the same way; a held live file there is refused as
+  "could not be read" today and is lane G's helper's job later. The assistant
+  route:
   the assistant route reads only the live settings through
   `CourseConfiguration.Load` (the reference check) and the zip's copy is never
-  read here; step 2's `ReadFacts` reads the zip entry's stream. The menu
-  route (step 3) will read the live settings and the unpacked backup's through
-  `CourseConfiguration.Load`; a held live settings file there is lane G's
-  helper's job.
+  read here; step 2's `ReadFacts` reads the zip entry's stream. 
+
+### #911, the menu's route and the dialog
+
+- `CourseRestorer.RestoreSectionFromTheMenu` is the assistant route's swap
+  with the nine outside files added (`…\as-it-was\outside\<path>`), so one
+  staging folder holds both halves; the way back and the keep are the same
+  code. The legacy Netlify marker is kept from `BuildOutputLocation.ForSection`
+  (`builds\<id>\<CODE>\section<N>\.netlify_site.json`), where Windows'
+  launchers put it; the mac's `.merged_output\section<N>` has never held one
+  on this platform.
+- A page made since is hidden with the per-section key only
+  (`publishForSection<N>: false`) and only when `PageFrontmatter.IsDraft`
+  reads it published for the section, so a page whose plain `publish:` is
+  false is left byte for byte.
+- `MenuSectionRestore.Run` holds the click's order outside the view, so a
+  unit test can prove a refused click leaves `Archived` as it was; the view
+  passes the busy question as a delegate, asked before and after the archive.
+- Facts are cached per zip path in the sidebar for the window's life (the
+  mac's `backupFactsByPath`): a zip does not change.
+- The two `HarnessSourceRuleTests` facts that fail in the UI project
+  (`NoTestSendsAKeyDownWithNoKeyUp`, `EveryKeyATestNamesIsWatched`) fail on
+  `StopByKeyboardUiTests.cs`, another lane's file on `dev`, not on anything
+  here; `RestoreSectionDialogUiTests` sends only `Keyboard.Type` of ESCAPE and
+  RETURN, both watched.
+
+## Tests added tonight for steps 3 and 4 (first VM, 185 of 185 over the brief's run rule at db6ab3354, 02:25)
+
+- `MenuSectionRestoreTests` (14): every `filesOutsideTheSection` case from
+  the JSON against a fixture holding every listed path for Sections 1 and 2;
+  a `fromTheBackup` file the backup lacks; the Undo seam handed the aside
+  folder; the website record compared as parsed JSON; a page made since
+  hidden, one already hidden and a template left byte for byte; no room
+  counted; this section's key put back; naming, folders and section refusals
+  of the unpacked backup with nothing moved; a held file (real) leaving the
+  section and its outside files byte for byte; a way back that did not finish
+  saying the archive sentence; `.git` and `node_modules` left in place; the
+  built page gone with the legacy marker and the kept copies staying; the sweep.
+- `MenuSectionRestoreClickTests` (8): the offer for a menu backup and none for
+  a teacher's; a finished click (archive first, the restored section, the
+  done title and sentence, the trail line); `page settings left as they were`;
+  three refused clicks (busy, the offer rule asked again, not made for this
+  section), each with `Archived` the same before and after; busy after the
+  archive (archive stays, nothing restored); the offered dialog's source.
+- `OneSectionRestoreContractTests` (+3): every dialog, refusal and done
+  template from the JSON; `doneJoin` over 54 combinations; the never-published
+  folders against `shared-rules.json`.
+- `RestoreKillTests`: 18 kill points over both routes (above).
+- `RestoreSectionDialogUiTests` (UI Automation, first VM, passed 02:26): the
+  three buttons by name, title, left-to-right order; Escape closes it with
+  nothing archived and the lesson unchanged; Enter restores Section 1 (the
+  finished dialog by its title, the lesson back, one archive).
 
 ## Must-fail lines
 
@@ -162,6 +274,28 @@ branch head: 207 of 207 over every class named in the brief's run rule.
 | g7 | `KeptCopiesFolderName` spelled otherwise | `KeptCopiesTests.TheFolderNameIsTheContracts` :56 |
 | g7 | `Restore(ArchivedItem)` keeps the kept copies | `RestoringFromArchivedStillDiscardsEverything` :128 |
 | g7 | `AssistSectionRestore` without its `StoppedPartWay` catch | `SectionSwapTests.AWayBackThatDoesNotFinish…` :166 (the window would have said "Nothing was put back:") |
+| h1 | the menu route swaps no outside files | `MenuSectionRestoreTests.EveryFileOutsideTheSection…` :104, `AFileTheBackupLacks…` :138, `RestoreKillTests(move:10, menu)` :99 |
+| h1 | a page made since never hidden (nor counted) | `ASharedPageMadeSince…` :174, `APageMadeSinceWithNoRoom…` :192, `MenuSectionRestoreClickTests.APageThatCouldNotTakeAKey…` :82 |
+| h1 | the click never asks "made for this section" | `AClickOnABackupNotMadeForTheSectionArchivesNothing` :132 |
+| h1 | `.DS_Store` counted as work | `SectionSwapTests.SystemLitterDeeperInTheSection…` :288, `TheLeftOutListSplitsIntoWorkAndLitter` :299 |
+| h1 | `websiteUnchanged` never joined | `OneSectionRestoreContractTests.TheFinishedSentenceJoins…` :69 |
+| h2 | the unpacked backup's naming never asked | `ANamingChangedSinceTheBackup…` :220, `AFolderRemovedSinceTheBackupIsRefused` :234 |
+| h2 | the legacy marker not kept | `TheBuiltSiteGoesAndTheLegacyWebsiteMarker…` :353 |
+| h2 | busy not asked again after the archive | `MenuSectionRestoreClickTests.BusyAfterTheArchive…` :147 |
+| h2 | the offered dialog's default is Restore Whole Course | `TheOfferedDialogDefaultsToRestoreSectionN` :177; the UI test (below) |
+| h2 | the menu's stopped sentence without the archive sentence | `AWayBackThatDoesNotFinishOnTheMenusRoute…` :308, the menu sweep (`AssertToldTruly` :169) |
+| h3 | busy asked only after the archive | `AClickRefusedAsBusyArchivesNothing` :100 |
+| h3 | `Staged` reached after the swap (menu route) | `RestoreKillTests(staged, menu)` :107 (the section changed before the kill) |
+| h3 | the unpack never announces an entry | `RestoreKillTests(unpack:2, …)` :99, both routes |
+| h3 | the menu route puts back no per-section key | `ThisSectionsKeyOnASharedPage…` :206, `ASharedPageMadeSince…` :174, `BusyAfterTheArchive…` :147 and two more |
+| h4 | a way back that did not finish read as finished | both sweeps (`AssertToldTruly` :156), `AWayBackThatDoesNotFinish…` :166 and :302, `WithOnlyHiddenFiles…` :194, `WhenEvenTheKeep…` :215 |
+| h4 | the website record compared over the wrong files | passed every test: the gap is closed by `ADifferentWebsiteRecordIsSaidAndTheLiveOneIsKept`, proved by h5 below |
+
+h1 to h4 were built on db6ab3354 and run on the first VM at 02:28 over
+`MenuSectionRestoreClickTests`, `MenuSectionRestoreTests`,
+`OneSectionRestoreContractTests`, `RestoreKillTests` and `SectionSwapTests`
+(60 tests); `vm-tools/guest/911-mustfail.ps1` now prints the failing line of
+any test file.
 
 `RestoreKillTests(staged)` passes under every sabotage, by its nature: at
 `staged` nothing in the course has moved, so it holds only that staging moves
@@ -181,13 +315,23 @@ folder holding a deeper folder, one made since) and three backup entries, so
 seven forward moves and 21 cases. **Every original was kept in all 21**, in
 the section or the kept folder (asserted). **3 of 21 left `section2\` a mix**
 of original and backup files (first VM, five runs between 01:58 and 02:03,
-the same every time). The mac's 12 of 91 is the menu route on a larger fixture (four
-section files and six outside files, 14 forward moves); the menu route is
-step 3, not built, so the like-for-like count waits on it.
+the same every time).
+
+The MENU route, the mac's shape (`MenuSectionRestoreTests.EveryDoubleFailureOnTheMenusRouteKeepsEveryOriginalAndTheMixesAreCounted`):
+the same four live entries and three backup entries plus six outside files
+(timetable, the published-pages folder, three `fromTheBackup` records and the
+`discarded` checklist), 18 forward moves, 153 cases. **Every original, in the
+section and outside it, was kept in all 153**, and every case was told the
+true sentence (asserted). **18 of 153 left `section2\` a mix** (first VM,
+NTFS, three runs 02:16 to 02:26, the same each time), against the mac's 12 of
+91 on its own fixture (four section files, six outside, 14 forward moves):
+the same order of rate, about one case in eight to nine, because a mix needs
+a backup entry already in and the failing way-back move to be that entry's.
 
 ## Where this meets the Undo door
 
-Neither route goes through the door. `SwapSectionInPlace` takes
+Neither route goes through the door. `RestoreSectionFromTheMenu(…, keepingWhatWasReplaced:)`
+is the menu route's seam, passed on to `SwapSectionInPlace`, which takes
 `Action<string>? keepingWhatWasReplaced`, handed the aside folder after the
 swap and before it is removed, as the mac's `restoreSectionFromTheMenu(…keepingWhatWasReplaced:)`;
 no caller passes it tonight. When W9 lands, the menu route (step 3) passes it
