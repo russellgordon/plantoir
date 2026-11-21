@@ -419,7 +419,22 @@ public class SectionAndClassesUiTests
         var meetings = MenuBar.Open(app, "Meetings", "classesClassDates");
         Assert.Equal(Expected(Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes).Where(line => line != Separator).OrderBy(id => id),
                      meetings.Keys.OrderBy(id => id));
+        // #1027: its items say meeting too (subjectMenus.layout.itemTitles),
+        // and none says class. MUST FAIL with the items' words set once.
+        foreach (var (id, element) in meetings)
+        {
+            var item = Enum.GetValues<Plantoir.Core.Models.SubjectMenuRules.Item>()
+                .Single(i => Plantoir.Core.Models.SubjectMenuLayout.MenuContaining(i) == Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes
+                             && Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(Plantoir.Core.Models.SubjectMenuLayout.Menu.Classes, i) == id);
+            Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item, Plantoir.Core.Models.ClassNoun.Meeting), element.Name);
+            Assert.DoesNotMatch(@"\b[Cc]lass(es)?\b", element.Name);
+        }
         MenuBar.Close();
+        var section = MenuBar.Open(app, "Section", "sectionPublishPages");
+        Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(Plantoir.Core.Models.SubjectMenuRules.Item.PublishClassForADate, Plantoir.Core.Models.ClassNoun.Meeting),
+                     section["sectionPublishClassForADate"].Name);
+        MenuBar.Close();
+        CaptureIfAsked(app, "Meetings", "classesClassDates", "windows-meetings-menu.png");
 
         app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
         Assert.True(MenuBarComesToRead(app, ForACourse), $"back on a course the menu bar reads {MenuBarTitles(app)}");
@@ -459,7 +474,7 @@ public class SectionAndClassesUiTests
                 var item = Enum.GetValues<Plantoir.Core.Models.SubjectMenuRules.Item>()
                     .Single(i => Plantoir.Core.Models.SubjectMenuLayout.MenuContaining(i) == menu
                                  && Plantoir.Core.Models.SubjectMenuLayout.AutomationIdHere(menu, i) == line);
-                Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item), element.Name);
+                Assert.Equal(Plantoir.Core.Models.SubjectMenuLayout.TitleHere(item, Plantoir.Core.Models.ClassNoun.Class), element.Name);
             }
             MenuBar.Close();
         }

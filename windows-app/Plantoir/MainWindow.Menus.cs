@@ -237,7 +237,7 @@ public sealed partial class MainWindow
     }
 
     /// <summary>An item's words in Section ▸ or Classes ▸; a layout item with none draws its name, and the contract test fails on it.</summary>
-    private static string LayoutTitle(Item item) => SubjectMenuLayout.TitleHere(item) ?? item.ToString();
+    private static string LayoutTitle(Item item, ClassNoun noun) => SubjectMenuLayout.TitleHere(item, noun) ?? item.ToString();
 
     /// <summary>One item of Section ▸ or Classes ▸, with its key where it has one.</summary>
     private void AddLayoutItem(IList<MenuFlyoutItemBase> into, SubjectMenuLayout.Menu layout, Item item)
@@ -258,13 +258,13 @@ public sealed partial class MainWindow
                 return;
             case Item.RebuildPreview:
                 // Ctrl+Shift+B, the mac's Shift+Cmd+B until #990: kept free for it by #488's key census.
-                Add(into, LayoutTitle(item), id, item, Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item, Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
                 return;
             case Item.Deploy:
-                Add(into, LayoutTitle(item), id, item, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
                 return;
             case Item.SectionOpenInObsidian:
-                Add(into, LayoutTitle(item), id, item);
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item);
                 // Its key is moved onto it by ApplyMenuEnablement while a section is selected.
                 _sectionObsidianKey = Key(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+O")!.Value.Make(this, Item.SectionOpenInObsidian);
                 return;
@@ -273,7 +273,7 @@ public sealed partial class MainWindow
                 // belongs to text editing, and a key that took back a page
                 // change from inside a text field would be a surprise nobody
                 // could undo (the mac's reason for no Cmd+Z).
-                Add(into, LayoutTitle(item), id, item);
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item);
                 return;
         }
     }
@@ -580,6 +580,11 @@ public sealed partial class MainWindow
         var noun = SelectedCourseNoun();
         SectionMenu.Title = SubjectMenuLayout.Title(SubjectMenuLayout.Menu.Section, noun);
         ClassesMenu.Title = SubjectMenuLayout.Title(SubjectMenuLayout.Menu.Classes, noun);
+        // And its items say meeting in a club (#1027): only the words change.
+        foreach (var item in Enum.GetValues<Item>())
+            if (SubjectMenuLayout.TitleSayingTheNoun(item, noun) is { } words
+                && _ruled.TryGetValue(item, out var drawn) && drawn is MenuFlyoutItem titled)
+                titled.Text = words;
 
         // Ctrl+Shift+O sits on the ONE Open in Obsidian item that can be live.
         bool onSection = situation.Row == Row.Section;

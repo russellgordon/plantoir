@@ -143,7 +143,7 @@ public sealed class UndoFilesContractTests : IDisposable
                     case "undid": Assert.Equal(AssistWording.UndidFromTheMenu(description), answer.Summary); break;
                     case "undidPartly": Assert.Equal(AssistWording.UndidPartlyFromTheMenu(description, leftAlone), answer.Summary); break;
                     case "couldNotUndo": Assert.StartsWith(AssistWording.CouldNotUndoFromTheMenu(description, leftAlone), answer.Summary); break;
-                    case "nothingToUndo": Assert.Equal(AssistWording.NothingToUndoFromTheMenu, answer.Summary); break;
+                    case "nothingToUndo": Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class), answer.Summary); break;
                     default: Assert.Fail($"{label}: unknown sentence {sentence}"); break;
                 }
 

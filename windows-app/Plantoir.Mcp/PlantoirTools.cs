@@ -1867,7 +1867,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // The Section menu's undo speaks in its own voice (#489): nobody said
         // "undo that", and its way out is Section ▸ Undo Last Change.
         bool menu = workspace.SpeaksFromTheMenu;
-        string nothingToUndo = menu ? AssistWording.NothingToUndoFromTheMenu : AssistWording.NothingToUndo;
+        string nothingToUndo = menu ? workspace.NothingToUndoFromTheMenu() : AssistWording.NothingToUndo;
         string stillAvailable = menu ? AssistWording.UndoIsStillAvailableFromTheMenu : AssistWording.UndoIsStillAvailable;
         if (workspace.History is not { } history)
             return Answering(nothingToUndo);

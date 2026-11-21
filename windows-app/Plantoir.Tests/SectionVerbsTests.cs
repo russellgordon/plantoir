@@ -259,7 +259,7 @@ public class SectionVerbsTests : IDisposable
         Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — took the last change back", File.ReadAllText(_trail));
 
         var third = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1, SubjectMenuLayout.Menu.Section);
-        Assert.Equal(AssistWording.NothingToUndoFromTheMenu, third.Summary);
+        Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class), third.Summary);
         Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — changed nothing", File.ReadAllText(_trail));
         Assert.NotEqual(third.Summary, second.Summary);
     }

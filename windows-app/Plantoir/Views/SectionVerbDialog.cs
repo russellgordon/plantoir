@@ -135,7 +135,7 @@ internal sealed class SectionVerbDialog
     /// in a club), and the words it is drawn with there.
     /// </summary>
     internal static string MenuPath(Item item, ClassNoun noun) =>
-        SubjectMenuLayout.MenuContaining(item) is not null && SubjectMenuLayout.TitleHere(item) is { } title
+        SubjectMenuLayout.MenuContaining(item) is not null && SubjectMenuLayout.TitleHere(item, noun) is { } title
             ? SubjectMenuLayout.Path(item, title, noun)
             : item.ToString();
 

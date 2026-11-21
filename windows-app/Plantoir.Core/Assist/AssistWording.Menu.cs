@@ -66,9 +66,9 @@ public static partial class AssistWording
     /// Undo Last Change with nothing to undo — greyed in the menu, so this is
     /// said only when the change went away between drawing the menu and the click.
     /// </summary>
-    /// <remarks>It names the menus as an ordinary course titles them, "Section or Classes", even in a club. The course is known when the item runs, so that is not why: the item and this sentence leave with #899 U7 (Windows' W11b) in the same milestone, and no interim state is built for it (#990 review 3, low 1). If U7 or W11b slips out of v2.0.0, this must name the Meetings menu in a club.</remarks>
-    public static string NothingToUndoFromTheMenu =>
-        $"Nothing has been changed from the {Plantoir.Core.Models.SubjectMenuLayout.EitherMenu(Plantoir.Core.Models.ClassNoun.Class)} menu in this window yet, so there is nothing to undo. Anything older is in Plantoir's Backups list.";
+    /// <remarks>It names the menus as the selected section's course titles them (#1027): "the Section or Meetings menu" in a club, the contract's <c>nothingToUndoFromTheMeetingsMenu</c>. The window sends the course in the call's <c>_meta</c> (<see cref="AssistWorkspace.CourseMetaKey"/>).</remarks>
+    public static string NothingToUndoFromTheMenu(Plantoir.Core.Models.ClassNoun noun) =>
+        $"Nothing has been changed from the {Plantoir.Core.Models.SubjectMenuLayout.EitherMenu(noun)} menu in this window yet, so there is nothing to undo. Anything older is in Plantoir's Backups list.";
 
     /// <summary>The section changed while its copy was being saved, so the plan no longer fits.</summary>
     public static string ChangedWhileSavingACopyFromTheMenu(string course, string section) =>

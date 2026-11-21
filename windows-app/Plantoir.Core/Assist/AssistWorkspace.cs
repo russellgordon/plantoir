@@ -3355,6 +3355,20 @@ public sealed partial class AssistWorkspace
     /// <summary>The key in a tools/call request's <c>_meta</c> that names the menu (its contract name).</summary>
     public const string MenuMetaKey = "plantoirMenu";
 
+    /// <summary>
+    /// On the menu's server: the course of the section the running item was
+    /// chosen on (#1027), from the call's <c>_meta</c> (<see cref="CourseMetaKey"/>),
+    /// set for one call by <c>plantoir-mcp</c>'s filter; null otherwise.
+    /// </summary>
+    public string? MenuCourseOfTheCall { get; set; }
+
+    /// <summary>The key in a tools/call request's <c>_meta</c> that names the selected section's course.</summary>
+    public const string CourseMetaKey = "plantoirCourse";
+
+    /// <summary>Undo Last Change's nothing-to-undo from the menu, naming the menus as the selected section's course's menu bar does (#1027).</summary>
+    public string NothingToUndoFromTheMenu() =>
+        AssistWording.NothingToUndoFromTheMenu(MenuCourseOfTheCall is { } code ? NounForCourse(code) : ClassNoun.Class);
+
     /// <summary>The menu named by a <c>_meta</c> value, or Section.</summary>
     public static SubjectMenuLayout.Menu MenuNamed(string? contractName) =>
         Enum.GetValues<SubjectMenuLayout.Menu>().FirstOrDefault(menu => SubjectMenuLayout.ContractName(menu) == contractName);

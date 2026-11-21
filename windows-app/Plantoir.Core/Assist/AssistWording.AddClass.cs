@@ -142,13 +142,15 @@ public static class AddClassWords
     public static string PickClassToDuplicate(ClassNoun noun) =>
         $"Choose the {Singular(noun)} to copy. The copy becomes the next {Singular(noun)}, dated for this section's next {Singular(noun)} day, and starts hidden. Nothing else moves.";
 
+    /// <summary>
+    /// The item named where the menu bar has it: Classes ▸ Class Dates…, or
+    /// Meetings ▸ Meeting Dates… in a club (#1027), from the layout.
+    /// </summary>
     public static string NeedsClassDatesFirst(ClassNoun noun)
     {
-        string menu = SubjectMenuLayout.Title(SubjectMenuLayout.MenuContaining(SubjectMenuRules.Item.ClassDates) ?? SubjectMenuLayout.Menu.Classes, noun);
-        string first = $"This section has no {Singular(noun)} dates on file, so nothing was copied.";
-        return noun == ClassNoun.Meeting
-            ? $"{first} Add them from the {menu} menu, then try again."
-            : $"{first} Add them with {menu} ▸ Class Dates…, then try again.";
+        var item = SubjectMenuRules.Item.ClassDates;
+        string path = SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleSayingTheNoun(item, noun)!, noun);
+        return $"This section has no {Singular(noun)} dates on file, so nothing was copied. Add them with {path}, then try again.";
     }
 
     public static string UnitWordRenameUnfinished(ClassNoun noun) =>

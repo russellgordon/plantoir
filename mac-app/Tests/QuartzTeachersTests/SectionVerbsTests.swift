@@ -757,7 +757,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         let third: AssistToolOutcome = await verbs.perform(
             SectionVerbs.undoLastChange(), item: .undoLastChange, courseCode: "ICS3U", sectionNumber: 1
         )
-        XCTAssertEqual(third.summary, AssistWording.nothingToUndoFromTheMenu)
+        XCTAssertEqual(third.summary, AssistWording.nothingToUndoFromTheMenu(noun: .class))
     }
 
     /// #555, `undoFiles.presses` row 2 through the real runner: a repeat

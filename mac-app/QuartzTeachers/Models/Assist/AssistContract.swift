@@ -670,7 +670,9 @@ enum AssistContract {
             "undidPartlyFromTheMenu": AssistWording.undidPartlyFromTheMenu(changePlaceholder, leftAlone: 2),
             "couldNotUndoFromTheMenu": AssistWording.couldNotUndoFromTheMenu(changePlaceholder, leftAlone: 2),
             "undoIsStillAvailableFromTheMenu": AssistWording.undoIsStillAvailableFromTheMenu,
-            "nothingToUndoFromTheMenu": AssistWording.nothingToUndoFromTheMenu,
+            "nothingToUndoFromTheMenu": AssistWording.nothingToUndoFromTheMenu(noun: .class),
+            // #1027: in a club, the menus as its menu bar titles them.
+            "nothingToUndoFromTheMeetingsMenu": AssistWording.nothingToUndoFromTheMenu(noun: .meeting),
             "changedWhileSavingACopyFromTheMenu": AssistWording.changedWhileSavingACopyFromTheMenu(
                 course: course, section: section
             ),

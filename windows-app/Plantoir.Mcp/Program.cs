@@ -158,6 +158,8 @@ builder.Services.AddMcpServer(options =>
         // time on the menu's server, and back to Section after it.
         workspace.MenuOfTheChange = AssistWorkspace.MenuNamed(
             context.Params?.Meta?[AssistWorkspace.MenuMetaKey]?.GetValue<string>());
+        // #1027: the selected section's course, for a sentence with no course of its own.
+        workspace.MenuCourseOfTheCall = context.Params?.Meta?[AssistWorkspace.CourseMetaKey]?.GetValue<string>();
         CallToolResult result;
         try
         {
@@ -168,7 +170,11 @@ builder.Services.AddMcpServer(options =>
                 ? copy
                 : await next(context, cancellation);
         }
-        finally { workspace.MenuOfTheChange = Plantoir.Core.Models.SubjectMenuLayout.Menu.Section; }
+        finally
+        {
+            workspace.MenuOfTheChange = Plantoir.Core.Models.SubjectMenuLayout.Menu.Section;
+            workspace.MenuCourseOfTheCall = null;
+        }
         return PlantoirTools.AfterCall(workspace, topBefore, Text(arguments, "course"), Number(arguments, "section"), result);
     }));
 

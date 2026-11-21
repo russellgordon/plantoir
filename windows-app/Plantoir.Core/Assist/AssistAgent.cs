@@ -70,6 +70,13 @@ public interface IHearsTheMenu
 {
     /// <summary>The menu's contract name ("section", "classes"), or null to send none.</summary>
     string? MenuOfTheNextCalls { get; set; }
+
+    /// <summary>
+    /// The course of the section the item was chosen on (#1027), or null to
+    /// send none: a sentence with no course of its own, Undo Last Change's
+    /// nothing-to-undo, names the menus as that course's menu bar titles them.
+    /// </summary>
+    string? CourseOfTheNextCalls { get; set; }
 }
 
 public interface IToolServer

@@ -85,6 +85,13 @@ final class AssistToolRunner {
     /// Section or Classes. Section otherwise.
     var menuMakingTheChange: SubjectMenuLayout.Menu = .section
 
+    /// On `.menu`: the course of the section the running item was chosen
+    /// on, set by `SectionVerbs.perform` for the length of one call (#1027),
+    /// so a sentence with no course of its own, Undo Last Change's "nothing
+    /// to undo", names the menus as that course's menu bar titles them (the
+    /// Section or Meetings menu in a club). nil otherwise.
+    var menuSelectedCourseCode: String?
+
     /// Where the courses are.
     private let workspace: WorkspaceModel
 
@@ -2865,7 +2872,9 @@ final class AssistToolRunner {
         // The Section menu's undo is not a conversation (#457 batch B): its
         // sentences are the `…FromTheMenu` twins, chosen here.
         let fromTheMenu: Bool = surface == .menu
-        let nothingToUndo: String = fromTheMenu ? AssistWording.nothingToUndoFromTheMenu : AssistWording.nothingToUndo
+        let nothingToUndo: String = fromTheMenu
+            ? AssistWording.nothingToUndoFromTheMenu(noun: classNoun(ofCourse: menuSelectedCourseCode ?? ""))
+            : AssistWording.nothingToUndo
         let stillAvailable: String = fromTheMenu
             ? AssistWording.undoIsStillAvailableFromTheMenu : AssistWording.undoIsStillAvailable
         if history.isEmpty {

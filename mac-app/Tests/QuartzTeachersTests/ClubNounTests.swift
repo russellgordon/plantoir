@@ -204,6 +204,152 @@ final class ClubNounTests: XCTestCase {
         XCTAssertTrue(ordinary.contains("the Section or Classes menu"), ordinary)
     }
 
+    // MARK: - The menus' items in a club (#1027)
+
+    /// `subjectMenus.layout.itemTitles` → `items`: each item whose title
+    /// says class, as a course titles it and as a club does.
+    private func itemTitlesInTheContract() throws -> [String: [String: String]] {
+        let layout: [String: Any] = try SubjectMenuLayoutTests.layout()
+        let itemTitles: [String: Any] = try XCTUnwrap(layout["itemTitles"] as? [String: Any])
+        return try XCTUnwrap(itemTitles["items"] as? [String: [String: String]])
+    }
+
+    /// Every item of Section ▸ and Classes ▸, the submenu's included.
+    private func everyItemOfTheTwoMenus() -> [SubjectMenuRules.Item] {
+        var items: [SubjectMenuRules.Item] = []
+        for menu in SubjectMenuLayout.Menu.allCases {
+            for group in SubjectMenuLayout.groups(of: menu) {
+                for entry in group {
+                    switch entry {
+                    case .item(let item):
+                        items.append(item)
+                    case .submenu(let submenu):
+                        items.append(contentsOf: SubjectMenuLayout.items(of: submenu))
+                    }
+                }
+            }
+        }
+        return items
+    }
+
+    /// Russell's ruling on #1027 (2026-11-20, night): in a club the
+    /// Meetings menu's items say meeting. Each item the contract lists is
+    /// drawn with its `title` in a course and its `titleForAMeeting` in a
+    /// club, in the menu bar and in a section row's menu (both read
+    /// `SectionMenu.title`); every other item of the two menus says neither
+    /// class nor meeting and has one title in every course, so the list is
+    /// complete. MUST FAIL with any club title put back to its class words,
+    /// or a new item that says class left out of the list.
+    func testEveryItemTitleSaysMeetingInAClub() throws {
+        let listed: [String: [String: String]] = try itemTitlesInTheContract()
+        XCTAssertEqual(listed.count, 5)
+        for item in everyItemOfTheTwoMenus() {
+            let asAClass: String? = SectionMenu.title(for: item, noun: .class)
+            let asAMeeting: String? = SectionMenu.title(for: item, noun: .meeting)
+            if let titles = listed[item.rawValue] {
+                XCTAssertEqual(asAClass, titles["title"], item.rawValue)
+                XCTAssertEqual(asAMeeting, titles["titleForAMeeting"], item.rawValue)
+                XCTAssertEqual(SubjectMenuLayout.titleSayingTheNoun(of: item, noun: .meeting), titles["titleForAMeeting"])
+                XCTAssertEqual(SubjectMenuLayout.titleSayingTheNoun(of: item, noun: .class), titles["title"])
+                XCTAssertTrue(saysClass(asAClass ?? ""), item.rawValue)
+                XCTAssertTrue((asAMeeting ?? "").contains("Meeting"), item.rawValue)
+                XCTAssertTrue((asAMeeting ?? "").hasSuffix("…"), "\(item.rawValue) lost its ellipsis")
+            } else {
+                XCTAssertEqual(asAMeeting, asAClass, "\(item.rawValue) changes with the noun and is not in the contract")
+                XCTAssertNil(SubjectMenuLayout.titleSayingTheNoun(of: item, noun: .meeting), item.rawValue)
+            }
+            XCTAssertFalse(saysClass(asAMeeting ?? ""), "\(item.rawValue) says class in a club: \(asAMeeting ?? "")")
+        }
+        for name in listed.keys {
+            let item: SubjectMenuRules.Item? = SubjectMenuRules.Item(rawValue: name)
+            XCTAssertNotNil(item, "\(name) is no item")
+            if let item {
+                XCTAssertNotNil(SubjectMenuLayout.menu(containing: item), "\(name) is in neither menu")
+            }
+        }
+    }
+
+    /// The trail's "ran from a menu" line names the item as the club's menu
+    /// bar draws it (`itemTitles` → `ranFromAMenuCases`). MUST FAIL with the
+    /// path's item title read in the ordinary noun.
+    func testTheRanFromAMenuPathSaysMeetingInAClub() throws {
+        let layout: [String: Any] = try SubjectMenuLayoutTests.layout()
+        let itemTitles: [String: Any] = try XCTUnwrap(layout["itemTitles"] as? [String: Any])
+        let cases: [[String: String]] = try XCTUnwrap(itemTitles["ranFromAMenuCases"] as? [[String: String]])
+        XCTAssertGreaterThanOrEqual(cases.count, 4)
+        for testCase in cases {
+            let item: SubjectMenuRules.Item = try XCTUnwrap(SubjectMenuRules.Item(rawValue: testCase["item"] ?? ""))
+            let noun: ClassNoun = try XCTUnwrap(ClassNoun(rawValue: testCase["noun"] ?? ""))
+            XCTAssertEqual(SectionVerbs.menuPath(of: item, noun: noun), testCase["path"])
+            XCTAssertEqual(
+                SectionVerbs.ranLine(item, ending: "carried out", counts: "", noun: noun),
+                (testCase["path"] ?? "") + " — carried out"
+            )
+        }
+    }
+
+    /// Every club sentence that names one of the items names it as the
+    /// club's menu bar does: where the ordinary twin says "Classes ▸ Class
+    /// Dates…", the club's says "Meetings ▸ Meeting Dates…" (#1027). Walks
+    /// every club key of the contract's wording, the `…ForAMeeting` keys and
+    /// the two `…MeetingsMenu` ones. MUST FAIL with a club sentence that
+    /// points at "the Meetings menu" without the item's title, as before
+    /// #1027.
+    func testEveryClubSentenceNamesTheItemAsTheClubsMenuBarDoes() throws {
+        let wording: [String: Any] = try XCTUnwrap(AssistContract.wording()["wording"] as? [String: Any])
+        let listed: [String: [String: String]] = try itemTitlesInTheContract()
+        var pairs: [(club: String, ordinary: String)] = []
+        for key in wording.keys {
+            if key.hasSuffix("ForAMeeting") {
+                pairs.append((key, String(key.dropLast("ForAMeeting".count))))
+            } else if key.hasSuffix("FromTheMeetingsMenu") {
+                pairs.append((key, String(key.dropLast("FromTheMeetingsMenu".count)) + "FromTheMenu"))
+            }
+        }
+        XCTAssertTrue(pairs.contains { pair in pair.club == "nothingToUndoFromTheMeetingsMenu" })
+        var namesAnItem: Int = 0
+        for pair in pairs {
+            let club: String = try XCTUnwrap(wording[pair.club] as? String, pair.club)
+            let ordinary: String = try XCTUnwrap(wording[pair.ordinary] as? String, "\(pair.club) has no \(pair.ordinary)")
+            for (name, titles) in listed {
+                let item: SubjectMenuRules.Item = try XCTUnwrap(SubjectMenuRules.Item(rawValue: name))
+                let ordinaryPath: String = SectionVerbs.menuPath(of: item, noun: .class)
+                if ordinary.contains(ordinaryPath) {
+                    namesAnItem += 1
+                    let clubPath: String = SectionVerbs.menuPath(of: item, noun: .meeting)
+                    XCTAssertTrue(clubPath.hasSuffix(titles["titleForAMeeting"] ?? "?"), clubPath)
+                    XCTAssertTrue(club.contains(clubPath), "\(pair.club) does not say \(clubPath): \(club)")
+                }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(namesAnItem, 2)
+        XCTAssertEqual(
+            wording["nothingToUndoFromTheMeetingsMenu"] as? String, AssistWording.nothingToUndoFromTheMenu(noun: .meeting)
+        )
+    }
+
+    /// Undo Last Change's "nothing to undo", from the menu on a club's
+    /// section, names the menus as the club's menu bar titles them (#1027:
+    /// named from the selected section's course, like the rest). MUST FAIL
+    /// with the sentence read in the ordinary noun.
+    func testNothingToUndoOnAClubsSectionNamesTheMeetingsMenu() async throws {
+        let club = try makeClub(noun: .meeting)
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: club.root.appendingPathComponent("trail"))
+        defer {
+            ActivityTrail.store = previousTrail
+            SectionMenuActivity.reset()
+            try? FileManager.default.removeItem(at: club.root)
+        }
+        let verbs: SectionVerbs = SectionVerbs(folderPath: club.root.path, siteWork: StubSiteWork())
+        let nothing: AssistToolOutcome = await verbs.perform(
+            SectionVerbs.undoLastChange(), item: .undoLastChange, courseCode: club.course.code, sectionNumber: 1
+        )
+        XCTAssertEqual(nothing.summary, AssistWording.nothingToUndoFromTheMenu(noun: .meeting))
+        XCTAssertTrue(nothing.summary.contains("the Section or Meetings menu"), nothing.summary)
+        XCTAssertFalse(saysClass(nothing.summary), nothing.summary)
+    }
+
     // MARK: - What the window offers a club
 
     /// The sentence the declined-dates answer tells a club to say is one the

@@ -117,8 +117,10 @@ final class SectionVerbs {
         let changesBefore: Int = toolRunner.changeCount
         let writesBefore: Int = toolRunner.writesWithNoNewUndoEntry
         toolRunner.menuMakingTheChange = SubjectMenuLayout.menu(containing: item) ?? .section
+        toolRunner.menuSelectedCourseCode = courseCode
         let outcome: AssistToolOutcome = await toolRunner.run(call: call)
         toolRunner.menuMakingTheChange = .section
+        toolRunner.menuSelectedCourseCode = nil
         let changesAfter: Int = toolRunner.changeCount
         let writesAfter: Int = toolRunner.writesWithNoNewUndoEntry
         lastChange = currentLastChange()
@@ -215,9 +217,10 @@ final class SectionVerbs {
     /// Where the item is, the way a teacher would say it: the menu that
     /// holds it, from `SubjectMenuLayout` (#990: Section or Classes), and
     /// the title it is drawn with there, under the menu's title for a course
-    /// whose class pages are called `noun` (Meetings ▸ in a club).
+    /// whose class pages are called `noun`: "Meetings ▸ Add Meeting…" in a
+    /// club (#990, #1027).
     static func menuPath(of item: SubjectMenuRules.Item, noun: ClassNoun) -> String {
-        guard SubjectMenuLayout.menu(containing: item) != nil, let title = SectionMenu.title(for: item) else {
+        guard SubjectMenuLayout.menu(containing: item) != nil, let title = SectionMenu.title(for: item, noun: noun) else {
             return item.rawValue
         }
         return SubjectMenuLayout.path(of: item, titled: title, noun: noun)

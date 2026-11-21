@@ -19,6 +19,9 @@ public sealed class ClubNounTests : IDisposable
 {
     private readonly string _folder = Directory.CreateTempSubdirectory("club-noun").FullName;
 
+    /// <summary>The workspace the last <see cref="Club"/> made.</summary>
+    private AssistWorkspace? _workspace;
+
     public void Dispose()
     {
         try { Directory.Delete(_folder, recursive: true); } catch { }
@@ -43,6 +46,7 @@ public sealed class ClubNounTests : IDisposable
             ? text.Replace("\"class_noun\": \"meeting\"", "\"class_noun_unused\": \"x\"")
             : text.Replace("\"class_noun\": \"meeting\"", $"\"class_noun\": \"{noun}\"");
         File.WriteAllText(config, text);
+        _workspace = workspace;
         return new PlantoirTools(workspace);
     }
 
@@ -209,5 +213,113 @@ public sealed class ClubNounTests : IDisposable
         var refused = Club("meeting").PlanAddNextClass("ICS3U", 1, "next");
         Assert.Equal(NextClassPlanner.NoUnitsInANumberedCourse("ICS3U", "Week"), ModelCopy(refused));
         Assert.Null(refused.Meta?[AssistToolAnswer.TeacherSummaryKey]);
+    }
+
+    // ---- The menus' items in a club (#1027) --------------------------------------------
+
+    private static JsonNode ItemTitles => SubjectMenusContractTests.Rule["layout"]!["itemTitles"]!;
+
+    private static readonly System.Text.RegularExpressions.Regex SaysClass = new(@"\b[Cc]lass(es)?\b");
+
+    /// <summary>
+    /// Russell's ruling on #1027: in a club the Meetings menu's items say
+    /// meeting. Every item of Section ▸ and Classes ▸ the contract lists has its
+    /// <c>title</c> in a course and its <c>titleForAMeeting</c> in a club (the
+    /// menu bar and a section row's menu both read <see cref="SubjectMenuLayout.TitleHere"/>);
+    /// every other item says neither and has one title, so the list is
+    /// complete. The mac's <c>testEveryItemTitleSaysMeetingInAClub</c>.
+    /// MUST FAIL with a club title put back to its class words.
+    /// </summary>
+    [Fact]
+    public void EveryItemTitleSaysMeetingInAClub()
+    {
+        var listed = ItemTitles["items"]!.AsObject();
+        Assert.Equal(5, listed.Count);
+        foreach (var menu in Enum.GetValues<SubjectMenuLayout.Menu>())
+            foreach (var group in SubjectMenuLayout.Groups(menu))
+                foreach (var entry in group)
+                {
+                    if (entry is not SubjectMenuLayout.Entry.OfItem(var item)) continue;
+                    string? asAClass = SubjectMenuLayout.TitleHere(item, ClassNoun.Class);
+                    string? asAMeeting = SubjectMenuLayout.TitleHere(item, ClassNoun.Meeting);
+                    if (listed[SubjectMenuRules.ContractName(item)] is { } titles)
+                    {
+                        Assert.Equal(titles["title"]!.ToString(), asAClass);
+                        Assert.Equal(titles["titleForAMeeting"]!.ToString(), asAMeeting);
+                    }
+                    else
+                    {
+                        Assert.Equal(asAClass, asAMeeting);
+                        Assert.Null(SubjectMenuLayout.TitleSayingTheNoun(item, ClassNoun.Meeting));
+                    }
+                    Assert.DoesNotMatch(SaysClass, asAMeeting ?? "");
+                }
+        foreach (var (name, _) in listed)
+            Assert.Contains(Enum.GetValues<SubjectMenuRules.Item>(), item => SubjectMenuRules.ContractName(item) == name
+                                                                    && SubjectMenuLayout.MenuContaining(item) is not null);
+    }
+
+    /// <summary>The trail's "ran from a menu" path names the item as the club's menu bar draws it (<c>ranFromAMenuCases</c>). MUST FAIL with the path read in the ordinary noun.</summary>
+    [Fact]
+    public void TheRanFromAMenuPathSaysMeetingInAClub()
+    {
+        var cases = ItemTitles["ranFromAMenuCases"]!.AsArray();
+        Assert.True(cases.Count >= 4);
+        foreach (var c in cases)
+        {
+            var item = Enum.GetValues<SubjectMenuRules.Item>().Single(i => SubjectMenuRules.ContractName(i) == c!["item"]!.ToString());
+            var noun = ClassPageSchemes.NounReading(c!["noun"]!.ToString());
+            Assert.Equal(c["path"]!.ToString(), Plantoir.Core.Models.SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleHere(item, noun)!, noun));
+        }
+    }
+
+    /// <summary>
+    /// Every club sentence that names one of the items names it as the club's
+    /// menu bar does: where the ordinary twin says "Classes ▸ Class Dates…", the
+    /// club's says "Meetings ▸ Meeting Dates…". Walks every <c>…ForAMeeting</c>
+    /// and <c>…FromTheMeetingsMenu</c> key of the contract's wording.
+    /// </summary>
+    [Fact]
+    public void EveryClubSentenceNamesTheItemAsTheClubsMenuBarDoes()
+    {
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        int namesAnItem = 0;
+        foreach (var (key, value) in wording)
+        {
+            string? ordinaryKey = key.EndsWith("ForAMeeting", StringComparison.Ordinal) ? key[..^"ForAMeeting".Length]
+                : key.EndsWith("FromTheMeetingsMenu", StringComparison.Ordinal) ? key[..^"FromTheMeetingsMenu".Length] + "FromTheMenu"
+                : null;
+            if (ordinaryKey is null) continue;
+            string club = value!.ToString();
+            string ordinary = wording[ordinaryKey]!.ToString();
+            foreach (var (name, _) in ItemTitles["items"]!.AsObject())
+            {
+                var item = Enum.GetValues<SubjectMenuRules.Item>().Single(i => SubjectMenuRules.ContractName(i) == name);
+                string ordinaryPath = SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleHere(item, ClassNoun.Class)!, ClassNoun.Class);
+                if (!ordinary.Contains(ordinaryPath)) continue;
+                namesAnItem++;
+                Assert.Contains(SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleHere(item, ClassNoun.Meeting)!, ClassNoun.Meeting), club);
+            }
+        }
+        Assert.True(namesAnItem >= 2, $"{namesAnItem} club sentences name an item");
+        Assert.Equal(wording["menuNeedsClassDatesFirstForAMeeting"]!.ToString(), AssistWording.NeedsClassDatesFirst(ClassNoun.Meeting));
+    }
+
+    /// <summary>
+    /// Undo Last Change's nothing-to-undo from the menu on a club's section
+    /// names the Section or Meetings menu: the window sends the section's
+    /// course in the call's <c>_meta</c> (#1027). MUST FAIL with the sentence
+    /// read in the ordinary noun.
+    /// </summary>
+    [Fact]
+    public void NothingToUndoOnAClubsSectionNamesTheMeetingsMenu()
+    {
+        Club("meeting");
+        var workspace = _workspace!;
+        workspace.MenuCourseOfTheCall = "ICS3U";
+        Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Meeting), workspace.NothingToUndoFromTheMenu());
+        Assert.Contains("the Section or Meetings menu", workspace.NothingToUndoFromTheMenu());
+        workspace.MenuCourseOfTheCall = null;
+        Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class), workspace.NothingToUndoFromTheMenu());
     }
 }

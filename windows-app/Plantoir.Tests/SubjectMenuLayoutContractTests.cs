@@ -119,11 +119,11 @@ public class SubjectMenuLayoutContractTests
                 foreach (var entry in group)
                     if (entry is SubjectMenuLayout.Entry.OfItem(var item))
                     {
-                        Assert.False(string.IsNullOrEmpty(SubjectMenuLayout.TitleHere(item)), $"{item} is in {menu} with no words");
+                        Assert.False(string.IsNullOrEmpty(SubjectMenuLayout.TitleHere(item, ClassNoun.Class)), $"{item} is in {menu} with no words");
                         ids.Add(SubjectMenuLayout.AutomationIdHere(menu, item));
                     }
         Assert.Equal(ids.Count, ids.Distinct().Count());
-        Assert.Null(SubjectMenuLayout.TitleHere(Item.Rename));
+        Assert.Null(SubjectMenuLayout.TitleHere(Item.Rename, ClassNoun.Class));
     }
 
     /// <summary>
@@ -151,7 +151,8 @@ public class SubjectMenuLayoutContractTests
         }
         Assert.Equal("Section or Classes", SubjectMenuLayout.EitherMenu(ClassNoun.Class));
         Assert.Equal("Section or Meetings", SubjectMenuLayout.EitherMenu(ClassNoun.Meeting));
-        Assert.Contains("the Section or Classes menu", AssistWording.NothingToUndoFromTheMenu);
+        Assert.Contains("the Section or Classes menu", AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class));
+        Assert.Contains("the Section or Meetings menu", AssistWording.NothingToUndoFromTheMenu(ClassNoun.Meeting));
         Assert.Contains("the Section or Classes menu", AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1", ClassNoun.Class));
         Assert.Contains("the Section or Meetings menu", AssistWording.SectionIsChangingFromTheMenu("CODING", "1", ClassNoun.Meeting));
     }
@@ -175,11 +176,11 @@ public class SubjectMenuLayoutContractTests
     {
         Assert.Equal("Classes ▸ Class Dates…", SubjectMenuLayout.Path(Item.ClassDates, "Class Dates…", ClassNoun.Class));
         Assert.Equal("Classes ▸ Add Class…", SubjectMenuLayout.Path(Item.AddClass, "Add Class…", ClassNoun.Class));
-        Assert.Equal("Meetings ▸ Add Class…", SubjectMenuLayout.Path(Item.AddClass, "Add Class…", ClassNoun.Meeting));
+        Assert.Equal("Meetings ▸ Add Meeting…", SubjectMenuLayout.Path(Item.AddClass, "Add Meeting…", ClassNoun.Meeting));
         Assert.Equal("Section ▸ Publish Pages…", SubjectMenuLayout.Path(Item.PublishPages, "Publish Pages…", ClassNoun.Class));
         Assert.Equal("Rename", SubjectMenuLayout.Path(Item.Rename, "Rename", ClassNoun.Class));
         // A club's trail names its menus as its menu bar does (#990, 2026-11-20 evening).
-        Assert.Equal("Meetings ▸ Class Dates…", SubjectMenuLayout.Path(Item.ClassDates, "Class Dates…", ClassNoun.Meeting));
+        Assert.Equal("Meetings ▸ Meeting Dates…", SubjectMenuLayout.Path(Item.ClassDates, "Meeting Dates…", ClassNoun.Meeting));
         Assert.Equal("Section ▸ Publish Pages…", SubjectMenuLayout.Path(Item.PublishPages, "Publish Pages…", ClassNoun.Meeting));
     }
 

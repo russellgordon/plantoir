@@ -1812,11 +1812,14 @@ struct SidebarView: View {
         if !course.isKeptForReference {
             sectionVerbItem("Publish Pages…", .publishPages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Hide Pages…", .hidePages, course: course, sectionNumber: sectionNumber, row: row)
-            sectionVerbItem("Publish Class for a Date…", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
+            // Titled as the menu bar titles them, from `SectionMenu.title`:
+            // Publish Meeting for a Date… and Add Meeting… in a club (#1027).
+            let noun: ClassNoun = course.configuration.classNoun
+            sectionVerbItem(SectionMenu.title(for: .publishClassForADate, noun: noun) ?? "", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
             // #897: Add Class… is here as well as in the Section menu, in the
             // place Add Next Class had (Russell, 2026-11-13 night). The
             // request reaches `performVerb`, which opens the same sheet.
-            sectionVerbItem("Add Class…", .addClass, course: course, sectionNumber: sectionNumber, row: row)
+            sectionVerbItem(SectionMenu.title(for: .addClass, noun: noun) ?? "", .addClass, course: course, sectionNumber: sectionNumber, row: row)
             Divider()
         }
         // One item or the other, never a

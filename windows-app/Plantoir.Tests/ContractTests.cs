@@ -311,6 +311,9 @@ public class ContractTests
                      AssistWording.PagesAChangeCouldNotFinishFromTheMenuNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
         Assert.Equal(wording["sectionIsChangingFromTheMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMenu("{course}", "{section}", ClassNoun.Class));
         Assert.Equal(wording["sectionIsChangingFromTheMeetingsMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMeetingsMenu("{course}", "{section}"));
+        // #1027: named from the selected section's course, the Meetings menu in a club.
+        Assert.Equal(wording["nothingToUndoFromTheMenu"]!.ToString(), AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class));
+        Assert.Equal(wording["nothingToUndoFromTheMeetingsMenu"]!.ToString(), AssistWording.NothingToUndoFromTheMenu(ClassNoun.Meeting));
         Assert.Equal(wording["menuPublishPagesTitle"]!.ToString(), AssistWording.MenuPublishPagesTitle("{course}", "{section}"));
         Assert.Equal(wording["menuHidePagesTitle"]!.ToString(), AssistWording.MenuHidePagesTitle("{course}", "{section}"));
         Pair("menuPublishClassTitle", AssistWording.MenuPublishClassTitle("{course}", "{section}"),

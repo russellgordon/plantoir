@@ -292,9 +292,19 @@ public sealed class SectionVerbs : IAsyncDisposable
                 var runner = _runnerFor(course, section, progress is null ? server : new Relaying(server, progress));
                 runner.PreviewFollowsAChange = previewFollows;
                 if (server is IHearsTheMenu hears)
+                {
                     hears.MenuOfTheNextCalls = SubjectMenuLayout.ContractName(menu ?? SubjectMenuLayout.Menu.Section);
+                    hears.CourseOfTheNextCalls = course;   // #1027
+                }
                 try { (answer, _) = await runner.Run(call, cancellation); }
-                finally { if (server is IHearsTheMenu heard) heard.MenuOfTheNextCalls = null; }
+                finally
+                {
+                    if (server is IHearsTheMenu heard)
+                    {
+                        heard.MenuOfTheNextCalls = null;
+                        heard.CourseOfTheNextCalls = null;
+                    }
+                }
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
