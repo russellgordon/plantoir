@@ -74,9 +74,9 @@ public static partial class AssistWording
     public const string MenuDuplicateButton = "Duplicate";
 
     /// <summary>
-    /// A copy asked for after the section's class dates went missing. A club
-    /// is pointed at the menu by the title its menu bar gives it (Meetings,
-    /// #990), without Class Dates…'s own title, which says "class".
+    /// A copy asked for after the section's class dates went missing, naming
+    /// the item as the course's menu bar has it: Meetings ▸ Meeting Dates… in a
+    /// club (#990, #1027).
     /// </summary>
     public static string MenuNeedsClassDatesFirst => AddClassWords.NeedsClassDatesFirst(ClassNoun.Class);
     public static string MenuNeedsClassDatesFirstForAMeeting => AddClassWords.NeedsClassDatesFirst(ClassNoun.Meeting);

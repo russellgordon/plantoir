@@ -302,7 +302,7 @@ public sealed class ClubNounTests : IDisposable
             }
         }
         Assert.True(namesAnItem >= 2, $"{namesAnItem} club sentences name an item");
-        Assert.Equal(wording["menuNeedsClassDatesFirstForAMeeting"]!.ToString(), AssistWording.NeedsClassDatesFirst(ClassNoun.Meeting));
+        Assert.Equal(wording["menuNeedsClassDatesFirstForAMeeting"]!.ToString(), AddClassWords.NeedsClassDatesFirst(ClassNoun.Meeting));
     }
 
     /// <summary>
