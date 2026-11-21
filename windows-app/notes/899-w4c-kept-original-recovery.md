@@ -23,3 +23,14 @@ Branch `issue/899-w4c-kept-original-recovery`, on W6 (`origin/issue/899-w6-op-ki
 ### Where W7 connects
 
 Today's class's "Show on Front Page" does not go through the door on Windows yet (W7). The part-way outcome W7 needs is the door's `Refused` with `LeftPartWay`, then recovery, whose "undo kept what a page held" line names the kept file. The alert keys `keptTitle`, `kept` and `showKept` stay held until W7 wires the action and the alert is built from the measurement below.
+
+## For W7
+
+- **Pruning's tidy writes no folder line** (W6's final sweep, finding 3). `UndoJournal.TidyTheStagedFilesOf` (`UndoJournal.cs`, the prune's tidy, live only) passes no `onAside`, so a teacher's folder it puts back changed, or keeps as `<name> (kept by Undo)`, leaves no "undo found a folder set aside" line; the Mac writes one on every tidy (`UndoRecovery.swift`, `tidyStagedFiles`). Unreachable until a tree op goes through the door with the switch on; fix in W7, before then. (W4c made the same tidy keep only copies of kept originals.)
+- **Show on Front Page through the door** is W7's; the kept-file alert (`keptTitle`, `kept`, `showKept`) connects to the door's `Refused { LeftPartWay }` and recovery's "undo kept what a page held" line, and is built only once File Explorer has been measured on a desktop session (below).
+- The four U3c trail sentences are checked against `activityTrail.mustRecord`'s example lines by `UndoTrailWordsContractTests`, read from the JSON: if the Mac rewords "undo kept what it replaced" (its sweep found it untrue on one Mac path), that test goes red here until `UndoTrail.KeptWhatItReplacedWords` follows.
+
+## Not measured in this piece
+
+- **File Explorer and the kept file.** Not done: it needs the PC's desktop session (the SSH session cannot show or read Explorer's selection), and this piece ran out of its budget before a UI Automation probe could be written. So the alert's three keys stay held, and the brief's question (is the word "hidden" true on Windows, where a hard-link `-orig` shares its page's attributes and Explorer has no dot-file convention?) is open for W7's writer to measure first.
+- An online-only OneDrive placeholder as the unreadable kept original: the replays use a real deny entry on the PC's disk (outside and inside OneDrive), not a placeholder.

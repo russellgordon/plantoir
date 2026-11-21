@@ -16281,8 +16281,8 @@ rename or write; a place that leads outside is `changedSince`;
 `rule.stagedThenSwapped`, `stackCases`); and **a folder set aside is the
 teacher's own** (renamed back whenever its place is free, whatever it holds,
 and in the way when it changed; left untouched and recorded when its place
-is taken; the trail event `undo found a folder set aside`, held in
-`NamedGapLedger` under #899 until Windows writes Undo lines; `recoveryCases`
+is taken; the trail event `undo found a folder set aside`, written by
+recovery since W6 (one line before each rename); `recoveryCases`
 with `changeTheFolderSetAside` and `somethingInItsPlace`).
 
 Two more from the fourth review and Russell's ruling of 2026-11-19 bind
