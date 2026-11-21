@@ -1012,25 +1012,93 @@ public static class ActivityTrail
     public static void Note(Event @event, string what, DateTime? moment = null)
     {
         DateTime when = moment ?? DateTime.Now;
-        string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{DateText.Stamp(when)} · {safeWhat}";
-        Append(entry);
+        Append(SafeTrailLine($"{DateText.Stamp(when)} · {what}", keepingLineBreaks: false));
     }
 
+    /// <summary>A line about one course: <see cref="Place"/> puts the course,
+    /// and the section when one was named, in front of <paramref name="what"/>.</summary>
     public static void Note(Event @event, string what, string course, int section, DateTime? moment = null)
     {
         DateTime when = moment ?? DateTime.Now;
-        string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{DateText.Stamp(when)} · {course}/{section} · {safeWhat}";
-        Append(entry);
+        Append(SafeTrailLine($"{DateText.Stamp(when)} · {Place(course, section)}{what}", keepingLineBreaks: false));
     }
 
+    /// <summary>
+    /// The assistant's question: a stamped line naming the course, then the
+    /// teacher's sentence on ONE line behind <see cref="PromptPrefix"/>
+    /// (<c>courseNameCharacters.trailLines.promptCases</c>, #821). The
+    /// sentence is put on one line before it goes behind the prefix, so a
+    /// sentence on two lines can no longer put its second line on the trail
+    /// with no prefix, where a report sent with the prompts left out still
+    /// carried it. The record's own line break between its two lines stays.
+    /// </summary>
     public static void NotePrompt(string prompt, string course, int section, DateTime? moment = null)
     {
-        DateTime when = moment ?? DateTime.Now;
-        string safePrompt = LogRedactor.Redacting(prompt.Trim());
-        string entry = $"{DateText.Stamp(when)} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
-        Append(entry);
+        Append(PromptRecord(prompt, course, section, moment ?? DateTime.Now));
+    }
+
+    /// <summary>The record <see cref="NotePrompt"/> writes, without writing it.</summary>
+    public static string PromptRecord(string prompt, string course, int section, DateTime moment)
+    {
+        string head = OneLineText.Cleaned($"{DateText.Stamp(moment)} · {Place(course, section)}asked a question");
+        string asked = PromptPrefix + OneLineText.Cleaned(prompt).Trim();
+        return SafeTrailLine(head + "\n" + asked, keepingLineBreaks: true);
+    }
+
+    /// <summary>
+    /// What goes in front of a line about one course: <c>ICS3U/2 · </c> for a
+    /// section, <c>ICS3U · </c> when no section was named, and nothing when
+    /// there is no course either (<c>shared-rules.json</c> →
+    /// <c>activityTrail.lineShape.placeCases</c>, #946, the mac's #879 and its
+    /// <c>ActivityTrail.place</c>). A section is numbered from 1, so 0 or less
+    /// is "none was named": a line that names no section used to be written
+    /// <c>ICS3U/0</c>, a section that does not exist. Every trail line about
+    /// a course gets its place here, from the window, the headless door and
+    /// the built-in assistant alike; no caller builds its own.
+    /// </summary>
+    public static string Place(string course, int section)
+    {
+        string trimmedCourse = course.Trim();
+        if (trimmedCourse.Length == 0) return "";
+        if (section <= 0) return $"{trimmedCourse} · ";
+        return $"{trimmedCourse}/{section} · ";
+    }
+
+    /// <summary>
+    /// <paramref name="line"/> as the trail may hold it: one line (unless
+    /// <paramref name="keepingLineBreaks"/>) and redacted
+    /// (<c>courseNameCharacters.trailLines.order</c>, #821, the mac's
+    /// <c>ProblemReportStore.safeTrailLine</c>). Every line this file writes
+    /// goes through here and nowhere else.
+    ///
+    /// <para>A line with nothing to clean is redacted once, as it always was.
+    /// A line that holds a control is redacted, cleaned, and redacted again.
+    /// The first pass takes a secret with a control INSIDE it whole (the
+    /// redactor's <c>\S+</c> reads a NUL, an ESC or a DEL as part of the
+    /// value; cleaning first turned it into a space and the tail was written:
+    /// <c>Bearer abc123</c> NUL <c>SECRETTAIL</c>). The second pass takes a
+    /// secret a control was HIDING (a NUL after <c>Bearer</c>, an isolate
+    /// inside <c>CLOUDFLARE_API_TOKEN</c>, an override before an email's
+    /// <c>@</c>). Each order alone leaks one shape; both together leak
+    /// neither, and redacting twice changes nothing
+    /// (<c>problemReportRedaction.redactedAgainCases</c>).</para>
+    ///
+    /// <para><b>Not caught by any order</b> (<c>trailLines.knownLimits</c>,
+    /// written down so nobody believes the trail catches them, and not
+    /// tested as passing): a rule that matches a run of particular
+    /// characters (an email, a Netlify token, an account ID, the
+    /// 40-character run) cut short by a control in the middle of the value,
+    /// and <c>labelledSecret</c> / <c>bearerHeader</c> when that control is
+    /// white space to the redactor (tab, LF, CR, VT, FF, U+0085, U+2028,
+    /// U+2029).</para>
+    /// </summary>
+    public static string SafeTrailLine(string line, bool keepingLineBreaks)
+    {
+        string cleanedLine = OneLineText.Cleaned(line, keepingLineBreaks);
+        if (cleanedLine == line) return LogRedactor.Redacting(line);
+        string redactedOnce = LogRedactor.Redacting(line);
+        string cleanedAfterRedacting = OneLineText.Cleaned(redactedOnce, keepingLineBreaks);
+        return LogRedactor.Redacting(cleanedAfterRedacting);
     }
 
     /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
@@ -1109,7 +1177,7 @@ public static class ActivityTrail
 
     /// <summary>A line written with its own wait for the writers' lock; true when it was written.</summary>
     private static bool Note(Event @event, string what, TimeSpan lockWait, bool capsThisProcess) =>
-        Append($"{DateText.Stamp(DateTime.Now)} · {LogRedactor.Redacting(what)}", lockWait, capsThisProcess);
+        Append(SafeTrailLine($"{DateText.Stamp(DateTime.Now)} · {what}", keepingLineBreaks: false), lockWait, capsThisProcess);
 
     /// <summary>The close line's words; the contract's <c>line</c> is this with reason "quit by the teacher".</summary>
     public static string ClosedLine(QuitConfirmation.ClosingReason reason, int processId) =>
