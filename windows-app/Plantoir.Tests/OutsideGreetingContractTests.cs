@@ -213,108 +213,161 @@ public sealed class OutsideGreetingContractTests : IDisposable
         Assert.Empty(ReferenceCoursesToMention.ReadFor("\0 not a path", "ICS3U", today));
     }
 
-    // ---- greetingMustSay (#791, Windows' half) --------------------------------
+    // ---- greetingMustSay, by key and where (#791, #946) -------------------------
+
+    /// <summary>The three variants <c>greetingMustSayHow</c> names.</summary>
+    private static readonly (string Name, string Code, string CourseName, string[] References, bool UnitPlansTold)[] Variants =
+    {
+        ("a name that differs from the code", "MUSTSAY_A", "Grade 11 Computer Science", Array.Empty<string>(), false),
+        ("a reference course and no unit plan yet", "MUSTSAY_B", "Grade 11 Computer Science", new[] { "MUSTSAY_B-2025 (2025–26)" }, true),
+        ("a name that is the code", "MUSTSAY_C", "MUSTSAY_C", Array.Empty<string>(), false),
+    };
 
     /// <summary>
-    /// Every <c>greetingMustSay</c> entry that names a key, as
-    /// <c>(greetingXxx…)</c>, names one under <c>outsideAgents</c>. A STRING
-    /// key is said verbatim in every Revise greeting the cases above build,
-    /// and the handouts sentence also in every Fix with… and Plan a Unit…
-    /// message (its entry says "on every door"). <c>greetingReferenceCourses</c>
-    /// and <c>greetingUnitPlans</c> are lists of cases walked elsewhere in this
-    /// suite (<see cref="TheReferenceCasesAreTheGreetingOfEveryDoor"/>,
-    /// <c>UnitPlansGreetingTests</c>); here it is checked that they have cases.
-    /// The entries that name no key (the course by code and name, the plantoir
-    /// tools, listing the sections, the plan tool first) are carried by the
-    /// whole-text equality of <see cref="TheHandoutsCasesAreTheGreetingOfEveryDoor"/>.
-    /// A key named that this test does not know how to check FAILS, so a new
-    /// entry is read rather than skipped.
+    /// Each <c>greetingMustSay</c> entry's <c>key</c> and <c>where</c>, checked
+    /// as <c>greetingMustSayHow</c> defines each <c>where</c>, over the greeting
+    /// each Windows door really passes (its <c>Prepare</c>'s last argument), in
+    /// the three variants it names (#946 item 3, the mac's
+    /// <c>testEveryDoorsGreetingSaysWhatTheContractSays</c>). A <c>where</c>
+    /// this test does not know FAILS. A door the contract lists and Windows
+    /// does not have yet (GitHub Copilot) is held open by name in
+    /// <see cref="NamedGapLedger"/> until #884, so <see cref="Doors"/> leaves
+    /// it out rather than this test failing on the count. The handouts
+    /// sentence's "on every door" is checked on Fix with… and Plan a Unit…
+    /// too.
     /// </summary>
     [Fact]
-    public void EveryKeyTheGreetingMustSayIsSaid()
+    public void EveryDoorsGreetingSaysWhatTheContractSaysWhereItSays()
     {
         var outside = OutsideAgents();
-        var entries = Strings(outside["greetingMustSay"]);
-        Assert.NotEmpty(entries);
-        var keys = entries.SelectMany(e => Regex.Matches(e, @"\((greeting[A-Za-z]+)").Select(m => m.Groups[1].Value)).Distinct().ToList();
-        Assert.Contains("greetingHandoutsSentence", keys);
-        var revise = ReviseGreetings();
-        foreach (string key in keys)
+        var entries = outside["greetingMustSay"]!.AsArray();
+        Assert.True(entries.Count >= 8, entries.Count.ToString(CultureInfo.InvariantCulture));
+        string withName = outside["greetingOpening"]!["withName"]!.ToString();
+        string withoutName = outside["greetingOpening"]!["withoutName"]!.ToString();
+        string planFirst = outside["greetingPlanFirstSentence"]!.ToString();
+        string handouts = outside["greetingHandoutsSentence"]!.ToString();
+        string noUnitPlanYet = outside["greetingUnitPlans"]!["none"]!.ToString();
+        string referencesTemplate = outside["greetingReferenceCourses"]!["sentence"]!.ToString();
+        string referencesSeparator = outside["greetingReferenceCourses"]!["separator"]!.ToString();
+        string referencesFirstWords = referencesTemplate.Split("{course}")[0];
+        Assert.NotEqual("", referencesFirstWords);
+
+        var doors = Doors();
+        int checkedGreetings = 0;
+        foreach (var (door, prepare, _) in doors)
         {
-            var node = outside[key];
-            Assert.True(node is not null, $"greetingMustSay names {key}, which outsideAgents does not have");
-            switch (key)
+            foreach (var variant in Variants)
             {
-                case "greetingReferenceCourses":
-                    Assert.NotEmpty(node!["cases"]!.AsArray());
-                    Assert.NotEmpty(node["listCases"]!.AsArray());
-                    break;
-                case "greetingUnitPlans":
-                    Assert.NotEmpty(outside["greetingUnitPlansCases"]!["cases"]!.AsArray());
-                    break;
-                default:
-                    Assert.True(node is JsonValue, $"greetingMustSay names {key}, which this test does not know how to check");
-                    string sentence = node!.ToString();
-                    foreach (string greeting in revise)
-                        Assert.True(greeting.Contains(sentence, StringComparison.Ordinal), $"{key} is not in: {greeting}");
-                    break;
+                string label = door + ", " + variant.Name;
+                var plans = variant.UnitPlansTold ? new UnitPlans.Reading(Array.Empty<UnitPlans.Plan>(), 0) : null;
+                string greeting = prepare(variant.Code, variant.CourseName, plans, null, variant.References).Arguments[^1];
+                checkedGreetings++;
+                foreach (var entry in entries)
+                {
+                    string key = entry!["key"]!.ToString();
+                    string where = entry["where"]!.ToString();
+                    Assert.True(outside[key] is not null, $"{label}: greetingMustSay names {key}, which the contract does not carry");
+                    switch (where)
+                    {
+                        case "first":
+                            string expected = variant.CourseName.Length > 0 && variant.CourseName != variant.Code
+                                ? withName.Replace("{courseName}", variant.CourseName)
+                                : withoutName;
+                            expected = expected.Replace("{course}", variant.Code);
+                            Assert.True(greeting.StartsWith(expected + " ", StringComparison.Ordinal), $"{label}: {key}\n{greeting}");
+                            break;
+                        case "contains":
+                            Assert.True(greeting.Contains(outside[key]!.ToString(), StringComparison.Ordinal), $"{label}: {key}\n{greeting}");
+                            break;
+                        case "afterPlanFirst":
+                            Assert.True(greeting.Contains(planFirst + " " + outside[key]!.ToString(), StringComparison.Ordinal), $"{label}: {key}\n{greeting}");
+                            break;
+                        case "whenReferenceCourses":
+                            if (variant.References.Length == 0)
+                            {
+                                Assert.False(greeting.Contains(referencesFirstWords, StringComparison.Ordinal), $"{label}: {key}\n{greeting}");
+                            }
+                            else
+                            {
+                                string sentence = referencesTemplate.Replace("{course}", variant.Code)
+                                    .Replace("{courses}", string.Join(referencesSeparator, variant.References));
+                                Assert.True(greeting.Contains(sentence, StringComparison.Ordinal), $"{label}: {key}\n{greeting}");
+                            }
+                            break;
+                        case "last":
+                            if (variant.UnitPlansTold)
+                            {
+                                Assert.True(greeting.EndsWith(" " + noUnitPlanYet, StringComparison.Ordinal), $"{label}: {key}\n{greeting}");
+                            }
+                            else
+                            {
+                                Assert.False(greeting.Contains(noUnitPlanYet, StringComparison.Ordinal), $"{label}: {key}\n{greeting}");
+                                Assert.True(greeting.EndsWith(handouts, StringComparison.Ordinal), $"{label}: {key}\n{greeting}");
+                            }
+                            break;
+                        default:
+                            Assert.Fail($"{label}: greetingMustSay has a 'where' this suite does not know: {where}");
+                            break;
+                    }
+                }
             }
         }
-        string handouts = outside["greetingHandoutsSentence"]!.ToString();
+        Assert.Equal(doors.Count * Variants.Length, checkedGreetings);
         foreach (string message in FixMessages().Concat(PlanAUnitMessages()))
             Assert.True(message.Contains(handouts, StringComparison.Ordinal), $"no handouts sentence in: {message}");
     }
 
-    // ---- No greeting offers a held skill (#791's ruling) ---------------------
+    // ---- What no greeting may say (#791's ruling, #946) ------------------------
 
     /// <summary>
-    /// Russell's ruling on #791 (2026-11-13): no greeting mentions marking,
-    /// class results or report-card comments. The words are
-    /// <c>shared-rules.json</c> → <c>printablePages.agentGuidance.held.words</c>,
-    /// matched as <c>scripts/test_held_skills.py</c> matches them, over every
-    /// message the doors COMPOSE (that script reads sources and contract
-    /// strings, never a greeting built from a course name, the reference list
-    /// and unit names). The C# matcher is first proved on the contract's own
-    /// <c>mustTrip</c> and <c>mustPass</c> sentences.
+    /// Russell's ruling on #791 (2026-11-13, restated from #750): no greeting
+    /// mentions marking, class results or report-card comments. The words'
+    /// permanent home is <c>app-rules.json</c> → <c>outsideAgents.greetingMustNotSay</c>:
+    /// case-insensitive regular expressions, proved first on the contract's
+    /// own <c>mustMatch</c> (each caught by some expression) and
+    /// <c>mustNotMatch</c> (caught by none), the mac's
+    /// <c>testTheGreetingsForbiddenExpressionsCatchTheirCases</c>; then matched
+    /// over every message the doors compose. It moved here from
+    /// <c>printablePages.agentGuidance.held.words</c> (#946), which
+    /// <c>held.whenTheyReturn</c> deletes while the ruling stays.
     /// </summary>
-    /// <remarks>
-    /// <c>held.words</c> lasts only while the skills are held
-    /// (<c>held.whenTheyReturn</c> deletes the block), and the ruling is
-    /// permanent. So a missing block FAILS here, naming #791, rather than
-    /// passing with nothing to look for: the words need a lasting home first.
-    /// </remarks>
     [Fact]
-    public void NoGreetingOffersAHeldSkill()
+    public void NoGreetingSaysWhatTheContractForbids()
     {
-        var words = ContractLoader.LoadJson("shared-rules.json")["printablePages"]?["agentGuidance"]?["held"]?["words"];
-        Assert.True(words?["bySkill"] is JsonObject { Count: > 0 },
-            "printablePages.agentGuidance.held.words.bySkill is gone: the words a greeting must never say need a permanent home "
-            + "before the held block is deleted (GitHub #791), and this test must then read them there");
-        var patterns = words!["bySkill"]!.AsObject()
-            .SelectMany(pair => pair.Value!.AsArray().Select(p => new Regex(p!.ToString(), RegexOptions.IgnoreCase)))
-            .ToList();
-        var allowed = Strings(words["allowed"]);
+        var mustNotSay = OutsideAgents()["greetingMustNotSay"]!;
+        var expressions = Strings(mustNotSay["expressions"]).Select(p => new Regex(p, RegexOptions.IgnoreCase)).ToList();
+        Assert.NotEmpty(expressions);
 
-        string? Offers(string text)
+        string? Says(string text)
         {
-            string folded = Folded(text);
-            foreach (string sentence in allowed) folded = folded.Replace(Folded(sentence), " ");
-            foreach (var pattern in patterns)
-                if (pattern.Match(folded) is { Success: true } match) return match.Value;
+            foreach (var expression in expressions)
+                if (expression.Match(text) is { Success: true } match) return match.Value;
             return null;
         }
 
-        foreach (string sentence in Strings(words["mustTrip"])) Assert.True(Offers(sentence) is not null, $"not caught: {sentence}");
-        foreach (string sentence in Strings(words["mustPass"])) Assert.True(Offers(sentence) is null, $"caught: {sentence}");
+        var mustMatch = Strings(mustNotSay["mustMatch"]);
+        var mustNotMatch = Strings(mustNotSay["mustNotMatch"]);
+        Assert.NotEmpty(mustMatch);
+        Assert.NotEmpty(mustNotMatch);
+        foreach (string sentence in mustMatch) Assert.True(Says(sentence) is not null, $"not caught: {sentence}");
+        foreach (string sentence in mustNotMatch) Assert.True(Says(sentence) is null, $"caught: '{Says(sentence)}' in {sentence}");
 
-        var every = ReviseGreetings().Concat(FixMessages()).Concat(PlanAUnitMessages()).Concat(UnitPlanGreetings()).ToList();
+        var every = ReviseGreetings().Concat(VariantGreetings()).Concat(FixMessages()).Concat(PlanAUnitMessages()).Concat(UnitPlanGreetings()).ToList();
         Assert.True(every.Count >= 3 + 4 + 9 + 6 + 18, every.Count.ToString(CultureInfo.InvariantCulture));
         foreach (string text in every)
-            Assert.True(Offers(text) is null, $"'{Offers(text)}' in: {text}");
+            Assert.True(Says(text) is null, $"'{Says(text)}' in: {text}");
     }
 
-    private static string Folded(string text) =>
-        string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    private static IReadOnlyList<string> VariantGreetings()
+    {
+        var greetings = new List<string>();
+        foreach (var (_, prepare, _) in Doors())
+            foreach (var variant in Variants)
+                greetings.Add(prepare(variant.Code, variant.CourseName,
+                    variant.UnitPlansTold ? new UnitPlans.Reading(Array.Empty<UnitPlans.Plan>(), 0) : null,
+                    null, variant.References).Arguments[^1]);
+        return greetings;
+    }
 
     // ---- The messages the cases build -----------------------------------------
 

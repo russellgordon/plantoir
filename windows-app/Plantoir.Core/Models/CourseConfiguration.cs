@@ -112,6 +112,11 @@ public sealed class CourseConfiguration
         var (written, kept, replaced) = onDisk is null || lastRead is null
             ? ((JObject)_values.DeepClone(), new List<string>(), new List<string>())
             : Merged(lastRead, onDisk, _values);
+        // Every Save writes the name cleaned, whatever was edited (#821, the
+        // mac's write(to:)): the per-key merge above keeps the FILE's value
+        // for a key this copy did not change, which would keep a raw name.
+        if (written["course_name"] is JValue { Type: JTokenType.String } storedName)
+            written["course_name"] = OneLineText.CourseName((string)storedName!);
         byte[] data = Serialize(written);
         string temp = path + ".tmp";
         File.WriteAllBytes(temp, data);
@@ -363,8 +368,11 @@ public sealed class CourseConfiguration
 
     public string CourseName
     {
-        get => StringValue("course_name");
-        set => _values["course_name"] = value;
+        // Cleaned where it is read and where it is set (#821, the mac's #780):
+        // a control character becomes a space and a bidirectional control is
+        // removed, by shared-rules.json → courseNameCharacters. Not trimmed.
+        get => OneLineText.CourseName(StringValue("course_name"));
+        set => _values["course_name"] = OneLineText.CourseName(value);
     }
 
     public string CustomShortName

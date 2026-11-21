@@ -234,4 +234,23 @@ public class ActivityTrailWiringTests
                 $"RecordedThroughAHelper says {helper} records {ev}, and ActivityTrail no longer has it.");
         }
     }
+    /// <summary>
+    /// No product file builds a course's place by hand (<c>{code} · </c>):
+    /// every line about a course gets it from <see cref="ActivityTrail.Place"/>
+    /// (#946, lane E review 1, L1). Only ActivityTrail.cs itself writes the shape.
+    /// </summary>
+    [Fact]
+    public void NoCallerBuildsACoursesPlaceByHand()
+    {
+        var handBuilt = new Regex(@"\{[A-Za-z_.]*(\.Code|CourseCode)\} · ");
+        var found = new List<string>();
+        foreach (string path in ProductFiles())
+        {
+            if (Path.GetFileName(path) == "ActivityTrail.cs") continue;
+            string[] lines = File.ReadAllLines(path);
+            for (int i = 0; i < lines.Length; i++)
+                if (handBuilt.IsMatch(lines[i])) found.Add($"{Path.GetFileName(path)}:{i + 1}");
+        }
+        Assert.True(found.Count == 0, "A place built by hand instead of ActivityTrail.Place: " + string.Join(", ", found));
+    }
 }
