@@ -545,6 +545,34 @@ class ContractCaseTests(unittest.TestCase):
         for name in REFUSED_HERE_EDIT_JSON + REFUSED_HERE_CHECK:
             self.assertIn(name, names)
 
+    def test_the_number_limits_are_the_contracts_rule(self):
+        # undo.numberSpellingRule, the one rule Windows' UndoJson checks too.
+        rule = shared_undo()["numberSpellingRule"]
+        self.assertEqual(rule["exponentCharactersAtMost"], traces.MAC_EXPONENT_CHARACTERS_AT_MOST)
+        self.assertEqual(rule["digitsWithAnExponentAtMost"], traces.MEASURED_DIGITS_WITH_AN_EXPONENT)
+        self.assertEqual(rule["digitsWithoutAnExponentAtMost"], traces.MEASURED_DIGITS_WITHOUT_AN_EXPONENT)
+        self.assertGreaterEqual(len(shared_undo()["numberSpellingCases"]), 30)
+
+    def test_number_spelling_cases(self):
+        # Each spelling as the member a of {"a": <spelling>, "b": 1}: not JSON,
+        # cannot tell (read, never as measured), minus infinity, or the double.
+        for case in shared_undo()["numberSpellingCases"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(set(case), {"name", "spelling", "reads"})
+                data = ('{"a": ' + case["spelling"] + ', "b": 1}\n').encode("utf-8")
+                read = traces._mac_read(data)
+                reads = case["reads"]
+                if reads == "notJSON":
+                    self.assertIsNone(read)
+                    continue
+                self.assertIsNotNone(read)
+                if reads == "cannotTell":
+                    self.assertIsInstance(read["a"], traces._Unmeasured)
+                    continue
+                self.assertNotIsInstance(read["a"], traces._Unmeasured)
+                wanted = float("-inf") if reads == "minusInfinity" else reads
+                self.assertEqual(read["a"], wanted)
+
     def test_listing_cases(self):
         cases = shared_undo()["listingCases"]
         self.assertGreaterEqual(len(cases), 3)

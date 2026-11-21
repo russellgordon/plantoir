@@ -126,6 +126,10 @@ internal abstract class UndoJson
                 if (double.IsNaN(number)) return null;
                 if (!asTheMacReadsAFile) return double.IsInfinity(number) ? null : new Number(number);
                 string spelling = element.GetRawText();
+                // Measured (2026-11-20, #899 W6 review 3): an exponent written
+                // with more characters than the mac reads is a file the mac
+                // cannot read at all: not JSON, on both platforms.
+                if (!TheMacReadsTheExponent(spelling)) return null;
                 if (!SpellingIsMeasured(spelling)) return new Number(double.IsInfinity(number) ? 0 : number, measured: false);
                 // Measured (2026-11-20): the mac reads a number beyond a double's
                 // range as minus infinity when it is negative (-1e400, -1.8e308,
@@ -404,6 +408,39 @@ internal abstract class UndoJson
     }
 
     /// <summary>
+    /// The most characters the mac's reader takes after a number's <c>e</c>
+    /// or <c>E</c>, its sign and leading zeros included
+    /// (<c>undo.numberSpellingRule.exponentCharactersAtMost</c>). Measured on
+    /// macOS 26.7.3, 2026-11-20 (#899 W6 review 3): <c>1e0005</c>,
+    /// <c>1e+005</c> and <c>1e-999</c> are read; <c>1e00005</c>,
+    /// <c>1e+0005</c>, <c>1e-0001</c> and <c>0e99999</c> make the file one
+    /// the mac cannot read, whatever the value or the digits before it.
+    /// </summary>
+    internal const int MacExponentCharactersAtMost = 4;
+
+    /// <summary>The most digits a spelling with an exponent may have and be read here as the mac reads it (<c>undo.numberSpellingRule.digitsWithAnExponentAtMost</c>).</summary>
+    internal const int MeasuredDigitsWithAnExponent = 17;
+
+    /// <summary>The most digits a spelling without an exponent may have and be read here as the mac reads it (<c>undo.numberSpellingRule.digitsWithoutAnExponentAtMost</c>).</summary>
+    internal const int MeasuredDigitsWithoutAnExponent = 38;
+
+    /// <summary>
+    /// Whether the mac's reader reads a number's exponent at all
+    /// (<see cref="MacExponentCharactersAtMost"/>): a spelling with none, or
+    /// with at most that many characters after its <c>e</c> or <c>E</c>. A
+    /// file holding one it does not read is not JSON, so every editJSON op on
+    /// it is changed since and every move refused, on both platforms
+    /// (<c>undo.numberSpellingCases</c>, <c>undo.checkCases</c>).
+    /// </summary>
+    internal static bool TheMacReadsTheExponent(string spelling)
+    {
+        int marker = spelling.IndexOfAny(['e', 'E']);
+        if (marker < 0) return true;
+        int charactersAfterIt = spelling.Length - marker - 1;
+        return charactersAfterIt <= MacExponentCharactersAtMost;
+    }
+
+    /// <summary>
     /// Whether a file's spelling of a number is one this app is measured to
     /// read as the mac reads it (2026-11-20, on macOS 26.7.3, through the mac's
     /// reader): at most 17 digits with an exponent, at most 38 without, digits
@@ -413,9 +450,10 @@ internal abstract class UndoJson
     /// more than 17 digits, <c>1.2345678901234567890123e-5</c> is
     /// <c>1.2345678901234573e-05</c> there, not the nearest double; with more
     /// than 38, its reads disagree, and with 120 or more digits after the point
-    /// (or an exponent far from zero) it cannot read the file at all. A
-    /// spelling that is not measured makes the file "cannot tell"
-    /// (<see cref="HoldsOnlyMeasuredNumbers"/>, <c>undo.checkCases</c>).
+    /// it cannot read the file at all. A spelling that is not measured makes
+    /// the file "cannot tell" (<see cref="HoldsOnlyMeasuredNumbers"/>,
+    /// <c>undo.checkCases</c>). An exponent the mac does not read at all is
+    /// settled first, by <see cref="TheMacReadsTheExponent"/>: not JSON.
     /// </summary>
     internal static bool SpellingIsMeasured(string spelling)
     {
@@ -426,7 +464,7 @@ internal abstract class UndoJson
         string whole = (point >= 0 ? mantissa[..point] : mantissa).TrimStart('0');
         int fractionDigits = point >= 0 ? mantissa.Length - point - 1 : 0;
         int digits = whole.Length + fractionDigits;
-        return marker >= 0 ? digits <= 17 : digits <= 38;
+        return marker >= 0 ? digits <= MeasuredDigitsWithAnExponent : digits <= MeasuredDigitsWithoutAnExponent;
     }
 
     /// <summary>
@@ -442,8 +480,10 @@ internal abstract class UndoJson
     /// in 16-bit pieces as doubles, then divided by ten once per decimal place
     /// (every one of 30,000 such spellings of 18 to 38 digits agreed, bit for
     /// bit or, for a long spelling of zero, as the same number); every other
-    /// measured spelling is the nearest double (4,244 in fixed notation; 4,000
-    /// with an exponent and at most 17 digits, exponents -330 to 310). So
+    /// measured spelling is the nearest double (4,244 in fixed notation; with
+    /// an exponent and at most 17 digits, every exponent of 1 to 4 characters,
+    /// 13,330 of them, on 14 mantissas at a double's range's edges, and 200,000
+    /// random spellings, the mac's reader on macOS 26.7.3, #899 W6 review 3). So
     /// 0.00012339999999999999, the spelling of 0.0001234, reads as
     /// 0.00012340000000000002 there, and a member set to 0.0001234 is refused
     /// on both platforms (<c>undo.editJSONCases</c>).

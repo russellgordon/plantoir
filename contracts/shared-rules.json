@@ -50443,6 +50443,24 @@
         "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
       },
       {
+        "name": "editJSON: another member written 1e-0001, five characters after the e, which the mac cannot read: the file is not JSON there",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 1,
+          "after": 2
+        },
+        "current": {
+          "text": "{\"k\": 1, \"x\": 1e-0001}\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The mac's reader (JSONSerialization) cannot read this file, measured on macOS 26.7.3, 2026-11-20 (#899 W6 review 3; undo.numberSpellingRule), and a file that is not JSON is changed since, as in 'editJSON: the file is not JSON'."
+      },
+      {
         "name": "editJSON: text holding half of a surrogate pair (written \\ud800), which the mac cannot read: the file is not JSON there",
         "op": {
           "kind": "editJSON",
@@ -50967,6 +50985,200 @@
       }
     ],
     "editJSONCasesHow": "An editJSON move on the bytes of a file (file-formats.json -> undoJournal.opKinds.editJSON): file is the file's text, op the op (its before and after any JSON, a missing one meaning no such member), direction undo (towards before) or redo (towards after), and result the file's exact text afterwards, or null when the move is refused (as changed since). Both platforms must produce these bytes exactly: only the member's own bytes change, and a new value is spelled compactly with keys sorted.",
+    "numberSpellingRule": {
+      "exponentCharactersAtMost": 4,
+      "digitsWithAnExponentAtMost": 17,
+      "digitsWithoutAnExponentAtMost": 38,
+      "why": "Measured on macOS 26.7.3, 2026-11-20, through JSONSerialization.jsonObject on {\"a\": <n>, \"b\": 1} (#899 W6 review 3). The mac reads an exponent written with at most 4 characters after the e or E, its sign and leading zeros included (1e0005, 1e+005, 1e-999, 0e9999), and cannot read the file when there are more (1e00005, 1e+0005, 1e-0001, 1e-1000, 0e99999), whatever the value or the digits before it: 103,528 of 103,528 random spellings with 5 to 7 such characters could not be read. Within that, a spelling with at most 17 digits (counted from the first that is not a leading zero of the integer part) is the nearest double, minus infinity below a double's range and not readable above it: every exponent of 1 to 4 characters (13,330) on 14 mantissas at the range's edges, and 200,000 random spellings, every one agreeing. More digits than that with an exponent, or more than 38 without, the mac reads as a decimal number or not at all: cannot tell, or not JSON where it is the exponent the mac cannot read."
+    },
+    "numberSpellingCasesHow": "What the mac's reader (Foundation's JSONSerialization) takes from a number a JSON file spells with an exponent, measured on macOS 26.7.3, 2026-11-20 (#899 W6 review 3), and so what both platforms take from it when they judge or move an editJSON member: spelling is the number, read as the member a of the file {\"a\": <spelling>, \"b\": 1}; reads is notJSON (the mac cannot read the file, so it is not one JSON object: every editJSON op on it is changed since and every move refused, as undo.checkCases 'editJSON: the file is not JSON'), cannotTell (the mac reads a decimal number that Windows and the Python model are not measured to copy: there the file is cannot tell, never judged or moved; these rows are not the mac's own answer), minusInfinity, or the double read. The rule (numberSpellingRule) holds for every spelling, and both runners check their own constants against it as well as every row.",
+    "numberSpellingCases": [
+      {
+        "name": "1e-0001: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e-0001",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e-1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e-1000",
+        "reads": "notJSON"
+      },
+      {
+        "name": "-1e-1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "-1e-1000",
+        "reads": "notJSON"
+      },
+      {
+        "name": "0e-1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "0e-1000",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e-0999: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e-0999",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1.5e+0010: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1.5e+0010",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e+1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e+1000",
+        "reads": "notJSON"
+      },
+      {
+        "name": "-1e+1000: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "-1e+1000",
+        "reads": "notJSON"
+      },
+      {
+        "name": "0e99999: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "0e99999",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e00005: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1e00005",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1E-0005: 5 characters after the E, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1E-0005",
+        "reads": "notJSON"
+      },
+      {
+        "name": "12345678901234567e+0001: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "12345678901234567e+0001",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1.23456789012345678e-00005: 6 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1.23456789012345678e-00005",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e0005: 4 characters after the e, read as the nearest double, 100000.0",
+        "spelling": "1e0005",
+        "reads": 100000.0
+      },
+      {
+        "name": "1e+005: 4 characters after the e, read as the nearest double, 100000.0",
+        "spelling": "1e+005",
+        "reads": 100000.0
+      },
+      {
+        "name": "1e-005: 4 characters after the e, read as the nearest double, 1e-05",
+        "spelling": "1e-005",
+        "reads": 1e-05
+      },
+      {
+        "name": "1e0001: 4 characters after the e, read as the nearest double, 10.0",
+        "spelling": "1e0001",
+        "reads": 10.0
+      },
+      {
+        "name": "2.5E0002: 4 characters after the E, read as the nearest double, 250.0",
+        "spelling": "2.5E0002",
+        "reads": 250.0
+      },
+      {
+        "name": "1e-999: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "1e-999",
+        "reads": 0.0
+      },
+      {
+        "name": "-1e-999: 4 characters after the e, read as the nearest double, -0.0",
+        "spelling": "-1e-999",
+        "reads": -0.0
+      },
+      {
+        "name": "0.1e-998: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "0.1e-998",
+        "reads": 0.0
+      },
+      {
+        "name": "0e9999: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "0e9999",
+        "reads": 0.0
+      },
+      {
+        "name": "1e-400: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "1e-400",
+        "reads": 0.0
+      },
+      {
+        "name": "-1e999: below a double's range, which the mac reads as minus infinity",
+        "spelling": "-1e999",
+        "reads": "minusInfinity"
+      },
+      {
+        "name": "-1e9999: below a double's range, which the mac reads as minus infinity",
+        "spelling": "-1e9999",
+        "reads": "minusInfinity"
+      },
+      {
+        "name": "1e999: above a double's range, which the mac cannot read: the file is not JSON",
+        "spelling": "1e999",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1e9999: above a double's range, which the mac cannot read: the file is not JSON",
+        "spelling": "1e9999",
+        "reads": "notJSON"
+      },
+      {
+        "name": "4.9406564584124654e-324: 4 characters after the e, read as the nearest double, 5e-324",
+        "spelling": "4.9406564584124654e-324",
+        "reads": 5e-324
+      },
+      {
+        "name": "2.4703282292062328e-324: 4 characters after the e, read as the nearest double, 5e-324",
+        "spelling": "2.4703282292062328e-324",
+        "reads": 5e-324
+      },
+      {
+        "name": "2.4703282292062327e-324: 4 characters after the e, read as the nearest double, 0.0",
+        "spelling": "2.4703282292062327e-324",
+        "reads": 0.0
+      },
+      {
+        "name": "1.7976931348623157e308: 3 characters after the e, read as the nearest double, 1.7976931348623157e+308",
+        "spelling": "1.7976931348623157e308",
+        "reads": 1.7976931348623157e+308
+      },
+      {
+        "name": "17976931348623157e292: 3 characters after the e, read as the nearest double, 1.7976931348623157e+308",
+        "spelling": "17976931348623157e292",
+        "reads": 1.7976931348623157e+308
+      },
+      {
+        "name": "1.7976931348623159e308: above a double's range, which the mac cannot read: the file is not JSON",
+        "spelling": "1.7976931348623159e308",
+        "reads": "notJSON"
+      },
+      {
+        "name": "-1.7976931348623159e308: below a double's range, which the mac reads as minus infinity",
+        "spelling": "-1.7976931348623159e308",
+        "reads": "minusInfinity"
+      },
+      {
+        "name": "12345678901234567e-005: 4 characters after the e, read as the nearest double, 123456789012.34567",
+        "spelling": "12345678901234567e-005",
+        "reads": 123456789012.34567
+      },
+      {
+        "name": "1.2345678901234567e-0330: 5 characters after the e, its sign included, which the mac cannot read: the file is not JSON",
+        "spelling": "1.2345678901234567e-0330",
+        "reads": "notJSON"
+      },
+      {
+        "name": "1.23456789012345678e-5: 18 digits with an exponent, which the mac reads as a decimal number Windows does not copy: cannot tell",
+        "spelling": "1.23456789012345678e-5",
+        "reads": "cannotTell"
+      }
+    ],
     "stackCases": [
       {
         "name": "three steps: the newest is the head",

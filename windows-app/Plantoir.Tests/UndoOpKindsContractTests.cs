@@ -143,6 +143,64 @@ public sealed class UndoOpKindsContractTests : IDisposable
         Assert.False(UndoJson.SpellingIsMeasured("12345678901234567890.1234567890123456789"));
     }
 
+    public static IEnumerable<object[]> NumberSpellingCases() =>
+        UndoContract.Undo.GetProperty("numberSpellingCases").EnumerateArray().Select(row => new object[] { row.GetProperty("name").GetString()! });
+
+    /// <summary>
+    /// The limits this app reads numbers within are the contract's one rule
+    /// (<c>undo.numberSpellingRule</c>, measured through the mac's reader),
+    /// the same numbers the Python model checks.
+    /// </summary>
+    [Fact]
+    public void TheNumberLimitsAreTheContractsRule()
+    {
+        JsonElement rule = UndoContract.Undo.GetProperty("numberSpellingRule");
+        Assert.Equal(rule.GetProperty("exponentCharactersAtMost").GetInt32(), UndoJson.MacExponentCharactersAtMost);
+        Assert.Equal(rule.GetProperty("digitsWithAnExponentAtMost").GetInt32(), UndoJson.MeasuredDigitsWithAnExponent);
+        Assert.Equal(rule.GetProperty("digitsWithoutAnExponentAtMost").GetInt32(), UndoJson.MeasuredDigitsWithoutAnExponent);
+        Assert.True(UndoContract.Undo.GetProperty("numberSpellingCases").GetArrayLength() >= 30);
+    }
+
+    /// <summary>
+    /// A number a file spells with an exponent is read here as the mac's
+    /// reader reads it, or the file is refused as the case says: not JSON
+    /// (no member, and a move on another member refused), cannot tell (read
+    /// but not measured, and a move refused), minus infinity, or the double.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(NumberSpellingCases))]
+    public void EveryNumberSpellingCase(string name)
+    {
+        JsonElement row = Named("numberSpellingCases", name);
+        OnlyKeys(row, "name", "spelling", "reads");
+        string spelling = row.GetProperty("spelling").GetString()!;
+        byte[] file = Encoding.UTF8.GetBytes("{\"a\": " + spelling + ", \"b\": 1}\n");
+        UndoJson.Members? read = UndoJsonMember.TopLevel(file);
+        var given = new JsonObject { ["kind"] = "editJSON", ["path"] = "course_config.json", ["keyPath"] = new JsonArray("b"), ["before"] = 1, ["after"] = 2 };
+        using JsonDocument opDocument = JsonDocument.Parse(given.ToJsonString());
+        byte[]? moved = UndoJsonMember.Moved(UndoFormat.ReadOp(opDocument.RootElement), file, backward: false);
+        JsonElement reads = row.GetProperty("reads");
+        string expected = reads.ValueKind == JsonValueKind.Number ? "aNumber" : reads.GetString()!;
+        switch (expected)
+        {
+            case "notJSON":
+                Assert.Null(read);
+                Assert.Null(moved);
+                return;
+            case "cannotTell":
+                Assert.NotNull(read);
+                Assert.False(read!.HoldsOnlyMeasuredNumbers, spelling + " must not be read as measured");
+                Assert.Null(moved);
+                return;
+        }
+        Assert.NotNull(read);
+        UndoJson.Number number = Assert.IsType<UndoJson.Number>(read!.Items["a"]);
+        Assert.True(number.Measured, spelling + " must be read as measured");
+        double wanted = expected == "minusInfinity" ? double.NegativeInfinity : reads.GetDouble();
+        Assert.Equal(wanted, number.Value);
+        Assert.NotNull(moved);
+    }
+
     /// <summary>
     /// A file that starts with a UTF-8 byte-order mark is read as the mac's
     /// reader reads it (measured on the mac, 2026-11-20: its member judged as
