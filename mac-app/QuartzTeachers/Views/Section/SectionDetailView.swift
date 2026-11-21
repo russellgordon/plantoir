@@ -146,6 +146,10 @@ struct SectionDetailView: View {
     enum PreviewAlert: Equatable {
         case refusal(title: String, sentence: String)
         case todaysClass(TodaysClassOnTheFrontPage.Offer)
+        /// Purely informational, one OK (#899 U3c, Russell's ruling of
+        /// 2026-11-20, night): Yes to today's class went in, and what the
+        /// front page held a moment before is kept in the named hidden file.
+        case notice(title: String, sentence: String)
     }
 
     /// A refusal that arrived while the question about today's class was up
@@ -178,6 +182,12 @@ struct SectionDetailView: View {
     /// the question has gone — unless starting the preview had something to
     /// say first (the trail has both).
     @State var frontPageNotChanged: String?
+
+    /// The one alert naming the hidden file what the front page held a
+    /// moment before is kept in, when Show on Front Page went in part way
+    /// (Russell's ruling of 2026-11-20, night, on #899 U3c). Shown once the
+    /// question has gone; whatever the preview then says waits behind it.
+    @State var frontPageKept: PreviewAlert?
 
     /// A deploy that was set to happen on its own and did not get through.
     ///
@@ -1067,7 +1077,7 @@ struct SectionDetailView: View {
                         answerTodaysClass(offer, show: false)
                     }
                     .keyboardShortcut(.cancelAction)
-                case .refusal:
+                case .refusal, .notice:
                     Button("OK") { }
                 }
             } message: {
@@ -1823,7 +1833,7 @@ struct SectionDetailView: View {
 
     var previewAlertTitle: String {
         switch previewAlert {
-        case .refusal(let title, _):
+        case .refusal(let title, _), .notice(let title, _):
             return title
         case .todaysClass(let offer):
             return FrontPageWording.question(class: offer.classTitle)
@@ -1832,7 +1842,7 @@ struct SectionDetailView: View {
 
     var previewAlertMessage: String {
         switch previewAlert {
-        case .refusal(_, let sentence):
+        case .refusal(_, let sentence), .notice(_, let sentence):
             return sentence
         case .todaysClass(let offer):
             return FrontPageWording.because(noun: offer.noun.singular, shown: offer.shownTitle)
@@ -1881,6 +1891,25 @@ struct SectionDetailView: View {
             if !previewRunner.isRunning {
                 startPreview(at: pendingPreviewRequest)
             }
+        }
+        if let kept = frontPageKept {
+            // The kept file is named first, in its own alert; whatever the
+            // preview has just said, and anything held, is shown when it
+            // closes (this runs again then).
+            frontPageKept = nil
+            var waiting: PreviewAlert? = heldPreviewRefusal
+            if previewAlertIsUp {
+                if let earlier = waiting {
+                    waiting = SectionDetailView.joining(earlier, then: previewAlert)
+                } else {
+                    waiting = previewAlert
+                }
+            }
+            heldPreviewRefusal = waiting
+            frontPageNotChanged = nil
+            previewAlert = kept
+            previewAlertIsUp = true
+            return
         }
         if previewAlertIsUp, let held = heldPreviewRefusal {
             // The button's own preview was refused too: both are said, the
@@ -2058,8 +2087,14 @@ struct SectionDetailView: View {
         ActivityTrail.note(line.event, line.what, course: course.code, section: sectionNumber)
         switch outcome {
         case .shown, .shownKeepingWhatItHeld:
-            // A kept file is named on the trail line above; what the window
-            // should show of it waits on the HIG question in the U3c report.
+            if case .shownKeepingWhatItHeld(_, let shown, let keptOriginals) = outcome {
+                // One alert naming the kept file (Russell's ruling of
+                // 2026-11-20, night), shown once the question has gone.
+                frontPageKept = .notice(
+                    title: FrontPageWording.keptTitle(class: shown),
+                    sentence: FrontPageWording.kept(keptOriginals)
+                )
+            }
             refreshEditedMarker()
             // The teacher has just asked to change the FRONT page, so that
             // is what they are shown, even when they asked for the page last

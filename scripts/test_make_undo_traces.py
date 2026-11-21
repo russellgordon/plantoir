@@ -497,7 +497,8 @@ class ContractCaseTests(unittest.TestCase):
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside"}
+                  "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
+                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
     MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
@@ -675,6 +676,23 @@ class ContractCaseTests(unittest.TestCase):
                         last = ("applied", seq)
                     elif call == "removeContent":
                         model.content_removed = True
+                    elif call == "contentCannotBeStored":
+                        model.content_cannot_be_stored = True
+                    elif call == "keepTheOriginal":
+                        # The newest step's kept original of p1: what p1
+                        # held before its whole-file op (U3c).
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.kept.setdefault(p1, []).append(op["beforeText"])
+                    elif call == "changeTheKeptOriginal":
+                        for path in model.kept:
+                            model.kept[path] = [text + "A line added to the kept original.\n" for text in model.kept[path]]
+                    elif call == "foreignKeptOriginal":
+                        # Another list's kept original under the next step's
+                        # name: the model's pages and list never see it; the
+                        # Swift replay checks it is untouched.
+                        pass
                     elif call == "begin:dead@B":
                         path = folder_b + p1
                         after = flipped(path)
@@ -766,6 +784,11 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:
                     self.assertEqual(model.rederived, case["rederived"])
+                if "keptOriginalLeft" in case:
+                    foreign = "foreignKeptOriginal" in case["calls"]
+                    self.assertEqual(bool(model.kept) or foreign, case["keptOriginalLeft"])
+                if "keptWhatItReplacedLines" in case:
+                    self.assertEqual(model.kept_what_it_replaced_lines, case["keptWhatItReplacedLines"])
 
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;

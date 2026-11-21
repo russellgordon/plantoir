@@ -220,5 +220,50 @@ final class UndoShadowPublishTests: XCTestCase {
             ),
             examples[ActivityTrail.Event.undoRefusedForAChangeLeftPartWay.rawValue]
         )
+        XCTAssertEqual(
+            UndoTrail.keptAnOriginalLine(
+                course: "ICS3U", section: 1, phase: .begin,
+                keptOriginals: [".A.md.plantoir-undo-4-apply-orig"]
+            ),
+            examples[ActivityTrail.Event.undoKeptAnOriginal.rawValue]
+        )
+        XCTAssertEqual(
+            UndoTrail.keptWhatItReplacedLine(
+                course: "ICS3U", section: 1, isUndo: true,
+                keptOriginals: [".A.md.plantoir-undo-4-undo-orig"]
+            ),
+            examples[ActivityTrail.Event.undoKeptWhatItReplaced.rawValue]
+        )
+    }
+
+    /// A kept original whose bytes are exactly what the list recorded is
+    /// said as kept because the list no longer holds a copy of it, never as
+    /// differing from what the list recorded: the reason the contract's row
+    /// carries (the first review of U3c, LOW 2). After a Redo, the line says
+    /// the Undo is not offered and the list was cleared.
+    func testTheKeptLinesSayWhatIsTrueInEachCase() throws {
+        let rules: [String: Any] = try UndoContractReplay.contract("shared-rules.json")
+        let trail: [String: Any] = rules["activityTrail"] as? [String: Any] ?? [:]
+        var carries: [String: String] = [:]
+        for row in trail["mustRecord"] as? [[String: Any]] ?? [] {
+            if let event = row["event"] as? String, let said = row["carries"] as? String {
+                carries[event] = said
+            }
+        }
+        let recorded: String = UndoTrail.keptAnOriginalLine(
+            course: "ICS3U", section: 1, phase: .begin,
+            keptOriginals: [".A.md.plantoir-undo-4-apply-orig"],
+            noLongerInTheList: [".A.md.plantoir-undo-4-apply-orig"]
+        )
+        XCTAssertFalse(recorded.contains("differs"), recorded)
+        let reason: String = "because the list no longer holds a copy of it"
+        XCTAssertTrue(recorded.hasSuffix(", " + reason + "."), recorded)
+        XCTAssertTrue(carries[ActivityTrail.Event.undoKeptAnOriginal.rawValue]?.contains(reason) == true)
+        let afterARedo: String = UndoTrail.keptWhatItReplacedLine(
+            course: "ICS3U", section: 1, isUndo: false,
+            keptOriginals: [".A.md.plantoir-undo-4-redo-orig"]
+        )
+        XCTAssertTrue(afterARedo.hasPrefix("ICS3U/1 · Redo put back “A.md”"), afterARedo)
+        XCTAssertTrue(afterARedo.contains("so Undo is not offered and the list was cleared."), afterARedo)
     }
 }

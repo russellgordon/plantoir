@@ -198,6 +198,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/Undo/UndoLock.swift": (1, "door: the list's own lock file"),
         "Models/Undo/UndoOpKinds.swift": (4, "door: a folder a redo of createTree (or an undo of removeTree) makes under its staged name, from the list's content"),
         "Models/Undo/UndoRecovery.swift": (2, "door: pruning the list's own content and segments"),
+        "Models/Undo/UndoUITestSeam.swift": (1, "notAStep: a debug build's test seam, only with --state-dir, which edits a page in place as another program racing a swap would (#899 U3c, the real-window test of Russell's ruling of 2026-11-20, night)"),
         "Models/UnitWordRenamer.swift": (6, "waitsFor: U4"),
         "Models/WorkLeaseFiles.swift": (3, "notAStep: work leases"),
         "Models/WorkLeaseRegistry.swift": (3, "notAStep: work leases"),

@@ -1277,6 +1277,13 @@ nonisolated enum ActivityTrail {
         /// the course and section, which work stopped, and each kept
         /// original's hidden name with its page's. Never page text.
         case undoKeptAnOriginal = "undo kept what a page held"
+        /// An Undo or a Redo put a page back from the kept original beside
+        /// it, and the list could not keep a copy of what the page held a
+        /// moment before (#899, U3c's first review, MEDIUM): the course and
+        /// section, Undo or Redo, that the other direction is not offered
+        /// (after a Redo the list was cleared), and the hidden name each
+        /// page's content is kept under. Never page text.
+        case undoKeptWhatItReplaced = "undo kept what it replaced"
         /// An Undo or a Redo was refused because the newest step is one a
         /// change that stopped left part way, and recovery has just tried to
         /// put it back and could not yet (#899, U3c): a file in use, or one

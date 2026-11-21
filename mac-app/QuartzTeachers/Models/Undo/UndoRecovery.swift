@@ -293,19 +293,67 @@ nonisolated enum UndoRecovery {
     /// journal's record of what the page held (Russell's ruling of
     /// 2026-11-20, 15:20). Nil when none matches; a kept original that does
     /// not match is never used, and never removed for not matching.
-    static func keptOriginal(of step: UndoStep, root: URL) -> (_ path: String, _ sha: String) -> Data? {
+    ///
+    /// A kept original that is there and cannot be read just now (a cloud
+    /// placeholder not downloaded, a permission) is told to `couldNotRead`
+    /// with its page's path when none matches: it may be the one, so the
+    /// caller answers "cannot tell now", never "no kept original matches"
+    /// (the first review of U3c, LOW 5).
+    static func keptOriginal(
+        of step: UndoStep, root: URL, couldNotRead: ((_ path: String) -> Void)? = nil
+    ) -> (_ path: String, _ sha: String) -> Data? {
         return { path, sha in
             let place: URL = root.appendingPathComponent(path)
+            var unreadable: Bool = false
             for kept in UndoRecovery.keptOriginalFiles(of: step, beside: place) {
-                guard case .file(let data) = UndoItem.read(at: kept) else {
+                let item: UndoItem = UndoItem.read(at: kept)
+                if item == .unreadable {
+                    unreadable = true
+                    continue
+                }
+                guard case .file(let data) = item else {
                     continue
                 }
                 if UndoHash.sha256(of: data) == sha {
                     return data
                 }
             }
+            if unreadable {
+                couldNotRead?(path)
+            }
             return nil
         }
+    }
+
+    /// Writes back into the list what a put-back from kept originals takes
+    /// and sets aside (the first review of U3c, MEDIUM): each kept original's
+    /// bytes as the blob its hash names, and what the page holds now as the
+    /// other direction's blob when it hashes to the recorded other hash, so
+    /// the swap's tidy removes no only copy and the step's other direction
+    /// can still be made. Inside the lock, before the swap. The pages whose
+    /// other direction's content could not be made whole (the list would
+    /// not take it, or the page does not hash to what was recorded): their
+    /// outgoing bytes must be kept beside them, never tidied.
+    static func storeWhatKeptOriginalsGive(_ uses: [UndoKeptOriginalUse], _ writer: UndoJournalWriter) -> [String] {
+        var notWhole: [String] = []
+        for use in uses {
+            _ = try? writer.writeBlob(use.kept)
+            guard let otherSha = use.otherSha else {
+                // The other direction wants no file there: nothing to keep.
+                continue
+            }
+            if writer.journal.readBlob(sha: otherSha) != nil {
+                continue
+            }
+            var stored: Bool = false
+            if case .file(let outgoing) = use.outgoing, UndoHash.sha256(of: outgoing) == otherSha {
+                stored = (try? writer.writeBlob(outgoing)) != nil
+            }
+            if !stored && !notWhole.contains(use.path) {
+                notWhole.append(use.path)
+            }
+        }
+        return notWhole
     }
 
     /// Every kept original (`-orig`, a file) of this step's beside one
@@ -328,6 +376,33 @@ nonisolated enum UndoRecovery {
             found.append(url)
         }
         return found
+    }
+
+    /// Of these kept originals' hidden names, those whose bytes hash to what
+    /// the journal recorded for their page (a `writeFile` op's before or
+    /// after): kept because the list no longer holds that content, never
+    /// because they differ from it (the first review of U3c, LOW 2).
+    static func keptOriginalsOfWhatWasRecorded(_ names: [String], of step: UndoStep, root: URL) -> [String] {
+        var recorded: [String] = []
+        for op in step.ops where op.knownKind == .writeFile {
+            guard let path = op.path else {
+                continue
+            }
+            for kept in UndoRecovery.keptOriginalFiles(of: step, beside: root.appendingPathComponent(path)) {
+                let name: String = kept.lastPathComponent
+                if !names.contains(name) || recorded.contains(name) {
+                    continue
+                }
+                guard case .file(let data) = UndoItem.read(at: kept) else {
+                    continue
+                }
+                let sha: String = UndoHash.sha256(of: data)
+                if sha == op.beforeSha || sha == op.afterSha {
+                    recorded.append(name)
+                }
+            }
+        }
+        return recorded
     }
 
     /// The hidden name of every kept original of this step still beside the
@@ -583,16 +658,17 @@ nonisolated enum UndoRecovery {
             }
         }
         if mode == .live {
-            // Before the plan is known to settle, every kept original that is
-            // the only copy of its page's earlier content (its bytes not in
-            // the list) stays (the Windows recovery review's 15): it is
-            // tidied only once the step is closed, below. One the list holds
-            // is not needed to put the page back and goes now, as before.
+            // Before the plan is known to settle, every kept original that
+            // differs from its page stays, even one whose bytes the list
+            // gives (the Windows recovery review's 15; the first review of
+            // U3c, LOW 1: a page the list holds may still be left part way
+            // and the list cleared when ANOTHER page cannot be put back, and
+            // then the kept original is the only copy). Those the list holds
+            // are tidied only once the step has settled, below.
             UndoSwap.tidyLeftovers(
                 label: label, beside: urls, asideListings: asideListings(of: step, root: root),
                 onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) },
-                root: root, keepingOnlyCopies: true,
-                unlessTheListHolds: UndoRecovery.listHolds(step, root: root, from: writer.journal)
+                root: root, keepingOnlyCopies: true
             )
             if UndoKillPoints.stopsHere(.afterRecoveryTidied) {
                 return nil
@@ -692,10 +768,26 @@ nonisolated enum UndoRecovery {
                 // own kept original beside the page when its hash is the one
                 // recorded (Russell's ruling of 2026-11-20, 15:20): the first
                 // tidy above left every such original for this.
+                var keptOriginalNotRead: String? = nil
+                var uses: [UndoKeptOriginalUse] = []
                 let plan: UndoPlan = UndoCheck.plan(
                     opsToPutBack, direction: back, root: root, journal: writer.journal, places: places,
-                    keptOriginal: UndoRecovery.keptOriginal(of: step, root: root)
+                    keptOriginal: UndoRecovery.keptOriginal(of: step, root: root, couldNotRead: { path in
+                        if keptOriginalNotRead == nil {
+                            keptOriginalNotRead = path
+                        }
+                    }),
+                    keptOriginalUsed: { use in uses.append(use) }
                 )
+                if case .refused(.contentMissing) = plan, let keptOriginalNotRead {
+                    // A kept original that cannot be read just now may be the
+                    // one: cannot tell now, so the step is left for the next
+                    // recovery, never closed and the list never cleared (the
+                    // first review of U3c, LOW 5).
+                    swapRefused = true
+                    leftFor = .cannotTellNow(path: keptOriginalNotRead)
+                    return nil
+                }
                 if plan == .listUnreadable {
                     // Content it needs cannot be read just now: never
                     // closed for it, tried again on the schedule, as for a
@@ -732,7 +824,31 @@ nonisolated enum UndoRecovery {
                     )
                     return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: .interrupted(filesInTheWay: leftPartWay.count, filesPutBack: 0))
                 }
-                switch UndoSwap.swap(targets, label: label + "-recover", places: places, root: root) {
+                // What the kept originals give, and what the pages hold now,
+                // into the list before the swap (the first review of U3c,
+                // MEDIUM). A step that stays on the list (an undo or a redo
+                // put back to where it began) needs the content the swap sets
+                // aside for its next Undo or Redo: kept beside its page when
+                // the list will not take it. A change rolled back leaves the
+                // list, and what it set aside is its own new content.
+                // The plan is ready, so the list will put these pages back:
+                // only now does a kept original whose bytes the list gives
+                // go (the first review of U3c, LOW 1). One a put-back takes
+                // from a kept original is not among them, its content not
+                // in the list yet.
+                UndoSwap.tidyLeftovers(
+                    label: label, beside: urls, root: root, keepingOnlyCopies: true,
+                    unlessTheListHolds: UndoRecovery.listHolds(step, root: root, from: writer.journal)
+                )
+                let notWhole: [String] = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
+                var keepingTheOriginalsOf: Set<String> = []
+                if phase != .begin {
+                    keepingTheOriginalsOf = Set(notWhole)
+                }
+                switch UndoSwap.swap(
+                    targets, label: label + "-recover", places: places, root: root,
+                    keepingTheOriginalsOf: keepingTheOriginalsOf
+                ) {
                 case .swapped:
                     break
                 case .refused(let refusal), .notPutBack(let refusal, _):
@@ -784,7 +900,10 @@ nonisolated enum UndoRecovery {
                 UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true, unlessTheListHolds: listHolds)
                 let kept: [String] = UndoRecovery.keptOriginalsLeft(of: step, root: root)
                 if !kept.isEmpty {
-                    UndoTrailHook.keptAnOriginalLine?(step.course ?? "", step.section, phase, kept)
+                    UndoTrailHook.keptAnOriginalLine?(
+                        step.course ?? "", step.section, phase, kept,
+                        UndoRecovery.keptOriginalsOfWhatWasRecorded(kept, of: step, root: root)
+                    )
                 }
             }
         case .interrupted, .leftAlone:

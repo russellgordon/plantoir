@@ -888,6 +888,52 @@ final class UndoActionStepsTests: XCTestCase {
         XCTAssertTrue(said.contains(kept.first ?? "?"), said)
     }
 
+    /// The Class Dates sheet, on dates that went in part way, carries on as
+    /// a plain save does: it hands back the remembered timetable (so a verb
+    /// waiting on the dates continues once the alert closes) and its one
+    /// alert names the kept file, never a blocking line (the first review of
+    /// U3c, LOW 6). MUST FAIL with the part-way case answered as
+    /// `.notRemembered`, as the sheet's blocking line was.
+    func testTheClassDatesSheetCarriesOnWhenTheDatesWentInPartWay() throws {
+        let today: AssistFixture.Made = try morning()
+        let firstPlan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08"], source: "", forSection: 1, in: today.course,
+            today: try XCTUnwrap(CalendarDay(text: "2026-09-01"))
+        )
+        try SectionTimetableStore.applyRememberTimetable(firstPlan)
+        let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08", "2026-09-10"], source: "", forSection: 1, in: today.course,
+            today: try XCTUnwrap(CalendarDay(text: "2026-09-01"))
+        )
+        let fileName: String = plan.fileURL.lastPathComponent
+        UndoKillPoints.beforeTheRename = { _, url in
+            guard url.lastPathComponent == fileName, let handle = try? FileHandle(forWritingTo: url) else {
+                return
+            }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(" ".utf8))
+            try? handle.close()
+        }
+        UndoKillPoints.putBackFailsAt = { index in index == 0 }
+        defer {
+            UndoKillPoints.beforeTheRename = nil
+            UndoKillPoints.putBackFailsAt = nil
+        }
+        guard case .rememberedKeeping(let remembered) = SectionScheduleSheet.save(plan) else {
+            XCTFail("the part-way save was not carried on as remembered")
+            return
+        }
+        XCTAssertEqual(remembered.timetable.dates, plan.dates)
+        XCTAssertEqual(remembered.title, "The class dates for \(plan.courseCode) Section \(plan.sectionNumber) are remembered.")
+        var keptOnDisk: [String] = []
+        let folder: URL = plan.fileURL.deletingLastPathComponent()
+        for name in try FileManager.default.contentsOfDirectory(atPath: folder.path) where name.hasSuffix("-orig") {
+            keptOnDisk.append(name)
+        }
+        XCTAssertEqual(keptOnDisk.count, 1, "\(keptOnDisk)")
+        XCTAssertTrue(remembered.message.contains(keptOnDisk.first ?? "?"), remembered.message)
+    }
+
     /// A press that went in part way (a page could not be put back after the
     /// step was refused) says so, `publishStoppedPartWay`, naming where the
     /// page's earlier content is kept, never "Nothing was changed" (the

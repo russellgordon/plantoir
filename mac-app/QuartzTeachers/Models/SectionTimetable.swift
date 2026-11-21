@@ -146,12 +146,25 @@ enum SectionTimetableStore {
             case .couldNotWrite(let code, let number, let reason):
                 return "The class dates for \(code) Section \(number) could not be saved, so they are NOT remembered: \(reason)"
             case .savedWithWhatItHeldKept(let code, let number, let keptOriginals):
-                var said: String = "The class dates for \(code) Section \(number) are remembered, but another program may have changed their file as they were saved."
-                for kept in keptOriginals {
-                    said += " What \(JournaledStepError.placeName(ofKept: kept)) held just before is kept beside it as the hidden file “\(kept)”."
-                }
-                return said
+                return Problem.rememberedTitle(code, number) + " " + Problem.keptMessage(keptOriginals)
             }
+        }
+
+        /// The title of the one alert the Class Dates sheet shows when the
+        /// dates went in part way (#899 U3c's first review, LOW 6, after
+        /// Russell's ruling for today's class): a complete sentence, so
+        /// sentence-style capitals and a full stop (the HIG's Alerts page).
+        static func rememberedTitle(_ code: String, _ number: Int) -> String {
+            return "The class dates for \(code) Section \(number) are remembered."
+        }
+
+        /// That alert's message, naming each hidden file kept.
+        static func keptMessage(_ keptOriginals: [String]) -> String {
+            var said: String = "Another program may have changed their file as they were saved."
+            for kept in keptOriginals {
+                said += " What \(JournaledStepError.placeName(ofKept: kept)) held just before is kept beside it as the hidden file “\(kept)”."
+            }
+            return said
         }
     }
 

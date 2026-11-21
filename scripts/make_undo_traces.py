@@ -741,10 +741,14 @@ def external_state(op, current):
     return "neither"
 
 
-def plan(ops, backward, pages_by_path, content_missing=False):
+def plan(ops, backward, pages_by_path, content_missing=False, available=None, used=None):
     """UndoCheck.plan: ('ready', {path: new text or None}), ('changedSince',
     first, others), or ('contentMissing', path) when a whole-file op needs a
-    blob and the list's content is gone (`content_missing`)."""
+    blob and the list's content is gone (`content_missing`). `available(path,
+    text)` says whether a text the list's content no longer holds can still
+    be had (written back since, or a kept original beside the page whose hash
+    matches: Russell's ruling of 2026-11-20, 15:20); each such use is added
+    to `used` as (path, text taken, text the page held, the other text)."""
     ordered = list(reversed(ops)) if backward else list(ops)
     original = {}
     working = {}
@@ -795,7 +799,11 @@ def plan(ops, backward, pages_by_path, content_missing=False):
         if op["kind"] == "writeFile":
             target = op["beforeText"] if backward else op["afterText"]
             if content_missing and target is not None:
-                return ("contentMissing", path)
+                if available is None or not available(path, target):
+                    return ("contentMissing", path)
+                if used is not None:
+                    other = op["afterText"] if backward else op["beforeText"]
+                    used.append((path, target, working[path], other))
             working[path] = target
         elif kind == "replaceText":
             moved = hunk_moved(op, backward, working[path])
@@ -921,6 +929,14 @@ class Model:
         self.newest_written = None
         self.unreachable = set()   # working folders that cannot be reached
         self.content_removed = False   # the list's content/ was taken away
+        # U3c: texts written back into the list after its content was taken
+        # away, the kept originals beside each page ({path: [text, ...]}),
+        # whether the list takes new content, and how many 'undo kept what
+        # it replaced' lines were written.
+        self.stored = set()
+        self.kept = {}
+        self.content_cannot_be_stored = False
+        self.kept_what_it_replaced_lines = 0
         self.maintainer_registered = True   # UndoMaintainers has a runner
         self.linked_outside = set()   # folders replaced by a link to outside
         self.rederived = 0   # how many times a recompute's runner ran
@@ -1181,7 +1197,9 @@ class Model:
             return ("notAvailable",)
         if self.holds_a_recompute(undo) and not self.maintainer_registered:
             return ("notAvailable",)
-        result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed)
+        used = []
+        result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed,
+                      self.available, used)
         if result[0] == "contentMissing" and not UNDO_REFUSED_FOR_MISSING_CONTENT_CLEARS:
             return result
         if result[0] in ("changedSince", "contentMissing"):
@@ -1190,11 +1208,20 @@ class Model:
                 self.prune()
             return result
         if not dry:
+            not_whole = self.store_what_kept_originals_give(used)
             self.write(result[1])
             if self.holds_a_recompute(undo):
                 self.rederived += 1
             undo["phase"] = "undone"
             self.write_line()
+            self.tidy_kept_copies()
+            if not_whole:
+                # The Redo can never be made: dropped, never offered.
+                for step in self.steps:
+                    if step["phase"] == "undone" and step["seq"] >= undo["seq"]:
+                        step["phase"] = "dropped"
+                self.write_line()
+                self.kept_what_it_replaced_lines += 1
             self.prune()
         return ("undone", undo["seq"])
 
@@ -1210,7 +1237,9 @@ class Model:
             return ("notAvailable",)
         if self.holds_a_recompute(candidate) and not self.maintainer_registered:
             return ("notAvailable",)
-        result = plan(candidate["ops"], False, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed)
+        used = []
+        result = plan(candidate["ops"], False, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed,
+                      self.available, used)
         if result[0] in ("changedSince", "contentMissing"):
             if not dry:
                 # Ruling 20: refused once, then only the redo branch goes.
@@ -1220,13 +1249,51 @@ class Model:
                 self.write_line()
             return result
         if not dry:
+            not_whole = self.store_what_kept_originals_give(used)
             self.write(result[1])
             if self.holds_a_recompute(candidate):
                 self.rederived += 1
             candidate["phase"] = "done"
             self.write_line()
+            self.tidy_kept_copies()
+            if not_whole:
+                # Its Undo can never be made: the list is cleared now, as
+                # that refusal would clear it.
+                self.clear()
+                self.kept_what_it_replaced_lines += 1
             self.prune()
         return ("redone", candidate["seq"])
+
+    def available(self, path, text):
+        """Content the list's content no longer holds that can still be had:
+        written back since, or a kept original beside its page."""
+        return text in self.stored or text in self.kept.get(path, [])
+
+    def store_what_kept_originals_give(self, used):
+        """Before the swap (the first review of U3c, MEDIUM): the kept
+        original's text, and what the page held as the other direction's
+        text when it is exactly that, written back into the list. True when
+        some page's other text could not be: what the page held is then kept
+        beside it."""
+        not_whole = False
+        for path, taken, outgoing, other in used:
+            if not self.content_cannot_be_stored:
+                self.stored.add(taken)
+            if other is None or other in self.stored:
+                continue
+            if outgoing == other and not self.content_cannot_be_stored:
+                self.stored.add(outgoing)
+                continue
+            not_whole = True
+            self.kept.setdefault(path, []).append(outgoing)
+        return not_whole
+
+    def tidy_kept_copies(self):
+        """A kept original whose page holds the same text is a copy: gone."""
+        for path in list(self.kept):
+            self.kept[path] = [text for text in self.kept[path] if text != self.pages.get(path)]
+            if not self.kept[path]:
+                del self.kept[path]
 
     def write(self, changes):
         for path, text in changes.items():

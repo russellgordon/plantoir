@@ -90,6 +90,22 @@ struct SectionScheduleSheet: View {
     /// The refusal, when there was one.
     @State var failure: String?
 
+    /// The dates went in part way: remembered, with what their file held
+    /// just before kept beside it under a hidden name. One alert names it;
+    /// its OK carries on as a plain save does (the first review of U3c,
+    /// LOW 6). Nil the rest of the time.
+    @State var rememberedKeeping: RememberedKeeping?
+
+    /// What that alert says, and what was remembered.
+    struct RememberedKeeping {
+
+        // MARK: - Stored properties
+
+        let title: String
+        let message: String
+        let timetable: SectionTimetable
+    }
+
     @Environment(\.dismiss) var dismiss
 
     // MARK: - Computed properties
@@ -169,6 +185,25 @@ struct SectionScheduleSheet: View {
             case .failure:
                 break
             }
+        }
+        .alert(
+            rememberedKeeping?.title ?? "",
+            isPresented: Binding(
+                get: { return rememberedKeeping != nil },
+                set: { isUp in
+                    if !isUp, let remembered = rememberedKeeping {
+                        rememberedKeeping = nil
+                        onRemembered(remembered.timetable)
+                        dismiss()
+                    }
+                }
+            )
+        ) {
+            // Purely informational: one OK, the default (the HIG's Alerts
+            // page). Closing it carries on as a plain save does.
+            Button("OK") { }
+        } message: {
+            Text(rememberedKeeping?.message ?? "")
         }
         .task {
             // Remembering the dates makes a step on the main actor: the list
@@ -494,28 +529,52 @@ struct SectionScheduleSheet: View {
         return described
     }
 
-    func remember(_ plan: RememberTimetablePlan) {
-        do {
-            try SectionTimetableStore.applyRememberTimetable(plan)
-        } catch JournaledStepError.leftPartWay(_, _, let keptOriginals) {
-            // The dates are in the file: said as remembered, naming where
-            // what it held just before is kept (the third review of U3a,
-            // LOW 2). The sheet stays open so the sentence is read.
-            failure = SectionTimetableStore.Problem.savedWithWhatItHeldKept(
-                plan.courseCode, plan.sectionNumber, keptOriginals
-            ).localizedDescription
-            return
-        } catch {
-            failure = error.localizedDescription
-            return
-        }
-        onRemembered(SectionTimetable(
+    /// What saving the dates came to, for the sheet to act on.
+    enum Remembering {
+        /// Saved: carry on.
+        case remembered(SectionTimetable)
+        /// Saved part way: remembered, one alert names the kept file, and its
+        /// OK carries on as `.remembered` does.
+        case rememberedKeeping(RememberedKeeping)
+        /// Not saved: the sentence, said in the sheet.
+        case notRemembered(String)
+    }
+
+    /// Saves the plan's dates and says what that came to. The dates going
+    /// in part way are REMEMBERED (the first review of U3c, LOW 6): what
+    /// waits on them carries on once the one alert naming the kept file
+    /// closes, never held up by a blocking line.
+    static func save(_ plan: RememberTimetablePlan) -> Remembering {
+        let timetable: SectionTimetable = SectionTimetable(
             sectionNumber: plan.sectionNumber,
             dates: plan.dates,
             source: plan.source,
             recorded: plan.recorded
-        ))
-        dismiss()
+        )
+        do {
+            try SectionTimetableStore.applyRememberTimetable(plan)
+        } catch JournaledStepError.leftPartWay(_, _, let keptOriginals) {
+            return .rememberedKeeping(RememberedKeeping(
+                title: SectionTimetableStore.Problem.rememberedTitle(plan.courseCode, plan.sectionNumber),
+                message: SectionTimetableStore.Problem.keptMessage(keptOriginals),
+                timetable: timetable
+            ))
+        } catch {
+            return .notRemembered(error.localizedDescription)
+        }
+        return .remembered(timetable)
+    }
+
+    func remember(_ plan: RememberTimetablePlan) {
+        switch SectionScheduleSheet.save(plan) {
+        case .remembered(let timetable):
+            onRemembered(timetable)
+            dismiss()
+        case .rememberedKeeping(let remembered):
+            rememberedKeeping = remembered
+        case .notRemembered(let sentence):
+            failure = sentence
+        }
     }
 }
 

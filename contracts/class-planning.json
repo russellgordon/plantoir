@@ -3974,9 +3974,11 @@
       "notToday": "Not Now",
       "notChangedTitle": "The Front Page Was Not Changed",
       "noLongerOffered": "The front page or today’s {noun} changed while you were deciding, so it was left as it is.",
-      "couldNotSave": "The front page could not be saved, so it still shows {shown}."
+      "couldNotSave": "The front page could not be saved, so it still shows {shown}.",
+  "keptTitle": "The front page now shows {class}.",
+  "kept": "What the front page held a moment before is kept beside it, hidden, as “{kept}”."
     },
-    "fill": "`{class}` and `{shown}` are class pages' file names; `{noun}` is the course's word for a class, singular (“class”, or “meeting” for a club).",
+    "fill": "`{class}` and `{shown}` are class pages' file names; `{noun}` is the course's word for a class, singular (“class”, or “meeting” for a club). `{kept}` is the hidden name what the front page held a moment before is kept under, when Show on Front Page went in but an edit made at that instant could not be merged (#899 U3c): `keptTitle` and `kept` are the one alert that names it (Russell's ruling of 2026-11-20, night), with one OK; it is a name the app made, not a word of the sentence, so the plain-words check is run on the sentence with it filled by a placeholder.",
     "plainWordsCheck": "No sentence says “transclude”, “transclusion”, “embed” (R14, Russell 2026-09-30), “index”, “file”, “frontmatter” or “link” — the page every student lands on is “the front page”.",
     "rejected": [
       "The build detects it and reports a marker (the #379 shape): the answer would come after the preview was built, so Yes needs a second build; the container's clock is not the teacher's; and every scheduled and assistant build would have to be taught to ignore it.",

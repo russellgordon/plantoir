@@ -91,10 +91,19 @@ nonisolated enum UndoTrail {
                 UndoTrail.couldNotPutBackLine(course: course, section: section, phase: phase, leftPartWay: leftPartWay, keptOriginals: keptOriginals)
             )
         }
-        UndoTrailHook.keptAnOriginalLine = { course, section, phase, keptOriginals in
+        UndoTrailHook.keptAnOriginalLine = { course, section, phase, keptOriginals, noLongerInTheList in
             ActivityTrail.note(
                 .undoKeptAnOriginal,
-                UndoTrail.keptAnOriginalLine(course: course, section: section, phase: phase, keptOriginals: keptOriginals)
+                UndoTrail.keptAnOriginalLine(
+                    course: course, section: section, phase: phase,
+                    keptOriginals: keptOriginals, noLongerInTheList: noLongerInTheList
+                )
+            )
+        }
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals in
+            ActivityTrail.note(
+                .undoKeptWhatItReplaced,
+                UndoTrail.keptWhatItReplacedLine(course: course, section: section, isUndo: isUndo, keptOriginals: keptOriginals)
             )
         }
         UndoTrailHook.leftNewestLine = { course, section, isUndo, refusal in
@@ -124,12 +133,44 @@ nonisolated enum UndoTrail {
     /// `ICS3U/1 · the undo list settled a change that stopped. What “A.md”
     /// held before is kept beside it as the hidden file
     /// “.A.md.plantoir-undo-4-apply-orig”, because it differs from what the
-    /// list recorded.`
-    static func keptAnOriginalLine(course: String, section: Int?, phase: UndoPhase, keptOriginals: [String]) -> String {
+    /// list recorded.` For a kept original in `noLongerInTheList` (its bytes
+    /// exactly what the list recorded) the reason is `because the list no
+    /// longer holds a copy of it.` (the first review of U3c, LOW 2).
+    static func keptAnOriginalLine(
+        course: String, section: Int?, phase: UndoPhase, keptOriginals: [String], noLongerInTheList: [String] = []
+    ) -> String {
         var line: String = UndoTrail.prefix(course: course, section: section)
         line += "the undo list settled \(UndoTrail.what(phase)) that stopped."
         for kept in keptOriginals {
-            line += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”, because it differs from what the list recorded."
+            let because: String = noLongerInTheList.contains(kept)
+                ? "because the list no longer holds a copy of it"
+                : "because it differs from what the list recorded"
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”, \(because)."
+        }
+        return line
+    }
+
+    /// `ICS3U/1 · Undo put back “A.md” from what was kept beside it, but the
+    /// list could not keep a copy of what it held a moment before, so Redo
+    /// is not offered. What “A.md” held a moment before is kept beside it as
+    /// the hidden file “.A.md.plantoir-undo-4-undo-orig”.` After a Redo,
+    /// `… so Undo is not offered and the list was cleared.` (the first
+    /// review of U3c, MEDIUM).
+    static func keptWhatItReplacedLine(course: String, section: Int?, isUndo: Bool, keptOriginals: [String]) -> String {
+        var places: [String] = []
+        for kept in keptOriginals {
+            let place: String = JournaledStepError.placeName(ofKept: kept)
+            if !places.contains(place) {
+                places.append(place)
+            }
+        }
+        let which: String = isUndo ? "Undo" : "Redo"
+        let what: String = places.isEmpty ? "a page" : places.joined(separator: ", ")
+        var line: String = UndoTrail.prefix(course: course, section: section)
+        line += "\(which) put back \(what) from what was kept beside it, but the list could not keep a copy of what it held a moment before, "
+        line += isUndo ? "so Redo is not offered." : "so Undo is not offered and the list was cleared."
+        for kept in keptOriginals {
+            line += " What \(JournaledStepError.placeName(ofKept: kept)) held a moment before is kept beside it as the hidden file “\(kept)”."
         }
         return line
     }

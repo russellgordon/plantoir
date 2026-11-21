@@ -1127,6 +1127,13 @@ nonisolated enum UndoKillPoints {
     /// (`UndoSwap.keep`); nil lets it go ahead. Set only by tests.
     nonisolated(unsafe) static var keepingTheOriginalFails: ((Int) -> Int32?)?
 
+    /// Called with a file's index and the name its original is about to be
+    /// kept under, after that name was found free and before the original
+    /// is kept there: a test puts a file at that name, as another Mac
+    /// syncing the folder could in that instant (the first review of U3c,
+    /// LOW 4). Set only by tests.
+    nonisolated(unsafe) static var beforeKeepingTheOriginal: ((Int, URL) -> Void)?
+
     /// Called with a file's index and place just after its original is kept
     /// and before the new content is renamed in: a test edits the file IN
     /// PLACE there, as another program racing the swap would. Set only by
@@ -1180,7 +1187,20 @@ nonisolated enum UndoTrailHook {
     /// not hold, such as an edit another program made as the swap went in:
     /// the course and section, what it ended, and each kept original's
     /// hidden name. Never removed: the only copy of what it holds.
-    nonisolated(unsafe) static var keptAnOriginalLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ keptOriginals: [String]) -> Void)?
+    /// `noLongerInTheList` names those whose bytes are exactly what the list
+    /// recorded for the page, kept because the list no longer holds that
+    /// content (its blob gone, or the list would not take it); every other
+    /// one differs from what the list recorded (the first review of U3c,
+    /// LOW 2).
+    nonisolated(unsafe) static var keptAnOriginalLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ keptOriginals: [String], _ noLongerInTheList: [String]) -> Void)?
+
+    /// An Undo (`isUndo`) or a Redo put a page back from its kept original
+    /// and the list would not take what the page held a moment before, so
+    /// the other direction is never offered (a Redo dropped, or after a Redo
+    /// the list cleared): the course and section, and the hidden name each
+    /// such page's content is kept under beside it (the first review of
+    /// U3c, MEDIUM).
+    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String]) -> Void)?
 
     /// An Undo (`isUndo`) or a Redo was refused because the newest step is
     /// a gone process's that recovery has just tried and left: the course
