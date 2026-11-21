@@ -1989,7 +1989,8 @@ nonisolated extension UndoJournal {
                 }
             }
             UndoTrailHook.keptWhatItReplacedLine?(
-                record.step.course ?? "", record.step.section, direction == .backward, keptOfWhatItHeld, keptOfWhatItHoldsNow
+                record.step.course ?? "", record.step.section, direction == .backward, keptOfWhatItHeld, keptOfWhatItHoldsNow,
+                !uses.isEmpty
             )
         }
         // Only now, the whole swap in and the step closed, the trail says a

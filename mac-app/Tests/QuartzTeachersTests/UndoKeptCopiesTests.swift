@@ -190,4 +190,59 @@ final class UndoKeptCopiesTests: XCTestCase {
             "“.p1.md.plantoir-undo-1-undo-orig” is no longer there, so there is nothing to show."
         )
     }
+
+    /// The plan the app's own path follows, in every build: a gone file
+    /// gets the alert with one OK button and is never handed to Finder;
+    /// with every file there, no alert, and Finder selects them all (the
+    /// U4a sweep: the test above reads only the recorder's branch). MUST
+    /// FAIL with the gone file handed to Finder or the alert skipped.
+    func testShowInFinderTheAppsPathAlertsForAGoneFileAndSelectsOnlyWhatIsThere() throws {
+        let folder: URL = root.appendingPathComponent(UndoKeptCopiesTests.pagePath).deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let there: URL = folder.appendingPathComponent(".p1.md.plantoir-undo-1-apply-orig")
+        try Data("kept".utf8).write(to: there)
+        let gone: URL = folder.appendingPathComponent(".p1.md.plantoir-undo-1-undo-orig")
+
+        let mixed: FolderActions.ShowInFinderPlan = FolderActions.showInFinderPlan([there, gone])
+        XCTAssertEqual(mixed.alertSentence, FrontPageWording.keptGone([gone.lastPathComponent]))
+        XCTAssertEqual(mixed.alertButtons, ["OK"])
+        XCTAssertEqual(mixed.selected, [there])
+
+        let allThere: FolderActions.ShowInFinderPlan = FolderActions.showInFinderPlan([there])
+        XCTAssertNil(allThere.alertSentence)
+        XCTAssertEqual(allThere.alertButtons, [])
+        XCTAssertEqual(allThere.selected, [there])
+
+        let allGone: FolderActions.ShowInFinderPlan = FolderActions.showInFinderPlan([gone])
+        XCTAssertEqual(allGone.selected, [])
+        XCTAssertNotNil(allGone.alertSentence)
+    }
+
+    /// The U4a sweep, LOW 1: the after content gone from the list and the
+    /// list taking no new file, the Undo puts the page back FROM THE LIST,
+    /// so the line never says it was put back "from what was kept beside
+    /// it". MUST FAIL with the sentence as it was (said whenever anything
+    /// was kept).
+    func testTheKeptLineSaysFromTheListWhenThePageCameFromTheList() throws {
+        try makeTheStep()
+        try removeBlob(UndoKeptCopiesTests.after, andTakesNoNewOne: true)
+        var lines: [String] = []
+        let hookBefore = UndoTrailHook.keptWhatItReplacedLine
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, fromAKeptOriginal in
+            lines.append(UndoTrail.keptWhatItReplacedLine(
+                course: course, section: section, isUndo: isUndo, keptOriginals: keptOriginals,
+                keptOfWhatItHoldsNow: keptOfWhatItHoldsNow, fromAKeptOriginal: fromAKeptOriginal
+            ))
+        }
+        defer {
+            UndoTrailHook.keptWhatItReplacedLine = hookBefore
+        }
+
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in self.root }), .undone(seq: 1))
+
+        XCTAssertEqual(lines.count, 1)
+        let line: String = lines.first ?? ""
+        XCTAssertFalse(line.contains("from what was kept beside it"), line)
+        XCTAssertTrue(line.contains("Undo put back “p1.md”, but the list could not keep a copy"), line)
+    }
 }

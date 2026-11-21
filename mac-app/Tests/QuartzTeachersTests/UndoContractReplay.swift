@@ -702,7 +702,7 @@ nonisolated enum UndoContractReplay {
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-        "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
+        "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
     ]
 
@@ -776,7 +776,7 @@ nonisolated enum UndoContractReplay {
             var unreadableKeptOriginals: [URL] = []
             var keptWhatItReplacedLines: Int = 0
             let keptWhatItReplacedHookBefore = UndoTrailHook.keptWhatItReplacedLine
-            UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _, _ in
+            UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _, _, _ in
                 keptWhatItReplacedLines += 1
             }
             defer {
@@ -1053,6 +1053,34 @@ nonisolated enum UndoContractReplay {
                     if !removedOne {
                         failures.append("stackCases '\(name)': no whole-file step whose before content to take away")
                     }
+                } else if value == "afterContentGone" {
+                    // Only the newest step's content for what p1 holds after
+                    // it is gone from the list; the list still takes a new
+                    // file unless a later call says otherwise (U4a review 1,
+                    // LOW 4: U3c review 3's probe shape).
+                    let fold: UndoFold = try journal().read()
+                    var removedOne: Bool = false
+                    if let head = fold.offer(now: journal().now()).head {
+                        for op in head.step.ops where op.path == pagePath && op.knownKind == .writeFile {
+                            if let sha = op.afterSha {
+                                // The blob and, when it is then empty, the
+                                // folder it was in: a later write of the blob
+                                // makes that folder again, so a list taking
+                                // no new file (`contentCannotBeStored`, which
+                                // seals the content folder) cannot take it.
+                                let blobURL: URL = journal().blobURL(sha: sha)
+                                try FileManager.default.removeItem(at: blobURL)
+                                let prefixFolder: URL = blobURL.deletingLastPathComponent()
+                                if (try? FileManager.default.contentsOfDirectory(atPath: prefixFolder.path))?.isEmpty == true {
+                                    try FileManager.default.removeItem(at: prefixFolder)
+                                }
+                                removedOne = true
+                            }
+                        }
+                    }
+                    if !removedOne {
+                        failures.append("stackCases '\(name)': no whole-file step whose after content to take away")
+                    }
                 } else if value == "keepTheOriginal" {
                     // The newest step's kept original of p1, as a swap whose
                     // tidy could not remove it leaves it: what p1 held before.
@@ -1194,6 +1222,20 @@ nonisolated enum UndoContractReplay {
                     failures.append("stackCases '\(name)': the other list's kept original was changed or removed")
                 } else if foreignKept == nil {
                     failures.append("stackCases '\(name)': no other list's kept original was made")
+                }
+            }
+            if let wanted = int(testCase["keptBesideThePage"]) {
+                // Every file kept beside p1 under a staged name, any step's.
+                let folder: URL = root.appendingPathComponent(pagePath).deletingLastPathComponent()
+                let prefix: String = "." + URL(fileURLWithPath: pagePath).lastPathComponent + UndoSwap.stagedMarker
+                var keptFiles: Int = 0
+                for entry in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] {
+                    if entry.hasPrefix(prefix) && entry.hasSuffix("-orig") {
+                        keptFiles += 1
+                    }
+                }
+                if keptFiles != wanted {
+                    failures.append("stackCases '\(name)': \(keptFiles) files kept beside the page, not \(wanted)")
                 }
             }
             if let kept = testCase["keptOriginalLeft"] as? Bool {

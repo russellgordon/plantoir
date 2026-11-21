@@ -1293,6 +1293,8 @@ class Model:
         changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
             not_whole = self.store_what_kept_originals_give(used)
+            if self.store_what_the_other_direction_needs(undo["ops"], True, used):
+                not_whole = True
             self.write(changes)
             if self.holds_a_recompute(undo):
                 self.rederived += 1
@@ -1333,6 +1335,8 @@ class Model:
         changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
             not_whole = self.store_what_kept_originals_give(used)
+            if self.store_what_the_other_direction_needs(candidate["ops"], False, used):
+                not_whole = True
             self.write(changes)
             if self.holds_a_recompute(candidate):
                 self.rederived += 1
@@ -1394,6 +1398,31 @@ class Model:
             not_whole = True
             self.kept.setdefault(path, []).append(outgoing)
         return not_whole
+
+    def store_what_the_other_direction_needs(self, ops, backward, used):
+        """Before the swap (U4a, the U3c review 3 LOW 3 fix): each page a
+        whole-file op moves from the list, whose outgoing text the other
+        direction needs and the list lacks, has that text written into the
+        list; when the list will not take it, it is kept beside the page
+        instead, unless a kept copy there already holds it. True when
+        anything is kept beside a page."""
+        taken_from_kept = set(use[0] for use in used)
+        kept_any = False
+        for op in ops:
+            if op["kind"] != "writeFile" or op["path"] in taken_from_kept:
+                continue
+            path = op["path"]
+            other = op["afterText"] if backward else op["beforeText"]
+            if other is None or self.in_the_list(other) or self.pages.get(path) != other:
+                continue
+            if self.storable(other):
+                self.stored.add(other)
+                continue
+            if other in self.kept.get(path, []):
+                continue
+            self.kept.setdefault(path, []).append(other)
+            kept_any = True
+        return kept_any
 
     def tidy_kept_copies(self):
         """A kept original whose page holds the same text is a copy: gone,

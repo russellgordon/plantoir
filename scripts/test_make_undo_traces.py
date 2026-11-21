@@ -550,7 +550,7 @@ class ContractCaseTests(unittest.TestCase):
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
                   "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
+                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
                   "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
@@ -820,6 +820,13 @@ class ContractCaseTests(unittest.TestCase):
                             if op["kind"] == "writeFile" and op["path"] == p1:
                                 model.removed_texts.add(op["beforeText"])
                                 model.unstorable_texts.add(op["beforeText"])
+                    elif call == "afterContentGone":
+                        # Only the newest step's after text of p1 is gone
+                        # from the list (U4a review 1, LOW 4).
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.removed_texts.add(op["afterText"])
                     elif call == "keepTheOriginal":
                         # The newest step's kept original of p1: what p1
                         # held before its whole-file op (U3c).
@@ -937,6 +944,8 @@ class ContractCaseTests(unittest.TestCase):
                 if "keptOriginalLeft" in case:
                     foreign = "foreignKeptOriginal" in case["calls"]
                     self.assertEqual(bool(model.kept) or foreign, case["keptOriginalLeft"])
+                if "keptBesideThePage" in case:
+                    self.assertEqual(len(set(model.kept.get(p1, []))), case["keptBesideThePage"])
                 if "keptWhatItReplacedLines" in case:
                     self.assertEqual(model.kept_what_it_replaced_lines, case["keptWhatItReplacedLines"])
                 if "leftApart" in case:

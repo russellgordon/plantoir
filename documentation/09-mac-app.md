@@ -4353,14 +4353,18 @@ folder the teacher adds to the shared or per-section list, then hands
 `FolderScaffold` the folders it has JUST made (a location already on disk is
 skipped and gets nothing). `FolderScaffold.pages` is pure — folder, scope,
 section numbers, the primary curriculum folder's top-level file names, the
-moment and the template in; paths and texts out — and `writePages` writes
-each page with `.withoutOverwriting`, only into a folder in that list. The
+moment and the template in; paths and texts out — and `planPages` (which
+replaced `writePages` in #899 U4a) plans each folder with its two pages as one
+`createTree`, built beside its place and renamed in, never over anything, only
+for a folder in that list (documentation 09, "U4a"). The
 template comes from the bundle through `SkeletonCatalog.duplicateMeTemplateURL()`
 (the generic family's `Concepts/_DUPLICATE ME.md`); the moment is
 `SectionAdder.timestamp()`; the primary curriculum folder is the first one
-`CurriculumFolderRule.resolvedFolders(for:)` gives (#128), read AFTER the new
-folder is made, so a "Curriculum" folder added to a course with none is
-empty and its own template's connection is taken out.
+`CurriculumFolderRule.resolvedFolders(for:)` gives (#128), read BEFORE the
+step that makes the new folder (since U4a the folder is made with its pages
+in one step), so a "Curriculum" folder added to a course with none finds no
+curriculum page either way: none and an empty folder are treated alike, and
+its own template's connection is taken out.
 
 What was MEASURED before choosing this: there is no shared writer — the
 course creator is `setup_course.py` inside the builder, and each app makes a
@@ -22036,8 +22040,10 @@ stays off.
   never an empty list (#986 section 4.5: the first Marks tick creates
   `graded_folders`). The bytes each member leaves are worked out at plan
   time by the member rule (`UndoJSONMember.moved`, the bytes
-  `undo.editJSONCases` pins), so `lastSavedData` is exactly the file the
-  step leaves. A file that is missing, is not one JSON object, or whose
+  `undo.editJSONCases` pins). After the make `finishWrite` reads the file
+  back, so `lastSavedData` and `values` are the file as it is, a member
+  another program changed between the plan and the make included (U4b,
+  from U4a review 1, LOW 2). A file that is missing, is not one JSON object, or whose
   bytes the member rule cannot move (a key written twice, a number a double
   cannot hold) is planned WHOLE, the bytes `write(to:)` writes, and the door
   chooses `writeFile`. `writeAsOneStep(to:madeBy:)` plans, makes and
@@ -22161,6 +22167,63 @@ moves are `move` ops on folders in the same step. `JournaledStep.editJSON(at:rea
 takes a file once; a step that edits `course_config.json` twice (a rename
 and its record) works out both changes on one read and plans once. When
 U4b moves its callers, `CourseConfiguration`'s scan reason loses U4b.
+
+### U4b, first part: U4a's lows and the U4a sweep's (#899)
+
+Branch `issue/899-u4b-rename-folder`. Nothing a teacher sees changes, and
+the switch stays off. Rename folder through the door is NOT in this part
+(see "For U4b", above, which still holds for it).
+
+- **After the make, this copy is the file** (U4a review 1, LOW 2):
+  `CourseConfiguration.finishWrite` reads `course_config.json` back once the
+  step is made, so `lastSavedData` and `values` hold another program's
+  change of ANOTHER member made between the plan and the make (the door
+  kept it), never the plan's read. Only a file that cannot be read back as
+  one object leaves this copy as the plan said
+  (`UndoCourseSettingsStepTests.testAfterTheMakeThisCopyIsTheFileWithAnotherMemberChangedInTheGap`).
+- **A fourth refusal in a row** (LOW 3): a Save whose own member is changed
+  by something else before every make is tried four times in all; the
+  fourth refusal writes nothing, keeps the edits unsaved, and the sheet
+  says "Could not save: The file “course_config.json” couldn’t be saved."
+  (`…testAFourthRefusalInARowWritesNothingAndKeepsTheEditsUnsaved`). The
+  sentence is true of the disk. `write(to:)` wrote after its third
+  read-again; the refusal is deliberate, since writing over a member that
+  just changed is what #265 forbids.
+- **Two contract rows for U3c review 3's kept-copy rules** (LOW 4):
+  `stackCases` 'U4a, LOW 4 (a)' (twice: the outgoing bytes stored before the
+  swap, and kept beside the page when the list takes no new file) and
+  'U4a, LOW 4 (b)' (seven moves, two kept files), with the call
+  `afterContentGone` and the key `keptBesideThePage` (`stackCasesHow`). The
+  Python model (`make_undo_traces.py`) now stores the outgoing bytes as the
+  door does (`store_what_the_other_direction_needs`); before, it had only
+  the U3c store from a kept original. Held for Windows under W4c.
+- **The trail line `undo kept what it replaced` is true on the list's path**
+  (the sweep, LOW 1): it said the page was put back "from what was kept
+  beside it" whenever anything was kept, also when the page came from the
+  list and only its outgoing bytes were kept
+  (`storeWhatTheOtherDirectionNeeds`). The phrase is now said only when a
+  kept original was used (`fromAKeptOriginal`, set by the swap from the
+  check's uses); `activityTrail.mustRecord` says so
+  (`UndoKeptCopiesTests.testTheKeptLineSaysFromTheListWhenThePageCameFromTheList`).
+- **A settings file that is a link is saved again with the switch off** (the
+  sweep, LOW 2, run, not only read): U4a planned the Save at the link's own
+  place, the swap found a link there (`lstat`), refused it as changed since,
+  and after four tries the Save said "Could not save". `planWrite` now plans
+  where the link leads (`CourseConfiguration.fileALinkLeadsTo`, the last
+  component's links followed, at most `MAXSYMLINKS`), and the link stays a
+  link, for a target inside the course and one outside the working folder
+  (`…testASettingsFileThatIsALinkIsSavedThroughTheLinkWithTheSwitchOff`).
+  Measured: before U4a, `write(to:)`'s atomic write REPLACED the link with a
+  plain file and left the teacher's real file as it was; rejected, for the
+  reason `rule.shadow` gives for a daily page.
+- **Show in Finder's real path is read by a test** (the sweep's note): the
+  alert and what Finder selects are worked out first
+  (`FolderActions.showInFinderPlan`), and the app's path follows that plan
+  (`…testShowInFinderTheAppsPathAlertsForAGoneFileAndSelectsOnlyWhatIsThere`);
+  before, only the debug recorder's branch was tested.
+- Documentation's #506 section no longer says `writePages` writes with
+  `.withoutOverwriting` (the sweep, LOW 3), and `undo.laterPieces.U4` says
+  what U4a landed and what U4b still owes (LOW 4).
 
 ### The U1 harness
 
