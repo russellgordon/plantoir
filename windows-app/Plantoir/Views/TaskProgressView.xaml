@@ -158,7 +158,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="ConsoleInput" PlaceholderText="If you're asked a question, type your answer here…"
-                         KeyDown="ConsoleInput_KeyDown" AutomationProperties.AutomationId="consoleInputField" />
+                         KeyDown="ConsoleInput_KeyDown" AutomationProperties.AutomationId="consoleInputField"
+                         AutomationProperties.Name="Your answer" />
                 <Button Grid.Column="1" Content="Send" Click="ConsoleSend_Click" />
                 <Button Grid.Column="2" Content="Stop" Click="ConsoleStop_Click"
                         AutomationProperties.AutomationId="consoleStopButton" />

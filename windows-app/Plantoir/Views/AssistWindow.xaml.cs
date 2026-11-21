@@ -1172,7 +1172,7 @@ public sealed partial class AssistWindow : Window
             };
             try
             {
-                var result = await dialog.ShowAsync();
+                var result = await dialog.ShowWithTheFirstFocusInTheBoxAsync();
                 if (result == ContentDialogResult.Primary && dialog.SavedDates is { Count: > 0 } dates)
                 {
                     Say("Assistant", ClassDatesDialogWords.Remembered(dates.Count, _course, _section));

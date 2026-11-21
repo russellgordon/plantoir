@@ -242,7 +242,7 @@ public sealed partial class MainWindow
         var dialog = new SectionScheduleDialog(folder, course, section, hwnd, reason) { XamlRoot = root };
         try
         {
-            var result = await dialog.ShowAsync();
+            var result = await dialog.ShowWithTheFirstFocusInTheBoxAsync();
             return result == ContentDialogResult.Primary && dialog.SavedDates is { Count: > 0 };
         }
         catch (Exception ex)
