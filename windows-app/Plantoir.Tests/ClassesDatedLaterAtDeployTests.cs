@@ -225,7 +225,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var workspace = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow, Today = () => Today };
         var tools = new Plantoir.Mcp.PlantoirTools(workspace);
 
-        var answer = await tools.DeploySection("ICS3U", 1, new Progress<ModelContextProtocol.Protocol.ProgressNotificationValue>(_ => { }), default);
+        var answer = await tools.DeploySection("ICS3U", 1, new Progress<ModelContextProtocol.ProgressNotificationValue>(_ => { }), default);
 
         var titles = new[] { "Unit 2, Day 5" };
         Assert.Equal(AssistWording.DeployHasClassesDatedLaterAndNoWindow("ICS3U", "1", titles, ClassNoun.Meeting),

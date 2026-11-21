@@ -587,7 +587,7 @@ public sealed class ClubNounTests : IDisposable
         {
             var tools = Linked(Club("meeting"), visible: false);
             var published = await tools.PublishClassOn("ICS3U", 1, "2025-09-18",
-                                                       new Progress<ProgressNotificationValue>(_ => { }), default, preview: false);
+                                                       new Progress<ModelContextProtocol.ProgressNotificationValue>(_ => { }), default, preview: false);
             return new[] { TeacherCopy(published) };
         },
     };
@@ -638,7 +638,7 @@ public sealed class ClubNounTests : IDisposable
     public async Task TheThreeResultLinesAreTheMacsInAClub()
     {
         var published = await Linked(Club("meeting"), visible: false).PublishClassOn(
-            "ICS3U", 1, "2025-09-18", new Progress<ProgressNotificationValue>(_ => { }), default, preview: false);
+            "ICS3U", 1, "2025-09-18", new Progress<ModelContextProtocol.ProgressNotificationValue>(_ => { }), default, preview: false);
         Assert.Equal(AssistWording.PublishedTheClassOnForAMeeting("2025-09-18"), TeacherCopy(published));
         Assert.DoesNotContain("meeting", ModelCopy(published), StringComparison.OrdinalIgnoreCase);
 
