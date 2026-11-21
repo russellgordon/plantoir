@@ -45,6 +45,33 @@ public static class OneSectionRestore
         new OutsideFile(".netlify_sites/section{N}.json", false, Treatment.LeftAsItIs),
         new OutsideFile(".cloudflare_sites/section{N}.json", false, Treatment.LeftAsItIs),
     };
+
+    /// <summary>What a one-section restore from the menu did, for the finished sentence and the trail (the mac's <c>Outcome</c>).</summary>
+    /// <param name="PagesNotPutBack">Shared pages whose setting for this section could not be put back: no column-0 place for a new key (#186's shape).</param>
+    /// <param name="PagesNotSaved">Shared pages whose new text could not be saved, so they are as they were.</param>
+    /// <param name="PagesMadeSinceHidden">Shared pages made after the backup that were visible to this section and are now hidden from it.</param>
+    /// <param name="WebsiteRecordDiffers">The backup's record of this section's website differs from the live one, which is left as it is.</param>
+    public sealed record Outcome(int PagesNotPutBack, int PagesNotSaved, int PagesMadeSinceHidden, bool WebsiteRecordDiffers);
+
+    /// <summary>
+    /// The folders at the TOP of a course that Quartz never publishes
+    /// (<c>shared-rules.json</c> → <c>geogebraFences.files.notPublished.folders</c>,
+    /// held against this copy by <c>OneSectionRestoreContractTests</c>): a page
+    /// in one is never given a key by the restore, because a template made
+    /// since the backup and hidden here would hide every page later made from it.
+    /// </summary>
+    public static readonly IReadOnlyList<string> FoldersNeverPublished = new[] { "private", "templates", ".obsidian" };
+
+    /// <summary>Whether a page, by its path inside the course folder, is one Quartz publishes: not under a top folder <see cref="FoldersNeverPublished"/> names, and no part of its path starting with a dot (the mac's <c>isPublishable</c>).</summary>
+    public static bool IsPublishable(string relativePath)
+    {
+        string[] parts = relativePath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length > 0 && FoldersNeverPublished.Contains(parts[0])) return false;
+        foreach (string part in parts)
+            if (part.StartsWith('.')) return false;
+        return true;
+    }
+
     // ---- When one section is offered (step 2 of #911) ----------------------
 
     /// <summary>Why a backup's naming does not fit the course now.</summary>
@@ -119,6 +146,66 @@ public static class OneSectionRestore
         if (!sectionExistsNow || keptForReference || renameUnfinished) return null;
         if (!backupHasTheSection || !namingSameAsNow) return null;
         return madeFor;
+    }
+
+    /// <summary>The section a backup was made for, or null for a teacher's own copy of the whole course.</summary>
+    public static int? MadeFor(BackupMaker maker) => maker switch
+    {
+        BackupMaker.Assistant assistant => assistant.SectionNumber,
+        BackupMaker.Menu menu => menu.SectionNumber,
+        _ => null,
+    };
+
+    /// <summary>
+    /// The section Restore from Backup… offers for this backup, or null for
+    /// today's two-button question (the mac's <c>WorkspaceModel.oneSectionRestoreOffer</c>,
+    /// which gathers the facts <see cref="OfferedSection"/> decides on).
+    /// <paramref name="course"/> is the course as loaded; its naming is asked
+    /// of the settings as SAVED, as the restorer asks them, because a build
+    /// may have added a folder since the window last read them.
+    /// <paramref name="facts"/> is read once per backup by the caller
+    /// (<see cref="ReadFacts"/>), before the dialog opens.
+    /// </summary>
+    public static int? OfferFor(BackupItem item, Course? course, BackupFacts facts)
+    {
+        if (MadeFor(item.Maker) is not int section || course is null) return null;
+        bool sectionExistsNow = course.Configuration.SectionNumbers.Contains(section) && Directory.Exists(course.SectionDirectory(section));
+        bool namingSameAsNow = facts.Naming is { } backedUp && Naming.Of(SavedConfiguration(course)).DifferenceFromBackup(backedUp) is null;
+        return OfferedSection(item.Maker, sectionExistsNow, ReferenceCourse.IsKeptForReference(course),
+            RenameIsUnfinished(course.DirectoryPath), facts.SectionsInside.Contains(section), namingSameAsNow);
+    }
+
+    /// <summary>
+    /// Why this section may not be put back on its own from this backup,
+    /// asked again at the click, before the archive, or null when it may (the
+    /// mac's <c>oneSectionRestoreRefusal</c>, reason for reason, in its
+    /// order). Each is a reason <see cref="OfferedSection"/> would have
+    /// withheld the offer for, so a click refused here leaves nothing in Archived.
+    /// </summary>
+    public static string? RefusalAtTheClick(int section, BackupItem item, Course? course, BackupFacts facts)
+    {
+        if (MadeFor(item.Maker) != section) return OneSectionRestoreWording.NotMadeForThisSection(section);
+        if (course is null)
+            return $"{item.CourseCode} is not in Courses & Clubs. Restore the course first, then restore this section into it.";
+        if (ReferenceCourse.IsKeptForReference(course)) return ReferenceCourse.StaysAsItIs(ReferenceCourse.ShownCode(course));
+        if (!course.Configuration.SectionNumbers.Contains(section) || !Directory.Exists(course.SectionDirectory(section)))
+            return OneSectionRestoreWording.SectionNotInCourse(section, item.CourseCode);
+        if (RenameIsUnfinished(course.DirectoryPath)) return OneSectionRestoreWording.RenameUnfinished(section, item.CourseCode);
+        if (!facts.SectionsInside.Contains(section)) return CourseRestorer.SectionMissingFromBackup(item.CourseCode, section);
+        if (facts.Naming is not { } backedUp) return CourseRestorer.ArchiveUnreadable("its course settings could not be read");
+        return Naming.Of(SavedConfiguration(course)).DifferenceFromBackup(backedUp) switch
+        {
+            NamingDifference.Folders => OneSectionRestoreWording.FoldersChanged(section, item.CourseCode),
+            NamingDifference.ClassPages => OneSectionRestoreWording.NamingChanged(section, item.CourseCode),
+            _ => null,
+        };
+    }
+
+    /// <summary>The course's settings as saved now, or as loaded when the file cannot be read.</summary>
+    private static CourseConfiguration SavedConfiguration(Course course)
+    {
+        try { return CourseConfiguration.Load(course.ConfigFilePath); }
+        catch (Exception) { return course.Configuration; }
     }
 
     /// <summary>

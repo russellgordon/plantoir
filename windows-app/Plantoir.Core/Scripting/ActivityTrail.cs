@@ -1185,12 +1185,29 @@ public static class ActivityTrail
         return (arguments[0], section);
     }
 
-    /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
     /// <summary>The words for <c>section restore stopped part way</c>: the mac's <c>sectionRestoreStoppedPartWayLine</c> word for word.</summary>
     public static string SectionRestoreStoppedPartWayLine(string keptAt) =>
         "a section restore stopped part way and could not move every file back; the section may hold " +
         "some files from the backup and some as they were; the files set aside are kept in " + keptAt;
 
+    /// <summary>
+    /// The words for <c>section restored</c> from Restore from Backup…'s
+    /// "Restore Section N" (#911, the mac's <c>restoredOneSectionFromTheMenuLine</c>
+    /// word for word): the backup's file name, the archive made of the whole
+    /// course first, and counts of shared pages hidden and not saved, never which.
+    /// </summary>
+    public static string RestoredOneSectionFromTheMenuLine(string backupFileName, string? archiveFileName, int pagesMadeSinceHidden, int pagesNotSaved)
+    {
+        string line = $"put the section back from {backupFileName}, from Restore from Backup…";
+        if (archiveFileName is not null) line += $"; the course as it was is in Archived as {archiveFileName}";
+        if (pagesMadeSinceHidden == 1) line += "; 1 shared page made since the backup is now hidden from this section";
+        else if (pagesMadeSinceHidden > 1) line += $"; {pagesMadeSinceHidden} shared pages made since the backup are now hidden from this section";
+        if (pagesNotSaved == 1) line += "; 1 shared page could not be saved and is as it was";
+        else if (pagesNotSaved > 1) line += $"; {pagesNotSaved} shared pages could not be saved and are as they were";
+        return line;
+    }
+
+    /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
     public static string PageSettingsLeftAsTheyWereLine(string act, int pages) =>
         $"left the settings of {(pages == 1 ? "1 page" : $"{pages} pages")} as they were while {act}: no room at the top for a new setting";
 

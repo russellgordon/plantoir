@@ -7,14 +7,18 @@ using Plantoir.Core.Scripting;
 // standard output and then waits on standard input; the test waits for that
 // line (an event, never a sleep) and kills the process tree.
 //
-// Arguments: <courses folder> <backup zip> <course code> <section> <stop at> <trail file>
+// Arguments: <courses folder> <backup zip> <course code> <section> <stop at> <trail file> [route]
 //   <stop at>: staged | setAside | move:<k> (after the k-th move of the swap)
+//   [route]: assistant (the default, CourseRestorer.RestoreSection) | menu
+//            (CourseRestorer.RestoreSectionFromTheMenu, Restore from Backup…'s
+//            "Restore Section N", #911 step 3)
 string coursesDirectory = args[0];
 string backupPath = args[1];
 string courseCode = args[2];
 int section = int.Parse(args[3], System.Globalization.CultureInfo.InvariantCulture);
 string stopAt = args[4];
 ActivityTrail.SetCustomLogPathForTesting(args[5]);
+string route = args.Length > 6 ? args[6] : "assistant";
 
 void Stop(string point)
 {
@@ -42,7 +46,8 @@ var hooks = new CourseRestorer.SectionSwapHooks
 var item = BackupItem.From(backupPath, courseCode) ?? throw new InvalidOperationException("not a backup: " + backupPath);
 try
 {
-    CourseRestorer.RestoreSection(section, item, coursesDirectory, hooks);
+    if (route == "menu") CourseRestorer.RestoreSectionFromTheMenu(section, item, coursesDirectory, hooks);
+    else CourseRestorer.RestoreSection(section, item, coursesDirectory, hooks);
     Console.Out.WriteLine("FINISHED");
 }
 catch (Exception error)

@@ -194,6 +194,213 @@ public static class CourseRestorer
         }
     }
 
+    /// <summary>
+    /// Puts ONE section back from a backup made for it, from Restore from
+    /// Backup…'s "Restore Section N" (#911 step 3, the mac's
+    /// <c>restoreSectionFromTheMenu</c>, case for case). The caller has
+    /// archived the whole course first and asked every refusal again.
+    ///
+    /// <para>Staged, swapped, with a way back, like <see cref="RestoreSection"/>,
+    /// and four things more, each a fault that reported success, each for this
+    /// route only (the assistant window's is the mac's frozen one): the
+    /// section's files outside its folder (<see cref="OneSectionRestore.FilesOutsideTheSection"/>,
+    /// each from the backup, discarded or left as it is); a shared page made
+    /// since the backup hidden from this section unless it already is
+    /// (<see cref="HidingAPageMadeSinceTheBackup"/>; pages Quartz never
+    /// publishes excepted); the course's naming asked again of the UNPACKED
+    /// backup; and the legacy website marker in the section's built output
+    /// kept across the discarded build.</para>
+    ///
+    /// <para><paramref name="keepingWhatWasReplaced"/> is the seam for Undo
+    /// (W9, the mac's #899 U5): handed the folder holding everything the swap
+    /// moved aside, after the swap and before that folder is removed. No
+    /// caller passes it yet.</para>
+    /// </summary>
+    public static OneSectionRestore.Outcome RestoreSectionFromTheMenu(int sectionNumber, BackupItem item, string coursesDirectory,
+        SectionSwapHooks? hooks = null, Action<string>? keepingWhatWasReplaced = null)
+    {
+        hooks ??= SectionSwapHooks.Real;
+        string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
+        if (!Directory.Exists(courseDir))
+            throw new RestoreException($"{item.CourseCode} is not in Courses & Clubs. Restore the course first, then restore this section into it.");
+        CourseConfiguration liveConfiguration;
+        try { liveConfiguration = CourseConfiguration.Load(Path.Combine(courseDir, "course_config.json")); }
+        catch (Exception error) { throw new RestoreException($"The course settings of {item.CourseCode} could not be read: {error.Message}"); }
+        var liveCourse = new Course(item.CourseCode, courseDir, liveConfiguration);
+        if (ReferenceCourse.IsKeptForReference(liveCourse))
+            throw new RestoreException(ReferenceCourse.StaysAsItIs(ReferenceCourse.ShownCode(liveCourse)));
+        if (!liveConfiguration.SectionNumbers.Contains(sectionNumber))
+            throw new RestoreException(OneSectionRestoreWording.SectionNotInCourse(sectionNumber, item.CourseCode));
+
+        var staging = new RestoreStaging(coursesDirectory);
+        try
+        {
+            // Unpack and check BEFORE anything in the course moves.
+            string payload = staging.Unpack(item);
+            if (!Directory.Exists(Path.Combine(payload, "section" + sectionNumber)))
+                throw new RestoreException(SectionMissingFromBackup(item.CourseCode, sectionNumber));
+            CourseConfiguration backedUpConfiguration;
+            try { backedUpConfiguration = CourseConfiguration.Load(Path.Combine(payload, "course_config.json")); }
+            catch (Exception) { throw new RestoreException(ArchiveUnreadable("its course settings could not be read")); }
+            switch (OneSectionRestore.Naming.Of(liveConfiguration).DifferenceFromBackup(OneSectionRestore.Naming.Of(backedUpConfiguration)))
+            {
+                case OneSectionRestore.NamingDifference.ClassPages:
+                    throw new RestoreException(OneSectionRestoreWording.NamingChanged(sectionNumber, item.CourseCode));
+                case OneSectionRestore.NamingDifference.Folders:
+                    throw new RestoreException(OneSectionRestoreWording.FoldersChanged(sectionNumber, item.CourseCode));
+            }
+            bool websiteRecordDiffers = WebsiteRecordDiffers(sectionNumber, courseDir, payload);
+            hooks.Reached(SwapPoint.Staged);
+
+            try
+            {
+                SwapSectionInPlace(sectionNumber, courseDir, payload, OneSectionRestore.FilesOutsideTheSection, staging.Aside, hooks, keepingWhatWasReplaced);
+            }
+            catch (WayBackDidNotFinish)
+            {
+                var kept = KeepTheSetAsideFiles(staging.Aside, sectionNumber, item.CourseCode, coursesDirectory);
+                staging.KeepAside = kept.IsStillInStaging;
+                throw new SectionRestoreStoppedPartWay(StoppedPartWaySentence(sectionNumber, kept.PathToSay, archived: true));
+            }
+
+            var keys = RestorePerSectionKeysFromTheMenu(sectionNumber, courseDir, payload);
+            DiscardBuiltSiteKeepingItsWebsiteMarker(sectionNumber, item.CourseCode, coursesDirectory);
+            return new OneSectionRestore.Outcome(keys.NotPutBack, keys.NotSaved, keys.MadeSinceHidden, websiteRecordDiffers);
+        }
+        finally
+        {
+            staging.Finish();
+        }
+    }
+
+    /// <summary>The mac's <c>Problem.sectionMissingFromBackup</c>.</summary>
+    public static string SectionMissingFromBackup(string courseCode, int sectionNumber) =>
+        $"That copy of {courseCode} has no Section {sectionNumber} in it, so there is nothing to put back.";
+
+    /// <summary>The mac's <c>Problem.archiveUnreadable</c>.</summary>
+    public static string ArchiveUnreadable(string reason) => $"The archive could not be opened: {reason}";
+
+    /// <summary>
+    /// Whether the backup's record of where this section's website is differs
+    /// from the live one (the mac's <c>websiteRecordDiffers</c>): the
+    /// <c>leftAsItIs</c> markers outside <c>.publish_state</c> (the deploy
+    /// stamp says when, not where), compared as parsed JSON. With no live
+    /// marker that reads, nothing is said: the section then has no address
+    /// until its next deploy makes one.
+    /// </summary>
+    private static bool WebsiteRecordDiffers(int sectionNumber, string courseDir, string payload)
+    {
+        foreach (var file in OneSectionRestore.FilesOutsideTheSection)
+        {
+            if (file.Treatment != OneSectionRestore.Treatment.LeftAsItIs) continue;
+            if (file.PathTemplate.StartsWith(".publish_state/", StringComparison.Ordinal)) continue;
+            string relative = file.PathFor(sectionNumber);
+            if (ParsedMarker(Path.Combine(courseDir, relative)) is not { } live) continue;
+            var backedUp = ParsedMarker(Path.Combine(payload, relative));
+            if (backedUp is null || !Newtonsoft.Json.Linq.JToken.DeepEquals(live, backedUp)) return true;
+        }
+        return false;
+    }
+
+    private static Newtonsoft.Json.Linq.JToken? ParsedMarker(string path)
+    {
+        try { return File.Exists(path) ? Newtonsoft.Json.Linq.JToken.Parse(File.ReadAllText(path)) : null; }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// The section's built site discarded, keeping the one file in it that is
+    /// not derived from its pages: the legacy Netlify marker
+    /// (<c>.netlify_site.json</c>, which <c>deploy.py</c> still reads), so the
+    /// next deploy goes to the site the section already has (the mac's
+    /// <c>discardBuiltSiteKeepingItsWebsiteMarker</c>). On Windows it lives in
+    /// the section's build root (<see cref="BuildOutputLocation.ForSection"/>),
+    /// where the launchers put it.
+    /// </summary>
+    private static void DiscardBuiltSiteKeepingItsWebsiteMarker(int sectionNumber, string courseCode, string coursesDirectory)
+    {
+        string? marker = CourseArchiver.BuildsRootOf(coursesDirectory) is { } root
+            ? Path.Combine(BuildOutputLocation.ForSection(root, courseCode, sectionNumber), ".netlify_site.json")
+            : null;
+        byte[]? kept = null;
+        try { if (marker is not null && File.Exists(marker)) kept = File.ReadAllBytes(marker); } catch { kept = null; }
+        CourseArchiver.DiscardBuilds(coursesDirectory, courseCode, sectionNumber);
+        if (kept is null || marker is null) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(marker)!);
+            File.WriteAllBytes(marker, kept);
+        }
+        catch { /* as the mac's try?: the build writes a site of its own next */ }
+    }
+
+    /// <summary>
+    /// The shared pages' per-section keys for this section put back as the
+    /// backup had them (as <see cref="RestorePerSectionKeys"/>), and the two
+    /// things the menu's route adds (the mac's <c>restorePerSectionKeys(…,
+    /// fromTheMenu: true)</c>): a shared page the backup LACKS is hidden from
+    /// this section unless it already is (never a page Quartz does not
+    /// publish), and a page whose rewrite fails is counted, not passed over.
+    /// Identity is the path, so a page renamed since counts as made since.
+    /// </summary>
+    private static (int NotPutBack, int NotSaved, int MadeSinceHidden) RestorePerSectionKeysFromTheMenu(int sectionNumber, string courseDir, string payload)
+    {
+        int notPutBack = 0, notSaved = 0, madeSinceHidden = 0;
+        foreach (string page in SharedMarkdownPages(courseDir))
+        {
+            string relative = Path.GetRelativePath(courseDir, page);
+            string backedUpPage = Path.Combine(payload, relative);
+            if (!File.Exists(backedUpPage))
+            {
+                if (!OneSectionRestore.IsPublishable(relative)) continue;
+                string madeSince;
+                try { madeSince = File.ReadAllText(page); }
+                catch (IOException) { continue; }
+                catch (UnauthorizedAccessException) { continue; }
+                var hiding = HidingAPageMadeSinceTheBackup(sectionNumber, madeSince);
+                if (hiding.NoRoomForAKey) { notPutBack++; continue; }
+                if (hiding.Text is not { } hidden) continue;
+                try { File.WriteAllText(page, hidden); madeSinceHidden++; }
+                catch (IOException) { notSaved++; }
+                catch (UnauthorizedAccessException) { notSaved++; }
+                continue;
+            }
+            string liveText, backupText;
+            try
+            {
+                backupText = File.ReadAllText(backedUpPage);
+                liveText = File.ReadAllText(page);
+            }
+            catch (IOException) { continue; }
+            catch (UnauthorizedAccessException) { continue; }
+            var (rewritten, couldNotBePutBack) = SettingPerSectionKeys(sectionNumber, liveText, backupText);
+            if (couldNotBePutBack) notPutBack++;
+            if (rewritten == liveText) continue;
+            try { File.WriteAllText(page, rewritten); }
+            catch (IOException) { notSaved++; }
+            catch (UnauthorizedAccessException) { notSaved++; }
+        }
+        return (notPutBack, notSaved, madeSinceHidden);
+    }
+
+    /// <summary>
+    /// What hiding a shared page made since the backup comes to (the mac's
+    /// <c>hidingAPageMadeSinceTheBackup</c>): null text and no "no room" when
+    /// the build already reads it as hidden for this section; otherwise the
+    /// page with <c>publishForSection&lt;N&gt;: false</c> written by the
+    /// ordinary setter, or "no room" when its settings have no column-0 place
+    /// for a key. Rejected (the mac's amendment 18): taking this section's
+    /// keys OFF the page, which would PUBLISH a page whose plain
+    /// <c>publish:</c> is true and that the teacher hid for this section.
+    /// </summary>
+    public static (string? Text, bool NoRoomForAKey) HidingAPageMadeSinceTheBackup(int sectionNumber, string liveText)
+    {
+        if (PageFrontmatter.IsDraft(liveText, sectionNumber)) return (null, false);
+        var (after, edit) = PageFrontmatter.SetDraft(liveText, PageFrontmatter.PublishKeyFor(sectionNumber, isSectionLocal: false), true, sectionNumber);
+        if (edit.NoRoomForAKey) return (null, true);
+        return after == liveText ? (null, false) : (after, false);
+    }
+
     // ---- The staged swap of one section (#911, the mac's #897 C) ----------
 
     /// <summary>
