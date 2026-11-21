@@ -46,7 +46,16 @@ internal abstract record UndoSwapResult
     private UndoSwapResult() { }
 
     internal sealed record Swapped : UndoSwapResult;
-    internal sealed record Refused(UndoRefusal Refusal) : UndoSwapResult;
+    internal sealed record Refused(UndoRefusal Refusal) : UndoSwapResult
+    {
+        /// <summary>
+        /// A swap already made could not be reversed: a page still holds the
+        /// step's content (its original kept under its staged name). The step
+        /// is half applied and must be left IN FLIGHT for recovery, never
+        /// closed <c>failed</c> (W2b's review, LOW 1; <c>rule.recovery</c>).
+        /// </summary>
+        internal bool LeftPartWay { get; init; }
+    }
     /// <summary>A test (or the harness) stopped it at a kill point, leaving everything as a process that died there would.</summary>
     internal sealed record StoppedByATest : UndoSwapResult;
 }
@@ -61,7 +70,9 @@ internal sealed class UndoSeams
     /// <summary>
     /// Asked at each kill point (<c>afterBegin</c>, <c>afterTheCheck</c>,
     /// <c>afterUndoing</c>, <c>afterRedoing</c>, <c>beforeSwap</c> with its index,
-    /// <c>beforeApplied</c>, <c>beforeUndone</c>, <c>beforeRedone</c>): true stops the
+    /// <c>beforeApplied</c>, <c>beforeUndone</c>, <c>beforeRedone</c>; and
+    /// recovery's own, W3: <c>afterRecoveryTidied</c>,
+    /// <c>recoveryBeforeSwap</c> with its index, <c>recoveryBeforeWriting</c>): true stops the
     /// work there, nothing more written, as a process that died there would.
     /// The harness blocks in it until it is killed.
     /// </summary>
@@ -81,6 +92,9 @@ internal sealed class UndoSeams
 
     /// <summary>Called once a step's undo or redo has checked its ops and before it answers (the stack case <c>undoWhileAStepBegins</c>).</summary>
     internal Action? AfterTheCheck { get; init; }
+
+    /// <summary>Called by <c>Perform(UndoOpsDraft)</c> once its ops are vetted and before its begin hold (a test prunes a blob there: W2b's review, LOW 5).</summary>
+    internal Action? BeforeTheBegin { get; init; }
 
     internal bool Stops(string point, int index = -1) => StopsHere?.Invoke(point, index) == true;
 }
@@ -136,42 +150,63 @@ internal static class UndoSwap
 
     internal static UndoSwapResult Swap(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams = null)
     {
+        // Every staged file's handle is let go however the swap ends, a test's
+        // kill point included, as a process that died there would let it go.
+        var staged = new UndoStagedFile?[targets.Count];
+        var originals = new UndoStagedFile?[targets.Count];
+        try { return SwapStaged(targets, label, root, seams, staged, originals); }
+        finally
+        {
+            foreach (UndoStagedFile? file in staged) file?.LetGo();
+            foreach (UndoStagedFile? file in originals) file?.LetGo();
+        }
+    }
+
+    private static UndoSwapResult SwapStaged(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams,
+                                             UndoStagedFile?[] staged, UndoStagedFile?[] originals)
+    {
         int count = targets.Count;
-        var staged = new string?[count];
-        var originals = new string?[count];
         int swapsMade = 0;
 
         void Tidy()
         {
             for (int index = 0; index < count; index++)
             {
-                if (staged[index] is { } stagedPath) TryDelete(stagedPath);
-                if (originals[index] is { } originalPath) TryDelete(originalPath);
+                staged[index]?.Remove();
+                originals[index]?.Remove();
                 staged[index] = null;
                 originals[index] = null;
             }
         }
 
-        void Reverse()
+        // True when every swap already made was reversed. False when one could
+        // not be (its page still holds this step's content): the step is then
+        // half applied, its original is left under its staged name, and the
+        // caller must leave the step IN FLIGHT for recovery (W2b's review,
+        // LOW 1), never close it failed.
+        bool Reverse()
         {
+            bool whole = true;
             for (int index = swapsMade - 1; index >= 0; index--)
             {
                 UndoSwapTarget target = targets[index];
                 if (originals[index] is { } original)
                 {
-                    // Put back. Either way it is no longer the tidy's to remove:
-                    // put back, it is the page again; not put back, it is the
+                    // Put back, it is the page again; not put back, it is the
                     // page's old content under its staged name, left for
-                    // recovery (W3) and never deleted.
-                    RenameWithRetries(original, target.FullPath, replace: true, seams);
+                    // recovery and never deleted. Either way it is no longer
+                    // the tidy's to remove.
+                    original.LetGo();
                     originals[index] = null;
+                    if (RenameWithRetries(original.Path, target.FullPath, replace: true, seams) != 0) whole = false;
                 }
-                else
+                else if (!TryDelete(target.FullPath))
                 {
                     // There was no file: the one the swap made goes.
-                    TryDelete(target.FullPath);
+                    whole = false;
                 }
             }
+            return whole;
         }
 
         // 1. Stage every new content beside its target.
@@ -197,7 +232,7 @@ internal static class UndoSwap
                     throw new IOException("There is not enough space on the disk.", unchecked((int)0x80070070));
                 }
                 WriteDurably(stagedPath, replacement);
-                staged[index] = stagedPath;
+                staged[index] = UndoStagedFile.Made(stagedPath);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
@@ -215,15 +250,13 @@ internal static class UndoSwap
         {
             UndoSwapTarget target = targets[index];
             if (seams?.Stops("beforeSwap", index) == true) return new UndoSwapResult.StoppedByATest();
-            UndoRefusal? refusal;
-            bool wentIn = false;
-            refusal = SwapAFile(target, index, label, root, staged, originals, seams, out wentIn);
+            UndoRefusal? refusal = SwapAFile(target, index, label, root, staged, originals, seams, out bool wentIn);
             if (wentIn) swapsMade++;
             if (refusal is not null)
             {
-                Reverse();
+                bool reversed = Reverse();
                 Tidy();
-                return new UndoSwapResult.Refused(refusal);
+                return new UndoSwapResult.Refused(refusal) { LeftPartWay = !reversed };
             }
         }
 
@@ -232,9 +265,27 @@ internal static class UndoSwap
         return new UndoSwapResult.Swapped();
     }
 
-    /// <summary>One file's swap; the refusal, or null when it went in. <paramref name="wentIn"/> says whether the page was changed (a raced edit is refused AFTER its rename, and must be reversed).</summary>
-    private static UndoRefusal? SwapAFile(UndoSwapTarget target, int index, string label, string? root, string?[] staged,
-                                          string?[] originals, UndoSeams? seams, out bool wentIn)
+    /// <summary>
+    /// One file's swap; the refusal, or null when it went in.
+    /// <paramref name="wentIn"/> says whether the page was changed (a raced
+    /// edit is refused AFTER its rename, and must be reversed).
+    /// </summary>
+    /// <remarks>
+    /// The order shrinks the window in which an edit can be lost (W2b's
+    /// review, LOW 3): everything that can refuse without touching the page
+    /// (containment, the re-read, read-only, the attribute copy onto the
+    /// staged file) comes BEFORE the original is kept, so the keep is
+    /// followed at once by the identity check and the rename. An edit in
+    /// place after the keep shows in the kept link's hash (L4); an editor that
+    /// saves by REPLACING the page (a new file renamed over it) gives the
+    /// page a new file identity, which the identity check just before the
+    /// rename sees as changed since. What remains is the few microseconds
+    /// between that check and the rename, and, on a volume with no hard links
+    /// (the original a COPY), every replace after the re-read: documented in
+    /// documentation 12.
+    /// </remarks>
+    private static UndoRefusal? SwapAFile(UndoSwapTarget target, int index, string label, string? root, UndoStagedFile?[] staged,
+                                          UndoStagedFile?[] originals, UndoSeams? seams, out bool wentIn)
     {
         wentIn = false;
         seams?.BeforeEachSwap?.Invoke(index, target.FullPath);
@@ -253,41 +304,64 @@ internal static class UndoSwap
         // A read-only page is never forced (the plan review's M4): it is a page
         // that will not take a write, the same word as a full disk, never "in use".
         if (now is UndoCurrent.Bytes && IsReadOnly(target.FullPath)) return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath);
+        bool replacing = now is UndoCurrent.Bytes;
+        if (replacing && staged[index] is { } lookOnto) CopyTheLookOf(target.FullPath, lookOnto.Path);
 
-        if (now is UndoCurrent.Bytes)
+        if (replacing)
         {
             string originalPath = BesidePath(target.FullPath, label, "orig");
-            TryDelete(originalPath);
-            int? keptFailure = Keep(target.FullPath, originalPath);
-            if (keptFailure is { } failure)
+            // A leftover of an earlier try may be a link to this very page:
+            // removed without touching its attributes (LOW 4).
+            UndoStagedFile.RemoveByName(originalPath);
+            // A page the step removes has no staged content holding its folder
+            // in place: its original holds the handle instead, from the keep
+            // to the delete, which an editor's save cannot meet (the page is
+            // going). A page the step replaces is held by its staged content.
+            UndoStagedFile? kept = UndoStagedFile.Keep(target.FullPath, originalPath, out int failure, holdItsFolder: staged[index] is null);
+            if (kept is null)
             {
-                TryDelete(originalPath);
                 // On a volume without hard links the original is COPIED, and a
                 // copy can fail for room or permission: the same word as a
                 // staging write that fails (the mac's U2a review, LOW 1).
                 return new UndoRefusal(IsRoomOrPermission(failure) ? UndoRefusalKind.CouldNotWrite : UndoRefusalKind.FileIsInUse, target.RelativePath);
             }
-            originals[index] = originalPath;
+            originals[index] = kept;
         }
         seams?.BetweenKeepingAndRenaming?.Invoke(index, target.FullPath);
         if (root is not null && !UndoPlaces.StaysInside(root, target.RelativePath))
         {
-            // Its name now leads outside: nothing is removed through it either.
-            // The kept original stays where it was made, for recovery (W3).
+            // Its name now leads outside: nothing is renamed through it, and the
+            // kept original is removed by its own handle, never through the
+            // name that now leads outside (W2b's review, LOW 2).
+            originals[index]?.Remove();
             originals[index] = null;
             return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
         }
-
-        if (staged[index] is { } stagedPath)
+        if (originals[index] is { IsALink: true } link && !link.IsStillThePageAt(target.FullPath, out int openError))
         {
-            bool replacing = now is UndoCurrent.Bytes;
-            if (replacing) CopyTheLookOf(target.FullPath, stagedPath);
-            int renamed = RenameWithRetries(stagedPath, target.FullPath, replace: replacing, seams);
+            // The page is no longer the file the original was kept from: an
+            // editor saved it by replacing it (LOW 3). Its save is kept.
+            originals[index]?.Remove();
+            originals[index] = null;
+            UndoRefusalKind kind = openError is 32 or 33 ? UndoRefusalKind.FileIsInUse
+                : openError is 0 or 2 or 3 ? UndoRefusalKind.ChangedSince : UndoRefusalKind.CannotTellNow;
+            return new UndoRefusal(kind, target.RelativePath);
+        }
+
+        if (staged[index] is { } stagedFile)
+        {
+            int renamed = RenameWithRetries(stagedFile.Path, target.FullPath, replace: replacing, seams);
             if (renamed != 0)
             {
-                if (originals[index] is { } kept) { TryDelete(kept); originals[index] = null; }
+                // Removed by its own handle with the read-only attribute
+                // ignored: never by clearing read-only on a link to the live
+                // page (W2b's review, LOW 4).
+                originals[index]?.Remove();
+                originals[index] = null;
                 return new UndoRefusal(Classify(renamed, target.FullPath), target.RelativePath);
             }
+            // It is the page now: its handle is let go, never used to remove it.
+            stagedFile.LetGo();
             staged[index] = null;
         }
         else
@@ -296,7 +370,8 @@ internal static class UndoSwap
             try { File.Delete(target.FullPath); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
-                if (originals[index] is { } kept) { TryDelete(kept); originals[index] = null; }
+                originals[index]?.Remove();
+                originals[index] = null;
                 return new UndoRefusal(Classify(error.HResult & 0xFFFF, target.FullPath), target.RelativePath);
             }
         }
@@ -313,7 +388,7 @@ internal static class UndoSwap
             // cannot tell: reversed, never changed since, which would clear the
             // list for a page nobody touched (ruling 4: only content that was
             // read and differs is changed).
-            byte[]? kept = ReadAllShared(original);
+            byte[]? kept = ReadAllShared(original.Path);
             if (kept is null) return new UndoRefusal(UndoRefusalKind.CannotTellNow, target.RelativePath);
             if (!SameBytes(kept, target.Expected)) return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
         }
@@ -377,31 +452,16 @@ internal static class UndoSwap
     {
         try
         {
-            const FileAttributes Copied = FileAttributes.Hidden | FileAttributes.System | FileAttributes.Archive | FileAttributes.NotContentIndexed;
+            // OneDrive's Pinned ("always keep on this device") and Unpinned
+            // ("free up space") are attributes too, set by the same call, so
+            // a page keeps its place in Files On Demand (W2b's review, LOW 8).
+            const FileAttributes Copied = FileAttributes.Hidden | FileAttributes.System | FileAttributes.Archive
+                                        | FileAttributes.NotContentIndexed | Pinned | Unpinned;
             FileAttributes attributes = File.GetAttributes(target) & Copied;
             File.SetCreationTimeUtc(staged, File.GetCreationTimeUtc(target));
             File.SetAttributes(staged, attributes == 0 ? FileAttributes.Normal : attributes);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
-    }
-
-    /// <summary>
-    /// Keeps the original under a second name: a hard link where the volume
-    /// has them, a copy where it does not. Null when it was kept, otherwise
-    /// the error number of the last try.
-    /// </summary>
-    internal static int? Keep(string path, string keptPath)
-    {
-        if (CreateHardLinkW(UndoLock.LongPath(keptPath), UndoLock.LongPath(path), IntPtr.Zero)) return null;
-        try
-        {
-            File.Copy(path, keptPath, overwrite: false);
-            return null;
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        {
-            return error is UnauthorizedAccessException ? 5 : error.HResult & 0xFFFF;
-        }
     }
 
     /// <summary>The rename, tried again a few times when it is refused for a holder; 0 when it went in, else the last error.</summary>
@@ -503,7 +563,11 @@ internal static class UndoSwap
             {
                 string name = Path.GetFileName(file);
                 if (!labels.Any(label => IsStaged(name, label))) continue;
-                if (!TryDelete(file)) allGone = false;
+                // A kept original a stopped swap left may still be a hard link
+                // to the live page (it died before the rename): removed with
+                // the read-only attribute ignored, never cleared, since the
+                // two names share it (W2b's review, LOW 4).
+                if (!UndoStagedFile.RemoveByName(file)) allGone = false;
             }
         }
         return allGone;
@@ -532,6 +596,10 @@ internal static class UndoSwap
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
     }
 
+    /// <summary><c>FILE_ATTRIBUTE_PINNED</c> and <c>FILE_ATTRIBUTE_UNPINNED</c> (Files On Demand).</summary>
+    internal const FileAttributes Pinned = (FileAttributes)0x00080000;
+    internal const FileAttributes Unpinned = (FileAttributes)0x00100000;
+
     private const uint Delete = 0x00010000;
     private const uint Synchronize = 0x00100000;
     private const uint ShareAll = 0x7;
@@ -550,6 +618,205 @@ internal static class UndoSwap
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool MoveFileExW(string existing, string replacement, uint flags);
+
+}
+
+/// <summary>
+/// A file a swap makes beside a page (#899 W2b; W3 made it an object, from
+/// W2b's review, LOWs 2 to 4): a new content staged as <c>-new</c>, or the
+/// page's original kept under its staged <c>-orig</c> name.
+///
+/// <para>A STAGED new content holds an attributes-only handle from the moment
+/// it is written until it is renamed in or removed. That handle takes part in
+/// no sharing check, so it keeps no program from the file, but Windows will
+/// not rename or move a folder with a file open below it (measured: access
+/// denied), so while a swap is under way the folders of its pages cannot be
+/// replaced by a junction: the race the containment checks catch is made
+/// impossible for those folders rather than merely detected, and a staged
+/// file is removed by its handle, never through a name that leads elsewhere.
+/// A KEPT original holds no handle (the file IS the page, a hard link, and
+/// an open handle on it would refuse an editor's save by replace): it keeps
+/// the file identity it was made with, and is removed by name only when that
+/// name is still that file. The one exception is the original of a page the
+/// step REMOVES, which has no staged content to hold its folder: it holds
+/// the handle itself, from the keep to the delete.</para>
+/// </summary>
+internal sealed class UndoStagedFile
+{
+    private SafeFileHandle? _handle;
+    private readonly (uint Volume, ulong Index)? _identity;
+
+    private UndoStagedFile(string path, bool isALink, SafeFileHandle? handle, (uint Volume, ulong Index)? identity)
+    {
+        Path = path;
+        IsALink = isALink;
+        _handle = handle;
+        _identity = identity;
+    }
+
+    internal string Path { get; }
+
+    /// <summary>A hard link to the page (the same file); false for a copy, on a volume with no links.</summary>
+    internal bool IsALink { get; }
+
+    /// <summary>A staged new content just written (not a link), its handle held.</summary>
+    internal static UndoStagedFile Made(string path)
+    {
+        SafeFileHandle handle = CreateFileW(UndoLock.LongPath(path), ReadAttributes, ShareAll, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+        if (!handle.IsInvalid) return new UndoStagedFile(path, false, handle, UndoFileIdentity.Of(handle));
+        handle.Dispose();
+        return new UndoStagedFile(path, false, null, null);
+    }
+
+    /// <summary>
+    /// Keeps <paramref name="page"/> as <paramref name="keptPath"/>: a hard
+    /// link where the volume has them, a copy where it does not. Null when it
+    /// could not be kept, with the error number of the last try.
+    /// </summary>
+    internal static UndoStagedFile? Keep(string page, string keptPath, out int failure, bool holdItsFolder = false)
+    {
+        failure = 0;
+        bool linked = CreateHardLinkW(UndoLock.LongPath(keptPath), UndoLock.LongPath(page), IntPtr.Zero);
+        if (!linked)
+        {
+            try { File.Copy(page, keptPath, overwrite: false); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                failure = error is UnauthorizedAccessException ? 5 : error.HResult & 0xFFFF;
+                return null;
+            }
+        }
+        SafeFileHandle handle = CreateFileW(UndoLock.LongPath(keptPath), ReadAttributes, ShareAll, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            handle.Dispose();
+            return new UndoStagedFile(keptPath, linked, null, null);
+        }
+        (uint, ulong)? identity = UndoFileIdentity.Of(handle);
+        if (holdItsFolder) return new UndoStagedFile(keptPath, linked, handle, identity);
+        handle.Dispose();
+        return new UndoStagedFile(keptPath, linked, null, identity);
+    }
+
+    /// <summary>
+    /// Whether the file at <paramref name="page"/> is still the one this link
+    /// was made to (the same volume and file index): false when an editor has
+    /// saved by REPLACING the page since the keep (W2b's review, LOW 3). True
+    /// when the identity is not known (nothing to compare: the content checks
+    /// still stand). <paramref name="openError"/> is the error when the page
+    /// could not be opened even for its attributes.
+    /// </summary>
+    internal bool IsStillThePageAt(string page, out int openError)
+    {
+        openError = 0;
+        if (_identity is null) return true;
+        using SafeFileHandle now = CreateFileW(UndoLock.LongPath(page), ReadAttributes, ShareAll, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+        if (now.IsInvalid)
+        {
+            openError = Marshal.GetLastWin32Error();
+            return false;
+        }
+        return UndoFileIdentity.Of(now) == _identity;
+    }
+
+    /// <summary>Removes a staged file by its name, its attributes untouched (the read-only bit ignored, never cleared). True when it is gone.</summary>
+    internal static bool RemoveByName(string path)
+    {
+        using SafeFileHandle byName = CreateFileW(UndoLock.LongPath(path), Delete | ReadAttributes | Synchronize, ShareAll, IntPtr.Zero,
+                                                  OpenExisting, OpenReparsePoint, IntPtr.Zero);
+        if (byName.IsInvalid) return Marshal.GetLastWin32Error() is 2 or 3;
+        return DeleteByHandle(byName);
+    }
+
+    /// <summary>Closes the handle without removing anything (the kept file is put back in its place, or left for recovery).</summary>
+    internal void LetGo()
+    {
+        _handle?.Dispose();
+        _handle = null;
+    }
+
+    /// <summary>
+    /// Removes the file. A staged content by its own handle, reopened for
+    /// delete; a kept original (or a staged file whose handle cannot be
+    /// reopened) by its name, opened for delete without following a link and
+    /// removed only if it is still the file that was made, so a name that now
+    /// leads elsewhere removes nothing (LOW 2). Always with the read-only
+    /// attribute IGNORED rather than cleared, because a hard link shares its
+    /// attributes with the live page and clearing it there would change the
+    /// teacher's page (LOW 4). True when it is gone.
+    /// </summary>
+    internal bool Remove()
+    {
+        try
+        {
+            if (_handle is not null)
+            {
+                using SafeFileHandle reopened = ReOpenFile(_handle, Delete | Synchronize, ShareAll, 0);
+                if (!reopened.IsInvalid) return DeleteByHandle(reopened);
+            }
+            if (_identity is null)
+            {
+                // Nothing to recognise it by: removed by name only while the
+                // name is inside a folder that has not changed since (the
+                // caller's containment check), the old way.
+                try { File.Delete(Path); return !File.Exists(Path); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+            }
+            using SafeFileHandle byName = CreateFileW(UndoLock.LongPath(Path), Delete | ReadAttributes | Synchronize, ShareAll, IntPtr.Zero,
+                                                      OpenExisting, OpenReparsePoint, IntPtr.Zero);
+            if (byName.IsInvalid) return Marshal.GetLastWin32Error() is 2 or 3;
+            if (UndoFileIdentity.Of(byName) != _identity) return false;
+            return DeleteByHandle(byName);
+        }
+        finally
+        {
+            LetGo();
+        }
+    }
+
+    /// <summary>
+    /// <c>FileDispositionInfoEx</c> with DELETE, POSIX semantics and IGNORE
+    /// READONLY: the name goes at once, the file's attributes untouched.
+    /// Where the volume does not know it (87, FAT), the plain disposition,
+    /// which leaves a read-only file where it is rather than change it.
+    /// </summary>
+    private static bool DeleteByHandle(SafeFileHandle handle)
+    {
+        IntPtr flags = Marshal.AllocHGlobal(4);
+        try
+        {
+            Marshal.WriteInt32(flags, (int)(DispositionDelete | DispositionPosix | DispositionIgnoreReadOnly));
+            if (SetFileInformationByHandle(handle, FileDispositionInfoEx, flags, 4)) return true;
+            if (Marshal.GetLastWin32Error() is not (87 or 50)) return false;
+            Marshal.WriteInt32(flags, 1);
+            return SetFileInformationByHandle(handle, FileDispositionInfo, flags, 1);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(flags);
+        }
+    }
+
+    private const uint ReadAttributes = 0x00000080;
+    private const uint Delete = 0x00010000;
+    private const uint Synchronize = 0x00100000;
+    private const uint ShareAll = 0x7;
+    private const uint OpenExisting = 3;
+    private const uint OpenReparsePoint = 0x00200000;
+    private const int FileDispositionInfo = 4;
+    private const int FileDispositionInfoEx = 21;
+    private const uint DispositionDelete = 0x1;
+    private const uint DispositionPosix = 0x2;
+    private const uint DispositionIgnoreReadOnly = 0x10;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern SafeFileHandle ReOpenFile(SafeFileHandle original, uint access, uint share, uint flags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetFileInformationByHandle(SafeFileHandle file, int informationClass, IntPtr information, uint size);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CreateHardLinkW(string newName, string existing, IntPtr security);

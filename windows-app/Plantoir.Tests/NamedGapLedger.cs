@@ -310,6 +310,15 @@ internal static class NamedGapLedger
     internal const string UndoTraces = "undo-traces.json → traces";
 
     /// <summary>
+    /// <c>shared-rules.json</c> → <c>undo.recoveryCases</c>, by case <c>name</c>:
+    /// a case that needs a key this replay does not check yet (U2b's
+    /// <c>withAMove</c>, <c>withATree</c>, <c>withAPreference</c>,
+    /// <c>recoveredBy</c>: W6). A held case must still stop at that key
+    /// (<c>UndoRecoveryContractTests.EveryRecoveryCase</c>).
+    /// </summary>
+    internal const string UndoRecoveryCases = "shared-rules.json → undo.recoveryCases";
+
+    /// <summary>
     /// The older name each <see cref="SubjectMenuItemsUnderAnOlderName"/> entry
     /// is said under here. Every entry has exactly one, and every name here has
     /// an entry (<c>NamedGapLedgerTests</c>).
@@ -415,8 +424,7 @@ internal static class NamedGapLedger
     private const string Reason899W6 = "the six op kinds the mac's U2b defines (replaceText, editJSON, move, createTree, removeTree, external) and recompute run are Windows' W6 for #899, still to come (plans/899-plan.md, W6 to W11b); until it lands this app's reader takes each for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
     private const string Reason899W7U3b = "the mac's U3b for #899 (2026-11-20): the rollover as one step, whose site markers are the op kind moveApart (judged as move, but an Undo or Redo that finds it changed since leaves it and goes on with the rest: Russell's ruling of 2026-11-19 on Q3, #959), and a step's moveApart ops move as a group, all left apart when any one is changed since (the director's decision of 2026-11-20), as is a deploy set for later the swap cannot set at an Undo or Redo (the U3b review's LOW 3); a leftover no deploy reads is the op kind setAside, judged as move and standing apart ON ITS OWN, never one of that group, and a deploy set for later put back whose job will start only at the next login is named in startsAtTheNextLogin with its own sentence, undoScheduleStartsAtTheNextLogin (U3b's fix round three, 2026-11-20; which record a deploy reads is undo.netlifyRecordCases, which W7 runs as well); Windows' W7 for #899 builds it (documentation 12, the W7 row); until it lands this app's reader takes moveApart for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
     private const string Reason899W6Traces = Reason899W6 + ". COVERAGE LOST, for W6 to restore: until U2b's contract put a move in them, W1 replayed all 20 traces call by call to their final hashes; held, each of these 15 is asserted only up to its first move and must stop exactly there, and trace-002, trace-012 and trace-020 open with a move, so they check nothing at all here until W6 replays them whole";
-    private const string Reason1009 = "stopping a running preview, deploy or plan share from the keyboard, with the two stop questions, their Don't ask again boxes and Settings > Deploying > Stopping (the mac's #988), is #1009's piece of v2.0.0; until it lands Windows asks no stop question and has no setting for one, so it has no change to record";
-    private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
+    private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) has no action wired on Windows yet (W7 wires them, with 'undo could not record a step'), and no op kind that sets a folder aside (W6, with 'undo found a folder set aside'); 'undo rolled back' is written by W3's recovery";
 
     /// <summary>
     /// The outside doors the contract names that this app does not have,
@@ -554,8 +562,7 @@ internal static class NamedGapLedger
              "Cloudflare token end date learned"),
         Owed(ActivityTrailEvents, 936, V200, Reason936,
              "files for the site downloaded", "files for the site could not be downloaded"),
-        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back", "undo found a folder set aside"),
-        Owed(ActivityTrailEvents, 1009, V200, Reason1009, "stop question setting changed"),
+        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo found a folder set aside"),
         // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
         // recompute run. This reader takes them for kinds it does not know
         // until W6 (the Windows plan, plans/899-plan.md: W1 reads the
@@ -688,6 +695,28 @@ internal static class NamedGapLedger
              "trace-017",
              "trace-018",
              "trace-020"),
+        Owed(UndoRecoveryCases, 899, V200, Reason899W6,
+             "U2: a step with a marker move and the front page dies after every swap, before its re-derivation: completed, and recovery re-derives the front page",
+             "U2: the same step dies with its pages swapped and its marker not yet moved: the pages put back, rolled back, and the front page re-derived",
+             "U2: the same step dies before anything is swapped: failed, nothing to put back, and the front page re-derived all the same (re-deriving is idempotent)",
+             "U2: its undo dies after its swaps, before its re-derivation: completed, and re-derived",
+             "U2: its undo dies with the marker moved back and the pages not yet: the marker moved aside again, the undo ends where it began",
+             "U2: a deploy wrote a new marker after the step died with its marker moved: the pair is in the way, the pages are put back, both markers kept, the step interrupted and the list cleared",
+             "U2: a step that removes a folder dies with the folder set aside and its marker not yet moved: the folder put back from where it was set aside (its listing the step's), the pages put back, rolled back",
+             "U2: the same step dies after every change, before applied: completed, the folder gone, nothing staged left",
+             "U2: its undo dies with the pages and the marker back and the folder not yet made: the folder made beside its place is removed, and the undo rolled back",
+             "U2: a step that sets a preference dies with its pages swapped and the preference not yet set: rolled back, the preference as it was",
+             "U2: the same step dies after the preference is set, before applied: completed",
+             "U2: a step with the front page that died before applied is settled by the next write through the door for ops, and its front page re-derived",
+             "U2: the same step meets a write through U1's door first: the write is refused (another change is under way) and the step left in flight for a recovery that re-derives, never settled with its front page stale",
+             "U2: a step that removes a folder dies with the folder set aside, and a file is saved into it while it is aside: the folder is put back in its place, changed, and is in the way: the pages are put back, the step is interrupted naming the folder, and the list cleared",
+             "U2: the same, with something else made in the folder's place since: the folder set aside is kept under a visible name beside it, the step interrupted naming the folder, and the list cleared",
+             "U2: the same, with that visible name taken too: the folder is kept as '(kept by Undo 2)', the taken name untouched",
+             "U2: the same, with the recovery dying after the folder is kept under its visible name and before it writes to the list: the next recovery finds nothing hidden and settles the step as interrupted, the folder still kept, one trail line",
+             "U2: a step that removes a folder dies with the folder changed while aside and the recovery dying after putting it back, before it writes to the list: the next recovery finds the folder in its place, in the way, and settles the step as interrupted, one trail line",
+             "U2: a step that removes a folder dies part way through deleting it, every change in: the folder was renamed to its -gone name first, so recovery finishes the delete and the step is completed, never a half-emptied folder put back",
+             "U2: its redo dies the same way, part way through deleting the folder again: recovery finishes the delete and the redo is completed",
+             "U2: a write through U1's door on the very file a dead front-page step left part way is refused, never written over it"),
         Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
         Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921, "cloudflareToken"),
         Owed(CredentialRequestsSaidDifferently, 920, V200, Reason920, "teacherSurname", "siteName", "siteNameConflict"),

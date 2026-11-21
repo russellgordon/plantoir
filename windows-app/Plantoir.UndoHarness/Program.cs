@@ -33,8 +33,13 @@ internal static class Program
                 "onedrive" => OneDriveWatch(folder, Int(args[2])),
                 "door-kill" => DoorRuns.Kill(folder, Int(args[2])),
                 "child-door" => DoorRuns.ChildDoor(folder, Int(args[2]), args[3]),
+                "recovery-kill" => DoorRuns.RecoveryKill(folder, Int(args[2])),
+                "child-recover" => DoorRuns.ChildRecover(folder, args[2]),
                 "door-time" => DoorRuns.Time(folder, Int(args[2]), Int(args[3])),
                 "swap-cases" => DoorRuns.SwapCases(folder, args[2] == "1", Int(args[3])),
+                "w4-seed" => W4Runs.Seed(folder, args[2], args[3], Int(args[4])),
+                "child-w4" => W4Runs.Child(folder, args[2], args[3], Int(args[4])),
+                "w4-read" => W4Runs.Read(folder, args[2], Int(args[3])),
                 _ => Unknown(mode),
             };
         }

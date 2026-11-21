@@ -292,6 +292,15 @@ public static class ActivityTrail
         /// them; without it the trail shows six changes and then nothing.
         /// </summary>
         SectionRestored,
+
+        /// <summary>
+        /// Undo's recovery settled a step whose work stopped part way (#899
+        /// W3, <c>undo.rule.recovery</c>): it put back what had taken effect,
+        /// or found a file changed by hand since and cleared the list. Counts
+        /// only, never page text. Written only while the list is live (in
+        /// shadow recovery never writes into a working folder).
+        /// </summary>
+        UndoRolledBack,
         /// <summary>
         /// A whole course was put back, from one of its backups (Restore…) or
         /// from Archived: the code it shows, its folder, the zip's FILE NAME,
@@ -746,6 +755,14 @@ public static class ActivityTrail
         /// <summary>File ▸ Settings ▸ Obsidian turned the add-ons on or off — the only way back from "Don't ask again".</summary>
         ObsidianAddOnsSettingChanged,
         /// <summary>
+        /// "Stop the deploy?" or "Stop this share?" was turned off by its
+        /// "Don't ask again" box with the stop, or on or off in File ▸
+        /// Settings ▸ Deploying ▸ Stopping (#1009, the mac's #988). While one
+        /// is off Escape stops that task at once, so "Escape stopped my deploy
+        /// without asking" is answered here. Words: <c>stopQuestions.trail</c>.
+        /// </summary>
+        StopQuestionSettingChanged,
+        /// <summary>
         /// "Close Obsidian to open {course}?" was answered (#1003, the mac's
         /// #995): the course and what came of it - opened after closing
         /// Obsidian, Cancel, nothing to close by then, Obsidian did not close,
@@ -876,6 +893,7 @@ public static class ActivityTrail
         Event.HowITeachPageWritten => "How I Teach page written",
         Event.HowITeachPageKeptOff => "How I Teach page kept off the website",
         Event.SectionRestored => "section restored",
+        Event.UndoRolledBack => "undo rolled back",
         Event.CourseRestoredFromABackup => "course restored from a backup",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
@@ -945,6 +963,7 @@ public static class ActivityTrail
         Event.ObsidianAddOnsAdded => "obsidian add-ons added",
         Event.ObsidianReopenedForAddOns => "obsidian reopened for add-ons",
         Event.ObsidianAddOnsSettingChanged => "obsidian add-ons setting changed",
+        Event.StopQuestionSettingChanged => "stop question setting changed",
         Event.ObsidianClosingAsked => "asked to close Obsidian to open a course",
         Event.PageOpenedInObsidian => "page opened in Obsidian",
         Event.SwiftGotReady => "Swift got ready on this computer",
