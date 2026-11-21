@@ -110,15 +110,28 @@ internal static class UndoJsonMember
         MaxDepth = 256,
     };
 
-    /// <summary>The file's top-level object as a value, or null when the file is not UTF-8 or not one JSON object.</summary>
+    /// <summary>
+    /// The file's top-level object as a value, read as the mac's reader reads
+    /// it, or null when the file is not UTF-8 or not one JSON object. A UTF-8
+    /// byte-order mark at the very start is passed over, as Foundation's reader
+    /// does (measured on the mac, 2026-11-20: a file starting with one is read,
+    /// its member judged; one with a space before the mark is not JSON), so the
+    /// verdict before a write is the mac's. The byte mover still refuses such a
+    /// file (<see cref="UndoJsonBytes.Locate"/> starts at the first byte, as
+    /// the mac's does), so a member is never moved in it: changed since, on
+    /// both platforms. Its numbers are the doubles the mac reads
+    /// (<see cref="UndoJson.ReadAsTheMacReads"/>).
+    /// </summary>
     internal static UndoJson.Members? TopLevel(byte[] bytes)
     {
         if (UndoCheck.DecodeStrictly(bytes) is null) return null;
+        ReadOnlyMemory<byte> json = bytes;
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) json = bytes.AsMemory(3);
         try
         {
-            using JsonDocument document = JsonDocument.Parse(bytes, Strict);
+            using JsonDocument document = JsonDocument.Parse(json, Strict);
             if (document.RootElement.ValueKind != JsonValueKind.Object) return null;
-            return UndoJson.From(document.RootElement) as UndoJson.Members;
+            return UndoJson.From(document.RootElement, asTheMacReadsAFile: true) as UndoJson.Members;
         }
         catch (JsonException) { return null; }
     }
@@ -799,18 +812,52 @@ internal interface IUndoExternalPlaces
 /// <summary>
 /// The app's own settings store (<c>%LOCALAPPDATA%\Plantoir\settings.json</c>,
 /// following <c>--state-dir</c>), named <c>preference:&lt;name&gt;</c> by the
-/// member's name as the file spells it. Read and set through
-/// <see cref="Models.AppSettings.Current"/>, the one copy the app holds, and
-/// saved at once, so a set is never overwritten by the app's next save of an
-/// older copy. A name the store does not have is cannot tell (never "not
-/// set"), and a typed setting cannot be removed, so setting one to "not set"
-/// is refused (couldNotWrite). Which of the app's settings a step records, and
+/// member's name as <see cref="Models.AppSettings"/> spells it. Read from the
+/// FILE as it is on the disk now, as the app's typed settings read it (a member
+/// the file does not hold is its default), never from a process's copy, which
+/// may be older (<c>plantoir-mcp.exe</c> holds its own). A set replaces exactly
+/// that member with exactly the value (a list or a dictionary replaced whole,
+/// never merged into), into the file as it is on the disk now: the file is
+/// read, that one member changed, the result checked to read back as the value,
+/// and only then written whole, by a temporary file and one rename that
+/// replaces, so a set either happened or did not. A result that does not read
+/// back as the value (a number given for a text setting) writes nothing and is
+/// refused (couldNotWrite), the file byte for byte as it was. Once written, the
+/// copy this process runs on (<see cref="Models.AppSettings.Current"/>) is given
+/// the same member, so its next save keeps it. A name the store does not have
+/// is cannot tell (never "not set"), and a typed setting cannot be removed, so
+/// setting one to "not set" is refused (couldNotWrite). Rejected (the first
+/// review of W6, MEDIUM): <c>JsonConvert.PopulateObject</c> on the running copy
+/// and its <c>Save()</c>, which appended to a list and merged a dictionary,
+/// saved before checking, and wrote that process's older copy of every other
+/// setting over the file. Which of the app's settings a step records, and
 /// under what names, is W8's (the mac's U4 wires its preferences); nothing
 /// writes an external op on Windows before then.
 /// </summary>
 internal sealed class UndoAppSettingsPlaces : IUndoExternalPlaces
 {
     private const string Family = "preference:";
+
+    private static readonly Newtonsoft.Json.Linq.JsonLoadSettings AsWritten = new()
+    {
+        CommentHandling = Newtonsoft.Json.Linq.CommentHandling.Ignore,
+        DuplicatePropertyNameHandling = Newtonsoft.Json.Linq.DuplicatePropertyNameHandling.Replace,
+    };
+
+    private readonly string? _file;
+    private readonly Func<Models.AppSettings?> _running;
+
+    /// <summary>The app's own store: <see cref="Models.AppSettings.DefaultPath"/>, and the copy this process runs on.</summary>
+    internal UndoAppSettingsPlaces() : this(null, () => Models.AppSettings.Current) { }
+
+    /// <summary>A store in a file of the caller's (a test's, the harness's), and the copy that process runs on, if any.</summary>
+    internal UndoAppSettingsPlaces(string? file, Func<Models.AppSettings?> running)
+    {
+        _file = file;
+        _running = running;
+    }
+
+    private string SettingsFile => _file ?? Models.AppSettings.DefaultPath;
 
     private static string? NameOf(string target) =>
         target.StartsWith(Family, StringComparison.Ordinal) && target.Length > Family.Length ? target[Family.Length..] : null;
@@ -820,13 +867,10 @@ internal sealed class UndoAppSettingsPlaces : IUndoExternalPlaces
         if (NameOf(target) is not { } name) return UndoExternalReading.Unknown;
         try
         {
-            Newtonsoft.Json.Linq.JObject all = Newtonsoft.Json.Linq.JObject.FromObject(Models.AppSettings.Current);
-            if (all.Property(name, StringComparison.Ordinal) is not { } property) return UndoExternalReading.Unknown;
-            if (HoldsADate(property.Value)) return UndoExternalReading.Unknown;
-            using JsonDocument document = JsonDocument.Parse(property.Value.ToString(Newtonsoft.Json.Formatting.None));
-            return UndoJson.From(document.RootElement) is { } value ? UndoExternalReading.Holding(value) : UndoExternalReading.Unknown;
+            string? text = System.IO.File.Exists(SettingsFile) ? System.IO.File.ReadAllText(SettingsFile) : null;
+            return MemberOf(text ?? "{}", name);
         }
-        catch (Exception error) when (error is JsonException or Newtonsoft.Json.JsonException or InvalidOperationException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             return UndoExternalReading.Unknown;
         }
@@ -835,18 +879,64 @@ internal sealed class UndoAppSettingsPlaces : IUndoExternalPlaces
     public bool Write(string target, UndoJson? value)
     {
         if (NameOf(target) is not { } name || value is null || value.Spelled() is not { } spelled) return false;
+        string temporary = SettingsFile + ".undo-writing";
         try
         {
-            Newtonsoft.Json.Linq.JObject all = Newtonsoft.Json.Linq.JObject.FromObject(Models.AppSettings.Current);
-            if (all.Property(name, StringComparison.Ordinal) is null) return false;
-            var one = new Newtonsoft.Json.Linq.JObject { [name] = Newtonsoft.Json.Linq.JToken.Parse(spelled) };
-            Newtonsoft.Json.JsonConvert.PopulateObject(one.ToString(), Models.AppSettings.Current);
-            Models.AppSettings.Current.Save();
-            return Read(target).Matches(value);
+            if (!TheStoreHas(name)) return false;
+            string now = System.IO.File.Exists(SettingsFile) ? System.IO.File.ReadAllText(SettingsFile) : "{}";
+            // A file the app's own reader cannot read is never written over: cannot tell what it holds.
+            if (MemberOf(now, name).CannotTell) return false;
+            Newtonsoft.Json.Linq.JObject all = Newtonsoft.Json.Linq.JObject.Load(Reader(now), AsWritten);
+            // The app's reader matches a name ignoring case: every spelling of it goes, the one name comes in.
+            foreach (Newtonsoft.Json.Linq.JProperty spelling in all.Properties().ToList())
+            {
+                if (string.Equals(spelling.Name, name, StringComparison.OrdinalIgnoreCase)) spelling.Remove();
+            }
+            Newtonsoft.Json.Linq.JToken member = Newtonsoft.Json.Linq.JToken.Load(Reader(spelled));
+            all[name] = member;
+            string written = all.ToString(Newtonsoft.Json.Formatting.Indented);
+            if (!MemberOf(written, name).Matches(value)) return false;
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(SettingsFile))!);
+            System.IO.File.WriteAllText(temporary, written);
+            System.IO.File.Move(temporary, SettingsFile, overwrite: true);
+            if (_running() is { } running)
+            {
+                var replacing = new Newtonsoft.Json.JsonSerializerSettings { ObjectCreationHandling = Newtonsoft.Json.ObjectCreationHandling.Replace };
+                var one = new Newtonsoft.Json.Linq.JObject { [name] = member.DeepClone() };
+                Newtonsoft.Json.JsonConvert.PopulateObject(one.ToString(Newtonsoft.Json.Formatting.None), running, replacing);
+            }
+            return true;
         }
-        catch (Exception error) when (error is Newtonsoft.Json.JsonException or InvalidOperationException or ArgumentException)
+        catch (Exception error) when (error is Newtonsoft.Json.JsonException or InvalidOperationException or ArgumentException
+                                          or IOException or UnauthorizedAccessException)
         {
+            try { System.IO.File.Delete(temporary); } catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException) { }
             return false;
+        }
+    }
+
+    /// <summary>A reader that keeps a date-like string as text, so a member that is not set is never re-spelled.</summary>
+    private static Newtonsoft.Json.JsonTextReader Reader(string text) =>
+        new(new StringReader(text)) { DateParseHandling = Newtonsoft.Json.DateParseHandling.None };
+
+    private static bool TheStoreHas(string name) =>
+        Newtonsoft.Json.Linq.JObject.FromObject(new Models.AppSettings()).Property(name, StringComparison.Ordinal) is not null;
+
+    /// <summary>The named member as the app's typed settings read it from this text, or cannot tell.</summary>
+    private static UndoExternalReading MemberOf(string text, string name)
+    {
+        try
+        {
+            if (Newtonsoft.Json.JsonConvert.DeserializeObject<Models.AppSettings>(text) is not { } settings) return UndoExternalReading.Unknown;
+            Newtonsoft.Json.Linq.JObject all = Newtonsoft.Json.Linq.JObject.FromObject(settings);
+            if (all.Property(name, StringComparison.Ordinal) is not { } property) return UndoExternalReading.Unknown;
+            if (HoldsADate(property.Value)) return UndoExternalReading.Unknown;
+            using JsonDocument document = JsonDocument.Parse(property.Value.ToString(Newtonsoft.Json.Formatting.None));
+            return UndoJson.From(document.RootElement) is { } value ? UndoExternalReading.Holding(value) : UndoExternalReading.Unknown;
+        }
+        catch (Exception error) when (error is JsonException or Newtonsoft.Json.JsonException or InvalidOperationException or ArgumentException)
+        {
+            return UndoExternalReading.Unknown;
         }
     }
 

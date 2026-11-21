@@ -97,7 +97,8 @@ internal static class UndoTrail
 /// Settles steps whose work stopped part way (#899 W3; <c>undo.rule.recovery</c>,
 /// the mac's <c>UndoRecovery</c>). Run inside the lock: in the door's begin
 /// hold, its Undo/Redo offer hold, before EVERY prune, and by
-/// <see cref="UndoDoor.Recover"/> (at launch, W11a).
+/// <see cref="UndoDoor.Recover"/> (at every launch of the app and of
+/// <c>plantoir-mcp.exe</c>, since W4: <see cref="UndoAtLaunch.Recover"/>).
 ///
 /// <para>For each step in flight whose process is gone (or that this process
 /// gave up on, <see cref="UndoProcessMemory.NoteAbandoned"/>), each file the

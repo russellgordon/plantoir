@@ -540,7 +540,8 @@ internal sealed class UndoDoor
     });
 
     /// <summary>
-    /// Recovery as the app asks for it (at every launch from W11a, the mac's
+    /// Recovery as the app asks for it (at every launch since W4, through
+    /// <see cref="UndoAtLaunch.Recover"/>, the switch on or off; the mac's
     /// <c>recoverAndRederive</c>): under the lock, every put-back tried at
     /// once, then, with the lock released, every file the settled steps keep
     /// true by a rule re-derived. Never fails the caller.

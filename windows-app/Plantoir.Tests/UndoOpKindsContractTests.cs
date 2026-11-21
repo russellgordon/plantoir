@@ -40,7 +40,7 @@ public sealed class UndoOpKindsContractTests : IDisposable
     public void TheContractHoldsTheListingAndEditJsonCases()
     {
         Assert.True(UndoContract.Undo.GetProperty("listingCases").GetArrayLength() >= 5);
-        Assert.True(UndoContract.Undo.GetProperty("editJSONCases").GetArrayLength() >= 8);
+        Assert.True(UndoContract.Undo.GetProperty("editJSONCases").GetArrayLength() >= 16);
     }
 
     /// <summary>The listing made from the case's tree is the case's text and hash, and reads back as itself; and the same folder made on the disk lists the same.</summary>
@@ -82,6 +82,29 @@ public sealed class UndoOpKindsContractTests : IDisposable
         JsonElement result = row.GetProperty("result");
         if (result.ValueKind == JsonValueKind.Null) Assert.Null(moved);
         else Assert.Equal(result.GetString(), moved is null ? null : Encoding.UTF8.GetString(moved));
+    }
+
+    /// <summary>
+    /// A file that starts with a UTF-8 byte-order mark is read as the mac's
+    /// reader reads it (measured on the mac, 2026-11-20: its member judged as
+    /// the step left it), so the verdict before a write is the mac's; and it
+    /// is never moved, as on the mac, whose byte scanner starts at the mark.
+    /// Not a contract row: the mac's contract runner hands each case's file
+    /// over through <c>JSONSerialization</c>, which drops a mark at the start
+    /// of a string (measured), so no row can carry one.
+    /// </summary>
+    [Fact]
+    public void AFileStartingWithAByteOrderMarkIsJudgedAsTheMacJudgesIt()
+    {
+        byte[] file = [0xEF, 0xBB, 0xBF, .. "{\"school_year\": \"2026-2027\"}\n"u8];
+        var op = new JsonObject { ["kind"] = "editJSON", ["path"] = "course_config.json", ["keyPath"] = new JsonArray("school_year"), ["before"] = "2025-2026", ["after"] = "2026-2027" };
+        using JsonDocument document = JsonDocument.Parse(op.ToJsonString());
+        UndoOp read = UndoFormat.ReadOp(document.RootElement);
+        Assert.Equal(UndoOpState.After, UndoJsonMember.StateOf(read, new UndoCurrent.Bytes(file)));
+        Assert.Null(UndoJsonMember.Moved(read, file, backward: true));
+        // A space before the mark is not JSON, there as here.
+        byte[] spaced = [0x20, .. file];
+        Assert.Equal(UndoOpState.Neither, UndoJsonMember.StateOf(read, new UndoCurrent.Bytes(spaced)));
     }
 
     /// <summary>

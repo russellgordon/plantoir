@@ -25,7 +25,7 @@ internal static class W6Runs
     private const string Made = "courses/TST1O/made";
     private const string MarkerFrom = "courses/TST1O/.netlify_sites/section1.json";
     private const string MarkerTo = "courses/TST1O/.netlify_sites/section1.previous.json";
-    private const string Preference = "preference:undoCasesPreference";
+    private const string Preference = "preference:AcceptedSyncedFolders";
 
     private static byte[] Page(string title, bool published) => Encoding.UTF8.GetBytes($"---\ntitle: {title}\npublish: {(published ? "true" : "false")}\n---\nThe lesson.\n");
     private static readonly byte[] NotesBefore = "Intro.\nLine one: old.\nEnd.\n"u8.ToArray();
@@ -43,40 +43,35 @@ internal static class W6Runs
         new(Path.Combine(run, "undo"), TimeProvider.System, UndoJournalChecks.ProcessIsAlive,
             step => UndoJournalChecks.FolderIsReachable(step, TimeProvider.System), isLive: true, memory: new UndoProcessMemory());
 
-    /// <summary>A preference store on the disk, so a value set by one process is read by the next: one JSON object, replaced whole.</summary>
-    private sealed class FilePlaces(string file) : IUndoExternalPlaces
+    /// <summary>
+    /// The app's own settings store, written through for real
+    /// (<see cref="UndoAppSettingsPlaces"/>; the first review of W6, MEDIUM):
+    /// the run's own settings file, and the copy this process runs on, loaded
+    /// from it when the process first asks, as the app's is.
+    /// </summary>
+    private static UndoAppSettingsPlaces Places(string run)
     {
-        public UndoExternalReading Read(string target)
-        {
-            try
-            {
-                using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(file));
-                return document.RootElement.TryGetProperty(target, out JsonElement value) && UndoJson.From(value) is { } read
-                    ? UndoExternalReading.Holding(read)
-                    : UndoExternalReading.Unset;
-            }
-            catch (FileNotFoundException) { return UndoExternalReading.Unset; }
-            catch (Exception error) when (error is IOException or JsonException) { return UndoExternalReading.Unknown; }
-        }
-
-        public bool Write(string target, UndoJson? value)
-        {
-            var all = new JsonObject();
-            try
-            {
-                if (File.Exists(file)) all = JsonNode.Parse(File.ReadAllBytes(file))!.AsObject();
-                if (value is null) all.Remove(target);
-                else all[target] = JsonNode.Parse(value.Spelled()!);
-                string temporary = file + ".tmp";
-                File.WriteAllText(temporary, all.ToJsonString());
-                File.Move(temporary, file, overwrite: true);
-                return true;
-            }
-            catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException) { return false; }
-        }
+        string file = Path.Combine(run, "settings.json");
+        Plantoir.Core.Models.AppSettings? running = null;
+        return new UndoAppSettingsPlaces(file, () => running ??= Plantoir.Core.Models.AppSettings.Load(file));
     }
 
-    private static FilePlaces Places(string run) => new(Path.Combine(run, "prefs.json"));
+    private static readonly string[] PreferenceBefore = ["C:\\one"];
+    private static readonly string[] PreferenceAfter = ["C:\\one", "C:\\two"];
+
+    private static UndoJson PreferenceValue(string[] folders)
+    {
+        var list = new List<UndoJson>();
+        foreach (string folder in folders) list.Add(new UndoJson.Text(folder));
+        return new UndoJson.List(list);
+    }
+
+    private static JsonArray PreferenceNode(string[] folders)
+    {
+        var list = new JsonArray();
+        foreach (string folder in folders) list.Add(folder);
+        return list;
+    }
 
     private static void Write(string run, string relative, byte[] bytes)
     {
@@ -99,7 +94,7 @@ internal static class W6Runs
         Write(run, Settings, SettingsBefore);
         foreach ((string path, byte[] bytes) in RemovedFiles) Write(run, Removed + "/" + path, bytes);
         Write(run, MarkerFrom, Marker);
-        Places(run).Write(Preference, new UndoJson.Text("a"));
+        File.WriteAllText(Path.Combine(run, "settings.json"), "{\n  \"WorkspacePath\": \"C:\\\\w\",\n  \"AcceptedSyncedFolders\": [\"C:\\\\one\"]\n}\n");
     }
 
     /// <summary>One step holding every kind: two pages' lines, a hunk, a member, a preference, a folder removed, a folder made, a marker moved (8 swaps).</summary>
@@ -112,7 +107,7 @@ internal static class W6Runs
         }
         ops.Add(new JsonObject { ["kind"] = "replaceText", ["path"] = Notes, ["before"] = "old", ["after"] = "new", ["contextBefore"] = "Line one: ", ["contextAfter"] = ".\n" });
         ops.Add(new JsonObject { ["kind"] = "editJSON", ["path"] = Settings, ["keyPath"] = new JsonArray("school_year"), ["before"] = "2025-2026", ["after"] = "2026-2027" });
-        ops.Add(new JsonObject { ["kind"] = "external", ["target"] = Preference, ["before"] = "a", ["after"] = "b" });
+        ops.Add(new JsonObject { ["kind"] = "external", ["target"] = Preference, ["before"] = PreferenceNode(PreferenceBefore), ["after"] = PreferenceNode(PreferenceAfter) });
         var blobs = new List<byte[]>();
         foreach ((string kind, string path, (string Path, byte[] Bytes)[] files) in new[] { ("removeTree", Removed, RemovedFiles), ("createTree", Made, MadeFiles) })
         {
@@ -148,7 +143,7 @@ internal static class W6Runs
             ["page2"] = Of(Same(Read(Page2), Page("second", false)), Same(Read(Page2), Page("second", true))),
             ["hunk"] = Of(Same(Read(Notes), NotesBefore), Same(Read(Notes), NotesAfter)),
             ["member"] = Of(Same(Read(Settings), SettingsBefore), Same(Read(Settings), SettingsAfter)),
-            ["preference"] = Of(preference.Matches(new UndoJson.Text("a")), preference.Matches(new UndoJson.Text("b"))),
+            ["preference"] = Of(preference.Matches(PreferenceValue(PreferenceBefore)), preference.Matches(PreferenceValue(PreferenceAfter))),
             ["removeTree"] = Of(removed == Listing(RemovedFiles).Sha, removed is null && !Directory.Exists(Full(run, Removed))),
             ["createTree"] = Of(made is null && !Directory.Exists(Full(run, Made)), made == Listing(MadeFiles).Sha),
             ["move"] = Of(Same(Read(MarkerFrom), Marker) && Read(MarkerTo) is null, Read(MarkerFrom) is null && Same(Read(MarkerTo), Marker)),
@@ -205,11 +200,15 @@ internal static class W6Runs
                 bool allOneWay = places.Values.All(value => value == expected);
                 int staged = Directory.EnumerateFileSystemEntries(Root(run), "*", SearchOption.AllDirectories)
                     .Count(entry => Path.GetFileName(entry).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal));
-                bool consistent = allOneWay && staged == 0 && !step.IsInFlight && reading.IsFresh;
+                // The settings file's other member is untouched, and no write was left part way beside it.
+                string settings = Path.Combine(run, "settings.json");
+                bool settingsKept = JsonNode.Parse(File.ReadAllText(settings))?["WorkspacePath"]?.GetValue<string>() == "C:\\w"
+                                    && !File.Exists(settings + ".undo-writing");
+                bool consistent = allOneWay && staged == 0 && !step.IsInFlight && reading.IsFresh && settingsKept;
                 string answer = $"state={step.State} places={expected}";
                 answers[variant] = answer;
                 Console.WriteLine($"RESULT kinds-kill point={point} variant={variant} child=[{said}] afterTheKill={afterTheKill} recoveryKilled={recoveryKilled} " +
-                                  $"recovered=[{recovered}] {answer} {string.Join(",", places.Select(pair => pair.Key + "=" + pair.Value))} staged={staged} " +
+                                  $"recovered=[{recovered}] {answer} {string.Join(",", places.Select(pair => pair.Key + "=" + pair.Value))} staged={staged} settingsKept={settingsKept} " +
                                   $"ms={clock.Elapsed.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture)} {(consistent ? "WHOLE" : "NOT-WHOLE")}");
                 if (!consistent) failures++;
             }

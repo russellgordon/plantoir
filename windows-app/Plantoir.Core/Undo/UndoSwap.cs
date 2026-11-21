@@ -471,7 +471,14 @@ internal static class UndoSwap
         return name[1..marker];
     }
 
-    /// <summary>The visible name a folder set aside is kept under when something else holds its place: <c>&lt;name&gt; (kept by Undo)</c>, then <c>(kept by Undo 2)</c> and on.</summary>
+    /// <summary>
+    /// The visible name a folder set aside is kept under when something else
+    /// holds its place: <c>&lt;name&gt; (kept by Undo)</c>, then
+    /// <c>(kept by Undo 2)</c> and on. It is a REAL folder beside its place:
+    /// under <c>courses/</c> it is part of the course, so a build and a deploy
+    /// include its pages (Russell's ruling of 2026-11-19 and the mac's, the
+    /// first review of W6's LOW 4: nothing of the teacher's stays hidden).
+    /// </summary>
     internal static string VisibleName(string place, int number) =>
         number <= 1 ? place + " (kept by Undo)" : place + $" (kept by Undo {number.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
 
@@ -759,7 +766,8 @@ internal static class UndoSwap
     /// goes. When something else holds its place it is renamed to the first
     /// free visible name beside it, <c>&lt;name&gt; (kept by Undo)</c>, then
     /// <c>(kept by Undo 2)</c> and on, so nothing of the teacher's stays hidden
-    /// and nothing is merged or overwritten (Russell's ruling of 2026-11-19).
+    /// and nothing is merged or overwritten (Russell's ruling of 2026-11-19);
+    /// that name is a real folder, which a build and a deploy include.
     /// Both renames never replace. <paramref name="onAside"/> is told BEFORE
     /// the rename (the intent first: a death between the rename and the trail
     /// line would lose it). When its place cannot be read now it is left for a

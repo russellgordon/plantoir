@@ -292,6 +292,11 @@ internal sealed class UndoJournal
         {
             foreach (UndoPruneAction action in UndoPruning.Decide(writer.Reading(), Now, IsAlive))
             {
+                // A step left in flight for a recovery that re-derives (one more
+                // try can settle it: W3's review, LOW 2) is KEPT, so the run stops
+                // there: never a step newer in sequence than one kept is pruned
+                // (limits; the final sweep of W3 and W4).
+                if (action is UndoPruneAction.ClosedUnsettled kept && writer.LeftForARederivingRecovery.Contains(kept.Seq)) break;
                 switch (action)
                 {
                     case UndoPruneAction.Pruned pruned:
@@ -299,9 +304,6 @@ internal sealed class UndoJournal
                         {
                             ["seq"] = pruned.Seq, ["event"] = "pruned", ["reason"] = pruned.Reason,
                         });
-                        break;
-                    case UndoPruneAction.ClosedUnsettled closed when writer.LeftForARederivingRecovery.Contains(closed.Seq):
-                        // One more try can settle it: left in flight (W3's review, LOW 2).
                         break;
                     case UndoPruneAction.ClosedUnsettled closed:
                         var paths = new System.Text.Json.Nodes.JsonArray();

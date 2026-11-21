@@ -50237,6 +50237,175 @@
         },
         "direction": "undo",
         "result": null
+      },
+      {
+        "name": "keys sorted as the mac sorts them: digits by their value, before letters, letters ignoring case",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": {
+            "B": 1,
+            "a": 1,
+            "10": 1,
+            "9": 1,
+            "b10": 1,
+            "b9": 1,
+            "A2": 1
+          }
+        },
+        "direction": "redo",
+        "result": "{\"k\": {\"9\":1,\"10\":1,\"a\":1,\"A2\":1,\"B\":1,\"b9\":1,\"b10\":1}}\n"
+      },
+      {
+        "name": "keys that differ only by case or by zeros in front: lowercase first, fewer zeros first, judged where they first differ",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": {
+            "X1": 1,
+            "x01": 1,
+            "x1": 1,
+            "01a": 1,
+            "1A": 1,
+            "Ab": 1,
+            "aB": 1,
+            "ab": 1
+          }
+        },
+        "direction": "redo",
+        "result": "{\"k\": {\"1A\":1,\"01a\":1,\"ab\":1,\"aB\":1,\"Ab\":1,\"x1\":1,\"x01\":1,\"X1\":1}}\n"
+      },
+      {
+        "name": "keys with punctuation: a space, then _ - , ; : ! ? . ' \" ( ) [ ] { } @ * / \\ & # % ` ^ + < = > | ~ $, then digits, then letters",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": {
+            "a.b": 1,
+            "a-b": 1,
+            "a_b": 1,
+            "a b": 1,
+            "ab": 1,
+            "a~b": 1,
+            "a$b": 1,
+            "a1b": 1,
+            "[": 1,
+            "-1": 1
+          }
+        },
+        "direction": "redo",
+        "result": "{\"k\": {\"-1\":1,\"[\":1,\"a b\":1,\"a_b\":1,\"a-b\":1,\"a.b\":1,\"a~b\":1,\"a$b\":1,\"a1b\":1,\"ab\":1}}\n"
+      },
+      {
+        "name": "fractions are spelled with 17 significant digits, as the mac writes a double",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": [
+            0.1,
+            0.5,
+            -0.1,
+            0.3333333333333333,
+            3.14159,
+            123.456,
+            1234567890123456.8
+          ]
+        },
+        "direction": "redo",
+        "result": "{\"k\": [0.10000000000000001,0.5,-0.10000000000000001,0.33333333333333331,3.1415899999999999,123.456,1234567890123456.8]}\n"
+      },
+      {
+        "name": "small numbers are spelled with an exponent of at least two digits",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": [
+            1e-07,
+            1.5e-10,
+            1e-05,
+            0.0001,
+            -1e-07,
+            5e-324
+          ]
+        },
+        "direction": "redo",
+        "result": "{\"k\": [9.9999999999999995e-08,1.5e-10,1.0000000000000001e-05,0.0001,-9.9999999999999995e-08,4.9406564584124654e-324]}\n"
+      },
+      {
+        "name": "large whole numbers below 2^53 are spelled whole, and negative zero is 0",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": [
+            9007199254740991,
+            9000000000000001,
+            1000000000000000,
+            -0.0,
+            -1.0
+          ]
+        },
+        "direction": "redo",
+        "result": "{\"k\": [9007199254740991,9000000000000001,1000000000000000,0,-1]}\n"
+      },
+      {
+        "name": "a fraction the mac's reader reads back as another number is refused: 0.0001234 is spelled 0.00012339999999999999, read back as 0.00012340000000000002",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": 0.0001234
+        },
+        "direction": "redo",
+        "result": null
+      },
+      {
+        "name": "a fraction whose long spelling still reads back as itself is written",
+        "file": "{\"k\": 0}\n",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "k"
+          ],
+          "before": 0,
+          "after": 0.08129913717470501
+        },
+        "direction": "redo",
+        "result": "{\"k\": 0.081299137174705008}\n"
       }
     ],
     "editJSONCasesHow": "An editJSON move on the bytes of a file (file-formats.json -> undoJournal.opKinds.editJSON): file is the file's text, op the op (its before and after any JSON, a missing one meaning no such member), direction undo (towards before) or redo (towards after), and result the file's exact text afterwards, or null when the move is refused (as changed since). Both platforms must produce these bytes exactly: only the member's own bytes change, and a new value is spelled compactly with keys sorted.",
