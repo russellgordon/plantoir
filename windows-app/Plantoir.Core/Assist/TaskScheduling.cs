@@ -169,9 +169,10 @@ public static class TaskScheduling
                                    IReadOnlyList<CourseConfiguration.DeployDestination> promised)
     {
         // The launcher does the deploy, exactly as the app does it.
+        // The sentence names no file and no folder (#928 item 9, the mac's
+        // scheduled-deploy refusal): the teacher can do nothing with either.
         if (!File.Exists(Path.Combine(workingFolder, "deploy.ps1")))
-            return CouldNotBeSet(courseCode, section, when, null, null,
-                $"There is no deploy.ps1 in {workingFolder}, so there is nothing to schedule.");
+            return CouldNotBeSet(courseCode, section, when, null, null, NothingToSchedule);
 
         if (RunnerExecutable() is not { } runner)
             return CouldNotBeSet(courseCode, section, when, null, null,
@@ -295,6 +296,10 @@ public static class TaskScheduling
 
     private static bool SameMinute(DateTime a, DateTime b) =>
         a.Date == b.Date && a.Hour == b.Hour && a.Minute == b.Minute;
+
+    /// <summary>The refusal when the working folder has no deploy launcher, in the words the mac uses.</summary>
+    public const string NothingToSchedule =
+        "This working folder is missing a piece it needs, so there is nothing to schedule.";
 
     private static string Stamp(DateTime moment) =>
         moment.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);

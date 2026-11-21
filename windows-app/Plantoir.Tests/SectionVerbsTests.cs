@@ -478,7 +478,7 @@ public class SectionVerbsTests : IDisposable
         var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
         {
             ShowPreviewInApp = () => shown++,
-            RebuildPreviewInApp = () => rebuilt++,
+            RebuildPreviewInApp = () => { rebuilt++; return Task.FromResult<string?>(null); },
             CourseIsBeingCopied = () => false,
         };
         var (answer, _) = await runner.Run(SectionVerbs.RebuildPreview("ICS3U", 1), default);
@@ -487,12 +487,52 @@ public class SectionVerbsTests : IDisposable
 
         var copying = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
         {
-            RebuildPreviewInApp = () => rebuilt++,
+            RebuildPreviewInApp = () => { rebuilt++; return Task.FromResult<string?>(null); },
             CourseIsBeingCopied = () => true,
         };
         var (refused, _) = await copying.Run(SectionVerbs.RebuildPreview("ICS3U", 1), default);
         Assert.Equal(AssistWording.CourseIsBeingCopiedFromTheMenu("ICS3U"), refused.Summary);
         Assert.Equal(1, rebuilt);
+    }
+
+    /// <summary>
+    /// #928 review 2, M3: a rebuild the window refuses (another window is
+    /// previewing the section) is answered with the window's sentence, marked
+    /// as shown there, and the trail ends "not rebuilt"; nothing says
+    /// "rebuilding".
+    /// </summary>
+    [Fact]
+    public async Task ARebuildTheWindowRefuses_IsAnsweredWithItsSentence_NeverRebuilding()
+    {
+        const string refusal = "Section 1 of ICS3U is already being previewed in another window. Stop that preview first, or work with it there.";
+        var tools = new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.Menu });
+        var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
+        {
+            ShowPreviewInApp = () => { },
+            RebuildPreviewInApp = () => Task.FromResult<string?>(refusal),
+            CourseIsBeingCopied = () => false,
+        };
+        var (answer, handed) = await runner.Run(SectionVerbs.RebuildPreview("ICS3U", 1), default);
+        Assert.True(handed);
+        Assert.Equal(refusal, answer.Summary);
+        Assert.True(answer.ShownInTheWindow);
+        Assert.Equal("not rebuilt", SectionVerbs.Ending("rebuild_preview", answer, null, null, "ICS3U", 1));
+    }
+
+    /// <summary>M3, the assistant's plain "rebuild the preview": the window's refusal is what it says, never "opening".</summary>
+    [Fact]
+    public async Task ThePlainRebuildTheWindowRefuses_SaysTheWindowsSentence()
+    {
+        const string refusal = "Section 1 of ICS3U is already being previewed in another window. Stop that preview first, or work with it there.";
+        var agent = new AssistAgent(new NoModel(), new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher())),
+                                    new JsonArray(), "ICS3U", 1)
+        {
+            ShowPreviewInApp = () => { },
+            RebuildPreviewInApp = () => Task.FromResult<string?>(refusal),
+        };
+        var plain = await agent.Say("rebuild the preview", CancellationToken.None);
+        Assert.Contains(plain, line => line.Text == refusal);
+        Assert.DoesNotContain(plain, line => line.Text.Contains("is opening", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -547,7 +587,7 @@ public class SectionVerbsTests : IDisposable
                                     new JsonArray(), "ICS3U", 1)
         {
             ShowPreviewInApp = () => shown++,
-            RebuildPreviewInApp = () => rebuilt++,
+            RebuildPreviewInApp = () => { rebuilt++; return Task.FromResult<string?>(null); },
             SectionIsChangingFromTheMenu = () => true,
         };
 

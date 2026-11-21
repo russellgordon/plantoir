@@ -528,7 +528,7 @@ public sealed partial class AssistWindow : Window
             ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
             // "Rebuild" means rebuild (#489, Q1): a serving preview is stopped
             // and started again, where ShowPreviewFor would leave it as it was.
-            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section),
+            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section) ?? Task.FromResult<string?>(null),
             // The Section menu's claim (#489): this window's change to a
             // section the menu is changing right now is refused, never interleaved.
             SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, _course.Code, _section),
@@ -596,8 +596,7 @@ public sealed partial class AssistWindow : Window
             },
             // Read from disk at the call: a course marked by hand while this
             // window was open is refused all the same (doors 2-4).
-            CourseIsKeptForReference = () => Workspace.DiscoverCourses(_folder)
-                .Any(c => c.Code.Equals(_course.Code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
+            CourseIsKeptForReference = () => Workspace.CourseIsKeptForReference(_folder, _course.Code),
             // "What does Unit 2, Day 3 in SPH3U link to?": SPH3U is a course
             // because it is a code in the shipped lists, not because of its
             // shape (#305 / mac #167).

@@ -210,7 +210,7 @@ public static class ToolchainReadiness
 
     private static AgentGuidance.Outcome WriteGuidance(string workspacePath, string bundledRoot) =>
         AgentGuidance.Write(Path.Combine(bundledRoot, "support", "agent_guidance"), workspacePath,
-                            AgentGuidanceDeclined.SignatureFor, AgentGuidanceDeclined.Forget);
+                            AgentGuidanceDeclined.SignatureFor, path => AgentGuidanceDeclined.Forget(path));
 
     /// <summary>The task of the last guidance pass started, for tests that wait for it.</summary>
     internal static Task? LastGuidancePass { get; private set; }

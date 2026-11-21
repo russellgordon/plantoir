@@ -451,7 +451,6 @@ internal static class NamedGapLedger
     private const string Reason920 = "the invented sample names on the surname and website-address sheets (the mac's #891) are #920's piece of v2.0.0, with the colour pickers and the switch; until it lands Windows' sheets carry the older example names, which name nothing a teacher acts on";
     private const string Reason921 = "Settings ▸ Deploying, the tokens checked before they are saved and the Cloudflare token's end date (the mac's #696), are #921's piece of v2.0.0; until it lands Windows shows no end date and warns of none, so its older words for the TTL step are the true ones, and it records, says and explains none of the pane's events, problems or refusals";
     private const string Reason927 = "Classes ▸ Add Class… in place of Add Next Class, with its three ways (the mac's #897 piece A), is #927's piece of v2.0.0; until it lands Windows' menus have Add Next Class, enabled exactly where the contract enables Add Class…, and none of the sheet's sentences";
-    private const string Reason928 = "a preview start that does nothing while the window's own start waits, a run that never started, and a repair's Preview Again that does not survive its stop (the mac's #812 and #813) are #928's piece of v2.0.0, not built here yet";
     private const string Reason936 = "PhET simulations and the kept-downloads folder (the mac's #674) are #936's piece of v2.0.0; until it lands Windows reads no PLANTOIR_DOWNLOADED: line, explains no stop for a simulation (the raw output is shown) and has no Science simulation row on the Problems tab";
     // The same hold, after the mac's stack 13 (956defd43, #800, #829, #897 piece B, #904).
     private const string Reason897RollOver = "Classes ▸ Roll Over to a New Year… with its sheet (the mac's #897 piece B) is #954's piece of v2.0.0 (Windows' issue for #897 piece B), not built here yet; until it lands Windows' menus have no Roll Over item and none of its sentences, and the built-in assistant's roll_over_section is unchanged";
@@ -595,8 +594,6 @@ internal static class NamedGapLedger
         // contract without the switch (test code only, #920 item 3); the
         // redactor's 24 cases are NOT held: a credential shape that leaks is
         // a defect (#941), never a gap.
-        Owed(ActivityTrailEvents, 928, V200, Reason928,
-             "preview already starting", "preview again abandoned", "preview could not start"),
         Owed(ActivityTrailEvents, 921, V200, Reason921,
              "deploy token changed in Settings", "deploy token removed in Settings",
              "deploy token change refused in Settings", "old deploy token kept in Settings",

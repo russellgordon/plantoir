@@ -580,7 +580,7 @@ public static class ScheduledRun
             string directory = Path.Combine(courses, folder);
             string config = Path.Combine(directory, "course_config.json");
             if (!File.Exists(config)) return null;
-            return new Course(courseCode, directory, CourseConfiguration.FromBytes(File.ReadAllBytes(config)));
+            return new Course(courseCode, directory, CourseConfiguration.Load(config));
         }
         catch { return null; }
     }

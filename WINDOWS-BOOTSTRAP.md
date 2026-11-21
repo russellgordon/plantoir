@@ -260,6 +260,20 @@ dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
 
+**Two prerequisites a fresh machine lacks (#964).** Found setting up a new
+Windows 11 machine in 2026-11 (ARM64, Python 3.14.10 from python.org with no
+extra packages); without them the suite does not match the development PC:
+
+- **`python-frontmatter` for the `python` on PATH** (`python -m pip install
+  python-frontmatter`). `CopyAPageFuzzTests` asks the website builder's own
+  code about each page on PATH's Python, and without the package that test
+  fails in seconds, saying "No module named 'frontmatter'" and naming
+  `python-frontmatter` (until #964 it hung the suite for half an hour).
+- **The symbolic-link privilege: turn on Developer Mode** (Settings ▸ System ▸
+  For developers), or hold `SeCreateSymbolicLinkPrivilege` another way.
+  Without it `scripts/test_site_files.py`'s
+  `test_media_reached_through_a_link_is_read` fails with WinError 1314.
+
 **A runtime fetched before #1010 needs `fetch-runtime.ps1` once more.** The
 build refuses it ("does not carry the Visual C++ runtime 14.52.37029.0 ...
 beside node.exe", or, for a runtime that has the `node.exe` copy only, "not

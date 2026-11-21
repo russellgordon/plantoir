@@ -118,6 +118,13 @@ public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan
     /// <summary>Whether the call changed anything (<see cref="AssistWorkspace.ChangedKey"/>); null when not told — the menu's server alone tells.</summary>
     public bool? Changed { get; init; }
 
+    /// <summary>
+    /// The app's window has already shown the teacher this answer under its
+    /// own title (#928 review 2, M3: a rebuild the window refused, shown under
+    /// "Cannot Preview Yet"), so the Section menu does not show it again.
+    /// </summary>
+    public bool ShownInTheWindow { get; init; }
+
     /// <summary>The same words to both, which is most tools.</summary>
     public static AssistToolAnswer Same(string both) => new(both, both);
 
