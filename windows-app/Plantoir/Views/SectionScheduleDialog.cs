@@ -143,30 +143,69 @@ public sealed class SectionScheduleDialog : ContentDialog
         // from now until the dialog closes, and nothing is focused on
         // Opened. GettingFocus with TrySetNewFocusedElement is WinUI's
         // documented place to change where focus lands, so nothing waits.
+        //
+        // The app-wide event is static, so the dialog listens only while it
+        // is in the window's tree: from Loaded to Unloaded (and Closed). A
+        // ShowAsync that throws never loads the dialog, so it never listens
+        // and nothing is left holding it (review 2's L5).
+        Loaded += (_, _) => StartListeningForTheFirstFocus();
+        Unloaded += (_, _) => StopListeningForTheFirstFocus();
+        Closed += (_, _) => StopListeningForTheFirstFocus();
+    }
+
+    /// <summary>Whether this dialog is listening to the app-wide <c>FocusManager.GettingFocus</c> (it is only while shown).</summary>
+    private bool _isListeningForTheFirstFocus;
+
+    private void StartListeningForTheFirstFocus()
+    {
+        if (_isListeningForTheFirstFocus) return;
         FocusManager.GettingFocus += SendTheFirstFocusToTheBox;
-        Closed += (_, _) => FocusManager.GettingFocus -= SendTheFirstFocusToTheBox;
+        _isListeningForTheFirstFocus = true;
+    }
+
+    private void StopListeningForTheFirstFocus()
+    {
+        FocusManager.GettingFocus -= SendTheFirstFocusToTheBox;
+        _isListeningForTheFirstFocus = false;
     }
 
     /// <summary>
     /// The dialog's first placement of the focus goes to the dates box while
     /// the route is Type or paste; nothing after it is touched (see the
     /// constructor). A move between two places outside the dialog, such as
-    /// the menu closing, is not the first focus and is left alone.
+    /// the menu closing, is not the first focus and is left alone. Only the
+    /// dialog's OWN placement is moved (review 2's L4): it lands on the route
+    /// picker, where the dialog puts its first focus, and is made neither by
+    /// the pointer nor by a key that moves focus in a direction. If the
+    /// dialog opened without placing focus, the person's own first click or
+    /// key is the first move in, and it stays where they sent it. The rule is
+    /// <see cref="DialogFirstFocus"/>, tested in Plantoir.Tests.
     /// </summary>
     private void SendTheFirstFocusToTheBox(object? sender, GettingFocusEventArgs args)
     {
-        if (_theFirstFocusHasArrived) return;
-        if (!IsInThisDialog(args.NewFocusedElement) || IsInThisDialog(args.OldFocusedElement)) return;
-        _theFirstFocusHasArrived = true;
-        if (_routePicker.SelectedIndex == 0 && !ReferenceEquals(args.NewFocusedElement, _typedBox))
+        bool landsInTheDialog = IsInThisDialog(args.NewFocusedElement);
+        bool comesFromInside = IsInThisDialog(args.OldFocusedElement);
+        bool isThePlacement = DialogFirstFocus.IsTheDialogsOwnFirstPlacement(
+            theFirstFocusHasArrived: _theFirstFocusHasArrived,
+            landsInTheDialog: landsInTheDialog,
+            comesFromInsideTheDialog: comesFromInside,
+            landsWhereTheDialogPlacesItsFirstFocus: IsInside(_routePicker, args.NewFocusedElement),
+            madeByThePersonsPointer: args.FocusState == FocusState.Pointer,
+            madeByAKeyThatMovesFocus: args.Direction != FocusNavigationDirection.None);
+        if (DialogFirstFocus.IsTheFirstMoveIntoTheDialog(_theFirstFocusHasArrived, landsInTheDialog, comesFromInside))
+            _theFirstFocusHasArrived = true;
+        if (isThePlacement && _routePicker.SelectedIndex == 0 && !ReferenceEquals(args.NewFocusedElement, _typedBox))
             args.TrySetNewFocusedElement(_typedBox);
     }
 
     /// <summary>Whether an element is this dialog or inside it, by its visual parents.</summary>
-    private bool IsInThisDialog(DependencyObject? element)
+    private bool IsInThisDialog(DependencyObject? element) => IsInside(this, element);
+
+    /// <summary>Whether an element is <paramref name="container"/> or inside it, by its visual parents.</summary>
+    private static bool IsInside(DependencyObject container, DependencyObject? element)
     {
         for (var step = element; step is not null; step = VisualTreeHelper.GetParent(step))
-            if (ReferenceEquals(step, this)) return true;
+            if (ReferenceEquals(step, container)) return true;
         return false;
     }
 

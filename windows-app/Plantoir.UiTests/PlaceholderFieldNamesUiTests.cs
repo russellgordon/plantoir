@@ -198,6 +198,18 @@ public class PlaceholderFieldNamesUiTests
             Assert.True(FocusArrivesAt(app, id => id == "sectionScheduleTypedField"),
                         $"opened from the keyboard (open {open}), the sheet started on '{Focused(app)}', not in the dates box");
             Assert.Equal("", box.Patterns.Value.Pattern.Value.Value);
+            // Review 2's L6: the focus STAYS in the box, not merely passes
+            // through it. A key typed now reaches the box once the window has
+            // handled everything queued before it, so a second placement made
+            // by then has moved the focus, and the box still holding it after
+            // the typed key is the check. The retry waits on the typed text,
+            // an event, not on a time.
+            Keyboard.Type("9");
+            Assert.True(Retry.WhileFalse(() => box.Patterns.Value.Pattern.Value.Value == "9",
+                                         TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(100)).Result,
+                        $"opened from the keyboard (open {open}), a key typed in the dates box did not reach it; the focus is on '{Focused(app)}'");
+            Assert.True(Focused(app) == "sectionScheduleTypedField",
+                        $"opened from the keyboard (open {open}), the focus left the dates box for '{Focused(app)}'");
             MenuBar.CloseDialog(app);
         }
     }
