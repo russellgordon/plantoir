@@ -2842,7 +2842,8 @@ assistant is shown changes. `scripts/test_tool_surface_digest.py` and
 expectation did not move. The test passed in the baseline, so Windows'
 surface still matches it.
 Add Next Class is not renamed: the issue says renaming the item is the fix,
-and the item is a menu a teacher sees, so it waits for #927's dialog.
+and the item is a menu a teacher sees, so it waited for #927's dialog (built 2026-11-21:
+Classes ▸ Add Class… replaced Add Next Class).
 
 **Five new areas, each read where its red was** (a sixth came with stack 13, below).
 - `SubjectMenuItemsUnderAnOlderName` (`subjectMenus.items`, with an older
@@ -8403,7 +8404,8 @@ here where Windows has the same thing:
   them"): Revise With ▸ and every item in it carry the star glyph, and the
   four assistant functions, the one group without icons, sit between dividers.
   The mac's other D43 change, the deployed folder's items in a group of their
-  own, has no Windows counterpart until #889 builds those items.
+  own, had no Windows counterpart until #889 built those items (2026-11-21: Open in Browser and
+Stop Showing Deployed Folder, a group of their own in the section row's menu).
 - **No grey text rows in the Course or Section menu** (Q14): Course ▸
   Rename's reason line (`courseRenameReason`) is gone. The row's context
   menus keep their lines (the ruling named the two menus): the busy note under
@@ -8461,9 +8463,9 @@ path (`SectionVerbDialog.MenuPath`) takes its menu from the layout, so it
 reads "Classes ▸ Re-date Classes… — carried out" now.
 
 **What Windows does not have yet** is left out by its named gap, and its
-neighbours keep their order: Stop Showing Deployed Folder (#889), GitHub
-Copilot (#884), Roll Over to a New Year… (#954); Add Class… is drawn as Add
-Next Class until #927. `SubjectMenuLayoutContractTests` builds the expected
+neighbours keep their order: GitHub Copilot (#884). Stop Showing Deployed
+Folder (#889), Roll Over to a New Year… (#954) and Add Class… (#927, which
+replaced Add Next Class) were gaps here until each was built on 2026-11-21. `SubjectMenuLayoutContractTests` builds the expected
 menus from the contract less those gaps and compares them with
 `SubjectMenuLayout`; the day a gap closes, the item must be added to the
 Windows lists, in its place, or the test goes red. The two Undo items stay in
