@@ -25,9 +25,9 @@ public static partial class AssistWording
     // ---- One line per way ------------------------------------------------------
 
     /// <summary>
-    /// The first way, what Add Next Class did. <paramref name="unit"/> is the
-    /// course's own word as a sentence says it ("module"); a numbered course
-    /// (a club) has no units, and its line says only "the next".
+    /// The first way, what Add Next Class did, in the course's own word as a
+    /// sentence says it ("module"); a numbered course (a club) has no units,
+    /// and its line says only "the next".
     /// </summary>
     public static string MenuAddClassNextInThisUnit => AddClassWords.NextInThisUnit(ClassNoun.Class, "unit", false);
     public static string MenuAddClassNextInThisUnitForAMeeting => AddClassWords.NextInThisUnit(ClassNoun.Meeting, "unit", false);

@@ -903,8 +903,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         if (!arguments.TryGetValue(AssistWorkspace.MenuDuplicateArgument, out var path)
             || path.ValueKind != System.Text.Json.JsonValueKind.String || string.IsNullOrWhiteSpace(path.GetString())) return null;
         string course = arguments.TryGetValue("course", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.String ? c.GetString()! : "";
-        int section = arguments.TryGetValue("section", out var n)
-            ? n.ValueKind == System.Text.Json.JsonValueKind.Number ? n.GetInt32() : int.TryParse(n.GetString(), out int m) ? m : 0
+        int section = !arguments.TryGetValue("section", out var n) ? 0
+            : n.ValueKind == System.Text.Json.JsonValueKind.Number && n.TryGetInt32(out int number) ? number
+            : n.ValueKind == System.Text.Json.JsonValueKind.String && int.TryParse(n.GetString(), out int written) ? written
             : 0;
         return DuplicateAsTheNextClassFromTheMenu(course, section, path.GetString()!, planning);
     }
