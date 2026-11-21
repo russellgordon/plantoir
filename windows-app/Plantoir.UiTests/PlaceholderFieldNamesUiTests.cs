@@ -83,8 +83,8 @@ public class PlaceholderFieldNamesUiTests
         AssertNamed(app.Find("deployFolderField", "the deploy folder box"), "Folder", "the deploy folder box");
 
         app.SelectSection(CourseFixtures.Renamed, 1);
-        EndToEnd.PressMenuBarItem(app, "Section", "sectionClassDates");
-        var dates = MenuBar.Dialog(app, "Section > Class Dates…");
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesClassDates");
+        var dates = MenuBar.Dialog(app, "Classes > Class Dates…");
         AssertNamed(InDialog(dates, "sectionScheduleTypedField", "the dates box"), "Class dates", "the dates box");
         AssertNamed(InDialog(dates, "sectionScheduleSourceField", "the source box"), "Where these came from", "the source box");
         var sheetRoute = dates.FindFirstDescendant(cf => cf.ByName("A Google Sheet").And(cf.ByControlType(ControlType.RadioButton)))
@@ -104,8 +104,8 @@ public class PlaceholderFieldNamesUiTests
     {
         using var app = new DrivenApp(WriteCourses);
         app.SelectSection(CourseFixtures.Renamed, 1);
-        EndToEnd.PressMenuBarItem(app, "Section", "sectionClassDates");
-        var dates = MenuBar.Dialog(app, "Section > Class Dates…");
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesClassDates");
+        var dates = MenuBar.Dialog(app, "Classes > Class Dates…");
         var box = InDialog(dates, "sectionScheduleTypedField", "the dates box");
         CopyAPageEscapeUiTests.Front(app);
 
