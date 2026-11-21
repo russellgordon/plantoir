@@ -40,6 +40,9 @@ internal static class Program
                 "w4-seed" => W4Runs.Seed(folder, args[2], args[3], Int(args[4])),
                 "child-w4" => W4Runs.Child(folder, args[2], args[3], Int(args[4])),
                 "w4-read" => W4Runs.Read(folder, args[2], Int(args[3])),
+                "kinds-kill" => W6Runs.KindsKill(folder),
+                "child-kinds" => W6Runs.ChildKinds(folder, args[2]),
+                "child-kinds-recover" => W6Runs.ChildKindsRecover(folder, args[2]),
                 _ => Unknown(mode),
             };
         }

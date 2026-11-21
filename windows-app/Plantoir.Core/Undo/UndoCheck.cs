@@ -159,8 +159,72 @@ internal static class UndoCheck
                 return UndoOpState.Neither;
             }
 
+            case UndoOp.ReplaceText:
+                return UndoHunk.StateOf(op, current);
+
+            case UndoOp.EditJson:
+                return UndoJsonMember.StateOf(op, current);
+
+            case UndoOp.Move or UndoOp.CreateTree or UndoOp.RemoveTree or UndoOp.External:
+                // Judged on the disk as a whole (WholeStateOf), never by one file.
+                return UndoOpState.Neither;
+
             default:
                 return UndoOpState.NotReadable;
+        }
+    }
+
+    /// <summary>
+    /// Where a move, a tree or an external op stands now, each judged AS A
+    /// WHOLE against what is there, on its own (<c>opKinds.wholeOps</c>; the
+    /// mac's <c>UndoCheck.wholeState</c>). A move is judged as a PAIR, never
+    /// by one place alone (#897 piece B, seam 1): its <c>from</c> free and
+    /// its <c>to</c> holding the content is as the step left it; the other way
+    /// round is as it was; anything else (both full, both free, either holding
+    /// something else) is a change since, so an undo leaves BOTH where they
+    /// are. <paramref name="cannotRead"/> is a test's seam (a full path that
+    /// cannot be read just now).
+    /// </summary>
+    internal static UndoOpState WholeStateOf(UndoOp op, string root, IUndoExternalPlaces places, Func<string, bool>? cannotRead = null)
+    {
+        if (!op.Readable) return UndoOpState.NotReadable;
+        switch (op.Kind)
+        {
+            case UndoOp.Move:
+            {
+                UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead);
+                UndoMoveSide atTo = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead);
+                if (atFrom == UndoMoveSide.CannotRead || atTo == UndoMoveSide.CannotRead) return UndoOpState.CannotTell;
+                if (atFrom == UndoMoveSide.Free && atTo == UndoMoveSide.HoldsTheContent) return UndoOpState.After;
+                if (atFrom == UndoMoveSide.HoldsTheContent && atTo == UndoMoveSide.Free) return UndoOpState.Before;
+                return UndoOpState.Neither;
+            }
+            case UndoOp.CreateTree:
+            case UndoOp.RemoveTree:
+            {
+                bool present;
+                switch (UndoTreeReading.Read(UndoTreeReading.Under(root, op.Path!), cannotRead: cannotRead))
+                {
+                    case UndoTreeReading.Absent: present = false; break;
+                    case UndoTreeReading.CannotRead: return UndoOpState.CannotTell;
+                    case UndoTreeReading.Tree tree:
+                        if (!string.Equals(tree.Listing.Sha, op.ListingSha, StringComparison.Ordinal)) return UndoOpState.Neither;
+                        present = true;
+                        break;
+                    default: return UndoOpState.Neither;
+                }
+                if (op.Kind == UndoOp.CreateTree) return present ? UndoOpState.After : UndoOpState.Before;
+                return present ? UndoOpState.Before : UndoOpState.After;
+            }
+            case UndoOp.External:
+            {
+                UndoExternalReading found = places.Read(op.Target!);
+                if (found.Matches(op.ValueBefore)) return UndoOpState.Before;
+                if (found.Matches(op.ValueAfter)) return UndoOpState.After;
+                return UndoOpState.Neither;
+            }
+            default:
+                return UndoOpState.Neither;
         }
     }
 
@@ -194,6 +258,9 @@ internal static class UndoCheck
         /// <summary>Every op can be moved: the new content of each file it touches (null: no file).</summary>
         internal sealed record Ready(IReadOnlyDictionary<string, byte[]?> Changes) : PlanResult
         {
+            /// <summary>The whole ops' changes (a move, a tree made or taken out, an external target set), in the order the check met them, after every file's (<c>opKinds.external</c>: "after every file's content has been swapped in").</summary>
+            internal IReadOnlyList<UndoSwapTarget> Whole { get; init; } = [];
+
             /// <summary>
             /// The same changes in the order the check MET their files (an undo
             /// meets its ops in reverse), each with what the file held when it
@@ -247,9 +314,12 @@ internal static class UndoCheck
     /// <param name="read">What is at an op's path now (relative path in, current out).</param>
     /// <param name="blob">A blob's bytes by name, or null when the store does not have it (or its bytes do not hash to its name).</param>
     /// <param name="folderIsReachable">Asked again when every page in the way is absent (the W1 review's M1); null: not asked.</param>
+    /// <param name="whole">Where a whole op (a move, a tree, an external target) is read and changed: the working folder's
+    /// root and the external places. Needed by a step that holds one (U2's kinds, W6); without it such a step is not readable here.
+    /// With it, every place every op names is checked inside the working folder, links resolved, before anything is read through it.</param>
     internal static PlanResult Plan(IReadOnlyList<UndoOp> ops, bool backward,
                                     Func<string, UndoCurrent> read, Func<string, byte[]?> blob,
-                                    Func<bool>? folderIsReachable = null)
+                                    Func<bool>? folderIsReachable = null, UndoWholeReads? whole = null)
     {
         foreach (UndoOp op in ops)
         {
@@ -265,9 +335,36 @@ internal static class UndoCheck
         string? inUse = null;
         string? cannotTell = null;
 
+        var wholeChanges = new List<UndoSwapTarget>();
         foreach (UndoOp op in ordered)
         {
-            if (op.Kind == UndoOp.Recompute) continue;   // re-derived after, never checked (U2 runs it)
+            if (op.Kind == UndoOp.Recompute) continue;   // re-derived after, never checked
+            // Every place it names still inside the working folder, links
+            // resolved: a folder on its path replaced by a junction to outside
+            // since the step was made is a change since, judged before
+            // anything is read through it (the mac's second hard review of
+            // U2b, MEDIUM 2).
+            if (whole is { Root.Length: > 0 } && op.PathsNamed.Any(place => !UndoPlaces.StaysInside(whole.Root, place)))
+            {
+                if (!inTheWay.Contains(op.PlaceName, StringComparer.Ordinal)) inTheWay.Add(op.PlaceName);
+                continue;
+            }
+            if (op.IsWhole)
+            {
+                if (whole is null) return new PlanResult.NotReadable();
+                UndoOpState wholeState = WholeStateOf(op, whole.Root, whole.Places, whole.CannotRead);
+                UndoVerdict verdict = backward ? UndoVerdictOf(wholeState) : RedoVerdictOf(wholeState);
+                if (verdict is UndoVerdict.AlreadyBack or UndoVerdict.AlreadyRedone) continue;
+                if (verdict == UndoVerdict.CannotTell) { cannotTell ??= op.PlaceName; continue; }
+                if (verdict == UndoVerdict.ChangedSince)
+                {
+                    if (!inTheWay.Contains(op.PlaceName, StringComparer.Ordinal)) inTheWay.Add(op.PlaceName);
+                    continue;
+                }
+                if (WholeTarget(op, backward, whole.Root, blob) is not { } target) { missing ??= op.PlaceName; continue; }
+                wholeChanges.Add(target);
+                continue;
+            }
             string path = op.Path!;
             if (!original.ContainsKey(path))
             {
@@ -298,6 +395,20 @@ internal static class UndoCheck
                 }
                 working[path] = new UndoCurrent.Bytes(content);
             }
+            else if (op.Kind is UndoOp.ReplaceText or UndoOp.EditJson)
+            {
+                // As the step left it, yet it cannot be placed exactly (a hunk
+                // found twice, a member that cannot be put back byte for
+                // byte): changed by hand since, never content missing.
+                byte[] bytes = ((UndoCurrent.Bytes)working[path]).Content;
+                byte[]? moved = op.Kind == UndoOp.ReplaceText ? UndoHunk.Moved(op, bytes, backward) : UndoJsonMember.Moved(op, bytes, backward);
+                if (moved is null)
+                {
+                    if (!inTheWay.Contains(path, StringComparer.Ordinal)) inTheWay.Add(path);
+                    continue;
+                }
+                working[path] = new UndoCurrent.Bytes(moved);
+            }
             else
             {
                 string text = DecodeStrictly(((UndoCurrent.Bytes)working[path]).Content)!;
@@ -321,7 +432,11 @@ internal static class UndoCheck
             bool everyOneIsGone = true;
             foreach (string path in inTheWay)
             {
-                if (original[path] is not UndoCurrent.Absent) everyOneIsGone = false;
+                if (original.TryGetValue(path, out UndoCurrent? was) && was is not UndoCurrent.Absent) everyOneIsGone = false;
+            }
+            foreach (string path in inTheWay)
+            {
+                if (!original.ContainsKey(path)) everyOneIsGone = false;   // a whole op's place, or one leading outside
             }
             if (everyOneIsGone && folderIsReachable is not null && !folderIsReachable())
                 return new PlanResult.FolderCannotBeReached(inTheWay[0]);
@@ -344,7 +459,7 @@ internal static class UndoCheck
             changes[path] = replacement;
             inOrder.Add((path, was is UndoCurrent.Bytes before ? before.Content : null, replacement));
         }
-        return new PlanResult.Ready(changes) { InOrder = inOrder };
+        return new PlanResult.Ready(changes) { InOrder = inOrder, Whole = wholeChanges };
     }
 
     private static bool SameContent(UndoCurrent a, UndoCurrent b) => (a, b) switch
@@ -353,4 +468,80 @@ internal static class UndoCheck
         (UndoCurrent.Bytes x, UndoCurrent.Bytes y) => x.Content.AsSpan().SequenceEqual(y.Content),
         _ => false,
     };
+
+    /// <summary>
+    /// The one change a move, a tree or an external op makes going this way,
+    /// or null when content it needs is missing from the list. A folder is
+    /// never taken out unless the list holds everything needed to make it
+    /// again (the mac's hard review of U2b, HIGH 2). <paramref name="blob"/>
+    /// throws when the list cannot be read, as for any other op.
+    /// </summary>
+    private static UndoSwapTarget? WholeTarget(UndoOp op, bool backward, string root, Func<string, byte[]?> blob)
+    {
+        switch (op.Kind)
+        {
+            case UndoOp.Move:
+            {
+                string source = backward ? op.To! : op.From!;
+                string destination = backward ? op.From! : op.To!;
+                return new UndoSwapTarget(UndoTreeReading.Under(root, destination), destination, null, null)
+                {
+                    Change = new UndoSwapChange.MoveHere(UndoTreeReading.Under(root, source), source, op),
+                };
+            }
+            case UndoOp.CreateTree:
+            case UndoOp.RemoveTree:
+            {
+                bool makes = (op.Kind == UndoOp.CreateTree) == !backward;
+                if (blob(op.ListingSha!) is not { } listingBytes || UndoTreeListing.Parse(listingBytes) is not { } listing
+                    || !string.Equals(listing.Sha, op.ListingSha, StringComparison.Ordinal))
+                    return null;
+                var contents = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+                foreach ((string path, string sha) in listing.Files)
+                {
+                    if (blob(sha) is not { } bytes || !string.Equals(Sha(bytes), sha, StringComparison.Ordinal)) return null;
+                    contents[path] = bytes;
+                }
+                var target = new UndoSwapTarget(UndoTreeReading.Under(root, op.Path!), op.Path!, null, null);
+                return makes
+                    ? target with { Change = new UndoSwapChange.MakeTree(listing, contents) }
+                    : target with { Change = new UndoSwapChange.TakeTree(op.ListingSha!) };
+            }
+            case UndoOp.External:
+                return new UndoSwapTarget("", op.Target!, null, null)
+                {
+                    Change = new UndoSwapChange.SetExternal(op.Target!, backward ? op.ValueAfter : op.ValueBefore,
+                                                            backward ? op.ValueBefore : op.ValueAfter),
+                };
+            default:
+                return null;
+        }
+    }
+}
+
+/// <summary>
+/// Where a plan reads and changes the whole ops of a step (U2's kinds, W6):
+/// the working folder's root (empty for a step none of whose ops names a
+/// path: an external op alone) and the places outside every working folder.
+/// <see cref="CannotRead"/> is a test's seam.
+/// </summary>
+internal sealed record UndoWholeReads(string Root, IUndoExternalPlaces Places, Func<string, bool>? CannotRead = null);
+
+/// <summary>The kinds of change a swap makes besides a file's content (the mac's <c>UndoSwapChange</c>).</summary>
+internal abstract record UndoSwapChange
+{
+    private UndoSwapChange() { }
+
+    /// <summary>The item at <see cref="FromFull"/> renamed onto the target, which must be free: one rename that never replaces, the pair re-checked first.</summary>
+    internal sealed record MoveHere(string FromFull, string FromRelative, UndoOp Op) : UndoSwapChange;
+
+    /// <summary>A folder made with every file in it: built beside its place under a staged name, then renamed in, never over anything.</summary>
+    internal sealed record MakeTree(UndoTreeListing Listing, IReadOnlyDictionary<string, byte[]> Contents) : UndoSwapChange;
+
+    /// <summary>A folder whose listing must still be this one, taken out: renamed aside FIRST, checked there, removed once every change has gone in.</summary>
+    internal sealed record TakeTree(string ListingSha) : UndoSwapChange;
+
+    /// <summary>An external target set (null: removed), which must still hold <see cref="Expected"/>.</summary>
+    internal sealed record SetExternal(string Target, UndoJson? Expected, UndoJson? Value) : UndoSwapChange;
+
 }

@@ -25,9 +25,17 @@ internal static class UndoContract
     internal static JsonElement Undo => SharedRules.RootElement.GetProperty("undo");
     internal static JsonElement Journal => FileFormats.RootElement.GetProperty("undoJournal");
 
+    /// <summary>
+    /// <c>undo-json-cases.json</c>: the editJSON byte cases, kept out of
+    /// <c>shared-rules.json</c> because some hold keys that differ only by
+    /// case, which Windows PowerShell 5.1 cannot read (#899 W6).
+    /// </summary>
+    internal static JsonElement JsonCases => JsonCasesDocument.Value.RootElement;
+
     private static readonly Lazy<JsonDocument> SharedRulesDocument = new(() => ContractLoader.LoadDocument("shared-rules.json"));
     private static readonly Lazy<JsonDocument> FileFormatsDocument = new(() => ContractLoader.LoadDocument("file-formats.json"));
     private static readonly Lazy<JsonDocument> TracesDocument = new(() => ContractLoader.LoadDocument("undo-traces.json"));
+    private static readonly Lazy<JsonDocument> JsonCasesDocument = new(() => ContractLoader.LoadDocument("undo-json-cases.json"));
 
     internal static JsonDocument SharedRules => SharedRulesDocument.Value;
     internal static JsonDocument FileFormats => FileFormatsDocument.Value;
@@ -217,13 +225,19 @@ internal sealed class UndoScribe : IDisposable
 
     // ---- What a door does: the real door (W2b) ------------------------------
 
-    /// <summary>The runner of the one maintainer U1 defines, standing in for the app's (W6): it re-derives nothing and counts.</summary>
+    /// <summary>The runner of the one maintainer U1 defines, standing in for the app's: it re-derives nothing and counts (the stack cases' <c>rederived</c>), and can be taken away (<c>forgetTheMaintainer</c>).</summary>
     internal sealed class FrontPageMaintainer : IUndoMaintainers
     {
-        internal int Rederived { get; private set; }
-        public bool CanRun(string maintainer) => maintainer == UndoOp.SectionFrontPage;
-        public void Rederive(UndoOp op, string root) => Rederived++;
+        private int _rederived;
+        internal int Rederived => _rederived;
+        internal bool Forgotten { get; set; }
+        public bool CanRun(string maintainer) => !Forgotten && maintainer == UndoOp.SectionFrontPage;
+        public void Rederive(UndoOp op, string root) => Interlocked.Increment(ref _rederived);
+        internal int Take() => Interlocked.Exchange(ref _rederived, 0);
     }
+
+    /// <summary>The external places every door of this scribe reads and sets (<c>preference:…</c>, in memory).</summary>
+    internal UndoMemoryPlaces Places { get; } = new();
 
     internal FrontPageMaintainer Maintainers { get; } = new();
 
@@ -232,7 +246,28 @@ internal sealed class UndoScribe : IDisposable
 
     /// <summary>The real door on this scribe's journal, live, as this process (or as the process <paramref name="pid"/> names).</summary>
     internal UndoDoor Door(UndoSeams? seams = null, long? pid = null, UndoMode mode = UndoMode.Live, IUndoMaintainers? maintainers = null) =>
-        new(Journal, mode, maintainers ?? Maintainers, seams, Process(pid ?? Environment.ProcessId), trail: line => { lock (TrailLines) TrailLines.Add(line); });
+        new(Journal, mode, maintainers ?? Maintainers, seams, Process(pid ?? Environment.ProcessId), trail: line => { lock (TrailLines) TrailLines.Add(line); },
+            places: Places);
+
+    /// <summary>The draft of a step given as its ops (U2's kinds, through <c>Perform(UndoOpsDraft)</c>), in a working folder or in none.</summary>
+    internal UndoOpsDraft OpsDraft(string? folder, JsonArray ops, IReadOnlyList<byte[]> blobs, string action = "rollOver") => new()
+    {
+        ActionKey = action,
+        MadeBy = "menu",
+        WorkingFolder = folder is null ? null : _folders[folder],
+        Course = folder is null ? null : ThisCourse,
+        Section = folder is null ? null : 1,
+        Class = "A",
+        Holds = folder is null ? null : "section",
+        Ops = ops,
+        Blobs = blobs,
+    };
+
+    /// <summary>Every staged file or folder (<c>.plantoir-undo-</c> in its name) anywhere in a working folder.</summary>
+    internal List<string> StagedLeftovers(string folder) =>
+        Directory.EnumerateFileSystemEntries(_folders[folder], "*", SearchOption.AllDirectories)
+                 .Where(entry => Path.GetFileName(entry).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal))
+                 .ToList();
 
     /// <summary>The ops of one file's change, as the door works them out, with any whole-file blobs stored (for the calls that write another process's or version's lines raw).</summary>
     internal JsonArray OpsFor(string relative, byte[]? before, byte[]? after)
@@ -351,5 +386,140 @@ internal static class UndoTraceEdits
         string bare = old.EndsWith('\r') ? old[..^1] : old;
         lines[found[0].Start] = kind == "otherKey" ? bare + " (edited)" + ending : bare + " # checked" + ending;
         return string.Join("\n", lines);
+    }
+}
+
+/// <summary>An external place in memory, for the cases (the mac's <c>UndoMemoryPlaces</c>): one dictionary, safe from any thread.</summary>
+internal sealed class UndoMemoryPlaces : IUndoExternalPlaces
+{
+    private readonly Dictionary<string, UndoJson> _values = new(StringComparer.Ordinal);
+
+    public UndoExternalReading Read(string target)
+    {
+        lock (_values) return _values.TryGetValue(target, out UndoJson? value) ? UndoExternalReading.Holding(value) : UndoExternalReading.Unset;
+    }
+
+    public bool Write(string target, UndoJson? value)
+    {
+        lock (_values)
+        {
+            if (value is null) _values.Remove(target);
+            else _values[target] = value;
+        }
+        return true;
+    }
+}
+
+/// <summary>What the U2 cases share (the mac's <c>UndoContractKinds</c>): the places their calls name and how each kind's op is written.</summary>
+internal static class UndoKindsForTheCases
+{
+    internal const string MarkerFrom = "courses/TST1O/.netlify_sites/section1.json";
+    internal const string MarkerTo = "courses/TST1O/.netlify_sites/section1.previous.json";
+    internal const string OldMarker = "{\"site_id\": \"aaa-111\"}\n";
+    internal const string NewMarker = "{\"site_id\": \"bbb-222\"}\n";
+    internal const string ExtraFolder = "courses/TST1O/extra";
+    internal static readonly (string Path, string Text)[] ExtraFiles = [("a.md", "A\n"), ("sub/b.md", "B\n")];
+    internal const string Settings = "courses/TST1O/settings.json";
+    internal const string Notes = "courses/TST1O/notes.md";
+    internal const string Preference = "preference:undoCasesPreference";
+    internal const string AsidePage = "courses/TST1O/old/a.md";
+    internal const string AsidePageMoved = "courses/TST1O/a.md";
+    internal const string FrontPage = "courses/TST1O/Section 1/index.md";
+
+    internal static JsonObject MoveFile(string from, string to, byte[] content) => new()
+    {
+        ["kind"] = "move", ["from"] = from, ["to"] = to, ["sha"] = UndoCheck.Sha(content),
+    };
+
+    /// <summary>A createTree or removeTree op and the blobs it needs: its listing and every file's content.</summary>
+    internal static (JsonObject Op, List<byte[]> Blobs) Tree(string kind, string path, UndoTreeListing listing, IEnumerable<byte[]> contents)
+    {
+        var names = new JsonArray(listing.Sha);
+        var blobs = new List<byte[]> { listing.Bytes };
+        var seen = new HashSet<string>(StringComparer.Ordinal) { listing.Sha };
+        foreach ((_, string sha) in listing.Files)
+        {
+            if (seen.Add(sha)) names.Add(sha);
+        }
+        blobs.AddRange(contents);
+        return (new JsonObject { ["kind"] = kind, ["path"] = path, ["listingSha"] = listing.Sha, ["blobs"] = names }, blobs);
+    }
+
+    internal static JsonObject External(string target, JsonNode? before, JsonNode? after, bool hasBefore = true)
+    {
+        var op = new JsonObject { ["kind"] = "external", ["target"] = target };
+        if (hasBefore) op["before"] = before;
+        op["after"] = after;
+        return op;
+    }
+
+    internal static JsonObject FrontPageRecompute() => new()
+    {
+        ["kind"] = "recompute", ["path"] = FrontPage, ["maintainer"] = "sectionFrontPage", ["section"] = 1,
+    };
+
+    /// <summary>What a working folder's two marker places hold (the cases' <c>markers</c>).</summary>
+    internal static string Markers(UndoScribe scribe, string folder = "A")
+    {
+        string? from = Text(scribe.Page(folder, MarkerFrom));
+        string? to = Text(scribe.Page(folder, MarkerTo));
+        if (from is null && to == OldMarker) return "moved";
+        if (from == OldMarker && to is null) return "movedBack";
+        if (from == NewMarker && to == OldMarker) return "bothKept";
+        return $"from {from ?? "nothing"}, to {to ?? "nothing"}";
+    }
+
+    internal static string? Text(byte[]? bytes) => bytes is null ? null : Encoding.UTF8.GetString(bytes);
+
+    /// <summary>Whether the folder makeAFolder makes is there, as a folder.</summary>
+    internal static bool FolderIsThere(UndoScribe scribe, string folder = "A") =>
+        UndoTreeReading.Read(scribe.FullPath(folder, ExtraFolder)) is UndoTreeReading.Tree;
+
+    /// <summary>The listing of the extra folder as the cases make it, and its contents.</summary>
+    internal static (UndoTreeListing Listing, List<byte[]> Contents) ExtraListing()
+    {
+        var files = new List<(string, string)>();
+        var contents = new List<byte[]>();
+        foreach ((string path, string text) in ExtraFiles)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(text);
+            files.Add((path, UndoCheck.Sha(bytes)));
+            contents.Add(bytes);
+        }
+        return (new UndoTreeListing(["sub"], files), contents);
+    }
+
+    /// <summary>
+    /// Makes a link at <paramref name="place"/> (never followed by the check):
+    /// a symbolic link where this account may make one, else a junction to a
+    /// folder of the test's own; either is a name-surrogate reparse point,
+    /// which is what the check reads as "a link".
+    /// </summary>
+    internal static void MakeALink(string place, string scratch)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(place)!);
+        string target = Path.Combine(scratch, "link-target-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "x.md"), "outside\n");
+        try
+        {
+            File.CreateSymbolicLink(place, Path.Combine(target, "x.md"));
+            return;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        MakeAJunction(place, target);
+    }
+
+    /// <summary>A junction (a mount point: no privilege needed) from <paramref name="place"/> to <paramref name="target"/>.</summary>
+    internal static void MakeAJunction(string place, string target)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(place)!);
+        var start = new System.Diagnostics.ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (string argument in new[] { "/c", "mklink", "/J", place, target }) start.ArgumentList.Add(argument);
+        using var made = System.Diagnostics.Process.Start(start)!;
+        made.StandardOutput.ReadToEnd();
+        made.StandardError.ReadToEnd();
+        made.WaitForExit();
+        Assert.True(Directory.Exists(place), "the junction was not made at " + place);
     }
 }
