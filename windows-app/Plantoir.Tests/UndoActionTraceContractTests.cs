@@ -48,7 +48,7 @@ public sealed class UndoActionTraceContractTests
     {
         if (NamedGapLedger.Holding(NamedGapLedger.UndoActionTraces, name) is { } held)
         {
-            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => ReplayTheActionTrace(name), "a step this replay does not make");
+            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => ReplayTheActionTrace(name), "a step this replay does not make", "named ");
             return;
         }
         ReplayTheActionTrace(name);

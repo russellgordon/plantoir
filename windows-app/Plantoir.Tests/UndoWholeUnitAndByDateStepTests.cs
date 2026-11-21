@@ -35,7 +35,7 @@ public sealed class UndoWholeUnitAndByDateStepTests : IDisposable
 
     public UndoWholeUnitAndByDateStepTests()
     {
-        Directory.CreateDirectory(CourseDirectory);
+        Directory.CreateDirectory(Path.Combine(CourseDirectory, "section1"));
         File.WriteAllText(Path.Combine(Folder, "preview.ps1"), "# marker");
         File.WriteAllText(Path.Combine(Folder, "deploy.ps1"), "# marker");
         File.WriteAllText(Path.Combine(CourseDirectory, "course_config.json"), """
