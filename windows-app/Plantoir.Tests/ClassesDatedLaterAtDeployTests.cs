@@ -83,7 +83,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var happened = new List<string>();
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
                                           "ICS3U", 1, AssistSurface.LocalWindow)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             AskAboutClassesDatedLaterInApp = () => Task.FromResult<LaterClassesAtADeploy>(LaterClassesAnswer.CannotAsk),
             PreviewIsShowing = () => true,
             StopPreviewInAppAsync = () => { happened.Add("stop"); return Task.CompletedTask; },
@@ -108,7 +108,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var happened = new List<string>();
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
                                           "ICS3U", 1, AssistSurface.LocalWindow)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             AskAboutClassesDatedLaterInApp = () => Task.FromResult(
                 new LaterClassesAtADeploy(LaterClassesAnswer.NothingToAsk, WillBeRefused: true)),
             PreviewIsShowing = () => true,
@@ -130,7 +130,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var happened = new List<string>();
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
                                           "ICS3U", 1, AssistSurface.LocalWindow)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             AskAboutClassesDatedLaterInApp = () => Task.FromResult<LaterClassesAtADeploy>(LaterClassesAnswer.NothingToAsk),
             PreviewIsShowing = () => true,
             StopPreviewInAppAsync = () => { happened.Add("stop"); return Task.CompletedTask; },
@@ -149,7 +149,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var happened = new List<string>();
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
                                           "ICS3U", 1, AssistSurface.LocalWindow)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             AskAboutClassesDatedLaterInApp = () => Task.FromResult(
                 new LaterClassesAtADeploy(LaterClassesAnswer.NoWindow, new[] { "Unit 2, Day 5", "Unit 2, Day 6" })),
             PreviewIsShowing = () => true,
@@ -177,7 +177,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(
                                               new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()) { Surface = AssistSurface.Menu }),
                                           "ICS3U", 1, AssistSurface.Menu)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             PreviewIsShowing = () => true,
             StopPreviewInAppAsync = () => { happened.Add("stop"); return Task.CompletedTask; },
             ShowPreviewInApp = () => happened.Add("start"),

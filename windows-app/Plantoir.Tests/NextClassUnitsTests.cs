@@ -169,7 +169,7 @@ public sealed class NextClassUnitsTests : IDisposable
             var model = new WindowBindingContractTests.ScriptedModel();
             model.Then(AddNextClassReply("""{"course":"ICS3U","section":1}"""), "tool_calls");
             var agent = new AssistAgent(model, new WindowBindingContractTests.RecordingTools(), LocalSchemas(), "ICS3U", 1)
-            {
+            { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
                 ConfirmationMode = () => false,
             };
             await agent.Say(input, CancellationToken.None);
@@ -308,7 +308,7 @@ public sealed class NextClassUnitsTests : IDisposable
         var model = new WindowBindingContractTests.ScriptedModel();
         model.Then(AddNextClassReply("""{"course":"ICS3U","section":1}"""), "tool_calls");
         model.Then(new JsonObject { ["role"] = "assistant", ["content"] = "Hello." }, "stop");
-        var agent = new AssistAgent(model, tools, LocalSchemas(), "ICS3U", 1) { ConfirmationMode = () => true };
+        var agent = new AssistAgent(model, tools, LocalSchemas(), "ICS3U", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class, ConfirmationMode = () => true };
         var pagesBefore = ClassPages(folder);
 
         var lines = await agent.Say("Add the next two classes", CancellationToken.None);

@@ -31,10 +31,20 @@ public class SeparatorGapsRuleTests
         Assert.Equal(new HashSet<int> { 3 }, SectionAndClassesUiTests.SeparatorGaps(new[] { 7, 9, 7, 14, 9 }));
     }
 
-    [Fact]
-    public void GapsAllEqual_NoSeparator()
+    /// <summary>
+    /// Gaps all of one kind fail the reading rather than guess which kind
+    /// (#990 review 3, low 2): no separator with gaps that round two ways, every
+    /// gap a separator, and all equal. MUST FAIL under round three's rule, which
+    /// read the 5s and the 8s as separators and all-equal as none.
+    /// </summary>
+    [Theory]
+    [InlineData(new[] { 4, 5, 4, 5, 4 })]
+    [InlineData(new[] { 7, 8, 7, 8 })]
+    [InlineData(new[] { 4, 4, 4 })]
+    public void GapsAllOfOneKind_FailTheReading(int[] gaps)
     {
-        Assert.Empty(SectionAndClassesUiTests.SeparatorGaps(new[] { 4, 4, 4 }));
+        var error = Assert.Throws<Xunit.Sdk.XunitException>(() => SectionAndClassesUiTests.SeparatorGaps(gaps));
+        Assert.Contains("all of one kind", error.Message);
     }
 
     /// <summary>Gaps that do not fall into two clear sets fail the reading rather than guess.</summary>

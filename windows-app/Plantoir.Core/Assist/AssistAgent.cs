@@ -453,9 +453,10 @@ public sealed class AssistAgent
     /// What the window's course calls its class pages, for the one sentence
     /// that names the menus to the teacher (<see cref="AssistWording.SectionIsChangingFromTheMenu"/>):
     /// "the Section or Meetings menu" in a club (#990). Set by the window,
-    /// which has the course.
+    /// which has the course. REQUIRED, with no default (#990 review 3, low
+    /// 3): a second site that forgot it would still compile.
     /// </summary>
-    public ClassNoun CourseNoun { get; init; } = ClassNoun.Class;
+    public required ClassNoun CourseNoun { get; init; }
     private readonly int _section;
 
     public AssistAgent(IChatModel model, IToolServer tools, JsonArray schemas, string courseCode, int section)

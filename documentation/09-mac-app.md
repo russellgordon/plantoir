@@ -7918,8 +7918,8 @@ on the section row's right-click menu
 **Menu paths.** `help/menu-paths.json`, `help/outline.json`, the two menu
 sentences that named Section ▸ Class Dates… (`menuNeedsClassDatesFirst`,
 `menuRollOverDatesAreOld`) and the comments that named the five moved items
-say Classes now. A club's twins of those two sentences name "the Classes menu"
-(below). The
+say Classes now. A club's twins of those two sentences name "the Meetings
+menu" (below). The
 three Undo sentences that name Section ▸ Undo Last Change are U7's and stay.
 
 **Name the real menu** (Russell, 2026-11-20, on #990). A sentence that says

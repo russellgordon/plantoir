@@ -99,7 +99,7 @@ public class UnofferedToolRefusalTests : IDisposable
         var model = new ScriptModel().Calls(tool, "{\"course\":\"VVH2O\",\"section\":1}");
         var tools = new CannedTools();
         var agent = new AssistAgent(model, tools, Offered("list_pages", "publish_pages", "unpublish_pages"), "VVH2O", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ServedTools = Served,
             ConfirmationMode = () => false,
         };
@@ -120,7 +120,7 @@ public class UnofferedToolRefusalTests : IDisposable
     {
         var model = new ScriptModel().Calls("re_date_classes").Says("Sure.");
         var agent = new AssistAgent(model, new CannedTools(), Offered("list_pages"), "VVH2O", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ServedTools = Served,
         };
 
@@ -137,7 +137,7 @@ public class UnofferedToolRefusalTests : IDisposable
     {
         var model = new ScriptModel().Calls("delete_everything").Says("There is no such tool.");
         var tools = new CannedTools { Answer = (_, _) => AssistToolAnswer.Same("There is no tool by that name.") };
-        var agent = new AssistAgent(model, tools, Offered("list_pages"), "VVH2O", 1) { ServedTools = Served };
+        var agent = new AssistAgent(model, tools, Offered("list_pages"), "VVH2O", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class, ServedTools = Served };
 
         agent.Say("delete it", CancellationToken.None).GetAwaiter().GetResult();
 
@@ -149,7 +149,7 @@ public class UnofferedToolRefusalTests : IDisposable
     {
         var model = new ScriptModel().Calls("list_pages").Says("Here they are.");
         var tools = new CannedTools();
-        var agent = new AssistAgent(model, tools, Offered("list_pages"), "VVH2O", 1) { ServedTools = Served };
+        var agent = new AssistAgent(model, tools, Offered("list_pages"), "VVH2O", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class, ServedTools = Served };
 
         agent.Say("what pages are there", CancellationToken.None).GetAwaiter().GetResult();
 
@@ -194,7 +194,7 @@ public class TrailCarriesArgumentNamesTests : IDisposable
     {
         var model = new ScriptModel().Calls("publish_pages",
             "{\"course\":\"VVH2O\",\"section\":1,\"pages\":[\"Secret Lesson Title\"]}");
-        var agent = new AssistAgent(model, new CannedTools(), new JsonArray(), "VVH2O", 1) { ConfirmationMode = () => true };
+        var agent = new AssistAgent(model, new CannedTools(), new JsonArray(), "VVH2O", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class, ConfirmationMode = () => true };
 
         agent.Say("publish my lesson", CancellationToken.None).GetAwaiter().GetResult();
 
@@ -209,7 +209,7 @@ public class TrailCarriesArgumentNamesTests : IDisposable
     [Fact]
     public void AFixedPhraseCarriesItsArgumentNames()
     {
-        var agent = new AssistAgent(new ScriptModel(), new CannedTools(), new JsonArray(), "VVH2O", 1);
+        var agent = new AssistAgent(new ScriptModel(), new CannedTools(), new JsonArray(), "VVH2O", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class };
 
         agent.Say("duplicate Unit 3, Day 2 as my next class", CancellationToken.None).GetAwaiter().GetResult();
         agent.Say("add the next class page", CancellationToken.None).GetAwaiter().GetResult();

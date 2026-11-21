@@ -333,15 +333,23 @@ public class SectionAndClassesUiTests
     /// across a separator. The split counts only when it is unambiguous: the
     /// jump must be wider than the spread inside either set (the spread being
     /// the device-pixel rounding of one drawn spacing), or the test fails
-    /// saying it cannot tell the two apart, rather than guess. All gaps equal:
-    /// no separator. A missing or extra separator then shows as a line out of
-    /// place against the layout, which is the assertion that fails.
+    /// saying it cannot tell the two apart, rather than guess. Gaps that are
+    /// all of ONE kind fail too (#990 review 3, low 2): gaps that span no more
+    /// than <see cref="OneSpacingSpan"/> can all be one spacing rounded to
+    /// device pixels, so whether they are all separators or none cannot be
+    /// read from them (4 and 5 with no separator, 7 and 8 with every gap one;
+    /// all equal likewise). Every menu read this way has both kinds. A missing
+    /// or extra separator then shows as a line out of place against the
+    /// layout, which is the assertion that fails.
     /// </summary>
     internal static HashSet<int> SeparatorGaps(IReadOnlyList<int> gaps)
     {
         var across = new HashSet<int>();
+        if (gaps.Count == 0) return across;
+        if (gaps.Max() - gaps.Min() <= OneSpacingSpan)
+            throw new Xunit.Sdk.XunitException(
+                $"the menu's gaps are all of one kind, so whether they are all separators or none cannot be read: {string.Join(", ", gaps)}");
         var sorted = gaps.Distinct().OrderBy(gap => gap).ToList();
-        if (sorted.Count < 2) return across;
         int widest = 0, splitAbove = 0;
         for (int index = 1; index < sorted.Count; index++)
             if (sorted[index] - sorted[index - 1] > widest) { widest = sorted[index] - sorted[index - 1]; splitAbove = sorted[index - 1]; }
@@ -355,6 +363,15 @@ public class SectionAndClassesUiTests
             if (gaps[index] > splitAbove) across.Add(index);
         return across;
     }
+
+    /// <summary>
+    /// The most the gaps of ONE drawn spacing differ once rounded to device
+    /// pixels: each gap is the difference of two rounded edges, and the rule
+    /// tests already take 7 and 9 as one spacing at a larger scaling (2
+    /// pixels apart), so gaps spanning no more than this may all be one kind.
+    /// Derived from that reading, not adjusted until a test passed.
+    /// </summary>
+    internal const int OneSpacingSpan = 2;
 
     /// <summary>
     /// With <c>PLANTOIR_UI_CAPTURE_DIR</c> set, a picture of the screen with the

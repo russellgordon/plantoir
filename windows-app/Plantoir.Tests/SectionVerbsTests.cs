@@ -60,7 +60,7 @@ public class SectionVerbsTests : IDisposable
         workspace = server;
         var tools = new AssistScenarioTests.RealTools(server);
         return new SectionVerbs(_folder, _ => Task.FromResult<IToolServer?>(tools),
-            (course, section, toolServer) => new AssistToolRunner(toolServer, course, section, AssistSurface.Menu));
+            (course, section, toolServer) => new AssistToolRunner(toolServer, course, section, AssistSurface.Menu) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class });
     }
 
     private static JsonObject Arguments(JsonObject call) =>
@@ -452,7 +452,7 @@ public class SectionVerbsTests : IDisposable
 
             var window = new AssistWorkspace(_folder, new FakeLauncher(), undo: new UndoHistory()) { Surface = AssistSurface.LocalWindow };
             var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(window), "ICS3U", 1, AssistSurface.LocalWindow)
-            {
+            { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
                 SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, "ICS3U", 1),
             };
             var (answer, handed) = await runner.Run(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1, Day 1" }, plan: false), default);
@@ -473,7 +473,7 @@ public class SectionVerbsTests : IDisposable
         int rebuilt = 0, shown = 0;
         var tools = new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.Menu });
         var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ShowPreviewInApp = () => shown++,
             RebuildPreviewInApp = () => rebuilt++,
             CourseIsBeingCopied = () => false,
@@ -483,7 +483,7 @@ public class SectionVerbsTests : IDisposable
         Assert.Equal((1, 0), (rebuilt, shown));
 
         var copying = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             RebuildPreviewInApp = () => rebuilt++,
             CourseIsBeingCopied = () => true,
         };
@@ -504,7 +504,7 @@ public class SectionVerbsTests : IDisposable
         var tools = new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher(), undo: history) { Surface = AssistSurface.Menu });
         int stopped = 0, shown = 0;
         var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             PreviewIsShowing = () => true,
             StopPreviewInApp = () => stopped++,
             ShowPreviewInApp = () => shown++,
@@ -542,7 +542,7 @@ public class SectionVerbsTests : IDisposable
         int rebuilt = 0, shown = 0;
         var agent = new AssistAgent(new NoModel(), new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher())),
                                     new JsonArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ShowPreviewInApp = () => shown++,
             RebuildPreviewInApp = () => rebuilt++,
             SectionIsChangingFromTheMenu = () => true,
