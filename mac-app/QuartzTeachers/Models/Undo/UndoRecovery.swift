@@ -366,6 +366,94 @@ nonisolated enum UndoRecovery {
         return UndoWhatTheListCouldNotTake(outgoingOf: notWhole, keptOriginalsHolding: keptNotStored)
     }
 
+    /// What an Undo or a Redo's swap is about to take off each page, into
+    /// the list as a blob when the step's OTHER direction needs it and the
+    /// list does not hold it (U3c review 3, LOW 3, fixed in U4a): a page
+    /// whose content for the Redo (or the Undo) was gone from the list had
+    /// its only copy deleted by the swap's tidy, and that Redo then came to
+    /// `contentMissing`. By the line's first invariant an only copy is never
+    /// deleted: the bytes go into the list, and when the list will not take
+    /// them the page is named here, so the swap keeps them beside it
+    /// (`keepingTheOriginalsOf`) and the other direction is made from that
+    /// kept file, as a put-back from a kept original is. Inside the lock,
+    /// before the swap.
+    ///
+    /// Bytes a kept original of the step already holds beside the page need
+    /// nothing more: that file is the copy the other direction is made from
+    /// (U3c's put-back keeps it, `keepingCopiesHolding`).
+    static func storeWhatTheOtherDirectionNeeds(
+        _ targets: [UndoSwapTarget], of step: UndoStep, direction: UndoDirection, root: URL, _ writer: UndoJournalWriter
+    ) -> [String] {
+        var notStored: [String] = []
+        for target in targets {
+            guard case .file = target.change, let outgoing = target.expected else {
+                continue
+            }
+            let outgoingSha: String = UndoHash.sha256(of: outgoing)
+            var needed: Bool = false
+            for op in step.ops where op.knownKind == .writeFile && op.path == target.relativePath {
+                let otherSha: String? = direction == .backward ? op.afterSha : op.beforeSha
+                if otherSha == outgoingSha {
+                    needed = true
+                }
+            }
+            if !needed || writer.journal.readBlob(sha: outgoingSha) != nil {
+                continue
+            }
+            var alreadyKept: Bool = false
+            for kept in UndoRecovery.keptOriginalFiles(of: step, beside: root.appendingPathComponent(target.relativePath)) {
+                if case .file(let data) = UndoItem.read(at: kept), UndoHash.sha256(of: data) == outgoingSha {
+                    alreadyKept = true
+                }
+            }
+            if alreadyKept {
+                continue
+            }
+            if (try? writer.writeBlob(outgoing)) == nil && !notStored.contains(target.relativePath) {
+                notStored.append(target.relativePath)
+            }
+        }
+        return notStored
+    }
+
+    /// Thins the kept originals of this step beside each of these pages to
+    /// ONE per content (U3c review 3, LOW 1, fixed in U4a): with both
+    /// contents gone and the list taking no new file, every Undo and Redo
+    /// kept its outgoing bytes under a new name and nothing removed them, so
+    /// the copies piled up, alternating between two contents. A kept copy
+    /// whose bytes another kept copy of the same step and page holds too is
+    /// superseded: no offer rests on it, since an offer rests on content,
+    /// and that content stays beside the page. The copy this move just made
+    /// (`newestLabel`) is the one kept for its content; otherwise the first
+    /// by name. A copy that cannot be read is never removed, and nothing but
+    /// this step's own kept copies is touched.
+    static func removeSupersededKeptCopies(of step: UndoStep, root: URL, paths: [String], newestLabel: String) {
+        for path in paths {
+            let place: URL = root.appendingPathComponent(path)
+            var keptFor: [String: URL] = [:]
+            var others: [(url: URL, sha: String)] = []
+            for kept in UndoRecovery.keptOriginalFiles(of: step, beside: place) {
+                guard case .file(let data) = UndoItem.read(at: kept) else {
+                    continue
+                }
+                let sha: String = UndoHash.sha256(of: data)
+                if UndoSwap.isStaged(kept.lastPathComponent, label: newestLabel), let earlier = keptFor[sha] {
+                    others.append((url: earlier, sha: sha))
+                    keptFor[sha] = kept
+                    continue
+                }
+                if keptFor[sha] == nil {
+                    keptFor[sha] = kept
+                } else {
+                    others.append((url: kept, sha: sha))
+                }
+            }
+            for superseded in others where keptFor[superseded.sha] != superseded.url {
+                _ = UndoSwap.removeStaged(superseded.url)
+            }
+        }
+    }
+
     /// Every kept original (`-orig`, a file) of this step's beside one
     /// place, by name order.
     static func keptOriginalFiles(of step: UndoStep, beside place: URL) -> [URL] {

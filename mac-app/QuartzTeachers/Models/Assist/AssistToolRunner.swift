@@ -4286,7 +4286,15 @@ final class AssistToolRunner {
             // Worth its own line on the trail: the room has been made by the
             // time this is answered, so a teacher sees their classes move and
             // no copy appear, and nothing else recorded would say why.
-            try? duplicateStep.make()
+            // The room alone, made or said as not made: never a reply about
+            // classes that moved when none did (the U3 sweep, finding 4).
+            do {
+                try duplicateStep.make()
+            } catch {
+                return AssistToolOutcome.refused(
+                    saidWhenTheStepStopped(error, what: "the classes", sectionNumber: request.located.sectionNumber)
+                )
+            }
             ActivityTrail.note(
                 .classCopyNotMade,
                 "did not copy a class — the page the copy would have become still held a lesson, "
@@ -4374,7 +4382,16 @@ final class AssistToolRunner {
         if AssistPageVisibility.answer(
             in: copied, forSection: request.located.sectionNumber
         ) != .hidden {
-            try? duplicateStep.make()
+            // The room and the blank page, made or said as not made: never
+            // "a blank class page is waiting" when none is (the U3 sweep,
+            // finding 4).
+            do {
+                try duplicateStep.make()
+            } catch {
+                return AssistToolOutcome.refused(
+                    saidWhenTheStepStopped(error, what: "the classes", sectionNumber: request.located.sectionNumber)
+                )
+            }
             ActivityTrail.note(
                 .classCopyNotMade,
                 "did not copy a class — the copy could not be made certainly hidden, and a copy "
@@ -5521,17 +5538,38 @@ final class AssistToolRunner {
             var said: String = underlyingSaid
             if let placeName {
                 if isTheCurrentRecord {
-                    said += " The website record “\(legacyName)” is now at “\(placeName)”, "
-                        + "where a deploy reads it; it names the same website."
+                    said += " " + RolloverStoppedAfterARecordMoved.recordStillMoved(legacy: legacyName, place: placeName)
                 } else {
-                    said += " The old website record “\(legacyName)” is now at “\(placeName)”, where no deploy reads it."
+                    said += " " + RolloverStoppedAfterARecordMoved.leftoverStillMoved(legacy: legacyName, place: placeName)
                 }
             }
             if let unreadable {
-                said += " The website record “\(unreadable.currentName)”, which no deploy could read, "
-                    + "is now at “\(unreadable.asideName)”, where no deploy reads it either."
+                said += " " + RolloverStoppedAfterARecordMoved.unreadableStillMoved(current: unreadable.currentName, aside: unreadable.asideName)
             }
             return said
+        }
+
+        // MARK: - Functions
+
+        /// `shared-rules.json` → `undo.wording` (the U3 sweep, finding 5):
+        /// `rolloverRecordStillMoved`.
+        static func recordStillMoved(legacy: String, place: String) -> String {
+            return "The website record “\(legacy)” is now at “\(place)”, where a deploy reads it; it names the same website."
+        }
+
+        /// `undo.wording.rolloverLeftoverStillMoved`.
+        static func leftoverStillMoved(legacy: String, place: String) -> String {
+            return "The old website record “\(legacy)” is now at “\(place)”, where no deploy reads it."
+        }
+
+        /// `undo.wording.rolloverUnreadableStillMoved`.
+        static func unreadableStillMoved(current: String, aside: String) -> String {
+            return "The website record “\(current)”, which no deploy could read, is now at “\(aside)”, where no deploy reads it either."
+        }
+
+        /// `undo.wording.rolloverNothingElseWasChanged`.
+        static func nothingElseWasChanged(_ said: String) -> String {
+            return "Nothing else was changed: \(said)"
         }
 
         // MARK: - Initializer
@@ -5562,7 +5600,7 @@ final class AssistToolRunner {
     /// built output could not be put back, which is then said.
     private func saidWhenTheRolloverStopped(_ error: Error, what: String, sectionNumber: Int) -> String {
         if error is RolloverStoppedAfterARecordMoved {
-            return "Nothing else was changed: \(error.localizedDescription)"
+            return RolloverStoppedAfterARecordMoved.nothingElseWasChanged(error.localizedDescription)
         }
         return saidWhenTheStepStopped(error, what: what, sectionNumber: sectionNumber)
     }

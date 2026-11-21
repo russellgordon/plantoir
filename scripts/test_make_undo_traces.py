@@ -94,6 +94,14 @@ def deployed_answer(case):
     return "noOffer"
 
 
+def undone_as_read(step, path, text):
+    """A file as a reader compares it after an Undo: its JSON value when the
+    step planned it member by member (U4a), its text otherwise."""
+    if text is not None and any(member["path"] == path for member in step.get("members", [])):
+        return json.loads(text)
+    return text
+
+
 class ActionTraceTests(unittest.TestCase):
     """U3: the action traces, made from the steps the Mac recorded from the
     real action code (contracts/undo-action-steps.json)."""
@@ -105,14 +113,35 @@ class ActionTraceTests(unittest.TestCase):
                 pages[moved["from"]] = moved["content"]
             model = traces.Model(pages=pages)
             outcome = model.files_step([(entry["path"], entry["before"], entry["after"]) for entry in step["files"]],
-                                       step.get("recomputes", []), step.get("moves", []))
+                                       step.get("recomputes", []), step.get("moves", []),
+                                       step.get("members", []), step.get("trees", []))
             self.assertEqual(outcome[0], "applied", step["name"])
             self.assertEqual([op["kind"] for op in outcome[2]], step["ops"], step["name"] + ": the op kinds")
             undone = traces.plan(outcome[2], True, dict(model.pages))
             self.assertEqual(undone[0], "ready", step["name"])
             for entry in step["files"]:
-                self.assertEqual(undone[1].get(entry["path"], model.pages.get(entry["path"])), entry["before"],
+                self.assertEqual(undone_as_read(step, entry["path"], undone[1].get(entry["path"], model.pages.get(entry["path"]))),
+                                 undone_as_read(step, entry["path"], entry["before"]),
                                  step["name"] + ": " + entry["path"] + " undone")
+            for tree in step.get("trees", []):
+                self.assertIsNone(undone[1].get(tree["path"], "kept"), step["name"] + ": " + tree["path"] + " taken out")
+
+    def test_a_member_by_member_file_is_made_by_the_member_rule_bytes(self):
+        # U4a: the after the Mac recorded is exactly what the members'
+        # editJSON ops leave, applied in order to its before.
+        for step in traces.read_action_steps():
+            for entry in step["files"]:
+                members = [member for member in step.get("members", []) if member["path"] == entry["path"]]
+                if not members:
+                    continue
+                data = entry["before"].encode("utf-8")
+                for member in members:
+                    op = {"kind": "editJSON", "path": member["path"], "keyPath": member["keyPath"]}
+                    for side in ("before", "after"):
+                        if side in member:
+                            op[side] = member[side]
+                    data = traces.json_bytes_moved(op, False, data)
+                self.assertEqual(data.decode("utf-8"), entry["after"], step["name"])
 
     def test_a_rollover_after_a_deploy_is_undone_leaving_its_marker_apart(self):
         # U3b, Russell's ruling of 2026-11-19 on Q3: some rollover trace has
@@ -147,8 +176,15 @@ class ActionTraceTests(unittest.TestCase):
                 continue
             step = steps[trace["step"]]
             for entry in step["files"]:
+                if any(member["path"] == entry["path"] for member in step.get("members", [])):
+                    # U4a: an Undo puts each member's VALUE back, spelled
+                    # compactly, so the file's values are its before's, not
+                    # its bytes (test_every_recorded_step_... checks them).
+                    continue
                 wanted = None if entry["before"] is None else traces.sha(entry["before"])
                 self.assertEqual(trace["afterUndoingAll"][entry["path"]], wanted, trace["name"] + " " + entry["path"])
+            for tree in step.get("trees", []):
+                self.assertIsNone(trace["afterUndoingAll"][tree["path"]], trace["name"] + " " + tree["path"])
 
     def test_the_twenty_seeded_traces_are_unchanged_by_the_action_traces(self):
         with_steps = traces.generate()

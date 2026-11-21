@@ -790,7 +790,11 @@ struct CourseSettingsView: View {
             if let onDisk {
                 hiddenBefore = onDisk.hiddenItems
             }
-            let result: CourseConfiguration.WriteResult = try course.configuration.write(to: course.configFileURL)
+            // ONE step on the list, whatever it changes: one `editJSON` per
+            // setting it changes (#899 U4a). Revert writes nothing.
+            let result: CourseConfiguration.WriteResult = try course.configuration.writeAsOneStep(
+                to: course.configFileURL, madeBy: UndoStepMaker.sheet("saveCourseSettings")
+            )
             let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
                 folderPath: workingFolderPath,
                 courseCode: course.code,
@@ -1226,28 +1230,26 @@ struct CourseSettingsView: View {
     /// a folder added later behaved unlike every folder made with the course.
     /// The pages are the course creator's own (`FolderScaffold`), written only
     /// into a folder this call has just made and never over a file.
-    func createFoldersOnDisk(named name: String, scope: FolderScope) -> FolderScaffold.Outcome {
+    ///
+    /// `created` is the pages' `created` moment, now unless a test fixes it
+    /// (the recorded action step, `undo-action-steps.json`).
+    func createFoldersOnDisk(
+        named name: String, scope: FolderScope, created: String = SectionAdder.timestamp()
+    ) -> FolderScaffold.Outcome {
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
         let locations: [URL] = SpecialFolderRenamer.folderLocations(
             named: name, scope: scope,
             courseDirectory: course.directoryURL,
             sectionNumbers: sectionNumbers
         )
+        // Re-adding a name whose folder is already there is the common case
+        // and is not worth a word.
         var newFolders: [URL] = []
         for location in locations {
             if FileManager.default.fileExists(atPath: location.path) {
                 continue
             }
-            do {
-                try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
-                newFolders.append(location)
-            } catch {
-                // Re-adding a name whose folder is already there is the common
-                // case and is not worth a word; a genuine failure shows up as
-                // the folder simply not being there, which the build's own
-                // checks already report in the teacher's own terms.
-                continue
-            }
+            newFolders.append(location)
         }
         if newFolders.isEmpty {
             return FolderScaffold.Outcome()
@@ -1257,10 +1259,26 @@ struct CourseSettingsView: View {
             scope: scope,
             sectionNumbers: sectionNumbers,
             curriculumPageNames: FolderScaffold.curriculumPageNames(for: course),
-            created: SectionAdder.timestamp(),
+            created: created,
             template: FolderScaffold.bundledTemplate()
         )
-        return FolderScaffold.writePages(pages, intoNewFolders: newFolders, courseDirectory: course.directoryURL)
+        // ONE step on the list (#899 U4a): each folder made whole with its
+        // two pages, as one `createTree`, all of them or none. The list's own
+        // change is Save's, in Save's step. A genuine failure makes nothing,
+        // and shows up as the folder simply not being there, which the
+        // build's own checks already report in the teacher's own terms.
+        let step: JournaledStep = JournaledStep(
+            course: course, section: nil, maker: UndoStepMaker.sheet("addFolder"), holds: "course"
+        )
+        let outcome: FolderScaffold.Outcome = FolderScaffold.planPages(
+            pages, intoNewFolders: newFolders, courseDirectory: course.directoryURL, into: step
+        )
+        do {
+            try step.make()
+        } catch {
+            return FolderScaffold.Outcome()
+        }
+        return outcome
     }
 
     // MARK: - What a removal or an untick may do
