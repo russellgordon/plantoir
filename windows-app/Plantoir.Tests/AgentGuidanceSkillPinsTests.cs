@@ -175,4 +175,58 @@ public partial class AgentGuidanceTests
         Assert.True(problems.Count == 0, string.Join("\n", problems));
         Assert.True(pinnedSkills > 0, "mustSay pins no skill at all");
     }
+
+    /// <summary>
+    /// #795 (the mac's handouts test, its #754 part): for each starter in
+    /// <c>handoutsSkill.starterMacros</c>, in both homes, the written starter
+    /// defines each macro (<c>\newcommand{macro}</c> or
+    /// <c>\newlength{macro}</c>) and the handouts skill names it after a
+    /// backtick, so an edit to either cannot drop a macro the other relies on.
+    /// A separate test beside <see cref="TheHandoutsSkillIsWrittenWithItsStartersAndEveryRouteToItNamesIt"/>,
+    /// whose other file another branch is changing.
+    /// </summary>
+    [Fact]
+    public void TheHandoutStartersDefineEveryMacroTheSkillNames()
+    {
+        var guidance = Contract["handoutsSkill"]!;
+        string skillName = guidance["skill"]!.ToString();
+        JsonObject starterMacros = guidance["starterMacros"]!.AsObject();
+        Assert.True(starterMacros.Count > 0, "starterMacros names no starter");
+        Assert.Empty(Pass().Failures);
+
+        var problems = new List<string>();
+        int macrosChecked = 0;
+        foreach (string home in AgentGuidance.SkillHomes)
+        {
+            string skill = ReadUtf8(WrittenPath(home, skillName, "SKILL.md"));
+            foreach (KeyValuePair<string, JsonNode?> entry in starterMacros)
+            {
+                string starter = entry.Key;
+                if (entry.Value is not JsonArray macroList || macroList.Count == 0)
+                {
+                    problems.Add($"{starter} must be a list of macros");
+                    continue;
+                }
+                string starterPath = WrittenPath(home, skillName, starter);
+                if (!File.Exists(starterPath))
+                {
+                    problems.Add($"{home}: {starter} is not written");
+                    continue;
+                }
+                string source = ReadUtf8(starterPath);
+                foreach (string macro in TextsIn(macroList))
+                {
+                    macrosChecked += 1;
+                    bool defined = source.Contains("\\newcommand{" + macro + "}", StringComparison.Ordinal)
+                                   || source.Contains("\\newlength{" + macro + "}", StringComparison.Ordinal);
+                    if (!defined)
+                        problems.Add($"{home}: {starter} must define {macro}");
+                    if (!skill.Contains("`" + macro, StringComparison.Ordinal))
+                        problems.Add($"{home}: the skill must name {macro}");
+                }
+            }
+        }
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+        Assert.True(macrosChecked > 0, "starterMacros names no macro");
+    }
 }
