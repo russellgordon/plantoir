@@ -1029,6 +1029,21 @@ internal static class UndoRecovery
                                                 UndoTrail.KeptWhatAPageHeldWords(phase, kept, noLonger), kept, noLonger));
             }
         }
+        if (!live && outcome == UndoRecoveryOutcome.NothingTookEffect && ChangesOnlyFiles(step))
+        {
+            // Shadow, a step of files killed before its first swap: closed
+            // `failed`, so the closed-step tidy (interrupted only) never meets
+            // it, and its staged new content would stay beside every page
+            // until the switch flips. Nothing took effect, so every staged
+            // file is the journal's own; a kept original that differs from
+            // its page still stays (W7a, the harness's w7-publish-kill,
+            // shadow beforeSwap@0). Nothing on the trail, as shadow writes none.
+            try
+            {
+                UndoSwap.TidyLeftovers(step.Seq, step.Paths, root, AsideListings(step, root), null, keepingOnlyCopies: true);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        }
         return new SettleAnswer(new UndoRecoveryResult(step.Seq, phase, outcome, step, root, putBack, inTheWay.Count), false, false);
     }
 

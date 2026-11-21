@@ -61,6 +61,33 @@ public sealed class UndoShadowClosedStepTidyTests
     }
 
     /// <summary>
+    /// A shadow publish of two pages killed before its first swap: recovery
+    /// closes it as nothing took effect, leaves both pages as they were, and
+    /// removes the staged new content of both (the harness's
+    /// <c>w7-publish-kill</c>, shadow <c>beforeSwap@0</c>).
+    /// </summary>
+    [Fact]
+    public void AShadowStepOfFilesKilledBeforeItsFirstSwapLeavesNoStagedNewContent()
+    {
+        using var scribe = new UndoScribe();
+        scribe.WritePage("A", First, Old(First));
+        scribe.WritePage("A", Second, Old(Second));
+        Assert.Equal(UndoOutcomeKind.StoppedByATest,
+            scribe.Door(StopAt("beforeSwap", 0), UndoScribe.AProcessThatIsGone, UndoMode.Shadow)
+                  .Perform(scribe.Draft("A", [(First, New(First)), (Second, New(Second))])).Kind);
+        Assert.Contains(scribe.StagedLeftovers("A"), entry => entry.EndsWith("-new", StringComparison.Ordinal));
+
+        scribe.Door(mode: UndoMode.Shadow).Recover();
+
+        Assert.Equal(Old(First), scribe.Page("A", First));
+        Assert.Equal(Old(Second), scribe.Page("A", Second));
+        UndoFoldedStep step = scribe.Fold().Steps[scribe.Fold().Steps.Keys.Max()];
+        Assert.False(step.IsInFlight);
+        Assert.Equal(UndoStepState.Failed, step.State);
+        Assert.Empty(scribe.StagedLeftovers("A"));
+    }
+
+    /// <summary>
     /// Part three, review 1, LOW 4: a closed shadow step that holds an op other
     /// than a file changed in place (here a <c>move</c>) is left alone by the
     /// shadow tidy: its staged files stay where the dead process left them

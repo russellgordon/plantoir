@@ -62,10 +62,10 @@ public sealed class UndoWholeUnitAndByDateStepTests : IDisposable
             $"---\npublish: {(published ? "true" : "false")}\ncreated: {DateText.Iso(day)}T07:00:00.000-0400\n---\n{body}\n");
     }
 
-    private AssistWorkspace Open(UndoHistory history, UndoSeams? seams = null) =>
+    private AssistWorkspace Open(UndoHistory history, UndoSeams? seams = null, AssistSurface surface = AssistSurface.Menu) =>
         new(Folder, new FakeLauncher(), undo: history)
         {
-            Surface = AssistSurface.Menu,
+            Surface = surface,
             UndoList = new UndoForThisProcess(ListFolder, UndoMode.Shadow, _trail.Add),
             UndoSeams = seams,
             Today = () => Today,
@@ -229,23 +229,34 @@ public sealed class UndoWholeUnitAndByDateStepTests : IDisposable
     /// Part three, review 1, MEDIUM 2 (switch off): a kept record that cannot
     /// be read when the publish is planned (held by another program) costs
     /// only the record: the class is published, and the record is as it was.
+    /// The record is held after the conversation's backup is made (the
+    /// assistant's window backs a course up once a conversation; an earlier
+    /// publish in it, tomorrow's class, which keeps nothing): held before
+    /// it, the backup itself cannot read the record, and "couldn't be backed
+    /// up, so nothing was changed" is the true answer, as it was before this
+    /// piece (the Section menu backs up before every change, so it always
+    /// meets that refusal first).
     /// </summary>
     [Fact]
     public async Task APublishClassForADateWhoseRecordCannotBeReadStillPublishes()
     {
         Class("Unit 2, Day 3", Today, published: true);
-        Class("Unit 2, Day 4", Today.AddDays(1), published: true);
+        Class("Unit 2, Day 4", Today.AddDays(1), published: false);
         Class("Unit 2, Day 5", Today.AddDays(3), published: false);
         Directory.CreateDirectory(Path.GetDirectoryName(KeptPath)!);
         File.WriteAllText(KeptPath, "{\"kept\": []}\n");
+        AssistWorkspace workspace = Open(new UndoHistory(), surface: AssistSurface.LocalWindow);
+        string first = await PublishOn(workspace, Today.AddDays(1));
+        Assert.True(File.ReadAllText(PagePath("Unit 2, Day 4")).Contains("publish: true"), first);
         byte[] recordBefore = File.ReadAllBytes(KeptPath);
 
+        string said;
         using (new FileStream(KeptPath, FileMode.Open, FileAccess.Read, FileShare.None))
         {
-            await PublishOn(Open(new UndoHistory()), Today.AddDays(3));
+            said = await PublishOn(workspace, Today.AddDays(3));
         }
 
-        Assert.Contains("publish: true", File.ReadAllText(PagePath("Unit 2, Day 5")));
+        Assert.True(File.ReadAllText(PagePath("Unit 2, Day 5")).Contains("publish: true"), said);
         Assert.Equal(recordBefore, File.ReadAllBytes(KeptPath));
     }
 
