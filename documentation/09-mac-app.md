@@ -21895,15 +21895,158 @@ the reverse. It stands apart by its family, which is right for the
 rollover; whether a schedule step U4 makes should stand apart (an Undo of
 Schedule Deploy after the job has fired) is U4's to decide, and if not, U4
 gives its ops a family or kind of their own rather than changing this one.
-A settings save goes through the same door: `JournaledStep.write` for
-`course_config.json` (the door then chooses `writeFile` for it), or, finer,
-one `editJSON` per member, which U4 adds to `JournaledStep` the way U3b
-added `move` and `setExternal` (a planned list beside the files, so the step
-is made as ops: `isMixed`); `setExternal` for a preference; `places` set to `UndoAppPlaces`
+A settings save goes through the door as U4a below describes;
+`setExternal` for a preference; `places` set to `UndoAppPlaces`
 whenever a step holds an external op. (`extraArguments` is gone: nothing
 used it once the legacy record moved inside the step; a piece that needs
 an action argument adds it back with its reason.) An Undo or Redo passes
 `leaveApart` to `UndoSwap.swap`; making a step and recovery never do.
+
+### U4a: Course Settings, Add folder and Set School Year (#899)
+
+Three actions, each ONE step through the door, made as ops
+(`JournaledStep.makeAsOps`). Nothing a teacher sees changes, and the switch
+stays off.
+
+- **Save Course Settings** (`CourseSettingsView.save`, key
+  `saveCourseSettings`, made by `sheet`): one step whatever it changes, one
+  `editJSON` per TOP-LEVEL setting whose value the Save changes, in key
+  order. The unit is #265's merge (per top-level key), and it is the unit
+  #986 will make one step per change. `CourseConfiguration.planWrite(to:into:)`
+  is `write(to:)` planned instead of written: the same merge, the same name
+  and label cleaning, and the same read-again loop, which is now the plan
+  (read, merge, read again, up to three times, until the read the plan was
+  built from is still the file). That read is each op's `before`, read at
+  PLAN time (the U3a trap was a `before` read when the step is made). A
+  setting that was absent has no `before`, so Undo makes it absent again,
+  never an empty list (#986 section 4.5: the first Marks tick creates
+  `graded_folders`). The bytes each member leaves are worked out at plan
+  time by the member rule (`UndoJSONMember.moved`, the bytes
+  `undo.editJSONCases` pins), so `lastSavedData` is exactly the file the
+  step leaves. A file that is missing, is not one JSON object, or whose
+  bytes the member rule cannot move (a key written twice, a number a double
+  cannot hold) is planned WHOLE, the bytes `write(to:)` writes, and the door
+  chooses `writeFile`. `writeAsOneStep(to:madeBy:)` plans, makes and
+  finishes (`finishWrite`: `values`, `lastSavedData`,
+  `WorkspaceModel.followWrite`, as before); a step refused because one of
+  ITS members was changed between the plan and the make (a build's
+  preflight) is planned again from the file then, up to three times, as the
+  loop always did. `WriteResult` is unchanged, so the notice and the trail
+  line are too. Revert writes nothing and makes no step; a Save that
+  changes no value writes nothing and makes no step (it used to rewrite the
+  same values pretty-printed).
+- **What changes on disk.** Only the changed members' bytes: each new value
+  is spelled compactly with its keys sorted (`"hidden" : ["Media"]` where
+  the app used to write it one item to a line). Every value a build reads
+  is the same. An Undo spells the value it puts back the same way, so the
+  file after an Undo has the old VALUES, not the old spacing.
+- **Undo takes back only what the step changed (ruling 4).** Another
+  copy's Save of another setting (a window, or Add Section's write, which is
+  not on the list until U4c), or a build adding a folder it found to a list
+  this Save did not change, is left as it is, and the Save's own settings go
+  back. A setting this Save changed that something else changed again is a
+  change since: the Undo is refused, names `course_config.json`, and the
+  list is cleared (ruling 13).
+- **Add folder** (`CourseSettingsView.createFoldersOnDisk`, key
+  `addFolder`): one `createTree` per folder made, holding exactly the folder
+  and FolderScaffold's two pages (`FolderScaffold.planPages`, which replaced
+  `writePages`), the highest folder of its path that is not there yet being
+  the tree's root. All of them or none: a place taken by the time the step is
+  made refuses the step and nothing is made or said, as a folder that could
+  not be made said nothing before. The list's own change is Save's, in
+  Save's step, as before. Undo takes a folder out only while its listing is
+  what the step made; a page the teacher put in it refuses the Undo and names
+  the folder (#986 ruling 7).
+- **Set School Year** (`SetSchoolYearSheet.write`, key `setSchoolYear`): one
+  step, its one `editJSON` `reference_school_year`.
+- **`StringListEditorView`** writes no file; `removeItem(named:)`, which the
+  writer scan counted as a removal, is `takeOutOfTheList(named:)`.
+
+The writer scan: `CourseSettingsView`, `StringListEditorView`,
+`SetSchoolYearSheet` and `FolderScaffold` are off the list (they write
+nothing outside the door); `CourseConfiguration` keeps its two calls,
+`write(to:)` and `recordOnDisk`, for the callers still on today's path
+(U4b the renames and Rename Course, U4c Add Section, U4d Keep a Copy, U5
+archive and restore).
+
+#### If the app dies between two writes
+
+- **Save or Set School Year**: one file, one swap. Before the begin: nothing
+  is on the list and the file is as it was. After the begin and before the
+  swap: recovery finds nothing took effect, closes the step `failed`, and
+  the file is whole as before (`testASaveKilledBeforeItsSwapIsWholeBeforeAfterRecovery`).
+  After the swap and before `applied`: recovery closes it `applied`; the
+  file is whole as the Save left it (`…KilledAfterItsSwap…`). A staged copy
+  beside the file is tidied either way.
+- **Add folder**: one swap per folder, each a rename of a folder built whole
+  beside its place. Killed between two folders: recovery takes the first
+  back out (its listing is still what the step made) and closes the step
+  `rolledBack`; neither folder is there. Killed after the last: `applied`,
+  every folder there with its pages
+  (`testAddFolderKilledBetweenItsFolders…`, `…AfterItsFolders…`).
+- With the switch off and a list that cannot take the step, the change is
+  made all or none with no record (`makeWithoutARecord`, which now also
+  makes a step's trees), and the trail line says what became of it.
+
+#### The action traces
+
+`UndoActionStepsTests` records three more steps from the real code
+(`UndoActionStepsCourseSettings.swift`): `saveCourseSettings` (the first
+Marks tick, `graded_folders` absent before, and a sidebar hide),
+`addFolder` (a shared folder, its pages' moment fixed through
+`createFoldersOnDisk(named:scope:created:)`) and `setSchoolYear`, 25 steps in
+all. `undo-action-steps.json` gains `members` (every `editJSON` op: file,
+key path, before and after, left out for absent) and `trees` (every folder
+made: path, folders inside, every file's text). `make_undo_traces.py` makes
+each file planned member by member into its `editJSON` ops, and each tree
+into a `createTree` after the moves; its model now moves a member by the
+member rule's bytes (`json_bytes_moved`), as both apps do, so a settings
+file hashes the same after an Undo everywhere; a folder hashes as its
+listing. The traces before them are unchanged byte for byte.
+
+#### Lows carried in from U3c's review 3, the U3 sweep and the merge review
+
+- **No pile of kept copies** (U3c review 3, LOW 1). With both contents gone
+  and the list taking no new file, every Undo and Redo kept its outgoing
+  bytes under a new name. Now, after such a move, the step's kept copies
+  beside each page are thinned to ONE per content
+  (`UndoRecovery.removeSupersededKeptCopies`): an offer rests on content, not
+  on a file, and that content stays.
+- **Show in Finder for a kept file that is gone** (LOW 2) says
+  `FrontPageWording.keptGone` in an alert with OK and asks nothing of Finder
+  (`FolderActions.whatIsStillThere`).
+- **No only copy deleted by an Undo or a Redo** (LOW 3). Under the lock,
+  before the swap, every page's outgoing bytes that the step's other
+  direction needs (a `writeFile` op's after for an Undo, its before for a
+  Redo) go into the list when it lacks them
+  (`UndoRecovery.storeWhatTheOtherDirectionNeeds`); when it will not take
+  them, the swap keeps them beside the page and the other direction is made
+  from that kept file, as U3c does for a put-back.
+- **The `undo could not record a step` line is written from what happened**
+  (the U3 sweep, finding 2): `UndoUnrecordedChange` (went ahead, nothing was
+  changed, stopped part way, made with its record finished at the next
+  chance), passed once the shadow write has answered. It used to say "The
+  change went ahead" before a write that could still refuse, always for a
+  page that is a link. `undo.rule.shadow` now says what the switch-off
+  refusals are (finding 3).
+- **Duplicate Class** (finding 4): a room that cannot be made after the copy
+  is refused is said as nothing changed, never "a blank class page is
+  waiting".
+- **`undo.wording`** (finding 5) holds the sentences that were in Swift
+  alone: a kept file named after a step refused part way, the Class Dates
+  alert, and the rollover's records still moved.
+- The two stack rows the merge added say and check what is true (the merge
+  review's two lows; one row added that stops at the rollover's Undo).
+
+#### For U4b
+
+The renames plan into a step the same way: `recordOnDisk` gets a planning
+form beside `planWrite` (the change applied to a fresh read, one `editJSON`
+per top-level member it changes, `before` from that read), and the folder
+moves are `move` ops on folders in the same step. `JournaledStep.editJSON(at:read:members:leaving:)`
+takes a file once; a step that edits `course_config.json` twice (a rename
+and its record) works out both changes on one read and plans once. When
+U4b moves its callers, `CourseConfiguration`'s scan reason loses U4b.
 
 ### The U1 harness
 

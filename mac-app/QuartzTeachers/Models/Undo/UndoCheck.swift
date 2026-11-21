@@ -1879,6 +1879,16 @@ nonisolated extension UndoJournal {
                 // for the other direction, into the list first (the first
                 // review of U3c, MEDIUM).
                 notTaken = UndoRecovery.storeWhatKeptOriginalsGive(uses, writer)
+                // And what any other page's swap takes off it, when the
+                // other direction needs it and the list lacks it: never an
+                // only copy deleted (U3c review 3, LOW 3).
+                var outgoingOf: [String] = notTaken.outgoingOf
+                for path in UndoRecovery.storeWhatTheOtherDirectionNeeds(targets, of: record.step, direction: direction, root: root, writer) {
+                    if !outgoingOf.contains(path) {
+                        outgoingOf.append(path)
+                    }
+                }
+                notTaken = UndoWhatTheListCouldNotTake(outgoingOf: outgoingOf, keptOriginalsHolding: notTaken.keptOriginalsHolding)
                 try writer.append(UndoEventLine(seq: seq, event: starting, process: process))
                 try writer.sync()
             }
@@ -1943,6 +1953,11 @@ nonisolated extension UndoJournal {
             )
         }
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
+        if !notTaken.outgoingOf.isEmpty {
+            // One kept copy per content per page, never a pile (U3c review
+            // 3, LOW 1).
+            UndoRecovery.removeSupersededKeptCopies(of: record.step, root: root, paths: notTaken.outgoingOf, newestLabel: label)
+        }
         if !notTaken.isEmpty {
             // The list could not take all the step needs. The step stays on
             // the list with the other direction offered, resting on what is

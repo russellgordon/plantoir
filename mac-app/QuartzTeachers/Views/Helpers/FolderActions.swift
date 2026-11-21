@@ -30,14 +30,50 @@ enum FolderActions {
     /// Measured that night on this Mac with Finder not showing hidden
     /// files: a file whose name starts with a dot is shown, greyed, and
     /// selected. Finder's settings are never changed.
+    ///
+    /// A kept file that is no longer there is never asked of Finder, which
+    /// would come forward on whatever window it last had and select
+    /// nothing (U3c review 3, LOW 2, measured that night): an alert says it
+    /// is gone (`FrontPageWording.keptGone`), and Finder shows only what is
+    /// still there, if anything is.
     static func showInFinder(files: [URL]) {
+        let found: (there: [URL], gone: [String]) = FolderActions.whatIsStillThere(files)
         #if DEBUG
         if let showInFinderRecorder = FolderActions.showInFinderRecorder {
-            showInFinderRecorder(files)
+            if !found.gone.isEmpty {
+                FolderActions.goneRecorder?(found.gone)
+            }
+            if !found.there.isEmpty {
+                showInFinderRecorder(found.there)
+            }
             return
         }
         #endif
-        NSWorkspace.shared.activateFileViewerSelecting(files)
+        if !found.gone.isEmpty {
+            let alert: NSAlert = NSAlert()
+            alert.alertStyle = .informational
+            alert.messageText = FrontPageWording.keptGone(found.gone)
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
+        if !found.there.isEmpty {
+            NSWorkspace.shared.activateFileViewerSelecting(found.there)
+        }
+    }
+
+    /// Of these files, those still there, and the names of those that are
+    /// not (a link that leads nowhere counts as not there).
+    static func whatIsStillThere(_ files: [URL]) -> (there: [URL], gone: [String]) {
+        var there: [URL] = []
+        var gone: [String] = []
+        for file in files {
+            if FileManager.default.fileExists(atPath: file.path) {
+                there.append(file)
+            } else {
+                gone.append(file.lastPathComponent)
+            }
+        }
+        return (there: there, gone: gone)
     }
 
     #if DEBUG
@@ -45,6 +81,9 @@ enum FolderActions {
     /// to show, rather than bringing Finder to the front
     /// (`UndoUITestSeam.showInFinderRecord`). Debug builds only.
     static var showInFinderRecorder: (([URL]) -> Void)?
+
+    /// With the recorder set, what the gone-file alert would name.
+    static var goneRecorder: (([String]) -> Void)?
     #endif
 
     /// Opens a new Terminal window whose working directory is the folder

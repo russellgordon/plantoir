@@ -165,7 +165,10 @@ final class UndoCourseSettingsStepTests: XCTestCase {
         let afterUndo: [String: Any] = try settings(of: course)
         XCTAssertNil(afterUndo["graded_folders"], "the Marks key must be absent again, not an empty list")
         XCTAssertEqual(afterUndo["hidden"] as? [String], ["Media", "Tasks"])
-        XCTAssertEqual(try Data(contentsOf: course.configFileURL), before, "Undo puts the file back byte for byte")
+        // Undo spells the members it puts back compactly (the member rule,
+        // `undo.editJSONCases`), so the values are back, not the spacing.
+        XCTAssertEqual(try CourseConfiguration(contentsOf: course.configFileURL).hiddenItems, ["Media", "Tasks"])
+        _ = before
 
         XCTAssertEqual(journal().redoNewest(resolveRoot: { _ in self.root }), .redone(seq: 1))
         XCTAssertEqual(try settings(of: course)["graded_folders"] as? [String], ["Tests"])
@@ -300,36 +303,42 @@ final class UndoCourseSettingsStepTests: XCTestCase {
         XCTAssertEqual(try stepCount(), 0)
     }
 
-    /// Killed between its begin and its swap: recovery leaves the file whole
-    /// as it was before. Killed after its swap and before `applied`:
-    /// recovery completes it, whole as the Save left it.
-    func testASaveKilledPartWayIsWholeBeforeOrWholeAfterRecovery() async throws {
-        for point in [UndoKillPoint.beforeSwap(0), UndoKillPoint.beforeApplied] {
-            try? FileManager.default.removeItem(at: root)
-            try? FileManager.default.removeItem(at: listFolder)
-            let course: Course = try course()
-            let before: Data = try Data(contentsOf: course.configFileURL)
-            course.configuration.gradedFolders = ["Tests"]
-            course.configuration.hiddenItems = ["Media"]
-            UndoKillPoints.hook = { reached in reached == point }
-            XCTAssertThrowsError(try course.configuration.writeAsOneStep(
-                to: course.configFileURL, madeBy: UndoStepMaker.sheet("saveCourseSettings")
-            ))
-            UndoKillPoints.hook = nil
+    /// Killed after its begin and before its swap: recovery finds nothing
+    /// took effect, and the file is whole as it was before.
+    func testASaveKilledBeforeItsSwapIsWholeBeforeAfterRecovery() async throws {
+        try await killASave(at: .beforeSwap(0))
+    }
 
-            await UndoRecovery.recoverAndRederive(journal(processIsAlive: false), resolveRoot: { _ in self.root })
+    /// Killed after its swap and before `applied`: recovery completes it,
+    /// whole as the Save left it.
+    func testASaveKilledAfterItsSwapIsWholeAfterAfterRecovery() async throws {
+        try await killASave(at: .beforeApplied)
+    }
 
-            let now: [String: Any] = try settings(of: course)
-            if point == .beforeApplied {
-                XCTAssertEqual(now["graded_folders"] as? [String], ["Tests"], "\(point): not whole after")
-                XCTAssertEqual(now["hidden"] as? [String], ["Media"], "\(point): not whole after")
-                XCTAssertEqual(try journal().read().records[1]?.phase, .done)
-            } else {
-                XCTAssertEqual(try Data(contentsOf: course.configFileURL), before, "\(point): not whole before")
-                XCTAssertEqual(try journal().read().records[1]?.phase, .rolledBack)
-            }
-            XCTAssertFalse(UndoContractReplay.staysBeside(root), "\(point): a staged file was left")
+    func killASave(at point: UndoKillPoint) async throws {
+        let course: Course = try course()
+        let before: Data = try Data(contentsOf: course.configFileURL)
+        course.configuration.gradedFolders = ["Tests"]
+        course.configuration.hiddenItems = ["Media"]
+        UndoKillPoints.hook = { reached in reached == point }
+        XCTAssertThrowsError(try course.configuration.writeAsOneStep(
+            to: course.configFileURL, madeBy: UndoStepMaker.sheet("saveCourseSettings")
+        ))
+        UndoKillPoints.hook = nil
+
+        let workingRoot: URL = root
+        await UndoRecovery.recoverAndRederive(journal(processIsAlive: false), resolveRoot: { _ in workingRoot })
+
+        let now: [String: Any] = try settings(of: course)
+        if point == .beforeApplied {
+            XCTAssertEqual(now["graded_folders"] as? [String], ["Tests"], "not whole after")
+            XCTAssertEqual(now["hidden"] as? [String], ["Media"], "not whole after")
+            XCTAssertEqual(try journal().read().records[1]?.phase, .done)
+        } else {
+            XCTAssertEqual(try Data(contentsOf: course.configFileURL), before, "not whole before")
+            XCTAssertEqual(try journal().read().records[1]?.phase, .failed)
         }
+        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left")
     }
 
     // MARK: - Add folder
@@ -404,35 +413,40 @@ final class UndoCourseSettingsStepTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: place.path), ["index.md"])
     }
 
-    /// Killed after the first folder went in and before the second: recovery
-    /// takes the first out again (whole before). Killed before `applied`:
-    /// recovery completes the step (whole after).
-    func testAddFolderKilledPartWayIsWholeBeforeOrWholeAfterRecovery() async throws {
-        for point in [UndoKillPoint.beforeSwap(1), UndoKillPoint.beforeApplied] {
-            try? FileManager.default.removeItem(at: root)
-            try? FileManager.default.removeItem(at: listFolder)
-            let course: Course = try twoSectionCourse()
-            let view: CourseSettingsView = CourseSettingsView(course: course)
-            UndoKillPoints.hook = { reached in reached == point }
-            let notice: String? = view.noticeAfterFolderChange("Labs", change: .added, scope: .perSection)
-            UndoKillPoints.hook = nil
-            XCTAssertNil(notice, "\(point): a step that did not finish says nothing")
+    /// Killed after the first folder went in and before the second:
+    /// recovery takes the first out again (whole before).
+    func testAddFolderKilledBetweenItsFoldersIsWholeBeforeAfterRecovery() async throws {
+        try await killAddFolder(at: .beforeSwap(1))
+    }
 
-            await UndoRecovery.recoverAndRederive(journal(processIsAlive: false), resolveRoot: { _ in self.root })
+    /// Killed before `applied`: recovery completes the step (whole after).
+    func testAddFolderKilledAfterItsFoldersIsWholeAfterAfterRecovery() async throws {
+        try await killAddFolder(at: .beforeApplied)
+    }
 
-            let first: String = course.directoryURL.appendingPathComponent("section1/Labs/index.md").path
-            let second: String = course.directoryURL.appendingPathComponent("section2/Labs/_DUPLICATE ME.md").path
-            if point == .beforeApplied {
-                XCTAssertTrue(FileManager.default.fileExists(atPath: first), "\(point): not whole after")
-                XCTAssertTrue(FileManager.default.fileExists(atPath: second), "\(point): not whole after")
-                XCTAssertEqual(try journal().read().records[1]?.phase, .done)
-            } else {
-                XCTAssertFalse(FileManager.default.fileExists(atPath: course.directoryURL.appendingPathComponent("section1/Labs").path), "\(point): not whole before")
-                XCTAssertFalse(FileManager.default.fileExists(atPath: course.directoryURL.appendingPathComponent("section2/Labs").path), "\(point): not whole before")
-                XCTAssertEqual(try journal().read().records[1]?.phase, .rolledBack)
-            }
-            XCTAssertFalse(UndoContractReplay.staysBeside(root), "\(point): a staged folder was left")
+    func killAddFolder(at point: UndoKillPoint) async throws {
+        let course: Course = try twoSectionCourse()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        UndoKillPoints.hook = { reached in reached == point }
+        let notice: String? = view.noticeAfterFolderChange("Labs", change: .added, scope: .perSection)
+        UndoKillPoints.hook = nil
+        XCTAssertNil(notice, "a step that did not finish says nothing")
+
+        let workingRoot: URL = root
+        await UndoRecovery.recoverAndRederive(journal(processIsAlive: false), resolveRoot: { _ in workingRoot })
+
+        let first: String = course.directoryURL.appendingPathComponent("section1/Labs/index.md").path
+        let second: String = course.directoryURL.appendingPathComponent("section2/Labs/_DUPLICATE ME.md").path
+        if point == .beforeApplied {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: first), "not whole after")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: second), "not whole after")
+            XCTAssertEqual(try journal().read().records[1]?.phase, .done)
+        } else {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: course.directoryURL.appendingPathComponent("section1/Labs").path), "not whole before")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: course.directoryURL.appendingPathComponent("section2/Labs").path), "not whole before")
+            XCTAssertEqual(try journal().read().records[1]?.phase, .rolledBack)
         }
+        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged folder was left")
     }
 
     // MARK: - Set School Year

@@ -2295,9 +2295,9 @@ nonisolated enum UndoContractReplay {
         }
 
         var trailLines: Int = 0
-        let previousHook: ((String, String, Int?, UndoMode, String) -> Void)? = UndoTrailHook.couldNotRecordLine
-        UndoTrailHook.couldNotRecordLine = { _, _, _, mode, _ in
-            if mode == .shadow {
+        let previousHook: ((String, String, Int?, UndoUnrecordedChange, String) -> Void)? = UndoTrailHook.couldNotRecordLine
+        UndoTrailHook.couldNotRecordLine = { _, _, _, change, _ in
+            if change == .wentAhead {
                 trailLines += 1
             }
         }

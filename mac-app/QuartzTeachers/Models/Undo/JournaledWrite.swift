@@ -229,19 +229,23 @@ nonisolated enum JournaledWrite {
         } catch UndoJournalError.notTheNewestStep where mode == .live {
             return .anotherChangeIsUnderWay
         } catch {
-            UndoTrailHook.couldNotRecord(draft: draft, mode: mode, problem: error)
             if mode == .live {
+                UndoTrailHook.couldNotRecord(draft: draft, change: .nothingWasChanged, problem: error)
                 return .couldNotRecordTheStep
             }
             // Shadow: the change goes ahead exactly as it would have, all
             // of it or none, its staged names noted so a kill part way
-            // leaves nothing of Plantoir's in the course for long.
+            // leaves nothing of Plantoir's in the course for long. The trail
+            // line says what then happened (the U3 sweep, finding 2).
             switch UndoShadowStaging.swap(targets, noting: journal) {
             case .swapped:
+                UndoTrailHook.couldNotRecord(draft: draft, change: .wentAhead, problem: error)
                 return .appliedWithoutARecord
             case .refused(let refusal):
+                UndoTrailHook.couldNotRecord(draft: draft, change: .nothingWasChanged, problem: error)
                 return .refused(refusal)
             case .notPutBack(let refusal, let keptOriginals):
+                UndoTrailHook.couldNotRecord(draft: draft, change: .stoppedPartWay, problem: error)
                 return .leftPartWay(refusal, keptOriginals: keptOriginals)
             case .stoppedByATest:
                 return .stoppedByATest
@@ -354,7 +358,7 @@ nonisolated enum JournaledWrite {
             }
         } catch {
             UndoFoldCache.keepPendingClosing(closing, for: journal.folderURL)
-            UndoTrailHook.couldNotFinish(seq: seq, problem: error)
+            UndoTrailHook.couldNotFinish(seq: seq, event: event, problem: error)
         }
     }
 
@@ -601,7 +605,7 @@ nonisolated enum JournaledWrite {
             let seq: Int = try begin(draft, ops: ops, in: journal, mode: .shadow)
             return UndoShadowTicket(seq: seq, draft: draft)
         } catch {
-            UndoTrailHook.couldNotRecord(draft: draft, mode: .shadow, problem: error)
+            UndoTrailHook.couldNotRecord(draft: draft, change: .wentAhead, problem: error)
             return nil
         }
     }
@@ -635,7 +639,7 @@ nonisolated enum JournaledWrite {
         }
         finish(seq: ticket.seq, with: .failed, phase: .begin, reason: "differedFromTheRecord", in: journal, mode: .shadow)
         UndoTrailHook.couldNotRecord(
-            draft: ticket.draft, mode: .shadow, problem: UndoShadowMismatch.differedFromTheRecord
+            draft: ticket.draft, change: .wentAhead, problem: UndoShadowMismatch.differedFromTheRecord
         )
     }
 
@@ -1155,6 +1159,24 @@ nonisolated enum UndoKillPoints {
     }
 }
 
+/// What became of a change the list could not record, as the
+/// `undo could not record a step` line says it: written only once that is
+/// known, never before the write that can still refuse (the U3 sweep,
+/// finding 2: the line said "The change went ahead" before a shadow swap
+/// that refused, always for a page that is a link).
+nonisolated enum UndoUnrecordedChange: Equatable, Sendable {
+    /// Made, all of it, without a record (switch off).
+    case wentAhead
+    /// Refused before anything changed.
+    case nothingWasChanged
+    /// Refused part way: some files hold the new content, what each held
+    /// before kept beside it.
+    case stoppedPartWay
+    /// Made and recorded, but its closing line could not be written now;
+    /// it is written at this process's next lock.
+    case madeButNotClosed
+}
+
 /// How the list reaches the activity trail. The core leaves it empty so it
 /// compiles on its own; the app sets it (`UndoTrail.install()`).
 nonisolated enum UndoTrailHook {
@@ -1162,8 +1184,9 @@ nonisolated enum UndoTrailHook {
     // MARK: - Stored properties
 
     /// A step could not be written down: the action's key, the course and
-    /// section, the mode, and a word for why. Never page text.
-    nonisolated(unsafe) static var couldNotRecordLine: ((_ action: String, _ course: String, _ section: Int?, _ mode: UndoMode, _ why: String) -> Void)?
+    /// section, what became of the change, and a word for why. Never page
+    /// text.
+    nonisolated(unsafe) static var couldNotRecordLine: ((_ action: String, _ course: String, _ section: Int?, _ change: UndoUnrecordedChange, _ why: String) -> Void)?
 
     /// Recovery or a failed swap put files back: the course and section,
     /// what it ended, and how many files.
@@ -1219,12 +1242,32 @@ nonisolated enum UndoTrailHook {
 
     // MARK: - Functions
 
-    static func couldNotRecord(draft: UndoStepDraft, mode: UndoMode, problem: Error) {
-        couldNotRecordLine?(draft.action.key, draft.course, draft.section, mode, UndoTrailHook.word(for: problem))
+    static func couldNotRecord(draft: UndoStepDraft, change: UndoUnrecordedChange, problem: Error) {
+        couldNotRecordLine?(draft.action.key, draft.course, draft.section, change, UndoTrailHook.word(for: problem))
     }
 
-    static func couldNotFinish(seq: Int, problem: Error) {
-        couldNotRecordLine?("step \(seq)", "", nil, UndoSwitch.currentMode, UndoTrailHook.word(for: problem))
+    /// The closing line of a step could not be written: a step that took
+    /// effect was made (its closing is written at the next lock); one that
+    /// failed changed nothing.
+    static func couldNotFinish(seq: Int, event: UndoEventKind, problem: Error) {
+        let change: UndoUnrecordedChange = event == .failed ? .nothingWasChanged : .madeButNotClosed
+        couldNotRecordLine?("step \(seq)", "", nil, change, UndoTrailHook.word(for: problem))
+    }
+
+    /// The line for a change made without a record, by how the write went.
+    static func couldNotRecord(
+        action: String, course: String, section: Int?, why: String, after outcome: () throws -> Void
+    ) throws {
+        do {
+            try outcome()
+        } catch JournaledStepError.leftPartWay(let refusal, let fileName, let keptOriginals) {
+            couldNotRecordLine?(action, course, section, .stoppedPartWay, why)
+            throw JournaledStepError.leftPartWay(refusal, fileName: fileName, keptOriginals: keptOriginals)
+        } catch {
+            couldNotRecordLine?(action, course, section, .nothingWasChanged, why)
+            throw error
+        }
+        couldNotRecordLine?(action, course, section, .wentAhead, why)
     }
 
     /// A word for a problem, never its description (which can carry a path).

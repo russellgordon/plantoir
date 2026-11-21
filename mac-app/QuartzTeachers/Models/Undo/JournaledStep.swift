@@ -70,7 +70,7 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
         case .leftPartWay(_, let fileName, let keptOriginals):
             var said: String = CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: fileName]).localizedDescription
             for kept in keptOriginals {
-                said += " What \(JournaledStepError.placeName(ofKept: kept)) held before is kept beside it as the hidden file “\(kept)”."
+                said += " " + JournaledStepError.keptSentence(place: JournaledStepError.placeName(ofKept: kept), kept: kept)
             }
             return said
         case .couldNotRecordTheStep, .anotherChangeIsUnderWay:
@@ -81,6 +81,13 @@ nonisolated enum JournaledStepError: Error, LocalizedError, Equatable {
     }
 
     // MARK: - Functions
+
+    /// One kept original, said after a step refused part way:
+    /// `shared-rules.json` → `undo.wording.keptBesideIt` (the U3 sweep,
+    /// finding 5). `place` is already quoted.
+    static func keptSentence(place: String, kept: String) -> String {
+        return "What \(place) held before is kept beside it as the hidden file “\(kept)”."
+    }
 
     /// The page a kept original stands beside, quoted: “Unit 1, Day 2.md”.
     static func placeName(ofKept name: String) -> String {
@@ -526,10 +533,12 @@ nonisolated final class JournaledStep {
             if currentMode == .live {
                 throw JournaledStepError.couldNotRecordTheStep
             }
-            UndoTrailHook.couldNotRecordLine?(
-                maker.actionKey, courseCode, section, .shadow, "a file it writes cannot be named in a step"
+            // The trail says what became of it once that is known (the U3
+            // sweep, finding 2).
+            try UndoTrailHook.couldNotRecord(
+                action: maker.actionKey, course: courseCode, section: section,
+                why: "a file it writes cannot be named in a step", after: { try writePlainly() }
             )
-            try writePlainly()
             return
         }
         var recomputes: [UndoOp] = []
@@ -603,10 +612,10 @@ nonisolated final class JournaledStep {
             if currentMode == .live {
                 throw JournaledStepError.couldNotRecordTheStep
             }
-            UndoTrailHook.couldNotRecordLine?(
-                maker.actionKey, courseCode, section, .shadow, "a file it writes cannot be named in a step"
+            try UndoTrailHook.couldNotRecord(
+                action: maker.actionKey, course: courseCode, section: section,
+                why: "a file it writes cannot be named in a step", after: { try makeWithoutARecord() }
             )
-            try makeWithoutARecord()
             return
         }
         var ops: [UndoOp] = []
@@ -688,10 +697,10 @@ nonisolated final class JournaledStep {
             if currentMode == .live {
                 throw JournaledStepError.couldNotRecordTheStep
             }
-            UndoTrailHook.couldNotRecordLine?(
-                maker.actionKey, courseCode, section, .shadow, "the list could not take the step"
+            try UndoTrailHook.couldNotRecord(
+                action: maker.actionKey, course: courseCode, section: section,
+                why: "the list could not take the step", after: { try makeWithoutARecord() }
             )
-            try makeWithoutARecord()
         case .anotherChangeIsUnderWay:
             throw JournaledStepError.anotherChangeIsUnderWay
         case .stoppedByATest:

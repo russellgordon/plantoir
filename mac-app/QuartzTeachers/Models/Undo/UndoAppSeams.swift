@@ -67,10 +67,10 @@ nonisolated enum UndoTrail {
                 UndoTrail.interruptedLine(course: course, section: section, phase: phase, putBack: putBack, inTheWay: inTheWay)
             )
         }
-        UndoTrailHook.couldNotRecordLine = { action, course, section, mode, why in
+        UndoTrailHook.couldNotRecordLine = { action, course, section, change, why in
             ActivityTrail.note(
                 .undoCouldNotRecordAStep,
-                UndoTrail.couldNotRecordLine(action: action, course: course, section: section, mode: mode, why: why)
+                UndoTrail.couldNotRecordLine(action: action, course: course, section: section, change: change, why: why)
             )
         }
         UndoTrailHook.foundAFolderSetAsideLine = { course, section, place, hiddenName, keptAs, changes in
@@ -238,8 +238,12 @@ nonisolated enum UndoTrail {
     }
 
     /// `ICS3U/1 · the undo list could not record publishPages: the list was
-    /// busy. The change went ahead (the list is not in use yet).`
-    static func couldNotRecordLine(action: String, course: String, section: Int?, mode: UndoMode, why: String) -> String {
+    /// busy. The change went ahead (the list is not in use yet).`, or, by
+    /// what became of the change (written only once that is known, the U3
+    /// sweep, finding 2), "Nothing was changed.", "The change stopped part
+    /// way; what a file held before is kept beside it." or "The change was
+    /// made; its record is finished at the next chance."
+    static func couldNotRecordLine(action: String, course: String, section: Int?, change: UndoUnrecordedChange, why: String) -> String {
         var line: String = ""
         if !course.isEmpty {
             line = course
@@ -249,10 +253,15 @@ nonisolated enum UndoTrail {
             line += " · "
         }
         line += "the undo list could not record \(action): \(why). "
-        if mode == .shadow {
+        switch change {
+        case .wentAhead:
             line += "The change went ahead (the list is not in use yet)."
-        } else {
+        case .nothingWasChanged:
             line += "Nothing was changed."
+        case .stoppedPartWay:
+            line += "The change stopped part way; what a file held before is kept beside it."
+        case .madeButNotClosed:
+            line += "The change was made; its record is finished at the next chance."
         }
         return line
     }
