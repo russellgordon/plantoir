@@ -8422,12 +8422,12 @@ A `MenuFlyoutSeparator` has no UI Automation element at all (measured in
 the VM, 2026-11-20, with FlaUI's RAW view walker under the open flyout's
 `MenuFlyout` and its `Popup`: the items and their text, nothing else; WinUI
 gives the separator no automation peer), so it cannot be read as structure.
-The test reads it where it is drawn, as a gap between two items' rectangles
-more than 1 pixel over the menu's smallest gap: 4 or 5 pixels between items
-of one group, 7 or 8 across a separator, at 100%. The groups themselves are
+The test reads it where it is drawn, from the gaps between items' rectangles compared with each other, never with a number of pixels (`SeparatorGaps`): every gap inside a group is one drawn spacing rounded to device pixels, and every gap across a separator is that spacing plus the separator, so the sorted gaps are split at their widest jump, and the split counts only when that jump is wider than the spread inside either set; otherwise the test fails saying the separators cannot be read. At 100% that is 4 or 5 pixels inside a group and 7 or 8 across (measured in the VM, 2026-11-20); the rule does not depend on those numbers. Its plain facts are `SeparatorGapsRuleTests` (one case the old "more than 1 pixel over the smallest" rule misread). The groups themselves are
 pinned without pixels by `SubjectMenuLayoutContractTests`. With
 `PLANTOIR_UI_CAPTURE_DIR` set it also saves a picture of each menu open on a
 section row.
+
+**In a club the Classes menu is titled Meetings** (Russell, 2026-11-20 evening, on #990), live with the selection: `SubjectMenuLayout.Title(menu, ClassNoun)` takes the selected course's noun, read in `ApplyMenuEnablement` (not part of `Situation`, which holds only what greys an item and is pinned against `situationKeys`). The noun decides it, not the club code, because the noun is what a club's sentences are chosen by. Backups name the menus by the noun of the backup's course when drawn (`WorkspaceViewModel.ClassNounOf`, `SubjectMenuLayout.NounOfCourse`: a course no longer in the folder is read by its code). The in-app assistant's refusal while the menu changes the section names "the Section or Meetings menu" through `AssistAgent.CourseNoun` and `AssistToolRunner.CourseNoun`, set by the window. `NothingToUndoFromTheMenu` keeps "Section or Classes": there is no course to read a noun from, and the item leaves with U7/W11b. The mac's account is documentation 09, "In a club the menu is titled Meetings".
 
 ### What does NOT exist here: File with no window
 
