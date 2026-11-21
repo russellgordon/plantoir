@@ -279,4 +279,71 @@ public partial class AgentGuidanceTests
         }
         Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
+
+    /// <summary>
+    /// #798 item 1 (the mac's <c>PrintablePagesTests.testTheTestAuthoringSkillIsWrittenWithItsTemplatesAndBothRootFilesNameIt</c>,
+    /// #751): in both homes the skill <c>assessment.agentGuidance.testAuthoringSkill.skill</c>
+    /// is written with every <c>templates</c> file (paths with spaces
+    /// included); its SKILL.md names <c>usesStyleOf</c> in backticks and the
+    /// <c>kitChecker</c> path; each <c>mentionedBy</c> skill names it in
+    /// backticks; it is not in the page routing table; and both root files
+    /// name it and no longer say "a quiz or test for marks". That phrase is
+    /// the one literal here: it is the wording the contract's rule says was
+    /// REMOVED, so the contract holds no value for it, and the mac's twin
+    /// types the same literal.
+    /// </summary>
+    [Fact]
+    public void TheTestAuthoringSkillIsWrittenWithItsTemplatesAndBothRootFilesNameIt()
+    {
+        var guidance = AssessmentGuidance["testAuthoringSkill"]!;
+        string skillName = guidance["skill"]!.ToString();
+        List<string> templates = TextsIn(guidance["templates"]!);
+        List<string> mentionedBy = TextsIn(guidance["mentionedBy"]!);
+        string usesStyleOf = guidance["usesStyleOf"]!.ToString();
+        string kitChecker = guidance["kitChecker"]!.ToString();
+        Assert.True(templates.Contains(kitChecker), "the kit checker is written with the skill");
+        List<string> routesTo = TextsIn(Contract["pageAuthoringSkill"]!["routesTo"]!);
+        Assert.False(routesTo.Contains(skillName), "a test is not part of a page");
+        Assert.NotEmpty(templates);
+        Assert.NotEmpty(mentionedBy);
+        Assert.Empty(Pass().Failures);
+
+        var problems = new List<string>();
+        foreach (string home in AgentGuidance.SkillHomes)
+        {
+            string skillPath = WrittenPath(home, skillName, "SKILL.md");
+            if (!File.Exists(skillPath))
+            {
+                problems.Add($"{home}: {skillName} is not written");
+                continue;
+            }
+            string skill = ReadUtf8(skillPath);
+            if (!skill.Contains("`" + usesStyleOf + "`", StringComparison.Ordinal))
+                problems.Add($"{home}: the skill must name {usesStyleOf}");
+            if (!skill.Contains(kitChecker, StringComparison.Ordinal))
+                problems.Add($"{home}: the skill must say how to run {kitChecker}");
+            foreach (string file in templates)
+            {
+                if (!File.Exists(WrittenPath(home, skillName, file)))
+                    problems.Add($"{home}: {file} must be written beside the skill");
+            }
+            foreach (string mentioning in mentionedBy)
+            {
+                string otherPath = WrittenPath(home, mentioning, "SKILL.md");
+                if (!File.Exists(otherPath))
+                    problems.Add($"{home}: mentionedBy names {mentioning}, and no such skill is written");
+                else if (!ReadUtf8(otherPath).Contains("`" + skillName + "`", StringComparison.Ordinal))
+                    problems.Add($"{home}: {mentioning} must name {skillName}");
+            }
+        }
+        foreach (string name in AgentGuidance.RootFiles)
+        {
+            string text = ReadUtf8(Path.Combine(_folder, name));
+            if (!text.Contains(skillName, StringComparison.Ordinal))
+                problems.Add($"{name} must name the {skillName} skill");
+            if (text.Contains("a quiz or test for marks", StringComparison.Ordinal))
+                problems.Add($"{name}: a unit test is no longer the handouts skill's");
+        }
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+    }
 }
