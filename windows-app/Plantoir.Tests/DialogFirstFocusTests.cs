@@ -85,20 +85,15 @@ public class DialogFirstFocusTests
     }
 
     /// <summary>
-    /// L5: the static event is joined only on Loaded and left on Unloaded and
-    /// Closed, so a ShowAsync that throws (the dialog never loads) leaves
-    /// nothing joined to it.
+    /// L5: the static event is joined only inside the dialog's own show
+    /// method and left in its finally, so a ShowAsync that throws leaves
+    /// nothing joined to it; both callers show it that way.
     /// </summary>
     [Fact]
     public void TheDialogListensToTheAppWideFocusEventOnlyWhileItIsShown()
     {
         string source = Dialog();
-        string constructor = Method(source, "public SectionScheduleDialog(");
-        Assert.DoesNotContain("FocusManager.GettingFocus +=", constructor);
-        Assert.Contains("Loaded += (_, _) => StartListeningForTheFirstFocus();", source);
-        Assert.Contains("Unloaded += (_, _) => StopListeningForTheFirstFocus();", source);
-        Assert.Contains("Closed += (_, _) => StopListeningForTheFirstFocus();", source);
-
+        Assert.DoesNotContain("FocusManager.GettingFocus +=", Method(source, "public SectionScheduleDialog("));
         int joins = 0;
         for (int at = source.IndexOf("FocusManager.GettingFocus +=", StringComparison.Ordinal); at >= 0;
              at = source.IndexOf("FocusManager.GettingFocus +=", at + 1, StringComparison.Ordinal))
@@ -106,5 +101,24 @@ public class DialogFirstFocusTests
         Assert.Equal(1, joins);
         Assert.Contains("FocusManager.GettingFocus +=", Method(source, "private void StartListeningForTheFirstFocus("));
         Assert.Contains("FocusManager.GettingFocus -=", Method(source, "private void StopListeningForTheFirstFocus("));
+
+        string show = Method(source, "public async Task<ContentDialogResult> ShowWithTheFirstFocusInTheBoxAsync(");
+        int listen = show.IndexOf("StartListeningForTheFirstFocus();", StringComparison.Ordinal);
+        int tryAt = show.IndexOf("try", StringComparison.Ordinal);
+        int finallyAt = show.IndexOf("finally", StringComparison.Ordinal);
+        int stop = show.IndexOf("StopListeningForTheFirstFocus();", StringComparison.Ordinal);
+        Assert.True(listen >= 0 && tryAt > listen && show.IndexOf("await ShowAsync()", StringComparison.Ordinal) > tryAt
+                    && finallyAt > tryAt && stop > finallyAt,
+                    "the show method does not join, show inside a try, and leave in its finally");
+
+        foreach (string caller in new[] { Path.Combine("Plantoir", "MainWindow.Verbs.cs"), Path.Combine("Plantoir", "Views", "AssistWindow.xaml.cs") })
+        {
+            string text = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", caller)).Replace("\r\n", "\n");
+            int made = text.IndexOf("new SectionScheduleDialog(", StringComparison.Ordinal);
+            Assert.True(made >= 0, $"{caller} no longer opens Class Dates");
+            int shown = text.IndexOf("await dialog.", made, StringComparison.Ordinal);
+            Assert.True(shown >= 0 && text.IndexOf("await dialog.ShowWithTheFirstFocusInTheBoxAsync()", made, StringComparison.Ordinal) == shown,
+                        $"{caller} shows Class Dates some other way than ShowWithTheFirstFocusInTheBoxAsync");
+        }
     }
 }

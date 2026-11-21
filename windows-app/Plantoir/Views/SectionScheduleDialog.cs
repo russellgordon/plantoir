@@ -144,13 +144,32 @@ public sealed class SectionScheduleDialog : ContentDialog
         // Opened. GettingFocus with TrySetNewFocusedElement is WinUI's
         // documented place to change where focus lands, so nothing waits.
         //
-        // The app-wide event is static, so the dialog listens only while it
-        // is in the window's tree: from Loaded to Unloaded (and Closed). A
-        // ShowAsync that throws never loads the dialog, so it never listens
-        // and nothing is left holding it (review 2's L5).
-        Loaded += (_, _) => StartListeningForTheFirstFocus();
-        Unloaded += (_, _) => StopListeningForTheFirstFocus();
-        Closed += (_, _) => StopListeningForTheFirstFocus();
+        // The app-wide event is static, so the dialog listens only for the
+        // length of one ShowWithTheFirstFocusInTheBoxAsync, and a finally
+        // leaves it on every way out, a ShowAsync that throws included
+        // (review 2's L5). Loaded is too late to join: measured in VM B on
+        // 2026-11-20, the placement came before Loaded in both a keyboard
+        // and a UI Automation open.
+    }
+
+    /// <summary>
+    /// Show the dialog with its first placement sent to the dates box. The
+    /// dialog listens to <c>FocusManager.GettingFocus</c> only inside this
+    /// call and stops in a finally, so a ShowAsync that throws (another
+    /// dialog already open on the same XamlRoot) leaves nothing joined to the
+    /// static event.
+    /// </summary>
+    public async Task<ContentDialogResult> ShowWithTheFirstFocusInTheBoxAsync()
+    {
+        StartListeningForTheFirstFocus();
+        try
+        {
+            return await ShowAsync();
+        }
+        finally
+        {
+            StopListeningForTheFirstFocus();
+        }
     }
 
     /// <summary>Whether this dialog is listening to the app-wide <c>FocusManager.GettingFocus</c> (it is only while shown).</summary>
