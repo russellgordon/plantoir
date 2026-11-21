@@ -69,15 +69,89 @@ internal sealed record UndoOp
     internal string? Maintainer { get; init; }
     internal long? Section { get; init; }
 
-    /// <summary>Every blob this op names: <c>blobs</c>, and writeFile's two hashes.</summary>
+    // replaceText (with Before and After): the text either side of the hunk
+    internal string? ContextBefore { get; init; }
+    internal string? ContextAfter { get; init; }
+
+    // editJSON: the members walked from the top-level object down
+    internal IReadOnlyList<string>? KeyPath { get; init; }
+
+    /// <summary><c>editJSON</c> and <c>external</c>: the value before and after, any JSON (null: no such member, or not set; <see cref="UndoJson.Null"/>: JSON's null).</summary>
+    internal UndoJson? ValueBefore { get; init; }
+    internal UndoJson? ValueAfter { get; init; }
+
+    // move: where the item was and where it went; a file's SHA-256 (never a blob)
+    internal string? From { get; init; }
+    internal string? To { get; init; }
+    internal string? Sha { get; init; }
+
+    /// <summary>A folder's <c>move</c>, <c>createTree</c> and <c>removeTree</c>: the SHA-256 of the folder's listing (<see cref="UndoTreeListing"/>).</summary>
+    internal string? ListingSha { get; init; }
+
+    /// <summary><c>external</c>: what outside every working folder it changed (<c>preference:&lt;name&gt;</c>).</summary>
+    internal string? Target { get; init; }
+
+    /// <summary>Every blob this op names: <c>blobs</c>, writeFile's two hashes, and a listing's hash.</summary>
     internal IReadOnlyList<string> Blobs { get; init; } = [];
+
+    /// <summary>Every path inside the working folder the op names: its <c>path</c>, or a move's <c>from</c> and <c>to</c>; none for an <c>external</c> op.</summary>
+    internal IEnumerable<string> PathsNamed
+    {
+        get
+        {
+            if (Path is not null) yield return Path;
+            if (From is not null) yield return From;
+            if (To is not null) yield return To;
+        }
+    }
+
+    /// <summary>The name recovery and a refusal use for the op's place: its path, a move's <c>from</c>, or an external op's target.</summary>
+    internal string PlaceName => Path ?? From ?? Target ?? Kind ?? "";
+
+    /// <summary>
+    /// A move, a tree or an external op: judged and changed AS A WHOLE against
+    /// what is there now, on its own, never folded into another op's file
+    /// (<c>opKinds.wholeOps</c>).
+    /// </summary>
+    internal bool IsWhole => Readable && Kind is Move or CreateTree or RemoveTree or External;
 
     internal const string WriteFile = "writeFile";
     internal const string EditLine = "editLine";
     internal const string Recompute = "recompute";
+    internal const string ReplaceText = "replaceText";
+    internal const string EditJson = "editJSON";
+    internal const string Move = "move";
+    internal const string CreateTree = "createTree";
+    internal const string RemoveTree = "removeTree";
+    internal const string External = "external";
+
+    /// <summary>The kinds this version reads (U1's three and U2's six); every other kind, U5's reserved two included, is one it does not know.</summary>
+    internal static readonly IReadOnlySet<string> KindsThisVersionKnows = new HashSet<string>(StringComparer.Ordinal)
+    {
+        WriteFile, EditLine, Recompute, ReplaceText, EditJson, Move, CreateTree, RemoveTree, External,
+    };
+
+    /// <summary>The <c>external</c> families this version reads and writes, by the part before the first colon.</summary>
+    internal static readonly IReadOnlySet<string> ExternalFamiliesThisVersionKnows = new HashSet<string>(StringComparer.Ordinal) { "preference" };
 
     /// <summary>The one maintainer U1 defines (<c>opKinds.recompute</c>).</summary>
     internal const string SectionFrontPage = "sectionFrontPage";
+
+    /// <summary>
+    /// Whether two places are the same, or one is a folder holding the other,
+    /// compared part by part WITHOUT regard to case (the mac's U2b hard review,
+    /// MEDIUM 7): NTFS, like a Mac's volume, takes <c>a.json</c> and
+    /// <c>A.json</c> for one place, so a move between them, or two ops naming
+    /// them, is a step this version cannot read. That is also why a move that
+    /// changes only case is never made as two renames here.
+    /// </summary>
+    internal static bool PlacesOverlap(string first, string second)
+    {
+        string one = first.ToLowerInvariant();
+        string other = second.ToLowerInvariant();
+        if (one == other) return true;
+        return one.StartsWith(other + "/", StringComparison.Ordinal) || other.StartsWith(one + "/", StringComparison.Ordinal);
+    }
 }
 
 /// <summary>
@@ -110,7 +184,7 @@ internal sealed record UndoStep
     /// </summary>
     internal IReadOnlyList<string> Blobs { get; init; } = [];
 
-    /// <summary>Every path its ops name, for an <c>interrupted</c> line that closes it unsettled.</summary>
+    /// <summary>Every path its ops name (a move's two included), for an <c>interrupted</c> line that closes it unsettled and for the tidy of its staged files.</summary>
     internal IEnumerable<string> Paths
     {
         get
@@ -118,9 +192,41 @@ internal sealed record UndoStep
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (UndoOp op in Ops)
             {
-                if (op.Path is { } path && seen.Add(path)) yield return path;
+                foreach (string path in op.PathsNamed)
+                {
+                    if (seen.Add(path)) yield return path;
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// <c>opKinds.wholeOps</c>: no other op of the step names a whole op's
+    /// places (a move's two, a tree's folder or anything inside it) or its
+    /// target. A step that breaks it is one this version cannot read: a
+    /// barrier, never undone in a guessed order.
+    /// </summary>
+    internal static bool WholeOpsStandAlone(IReadOnlyList<UndoOp> ops)
+    {
+        for (int index = 0; index < ops.Count; index++)
+        {
+            UndoOp op = ops[index];
+            if (!op.IsWhole) continue;
+            for (int other = 0; other < ops.Count; other++)
+            {
+                if (other == index) continue;
+                UndoOp second = ops[other];
+                if (op.Target is { } target && string.Equals(second.Target, target, StringComparison.Ordinal)) return false;
+                foreach (string mine in op.PathsNamed)
+                {
+                    foreach (string theirs in second.PathsNamed)
+                    {
+                        if (UndoOp.PlacesOverlap(mine, theirs)) return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 }
 
@@ -340,8 +446,10 @@ internal static class UndoFormat
             else
                 readable = false;
         }
-        // A step with ops that have paths and no working folder cannot say where they are.
-        if (folder is null && ops.Any(op => op.Path is not null)) readable = false;
+        // A step with ops that name paths and no working folder cannot say
+        // where they are; a step of external ops alone needs none (wholeOps).
+        if (folder is null && ops.Any(op => op.PathsNamed.Any())) readable = false;
+        if (readable && !UndoStep.WholeOpsStandAlone(ops)) readable = false;
 
         if (!OptionalString(element, "course", out string? course)) readable = false;
         if (!OptionalWholeNumber(element, "section", out long? section)) readable = false;
@@ -403,25 +511,32 @@ internal static class UndoFormat
         };
     }
 
-    /// <summary>One op. Never throws: anything it cannot read makes the op unreadable.</summary>
+    /// <summary>
+    /// One op. Never throws: anything it cannot read makes the op unreadable.
+    /// A key of the wrong type makes a known op unreadable whatever its kind
+    /// (the mac's <c>UndoLenient</c>); a kind's own rules are then
+    /// <see cref="ShapeIsKnown"/>'s, the mac's <c>UndoOp.shapeIsKnown</c>.
+    /// </summary>
     internal static UndoOp ReadOp(JsonElement element)
     {
         if (element.ValueKind != JsonValueKind.Object) return new UndoOp { Kind = null, Readable = false };
         string? kind = element.TryGetProperty("kind", out JsonElement kindElement) && kindElement.ValueKind == JsonValueKind.String
             ? kindElement.GetString()
             : null;
-        bool readable = kind is UndoOp.WriteFile or UndoOp.EditLine or UndoOp.Recompute && !HasDuplicateKeys(element);
+        bool readable = kind is not null && UndoOp.KindsThisVersionKnows.Contains(kind) && !HasDuplicateKeys(element);
 
         // `blobs` binds every kind, a kind this version does not know included,
         // so a pruner that cannot read the op still keeps what it names.
         var blobs = new List<string>();
-        if (element.TryGetProperty("blobs", out JsonElement blobsElement))
+        List<string>? listedBlobs = null;
+        if (element.TryGetProperty("blobs", out JsonElement blobsElement) && blobsElement.ValueKind != JsonValueKind.Null)
         {
+            listedBlobs = [];
             if (blobsElement.ValueKind == JsonValueKind.Array)
             {
                 foreach (JsonElement blob in blobsElement.EnumerateArray())
                 {
-                    if (blob.ValueKind == JsonValueKind.String) blobs.Add(blob.GetString()!);
+                    if (blob.ValueKind == JsonValueKind.String) { blobs.Add(blob.GetString()!); listedBlobs.Add(blob.GetString()!); }
                     else readable = false;
                 }
             }
@@ -429,16 +544,50 @@ internal static class UndoFormat
         }
 
         if (!OptionalString(element, "path", out string? path)) readable = false;
-        if (kind is UndoOp.WriteFile or UndoOp.EditLine or UndoOp.Recompute && !UndoPath.IsWithinTheRules(path)) readable = false;
 
-        bool okBefore = OptionalString(element, "before", out string? before);
-        bool okAfter = OptionalString(element, "after", out string? after);
-        bool okKey = OptionalString(element, "key", out string? key);
-        bool okAfterKey = OptionalString(element, "afterKey", out string? afterKey);
+        // editJSON's and external's before and after are ANY JSON, null
+        // included (a member holding null is not a member that is absent);
+        // every other kind's are strings.
+        bool valuesAreJson = kind is UndoOp.EditJson or UndoOp.External;
+        string? before = null, after = null;
+        UndoJson? valueBefore = null, valueAfter = null;
+        if (valuesAreJson)
+        {
+            if (!OptionalJson(element, "before", out valueBefore)) readable = false;
+            if (!OptionalJson(element, "after", out valueAfter)) readable = false;
+        }
+        else
+        {
+            if (!OptionalString(element, "before", out before)) readable = false;
+            if (!OptionalString(element, "after", out after)) readable = false;
+        }
+        if (!OptionalString(element, "key", out string? key)) readable = false;
+        if (!OptionalString(element, "afterKey", out string? afterKey)) readable = false;
         bool okBeforeSha = OptionalString(element, "beforeSha", out string? beforeSha);
         bool okAfterSha = OptionalString(element, "afterSha", out string? afterSha);
         bool okMaintainer = OptionalString(element, "maintainer", out string? maintainer);
         bool okSection = OptionalWholeNumber(element, "section", out long? section);
+        if (!OptionalString(element, "contextBefore", out string? contextBefore)) readable = false;
+        if (!OptionalString(element, "contextAfter", out string? contextAfter)) readable = false;
+        if (!OptionalString(element, "from", out string? from)) readable = false;
+        if (!OptionalString(element, "to", out string? to)) readable = false;
+        if (!OptionalString(element, "sha", out string? sha)) readable = false;
+        if (!OptionalString(element, "listingSha", out string? listingSha)) readable = false;
+        if (!OptionalString(element, "target", out string? target)) readable = false;
+        List<string>? keyPath = null;
+        if (element.TryGetProperty("keyPath", out JsonElement keyPathElement) && keyPathElement.ValueKind != JsonValueKind.Null)
+        {
+            if (keyPathElement.ValueKind != JsonValueKind.Array) readable = false;
+            else
+            {
+                keyPath = [];
+                foreach (JsonElement part in keyPathElement.EnumerateArray())
+                {
+                    if (part.ValueKind == JsonValueKind.String) keyPath.Add(part.GetString()!);
+                    else readable = false;
+                }
+            }
+        }
         bool created = false;
         bool okCreated = true;
         if (element.TryGetProperty("createdTheBlock", out JsonElement createdElement))
@@ -447,10 +596,11 @@ internal static class UndoFormat
             else if (createdElement.ValueKind is JsonValueKind.False or JsonValueKind.Null) created = false;
             else okCreated = false;
         }
-
-        // A field of the wrong type makes a known op unreadable whatever its kind
-        // (the reference model, readable_op, checks these four for every kind).
-        if (!okBefore || !okAfter || !okKey || !okAfterKey) readable = false;
+        // `element` (an array element of editJSON) and `heldBy` (a removeTree
+        // held outside the journal) are later pieces' meanings: an op carrying
+        // either is one this version cannot undo by its own rule.
+        if (kind == UndoOp.EditJson && element.TryGetProperty("element", out _)) readable = false;
+        if (kind == UndoOp.RemoveTree && element.TryGetProperty("heldBy", out _)) readable = false;
 
         switch (kind)
         {
@@ -471,8 +621,9 @@ internal static class UndoFormat
                 if (!okMaintainer || !okSection || !string.Equals(maintainer, UndoOp.SectionFrontPage, StringComparison.Ordinal)) readable = false;
                 break;
         }
+        if (listingSha is not null) blobs.Add(listingSha);
 
-        return new UndoOp
+        var op = new UndoOp
         {
             Kind = kind,
             Readable = readable,
@@ -486,8 +637,69 @@ internal static class UndoFormat
             AfterSha = afterSha,
             Maintainer = maintainer,
             Section = section,
+            ContextBefore = contextBefore,
+            ContextAfter = contextAfter,
+            KeyPath = keyPath,
+            ValueBefore = valueBefore,
+            ValueAfter = valueAfter,
+            From = from,
+            To = to,
+            Sha = sha,
+            ListingSha = listingSha,
+            Target = target,
             Blobs = blobs.Distinct(StringComparer.Ordinal).ToList(),
         };
+        return readable && ShapeIsKnown(op, listedBlobs) ? op : op with { Readable = false };
+    }
+
+    /// <summary>
+    /// Whether an op of a kind this version knows has the shape that kind
+    /// needs (the mac's <c>UndoOp.shapeIsKnown</c>): every blob a blob's name,
+    /// safe paths, and the fields of its kind.
+    /// </summary>
+    private static bool ShapeIsKnown(UndoOp op, IReadOnlyList<string>? listedBlobs)
+    {
+        foreach (string name in op.Blobs)
+        {
+            if (!IsBlobName(name)) return false;
+        }
+        if (op.Sha is not null && !IsBlobName(op.Sha)) return false;
+        switch (op.Kind)
+        {
+            case UndoOp.Move:
+                // No path: from and to follow path's rules, differ, and neither
+                // holds the other; exactly one of a file's sha and a folder's listingSha.
+                if (op.Path is not null || op.From is null || op.To is null) return false;
+                if (!UndoPath.IsWithinTheRules(op.From) || !UndoPath.IsWithinTheRules(op.To)) return false;
+                if (UndoOp.PlacesOverlap(op.From, op.To)) return false;
+                return (op.Sha is not null) != (op.ListingSha is not null);
+            case UndoOp.External:
+            {
+                if (op.Path is not null || op.Target is not { } target) return false;
+                int colon = target.IndexOf(':', StringComparison.Ordinal);
+                if (colon < 0) return false;
+                string family = target[..colon];
+                if (target.Length == colon + 1 || !UndoOp.ExternalFamiliesThisVersionKnows.Contains(family)) return false;
+                return op.ValueBefore is not null || op.ValueAfter is not null;
+            }
+        }
+        if (!UndoPath.IsWithinTheRules(op.Path)) return false;
+        switch (op.Kind)
+        {
+            case UndoOp.ReplaceText:
+                // Every part present (an empty string is a part), and the two
+                // windows differ, or the hunk could never tell its states apart.
+                if (op.Before is null || op.After is null || op.ContextBefore is null || op.ContextAfter is null) return false;
+                return !string.Equals(op.ContextBefore + op.Before + op.ContextAfter, op.ContextBefore + op.After + op.ContextAfter, StringComparison.Ordinal);
+            case UndoOp.EditJson:
+                if (op.KeyPath is not { Count: > 0 }) return false;
+                if (op.ValueBefore is null && op.ValueAfter is null) return false;
+                return !UndoJson.Same(op.ValueBefore, op.ValueAfter);
+            case UndoOp.CreateTree:
+            case UndoOp.RemoveTree:
+                return op.ListingSha is not null && listedBlobs is not null && listedBlobs.Contains(op.ListingSha, StringComparer.Ordinal);
+        }
+        return true;
     }
 
     private static UndoProcess? ReadProcess(JsonElement element)
@@ -520,6 +732,15 @@ internal static class UndoFormat
         if (found.ValueKind != JsonValueKind.String) return false;
         value = found.GetString();
         return true;
+    }
+
+    /// <summary>Any JSON value, null included (absent: null; JSON's null: <see cref="UndoJson.Null"/>). False when it is there and no double can hold a number in it.</summary>
+    private static bool OptionalJson(JsonElement element, string name, out UndoJson? value)
+    {
+        value = null;
+        if (!element.TryGetProperty(name, out JsonElement found)) return true;
+        value = UndoJson.From(found);
+        return value is not null;
     }
 
     private static bool OptionalWholeNumber(JsonElement element, string name, out long? value)

@@ -166,7 +166,7 @@ final class UndoCourseSettingsStepTests: XCTestCase {
         XCTAssertNil(afterUndo["graded_folders"], "the Marks key must be absent again, not an empty list")
         XCTAssertEqual(afterUndo["hidden"] as? [String], ["Media", "Tasks"])
         // Undo spells the members it puts back compactly (the member rule,
-        // `undo.editJSONCases`), so the values are back, not the spacing.
+        // `undo-json-cases.json` → `editJSONCases`), so the values are back, not the spacing.
         XCTAssertEqual(try CourseConfiguration(contentsOf: course.configFileURL).hiddenItems, ["Media", "Tasks"])
         _ = before
 

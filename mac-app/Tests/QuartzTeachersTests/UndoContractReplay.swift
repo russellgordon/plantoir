@@ -626,11 +626,14 @@ nonisolated enum UndoContractReplay {
         return (cases: cases.count, failures: failures)
     }
 
-    // MARK: - undo.editJSONCases
+    // MARK: - undo-json-cases.json -> editJSONCases
 
     /// The bytes of an editJSON move, exactly (the hard review of U2b, LOW a).
+    /// The cases live in their own file, out of shared-rules.json, because
+    /// some hold keys that differ only by case, which Windows PowerShell 5.1
+    /// cannot read (#899 W6).
     static func runEditJSONCases() throws -> (cases: Int, failures: [String]) {
-        let cases: [[String: Any]] = try undoBlock()["editJSONCases"] as? [[String: Any]] ?? []
+        let cases: [[String: Any]] = try contract("undo-json-cases.json")["editJSONCases"] as? [[String: Any]] ?? []
         var failures: [String] = []
         for testCase in cases {
             let name: String = string(testCase["name"]) ?? "?"
