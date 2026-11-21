@@ -183,21 +183,21 @@ internal static class UndoTrail
     /// </summary>
     internal static void ToTheActivityTrail(UndoTrailLine line)
     {
-        switch (line.Event)
+        // Each event Undo writes, named on the right of an arm so the trail's
+        // wiring scan sees its writer.
+        ActivityTrail.Event written = line.Event switch
         {
-            case ActivityTrail.Event.UndoRolledBack:
-            case ActivityTrail.Event.UndoFoundAFolderSetAside:
-            case ActivityTrail.Event.UndoCouldNotPutBack:
-            case ActivityTrail.Event.UndoKeptWhatAPageHeld:
-            case ActivityTrail.Event.UndoKeptWhatItReplaced:
-            case ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay:
-                if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(line.Event, line.Words);
-                else if (line.Section is { } section and >= 0 and <= int.MaxValue) ActivityTrail.Note(line.Event, line.Words, line.Course, (int)section);
-                else ActivityTrail.Note(line.Event, line.Course + " · " + line.Words);
-                break;
-            default:
-                throw new ArgumentException("An event Undo does not write: " + line.Event, nameof(line));
-        }
+            ActivityTrail.Event.UndoRolledBack => ActivityTrail.Event.UndoRolledBack,
+            ActivityTrail.Event.UndoFoundAFolderSetAside => ActivityTrail.Event.UndoFoundAFolderSetAside,
+            ActivityTrail.Event.UndoCouldNotPutBack => ActivityTrail.Event.UndoCouldNotPutBack,
+            ActivityTrail.Event.UndoKeptWhatAPageHeld => ActivityTrail.Event.UndoKeptWhatAPageHeld,
+            ActivityTrail.Event.UndoKeptWhatItReplaced => ActivityTrail.Event.UndoKeptWhatItReplaced,
+            ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay => ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay,
+            _ => throw new ArgumentException("An event Undo does not write: " + line.Event, nameof(line)),
+        };
+        if (string.IsNullOrEmpty(line.Course)) ActivityTrail.Note(written, line.Words);
+        else if (line.Section is { } section and >= 0 and <= int.MaxValue) ActivityTrail.Note(written, line.Words, line.Course, (int)section);
+        else ActivityTrail.Note(written, line.Course + " · " + line.Words);
     }
 }
 

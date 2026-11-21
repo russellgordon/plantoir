@@ -253,7 +253,9 @@ public sealed class UndoDoorTests : IDisposable
         UndoFolded folded = journal.Read().Folded;
         Assert.Equal(UndoStepState.Interrupted, folded.Steps[1].State);
         Assert.False(File.Exists(stagedNew), "a staged file of the step closed unsettled was left beside the page");
-        Assert.False(File.Exists(stagedOrig), "a staged file of the step closed unsettled was left beside the page");
+        // Its page is held with no sharing as the prune runs, so whether this
+        // kept original is a copy of it cannot be told: it is kept (W4c).
+        Assert.True(File.Exists(stagedOrig), "a kept original whose page could not be read was removed");
         Assert.True(File.Exists(anotherStepsFile), "another step's staged file was removed");
         Assert.True(File.Exists(onlyCopy), "a kept original that is the only copy of what it holds was removed");
         Assert.Equal(Old, File.ReadAllBytes(Full(APage)));
