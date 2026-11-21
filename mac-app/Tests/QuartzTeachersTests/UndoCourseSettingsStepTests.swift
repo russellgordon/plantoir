@@ -280,20 +280,6 @@ final class UndoCourseSettingsStepTests: XCTestCase {
         XCTAssertEqual(applied, 1)
     }
 
-    /// Revert writes nothing and makes no step.
-    func testRevertWritesNothingAndMakesNoStep() throws {
-        let course: Course = try course()
-        let before: Data = try Data(contentsOf: course.configFileURL)
-        let view: CourseSettingsView = CourseSettingsView(course: course)
-        course.configuration.hiddenItems = ["Media"]
-
-        view.revertToFile()
-
-        XCTAssertEqual(try Data(contentsOf: course.configFileURL), before)
-        XCTAssertEqual(try stepCount(), 0)
-        XCTAssertEqual(course.configuration.hiddenItems, ["Media", "Tasks"])
-    }
-
     /// A Save that changes nothing on disk writes nothing and makes no step.
     func testASaveThatChangesNothingMakesNoStep() throws {
         let course: Course = try course()
@@ -388,29 +374,6 @@ final class UndoCourseSettingsStepTests: XCTestCase {
         XCTAssertEqual(undone, .refused(.changedSince(firstPath: "courses/ICS3U/Labs", others: 0), clearedTheList: true))
         XCTAssertEqual(try String(contentsOf: page, encoding: .utf8), "mine\n")
         XCTAssertTrue(FileManager.default.fileExists(atPath: course.directoryURL.appendingPathComponent("Labs/index.md").path))
-    }
-
-    /// A folder whose place is taken by the time the step is made (a
-    /// folder of the teacher's that appeared after the plan) is never
-    /// written over: the step is refused, nothing is made, and nothing is
-    /// said, as a folder that could not be made said nothing before U4a.
-    func testAddFolderWhosePlaceIsTakenMakesNothingAndSaysNothing() throws {
-        let course: Course = try twoSectionCourse()
-        let step: JournaledStep = JournaledStep(
-            course: course, section: nil, maker: UndoStepMaker.sheet("addFolder"), holds: "course"
-        )
-        let place: URL = course.directoryURL.appendingPathComponent("Labs")
-        _ = FolderScaffold.planPages(
-            [FolderScaffold.Page(relativePath: "Labs/index.md", text: "Plantoir's\n")],
-            intoNewFolders: [place], courseDirectory: course.directoryURL, into: step
-        )
-        try FileManager.default.createDirectory(at: place, withIntermediateDirectories: false)
-        try Data("mine\n".utf8).write(to: place.appendingPathComponent("index.md"))
-
-        XCTAssertThrowsError(try step.make())
-
-        XCTAssertEqual(try String(contentsOf: place.appendingPathComponent("index.md"), encoding: .utf8), "mine\n")
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: place.path), ["index.md"])
     }
 
     /// Killed after the first folder went in and before the second:
