@@ -63,7 +63,7 @@ public class PreviewNavigationSourceTests
         Assert.Contains("await WaitForPreviewServer(new StartPageRequest(atLastViewed, frontPageWasJustChanged));",
                         Body(code, "private async Task PressPreviewAsync("));
         // The automated starts and the smoke hook: the front page.
-        Assert.Contains("await WaitForPreviewServer();", Body(code, "private async void StartAutomatedPreview("));
+        Assert.Contains("await WaitForPreviewServer();", Body(code, "private async void RunTheAutomatedStart("));
         Assert.Contains("PressPreviewAsync(atLastViewed: false)", code);
     }
 

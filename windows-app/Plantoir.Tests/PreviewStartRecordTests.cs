@@ -266,6 +266,30 @@ public class PreviewStartRecordTests : IDisposable
         a.Record!.Dispose();
     }
 
+    /// <summary>
+    /// Review 2's L10: what a closing window still holds, of every section, is
+    /// what it hands back; another window's rows stay, and the section a
+    /// replaced view left behind can be previewed elsewhere at once.
+    /// </summary>
+    [Fact]
+    public void AClosingWindowHandsBackEveryRowItHolds()
+    {
+        var windowA = new object();
+        var windowB = new object();
+        var leftBehind = PreviewStarts.Begin(Folder, Course, Section + 1, owner: windowA);
+        var current = PreviewStarts.Begin(Folder, Course, Section, owner: windowA);
+        var other = PreviewStarts.Begin(Folder, Course, Section + 2, owner: windowB);
+
+        var held = PreviewLeases.HeldBy(windowA);
+        Assert.Equal(2, held.Count);
+        foreach (var lease in held) PreviewLeases.Release(lease);
+
+        Assert.Equal(new[] { other.Lease }, PreviewLeases.Active.ToArray());
+        var elsewhere = PreviewStarts.Begin(Folder, Course, Section + 1, owner: windowB);
+        Assert.Null(elsewhere.Refusal);
+        foreach (var began in new[] { leftBehind, current, other, elsewhere }) began.Record?.Dispose();
+    }
+
     /// <summary>A start that already let go never removes a later lease equal to its own in every field.</summary>
     [Fact]
     public void AReleaseRemovesOnlyTheLeaseItsStartTook()
@@ -357,7 +381,7 @@ public class PreviewStartRecordTests : IDisposable
     /// </summary>
     [Theory]
     [InlineData("private async Task PressPreviewAsync(")]
-    [InlineData("private async void StartAutomatedPreview(")]
+    [InlineData("private async void RunTheAutomatedStart(")]
     public void EveryStartAsksTheModelInItsOrder(string header)
     {
         string body = Body(ViewSource(), header);
@@ -383,6 +407,40 @@ public class PreviewStartRecordTests : IDisposable
         Assert.Equal(2, Regex.Matches(code, @"PreviewStarts\.Begin\([^;]*owner:\s*_window\)").Count);
     }
 
+    /// <summary>
+    /// Review 2's M3: the automated start tells its caller the refusal before
+    /// it shows it, shows it as the press does, and the rebuild hands that
+    /// answer back to the menu and the assistant.
+    /// </summary>
+    [Fact]
+    public void TheAutomatedStartAnswersWithTheRefusalItShows()
+    {
+        string code = ViewSource();
+        string body = Body(code, "private async void RunTheAutomatedStart(");
+        int refused = body.IndexOf("if (began.Refusal is { } refusal)", StringComparison.Ordinal);
+        int told = body.IndexOf("decided.TrySetResult(refusal);", StringComparison.Ordinal);
+        int shown = body.IndexOf("await ShowPreviewRefusal(refusal);", StringComparison.Ordinal);
+        Assert.True(refused >= 0 && refused < told && told < shown, "the automated start's refusal is not answered and then shown");
+        Assert.Contains("await ShowPreviewRefusal(refusal);", Body(code, "private async Task PressPreviewAsync("));
+        Assert.Contains("return await StartAutomatedPreview();", Body(code, "public async Task<string?> RebuildPreviewAsync("));
+    }
+
+    /// <summary>Review 2's L10, the window's side: Closed hands back what the window still holds, after its view let go.</summary>
+    [Fact]
+    public void TheClosingWindowLetsGoOfWhatItStillHolds()
+    {
+        string window = Regex.Replace(File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot,
+            "windows-app", "Plantoir", "MainWindow.xaml.cs")), @"//[^\n]*", "");
+        int closed = window.IndexOf("Closed += (_, _) =>", StringComparison.Ordinal);
+        int view = window.IndexOf("LetGoAsTheWindowCloses();", closed, StringComparison.Ordinal);
+        int rows = window.IndexOf("LetGoOfThePreviewsThisWindowStillHolds();", closed, StringComparison.Ordinal);
+        int unregister = window.IndexOf("Workspace.UnregisterWindow();", closed, StringComparison.Ordinal);
+        Assert.True(closed >= 0 && view > closed && rows > view && rows < unregister, "Closed does not let go of the window's leases after its view");
+        string letGo = Body(window, "private void LetGoOfThePreviewsThisWindowStillHolds(");
+        Assert.Contains("PreviewLeases.HeldBy(this)", letGo);
+        Assert.Contains("PreviewLeases.Release(left);", letGo);
+    }
+
     /// <summary>The view's side of L1: the press asks about a stop under way, which the stop counts.</summary>
     [Fact]
     public void ThePressAsksWhetherTheWindowsStopIsUnderWay()
@@ -397,7 +455,7 @@ public class PreviewStartRecordTests : IDisposable
     public void AFailedStartHandsBackWhatItHolds()
     {
         string code = ViewSource();
-        foreach (string header in new[] { "private async Task PressPreviewAsync(", "private async void StartAutomatedPreview(" })
+        foreach (string header in new[] { "private async Task PressPreviewAsync(", "private async void RunTheAutomatedStart(" })
         {
             string body = Body(code, header);
             int caught = body.LastIndexOf("catch (Exception ex)", StringComparison.Ordinal);

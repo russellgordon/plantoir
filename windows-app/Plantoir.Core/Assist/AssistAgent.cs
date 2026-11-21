@@ -696,8 +696,11 @@ public sealed class AssistAgent
     /// preview" pressed <see cref="ShowPreviewInApp"/>, which does nothing while
     /// a preview is serving, and still said it was rebuilding. Null falls back
     /// to <see cref="ShowPreviewInApp"/>.
+    /// <para>Its answer (#928 review 2, M3): null when the start went ahead,
+    /// otherwise the sentence the window is showing under "Cannot Preview
+    /// Yet"; that sentence is then what the assistant says.</para>
     /// </summary>
-    public Action? RebuildPreviewInApp { get; set; }
+    public Func<Task<string?>>? RebuildPreviewInApp { get; set; }
 
     /// <summary>Whether the Section menu is changing this section right now (#489's claim, <c>SectionMenuActivity</c>).</summary>
     public Func<bool>? SectionIsChangingFromTheMenu { get; set; }
@@ -897,7 +900,7 @@ public sealed class AssistAgent
     {
         ActivityTrail.NotePrompt(text, _courseCode, _section);
 
-        if (PreviewAskedForPlainly(text) is { } handled) return handled;
+        if (await PreviewAskedForPlainly(text) is { } handled) return handled;
         if (await CardCommand(text, cancellation) is { } commanded) return commanded;
 
         // "deploy at 6:30" — morning or evening, and nobody can tell which
@@ -1016,12 +1019,19 @@ public sealed class AssistAgent
                 // implementation review, L3): a rebuild would stop the preview
                 // under a change the menu is making.
                 bool menuIsChanging = SectionIsChangingFromTheMenu?.Invoke() == true;
+                bool deploying = !menuIsChanging && ThisSectionIsBeingDeployed();
+                string? refusedInTheWindow = null;
+                if (!menuIsChanging && !deploying)
+                {
+                    if (RebuildPreviewInApp is not null) refusedInTheWindow = await RebuildPreviewInApp.Invoke();
+                    else ShowPreviewInApp.Invoke();
+                }
                 string said = menuIsChanging
                     ? AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString(), CourseNoun)
-                    : ThisSectionIsBeingDeployed()
+                    : deploying
                     ? SectionIsBeingDeployedSentence
-                    : "The preview is opening in Plantoir's main window — the build shows its progress there.";
-                if (!menuIsChanging && !ThisSectionIsBeingDeployed()) (RebuildPreviewInApp ?? ShowPreviewInApp).Invoke();
+                    : refusedInTheWindow   // the window's own refusal, never "opening" (M3)
+                    ?? "The preview is opening in Plantoir's main window — the build shows its progress there.";
                 _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
                 _messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = said });
                 return new List<Line> { new("assistant", said) };
@@ -1772,7 +1782,7 @@ public sealed class AssistAgent
 
     private static readonly string[] RebuildWords = { "rebuild", "refresh", "update" };
 
-    private List<Line>? PreviewAskedForPlainly(string text)
+    private async Task<List<Line>?> PreviewAskedForPlainly(string text)
     {
         if (ShowPreviewInApp is null || !PreviewCommands.Contains(Plainly(text))) return null;
 
@@ -1783,13 +1793,18 @@ public sealed class AssistAgent
         // A REBUILD stops the preview, so it meets the Section menu's claim as
         // the runner's rebuild_preview does (L3); showing one changes nothing.
         bool menuIsChanging = rebuild && SectionIsChangingFromTheMenu?.Invoke() == true;
+        string? refusedInTheWindow = null;
         if (!deploying && !menuIsChanging)
-            (rebuild && RebuildPreviewInApp is not null ? RebuildPreviewInApp : ShowPreviewInApp).Invoke();
+        {
+            if (rebuild && RebuildPreviewInApp is not null) refusedInTheWindow = await RebuildPreviewInApp.Invoke();
+            else ShowPreviewInApp.Invoke();
+        }
         string said = menuIsChanging
             ? AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString(), CourseNoun)
             : deploying
             ? SectionIsBeingDeployedSentence
-            : "The preview is opening in Plantoir's main window — the build shows its progress there.";
+            : refusedInTheWindow   // the window's own refusal, never "opening" (M3)
+            ?? "The preview is opening in Plantoir's main window — the build shows its progress there.";
         // The exchange still goes in the transcript the model sees, so a
         // follow-up question knows the preview is already on screen.
         _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });

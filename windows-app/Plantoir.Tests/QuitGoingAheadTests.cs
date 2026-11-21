@@ -16,7 +16,8 @@ public class QuitGoingAheadTests
     {
         public readonly QuitGoingAhead Quit = new(new PreviewAgainPresses());
         public int CopiesLetGo;
-        public QuitGoingAhead.Pass Pass() => Quit.BeginPass(whenTakenBack: () => CopiesLetGo++);
+        public readonly object Window = new();
+        public QuitGoingAhead.Pass Pass() => Quit.BeginPass(whenTakenBack: () => CopiesLetGo++, window: Window);
     }
 
     /// <summary>Whether a start parked behind a stop would run its launcher now.</summary>
@@ -70,6 +71,33 @@ public class QuitGoingAheadTests
         }
         Assert.False(close.Quit.HasGoneAhead);
         Assert.True(PreviewWorks(close));
+    }
+
+    /// <summary>
+    /// Review 2's L11: the pass that waited hands on and ENDS before its
+    /// Close() comes back through (a close dispatched later), a window opens
+    /// meanwhile, and the next pass finds the close is not the quit. It takes
+    /// the quit back, since the pass that set it is gone.
+    /// </summary>
+    [Fact]
+    public void AHandedOnQuitThatIsNoLongerAQuitIsTakenBack()
+    {
+        var close = new Close();
+        using (var first = close.Pass())
+        {
+            first.GoAhead();
+            first.HandOnToTheNextPass();
+        }
+        Assert.True(close.Quit.HasGoneAhead);
+        using (var second = close.Pass()) second.NotAQuit();   // another window is open now
+        Assert.False(close.Quit.HasGoneAhead, "the handed-on quit was kept: Preview starts nothing");
+        Assert.True(PreviewWorks(close));
+
+        // Another window's close is not handed this window's quit.
+        var other = new Close();
+        using (var first = other.Pass()) { first.GoAhead(); first.HandOnToTheNextPass(); }
+        using (var elsewhere = other.Quit.BeginPass(() => { }, window: new object())) elsewhere.NotAQuit();
+        Assert.True(other.Quit.HasGoneAhead);
     }
 
     /// <summary>The handler failed after the quit went ahead (even after it had handed on).</summary>
@@ -144,7 +172,7 @@ public class QuitGoingAheadTests
         Assert.True(at >= 0, "the closing handler moved");
         int end = code.IndexOf("private void LetHeldCopiesGo(", at, StringComparison.Ordinal);
         string handler = code[at..end];
-        Assert.Contains("using var pass = Plantoir.Core.Models.QuitGoingAhead.Shared.BeginPass(whenTakenBack: LetHeldCopiesGo)", handler);
+        Assert.Contains("using var pass = Plantoir.Core.Models.QuitGoingAhead.Shared.BeginPass(whenTakenBack: LetHeldCopiesGo, window: this)", handler);
         Assert.DoesNotContain("LetHeldCopiesGo()", handler);
         Assert.DoesNotContain("TheQuitWasTakenBack", handler);
         Assert.DoesNotContain("LetThePreviewStartsGo", handler);

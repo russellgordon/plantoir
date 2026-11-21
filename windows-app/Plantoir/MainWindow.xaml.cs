@@ -282,6 +282,12 @@ public sealed partial class MainWindow : Window
             // own task — and the quit question was asked before Closed.
             try { (DetailHost.Content as SectionDetailView)?.LetGoAsTheWindowCloses(); }
             catch (Exception ex) { App.LogDiagnostic($"MainWindow.Closed: the section view could not let go: {ex.Message}"); }
+            // Then whatever this window still holds (#928 review 2, L10): a
+            // row a replaced view left behind, whose Unloaded never ran, would
+            // otherwise outlive its window and refuse every other window's
+            // preview of that section until relaunch.
+            try { LetGoOfThePreviewsThisWindowStillHolds(); }
+            catch (Exception ex) { App.LogDiagnostic($"MainWindow.Closed: a preview lease could not be let go: {ex.Message}"); }
             SectionMenuActivity.Changed -= ActivityChanged;
             AssistActivity.Changed -= ActivityChanged;
             DropVerbs();   // this window's menu server stops; its undo list goes with it (#489)
@@ -545,7 +551,7 @@ public sealed partial class MainWindow : Window
         // handed to the next pass, or was no quit at all takes the quit back
         // (and lets held copies go), so no way out that leaves the window up
         // can leave Preview starting nothing.
-        using var pass = Plantoir.Core.Models.QuitGoingAhead.Shared.BeginPass(whenTakenBack: LetHeldCopiesGo);
+        using var pass = Plantoir.Core.Models.QuitGoingAhead.Shared.BeginPass(whenTakenBack: LetHeldCopiesGo, window: this);
         try
         {
             // A second close while this one waits does nothing new.
@@ -1155,6 +1161,22 @@ public sealed partial class MainWindow : Window
                 App.LogDiagnostic($"StopPreviewFor exception: {ex}");
             }
         });
+    }
+
+    /// <summary>
+    /// The window is closing (L10): each preview lease it still holds is swept
+    /// as a stop sweeps (registered first, so a start elsewhere waits for it),
+    /// then released by reference. The current view let go just before, so
+    /// these are only rows views replaced in this window left behind.
+    /// </summary>
+    private void LetGoOfThePreviewsThisWindowStillHolds()
+    {
+        foreach (PreviewLeases.Lease left in PreviewLeases.HeldBy(this))
+        {
+            App.LogDiagnostic($"MainWindow.Closed: let go of the preview of {left.CourseCode} Section {left.SectionNumber} a replaced view left behind");
+            PreviewStopper.StopSectionProcesses(left.FolderPath, left.CourseCode, left.SectionNumber);
+            PreviewLeases.Release(left);
+        }
     }
 
     /// <param name="sectionFolder">

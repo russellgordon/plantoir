@@ -1484,7 +1484,7 @@ public sealed partial class SectionDetailView : UserControl
             _ = PresentTheRepairsRefusalAsync(nowInstead);
             return;
         }
-        StartAutomatedPreview();
+        _ = StartAutomatedPreview();
     }
 
     /// <summary>
@@ -1546,7 +1546,7 @@ public sealed partial class SectionDetailView : UserControl
         try
         {
             if (_previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null) return;
-            StartAutomatedPreview();
+            _ = StartAutomatedPreview();
         }
         catch (Exception ex)
         {
@@ -1554,7 +1554,24 @@ public sealed partial class SectionDetailView : UserControl
         }
     }
 
-    private async void StartAutomatedPreview()
+    /// <summary>
+    /// Start a preview for the assistant, the menu or a repair, and answer
+    /// as soon as the start is DECIDED (#928 review 2, M3): null when it went
+    /// ahead (or this window's own start was already under way), otherwise
+    /// the sentence the teacher is being shown under "Cannot Preview Yet".
+    /// <see cref="PreviewStarts.Begin"/> is the one place that decides; the
+    /// caller reports from this answer, so nobody says "rebuilding" for a
+    /// start that was refused. The build and its wait for the page go on
+    /// after the answer.
+    /// </summary>
+    private Task<string?> StartAutomatedPreview()
+    {
+        var decided = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        RunTheAutomatedStart(decided);
+        return decided.Task;
+    }
+
+    private async void RunTheAutomatedStart(TaskCompletionSource<string?> decided)
     {
         // What this start took, for the catch below (the review's L2).
         PreviewLeases.Lease? heldLease = null;
@@ -1569,7 +1586,11 @@ public sealed partial class SectionDetailView : UserControl
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
             // Before any lease is released or taken (#386).
-            if (await RefusedWhileThisSectionDeploys(workspacePath)) return;
+            if (await RefusedWhileThisSectionDeploys(workspacePath))
+            {
+                decided.TrySetResult(AssistWording.SectionIsBeingDeployed(_course.Code, _sectionNumber.ToString()));
+                return;
+            }
             if (await _window.RefusedWhileTheFolderIsGettingReady(workspacePath, "Cannot Preview Yet")) return;   // #473
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
@@ -1582,11 +1603,26 @@ public sealed partial class SectionDetailView : UserControl
             if (began.Refusal is { } refusal)
             {
                 App.LogDiagnostic($"StartAutomatedPreview refused for {_course.Code} Section {_sectionNumber}: {refusal}");
+                // Shown as the press shows it, and the caller is told the
+                // same sentence first, so it never says "rebuilding" (M3).
+                decided.TrySetResult(refusal);
+                await ShowPreviewRefusal(refusal);
                 return;
             }
-            if (!TookTheStart(workspacePath, began, "the assistant's rebuild", out var ownLease, out Guid thisStart, out _)) return;
+            if (!TookTheStart(workspacePath, began, "the assistant's rebuild", out var ownLease, out Guid thisStart, out string? declinedBy))
+            {
+                if (declinedBy is not null)
+                {
+                    string declined = WorkLease.DeclinedInTheWindow(_course.Code, declinedBy);
+                    decided.TrySetResult(declined);
+                    await ShowPreviewRefusal(declined);
+                }
+                return;
+            }
             heldLease = ownLease;
             heldStart = thisStart;
+            // The start is this window's now: what "rebuilding" says is true.
+            decided.TrySetResult(null);
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
@@ -1613,6 +1649,12 @@ public sealed partial class SectionDetailView : UserControl
             App.LogDiagnostic($"StartAutomatedPreview exception: {ex}");
             HandBackAfterAFailure(heldLease, heldStart);
         }
+        finally
+        {
+            // Every other way out started nothing new and showed its own
+            // refusal, or found this window's start already under way.
+            decided.TrySetResult(null);
+        }
     }
 
     /// <summary>
@@ -1622,19 +1664,21 @@ public sealed partial class SectionDetailView : UserControl
     /// <see cref="StartPreviewIfIdle"/>, which returns at once while a preview
     /// serves, so "rebuilding" was said and nothing was rebuilt.
     /// </summary>
-    public async Task RebuildPreviewAsync()
+    /// <returns>The start's answer (<see cref="StartAutomatedPreview"/>): null, or the refusal the teacher was shown.</returns>
+    public async Task<string?> RebuildPreviewAsync()
     {
         try
         {
             await StopPreviewIfRunningAsync();
             // The stop can take a while; a view replaced meanwhile must not
             // start a preview nobody can see (PreviewAgainAfterRepairAsync's reason).
-            if (_isTornDown || !IsLoaded) return;
-            StartAutomatedPreview();
+            if (_isTornDown || !IsLoaded) return null;
+            return await StartAutomatedPreview();
         }
         catch (Exception ex)
         {
             App.LogDiagnostic($"RebuildPreviewAsync exception: {ex}");
+            return null;
         }
     }
 
@@ -1844,26 +1888,13 @@ public sealed partial class SectionDetailView : UserControl
             if (began.Refusal is { } refusal)
             {
                 App.LogDiagnostic($"Preview refused for {_course.Code} Section {_sectionNumber}: {refusal}");
-                var dialog = new ContentDialog
-                {
-                    Title = "Cannot Preview Yet",
-                    Content = refusal,
-                    CloseButtonText = "OK",
-                };
-                await ShowDialogSafelyAsync(dialog);
+                await ShowPreviewRefusal(refusal);
                 return;
             }
             if (!TookTheStart(workspacePath, began, "Preview", out var ownLease, out Guid thisStart, out string? declinedBy))
             {
                 if (declinedBy is not null)
-                {
-                    await ShowDialogSafelyAsync(new ContentDialog
-                    {
-                        Title = "Cannot Preview Yet",
-                        Content = WorkLease.DeclinedInTheWindow(_course.Code, declinedBy),
-                        CloseButtonText = "OK",
-                    });
-                }
+                    await ShowPreviewRefusal(WorkLease.DeclinedInTheWindow(_course.Code, declinedBy));
                 return;
             }
             heldLease = ownLease;
@@ -1927,6 +1958,16 @@ public sealed partial class SectionDetailView : UserControl
     {
         ActivityTrail.Note(ActivityTrail.Event.PreviewCouldNotStart,
                            PreviewStarts.CouldNotStartLine(sentence, detail), _course.Code, _sectionNumber);
+        await ShowPreviewRefusal(sentence);
+    }
+
+    /// <summary>
+    /// A start that cannot go ahead, shown (the mac's <c>showPreviewRefusal</c>):
+    /// the press, the menu's and the assistant's rebuild, and a run that never
+    /// started all show it here, so they show it the same way.
+    /// </summary>
+    private async Task ShowPreviewRefusal(string sentence)
+    {
         await ShowDialogSafelyAsync(new ContentDialog
         {
             Title = "Cannot Preview Yet",

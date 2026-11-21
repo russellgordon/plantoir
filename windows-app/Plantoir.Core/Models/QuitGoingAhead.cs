@@ -26,14 +26,28 @@ public sealed class QuitGoingAhead
     /// <summary>True from the moment a pass lets the quit go ahead until a pass takes it back.</summary>
     public bool HasGoneAhead { get; private set; }
 
+    /// <summary>
+    /// The window whose pass last handed the quit on to its next close, until
+    /// that window's next pass begins (#928 review 2, L11).
+    /// </summary>
+    private object? _handedOnBy;
+
     // MARK: - Initializer
 
     public QuitGoingAhead(PreviewAgainPresses presses) => _presses = presses;
 
     // MARK: - Functions
 
-    /// <summary>One run of the closing handler. <paramref name="whenTakenBack"/> runs if the pass takes the quit back.</summary>
-    public Pass BeginPass(Action whenTakenBack) => new(this, whenTakenBack);
+    /// <summary>
+    /// One run of the closing handler of <paramref name="window"/>.
+    /// <paramref name="whenTakenBack"/> runs if the pass takes the quit back.
+    /// </summary>
+    public Pass BeginPass(Action whenTakenBack, object? window = null)
+    {
+        bool handedThisQuit = window is not null && ReferenceEquals(_handedOnBy, window);
+        if (handedThisQuit) _handedOnBy = null;
+        return new Pass(this, whenTakenBack, window, handedThisQuit);
+    }
 
     /// <summary>How one pass of the closing handler ended.</summary>
     public enum Ending
@@ -55,6 +69,9 @@ public sealed class QuitGoingAhead
 
         private readonly QuitGoingAhead _quit;
         private readonly Action _whenTakenBack;
+        private readonly object? _window;
+        /// <summary>This window's previous pass handed the quit on to this one.</summary>
+        private readonly bool _handedThisQuit;
         private bool _ended;
 
         /// <summary>How the pass ends, so far.</summary>
@@ -62,10 +79,12 @@ public sealed class QuitGoingAhead
 
         // MARK: - Initializer
 
-        internal Pass(QuitGoingAhead quit, Action whenTakenBack)
+        internal Pass(QuitGoingAhead quit, Action whenTakenBack, object? window, bool handedThisQuit)
         {
             _quit = quit;
             _whenTakenBack = whenTakenBack;
+            _window = window;
+            _handedThisQuit = handedThisQuit;
         }
 
         // MARK: - Functions
@@ -79,9 +98,23 @@ public sealed class QuitGoingAhead
 
         public void TheCloseGoesThrough() => Ending = Ending.GoesThrough;
 
-        public void HandOnToTheNextPass() => Ending = Ending.HandedOn;
+        public void HandOnToTheNextPass()
+        {
+            Ending = Ending.HandedOn;
+            _quit._handedOnBy = _window;
+        }
 
-        public void NotAQuit() => Ending = Ending.NotAQuit;
+        /// <summary>
+        /// This close is not the quit. A pass handed the quit by this window's
+        /// own earlier pass is the one that decides it, so finding the close no
+        /// longer quits (a window opened before it ran) TAKES THE QUIT BACK
+        /// (the review's L11): the pass that set it has already ended.
+        /// </summary>
+
+        public void NotAQuit()
+        {
+            if (!_handedThisQuit) Ending = Ending.NotAQuit;
+        }
 
         /// <summary>Whatever was said before, the window is still up (the handler failed).</summary>
         public void TakeBack() => Ending = Ending.TakenBack;

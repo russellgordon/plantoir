@@ -82,6 +82,17 @@ public static class PreviewLeases
         }
     }
 
+    /// <summary>
+    /// Every row <paramref name="owner"/>'s window still holds, of any section
+    /// (#928 review 2, L10): read as that window closes, so a row a replaced
+    /// view left behind goes with its window instead of being stranded until
+    /// relaunch. Each is then released by reference (<see cref="Release(Lease)"/>).
+    /// </summary>
+    public static IReadOnlyList<Lease> HeldBy(object owner)
+    {
+        lock (_gate) return _active.Where(l => ReferenceEquals(l.Owner, owner)).ToList();
+    }
+
     public static void Release(string folderPath, string courseCode, int sectionNumber)
     {
         lock (_gate)
