@@ -395,7 +395,7 @@ public static class AgentGuidanceWording
     public static string AskTitle(string file) => "Add a section to " + file + "?";
 
     public static string AskFound(string file) =>
-        "This working folder already has " + file + ", a file that assistants such as Claude Code and Codex read before they start.";
+        "This working folder already has " + file + ", a file that assistants such as Claude Code, Codex and GitHub Copilot read before they start.";
 
     public static string CouldNotWrite(string reason) =>
         "Plantoir could not put its guidance for assistants into this folder (" + reason + "). Everything else works as usual.";

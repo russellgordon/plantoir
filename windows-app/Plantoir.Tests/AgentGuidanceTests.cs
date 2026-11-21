@@ -200,9 +200,10 @@ public sealed class AgentGuidanceTests : IDisposable
         var forbidden = ContractLoader.LoadJson("shared-rules.json")["userFacingLabelWords"]!["forbidden"]!.AsArray()
             .Select(w => Regex.Escape(w!.ToString()));
         var machinery = new Regex(@"\b(" + string.Join("|", forbidden) + @")\b", RegexOptions.IgnoreCase);
-        // A sentence this app says in older words (askFound, which names
-        // GitHub Copilot since the mac's #887, owed by #946) is held by key:
-        // it must still differ, and it is still checked for the machinery.
+        // A sentence this app says in older words would be held by key: it
+        // must still differ, and it is still checked for the machinery. None
+        // is held since #946 brought askFound's GitHub Copilot here (the
+        // mac's #887); the hook stays for the next such sentence.
         NamedGapLedger.StillNamed(NamedGapLedger.AgentGuidanceWordsSaidDifferently, words.AsObject().Select(pair => pair.Key));
         int held = 0;
         foreach (var (key, said) in pairs)

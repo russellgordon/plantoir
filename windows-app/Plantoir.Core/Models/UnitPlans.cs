@@ -207,12 +207,14 @@ public static class UnitPlans
     /// <see cref="char.IsWhiteSpace(string, int)"/> reads Unicode's White_Space
     /// property, becomes one space, and the ends are trimmed, so the greeting
     /// and the trail stay one line (707a review M1; the <c>cmd /k</c> door
-    /// cannot carry a line break). The mac runs its course-name cleaner
-    /// (<c>OneLineText.cleaned</c>, #780) first; on Windows that cleaner is
-    /// #821's and is the first step to add here when it lands.
+    /// cannot carry a line break). The course-name cleaner runs first, as the
+    /// mac's does (<see cref="OneLineText.Cleaned"/>, #821, the mac's #780), so
+    /// a NUL, an escape or a bidirectional control in a plan's name is
+    /// cleaned too, not only white space.
     /// </summary>
     public static string OneLine(string text)
     {
+        text = OneLineText.Cleaned(text);
         var result = new StringBuilder(text.Length);
         bool lastWasSpace = false;
         for (int i = 0; i < text.Length; i++)
