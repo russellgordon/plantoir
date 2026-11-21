@@ -1,6 +1,5 @@
 using System.Net.Http;
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Input;
 using FlaUI.Core.Tools;
 using Xunit.Abstractions;
 
@@ -122,8 +121,11 @@ public class DeployedFolderInBrowserUiTests
             File.WriteAllText(Path.Combine(deployed, "section1", "index.html"), "<html><body>Deployed</body></html>");
             app.BringToFront();
             var title = app.Find("sidebar-" + Code, "the course's row");
-            Mouse.MoveTo(DrivenApp.MiddleOf(title, app.Window.BoundingRectangle));
-            Mouse.MoveTo(DrivenApp.MiddleOf(button, app.Window.BoundingRectangle));
+            // Real pointer input (FixWithButtonsUiTests.Glide): a placed cursor
+            // raises no PointerEntered in WinUI.
+            var from = DrivenApp.MiddleOf(title, app.Window.BoundingRectangle);
+            FixWithButtonsUiTests.Glide(from, from, 1);
+            FixWithButtonsUiTests.Glide(from, DrivenApp.MiddleOf(button, app.Window.BoundingRectangle), 15);
             Assert.True(Retry.WhileFalse(() => button.IsEnabled, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250)).Result,
                         "Open in Browser stayed dimmed after the pointer reached it with the deployed folder there");
         }

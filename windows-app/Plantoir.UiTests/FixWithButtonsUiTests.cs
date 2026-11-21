@@ -253,7 +253,7 @@ public class FixWithButtonsUiTests
     /// pixels, as <see cref="DrivenApp.MiddleOf"/> gives them and as
     /// <c>GetSystemMetrics</c> measures the screen here.
     /// </summary>
-    private static void Glide(System.Drawing.Point from, System.Drawing.Point to, int steps)
+    internal static void Glide(System.Drawing.Point from, System.Drawing.Point to, int steps)
     {
         int width = GetSystemMetrics(0), height = GetSystemMetrics(1);
         for (int step = 1; step <= steps; step++)
