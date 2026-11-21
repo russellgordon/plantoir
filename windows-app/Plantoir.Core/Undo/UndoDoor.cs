@@ -257,7 +257,7 @@ internal sealed class UndoDoor
             // appliedWithoutARecord; W4's review, MEDIUM). One trail line says
             // what became of it, once that is known (W7a; the mac's
             // UndoTrailHook.couldNotRecord).
-            switch (UndoSwap.Swap(targets, "shadow", draft.WorkingFolder, _seams))
+            switch (UndoSwap.Swap(targets, UndoSwap.PlainLabel(), draft.WorkingFolder, _seams))
             {
                 case UndoSwapResult.Refused refused:
                     CouldNotRecord(draft, why, refused.LeftPartWay ? UndoUnrecordedChange.StoppedPartWay : UndoUnrecordedChange.NothingWasChanged);

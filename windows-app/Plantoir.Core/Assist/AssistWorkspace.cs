@@ -3651,7 +3651,11 @@ public sealed partial class AssistWorkspace
             $"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
 
         string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
-        string text = File.ReadAllText(path);
+        // ONE step through the door (#899 W7b1; the mac's
+        // AssistCurriculumMentions.apply): the page planned, its before read
+        // now, written all or none, with no recompute.
+        var step = NewUndoStep("addCurriculumMentions", course.Code, section);
+        string text = step.ReadText(path);
         string lineEnd = text.Contains("\r\n") ? "\r\n" : "\n";
         string transclusions = string.Join(lineEnd, plan.Adding.Select(e => $"![[{e.Code}]]"));
 
@@ -3674,7 +3678,16 @@ public sealed partial class AssistWorkspace
                 : text.TrimEnd() + lineEnd + lineEnd + block;
         }
 
-        Save(path, text);
+        try
+        {
+            step.Write(path, text);
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
+            throw;
+        }
         recording.Done();
 
         return new AssistResult(true,

@@ -85,7 +85,8 @@ public sealed class UndoActionTraceContractTests
         // fixture (#899 W7b1), so each trace judges what Windows wrote; the
         // rest still make the recorded step's draft through the door.
         string stepName = recorded.GetProperty("name").GetString()!;
-        bool byTheWindowsAction = WindowsActionsOnTheMacFixture.Converted.Contains(stepName);
+        bool byTheWindowsAction = WindowsActionsOnTheMacFixture.Converted.Contains(stepName)
+                                  && !WindowsActionsOnTheMacFixture.WindowsOwnLine.ContainsKey(stepName);
         if (byTheWindowsAction) WindowsActionsOnTheMacFixture.Lay(scribe.FullPath("A", ""), recorded);
 
         var calls = trace.GetProperty("calls").EnumerateArray().ToList();

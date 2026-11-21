@@ -344,7 +344,7 @@ internal sealed class UndoActionStep
             targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
         }
         HashSet<string> keptBefore = KeptOriginalsNow();
-        switch (UndoSwap.Swap(targets, "shadow", null, _plainSeams))
+        switch (UndoSwap.Swap(targets, UndoSwap.PlainLabel(), null, _plainSeams))
         {
             case UndoSwapResult.Refused { LeftPartWay: true } partWay:
                 throw LeftPartWay(partWay.Refusal, keptBefore);

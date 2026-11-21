@@ -31,8 +31,21 @@ internal static class WindowsActionsOnTheMacFixture
     internal static readonly IReadOnlyList<string> Converted =
     [
         "publishPages", "hidePages", "publishPagesAWholeUnit", "publishClassForADate",
-        "addNextClass", "addNextClassInANewUnit", "addClasses",
+        "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions",
     ];
+
+    /// <summary>
+    /// A converted step whose Windows after differs from the mac's for a
+    /// reason that is Windows' own, measured (never retyped): by step name,
+    /// the one line that differs and why. Its traces make the recorded
+    /// step's draft, since their hashes are of the mac's bytes.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, (string After, string Why)> WindowsOwnLine =
+        new Dictionary<string, (string, string)>(StringComparer.Ordinal)
+        {
+            ["addCurriculumMentions"] = ("%%curriculum-start%%",
+                "the line under the block's start marker is Windows' own (“Today's work points here:”, since the block was first written on Windows), where the mac writes “## Curriculum connection”; with the switch off a teacher meets nothing different from before, so it is kept and measured"),
+        };
 
     // ---- Functions -----------------------------------------------------------------
 
@@ -77,7 +90,7 @@ internal static class WindowsActionsOnTheMacFixture
         string course = Path.Combine(workingFolder, "courses", Course);
         Directory.CreateDirectory(course);
         File.WriteAllText(Path.Combine(course, "course_config.json"),
-            "{\"course_code\":\"ICS3U\",\"course_name\":\"Introduction to Computer Science\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
+            "{\"course_code\":\"ICS3U\",\"course_name\":\"Introduction to Computer Science\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[],\"shared_folders\":[\"Curriculum\",\"Concepts\"]}");
         File.WriteAllText(Path.Combine(workingFolder, Workspace.MarkerLauncher), "");
         JsonElement timetable = Recorded("rememberTimetable").GetProperty("files")[0];
         WriteAt(workingFolder, timetable.GetProperty("path").GetString()!, Bytes(timetable.GetProperty("before")));
@@ -125,6 +138,7 @@ internal static class WindowsActionsOnTheMacFixture
             "addNextClass" => tools.AddNextClass(Course, 1),
             "addNextClassInANewUnit" => tools.AddNextClass(Course, 1, unit: "next"),
             "addClasses" => tools.AddClasses(Course, 1, unit: 2, howMany: 2),
+            "addCurriculumMentions" => tools.AddCurriculumMentions(Course, 1, page: "Loops", codes: "A1.1"),
             _ => throw new InvalidOperationException($"{stepName}: no Windows action is converted for it yet"),
         };
         return string.Join("\n", answered.Content.OfType<TextContentBlock>().Select(block => block.Text));
@@ -224,6 +238,35 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
         Assert.True(checkedFiles >= 6, $"only {checkedFiles} of the fixture's files are checked against a recorded before");
     }
 
+    /// <summary>
+    /// Curriculum mentions on a page that cannot be written (read-only): the
+    /// step is refused before anything changes, said as "Nothing was
+    /// changed", no step on the list, the page as it was.
+    /// </summary>
+    [Fact]
+    public void CurriculumMentionsOnAPageThatCannotBeWrittenChangeNothing()
+    {
+        JsonElement recorded = WindowsActionsOnTheMacFixture.Recorded("addCurriculumMentions");
+        WindowsActionsOnTheMacFixture.Lay(Folder, recorded);
+        string page = UndoDoor.FullPath(Folder, recorded.GetProperty("files")[0].GetProperty("path").GetString()!);
+        byte[] before = File.ReadAllBytes(page);
+        File.SetAttributes(page, FileAttributes.ReadOnly);
+        try
+        {
+            var workspace = new AssistWorkspace(Folder, new FakeLauncher())
+            {
+                Surface = AssistSurface.Outside,
+                UndoList = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null),
+            };
+            string answered = WindowsActionsOnTheMacFixture.Run("addCurriculumMentions", workspace);
+
+            Assert.StartsWith("Nothing was changed: ", answered);
+            Assert.Equal(before, File.ReadAllBytes(page));
+            Assert.Equal(0, WindowsActionsOnTheMacFixture.Begins(ListFolder));
+        }
+        finally { File.SetAttributes(page, FileAttributes.Normal); }
+    }
+
     [Theory]
     [MemberData(nameof(RecordedSteps))]
     public void TheWindowsActionLeavesTheRecordedStep(string name)
@@ -288,6 +331,25 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             string full = UndoDoor.FullPath(Folder, path);
             byte[]? want = WindowsActionsOnTheMacFixture.Bytes(file.GetProperty("after"));
             byte[]? have = File.Exists(full) ? File.ReadAllBytes(full) : null;
+            if (WindowsActionsOnTheMacFixture.WindowsOwnLine.TryGetValue(name, out var own))
+            {
+                // Measured: the same lines but ONE, the line after the named
+                // one, and that line differs (a difference that closed would
+                // fail here, and the entry would go).
+                Assert.NotNull(want);
+                Assert.NotNull(have);
+                string[] mac = Encoding.UTF8.GetString(want!).Split('\n');
+                string[] windows = Encoding.UTF8.GetString(have!).Split('\n');
+                Assert.True(mac.Length == windows.Length, $"{name}: {path} has {windows.Length} lines, the mac's {mac.Length}");
+                var differing = new List<int>();
+                for (int line = 0; line < mac.Length; line++)
+                {
+                    if (mac[line] != windows[line]) differing.Add(line);
+                }
+                int only = Assert.Single(differing);
+                Assert.True(only > 0 && windows[only - 1] == own.After, $"{name}: {path} differs at line {only + 1}, not after “{own.After}”");
+                continue;
+            }
             Assert.True(want is null ? have is null : have is not null && want.AsSpan().SequenceEqual(have),
                         $"{name}: {path} after is not the recorded after:\n{(have is null ? "(absent)" : Encoding.UTF8.GetString(have))}");
         }
