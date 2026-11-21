@@ -47,6 +47,12 @@ public sealed class SectionScheduleDialog : ContentDialog
     /// <summary>The source box's name, the mac's label for it.</summary>
     public const string WhereTheseCameFromName = "Where these came from";
 
+    /// <summary>Set by the teacher's first keyboard or pointer move of the focus; from then the focus is theirs.</summary>
+    private bool _theTeacherHasMovedTheFocus;
+
+    /// <summary>Whether a focus the app or the dialog places still goes to the dates box (see the constructor).</summary>
+    private bool TheBoxTakesTheFocus => !_theTeacherHasMovedTheFocus && _routePicker.SelectedIndex == 0;
+
     private readonly TextBox _typedBox = new()
     {
         AcceptsReturn = true,
@@ -118,14 +124,30 @@ public sealed class SectionScheduleDialog : ContentDialog
 
         // The keyboard starts in the dates box, the mac's (#997, ClassDatesBoxKeyTests;
         // #1024 here): the sheet opens on Type or paste, and the box is what
-        // the teacher came to fill. Opened, not the box's Loaded: the dialog
-        // places its own first focus after its content loads, and Opened is
-        // raised once that is done, once per showing. Tab then leaves the box
-        // for "Where these came from" (a TextBox types no tab), as the mac's
-        // ruling Q-C asks.
+        // the teacher came to fill. Tab then leaves the box for "Where these
+        // came from" (a TextBox types no tab), as the mac's ruling Q-C asks.
+        //
+        // The dialog places its own first focus (on the route picker, its
+        // first stop), and measured in VM B on 2026-11-20 it sometimes did so
+        // AFTER Opened, taking the focus back from a box focused there. So
+        // the box asks on Opened, and until the teacher first moves the focus
+        // by keyboard or pointer, any focus the app or the dialog places
+        // elsewhere is redirected to the box through GettingFocus, the
+        // documented place to change where focus lands. Changing the route
+        // ends it, as the mac's takesTheFocusWhenShown does.
         Opened += (_, _) =>
         {
-            if (_routePicker.SelectedIndex == 0) _typedBox.Focus(FocusState.Programmatic);
+            if (TheBoxTakesTheFocus) _typedBox.Focus(FocusState.Programmatic);
+        };
+        GettingFocus += (_, args) =>
+        {
+            if (args.FocusState is FocusState.Keyboard or FocusState.Pointer)
+            {
+                _theTeacherHasMovedTheFocus = true;
+                return;
+            }
+            if (TheBoxTakesTheFocus && !ReferenceEquals(args.NewFocusedElement, _typedBox))
+                args.TrySetNewFocusedElement(_typedBox);
         };
     }
 

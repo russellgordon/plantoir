@@ -151,39 +151,12 @@ public class PlaceholderFieldNamesUiTests
         var shortTitle = app.Find($"sidebar-{CourseFixtures.Renamed}-title", "a short code's text");
         Assert.Equal("", shortTitle.Properties.HelpText.ValueOrDefault ?? "");
 
-        // What a person sees: a real hover over the cut-short code draws the
-        // tooltip, and it holds the whole code.
-        app.BringToFront();
-        // Two moves: the first can land as the pointer's entry alone, and a
-        // tooltip opens on the pointer moving over the element.
-        var middle = DrivenApp.MiddleOf(longTitle);
-        Mouse.MoveTo(new System.Drawing.Point(middle.X - 4, middle.Y));
-        Mouse.MoveTo(middle);
-        string? tipWords = null;
-        Retry.WhileFalse(() =>
-        {
-            try
-            {
-                // WinUI draws a tooltip in a popup inside the app's own window
-                // (as it does a dialog: DrivenApp.OpenDialog), so the window is
-                // asked first and the desktop after.
-                var tips = new List<AutomationElement>(app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.ToolTip)));
-                tips.AddRange(app.Desktop.FindAllChildren(cf => cf.ByControlType(ControlType.ToolTip)));
-                foreach (var tip in tips)
-                {
-                    var words = new List<string> { tip.Properties.Name.ValueOrDefault ?? "" };
-                    words.AddRange(DrivenApp.TextsUnder(tip));
-                    if (words.Contains(LongCode)) { tipWords = LongCode; return true; }
-                    tipWords = string.Join(" | ", words);
-                }
-            }
-            catch (System.Runtime.InteropServices.COMException) { }
-            return false;
-        }, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200));
-        CaptureIfAsked("1024-cut-short-code-tooltip.png");
-        Assert.True(tipWords == LongCode,
-                    tipWords is null ? "hovering the cut-short code drew no tooltip"
-                                     : $"the tooltip over the cut-short code says \"{tipWords}\", not the whole code");
+        // What a person sees: the real pointer rested on the cut-short code
+        // draws the tooltip, and it holds the whole code. The harness's own
+        // glide (FixWithButtonsUiTests): a placed cursor opens no WinUI tooltip.
+        string pictures = Environment.GetEnvironmentVariable("PLANTOIR_UI_CAPTURE_DIR") ?? "";
+        Assert.True(FixWithButtonsUiTests.RestThePointerOn(app, longTitle, LongCode, pictures, "1024-cut-short-code-tooltip"),
+                    "resting the pointer on the cut-short code drew no tooltip holding the whole code");
     }
 
     /// <summary>With <c>PLANTOIR_UI_CAPTURE_DIR</c> set, a picture of the screen for the hand-back; otherwise nothing.</summary>
