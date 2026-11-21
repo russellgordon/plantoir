@@ -390,6 +390,116 @@ public sealed class UndoSwapTests : IDisposable
         Assert.True(File.GetAttributes(page).HasFlag(pinning));
     }
 
+    /// <summary>
+    /// W7a review 1, MEDIUM 1: a kept original is marked Hidden once the page's
+    /// rename is in, and shown again before it is put back, so a page whose
+    /// swap is reversed is never left Hidden (nor one the teacher hid shown).
+    /// </summary>
+    [Fact]
+    public void AReversedPageIsNeverLeftHiddenAndAHiddenPageStaysHidden()
+    {
+        string first = Page("courses/A/a.md", Old);
+        string hiddenByTheTeacher = Page("courses/A/c.md", Old);
+        File.SetAttributes(hiddenByTheTeacher, FileAttributes.Hidden | FileAttributes.Archive);
+        string second = Page("courses/A/b.md", Old);
+        File.SetAttributes(second, FileAttributes.ReadOnly);
+
+        UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New), Target("courses/A/c.md", Old, New), Target("courses/A/b.md", Old, New)], "1-undo", _root);
+
+        File.SetAttributes(second, FileAttributes.Normal);
+        Assert.IsType<UndoSwapResult.Refused>(result);
+        Assert.Equal(Old, File.ReadAllBytes(first));
+        Assert.False(File.GetAttributes(first).HasFlag(FileAttributes.Hidden), "a page put back was left Hidden");
+        Assert.True(File.GetAttributes(hiddenByTheTeacher).HasFlag(FileAttributes.Hidden), "a page the teacher hid was shown");
+        Assert.Empty(StagedLeft());
+    }
+
+    /// <summary>
+    /// W7a part two, review 1, LOW 1: when the Hidden attribute the swap set on
+    /// a kept original cannot be cleared, the put-back does not go ahead. The
+    /// page keeps what the swap wrote and is not Hidden; the kept file stays
+    /// Hidden under its kept name, holding the page's earlier content.
+    /// </summary>
+    [Fact]
+    public void AKeptFileThatCannotBeShownIsNeverPutBackSoNoPageIsLeftHidden()
+    {
+        string first = Page("courses/A/a.md", Old);
+        string second = Page("courses/A/b.md", Old);
+        File.SetAttributes(second, FileAttributes.ReadOnly);
+
+        UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New), Target("courses/A/b.md", Old, New)], "1-undo", _root,
+                                              new UndoSeams { ShowingTheKeptFileFailsAt = index => index == 0 });
+
+        File.SetAttributes(second, FileAttributes.Normal);
+        Assert.IsType<UndoSwapResult.Refused>(result);
+        Assert.False(File.GetAttributes(first).HasFlag(FileAttributes.Hidden), "the page was left Hidden");
+        Assert.Equal(New, File.ReadAllBytes(first));
+        string kept = UndoSwap.BesidePath(first, "1-undo", "orig");
+        Assert.True(File.Exists(kept), "the kept original is gone");
+        Assert.Equal(Old, File.ReadAllBytes(kept));
+        Assert.True(File.GetAttributes(kept).HasFlag(FileAttributes.Hidden), "the kept original was shown");
+    }
+
+    private UndoSwapTarget FolderTakenOut(string relative)
+    {
+        string full = Path.Combine(_root, relative.Replace('/', Path.DirectorySeparatorChar));
+        return new UndoSwapTarget(full, relative, null, null) { Change = new UndoSwapChange.TakeTree(UndoTreeReading.Read(full).ListingSha) };
+    }
+
+    /// <summary>
+    /// W4c review 1, LOW 1 (the mac's U3c, first review, LOW 3): a folder taken
+    /// out whose <c>-orig</c> name already holds a folder set aside (step
+    /// numbers that collided) takes the next free kept name; it is never
+    /// refused for good, and the folder already aside is left as it was.
+    /// </summary>
+    [Fact]
+    public void AFolderTakenOutTakesTheNextFreeKeptName()
+    {
+        Page("courses/A/extra/x.md", Old);
+        string folder = Path.Combine(_root, "courses", "A", "extra");
+        string alreadyAside = UndoSwap.BesidePath(folder, "1-apply", "orig");
+        Directory.CreateDirectory(alreadyAside);
+        File.WriteAllBytes(Path.Combine(alreadyAside, "y.md"), New);
+
+        UndoSwapResult result = UndoSwap.Swap([FolderTakenOut("courses/A/extra")], "1-apply", _root);
+
+        Assert.IsType<UndoSwapResult.Swapped>(result);
+        Assert.False(Directory.Exists(folder));
+        Assert.Equal(New, File.ReadAllBytes(Path.Combine(alreadyAside, "y.md")));
+        Assert.False(Directory.Exists(UndoSwap.BesidePath(folder, "1-apply", "2-orig")));
+    }
+
+    /// <summary>W4c review 1, LOW 2, for a folder: every kept name taken is could not write (the mac's couldNotWrite), never "in use", and the folder stays.</summary>
+    [Fact]
+    public void AFolderTakenOutWithEveryKeptNameTakenIsCouldNotWrite()
+    {
+        Page("courses/A/extra/x.md", Old);
+        string folder = Path.Combine(_root, "courses", "A", "extra");
+        for (int number = 1; number <= UndoSwap.KeptNames; number++)
+            Directory.CreateDirectory(UndoSwap.BesidePath(folder, "1-apply", number == 1 ? "orig" : number + "-orig"));
+
+        UndoSwapResult result = UndoSwap.Swap([FolderTakenOut("courses/A/extra")], "1-apply", _root);
+
+        var refused = Assert.IsType<UndoSwapResult.Refused>(result);
+        Assert.Equal(new UndoRefusal(UndoRefusalKind.CouldNotWrite, "courses/A/extra") { EveryKeptNameTaken = true }, refused.Refusal);
+        Assert.Equal(Old, File.ReadAllBytes(Path.Combine(folder, "x.md")));
+    }
+
+    /// <summary>W4c review 1, LOW 2: a page whose every kept name is taken is could not write (the mac's UndoCheck couldNotWrite), never "in use", and stays as it was.</summary>
+    [Fact]
+    public void APageWithEveryKeptNameTakenIsCouldNotWrite()
+    {
+        string page = Page("courses/A/a.md", Old);
+        for (int number = 1; number <= UndoSwap.KeptNames; number++)
+            File.WriteAllBytes(UndoSwap.BesidePath(page, "1-undo", number == 1 ? "orig" : number + "-orig"), New);
+
+        UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New)], "1-undo", _root);
+
+        var refused = Assert.IsType<UndoSwapResult.Refused>(result);
+        Assert.Equal(new UndoRefusal(UndoRefusalKind.CouldNotWrite, "courses/A/a.md") { EveryKeptNameTaken = true }, refused.Refusal);
+        Assert.Equal(Old, File.ReadAllBytes(page));
+    }
+
     internal static void MakeAJunction(string link, string target)
     {
         using var mklink = Process.Start(new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"")

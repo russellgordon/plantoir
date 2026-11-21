@@ -49,9 +49,13 @@ public class PublishStoppedPartWayTests : IDisposable
     /// outside assistant (director's ruling, as on the mac).
     /// </summary>
     /// <remarks>
-    /// Day 1 is written before Day 2 fails, so part of it WAS changed. Asked
-    /// for Day 2 alone, its first write is the one that fails, and since #550
-    /// that says "Nothing was changed" (the next test).
+    /// Since #899 W7a a publish is ONE step through the door, a page list and
+    /// a whole unit alike: all of it or none. So the only way it stops part
+    /// way is the door's own: Day 2 refuses (read-only) and Day 1, already
+    /// swapped in, cannot be put back (a seam), so Day 1 holds the new
+    /// content with its earlier content kept beside it, named in the reason.
+    /// A refusal that put everything back says "Nothing was changed" (the
+    /// next test).
     /// </remarks>
     [Theory]
     [InlineData("Unit 1", "Unit 1", false)]
@@ -61,7 +65,11 @@ public class PublishStoppedPartWayTests : IDisposable
     public async Task APageThatCannotBeWrittenIsAnsweredAndTheCopyIsNamedOnlyInTheWindow(
         string asked, string what, bool inTheWindow)
     {
-        var workspace = new AssistWorkspace(_folder, new FakeLauncher()) { Surface = inTheWindow ? AssistSurface.LocalWindow : AssistSurface.Outside };
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher())
+        {
+            Surface = inTheWindow ? AssistSurface.LocalWindow : AssistSurface.Outside,
+            UndoSeams = new Plantoir.Core.Undo.UndoSeams { PutBackFailsAt = index => index == 0 },
+        };
         var tools = new PlantoirTools(workspace);
         var progress = new Progress<ProgressNotificationValue>(_ => { });
 
@@ -73,8 +81,15 @@ public class PublishStoppedPartWayTests : IDisposable
             var answer = await tools.PublishPages("ICS3U", 1, progress, default,
                                                   asked.Split('|'), preview: false);
             string said = answer.Summary();
-            Assert.StartsWith(AssistWording.PublishStoppedPartWay(what, ""), said);
             Assert.NotNull(workspace.ConversationBackupPath);
+            Assert.StartsWith(AssistWording.PublishStoppedPartWay(what, ""), said);
+            Assert.DoesNotContain("Nothing was", said);
+            // True to the disk: Day 1 holds the new content, Day 2 the old,
+            // and where Day 1's earlier content is kept is named.
+            Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
+            Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 2")));
+            string kept = Assert.Single(Directory.GetFiles(Path.GetDirectoryName(Page("Unit 1, Day 1"))!, ".Unit 1, Day 1.md.plantoir-undo-*-orig"));
+            Assert.Contains(Path.GetFileName(kept), said);
             if (inTheWindow)
                 Assert.EndsWith(AssistWording.RestoreSectionPutsItBack("1"), said);
             else

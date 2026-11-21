@@ -281,7 +281,8 @@ internal sealed class UndoJournal
     /// recovery could not settle it (a file still in use, a step this version
     /// cannot read, a recompute with no runner).
     /// </remarks>
-    internal void Prune(UndoJournalWriter writer)
+    /// <param name="trail">Where "undo found a folder set aside" goes when the tidy of a step closed unsettled puts back a folder that changed while aside, or keeps one under a visible name (the mac's tidyStagedFiles).</param>
+    internal void Prune(UndoJournalWriter writer, Action<UndoTrailLine>? trail = null)
     {
         // Recovery first, in this same hold, always (W2b's review, LOW 7): a
         // step that died mid-swap is settled whole before pruning could close
@@ -313,7 +314,7 @@ internal sealed class UndoJournal
                             ["seq"] = closed.Seq, ["event"] = "interrupted",
                             ["phase"] = closed.Phase.ToString().ToLowerInvariant(), ["reason"] = "unsettled", ["paths"] = paths,
                         });
-                        TidyTheStagedFilesOf(writer, closed.Seq);
+                        TidyTheStagedFilesOf(writer, closed.Seq, trail);
                         break;
                 }
             }
@@ -342,15 +343,23 @@ internal sealed class UndoJournal
     /// that cannot be reached keeps them for the first recovery that reaches it
     /// (W3; <c>knownLimits.stagedFilesOfAFolderAway</c>). Never fails the caller.
     /// </summary>
-    private void TidyTheStagedFilesOf(UndoJournalWriter writer, long seq)
+    private void TidyTheStagedFilesOf(UndoJournalWriter writer, long seq, Action<UndoTrailLine>? trail)
     {
         if (!IsLive) return;
         if (!writer.Folded.Steps.TryGetValue(seq, out UndoFoldedStep? closed)) return;
         UndoStep step = closed.Step;
         if (step.WorkingFolder?.PathAtTheTime is not { } root || !CanReach(step)) return;
         // A teacher's folder set aside is put back or kept visibly, never deleted
-        // (W6); this hold has no trail sink, so no line is written for it here.
-        try { UndoSwap.TidyLeftovers(seq, step.Paths, root, UndoRecovery.AsideListings(step, root)); }
+        // (W6), and one put back changed, or kept under a visible name, writes
+        // "undo found a folder set aside" just before its rename, as
+        // recovery's tidy does (the mac's tidyStagedFiles). A kept original that differs from its page is the only copy of what
+        // it held, and the list no longer gives anything for a pruned step:
+        // it stays (the mac's U3c, pruning's tidy).
+        try
+        {
+            UndoSwap.TidyLeftovers(seq, step.Paths, root, UndoRecovery.AsideListings(step, root),
+                                   found => UndoRecovery.NoteAnAsideFolder(found, step, root, this, trail), keepingOnlyCopies: true);
+        }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 

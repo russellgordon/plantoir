@@ -23,6 +23,14 @@ internal static class UndoFileIdentity
         return (information.VolumeSerialNumber, ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow);
     }
 
+    /// <summary>How many names the file an open handle is has on its volume (hard links), or null where the system cannot say.</summary>
+    internal static uint? LinksOf(SafeFileHandle handle)
+    {
+        if (!OperatingSystem.IsWindows() || handle.IsInvalid) return null;
+        if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information)) return null;
+        return information.NumberOfLinks;
+    }
+
     /// <summary>
     /// Whether a file index stays a file's for its life on the volume that
     /// holds <paramref name="folder"/>: NTFS and ReFS. FAT and exFAT number a

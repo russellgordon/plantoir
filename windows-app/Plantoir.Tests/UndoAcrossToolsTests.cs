@@ -142,7 +142,9 @@ public sealed class UndoAcrossToolsTests : IDisposable
 
         File.Delete(ClassPath("Unit 1, Day 2"));
 
-        await Assert.ThrowsAnyAsync<IOException>(() => workspace.Apply(plan, preview: false));
+        // Since #899 W7a the publish is one step, planned whole before anything
+        // is written: the missing page stops it with nothing written.
+        await Assert.ThrowsAsync<AssistRefusal>(() => workspace.Apply(plan, preview: false));
 
         // Nothing is remembered from the half that ran. That is the deliberate
         // choice, not an oversight: the description was written from the PLAN

@@ -234,7 +234,12 @@ public sealed class UndoDoorTests : IDisposable
         string stagedNew = UndoSwap.BesidePath(Full(APage), "1-apply", "new");
         string stagedOrig = UndoSwap.BesidePath(Full(APage), "1-undo", "orig");
         string anotherStepsFile = UndoSwap.BesidePath(Full(APage), "17-apply", "new");
-        foreach (string staged in new[] { stagedNew, stagedOrig, anotherStepsFile }) File.WriteAllBytes(staged, New);
+        // A kept original that differs from its page is the only copy of what
+        // it holds and stays (W4c, the mac's U3c: pruning's tidy keeps it);
+        // one that is a copy of its page goes.
+        string onlyCopy = UndoSwap.BesidePath(Full(APage), "1-apply", "orig");
+        foreach (string staged in new[] { stagedNew, anotherStepsFile, onlyCopy }) File.WriteAllBytes(staged, New);
+        File.WriteAllBytes(stagedOrig, Old);
 
         // Sixty-one days on, a step on another page prunes: the dead step is past the limits.
         _clock.Advance(TimeSpan.FromDays(61));
@@ -248,9 +253,118 @@ public sealed class UndoDoorTests : IDisposable
         UndoFolded folded = journal.Read().Folded;
         Assert.Equal(UndoStepState.Interrupted, folded.Steps[1].State);
         Assert.False(File.Exists(stagedNew), "a staged file of the step closed unsettled was left beside the page");
-        Assert.False(File.Exists(stagedOrig), "a staged file of the step closed unsettled was left beside the page");
+        // Its page is held with no sharing as the prune runs, so whether this
+        // kept original is a copy of it cannot be told: it is kept (W4c).
+        Assert.True(File.Exists(stagedOrig), "a kept original whose page could not be read was removed");
         Assert.True(File.Exists(anotherStepsFile), "another step's staged file was removed");
+        Assert.True(File.Exists(onlyCopy), "a kept original that is the only copy of what it holds was removed");
         Assert.Equal(Old, File.ReadAllBytes(Full(APage)));
+    }
+
+    /// <summary>
+    /// A dead process's step 1 on a.md (held with no sharing, so recovery
+    /// leaves it) and c.md, sixty-one days old; <paramref name="afterRecoveryTidied"/>
+    /// lays what pruning's own tidy must find once recovery's tidy has run (so
+    /// it is pruning's tidy, not recovery's, that meets it); then a step on
+    /// b.md prunes, and step 1 is closed unsettled. Recovery may tidy more
+    /// than once in the action's holds, so it is laid after EVERY tidy of
+    /// recovery's: what is laid the last time only pruning can meet.
+    /// </summary>
+    private (UndoJournal Journal, List<UndoTrailLine> Trail) PruneADeadStepAfter(Action afterRecoveryTidied)
+    {
+        const string cPage = "courses/TST1O/Section 1/c.md";
+        Write(APage, Old);
+        Write(cPage, Old);
+        UndoJournal journal = Journal();
+        var trail = new List<UndoTrailLine>();
+        bool laid = false;
+        var seams = new UndoSeams
+        {
+            StopsHere = (point, _) =>
+            {
+                if (point == "afterRecoveryTidied") { laid = true; afterRecoveryTidied(); }
+                return false;
+            },
+        };
+        var door = new UndoDoor(journal, UndoMode.Live, seams: seams, trail: trail.Add);
+        string identity = new FolderIdentityFile(Path.Combine(Folder, "courses", ".internal", "folder-id"), _clock).ReadOrMake()!;
+        var ops = UndoLineOps.ForAFile(APage, Old, New);
+        foreach (var op in UndoLineOps.ForAFile(cPage, Old, New)) ops.Add(op!.DeepClone());
+        journal.WithLock(writer => writer.Append(new JsonObject
+        {
+            ["seq"] = 1, ["event"] = "begin",
+            ["process"] = new JsonObject { ["host"] = "h", ["pid"] = 4_000_002, ["name"] = "plantoir-mcp", ["started"] = "1.000000" },
+            ["step"] = new JsonObject
+            {
+                ["seq"] = 1, ["madeAt"] = UndoMoment.Format(_clock.GetUtcNow()), ["madeBy"] = "menu", ["holds"] = "section", ["course"] = "TST1O",
+                ["workingFolder"] = new JsonObject { ["id"] = identity, ["pathAtTheTime"] = Folder },
+                ["ops"] = ops,
+            },
+        }));
+        _clock.Advance(TimeSpan.FromDays(61));
+        const string other = "courses/TST1O/Section 1/b.md";
+        Write(other, Old);
+        using (new FileStream(Full(APage), FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.Equal(UndoOutcomeKind.Applied, door.Perform(Draft((other, Old, New))).Kind);
+        }
+        Assert.True(laid, "recovery never reached its tidy");
+        Assert.Equal(UndoStepState.Interrupted, journal.Read().Folded.Steps[1].State);
+        return (journal, trail);
+    }
+
+    /// <summary>
+    /// W4c review 1, LOW 5: pruning's tidy still removes a kept original that
+    /// IS a copy of its readable page (the other side of the test above,
+    /// where the page is held and the kept original stays).
+    /// </summary>
+    // Once with the kept original marked Hidden, as the swap leaves one (W7a
+    // part two, review 1, LOW 3): pruning's tidy finds it all the same.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PruningsTidyRemovesAKeptOriginalThatIsACopyOfItsPage(bool hidden)
+    {
+        string copy = UndoSwap.BesidePath(Full("courses/TST1O/Section 1/c.md"), "1-apply", "orig");
+        PruneADeadStepAfter(() =>
+        {
+            if (File.Exists(copy)) File.SetAttributes(copy, FileAttributes.Normal);
+            File.WriteAllBytes(copy, Old);
+            if (hidden) File.SetAttributes(copy, FileAttributes.Hidden | FileAttributes.Archive);
+        });
+        Assert.False(File.Exists(copy), "a kept original that is a copy of its page was left by pruning's tidy");
+        Assert.Equal(Old, File.ReadAllBytes(Full("courses/TST1O/Section 1/c.md")));
+    }
+
+    /// <summary>
+    /// <c>activityTrail.mustRecord</c> "undo found a folder set aside", at
+    /// pruning (the mac's tidyStagedFiles): a teacher's folder a step closed
+    /// unsettled left aside, whose place something else now holds, is kept
+    /// under its visible name, and the line names both.
+    /// </summary>
+    [Fact]
+    public void PruningsTidyWritesTheLineForAFolderItKeepsVisibly()
+    {
+        string section = Path.Combine(Folder, "courses", "TST1O", "Section 1");
+        string aside = UndoSwap.BesidePath(Path.Combine(section, "extra"), "1-apply", "orig");
+        int laidCount = 0;
+        var (_, trail) = PruneADeadStepAfter(() =>
+        {
+            if (Directory.Exists(aside)) return;
+            laidCount++;
+            Directory.CreateDirectory(aside);
+            File.WriteAllBytes(Path.Combine(aside, "x.md"), Old);
+            Directory.CreateDirectory(Path.Combine(section, "extra"));
+        });
+        // The folder laid last only pruning met: it is kept under its visible
+        // name, and every folder laid has its one line (recovery's for the
+        // earlier ones, pruning's for the last).
+        Assert.False(Directory.Exists(aside));
+        string kept = Path.Combine(section, UndoSwap.VisibleName("extra", laidCount));
+        Assert.Equal(Old, File.ReadAllBytes(Path.Combine(kept, "x.md")));
+        var lines = trail.Where(each => each.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoFoundAFolderSetAside).ToList();
+        Assert.Equal(laidCount, lines.Count);
+        Assert.Equal(UndoTrail.FoundAFolderSetAsideWords("courses/TST1O/Section 1/extra", "courses/TST1O/Section 1/" + UndoSwap.VisibleName("extra", laidCount), ""), lines[^1].Words);
     }
 
     /// <summary>

@@ -16329,8 +16329,9 @@ rename or write; a place that leads outside is `changedSince`;
 `rule.stagedThenSwapped`, `stackCases`); and **a folder set aside is the
 teacher's own** (renamed back whenever its place is free, whatever it holds,
 and in the way when it changed; left untouched and recorded when its place
-is taken; the trail event `undo found a folder set aside`, written since W6
-(it was held in `NamedGapLedger` under #899 until then); `recoveryCases`
+is taken; the trail event `undo found a folder set aside`, written by
+recovery since W6 (one line before each rename; it was held in
+`NamedGapLedger` under #899 until then); `recoveryCases`
 with `changeTheFolderSetAside` and `somethingInItsPlace`).
 
 Two more from the fourth review and Russell's ruling of 2026-11-19 bind
@@ -17874,7 +17875,7 @@ new is held in `NamedGapLedger.cs`.
 ### The lows fixed with U4a that W4c and W7 copy
 
 1. **The `undo could not record a step` line (U3 sweep, finding 2).** Written only once the shadow write has answered, worded by what happened: went ahead ("The change went ahead (the list is not in use yet)."), nothing was changed ("Nothing was changed."), stopped part way ("The change stopped part way; what a file held before is kept beside it."), made with its closing line not yet written ("The change was made; its record is finished at the next chance."). Mac: `UndoUnrecordedChange`, `UndoTrailHook.couldNotRecord(action:course:section:why:after:)` around `writePlainly` and `makeWithoutARecord`, and the shadow swap in `JournaledWrite.perform`. Before, the line said "went ahead" before a write that could still refuse (always for a page that is a link).
-2. **Switch-off refusals (finding 3).** `undo.rule.shadow` now says: with the switch off, a daily action whose file is a link, a folder or unreadable is refused before anything changes, as is one whose file changed between plan and make; a refusal part way keeps what a file held beside it. Before U3 those wrote (a link was replaced by a regular file). Windows' door must refuse the same.
+2. **Switch-off refusals (finding 3).** `undo.rule.shadow` now says: with the switch off, a daily action whose file is a link, a folder or unreadable is refused before anything changes, as is one whose file changed between plan and make; a refusal part way keeps what a file held beside it. Before U3 those wrote (a link was replaced by a regular file). Windows refuses the same for a folder, a file it cannot read, and a file changed between plan and make, but NOT for a page that is a link: before Undo, Windows wrote a linked page through its link (`File.WriteAllText`) and the link stayed a link, so with the switch off such a step is written through the link, all or none, by the plain staged swap at the file the link leads to, the link left as it is, with one trail line (`undo could not record a step`); with the switch off nothing behaves differently from before Undo (the final sweep of W4c and W7a, item 1; `UndoActionStepTests.WithTheSwitchOffALinkedPageIsWrittenThroughItsLinkAndStaysALink`). `undo.rule.shadow`'s sentence on a link is the Mac's; live, Windows refuses such a step before anything is written.
 3. **Duplicate Class (finding 4).** When the copy is refused and the room alone then cannot be made, the reply is "Nothing was changed: …", never "a blank class page is waiting".
 4. **An Undo or Redo never deletes an only copy (U3c review 3, LOW 3).** Under the lock, before the swap: each page's outgoing bytes that the step's other direction needs (a writeFile op's after for an Undo, its before for a Redo) go into the list when it lacks them; when the list will not take them they are kept beside the page and the other direction is made from that kept file.
 5. **One kept copy per content (LOW 1).** After a move that kept outgoing bytes beside a page, the step's kept copies beside that page are thinned to one per distinct SHA-256 (the newest move's kept for its content).

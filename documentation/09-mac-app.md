@@ -20498,7 +20498,10 @@ off.
   or not one JSON object, or bytes that do not scan, refuse the move as a
   change since; the result must read back as exactly the file with that
   one member changed. `undo-json-cases.json` → `editJSONCases` pins the bytes for both
-  platforms, and the Python reference produces the same ones. The reserved
+  platforms; the Python reference produces the same ones, except the six
+  rows Windows and the Python both refuse until their key order is
+  measured to match Foundation's (W6's second review: they answer cannot
+  tell rather than guess). The reserved
   `element` (an array element) is left to the piece that needs it: an op
   carrying it cannot be read here, so an older reader can never undo it by
   the member rule.
