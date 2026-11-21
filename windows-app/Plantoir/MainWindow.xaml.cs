@@ -307,6 +307,16 @@ public sealed partial class MainWindow : Window
         // threaded through every place DetailHost.Content is assigned.
         DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForMenus());
 
+        // Restore…'s question greys every Restore… from the press until the
+        // answer (#911): the menu bar, and the backup pane's button, which is
+        // drawn again with the button greyed or not.
+        Sidebar.AskingWhichRestoreChanged += (_, _) =>
+        {
+            if (IsClosed) return;
+            if (Workspace.Selection is SidebarSelection.BackupEntry) ShowDetailForSelection();
+            ApplyMenuEnablement();
+        };
+
         Workspace.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(WorkspaceViewModel.State)
@@ -1411,7 +1421,8 @@ public sealed partial class MainWindow : Window
                     $"{backup.SubtitleFor(Workspace.ClassNounOf(backup.CourseCode))}. Restoring puts {backup.CourseCode} back to exactly this " +
                     "moment — the current version is archived first, and the backup is kept.",
                     "Restore…", () => Sidebar.ConfirmRestoreBackup(backup),
-                    "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup));
+                    "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup),
+                    actionEnabled: !Sidebar.IsAskingWhichRestore);
                 break;
             case null when Workspace.Courses.Count == 0:
                 DetailHost.Content = EmptyState("No Courses Yet",
@@ -1439,7 +1450,8 @@ public sealed partial class MainWindow : Window
     /// backup panes, `Restore…` prominent and `Delete …` plain).
     /// </summary>
     private static UIElement EmptyState(string title, string description, string? actionLabel, Action? action,
-                                        string? secondLabel = null, Action? secondAction = null)
+                                        string? secondLabel = null, Action? secondAction = null,
+                                        bool actionEnabled = true)
     {
         var panel = new StackPanel
         {
@@ -1470,6 +1482,7 @@ public sealed partial class MainWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Style = Application.Current.Resources["AccentButtonStyle"] as Style,
                 Margin = new Thickness(0, 8, 0, 0),
+                IsEnabled = actionEnabled,
             };
             button.Click += (_, _) => action();
             if (secondLabel is not null && secondAction is not null)

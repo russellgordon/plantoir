@@ -175,7 +175,57 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
         Assert.Contains("SecondaryButtonText = OneSectionRestoreWording.RestoreWholeCourseButton", body);
         Assert.Contains("CloseButtonText = \"Cancel\"", body);
         Assert.Contains("DefaultButton = ContentDialogButton.Primary", body);
-        Assert.Matches(@"if \(answer == ContentDialogResult\.None\) return;\s*if \(TheFolderMovedUnderThisConfirmation\(askedIn\)\) return;", body);
-        Assert.Contains("if (answer == ContentDialogResult.Primary) await RestoreOneSection(section", body);
+        // Only the two explicit buttons choose (review 2's MEDIUM): a question
+        // that could not be shown answers null, which must restore nothing.
+        Assert.Contains("RestoreChoice chosen = RestoreChoice.Nothing;", body);
+        Assert.Contains("if (answer == ContentDialogResult.Primary) chosen = RestoreChoice.OneSection;", body);
+        Assert.Contains("if (answer == ContentDialogResult.Secondary) chosen = RestoreChoice.WholeCourse;", body);
+        Assert.Matches(@"if \(chosen == RestoreChoice\.Nothing\) return nothing;\s*if \(TheFolderMovedUnderThisConfirmation\(askedIn\)\) return nothing;\s*return \(chosen, section, facts\);", body);
+        Assert.DoesNotContain("else", body);
+        Assert.DoesNotContain("RestoreWholeCourse(", body);
+    }
+
+    /// <summary>
+    /// The restore is run only for an explicit choice: the switch names both,
+    /// and nothing else in <c>ConfirmRestoreBackup</c> calls either restore,
+    /// so no answer other than a button's can fall through to one.
+    /// </summary>
+    [Fact]
+    public void OnlyAnExplicitChoiceRestores()
+    {
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SidebarPane.xaml.cs"));
+        var method = Regex.Match(source, @"public async void ConfirmRestoreBackup\(BackupItem item\)\s*\{(?<body>.*?)\r?\n    \}\r?\n", RegexOptions.Singleline);
+        Assert.True(method.Success, "ConfirmRestoreBackup is not where the scan looks");
+        string body = method.Groups["body"].Value;
+        Assert.Matches(@"case RestoreChoice\.OneSection:\s*await RestoreOneSection\(section, item, facts!\);\s*break;", body);
+        Assert.Matches(@"case RestoreChoice\.WholeCourse:\s*await RestoreWholeCourse\(item\);\s*break;", body);
+        Assert.Matches(@"case RestoreChoice\.Nothing:\s*break;", body);
+        Assert.DoesNotContain("default:", body);
+        Assert.Equal(1, Regex.Matches(body, @"RestoreOneSection\(").Count);
+        Assert.Equal(1, Regex.Matches(body, @"RestoreWholeCourse\(").Count);
+        // The question is asked with every Restore… greyed, and ungreyed
+        // whatever happens (a finally), before anything is restored.
+        Assert.Matches(@"if \(IsAskingWhichRestore\) return;\s*SetAskingWhichRestore\(true\);", body);
+        Assert.Matches(@"try\s*\{\s*\(choice, section, facts\) = await AskWhichRestore\(item\);\s*\}\s*finally\s*\{\s*SetAskingWhichRestore\(false\);\s*\}\s*//[^\n]*\n(\s*//[^\n]*\n)*\s*switch \(choice\)", body);
+    }
+
+    /// <summary>
+    /// Every Restore… a teacher can press reads <c>IsAskingWhichRestore</c>
+    /// and is greyed while it is true: the menu bar (the situation counts it
+    /// as a dialog up), the backup row's context menu as it opens, and the
+    /// backup pane's button, drawn again when the flag changes.
+    /// </summary>
+    [Fact]
+    public void EveryRestoreIsGreyedWhileTheQuestionIsAsked()
+    {
+        string root = Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir");
+        string sidebar = File.ReadAllText(Path.Combine(root, "Views", "SidebarPane.xaml.cs"));
+        string menus = File.ReadAllText(Path.Combine(root, "MainWindow.Menus.cs"));
+        string window = File.ReadAllText(Path.Combine(root, "MainWindow.xaml.cs"));
+        Assert.Contains("SheetIsUp = DialogGate.IsOpen(Content?.XamlRoot) || Sidebar.IsAskingWhichRestore,", menus);
+        Assert.Matches(@"var restoreItem = MenuItem\(""Restore…"", RestoreGlyph, Selecting\(row, \(\) => ConfirmRestoreBackup\(item\)\)\);\s*menu\.Items\.Add\(restoreItem\);\s*//[^\n]*\n\s*menu\.Opening \+= \(_, _\) => restoreItem\.IsEnabled = !IsAskingWhichRestore;", sidebar);
+        Assert.Matches(@"""Restore…"", \(\) => Sidebar\.ConfirmRestoreBackup\(backup\),\s*""Delete Backup…"", \(\) => Sidebar\.ConfirmDeleteBackup\(backup\),\s*actionEnabled: !Sidebar\.IsAskingWhichRestore\);", window);
+        Assert.Contains("IsEnabled = actionEnabled,", window);
+        Assert.Matches(@"Sidebar\.AskingWhichRestoreChanged \+= \(_, _\) =>\s*\{\s*if \(IsClosed\) return;\s*if \(Workspace\.Selection is SidebarSelection\.BackupEntry\) ShowDetailForSelection\(\);\s*ApplyMenuEnablement\(\);", window);
     }
 }

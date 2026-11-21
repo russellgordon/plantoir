@@ -1158,7 +1158,10 @@ public sealed partial class SidebarPane : UserControl
     {
         var row = new SidebarSelection.BackupEntry(item.Id);
         var menu = new MenuFlyout();
-        menu.Items.Add(MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestoreBackup(item))));
+        var restoreItem = MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestoreBackup(item)));
+        menu.Items.Add(restoreItem);
+        // Read as the menu opens (row 104's lesson): greyed while a Restore… question is being asked.
+        menu.Opening += (_, _) => restoreItem.IsEnabled = !IsAskingWhichRestore;
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(item.FilePath))));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Delete Backup…", Glyphs.Remove, Selecting(row, () => ConfirmDeleteBackup(item))));
@@ -1747,8 +1750,63 @@ public sealed partial class SidebarPane : UserControl
         _ = when;
     }
 
+    /// <summary>
+    /// True from Restore…'s press until the teacher answers its question,
+    /// the zip's reading before the question opens included (#911, review 2's
+    /// MEDIUM). While it is true every Restore… is greyed: the menu bar's
+    /// (the window reads it as a dialog being up), the backup row's context
+    /// menu item and the backup pane's button, so a second press cannot
+    /// reach a question that has no slot to open in.
+    /// </summary>
+    internal bool IsAskingWhichRestore { get; private set; }
+
+    /// <summary>Raised when <see cref="IsAskingWhichRestore"/> changes, so the window greys or ungreys what reads it.</summary>
+    internal event EventHandler? AskingWhichRestoreChanged;
+
+    private void SetAskingWhichRestore(bool asking)
+    {
+        IsAskingWhichRestore = asking;
+        AskingWhichRestoreChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>What the teacher chose in Restore…'s question. Only an explicit button chooses; anything else is <see cref="Nothing"/>.</summary>
+    private enum RestoreChoice { Nothing, OneSection, WholeCourse }
+
     public async void ConfirmRestoreBackup(BackupItem item)
     {
+        // Greyed while a question is being asked (above); this only backs that up.
+        if (IsAskingWhichRestore) return;
+        SetAskingWhichRestore(true);
+        RestoreChoice choice;
+        int section = 0;
+        OneSectionRestore.BackupFacts? facts = null;
+        try
+        {
+            (choice, section, facts) = await AskWhichRestore(item);
+        }
+        finally
+        {
+            SetAskingWhichRestore(false);
+        }
+        // Decided by the explicit answer only: a question that could not be
+        // shown (null), Cancel, Escape or a closed dialog restores nothing,
+        // and says nothing, as a cancelled question says nothing.
+        switch (choice)
+        {
+            case RestoreChoice.OneSection:
+                await RestoreOneSection(section, item, facts!);
+                break;
+            case RestoreChoice.WholeCourse:
+                await RestoreWholeCourse(item);
+                break;
+            case RestoreChoice.Nothing:
+                break;
+        }
+    }
+
+    private async Task<(RestoreChoice Choice, int Section, OneSectionRestore.BackupFacts? Facts)> AskWhichRestore(BackupItem item)
+    {
+        var nothing = (RestoreChoice.Nothing, 0, (OneSectionRestore.BackupFacts?)null);
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
         // Restoring rewrites the course's folders — never mid-copy (row 104's rule).
@@ -1758,7 +1816,7 @@ public sealed partial class SidebarPane : UserControl
             await ShowError($"{item.CourseCode} is busy right now",
                 "Restoring replaces the course's folders and files, and a preview or deploy " +
                 "of this course is still using them. Try again when it finishes.");
-            return;
+            return nothing;
         }
         // An assistant's hold, in its own words (#468): a Claude or Codex
         // session, or this app's own window — never "a preview or deploy".
@@ -1766,7 +1824,7 @@ public sealed partial class SidebarPane : UserControl
             && CourseActivity.AssistHoldRefusal(heldIn, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held)
         {
             await ShowError(AssistWording.CourseIsAlreadyBeingRevised(item.CourseCode), held);
-            return;
+            return nothing;
         }
 
         // A backup made for ONE section offers that section first (#911, the
@@ -1794,11 +1852,12 @@ public sealed partial class SidebarPane : UserControl
                 DefaultButton = ContentDialogButton.Primary,
             };
             var answer = await ShowDialogSafelyAsync(question);
-            if (answer == ContentDialogResult.None) return;
-            if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
-            if (answer == ContentDialogResult.Primary) await RestoreOneSection(section, item, facts!);
-            else await RestoreWholeCourse(item);
-            return;
+            RestoreChoice chosen = RestoreChoice.Nothing;
+            if (answer == ContentDialogResult.Primary) chosen = RestoreChoice.OneSection;
+            if (answer == ContentDialogResult.Secondary) chosen = RestoreChoice.WholeCourse;
+            if (chosen == RestoreChoice.Nothing) return nothing;
+            if (TheFolderMovedUnderThisConfirmation(askedIn)) return nothing;
+            return (chosen, section, facts);
         }
 
         var dialog = new ContentDialog
@@ -1812,9 +1871,9 @@ public sealed partial class SidebarPane : UserControl
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
         };
-        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
-        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
-        await RestoreWholeCourse(item);
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return nothing;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return nothing;
+        return (RestoreChoice.WholeCourse, 0, null);
     }
 
     /// <summary>What each backup zip holds that the one-section offer needs, read once per backup (a zip does not change; an unreadable one holds nothing).</summary>

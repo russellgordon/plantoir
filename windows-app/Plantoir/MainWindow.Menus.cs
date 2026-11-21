@@ -480,7 +480,9 @@ public sealed partial class MainWindow
         {
             HasFolder = hasFolder,
             FolderGettingReady = hasFolder && ToolchainReadiness.Refusal(folder) is not null,
-            SheetIsUp = DialogGate.IsOpen(Content?.XamlRoot),
+            // Restore…'s question counts from the press, its zip's reading
+            // before it opens included (#911): the slot is already taken.
+            SheetIsUp = DialogGate.IsOpen(Content?.XamlRoot) || Sidebar.IsAskingWhichRestore,
             Row = row,
             KeptForReference = course is not null && ReferenceCourse.IsKeptForReference(course),
             StructuralHold = folder is not null && course is not null && CourseActivity.BusyReason(folder, course.Code) is not null,
