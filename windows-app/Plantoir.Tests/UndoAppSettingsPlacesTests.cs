@@ -119,11 +119,14 @@ public sealed class UndoAppSettingsPlacesTests : IDisposable
         Assert.False(File.Exists(file + ".undo-writing"));
     }
 
-    /// <summary>A file the app's own reader cannot read is never written over: refused, byte for byte as it was.</summary>
+    /// <summary>
+    /// A file the app's own reader cannot read (JSON, but a list where a text
+    /// setting goes) is never written over: refused, byte for byte as it was.
+    /// </summary>
     [Fact]
     public void AFileTheAppCannotReadIsNeverWrittenOver()
     {
-        string file = SettingsFile("{\"PreviewOpensAt\": [\"not\", \"text\"]");
+        string file = SettingsFile("{\"PreviewOpensAt\": [\"not\", \"text\"], \"WorkspacePath\": \"C:\\\\w\"}");
         byte[] before = File.ReadAllBytes(file);
         var places = new UndoAppSettingsPlaces(file, () => null);
         Assert.True(places.Read("preference:PreviewOpensAt").CannotTell);
