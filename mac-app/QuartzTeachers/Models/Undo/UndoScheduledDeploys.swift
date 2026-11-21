@@ -115,8 +115,9 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
     /// be taken away again stays in LaunchAgents and loads at the next
     /// login: neither set back (it will not run at its moment unless the
     /// teacher logs out and in first) nor left apart (it will run), so it
-    /// has its own answer, `startsAtTheNextLogin`, and its own trail line
-    /// (the re-review of U3b's fixes, LOW 2).
+    /// has its own answer, `startsAtTheNextLogin` (the re-review of U3b's
+    /// fixes, LOW 2), and its own trail line, written only once the whole
+    /// swap has gone in (`noteItStartsAtTheNextLogin(_:)`, round four, LOW 4).
     func writeSaying(_ target: String, _ value: UndoJSON?) -> UndoExternalWrite {
         guard let label = UndoScheduledDeploys.label(of: target), Thread.isMainThread else {
             return .notWritten
@@ -173,12 +174,9 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
             // never said to be left apart (it will run), never said to be
             // back (it will not run at its moment unless the teacher logs
             // out and in first). Its script stays with it.
+            // Its trail line waits for the whole swap (`noteItStartsAtTheNextLogin`).
             if (try? FileManager.default.removeItem(at: plistURL)) == nil
                 && FileManager.default.fileExists(atPath: plistURL.path) {
-                let plist: Data = files.plist
-                MainActor.assumeIsolated {
-                    UndoScheduledDeploys.noteItStartsAtTheNextLogin(plist: plist)
-                }
                 return .startsAtTheNextLogin
             }
             if files.script != nil {
@@ -187,6 +185,21 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
             return .notWritten
         }
         return .written
+    }
+
+    /// The trail line for a deploy set for later that Undo or Redo put
+    /// back and macOS would not start now, written once the whole swap has
+    /// gone in (`UndoExternalPlaces.noteItStartsAtTheNextLogin`), from the
+    /// plist then on disk. Off the main thread nothing is written: such a
+    /// write was refused, so no job of it starts at the next login.
+    func noteItStartsAtTheNextLogin(_ target: String) {
+        guard let label = UndoScheduledDeploys.label(of: target), Thread.isMainThread,
+              let plist = try? Data(contentsOf: ScheduledDeploy.plistURL(label: label)) else {
+            return
+        }
+        MainActor.assumeIsolated {
+            UndoScheduledDeploys.noteItStartsAtTheNextLogin(plist: plist)
+        }
     }
 
     /// The trail line for a deploy set for later that Undo or Redo put back
@@ -305,5 +318,13 @@ nonisolated struct UndoAppPlaces: UndoExternalPlaces, @unchecked Sendable {
             return schedules.canSet(target, value)
         }
         return preferences.canSet(target, value)
+    }
+
+    func noteItStartsAtTheNextLogin(_ target: String) {
+        if UndoScheduledDeploys.label(of: target) != nil {
+            schedules.noteItStartsAtTheNextLogin(target)
+            return
+        }
+        preferences.noteItStartsAtTheNextLogin(target)
     }
 }

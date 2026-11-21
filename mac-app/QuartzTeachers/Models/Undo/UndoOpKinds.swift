@@ -1200,6 +1200,13 @@ nonisolated protocol UndoExternalPlaces: Sendable {
     /// the re-review of U3b's fixes, LOW 2). Every family but a deploy set
     /// for later answers from `write`.
     func writeSaying(_ target: String, _ value: UndoJSON?) -> UndoExternalWrite
+    /// Leaves the trail line for a target `writeSaying` answered
+    /// `startsAtTheNextLogin`, once the WHOLE swap has gone in and its step
+    /// is closed: never from inside the write, where a later target's
+    /// failure would roll the swap back after the line was written (the
+    /// review of U3b's fixes, round four, LOW 4). Nothing for every family
+    /// but a deploy set for later.
+    func noteItStartsAtTheNextLogin(_ target: String)
 }
 
 /// How setting an `external` target went (`UndoExternalPlaces.writeSaying`).
@@ -1222,6 +1229,9 @@ nonisolated extension UndoExternalPlaces {
 
     func writeSaying(_ target: String, _ value: UndoJSON?) -> UndoExternalWrite {
         return write(target, value) ? .written : .notWritten
+    }
+
+    func noteItStartsAtTheNextLogin(_ target: String) {
     }
 }
 

@@ -332,20 +332,65 @@ enum DeployCommand {
         let broughtIn: LegacyMarkerBroughtIn?
     }
 
+    /// A test fixes the moment a rollover's kept names are stamped with, so
+    /// it can lay a file at that name first. Nil in the app.
+    nonisolated(unsafe) static var momentForATest: Date?
+
+    /// THE ONE PLACE a rollover's step names what it sets aside (the review
+    /// of U3b's fixes, round four, MEDIUM 1): a file's kept name is its own
+    /// name with `.previous-<stamp>` before its `.json`, then `.2`, `.3`…
+    /// after the stamp, the first that is neither on disk nor already
+    /// chosen for this step. So no two ops of one step share a place, and
+    /// no file already there stops a rollover.
+    struct KeptNames {
+
+        // MARK: - Stored properties
+
+        /// Every place chosen for this step so far, by path.
+        var chosen: Set<String> = []
+
+        // MARK: - Functions
+
+        /// The kept place for `url`, now chosen.
+        mutating func choose(for url: URL, stamp: String) -> URL {
+            let folder: URL = url.deletingLastPathComponent()
+            let base: String = String(url.lastPathComponent.dropLast(".json".count)) + ".previous-" + stamp
+            var number: Int = 1
+            while true {
+                var name: String = base + ".json"
+                if number >= 2 {
+                    name = base + ".\(number).json"
+                }
+                let candidate: URL = folder.appendingPathComponent(name)
+                // `attributesOfItem` sees a link that leads nowhere too.
+                let onDisk: Bool = (try? FileManager.default.attributesOfItem(atPath: candidate.path)) != nil
+                if !chosen.contains(candidate.path) && !onDisk {
+                    chosen.insert(candidate.path)
+                    return candidate
+                }
+                number += 1
+            }
+        }
+    }
+
     /// `releaseSite`, PLANNED into the rollover's ONE step instead of
     /// written (#899 U3b; #897 piece B, seams 1 and 3): each record a deploy
     /// reads becomes one `moveApart`, the section's records standing apart
     /// from the rest of the step as a GROUP, so an Undo after a deploy has
     /// filled a record's place leaves every record where it is and takes
     /// back the rest (Russell's ruling of 2026-11-19 on Q3; #959; the
-    /// director's decision of 2026-11-20). A record that cannot be read, or
-    /// whose kept name is taken, is still pinned, as before.
+    /// director's decision of 2026-11-20). A record that cannot be read is
+    /// still pinned, as before. A Netlify record no deploy goes on with a
+    /// site from (`netlifySiteADeployGoesOnWith` is nil) is not a website
+    /// and is never moved: a deploy starts a new website from it before and
+    /// after, whatever the step does (round four). Every kept name is chosen
+    /// by `KeptNames`, which never gives a place twice or one on disk.
     ///
     /// The legacy marker in the built output is brought into the working
     /// folder first (`moveTheLegacyMarkerIn`), so the record a deploy reads
-    /// is planned here like any other. Every LEFTOVER no deploy reads (one
-    /// brought in from the built output, a current record no deploy can
-    /// read) is set aside here too, each a `setAside` op on its own, kept as
+    /// is planned here like any other. Every STALE LEFTOVER brought in from
+    /// the built output (`section<N>.from-built-output[.<k>].json`) is set
+    /// aside here too, each a `setAside` op on its own, kept as
     /// `<its name>.previous-<stamp>.json`: never one of the records, never
     /// in `keptFiles` (a leftover is not a website the section was on, the
     /// review of U3b's fixes, LOW 4; its two halves are in `savedFiles`, so
@@ -362,11 +407,12 @@ enum DeployCommand {
         into step: JournaledStep
     ) throws(LegacyMarkerNotMovedIn) -> PlannedRelease {
         let broughtIn: LegacyMarkerBroughtIn? = try moveTheLegacyMarkerIn(forSection: sectionNumber, in: course)
-        let reads: NetlifyRecordADeployReads = netlifyRecordADeployReads(forSection: sectionNumber, in: course)
+        let netlifySite: String? = netlifySiteADeployGoesOnWith(forSection: sectionNumber, in: course)
+        let stampText: String = stamp(momentForATest ?? moment)
+        var keptNames: KeptNames = KeptNames()
         var keptFiles: [String] = []
         var savedFiles: [AssistSavedFile] = []
         var stillPinned: [String] = []
-        var leftovers: [URL] = []
 
         for destinationType in CourseConfiguration.knownDeployTargetTypes {
             guard let markerURL = firstDeployMarkerURL(
@@ -377,20 +423,18 @@ enum DeployCommand {
             guard FileManager.default.fileExists(atPath: markerURL.path) else {
                 continue
             }
+            if destinationType == "netlify" && netlifySite == nil {
+                // No deploy goes on with a site from it (it does not parse,
+                // or it names no site): not the section's website, never
+                // moved and never pinned (round four, LOWs 2 and 3).
+                continue
+            }
             guard let contents = try? String(contentsOf: markerURL, encoding: .utf8) else {
                 stillPinned.append(nameForTeacher(markerURL))
                 continue
             }
-            if destinationType == "netlify" && reads != .current {
-                // There and readable, and no deploy reads it (it is not
-                // JSON): a leftover, never the section's website.
-                leftovers.append(markerURL)
-                continue
-            }
-            let keptURL: URL = markerURL.deletingLastPathComponent()
-                .appendingPathComponent(releasedMarkerName(forSection: sectionNumber, at: moment))
-            if FileManager.default.fileExists(atPath: keptURL.path)
-                || !step.move(markerURL, to: keptURL, standsApart: true) {
+            let keptURL: URL = keptNames.choose(for: markerURL, stamp: stampText)
+            if !step.move(markerURL, to: keptURL, standsApart: true) {
                 stillPinned.append(nameForTeacher(markerURL))
                 continue
             }
@@ -399,16 +443,12 @@ enum DeployCommand {
             savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
         }
 
-        // The leftovers brought in (now or by an earlier rollover that
-        // stopped before its step), each set aside on its own.
-        for leftover in leftoverURLs(forSection: sectionNumber, in: course) {
-            leftovers.append(leftover)
-        }
-        for leftover in leftovers {
-            let keptURL: URL = keptLeftoverURL(leftover, forSection: sectionNumber, stamp: stamp(moment))
-            guard let data = try? Data(contentsOf: leftover),
-                  !FileManager.default.fileExists(atPath: keptURL.path),
-                  step.setAside(leftover, to: keptURL) else {
+        // The stale leftovers brought in from the built output (now or by
+        // an earlier rollover), each set aside on its own. Nothing else is:
+        // a file no deploy reads needs no moving (documentation 09).
+        for leftover in leftoverURLs(.fromBuiltOutput, forSection: sectionNumber, in: course) {
+            let keptURL: URL = keptNames.choose(for: leftover, stamp: stampText)
+            guard let data = try? Data(contentsOf: leftover), step.setAside(leftover, to: keptURL) else {
                 continue
             }
             // In today's undo with the records (never in `keptFiles`), so

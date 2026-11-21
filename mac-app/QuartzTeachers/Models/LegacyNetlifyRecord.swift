@@ -57,15 +57,17 @@ extension DeployCommand {
 
     /// The families of LEFTOVER a bring-in makes in `.netlify_sites`: files
     /// no deploy reads (deploy.py reads `section<N>.json` by its exact
-    /// name), set aside by the rollover's step as `setAside` ops, never one
-    /// of the section's website records.
+    /// name), never one of the section's website records.
     nonisolated enum LeftoverFamily: String, CaseIterable, Sendable {
-        /// An old-format record from the built output that no deploy would
-        /// read: a current record wins, or it is not JSON.
+        /// A stale old-format record from the built output, which parses
+        /// and which a deploy would read once the current record were gone:
+        /// set aside by the rollover's step as a `setAside` op on its own
+        /// (Russell's ruling of 2026-11-20 evening).
         case fromBuiltOutput = "from-built-output"
         /// A current record no deploy can read (it is not JSON), moved out
         /// of the way so a good legacy record can take its place, as a
-        /// deploy's own migration would write over it.
+        /// deploy's own migration would write over it. Never moved again:
+        /// no deploy reads it here, or anywhere (round four).
         case unreadable = "unreadable"
     }
 
@@ -203,6 +205,46 @@ extension DeployCommand {
         return .none
     }
 
+    /// The site a deploy of the section would go on with now: the record it
+    /// reads (`netlifyRecordADeployReads`), and the site that record names
+    /// (`siteNamed(by:)`). Nil when a deploy would start a new website: no
+    /// record it reads, or one that names no site (`null`, `{}`, `[]`, a
+    /// string, an object with no id). THE SECTION'S WEBSITE: only a section
+    /// with one is released by a rollover, and only then is anything moved
+    /// (the review of U3b's fixes, round four).
+    static func netlifySiteADeployGoesOnWith(forSection sectionNumber: Int, in course: Course) -> String? {
+        let url: URL
+        switch netlifyRecordADeployReads(forSection: sectionNumber, in: course) {
+        case .current:
+            url = currentNetlifyRecordURL(forSection: sectionNumber, in: course.directoryURL)
+        case .legacy:
+            url = legacyMarkerURL(forSection: sectionNumber, in: course)
+        case .none:
+            return nil
+        }
+        guard let data = try? Data(contentsOf: url), let parsed = parsedRecord(data) else {
+            return nil
+        }
+        return siteNamed(by: parsed)
+    }
+
+    /// The site a parsed record names: a JSON object whose `id` (what
+    /// deploy.py goes on with, `site_marker.get("id")`) is a string that is
+    /// not empty, else its `site_id` (the same id in every record Netlify
+    /// returns, which deploy.py writes whole). Nil for anything else.
+    nonisolated static func siteNamed(by parsed: NSObject) -> String? {
+        guard let object = parsed as? [String: Any] else {
+            return nil
+        }
+        if let id = object["id"] as? String, !id.isEmpty {
+            return id
+        }
+        if let id = object["site_id"] as? String, !id.isEmpty {
+            return id
+        }
+        return nil
+    }
+
     // MARK: - Functions: leftovers
 
     /// A leftover's name: `section<N>.<family>.json`, then
@@ -229,45 +271,33 @@ extension DeployCommand {
         }
     }
 
-    /// Every leftover of the section in `.netlify_sites`, of every family,
-    /// by name: never a kept copy (`….previous-<stamp>.json`).
-    static func leftoverURLs(forSection sectionNumber: Int, in course: Course) -> [URL] {
+    /// The section's leftovers of one family in `.netlify_sites`, by name:
+    /// never a kept copy (`….previous-<stamp>.json`).
+    static func leftoverURLs(_ family: LeftoverFamily, forSection sectionNumber: Int, in course: Course) -> [URL] {
         let folder: URL = course.directoryURL.appendingPathComponent(".netlify_sites")
         let entries: [String] = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).sorted()
         var leftovers: [URL] = []
-        for entry in entries where isALeftoverName(entry, forSection: sectionNumber) {
+        for entry in entries where isALeftoverName(entry, of: family, forSection: sectionNumber) {
             leftovers.append(folder.appendingPathComponent(entry))
         }
         return leftovers
     }
 
-    /// Whether a name in `.netlify_sites` is one of the section's leftovers.
-    nonisolated static func isALeftoverName(_ name: String, forSection sectionNumber: Int) -> Bool {
-        for family in LeftoverFamily.allCases {
-            let start: String = "section\(sectionNumber).\(family.rawValue)."
-            guard name.hasPrefix(start), name.hasSuffix(".json") else {
-                continue
-            }
-            let middle: String = String(name.dropFirst(start.count).dropLast(".json".count))
-            if middle.isEmpty {
-                return true
-            }
-            if let number = Int(middle), number >= 2, String(number) == middle {
-                return true
-            }
+    /// Whether a name in `.netlify_sites` is one of the section's leftovers
+    /// of the family: `section<N>.<family>.json` or `section<N>.<family>.<k>.json`.
+    nonisolated static func isALeftoverName(_ name: String, of family: LeftoverFamily, forSection sectionNumber: Int) -> Bool {
+        let start: String = "section\(sectionNumber).\(family.rawValue)."
+        guard name.hasPrefix(start), name.hasSuffix(".json") else {
+            return false
+        }
+        let middle: String = String(name.dropFirst(start.count).dropLast(".json".count))
+        if middle.isEmpty {
+            return true
+        }
+        if let number = Int(middle), number >= 2, String(number) == middle {
+            return true
         }
         return false
-    }
-
-    /// The name a leftover is kept under when the rollover's step sets it
-    /// aside: `.previous-<stamp>` before its `.json`. A current record no
-    /// deploy can read is kept as `section<N>.unreadable.previous-<stamp>.json`.
-    static func keptLeftoverURL(_ leftoverURL: URL, forSection sectionNumber: Int, stamp: String) -> URL {
-        var base: String = String(leftoverURL.lastPathComponent.dropLast(".json".count))
-        if leftoverURL.lastPathComponent == "section\(sectionNumber).json" {
-            base = "section\(sectionNumber).\(LeftoverFamily.unreadable.rawValue)"
-        }
-        return leftoverURL.deletingLastPathComponent().appendingPathComponent(base + ".previous-" + stamp + ".json")
     }
 
     // MARK: - Functions: bringing the legacy record in
@@ -276,38 +306,47 @@ extension DeployCommand {
     /// working folder, before a rollover's step is planned (#899 U3b,
     /// Russell's rulings of 2026-11-20), so the step can name it like any
     /// other record and an Undo puts it back whole. Decided by ONE question,
-    /// which record a deploy reads now (`netlifyRecordADeployReads`), so a
-    /// deploy reads the same website before the rollover and after its Undo
-    /// in every state (the review of U3b's fixes, round three, MEDIUM 1):
+    /// the site a deploy goes on with now (`netlifySiteADeployGoesOnWith`),
+    /// and it moves ONLY what must move for a deploy to read the same site
+    /// before the rollover and after its Undo, in every state (the reviews
+    /// of U3b's fixes, rounds three and four):
     ///
-    /// - **the legacy record** (no current record that parses, the legacy
-    ///   one does): it IS the section's website. It is written in the current
-    ///   record's place (its bytes, mode 0600) and removed from the built
-    ///   output, as a deploy's migration does. A current record there that
-    ///   does not parse is a leftover: it is first moved out of the way, to
-    ///   `section<N>.unreadable.json` (the next free name), where the
-    ///   migration would have written over it;
-    /// - **the current record**: the legacy record is a leftover. When it
-    ///   says the same as the current record (parsed, never by bytes:
-    ///   deploy.py rewrites a record it migrates, the review's LOW 7), it is
-    ///   what a migration that stopped before its removal leaves, and it is
-    ///   only removed; otherwise it is brought in as
-    ///   `section<N>.from-built-output.json` (the next free name, LOW 5);
-    /// - **none** (the legacy record does not parse): it is a leftover,
-    ///   brought in the same way.
+    /// - **no site** (a deploy would start a new website now): nothing is
+    ///   brought in or moved. The rollover moves no Netlify record either,
+    ///   so a deploy starts a new website before, after and after Undo; a
+    ///   file no deploy can parse is ignored by every deploy wherever it
+    ///   sits, and the deploy's own `save_netlify_marker` writes over a
+    ///   current record that does not parse, with or without a rollover;
+    /// - **the legacy record's site** (no current record that parses): it
+    ///   IS the section's website. It is written in the current record's
+    ///   place (its bytes, mode 0600) and removed from the built output, as
+    ///   a deploy's migration does. A current record there that does not
+    ///   parse is first moved out of the way, to `section<N>.unreadable.json`
+    ///   (the next free name), where the migration would have written over
+    ///   it; it is never moved again, since no deploy reads that name;
+    /// - **the current record's site**: the step will move the current
+    ///   record away, after which a deploy WOULD read a legacy record that
+    ///   parses, so that one must leave the built output. When it says the
+    ///   same as the current record (parsed, never by bytes: deploy.py
+    ///   rewrites a record it migrates, the review's LOW 7) it is what a
+    ///   migration that stopped before its removal leaves, and it is only
+    ///   removed; otherwise it is brought in as
+    ///   `section<N>.from-built-output.json` (the next free name, LOW 5),
+    ///   which the step sets aside (Russell's ruling of 2026-11-20 evening).
+    ///   A legacy record that does not parse stays where it is: no deploy
+    ///   reads it, before or after.
     ///
     /// A leftover brought in that holds the same bytes as one already there
-    /// (a bring-in that died before its removal) is only removed. The
-    /// step sets every leftover aside (`setAside`), never as one of the
-    /// section's records. Every record is placed WHOLE (`placeWhole`), so a
-    /// death part way through leaves no partial record where a deploy reads
-    /// one.
+    /// (a bring-in that died before its removal) is only removed. Every
+    /// record is placed WHOLE (`placeWhole`), so a death part way through
+    /// leaves no partial record where a deploy reads one.
     ///
     /// Refused only when a record cannot be read, written, moved or
     /// removed (or the current record is there and cannot be read at all,
     /// when what a deploy reads cannot be known): what this call changed is
     /// changed back first, and a `.netlify_sites` folder it made removed, so
-    /// the folder is as it was. Nil when there is no legacy marker.
+    /// the folder is as it was. Nil when there is no legacy marker, or
+    /// nothing of it had to move.
     static func moveTheLegacyMarkerIn(
         forSection sectionNumber: Int, in course: Course
     ) throws(LegacyMarkerNotMovedIn) -> LegacyMarkerBroughtIn? {
@@ -334,21 +373,30 @@ extension DeployCommand {
         let madeTheFolder: Bool = !FileManager.default.fileExists(atPath: folder.path)
         removeHalfWrittenCopies(forSection: sectionNumber, in: folder)
 
+        // A section on no website: nothing has to move.
+        guard netlifySiteADeployGoesOnWith(forSection: sectionNumber, in: course) != nil else {
+            return nil
+        }
         if netlifyRecordADeployReads(forSection: sectionNumber, in: course) == .legacy {
             return try bringInTheSectionsRecord(
                 legacyData, from: legacyURL, to: currentURL, setAsideFirst: currentData != nil,
                 forSection: sectionNumber, in: course, madeTheFolder: madeTheFolder, refusal: refusedAtTheCurrentPlace
             )
         }
+        // The current record's site. A legacy record no deploy can parse
+        // stays where it is: none reads it once the current record is gone.
+        guard let legacy = parsedRecord(legacyData) else {
+            return nil
+        }
 
-        // A leftover. One that says what the current record says, or that
-        // a leftover already brought in holds byte for byte, is only removed.
+        // A stale leftover. One that says what the current record says, or
+        // that a leftover already brought in holds byte for byte, is only
+        // removed.
         var sameAsARecordThere: Bool = false
-        if let currentData, let current = parsedRecord(currentData), let legacy = parsedRecord(legacyData),
-           current.isEqual(legacy) {
+        if let currentData, let current = parsedRecord(currentData), current.isEqual(legacy) {
             sameAsARecordThere = true
         }
-        for leftover in leftoverURLs(forSection: sectionNumber, in: course) {
+        for leftover in leftoverURLs(.fromBuiltOutput, forSection: sectionNumber, in: course) {
             if let there = try? Data(contentsOf: leftover), there == legacyData {
                 sameAsARecordThere = true
             }

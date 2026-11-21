@@ -1718,6 +1718,11 @@ nonisolated extension UndoJournal {
         // (`undoNewestAndRederive`, `UndoMaintainers`).
         _ = recomputes
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
+        // Only now, the whole swap in and the step closed, the trail says a
+        // schedule put back starts at the next login (round four, LOW 4).
+        for place in everyScheduleStartingAtTheNextLogin {
+            places.noteItStartsAtTheNextLogin(place)
+        }
         if direction == .backward {
             return .undone(seq: seq, leftApart: everyPlaceLeftApart, startsAtTheNextLogin: everyScheduleStartingAtTheNextLogin)
         }

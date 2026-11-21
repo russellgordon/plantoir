@@ -62,6 +62,7 @@ final class UndoRolloverStepTests: XCTestCase {
         UndoKillPoints.putBackFailsAt = nil
         UndoKillPoints.fileInUseAtSwap = nil
         DeployCommand.bringInDiesAfterWriting = nil
+        DeployCommand.momentForATest = nil
         ActivityTrail.store = previousTrail
         for folder in listFolders {
             try? FileManager.default.removeItem(at: folder)
@@ -179,7 +180,7 @@ final class UndoRolloverStepTests: XCTestCase {
     }
 
     /// Which record a deploy reads (the contract's word) and the site it
-    /// names (`site_id`, else `id`), by the model above.
+    /// goes on with (`id`, else `site_id`, neither empty), by the model above.
     static func whatADeployReads(_ made: AssistFixture.Made) -> (reads: String, site: String?) {
         let current: URL = made.root.appendingPathComponent(UndoRolloverStepTests.markerPath)
         let legacy: URL = DeployCommand.legacyMarkerURL(forSection: 1, in: made.course)
@@ -207,10 +208,13 @@ final class UndoRolloverStepTests: XCTestCase {
         guard let object = parsed as? [String: Any] else {
             return nil
         }
-        if let site = object["site_id"] as? String {
+        if let site = object["id"] as? String, !site.isEmpty {
             return site
         }
-        return object["id"] as? String
+        if let site = object["site_id"] as? String, !site.isEmpty {
+            return site
+        }
+        return nil
     }
 
     func journal(processIsAlive: Bool = true) -> UndoJournal {
@@ -904,9 +908,11 @@ final class UndoRolloverStepTests: XCTestCase {
     /// Netlify records can be in), laid out: the product's one question
     /// (`DeployCommand.netlifyRecordADeployReads`) and this suite's model
     /// both answer what the row says, as deploy.py's own function does
-    /// (`scripts/test_netlify_record_a_deploy_reads.py`). MUST FAIL with a
+    /// (`scripts/test_netlify_record_a_deploy_reads.py`), and the product's
+    /// site (`netlifySiteADeployGoesOnWith`) is the row's. MUST FAIL with a
     /// current record that is there taken as the one read whether or not it
-    /// parses (the review's MEDIUM 1).
+    /// parses (the review's MEDIUM 1), or with a record that names no site
+    /// taken as naming one (round four, LOW 3).
     func testWhichRecordADeployReadsIsTheContracts() throws {
         let rows: [[String: Any]] = try UndoRolloverStepTests.netlifyRecordCases()
         XCTAssertGreaterThanOrEqual(rows.count, 10)
@@ -914,68 +920,131 @@ final class UndoRolloverStepTests: XCTestCase {
             let made: AssistFixture.Made = try sectionWith(row)
             let name: String = row["name"] as? String ?? "?"
             XCTAssertEqual(DeployCommand.netlifyRecordADeployReads(forSection: 1, in: made.course).rawValue, row["reads"] as? String, name)
+            XCTAssertEqual(DeployCommand.netlifySiteADeployGoesOnWith(forSection: 1, in: made.course), row["site"] as? String, name)
             let read: (reads: String, site: String?) = UndoRolloverStepTests.whatADeployReads(made)
             XCTAssertEqual(read.reads, row["reads"] as? String, name)
             XCTAssertEqual(read.site, row["site"] as? String, name)
         }
     }
 
-    /// Every row, and every row with a `.from-built-output.json` leftover
-    /// already there: rolled over onto a new website from the menu, undone
-    /// and redone. Before the rollover and after the Undo a deploy reads the
-    /// same site; after the rollover and after the Redo it starts a new
-    /// one; nothing is left in the built output for a deploy to migrate
-    /// back; a section on no website before is said to have had none
-    /// (LOW 4); nothing refuses (LOW 5). MUST FAIL with the bring-in of the
-    /// review (a broken current record beside a good legacy one: after Undo
-    /// a deploy found no record).
+    /// What may already be in `.netlify_sites` beside a row's records: each
+    /// a set of files, by name, with their text. `{stamp}` is the rollover's
+    /// kept-name stamp (`DeployCommand.momentForATest`), so a kept name a
+    /// rollover would choose can be taken first.
+    static let alreadyThere: [(name: String, files: [String: String])] = [
+        (name: "nothing else", files: [:]),
+        (name: "a stale leftover from an earlier rollover", files: [
+            "section1.from-built-output.json": "{\"site_id\": \"an-earlier-leftover\"}",
+        ]),
+        (name: "a record no deploy can parse, set aside by an earlier rollover", files: [
+            "section1.unreadable.json": "{\"site_id\": \"la",
+        ]),
+        (name: "both, and a second stale leftover", files: [
+            "section1.from-built-output.json": "{\"site_id\": \"an-earlier-leftover\"}",
+            "section1.from-built-output.2.json": "{\"site_id\": \"a-second-leftover\"}",
+            "section1.unreadable.json": "junk",
+        ]),
+        (name: "the kept names this rollover would choose already taken", files: [
+            "section1.from-built-output.json": "{\"site_id\": \"an-earlier-leftover\"}",
+            "section1.previous-{stamp}.json": "someone's own file",
+            "section1.from-built-output.previous-{stamp}.json": "another file of theirs",
+            "section1.unreadable.previous-{stamp}.json": "and another",
+        ]),
+    ]
+
+    /// Every row of `undo.netlifyRecordCases` beside every set of files
+    /// already there (`alreadyThere`): rolled over onto a new website from
+    /// the menu, undone and redone. At each point, what a deploy goes on
+    /// with: before the rollover and after the Undo the same site; after the
+    /// rollover and after the Redo none (a new website). What the teacher
+    /// is told: "last year's details are kept at" a file that holds them
+    /// only when the section was on a website, else that it was on none.
+    /// Nothing refuses, no file already there is changed or decides
+    /// anything, and Undo puts every one back where it was (round four).
+    /// MUST FAIL with the broken current record set aside beside a
+    /// `.unreadable.json` (both given one kept name: refused, MEDIUM 1), or
+    /// a record that names no site said to be last year's website (LOW 3),
+    /// or one not UTF-8 said to be still pinned (LOW 2).
     func testEveryRecordStateRolledOverUndoneAndRedoneLeavesADeployOnTheSameSite() async throws {
         let rows: [[String: Any]] = try UndoRolloverStepTests.netlifyRecordCases()
+        let moment: Date = Date(timeIntervalSince1970: 1_788_000_000)
+        DeployCommand.momentForATest = moment
+        let stamp: String = String(
+            DeployCommand.releasedMarkerName(forSection: 1, at: moment).dropFirst("section1.previous-".count).dropLast(".json".count)
+        )
         for row in rows {
-            for withALeftover in [false, true] {
+            for there in UndoRolloverStepTests.alreadyThere {
                 freshList()
                 let made: AssistFixture.Made = try sectionWith(row)
-                let name: String = (row["name"] as? String ?? "?") + (withALeftover ? ", a leftover already there" : "")
-                if withALeftover {
-                    try "{\"site_id\": \"an-earlier-leftover\"}".write(
-                        to: made.root.appendingPathComponent(UndoRolloverStepTests.leftoverPath), atomically: true, encoding: .utf8
-                    )
+                let name: String = (row["name"] as? String ?? "?") + "; " + there.name
+                let folder: URL = made.course.directoryURL.appendingPathComponent(".netlify_sites")
+                var laid: [URL: String] = [:]
+                for (fileName, contents) in there.files {
+                    let url: URL = folder.appendingPathComponent(fileName.replacingOccurrences(of: "{stamp}", with: stamp))
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try contents.write(to: url, atomically: true, encoding: .utf8)
+                    laid[url] = contents
                 }
                 let before: (reads: String, site: String?) = UndoRolloverStepTests.whatADeployReads(made)
+                let recordBefore: String? = before.reads == "legacy"
+                    ? (try? String(contentsOf: legacyURL(made), encoding: .utf8))
+                    : text(UndoRolloverStepTests.markerPath, in: made)
+
                 let said: AssistToolOutcome = await rollOver(made, surface: .menu)
                 XCTAssertFalse(said.summary.hasPrefix("Nothing was changed"), "\(name): \(said.summary)")
-                XCTAssertEqual(UndoRolloverStepTests.whatADeployReads(made).reads, "none", "\(name): a deploy now starts the new website")
-                if before.reads == "none" {
+                XCTAssertNil(siteADeployReads(made), "\(name): a deploy now starts the new website")
+                if before.site == nil {
                     XCTAssertTrue(said.summary.contains(AssistWording.menuRollOverNotDeployedYet), "\(name): \(said.summary)")
+                    XCTAssertFalse(said.summary.contains("kept at"), "\(name): \(said.summary)")
+                    XCTAssertFalse(said.summary.contains("last year's website"), "\(name): \(said.summary)")
                 } else {
                     XCTAssertFalse(said.summary.contains(AssistWording.menuRollOverNotDeployedYet), "\(name): \(said.summary)")
+                    let keptName: String? = UndoRolloverStepTests.keptNameSaid(in: said.summary)
+                    XCTAssertNotNil(keptName, "\(name): \(said.summary)")
+                    if let keptName {
+                        XCTAssertEqual(
+                            try? String(contentsOf: made.course.directoryURL.appendingPathComponent(keptName), encoding: .utf8),
+                            recordBefore, "\(name): the file named holds last year's details"
+                        )
+                    }
+                }
+                for (url, contents) in laid where !url.lastPathComponent.hasPrefix("section1.from-built-output.") || url.lastPathComponent.contains(".previous-") {
+                    XCTAssertEqual(try? String(contentsOf: url, encoding: .utf8), contents, "\(name): \(url.lastPathComponent) never changed")
                 }
 
                 let list: UndoJournal = journal()
                 XCTAssertEqual(list.undoNewest(resolveRoot: { _ in made.root }), .undone(seq: 1, leftApart: []), name)
-                let afterUndo: (reads: String, site: String?) = UndoRolloverStepTests.whatADeployReads(made)
-                XCTAssertEqual(afterUndo.site, before.site, "\(name): after Undo a deploy goes to the same site")
-                XCTAssertEqual(afterUndo.reads == "none", before.reads == "none", name)
-                if withALeftover {
-                    XCTAssertEqual(
-                        text(UndoRolloverStepTests.leftoverPath, in: made), "{\"site_id\": \"an-earlier-leftover\"}",
-                        "\(name): the leftover back where the step found it"
-                    )
+                XCTAssertEqual(siteADeployReads(made), before.site, "\(name): after Undo a deploy goes to the same site")
+                XCTAssertEqual(UndoRolloverStepTests.whatADeployReads(made).reads == "none", before.reads == "none", name)
+                for (url, contents) in laid {
+                    XCTAssertEqual(try? String(contentsOf: url, encoding: .utf8), contents, "\(name): \(url.lastPathComponent) back where it was")
                 }
 
                 XCTAssertEqual(list.redoNewest(resolveRoot: { _ in made.root }), .redone(seq: 1, leftApart: []), name)
-                XCTAssertEqual(UndoRolloverStepTests.whatADeployReads(made).reads, "none", "\(name): Redo starts the new website again")
+                XCTAssertNil(siteADeployReads(made), "\(name): Redo starts the new website again")
                 XCTAssertFalse(UndoContractReplay.staysBeside(made.root), name)
             }
         }
     }
 
+    /// The `.netlify_sites/…` file a reply says last year's details are
+    /// kept at, as a path inside the course, or nil.
+    static func keptNameSaid(in summary: String) -> String? {
+        guard let start = summary.range(of: ".netlify_sites/section1.previous-"),
+              let end = summary.range(of: ".json", range: start.upperBound..<summary.endIndex) else {
+            return nil
+        }
+        return String(summary[start.lowerBound..<end.upperBound])
+    }
+
     /// The reviewer's probe: a current record that is not JSON (a
     /// migration's `write_text` killed part way) and a good legacy record.
-    /// The broken current record is the leftover, set aside on its own; the
-    /// good legacy record is the section's website, and after Undo a deploy
-    /// goes to it, never a new website. MUST FAIL with the bring-in that
-    /// checked only that a current record existed (after Undo: nil).
+    /// The broken current record is moved out of the way before the step,
+    /// to `section1.unreadable.json`, and never again (no deploy reads it
+    /// there); the good legacy record is the section's website, and after
+    /// Undo a deploy goes to it, never a new website. MUST FAIL with the
+    /// bring-in that checked only that a current record existed (after
+    /// Undo: nil).
     func testABrokenCurrentRecordIsTheLeftoverAndTheGoodLegacyRecordStaysTheWebsite() async throws {
         let made: AssistFixture.Made = try sectionWith(["current": "{\"site_id\": \"la", "legacy": "{\"site_id\":\"legacy-good\"}"])
         XCTAssertEqual(siteADeployReads(made), "legacy-good")
@@ -985,10 +1054,8 @@ final class UndoRolloverStepTests: XCTestCase {
         for op in try journal().read().records[1]?.step.ops ?? [] where op.knownKind == .moveApart || op.knownKind == .setAside {
             kinds[op.from ?? ""] = op.kind
         }
-        XCTAssertEqual(kinds, [
-            UndoRolloverStepTests.markerPath: "moveApart",
-            "courses/ICS3U/.netlify_sites/section1.unreadable.json": "setAside",
-        ])
+        XCTAssertEqual(kinds, [UndoRolloverStepTests.markerPath: "moveApart"])
+        XCTAssertEqual(text("courses/ICS3U/.netlify_sites/section1.unreadable.json", in: made), "{\"site_id\": \"la")
         XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in made.root }), .undone(seq: 1, leftApart: []))
         XCTAssertEqual(siteADeployReads(made), "legacy-good", "after Undo a deploy goes to the legacy record's site")
         XCTAssertEqual(text("courses/ICS3U/.netlify_sites/section1.unreadable.json", in: made), "{\"site_id\": \"la")
@@ -1025,19 +1092,97 @@ final class UndoRolloverStepTests: XCTestCase {
 
     /// A legacy record that is not JSON and no current record: the section
     /// was on no website, and the reply says so, never "started a new
-    /// website… last year's details are kept at…" for a junk file; the junk
-    /// file is a leftover, set aside on its own, and Undo puts it back where
-    /// the step found it (LOW 4). MUST FAIL with the leftover counted among
-    /// the kept records.
+    /// website… last year's details are kept at…" for a junk file (LOW 4).
+    /// The junk file needs no moving (no deploy reads it, before or after)
+    /// and stays where it is (round four). MUST FAIL with the leftover
+    /// counted among the kept records.
     func testALegacyRecordThatIsNotJSONAloneIsANewWebsiteWithNoneBefore() async throws {
         let made: AssistFixture.Made = try sectionWith(["legacy": "not json"])
         let said: AssistToolOutcome = await rollOver(made, surface: .menu)
         XCTAssertTrue(said.summary.contains(AssistWording.menuRollOverNotDeployedYet), said.summary)
         XCTAssertFalse(said.summary.contains("kept"), said.summary)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL(made).path))
+        XCTAssertEqual(try String(contentsOf: legacyURL(made), encoding: .utf8), "not json")
+        XCTAssertNil(text(UndoRolloverStepTests.leftoverPath, in: made))
         XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in made.root }), .undone(seq: 1, leftApart: []))
-        XCTAssertEqual(text(UndoRolloverStepTests.leftoverPath, in: made), "not json")
+        XCTAssertEqual(try String(contentsOf: legacyURL(made), encoding: .utf8), "not json")
         XCTAssertNil(siteADeployReads(made))
+    }
+
+    // MARK: - Fix round four
+
+    /// The review's MEDIUM: a current record that is not JSON beside a
+    /// `section1.unreadable.json` already there (an earlier rollover of the
+    /// round-three state, undone), and no legacy record. The rollover goes
+    /// on and says the section was on no website; neither file moves (a
+    /// deploy reads neither, and writes over the broken record whatever the
+    /// rollover does). MUST FAIL with both set aside under one kept name
+    /// ("Nothing was changed: The file “Macintosh HD” couldn’t be saved.").
+    func testABrokenRecordBesideAnUnreadableLeftoverNeverStopsARollover() async throws {
+        let made: AssistFixture.Made = try sectionWith(["current": "{\"site_id\": \"la"])
+        try "junk".write(
+            to: made.root.appendingPathComponent("courses/ICS3U/.netlify_sites/section1.unreadable.json"), atomically: true, encoding: .utf8
+        )
+        let said: AssistToolOutcome = await rollOver(made, surface: .menu)
+        XCTAssertFalse(said.summary.hasPrefix("Nothing was changed"), said.summary)
+        XCTAssertTrue(said.summary.contains(AssistWording.menuRollOverNotDeployedYet), said.summary)
+        XCTAssertEqual(text(UndoRolloverStepTests.markerPath, in: made), "{\"site_id\": \"la")
+        XCTAssertEqual(text("courses/ICS3U/.netlify_sites/section1.unreadable.json", in: made), "junk")
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in made.root }), .undone(seq: 1, leftApart: []))
+        XCTAssertNil(siteADeployReads(made))
+    }
+
+    /// Two places a step sets aside never get one kept name, and a kept
+    /// name already on disk is passed over (`KeptNames`, MEDIUM 1's rule
+    /// made general). MUST FAIL with a chooser that checks only the disk.
+    func testKeptNamesAreNeverChosenTwiceOrOverAFileThere() throws {
+        let folder: URL = listFolder.appendingPathComponent("kept-names", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "theirs".write(to: folder.appendingPathComponent("section1.previous-S.json"), atomically: true, encoding: .utf8)
+        var names: DeployCommand.KeptNames = DeployCommand.KeptNames()
+        let record: URL = folder.appendingPathComponent("section1.json")
+        XCTAssertEqual(names.choose(for: record, stamp: "S").lastPathComponent, "section1.previous-S.2.json")
+        XCTAssertEqual(names.choose(for: record, stamp: "S").lastPathComponent, "section1.previous-S.3.json")
+        let leftover: URL = folder.appendingPathComponent("section1.from-built-output.json")
+        XCTAssertEqual(names.choose(for: leftover, stamp: "S").lastPathComponent, "section1.from-built-output.previous-S.json")
+    }
+
+    /// launchd refuses the job at Undo, its plist cannot be taken away, and
+    /// a LATER target of the same swap then fails, so the swap rolls back
+    /// and the Undo is refused: the trail never says the schedule was put
+    /// back (round four, LOW 4). MUST FAIL with the line written inside
+    /// the write.
+    func testNoTrailLineForAScheduleWhenItsUndoIsRefused() async throws {
+        let made: AssistFixture.Made = try section(surface: .menu)
+        let label: String = try scheduleADeploy(in: made, at: Date().addingTimeInterval(7 * 86_400))
+        _ = await rollOver(made, surface: .menu)
+        let agents: URL = ScheduledDeploy.plistURL(label: label).deletingLastPathComponent()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: agents.path)
+        }
+        let launchd: FakeLaunchControl = FakeLaunchControl()
+        launchd.bootstrapFailure = "Bootstrap failed: 5: Input/output error"
+        nonisolated(unsafe) var bootstrapped: Bool = false
+        launchd.onBootstrap = { _ in
+            try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: agents.path)
+            bootstrapped = true
+        }
+        nonisolated(unsafe) var failedAfterIt: Bool = false
+        UndoKillPoints.fileInUseAtSwap = { _ in
+            if bootstrapped && !failedAfterIt {
+                failedAfterIt = true
+                return true
+            }
+            return false
+        }
+        let places: UndoAppPlaces = UndoAppPlaces(schedules: UndoScheduledDeploys(runner: launchd))
+        let outcome: UndoOutcome = journal().undoNewest(resolveRoot: { _ in made.root }, places: places)
+        UndoKillPoints.fileInUseAtSwap = nil
+        XCTAssertTrue(failedAfterIt, "the schedule is not the swap's last target; the test needs one after it")
+        guard case .refused = outcome else {
+            return XCTFail("\(outcome)")
+        }
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: false)
+        XCTAssertFalse(trail.contains("put back a scheduled deploy"), trail)
     }
 
     /// A `.from-built-output.json` already there and a DIFFERENT legacy
@@ -1112,6 +1257,9 @@ final class UndoRolloverStepTests: XCTestCase {
                 bytes.append(contentsOf: [0xEF, 0xBB, 0xBF])
             }
             bytes.append(Data(text.utf8))
+            if row["currentEndsWithAByteThatIsNotUTF8"] as? Bool == true {
+                bytes.append(0xFF)
+            }
             try bytes.write(to: current)
         }
         if let text = row["legacy"] as? String {

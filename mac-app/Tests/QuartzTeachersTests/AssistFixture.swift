@@ -83,11 +83,13 @@ enum AssistFixture {
         if hasDeployedBefore {
             // The marker `deploy.py` leaves the first time a section goes out.
             // Without it, scheduling is refused — deploying a section for the
-            // first time asks what to call the website.
+            // first time asks what to call the website. It names its site,
+            // as every record deploy.py writes does: a record that names no
+            // site is not a website a rollover releases (#899 U3b, round four).
             try fileManager.createDirectory(
                 at: courseURL.appendingPathComponent(".netlify_sites"), withIntermediateDirectories: true
             )
-            try "{}".write(
+            try "{\"id\": \"deployed-before\"}".write(
                 to: courseURL.appendingPathComponent(".netlify_sites/section1.json"),
                 atomically: true, encoding: .utf8
             )
