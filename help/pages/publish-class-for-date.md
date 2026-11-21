@@ -56,7 +56,7 @@ You can publish a class for a day that is still some way off. Because you named 
 
 ## Take it back
 
-Choose {{menu:undoLastChange}}. The class and the pages published with it are hidden again. This works while publishing the class is still the last change made from the Section menu in this window. [Show or hide pages for a section](page:publish-pages) has the rules for Undo Last Change.
+Choose {{menu:undoLastChange}}. The class and the pages published with it are hidden again. This works while publishing the class is still the last change made from the Section or Classes menu in this window. [Show or hide pages for a section](page:publish-pages) has the rules for Undo Last Change.
 
 ## If it does not work
 

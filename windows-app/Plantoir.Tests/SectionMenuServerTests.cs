@@ -100,6 +100,34 @@ public class SectionMenuServerTests : IDisposable
         Assert.ThrowsAny<Exception>(() => workspace.Page(course, 1, "../../preview"));
     }
 
+    /// <summary>
+    /// #990 (Russell's ruling "name the real menu"): with the window's call
+    /// naming the Classes menu (<see cref="AssistWorkspace.MenuOfTheChange"/>,
+    /// set from the call's <c>_meta</c> by <c>plantoir-mcp</c>), the copy is
+    /// named <c>_classes-section1</c>, listed as the Classes menu's, and its
+    /// trail line says so. MUST FAIL with the backup ignoring the menu.
+    /// </summary>
+    [Fact]
+    public async Task ACopyBeforeAClassesItemIsNamedForTheClassesMenu()
+    {
+        var workspace = Menu();
+        workspace.MenuOfTheChange = SubjectMenuLayout.Menu.Classes;
+        var tools = new PlantoirTools(workspace);
+
+        await tools.PublishPages("ICS3U", 1, NoProgress, default, new[] { "section1/All Classes/Unit 1, Day 1" }, preview: false);
+
+        string backups = Path.Combine(_folder, "courses", "_backups", "ICS3U");
+        var copies = Directory.GetFiles(backups, "*_classes-section1.zip");
+        Assert.Single(copies);
+        Assert.Empty(MenuBackups());
+        var maker = Assert.IsType<BackupMaker.Menu>(BackupItem.From(copies[0], "ICS3U")!.Maker);
+        Assert.Equal(SubjectMenuLayout.Menu.Classes, maker.InMenu);
+        Assert.Contains("the Classes menu", maker.DescriptionFor(ClassNoun.Class));
+        Assert.Contains("ICS3U/1 · the Classes menu backed up the course as ", File.ReadAllText(_trail));
+        Assert.Equal(SubjectMenuLayout.Menu.Classes, AssistWorkspace.MenuNamed("classes"));
+        Assert.Equal(SubjectMenuLayout.Menu.Section, AssistWorkspace.MenuNamed(null));
+    }
+
     [Fact]
     public async Task EveryChangeSavesItsOwnMenuCopy_AndSaysSoOnTheTrail()
     {

@@ -111,6 +111,9 @@ public sealed class AssistToolRunner
     /// </summary>
     public Func<bool>? SectionIsChangingFromTheMenu { get; init; }
 
+    /// <summary>What the course calls its class pages: the refusal above names "the Section or Meetings menu" in a club (#990).</summary>
+    public ClassNoun CourseNoun { get; init; } = ClassNoun.Class;
+
     /// <summary>
     /// Whether a copy of the course is being saved right now (the work lease's
     /// <c>copying</c>). Asked by the menu's Rebuild Preview only, whose
@@ -209,7 +212,7 @@ public sealed class AssistToolRunner
         // is backed up or written, so two undo lists never interleave on one
         // section. The menu itself, and every read, go ahead.
         if (Surface == AssistSurface.LocalWindow && IsWriteTool(name) && SectionIsChangingFromTheMenu?.Invoke() == true)
-            return Handed(AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString()));
+            return Handed(AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString(), CourseNoun));
 
         // #690: Open in Obsidian is answered by the APP, by pressing the
         // section window's own button (#681's route), never by the server,

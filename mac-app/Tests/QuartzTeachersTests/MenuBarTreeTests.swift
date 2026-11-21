@@ -4,7 +4,7 @@ import XCTest
 
 /// The REAL menu bar, read out of `NSApp.mainMenu` in the hosted app (#457):
 /// its menus in order, and every title, key equivalent and divider in File,
-/// View's own group, Course, Section and Help, against
+/// View's own group, Course, Section, Classes (#990) and Help, against
 /// `mac-app/Tests/Goldens/menu-bar.txt` — plain indented text a reviewer
 /// reads without running anything.
 ///
@@ -17,8 +17,8 @@ import XCTest
 ///   Emoji & Symbols alternates, and Help a hidden ⌥⌘S "Toggle Sidebar".
 /// - **Titles, keys and dividers only** — never enablement, which follows the
 ///   selection and is `SubjectMenuRules`' to pin; and the title that
-///   changes with state (Stop Preview; Remove Scheduled Deploy… no longer
-///   carries the time since #987) is read
+///   changes with state (Stop Preview; Remove Scheduled Deploy no longer
+///   carries the time since #987, nor an ellipsis since #990) is read
 ///   back in their resting form — and so are Preview and its Option
 ///   alternate (#504), which the teacher's setting swaps.
 ///
@@ -123,7 +123,7 @@ final class MenuBarTreeTests: XCTestCase {
             titles.append(item.title)
         }
         lines.append("menus: " + titles.joined(separator: " · "))
-        for name in ["File", "View", "Course", "Section", "Help"] {
+        for name in ["File", "View", "Course", "Section", "Classes", "Help"] {
             lines.append("== " + name)
             let menu: NSMenu = try XCTUnwrap(topMenu(named: name), name)
             var menuLines: [String] = []
@@ -261,7 +261,7 @@ final class MenuBarTreeTests: XCTestCase {
     /// Page ⇧⌘C, and on 23b554773, where Rebuild Preview held ⇧⌘B.
     func testNoItemTakesAStandardShortcut() throws {
         var keys: [String: String] = [:]
-        for name in ["File", "Course", "Section", "Help"] {
+        for name in ["File", "Course", "Section", "Classes", "Help"] {
             let menu: NSMenu = try XCTUnwrap(MenuBarTreeTests.topMenu(named: name))
             var stack: [NSMenu] = [menu]
             while let current = stack.popLast() {

@@ -38,7 +38,7 @@ public class SidebarDeleteKeyUiTests
         Assert.True(Retry.WhileFalse(() => app.OpenDialog() is null, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result);
         Assert.NotNull(app.FindOrNull("sidebar-ICS3U", TimeSpan.FromSeconds(2)));
 
-        // A section of the course kept for reference: Remove Section… is
+        // A section of the course kept for reference: Remove Section is
         // withheld there, so the key does nothing and − is greyed.
         app.SelectSection("ICS3U-2025", 1, shownCode: "ICS3U");
         Assert.True(Retry.WhileFalse(() => !app.Find("removeSelectedButton", "the − button").IsEnabled,

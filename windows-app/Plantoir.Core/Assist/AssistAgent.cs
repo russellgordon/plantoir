@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Assist;
@@ -59,6 +60,18 @@ public sealed record ModelReply(JsonObject Message, string? FinishReason = null,
 /// It used to be one string, shown to the teacher and sent to the model both,
 /// and that single fact is why this app's replies read longer than the mac's.
 /// </summary>
+/// <summary>
+/// A tool server that can be told which menu the next calls come from (#990,
+/// Russell's ruling "name the real menu"): <c>McpClient</c> sends it in each
+/// call's <c>_meta</c> (<see cref="AssistWorkspace.MenuMetaKey"/>), never as a
+/// tool argument, so no tool's schema changes.
+/// </summary>
+public interface IHearsTheMenu
+{
+    /// <summary>The menu's contract name ("section", "classes"), or null to send none.</summary>
+    string? MenuOfTheNextCalls { get; set; }
+}
+
 public interface IToolServer
 {
     Task<AssistToolAnswer> CallTool(string name, JsonObject arguments,
@@ -435,6 +448,14 @@ public sealed class AssistAgent
     /// there (#274). Set by the window, which has the course.
     /// </summary>
     public string? NumberedPageWord { get; init; }
+
+    /// <summary>
+    /// What the window's course calls its class pages, for the one sentence
+    /// that names the menus to the teacher (<see cref="AssistWording.SectionIsChangingFromTheMenu"/>):
+    /// "the Section or Meetings menu" in a club (#990). Set by the window,
+    /// which has the course.
+    /// </summary>
+    public ClassNoun CourseNoun { get; init; } = ClassNoun.Class;
     private readonly int _section;
 
     public AssistAgent(IChatModel model, IToolServer tools, JsonArray schemas, string courseCode, int section)
@@ -996,7 +1017,7 @@ public sealed class AssistAgent
                 // under a change the menu is making.
                 bool menuIsChanging = SectionIsChangingFromTheMenu?.Invoke() == true;
                 string said = menuIsChanging
-                    ? AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString())
+                    ? AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString(), CourseNoun)
                     : ThisSectionIsBeingDeployed()
                     ? SectionIsBeingDeployedSentence
                     : "The preview is opening in Plantoir's main window — the build shows its progress there.";
@@ -1765,7 +1786,7 @@ public sealed class AssistAgent
         if (!deploying && !menuIsChanging)
             (rebuild && RebuildPreviewInApp is not null ? RebuildPreviewInApp : ShowPreviewInApp).Invoke();
         string said = menuIsChanging
-            ? AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString())
+            ? AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString(), CourseNoun)
             : deploying
             ? SectionIsBeingDeployedSentence
             : "The preview is opening in Plantoir's main window — the build shows its progress there.";
@@ -2277,6 +2298,7 @@ public sealed class AssistAgent
             ShowPreviewInApp = ShowPreviewInApp,
             RebuildPreviewInApp = RebuildPreviewInApp,
             SectionIsChangingFromTheMenu = SectionIsChangingFromTheMenu,
+            CourseNoun = CourseNoun,
             StartDeployInApp = StartDeployInApp,
             StartDeployInAppAsync = StartDeployInAppAsync,
             AskAboutClassesDatedLaterInApp = AskAboutClassesDatedLaterInApp,

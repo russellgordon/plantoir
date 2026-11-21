@@ -72,8 +72,8 @@ ready.
   deployed, Plantoir offers to deploy so your website matches.
   ([#899](https://github.com/russellgordon/plantoir/issues/899))
 - **Everything the built-in assistant can do is also in the menus.**
-  Section ▸ Add Class… adds the next class in this unit, the first class of a
-  new unit, or a copy of an earlier class; Section ▸ Roll Over to a New Year…
+  Classes ▸ Add Class… adds the next class in this unit, the first class of a
+  new unit, or a copy of an earlier class; Classes ▸ Roll Over to a New Year…
   starts a section's new year; a single section can be put back from a
   backup; and Publish Pages… and Hide Pages… gain a box for each unit, so a
   whole unit can be ticked at once.

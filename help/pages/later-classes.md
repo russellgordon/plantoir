@@ -60,7 +60,7 @@ If you untick every class, all of them are hidden and the section is still deplo
 
 ## Put an unticked class back
 
-- **Straight away:** choose {{menu:undoLastChange}}. The classes you unticked are published again. This works while it is still the last change made from the Section menu in this window.
+- **Straight away:** choose {{menu:undoLastChange}}. The classes you unticked are published again. This works while it is still the last change made from the Section or Classes menu in this window.
 - **Later:** publish the class with {{menu:publishPages}} or {{menu:publishClassForDate}}.
 
 Either way, students see the class after the section is next deployed.

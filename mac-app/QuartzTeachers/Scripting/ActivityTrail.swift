@@ -467,7 +467,7 @@ nonisolated enum ActivityTrail {
         /// Named for the OUTCOME rather than for today's single cause, the way
         /// `folderProblemNotRepaired` is: a second reason a copy is not made
         /// joins this line rather than earning a rename on both platforms.
-        /// The second arrived with #897: Section ▸ Add Class…, as a copy of a
+        /// The second arrived with #897: Classes ▸ Add Class…, as a copy of a
         /// class, reads its copy back before writing anything, and when the copy
         /// cannot be made certainly hidden it writes nothing and says so here.
         case classCopyNotMade = "class copy not made"
@@ -1835,16 +1835,22 @@ nonisolated enum ActivityTrail {
     }
 
     /// The words for `sectionMenuBackedUpACourse` (#457): the copy the
-    /// Section menu saves before each change it makes.
-    static func sectionMenuBackedUpLine(fileName: String, bytes: Int64, seconds: Double) -> String {
+    /// Section or Classes menu saves before each change it makes, naming the
+    /// menu the item is in (#990, "name the real menu") by the title the
+    /// course's menu bar gives it (Meetings in a club). The event keeps its
+    /// name from before the split.
+    static func sectionMenuBackedUpLine(
+        fileName: String, bytes: Int64, seconds: Double, inMenu: SubjectMenuLayout.Menu, noun: ClassNoun
+    ) -> String {
         let megabytes: String = String(format: "%.1f", Double(bytes) / 1_000_000)
         let took: String = String(format: "%.1f", seconds)
-        return "the Section menu backed up the course as \(fileName) (\(megabytes) MB, \(took) s)"
+        let menu: String = SubjectMenuLayout.title(of: inMenu, noun: noun)
+        return "the \(menu) menu backed up the course as \(fileName) (\(megabytes) MB, \(took) s)"
     }
 
-    /// The words for a Section menu backup that could not be made.
-    static func sectionMenuCouldNotBackUpLine(reason: String) -> String {
-        return "the Section menu could not back up the course: \(reason)"
+    /// The words for a menu backup that could not be made.
+    static func sectionMenuCouldNotBackUpLine(reason: String, inMenu: SubjectMenuLayout.Menu, noun: ClassNoun) -> String {
+        return "the \(SubjectMenuLayout.title(of: inMenu, noun: noun)) menu could not back up the course: \(reason)"
     }
 
     /// Where a start-of-the-year act was asked from, in the trail's words.

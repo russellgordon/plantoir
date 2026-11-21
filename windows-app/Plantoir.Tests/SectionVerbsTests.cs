@@ -99,17 +99,17 @@ public class SectionVerbsTests : IDisposable
         Assert.False(verbs.LastChangeIsIn("ICS3U", 1));
 
         var plan = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "section1/All Classes/Unit 1, Day 1" }, plan: true),
-                                       "Section ▸ Publish Pages…", "ICS3U", 1, "1 page ticked");
+                                       "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "1 page ticked");
         Assert.True(plan.IsPlan);
         Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
 
         await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "section1/All Classes/Unit 1, Day 1" }, plan: false),
-                            "Section ▸ Publish Pages…", "ICS3U", 1, "1 page ticked");
+                            "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "1 page ticked");
         Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
         Assert.True(verbs.LastChangeIsIn("ICS3U", 1));
         Assert.False(verbs.LastChangeIsIn("ICS3U", 2));
 
-        var undone = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+        var undone = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1, SubjectMenuLayout.Menu.Section);
         Assert.StartsWith("Undone. Earlier, you ", undone.Summary);
         Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
         Assert.False(verbs.LastChangeIsIn("ICS3U", 1));
@@ -129,7 +129,7 @@ public class SectionVerbsTests : IDisposable
         await using var verbs = Verbs(out _);
 
         await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "section1/All Classes/Unit 1, Day 2" }, plan: false),
-                            "Section ▸ Publish Pages…", "ICS3U", 1, "1 page ticked");
+                            "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "1 page ticked");
 
         Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — changed nothing, 1 page ticked", File.ReadAllText(_trail));
         Assert.False(verbs.LastChangeIsIn("ICS3U", 1));
@@ -150,11 +150,11 @@ public class SectionVerbsTests : IDisposable
         await using var verbs = Verbs(out _, history);
 
         await verbs.Perform(SectionVerbs.MakeRoomForClasses("ICS3U", 1, unit: 1, atDay: 2, howMany: 1, plan: false),
-                            "Section ▸ Make Room for Classes…", "ICS3U", 1, "room for 1");
+                            "Classes ▸ Make Room for Classes…", "ICS3U", 1, SubjectMenuLayout.Menu.Classes, "room for 1");
 
         Assert.True(File.Exists(Page("Unit 1, Day 3")), "the class after the new one was renamed");
         Assert.Empty(history.Entries);
-        Assert.Contains("ICS3U/1 · Section ▸ Make Room for Classes… — carried out, room for 1", File.ReadAllText(_trail));
+        Assert.Contains("ICS3U/1 · Classes ▸ Make Room for Classes… — carried out, room for 1", File.ReadAllText(_trail));
     }
 
     /// <summary>
@@ -178,7 +178,7 @@ public class SectionVerbsTests : IDisposable
 
         foreach (string title in new[] { "Unit 1, Day 1", "Unit 1, Day 2" })
             await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "section1/All Classes/" + title }, plan: false),
-                                "Section ▸ Publish Pages…", "ICS3U", 1, "1 page ticked");
+                                "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "1 page ticked");
 
         Assert.Equal(20, history.Entries.Count);
         Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 2")));
@@ -239,11 +239,11 @@ public class SectionVerbsTests : IDisposable
         var history = new UndoHistory();
         await using var verbs = Verbs(out _, history);
         await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
-                            "Section ▸ Publish Pages…", "ICS3U", 1, "2 pages ticked");
+                            "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "2 pages ticked");
         string published = File.ReadAllText(Page("Unit 1, Day 2"));
         File.WriteAllText(Page("Unit 1, Day 2"), published + "Edited since.\n");
 
-        await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+        await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1, SubjectMenuLayout.Menu.Section);
 
         Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
         Assert.Single(history.Entries);
@@ -251,14 +251,14 @@ public class SectionVerbsTests : IDisposable
         Assert.DoesNotContain("— took the last change back", File.ReadAllText(_trail));
 
         File.WriteAllText(Page("Unit 1, Day 2"), published);
-        var second = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+        var second = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1, SubjectMenuLayout.Menu.Section);
 
         Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 2")));
         Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
         Assert.Empty(history.Entries);
         Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — took the last change back", File.ReadAllText(_trail));
 
-        var third = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+        var third = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1, SubjectMenuLayout.Menu.Section);
         Assert.Equal(AssistWording.NothingToUndoFromTheMenu, third.Summary);
         Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — changed nothing", File.ReadAllText(_trail));
         Assert.NotEqual(third.Summary, second.Summary);
@@ -274,11 +274,11 @@ public class SectionVerbsTests : IDisposable
         var history = new UndoHistory();
         await using var verbs = Verbs(out _, history);
         await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
-                            "Section ▸ Publish Pages…", "ICS3U", 1, "2 pages ticked");
+                            "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "2 pages ticked");
         File.AppendAllText(Page("Unit 1, Day 2"), "Edited since.\n");
-        await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+        await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1, SubjectMenuLayout.Menu.Section);
 
-        var again = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+        var again = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1, SubjectMenuLayout.Menu.Section);
 
         Assert.Single(history.Entries);
         Assert.StartsWith(AssistWording.CouldNotUndoFromTheMenu(history.Entries[0].Description, 1), again.Summary);
@@ -297,7 +297,7 @@ public class SectionVerbsTests : IDisposable
         AssistToolAnswer answer;
         using (HeldAgainstWriting(Page("Unit 1, Day 2")))
             answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
-                                         "Section ▸ Publish Pages…", "ICS3U", 1, "2 pages ticked");
+                                         "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "2 pages ticked");
 
         Assert.StartsWith(AssistWording.PublishStoppedPartWay("the pages you named", ""), answer.Summary);
         Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
@@ -312,7 +312,7 @@ public class SectionVerbsTests : IDisposable
         AssistToolAnswer answer;
         using (HeldAgainstWriting(Page("Unit 1, Day 2")))
             answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1" }, plan: false),
-                                         "Section ▸ Publish Pages…", "ICS3U", 1, "1 unit");
+                                         "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "1 unit");
 
         Assert.StartsWith(AssistWording.PublishStoppedPartWay("Unit 1", ""), answer.Summary);
         Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
@@ -331,7 +331,7 @@ public class SectionVerbsTests : IDisposable
         AssistToolAnswer answer;
         using (HeldAgainstWriting(Page("Unit 1, Day 1")))
             answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { BothPages[0] }, plan: false),
-                                         "Section ▸ Publish Pages…", "ICS3U", 1, "1 page ticked");
+                                         "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "1 page ticked");
 
         Assert.StartsWith("Nothing was changed: ", answer.Summary);
         Assert.DoesNotContain("Only part of", answer.Summary);
@@ -352,7 +352,7 @@ public class SectionVerbsTests : IDisposable
         AssistToolAnswer answer;
         using (HeldAgainstWriting(Page("Unit 1, Day 2")))
             answer = await verbs.Perform(SectionVerbs.ReDateClasses("ICS3U", 1, plan: false),
-                                         "Section ▸ Re-date Classes…", "ICS3U", 1);
+                                         "Classes ▸ Re-date Classes…", "ICS3U", 1, SubjectMenuLayout.Menu.Classes);
 
         string said = answer.Summary + "\n" + answer.Detail;
         Assert.StartsWith(AssistWording.PublishStoppedPartWay("the section's class dates", ""), answer.Summary);
@@ -364,7 +364,7 @@ public class SectionVerbsTests : IDisposable
         Assert.DoesNotContain("couldn’t be read", said);
         Assert.DoesNotContain("Nothing was changed", said);
         Assert.Contains("2026-10-01", File.ReadAllText(Page("Unit 1, Day 1")));
-        Assert.Contains("ICS3U/1 · Section ▸ Re-date Classes… — carried out", File.ReadAllText(_trail));
+        Assert.Contains("ICS3U/1 · Classes ▸ Re-date Classes… — carried out", File.ReadAllText(_trail));
     }
 
     /// <summary>
@@ -380,11 +380,11 @@ public class SectionVerbsTests : IDisposable
         AssistToolAnswer answer;
         using (HeldAgainstWriting(Page("Unit 1, Day 1")))
             answer = await verbs.Perform(SectionVerbs.ReDateClasses("ICS3U", 1, plan: false),
-                                         "Section ▸ Re-date Classes…", "ICS3U", 1);
+                                         "Classes ▸ Re-date Classes…", "ICS3U", 1, SubjectMenuLayout.Menu.Classes);
 
         Assert.StartsWith("Nothing was changed: ", answer.Summary);
         Assert.DoesNotContain("couldn’t be read", answer.Summary);
-        Assert.Contains("ICS3U/1 · Section ▸ Re-date Classes… — changed nothing", File.ReadAllText(_trail));
+        Assert.Contains("ICS3U/1 · Classes ▸ Re-date Classes… — changed nothing", File.ReadAllText(_trail));
     }
 
     /// <summary>Two meetings in October, so both class pages change date, Day 1 first.</summary>
@@ -457,7 +457,7 @@ public class SectionVerbsTests : IDisposable
             };
             var (answer, handed) = await runner.Run(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1, Day 1" }, plan: false), default);
             Assert.True(handed);
-            Assert.Equal(AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1"), answer.Summary);
+            Assert.Equal(AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1", ClassNoun.Class), answer.Summary);
             Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
 
             // A read is never held back.
@@ -549,7 +549,7 @@ public class SectionVerbsTests : IDisposable
         };
 
         var refused = await agent.Say("rebuild the preview", CancellationToken.None);
-        Assert.Contains(refused, line => line.Text == AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1"));
+        Assert.Contains(refused, line => line.Text == AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1", ClassNoun.Class));
         Assert.Equal(0, rebuilt);
 
         await agent.Say("preview", CancellationToken.None);

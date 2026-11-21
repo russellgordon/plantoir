@@ -9,8 +9,13 @@ namespace Plantoir.Core.Models;
 /// </summary>
 public static class ScheduledDeployRemovalWording
 {
-    /// <summary>Section ▸ Remove Scheduled Deploy…, and the same item in a section's right-click menu.</summary>
-    public const string MenuItem = "Remove Scheduled Deploy…";
+    /// <summary>
+    /// Section ▸ Remove Scheduled Deploy, and the same item in a section's
+    /// right-click menu. No ellipsis since #990 (Russell, 2026-11-20): it only
+    /// asks for a confirmation, and an ellipsis goes on a command only when
+    /// more information must be provided.
+    /// </summary>
+    public const string MenuItem = "Remove Scheduled Deploy";
 
     /// <summary>The question's title: a full question, so sentence case and a question mark.</summary>
     public const string Question = "Remove the scheduled deploy?";
