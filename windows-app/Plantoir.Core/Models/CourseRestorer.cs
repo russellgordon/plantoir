@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.IO.Compression;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Models;
 
@@ -8,7 +10,16 @@ namespace Plantoir.Core.Models;
 /// </summary>
 public static class CourseRestorer
 {
-    public sealed class RestoreException(string message) : Exception(message);
+    public class RestoreException(string message) : Exception(message);
+
+    /// <summary>
+    /// A one-section restore moved a file and then could not move every file
+    /// back (#911, the mac's <c>sectionRestoreStoppedPartWay</c>): the message
+    /// is the whole sentence, <c>wording.stoppedPartWay</c> or
+    /// <c>stoppedPartWayNothingToOpen</c>, so a caller says it as it is and
+    /// never puts "Nothing was put back:" in front.
+    /// </summary>
+    public sealed class SectionRestoreStoppedPartWay(string message) : RestoreException(message);
 
     public static void Restore(ArchivedItem item, string coursesDirectory, IReadOnlyList<Course> courses)
     {
@@ -113,7 +124,9 @@ public static class CourseRestorer
 
 
     /// <summary>
-    /// Puts ONE section back to how a backup has it, and touches no other.
+    /// Puts ONE section back to how a backup has it, and touches no other:
+    /// the built-in assistant window's "Restore Section N…" (the mac's
+    /// <c>restoreSection</c>).
     ///
     /// <para>Whole-course restore was rejected for this job for the reason
     /// the mac's <c>AssistSectionRestore</c> gives: a teacher can be marking
@@ -122,54 +135,359 @@ public static class CourseRestorer
     /// is replaced wholesale, hidden files included; the course's SHARED pages
     /// keep every byte except this section's own per-section frontmatter keys
     /// (<c>publishForSection1:</c> and its relatives), which go back to what
-    /// the backup had — a key the conversation added where there was none
-    /// goes, one it removed comes back — so whether the shared pages are
-    /// published for this section is restored without touching what they
-    /// say for any other; and the section's built site is discarded, because
+    /// the backup had; and the section's built site is discarded, because
     /// a build left standing would read as newer than the pages just put back.</para>
     ///
-    /// <para>The zip is unpacked and checked BEFORE the course is touched, so
-    /// an unreadable backup can never leave an emptied section folder behind.
-    /// Mirrors the mac's <c>CourseRestorer.restoreSection</c>.</para>
+    /// <para><b>Staged, then swapped, with a way back (#911, the mac's #897 C,
+    /// by Russell's ruling on #897 for this route too).</b> The backup is
+    /// unpacked into <c>courses\.internal\restoring\&lt;id&gt;\</c>, on the
+    /// courses' own volume, so every move is a rename (<c>%TEMP%</c> can be
+    /// another volume, where <c>Directory.Move</c> refuses: #873's first
+    /// fault). Nothing in the course moves until the backup is unpacked and
+    /// checked; then <see cref="SwapSectionInPlace"/> moves the live children
+    /// aside, moves the backup's in, and on a failure moves every moved file
+    /// back. Before this the section folder was EMPTIED first and refilled,
+    /// and a move that failed part way (a file Obsidian or an editor holds
+    /// open) left it half empty.</para>
     /// </summary>
+    /// <param name="hooks">The moves and the points a test or the kill harness stops at; <see cref="SectionSwapHooks.Real"/> otherwise.</param>
     /// <returns>How many shared pages kept their current setting because there was nowhere on them to put the backup's back (#308).</returns>
-    public static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory)
+    public static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory, SectionSwapHooks? hooks = null)
     {
+        hooks ??= SectionSwapHooks.Real;
         string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
         if (!Directory.Exists(courseDir))
             throw new RestoreException($"{item.CourseCode} is not in Courses & Clubs, so there is nowhere to put Section {sectionNumber} back.");
         if (ReadsAsKeptForReference(courseDir) is { } shown)
             throw new RestoreException(ReferenceCourse.StaysAsItIs(shown));
 
-        string staging = Path.Combine(Path.GetTempPath(), "restore-" + Guid.NewGuid());
-        Directory.CreateDirectory(staging);
+        var staging = new RestoreStaging(coursesDirectory);
         try
         {
-            string payload = Unpack(item.FilePath, item.CourseCode, staging);
+            string payload = staging.Unpack(item);
             string folderName = "section" + sectionNumber;
-            string backedUpSection = Path.Combine(payload, folderName);
-            if (!Directory.Exists(backedUpSection))
+            if (!Directory.Exists(Path.Combine(payload, folderName)))
                 throw new RestoreException($"The copy of {item.CourseCode} does not hold a Section {sectionNumber}.");
+            hooks.Reached(SwapPoint.Staged);
 
-            ReplaceContents(Path.Combine(courseDir, folderName), backedUpSection);
+            try
+            {
+                SwapSectionInPlace(sectionNumber, courseDir, payload, Array.Empty<OneSectionRestore.OutsideFile>(), staging.Aside, hooks);
+            }
+            catch (WayBackDidNotFinish)
+            {
+                // The window makes no archive first, so it may not say one is in Archived.
+                var kept = KeepTheSetAsideFiles(staging.Aside, sectionNumber, item.CourseCode, coursesDirectory);
+                staging.KeepAside = kept.IsStillInStaging;
+                throw new SectionRestoreStoppedPartWay(StoppedPartWaySentence(sectionNumber, kept.PathToSay, archived: false));
+            }
             int notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
+            // The course's kept copies of geogebra.org sketches live at course
+            // level (builds\<id>\<CODE>\.geogebra-cache), so a section's discard
+            // never reaches them (#805; KeptCopiesTests).
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode, sectionNumber);
             return notPutBack;
         }
         finally
         {
-            try { Directory.Delete(staging, recursive: true); } catch { }
+            staging.Finish();
         }
     }
 
+    // ---- The staged swap of one section (#911, the mac's #897 C) ----------
+
     /// <summary>
-    /// Out with the live folder's children, hidden ones included; in with the
-    /// backup's. Moved when the staging folder is on the same volume, COPIED
-    /// when it is not: <c>Directory.Move</c> fails across volumes on Windows,
-    /// and a working folder on D: with %TEMP% on C: would otherwise be left
-    /// with an emptied section — the one outcome this method exists to
-    /// prevent. (The mac's <c>moveItem</c> copies across volumes itself.)
+    /// Points a test, or the kill harness, can stop a one-section restore at
+    /// (the mac's <c>SwapPoint</c>).
     /// </summary>
+    public enum SwapPoint
+    {
+        /// <summary>The backup is unpacked and checked; nothing in the course has moved.</summary>
+        Staged,
+        /// <summary>Every live file the swap replaces is aside and none of the backup's is in: the moment the old code had an EMPTY section folder.</summary>
+        SetAside,
+    }
+
+    /// <summary>
+    /// How a one-section restore moves an entry, and what it does at each
+    /// <see cref="SwapPoint"/> (the mac's <c>SectionSwapHooks</c>).
+    /// <see cref="Real"/> everywhere but the tests: the double-failure sweep
+    /// throws from <see cref="Move"/>, the real-fault tests only interleave a
+    /// real file handle with it, and the kill harness blocks in it.
+    /// </summary>
+    public sealed class SectionSwapHooks
+    {
+        public required Action<string, string> Move { get; init; }
+        public required Action<SwapPoint> Reached { get; init; }
+
+        public static SectionSwapHooks Real { get; } = new() { Move = MoveEntry, Reached = _ => { } };
+    }
+
+    /// <summary>
+    /// Renames one entry: a folder (or a junction or folder link, which moves
+    /// AS a link) with <c>Directory.Move</c>, anything else with
+    /// <c>File.Move</c>. Never a copy: both refuse another volume, which the
+    /// staging folder beside the courses makes impossible.
+    /// </summary>
+    public static void MoveEntry(string source, string destination)
+    {
+        if ((File.GetAttributes(source) & FileAttributes.Directory) != 0) Directory.Move(source, destination);
+        else File.Move(source, destination);
+    }
+
+    /// <summary>Thrown by <see cref="SwapSectionInPlace"/> when a move failed AND a move back failed too.</summary>
+    private sealed class WayBackDidNotFinish : Exception;
+
+    /// <summary>
+    /// A restore's working folder, <c>courses\.internal\restoring\&lt;id&gt;\</c>
+    /// (the mac's <c>stagingFolderBesideTheCourses</c>), holding <c>backup\</c>
+    /// (the unpacked zip) and <c>as-it-was\</c> (what the swap moves aside).
+    /// The mac uses two separate id folders for the assistant's route; one
+    /// with two inner folders is the same promise and one place to name.
+    /// </summary>
+    private sealed class RestoreStaging
+    {
+        private readonly string _root;
+        private readonly string _unpacked;
+
+        public RestoreStaging(string coursesDirectory)
+        {
+            _root = Path.Combine(coursesDirectory, ".internal", "restoring", Guid.NewGuid().ToString("D").ToUpperInvariant());
+            _unpacked = Path.Combine(_root, "backup");
+            Aside = Path.Combine(_root, "as-it-was");
+        }
+
+        public string Aside { get; }
+
+        /// <summary>True when the aside folder holds the only copy of something and must stay.</summary>
+        public bool KeepAside { get; set; }
+
+        public string Unpack(BackupItem item)
+        {
+            Directory.CreateDirectory(_unpacked);
+            return CourseRestorer.Unpack(item.FilePath, item.CourseCode, _unpacked);
+        }
+
+        /// <summary>
+        /// The unpacked backup always goes. The aside folder goes unless it
+        /// must stay: kept by a way back that did not finish, or holding
+        /// something backups leave out that went aside inside a folder of the
+        /// section (a deeper <c>.git</c>: invariant 2 of the brief, "an only
+        /// copy is never deleted"; the question is parked in the notes). Then
+        /// <c>restoring</c> and <c>.internal</c>, each only when empty
+        /// (<c>Directory.Delete</c> non-recursive refuses a folder that is not,
+        /// so a lease written into <c>.internal\activity</c> meanwhile is safe:
+        /// the mac's <c>rmdir</c>).
+        /// </summary>
+        public void Finish()
+        {
+            try { if (Directory.Exists(_unpacked)) DeleteTree(_unpacked); } catch { /* litter, never loss */ }
+            bool keep = KeepAside || HoldsSomethingBackupsLeaveOut(Aside);
+            if (!keep)
+            {
+                try { if (Directory.Exists(Aside)) DeleteTree(Aside); } catch { return; }
+            }
+            string? folder = _root;
+            for (int level = 0; level < 3 && folder is not null; level++)
+            {
+                try { Directory.Delete(folder, recursive: false); }
+                catch { return; }
+                folder = Path.GetDirectoryName(folder);
+            }
+        }
+    }
+
+    /// <summary>Whether anything at any depth of <paramref name="folder"/> is named as backups leave out (<see cref="CourseArchiver.ExcludedFromArchives"/>).</summary>
+    private static bool HoldsSomethingBackupsLeaveOut(string folder)
+    {
+        if (!Directory.Exists(folder)) return false;
+        var pending = new Stack<string>();
+        pending.Push(folder);
+        while (pending.Count > 0)
+        {
+            string current = pending.Pop();
+            IEnumerable<FileSystemInfo> entries;
+            try { entries = new DirectoryInfo(current).EnumerateFileSystemInfos("*", ReferenceLock.Unfiltered).ToList(); }
+            catch { return true; }                                   // cannot tell: keep it
+            foreach (var entry in entries)
+            {
+                if (CourseArchiver.ExcludedFromArchives.Contains(entry.Name)) return true;
+                if ((entry.Attributes & FileAttributes.Directory) != 0 && (entry.Attributes & FileAttributes.ReparsePoint) == 0)
+                    pending.Push(entry.FullName);
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Swaps a section's folder contents, and the files of it that live
+    /// outside the folder, for the backup's, with a way back (the mac's
+    /// <c>swapSectionInPlace</c>, move for move).
+    ///
+    /// <para>Out first, then in: every live child of <c>section&lt;N&gt;\</c>
+    /// and every live outside file the list does not leave alone moves into
+    /// <paramref name="aside"/>; then the backup's move into place. The folder
+    /// <c>section&lt;N&gt;</c> itself never moves (Obsidian's watcher holds on
+    /// to it). If any move fails, every move already made is made backwards,
+    /// last first, and <c>wording.leftAsItWas</c> is thrown; if one of THOSE
+    /// fails, <see cref="WayBackDidNotFinish"/> is thrown and the aside folder
+    /// must be kept, because it then holds the only copy of what the section
+    /// had.</para>
+    ///
+    /// <para><b>One difference from the mac, on purpose:</b> a child of the
+    /// section folder named as backups leave out
+    /// (<see cref="CourseArchiver.ExcludedFromArchives"/>, <c>.git</c> and
+    /// <c>node_modules</c> among them) is in neither the backup nor the
+    /// archive made first, so it is LEFT WHERE IT IS: never moved aside, never
+    /// deleted (Russell's ruling on #909, "a restore never deletes a course's
+    /// <c>.git</c>"). The mac's swap on <c>dev</c> moves it aside and deletes
+    /// it with the aside folder (documentation 09, "Two edges").</para>
+    /// </summary>
+    private static void SwapSectionInPlace(int sectionNumber, string courseDir, string payload,
+        IReadOnlyList<OneSectionRestore.OutsideFile> outsideFiles, string aside, SectionSwapHooks hooks,
+        Action<string>? keepingWhatWasReplaced = null)
+    {
+        string folderName = "section" + sectionNumber;
+        string liveSection = Path.Combine(courseDir, folderName);
+        string backedUpSection = Path.Combine(payload, folderName);
+        string asideSection = Path.Combine(aside, folderName);
+        string asideOutside = Path.Combine(aside, "outside");
+        Directory.CreateDirectory(liveSection);
+        Directory.CreateDirectory(asideSection);
+        Directory.CreateDirectory(asideOutside);
+
+        var done = new List<(string From, string To)>();
+        try
+        {
+            // Out: the section's own entries, hidden ones included.
+            foreach (var child in new DirectoryInfo(liveSection).EnumerateFileSystemInfos("*", ReferenceLock.Unfiltered).ToList())
+            {
+                if (CourseArchiver.ExcludedFromArchives.Contains(child.Name)) continue;
+                string destination = Path.Combine(asideSection, child.Name);
+                hooks.Move(child.FullName, destination);
+                done.Add((child.FullName, destination));
+            }
+            // Out: the section's files outside its folder.
+            foreach (var file in outsideFiles)
+            {
+                if (file.Treatment == OneSectionRestore.Treatment.LeftAsItIs) continue;
+                string relative = file.PathFor(sectionNumber);
+                string live = Path.Combine(courseDir, relative);
+                if (!File.Exists(live) && !Directory.Exists(live)) continue;
+                string destination = Path.Combine(asideOutside, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                hooks.Move(live, destination);
+                done.Add((live, destination));
+            }
+            hooks.Reached(SwapPoint.SetAside);
+            // In: the backup's section entries.
+            foreach (var child in new DirectoryInfo(backedUpSection).EnumerateFileSystemInfos("*", ReferenceLock.Unfiltered).ToList())
+            {
+                string destination = Path.Combine(liveSection, child.Name);
+                hooks.Move(child.FullName, destination);
+                done.Add((child.FullName, destination));
+            }
+            // In: the backup's files outside the folder, where it has them.
+            foreach (var file in outsideFiles)
+            {
+                if (file.Treatment != OneSectionRestore.Treatment.FromTheBackup) continue;
+                string relative = file.PathFor(sectionNumber);
+                string backedUp = Path.Combine(payload, relative);
+                if (!File.Exists(backedUp) && !Directory.Exists(backedUp)) continue;
+                string destination = Path.Combine(courseDir, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                hooks.Move(backedUp, destination);
+                done.Add((backedUp, destination));
+            }
+        }
+        catch (Exception error) when (error is not WayBackDidNotFinish)
+        {
+            bool everyFileIsBack = true;
+            for (int index = done.Count - 1; index >= 0; index--)
+            {
+                try { hooks.Move(done[index].To, done[index].From); }
+                catch { everyFileIsBack = false; }
+            }
+            if (!everyFileIsBack) throw new WayBackDidNotFinish();
+            throw new RestoreException(OneSectionRestoreWording.LeftAsItWas(sectionNumber, error.Message));
+        }
+        keepingWhatWasReplaced?.Invoke(aside);
+    }
+
+    /// <summary>Where a stopped restore kept what it set aside, and whether a teacher would find anything there.</summary>
+    internal sealed record SetAsideFiles(string Path, bool HoldsSomethingToOpen, bool IsStillInStaging)
+    {
+        /// <summary>The path the teacher is told, or null when there is nothing there to open.</summary>
+        public string? PathToSay => HoldsSomethingToOpen ? Path : null;
+    }
+
+    /// <summary>
+    /// Moves the files a stopped restore set aside to
+    /// <c>courses\_backups\&lt;CODE&gt;\Section N before a restore &lt;stamp&gt;</c>
+    /// (the mac's <c>keepTheSetAsideFiles</c>): the one place in a working
+    /// folder that already holds copies of the course, on the same volume (a
+    /// rename), where nothing reads a FOLDER (<see cref="Workspace"/>'s
+    /// backup and archive lists read top-level <c>.zip</c> names only). When
+    /// that move fails, the files stay in <c>courses\.internal\restoring\</c>
+    /// and that path is what is said. Writes <c>section restore stopped part
+    /// way</c>: the course, the section and the path, never a page.
+    /// </summary>
+    internal static SetAsideFiles KeepTheSetAsideFiles(string aside, int sectionNumber, string courseCode, string coursesDirectory)
+    {
+        string trimmed = coursesDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string workingFolder = Path.GetDirectoryName(trimmed) ?? trimmed;
+        string shelf = Path.Combine(trimmed, "_backups", courseCode);
+        // No comma: the sentence that names it puts punctuation after it.
+        string name = $"Section {sectionNumber} before a restore " + DateTime.Now.ToString(ArchivedItem.StampFormat, CultureInfo.InvariantCulture);
+        string kept = aside;
+        try
+        {
+            Directory.CreateDirectory(shelf);
+            string destination = Path.Combine(shelf, name);
+            Directory.Move(aside, destination);
+            kept = destination;
+        }
+        catch
+        {
+            kept = aside;
+        }
+        string keptAt = Path.GetRelativePath(workingFolder, kept);
+        ActivityTrail.Note(ActivityTrail.Event.SectionRestoreStoppedPartWay,
+            ActivityTrail.SectionRestoreStoppedPartWayLine(keptAt), courseCode, sectionNumber);
+        return new SetAsideFiles(keptAt, HoldsAFileATeacherWouldOpen(kept), string.Equals(kept, aside, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Whether a folder holds a file whose path inside it has no part starting
+    /// with a dot (the mac's <c>holdsAFileFinderShows</c>, the same rule:
+    /// what is left otherwise is Plantoir's own records, such as
+    /// <c>outside\.internal\timetable\section2.json</c>, and not a page).
+    /// Explorer does show dot-named files; the rule is kept as the mac's so
+    /// the two apps choose the same sentence for the same folder.
+    /// </summary>
+    private static bool HoldsAFileATeacherWouldOpen(string folder)
+    {
+        if (!Directory.Exists(folder)) return false;
+        foreach (string file in Directory.EnumerateFiles(folder, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0, IgnoreInaccessible = true }))
+        {
+            string relative = Path.GetRelativePath(folder, file);
+            bool hidden = false;
+            foreach (string part in relative.Split(Path.DirectorySeparatorChar))
+                if (part.StartsWith('.')) hidden = true;
+            if (!hidden) return true;
+        }
+        return false;
+    }
+
+    /// <summary>The sentence for a restore whose way back did not finish (the mac's <c>Problem.sectionRestoreStoppedPartWay</c>).</summary>
+    internal static string StoppedPartWaySentence(int sectionNumber, string? keptAt, bool archived)
+    {
+        string said = keptAt is null
+            ? OneSectionRestoreWording.StoppedPartWayNothingToOpen(sectionNumber)
+            : OneSectionRestoreWording.StoppedPartWay(sectionNumber, keptAt);
+        return archived ? said + " " + OneSectionRestoreWording.StoppedPartWayArchived : said;
+    }
+
     /// <summary>The code a teacher reads, when the course at <paramref name="courseDir"/> is kept for reference; otherwise null.</summary>
     private static string? ReadsAsKeptForReference(string courseDir)
     {
@@ -189,36 +507,6 @@ public static class CourseRestorer
     private static void LockAgainIfKeptForReference(string courseDir)
     {
         if (ReadsAsKeptForReference(courseDir) is not null) ReferenceLock.Lock(courseDir);
-    }
-
-    private static void ReplaceContents(string live, string backedUp)
-    {
-        Directory.CreateDirectory(live);
-        foreach (string child in Directory.EnumerateFileSystemEntries(live))
-            DeleteTree(child);
-        foreach (string child in Directory.EnumerateFileSystemEntries(backedUp))
-        {
-            string target = Path.Combine(live, Path.GetFileName(child));
-            try
-            {
-                if (Directory.Exists(child)) Directory.Move(child, target);
-                else File.Move(child, target);
-            }
-            catch (IOException)
-            {
-                if (Directory.Exists(child)) CopyTree(child, target);
-                else File.Copy(child, target, overwrite: true);
-            }
-        }
-    }
-
-    private static void CopyTree(string source, string target)
-    {
-        Directory.CreateDirectory(target);
-        foreach (string file in Directory.EnumerateFiles(source))
-            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
-        foreach (string folder in Directory.EnumerateDirectories(source))
-            CopyTree(folder, Path.Combine(target, Path.GetFileName(folder)));
     }
 
     /// <summary>

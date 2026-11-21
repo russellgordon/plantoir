@@ -835,6 +835,14 @@ public static class ActivityTrail
         /// "why was this morning's deploy slow?" days later.
         /// </summary>
         SiteBuiltAgainBeforeDeploying,
+        /// <summary>
+        /// A one-section restore moved a file and then could not move every
+        /// file back, so the section may hold some files from the backup and
+        /// some as they were (#911, the mac's #897 C): the course, the section
+        /// and where the set-aside files are kept, as a path inside the
+        /// working folder. Never a page. <see cref="SectionRestoreStoppedPartWayLine"/>.
+        /// </summary>
+        SectionRestoreStoppedPartWay,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -980,6 +988,7 @@ public static class ActivityTrail
         Event.ProblemsChanged => "problems changed",
         Event.AskedAnAssistantToFixProblems => "asked an assistant to fix problems",
         Event.SiteBuiltAgainBeforeDeploying => "site built again before deploying",
+        Event.SectionRestoreStoppedPartWay => "section restore stopped part way",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
@@ -1177,6 +1186,11 @@ public static class ActivityTrail
     }
 
     /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
+    /// <summary>The words for <c>section restore stopped part way</c>: the mac's <c>sectionRestoreStoppedPartWayLine</c> word for word.</summary>
+    public static string SectionRestoreStoppedPartWayLine(string keptAt) =>
+        "a section restore stopped part way and could not move every file back; the section may hold " +
+        "some files from the backup and some as they were; the files set aside are kept in " + keptAt;
+
     public static string PageSettingsLeftAsTheyWereLine(string act, int pages) =>
         $"left the settings of {(pages == 1 ? "1 page" : $"{pages} pages")} as they were while {act}: no room at the top for a new setting";
 

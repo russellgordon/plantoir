@@ -21,6 +21,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Plantoir.Core\Plantoir.Core.csproj" />
     <ProjectReference Include="..\Plantoir.Mcp\Plantoir.Mcp.csproj" />
+    <!-- #911: built with the tests so RestoreKillTests can launch it; none of its output is referenced. -->
+    <ProjectReference Include="..\Plantoir.RestoreHarness\Plantoir.RestoreHarness.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>

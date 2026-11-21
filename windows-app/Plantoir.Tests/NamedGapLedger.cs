@@ -426,7 +426,6 @@ internal static class NamedGapLedger
     private const string Reason903SetUpItem = "a Fix with… button dimmed because its assistant is missing names Settings ▸ Other Assistants in its second sentence (the mac's #990), the page Revise With ▸ Set Up an Assistant… opens; that page and the set-up behind it are #903's piece of v2.0.0, so until it lands Windows says the first sentence alone rather than send a teacher looking for a page that is not there";
 
     // #911's held-by-name piece (2026-11-14): the mac's #897 C and #785a merged into dev.
-    private const string Reason911 = "a one-section restore staged so that a failure part way moves everything back, and says when moving back failed too (the mac's #897 C), is #911's piece of v2.0.0; until it lands Windows' section restore is not staged, so it has no 'stopped part way' outcome to record, and its trail lines are unchanged";
     private const string Reason912 = "small backups that keep each Media file once in courses/_backups/.shared-media (the mac's #785a) are #912's piece of v2.0.0; until it lands Windows writes no small backup, sweeps nothing and lists no _shared-media name (BackupItem.From refuses every one), so none of these three can happen here";
 
     // The fourth hold (2026-11-14): the mac's fourteen pieces merged at cadd8eb11.
@@ -567,7 +566,6 @@ internal static class NamedGapLedger
         // shared Media store for small backups) brought. Their case lists
         // (backups.restoreOneSection, backups.sharedMedia, file-formats.json →
         // sharedMediaStore) have no reader here yet, so they are unrun, not red.
-        Owed(ActivityTrailEvents, 911, V200, Reason911, "section restore stopped part way"),
         Owed(ActivityTrailEvents, 912, V200, Reason912,
              "backup kept its Media files once", "shared backup Media swept", "backup Media not found"),
 
