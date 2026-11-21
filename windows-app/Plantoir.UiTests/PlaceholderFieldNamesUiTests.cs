@@ -155,13 +155,26 @@ public class PlaceholderFieldNamesUiTests
         // tooltip, and it holds the whole code.
         app.BringToFront();
         Mouse.MoveTo(DrivenApp.MiddleOf(longTitle));
-        var tip = Retry.WhileNull(() =>
+        string? tipWords = null;
+        Retry.WhileFalse(() =>
         {
-            try { return app.Desktop.FindFirstDescendant(cf => cf.ByControlType(ControlType.ToolTip).And(cf.ByName(LongCode))); }
-            catch (System.Runtime.InteropServices.COMException) { return null; }
-        }, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result;
-        Assert.True(tip is not null, "hovering the cut-short code drew no tooltip holding the whole code");
+            try
+            {
+                foreach (var tip in app.Desktop.FindAllDescendants(cf => cf.ByControlType(ControlType.ToolTip)))
+                {
+                    var words = new List<string> { tip.Properties.Name.ValueOrDefault ?? "" };
+                    words.AddRange(DrivenApp.TextsUnder(tip));
+                    if (words.Contains(LongCode)) { tipWords = LongCode; return true; }
+                    tipWords = string.Join(" | ", words);
+                }
+            }
+            catch (System.Runtime.InteropServices.COMException) { }
+            return false;
+        }, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200));
         CaptureIfAsked("1024-cut-short-code-tooltip.png");
+        Assert.True(tipWords == LongCode,
+                    tipWords is null ? "hovering the cut-short code drew no tooltip"
+                                     : $"the tooltip over the cut-short code says \"{tipWords}\", not the whole code");
     }
 
     /// <summary>With <c>PLANTOIR_UI_CAPTURE_DIR</c> set, a picture of the screen for the hand-back; otherwise nothing.</summary>
