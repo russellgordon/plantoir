@@ -101,6 +101,12 @@ public static class SubjectMenuRules
         ReDateClasses,
         MakeRoomForClasses,
         ClassDates,
+        /// <summary>
+        /// Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B):
+        /// live exactly where Re-date Classes… is, with no situation key of
+        /// its own (<c>subjectMenus.rollOverSheet</c>).
+        /// </summary>
+        RollOverToANewYear,
         // View
         Back,
         Forward,
@@ -261,6 +267,7 @@ public static class SubjectMenuRules
                 // ways can be chosen is the dialog's, decided when it opens.
                 enabled.Add(Item.AddClass);
                 enabled.Add(Item.ReDateClasses);
+                enabled.Add(Item.RollOverToANewYear);
                 enabled.Add(Item.MakeRoomForClasses);
                 enabled.Add(Item.ClassDates);
                 if (situation.LastChangeIsHere) enabled.Add(Item.UndoLastChange);

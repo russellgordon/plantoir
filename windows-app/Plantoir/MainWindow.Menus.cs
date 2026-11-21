@@ -428,7 +428,7 @@ public sealed partial class MainWindow
             case Item.ReloadPage: detail?.PreviewReload(); return;
             case Item.PublishPages or Item.HidePages or Item.PublishClassForADate or Item.RebuildPreview
                 or Item.UndoLastChange or Item.AddClass or Item.ReDateClasses or Item.MakeRoomForClasses
-                or Item.ClassDates:
+                or Item.ClassDates or Item.RollOverToANewYear:
                 _ = RunSectionVerb(item);
                 return;
         }

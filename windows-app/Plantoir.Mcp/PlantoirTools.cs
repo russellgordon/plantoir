@@ -1448,14 +1448,38 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     if (!AnAnswerWasGiven(website))
                         return Answering(already + "\n\n" + AskingWhichWebsite(),
                                          already + "\n\n" + AskingWhichWebsite());
+                    // Classes ▸ Roll Over to a New Year… (#954): the card says
+                    // the dates need nothing, then the menu's website and
+                    // record lines; "new" as the other branch says it.
+                    if (workspace.SpeaksFromTheMenu)
+                        return Proposing(already + "\n\n" + MenuRolloverPlanLines(found, number, website));
                     return Proposing(already + "\n\n" + WhatSettlingTheWebsiteWouldDo(website));
                 }
+                // From the menu, a rollover's card says what happens to the
+                // website on EITHER answer, then what is set aside (#954, the
+                // mac's menuRolloverPlanLines).
+                if (isRollover && AnAnswerWasGiven(website) && workspace.SpeaksFromTheMenu)
+                    return Proposing(plan.Describe() + "\n\n" + MenuRolloverPlanLines(found, number, website));
                 // Dates DO change, so Go is a real decision and the question
                 // arrives with the result afterwards - which is what the mac
                 // does, and why nothing is added here for the bare phrasing.
                 return Proposing(isRollover && WouldStartANewWebsite(website)
                     ? plan.Describe() + "\n\nIt would also " + WhatStartingANewWebsiteDoes()
                     : plan.Describe());
+            }
+
+            if (plan.ChangesNothing && isRollover && workspace.SpeaksFromTheMenu)
+            {
+                // Classes ▸ Roll Over to a New Year… on a section whose dates
+                // are already right (#954, the mac's
+                // menuRolloverWithTheDatesAlreadyRight): a copy of the course
+                // first, refused before anything is written when it cannot be
+                // made; then the record and the website.
+                workspace.BackUpBeforeARolloverFromTheMenu(course, section);
+                string settledFromTheMenu = SettleTheWebsiteAfterARollover(
+                    found, number, website, rollover, releasedWithTheDates: false);
+                string saidFromTheMenu = settledFromTheMenu.Length == 0 ? already : already + "\n\n" + settledFromTheMenu;
+                return Answering(saidFromTheMenu, saidFromTheMenu);
             }
 
             if (plan.ChangesNothing)
@@ -1592,6 +1616,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // is no re-date write for it to join.
         if (!releasedWithTheDates) workspace.ReleasePublishedPagesForARollover(course, sectionNumber);
 
+        if (workspace.SpeaksFromTheMenu) return SettleTheWebsiteFromTheMenu(course, sectionNumber, website);
+
         if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase))
         {
             ActivityTrail.Note(
@@ -1647,6 +1673,96 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
         NoteTheWebsiteOnTheTrail(released, course.Code, sectionNumber);
         return said;
+    }
+
+    // ---- Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B) ----
+
+    /// <summary>
+    /// The menu's plan lines for a rollover: what happens to the website, then
+    /// what is set aside. For "new", the window's own new-website line; for
+    /// "same", the menu's; the folder's line on either answer for a course
+    /// that deploys only to a folder; and the website rule's own line where it
+    /// says there is no question (<c>rollOverSheet.sheet.planLines</c>).
+    /// </summary>
+    private string MenuRolloverPlanLines(Course course, int sectionNumber, string website)
+    {
+        string said = WouldStartANewWebsite(website)
+            ? "It would also " + WhatStartingANewWebsiteDoes()
+            : AssistWording.MenuRollOverPlanKeepsTheWebsite;
+        if (RollOverFromTheMenu.DeploysOnlyToAFolder(course)) said = AssistWording.MenuRollOverDeploysToAFolder;
+        switch (RollOverFromTheMenu.WebsiteFor(workspace.FolderPath, course, sectionNumber, DateTime.Now.Year))
+        {
+            case RollOverFromTheMenu.Website.NotDeployedYet: said = AssistWording.MenuRollOverNotDeployedYet; break;
+            case RollOverFromTheMenu.Website.DeploysToAFolder: said = AssistWording.MenuRollOverDeploysToAFolder; break;
+            case RollOverFromTheMenu.Website.ANewWebsiteWouldReuseItsAddress:
+                said = AssistWording.MenuRollOverANewWebsiteWouldReuseItsAddress; break;
+        }
+        return said + "\n\n" + AssistWording.MenuRollOverPlanSetsTheRecordAside;
+    }
+
+    /// <summary>
+    /// The website half of a rollover from the menu, in the menu's words
+    /// (<c>rollOverSheet.sheet.finishedInPlaceOf</c>): a folder is a folder, a
+    /// new website that would take this one's own address is not started (the
+    /// dialog never sends one, but a deploy between opening it and pressing
+    /// Roll Over can make it so), and the new-website line ends on a sentence
+    /// true on Cloudflare. Settled before the tool returns, so before the
+    /// window rebuilds the preview. The markers move through
+    /// <see cref="AssistWorkspace.ReleaseSite"/>, the window's own path, and
+    /// its own undo entry (the journal step that makes the rollover ONE step
+    /// is Windows Undo W7's, #899).
+    /// </summary>
+    private string SettleTheWebsiteFromTheMenu(Course course, int sectionNumber, string website)
+    {
+        var rule = RollOverFromTheMenu.WebsiteFor(workspace.FolderPath, course, sectionNumber, DateTime.Now.Year);
+        bool wouldReuseItsAddress = rule == RollOverFromTheMenu.Website.ANewWebsiteWouldReuseItsAddress;
+        if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase)
+            || (WouldStartANewWebsite(website) && wouldReuseItsAddress))
+        {
+            string said = AssistWording.RolloverKeptTheSameWebsite;
+            string line = "kept last year's website when rolling the section over";
+            if (wouldReuseItsAddress)
+            {
+                said = AssistWording.MenuRollOverANewWebsiteWouldReuseItsAddress;
+                line = "kept the section's website when rolling it over — a new one would have had the same address";
+            }
+            else if (RollOverFromTheMenu.DeploysOnlyToAFolder(course))
+            {
+                said = AssistWording.RolloverDeploysToAFolderFromTheMenu;
+                line = "kept deploying the section to its folder when rolling it over";
+            }
+            ActivityTrail.Note(ActivityTrail.Event.SectionKeptItsWebsite, line, course.Code, sectionNumber);
+            return said;
+        }
+        // The dialog never sends anything but "new" or "same"; a call that
+        // did is asked, as the window asks.
+        if (!WouldStartANewWebsite(website)) return AskingWhichWebsite();
+
+        var released = workspace.ReleaseSite(course, sectionNumber);
+        if (!released.ReleasedAnything)
+        {
+            if (released.SomethingIsStillPinned)
+                return AssistWording.RolloverCouldNotStartANewWebsiteFromTheMenu(string.Join(", ", released.StillPinned));
+            ActivityTrail.Note(ActivityTrail.Event.SectionStartedANewWebsite,
+                "rolled the section over onto a new website — it was not on a website at the moment",
+                course.Code, sectionNumber);
+            return AssistWording.MenuRollOverNotDeployedYet;
+        }
+
+        string started = RollOverWords.StartedANewWebsite(string.Join(", ", released.KeptFiles),
+                                                          RollOverFromTheMenu.DeploysOnlyToAFolder(course));
+        if (released.SomethingIsStillPinned)
+            started += "\n\n" + AssistWording.RolloverCouldNotStartANewWebsiteFromTheMenu(string.Join(", ", released.StillPinned));
+        switch (TurnOffAnyScheduledPublish(workspace.FolderPath, course.Code, sectionNumber))
+        {
+            case ScheduledPublishOutcome.NoneWasSet: break;
+            case ScheduledPublishOutcome.TurnedOff:
+                started += "\n\n" + AssistWording.RolloverTurnedOffTheScheduledPublish; break;
+            case ScheduledPublishOutcome.CouldNotTurnOff:
+                started += "\n\n" + AssistWording.RolloverCouldNotTurnOffTheScheduledPublish; break;
+        }
+        NoteTheWebsiteOnTheTrail(released, course.Code, sectionNumber);
+        return started;
     }
 
     /// <summary>

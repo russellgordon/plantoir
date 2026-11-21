@@ -225,6 +225,20 @@ public sealed class SectionVerbs : IAsyncDisposable
     public static JsonObject ReDateClasses(string course, int section, bool plan) =>
         Call(plan ? "plan_re_date_classes" : "re_date_classes", Place(course, section));
 
+    /// <summary>
+    /// Classes ▸ Roll Over to a New Year… (#954, the mac's
+    /// <c>SectionVerbs.rollOver</c>): the same tool as Re-date Classes…, with
+    /// <c>rollover: "yes"</c> and the website the dialog chose
+    /// (<see cref="RollOverFromTheMenu.WebsiteSent"/>), always "new" or "same".
+    /// </summary>
+    public static JsonObject RollOver(string course, int section, string website, bool plan)
+    {
+        var arguments = Place(course, section);
+        arguments["rollover"] = "yes";
+        arguments["website"] = website;
+        return Call(plan ? "plan_re_date_classes" : "re_date_classes", arguments);
+    }
+
     /// <summary><c>plan_make_room_for_classes</c> / <c>make_room_for_classes</c> in front of a class.</summary>
     public static JsonObject MakeRoomForClasses(string course, int section, int unit, int atDay, int howMany, bool plan)
     {

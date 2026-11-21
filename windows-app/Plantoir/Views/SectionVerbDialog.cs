@@ -457,6 +457,127 @@ internal sealed class SectionVerbDialog
         return planning;
     }
 
+    // ---- Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B) -------
+
+    /// <summary>The website rule's answer for this section, read when the dialog opened; null for every other item.</summary>
+    private RollOverFromTheMenu.Website? _rollOverWebsite;
+
+    /// <summary>The answer chosen to the website question; none to begin with (the question guesses neither).</summary>
+    private string? _rollOverAnswer;
+
+    /// <summary>
+    /// Narrator's name for the two answers' group: the mac's
+    /// <c>AccessibilityNames.rollOverWebsite</c> (#993's D18), which no
+    /// contract carries.
+    /// </summary>
+    private const string RollOverWebsiteGroupName = "Website";
+
+    /// <summary>What a rollover's call carries, or null while the question is unanswered.</summary>
+    private string? RollOverSent() =>
+        _rollOverWebsite is { } website ? RollOverFromTheMenu.WebsiteSent(website, _rollOverAnswer) : null;
+
+    /// <summary>
+    /// Roll Over to a New Year…: the intro, the dates on file (and a line when
+    /// they have all passed), then the website: the window's own question over
+    /// two choices with NOTHING chosen where the section has a website, or one
+    /// line saying why there is no question (<c>subjectMenus.rollOverSheet</c>).
+    /// Continue stays dimmed until there is an answer to send; then the plan,
+    /// then Roll Over. The mac's <c>rollOverChoosing</c>.
+    /// </summary>
+    public static Task ChooseHowToRollOver(XamlRoot root, SectionVerbs verbs, Course course, int section)
+    {
+        var noun = course.Configuration.ClassNoun;
+        var view = new SectionVerbDialog(root, verbs, course, section, Item.RollOverToANewYear,
+                                         AssistWording.MenuRollOverTitle(course.Code, section.ToString()));
+        view._verbButton = AssistWording.MenuRollOverButton;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var website = RollOverFromTheMenu.WebsiteFor(verbs.Folder, course, section, today.Year);
+        view._rollOverWebsite = website;
+
+        var panel = new StackPanel { Spacing = 12, MinWidth = 420, MaxWidth = 560 };
+        panel.Children.Add(Words(RollOverWords.Intro(noun)));
+        var remembered = TimetableMemory.Read(verbs.Folder, course.Code, section, today, recording: false);
+        var dates = remembered?.Dates.OrderBy(day => day).ToList() ?? new List<DateOnly>();
+        if (dates.Count > 0)
+        {
+            var datesLine = Words(RollOverWords.Dates(RollOverFromTheMenu.DayAsWritten(dates[0]),
+                                                      RollOverFromTheMenu.DayAsWritten(dates[^1]), noun));
+            AutomationProperties.SetAutomationId(datesLine, "sectionVerbRollOverDates");
+            panel.Children.Add(datesLine);
+            if (RollOverFromTheMenu.DatesAreOld(dates[^1], today))
+            {
+                var old = Secondary(Words(RollOverWords.DatesAreOld(noun)));
+                AutomationProperties.SetAutomationId(old, "sectionVerbRollOverDatesAreOld");
+                panel.Children.Add(old);
+            }
+        }
+
+        if (website == RollOverFromTheMenu.Website.Asked)
+        {
+            panel.Children.Add(Words(AssistWording.RolloverWebsiteQuestion));
+            // In the question's own order: a new website, or the same one.
+            // Two RadioButtons of one group, neither checked: a RadioButtons
+            // control would be the same, and these give each answer its own id.
+            var choices = new StackPanel { Spacing = 4 };
+            AutomationProperties.SetName(choices, RollOverWebsiteGroupName);
+            AutomationProperties.SetAutomationId(choices, "sectionVerbRollOverWebsite");
+            foreach (var (answer, label) in new[]
+                     {
+                         (RollOverFromTheMenu.StartANewWebsite, AssistWording.MenuRollOverNewWebsite),
+                         (RollOverFromTheMenu.KeepTheSameWebsite, AssistWording.MenuRollOverKeepWebsite),
+                     })
+            {
+                var radio = new RadioButton { Content = label, GroupName = "rollOverWebsite", IsChecked = false };
+                AutomationProperties.SetName(radio, label);
+                AutomationProperties.SetAutomationId(radio, "sectionVerbRollOverWebsite-" + answer);
+                radio.Checked += (_, _) =>
+                {
+                    view._rollOverAnswer = answer;
+                    view.UpdateRollOverButton();
+                };
+                choices.Children.Add(radio);
+            }
+            panel.Children.Add(choices);
+        }
+        else
+        {
+            string why = website switch
+            {
+                RollOverFromTheMenu.Website.NotDeployedYet => AssistWording.MenuRollOverNotDeployedYet,
+                RollOverFromTheMenu.Website.DeploysToAFolder => AssistWording.MenuRollOverDeploysToAFolder,
+                _ => AssistWording.MenuRollOverANewWebsiteWouldReuseItsAddress,
+            };
+            var line = Secondary(Words(why));
+            AutomationProperties.SetAutomationId(line, "sectionVerbRollOverNoQuestion");
+            panel.Children.Add(line);
+        }
+
+        view._planCall = () =>
+        {
+            string sent = view.RollOverSent()!;
+            view._pendingCall = SectionVerbs.RollOver(course.Code, section, sent, plan: false);
+            return SectionVerbs.RollOver(course.Code, section, sent, plan: true);
+        };
+        view.ShowChoosing(panel);
+        view.UpdateRollOverButton();
+        return view.Show();
+    }
+
+    /// <summary>Continue is live only once the call has a website to send.</summary>
+    private void UpdateRollOverButton()
+    {
+        if (_item != Item.RollOverToANewYear || _stage != Stage.Choose) return;
+        DialogButtons.EnablePrimary(_dialog, RollOverSent() is not null);
+    }
+
+    /// <summary>A line in the secondary text colour, as the mac's <c>.foregroundStyle(.secondary)</c>.</summary>
+    private static TextBlock Secondary(TextBlock words)
+    {
+        if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out var grey) && grey is Brush secondary)
+            words.Foreground = secondary;
+        return words;
+    }
+
     /// <summary>Undo Last Change: no plan; the dialog shows working, then what was done.</summary>
     public static Task RunAtOnce(XamlRoot root, SectionVerbs verbs, Course course, int section, Item item,
                                  JsonObject call, string title)
@@ -1111,6 +1232,8 @@ internal sealed class SectionVerbDialog
         Item.PublishPages or Item.HidePages => Ticked().Count == 1 ? "1 page ticked" : $"{Ticked().Count} pages ticked",
         Item.MakeRoomForClasses when _howMany is not null => (int)_howMany.Value == 1 ? "room for 1" : $"room for {(int)_howMany.Value}",
         Item.AddClass when _way is { } way => SectionVerbs.AddClassCounts(way),
+        Item.RollOverToANewYear when _rollOverWebsite is { } website && RollOverSent() is { } sent
+            => RollOverFromTheMenu.Counts(website, sent),
         _ => null,
     };
 }

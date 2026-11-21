@@ -376,6 +376,25 @@ public class ContractTests
         Pair("menuNeedsClassDatesFirst", AssistWording.MenuNeedsClassDatesFirst, AssistWording.MenuNeedsClassDatesFirstForAMeeting);
         Pair("menuPickClassToDuplicate", AssistWording.MenuPickClassToDuplicate, AssistWording.MenuPickClassToDuplicateForAMeeting);
         Pair("menuUnitWordRenameUnfinished", AssistWording.MenuUnitWordRenameUnfinished, AssistWording.MenuUnitWordRenameUnfinishedForAMeeting);
+
+        // #954 (the mac's #897 piece B): Classes ▸ Roll Over to a New Year…,
+        // with the generator's examples (2026-09-08 to 2027-06-24; the
+        // section-1 Netlify marker). The constants are the value walk's.
+        Assert.Equal(wording["menuRollOverTitle"]!.ToString(), AssistWording.MenuRollOverTitle("{course}", "{section}"));
+        Assert.Equal(wording["menuRollOverIntro"]!.ToString(), RollOverWords.Intro(ClassNoun.Class));
+        Assert.Equal(wording["menuRollOverIntroForAMeeting"]!.ToString(), RollOverWords.Intro(ClassNoun.Meeting));
+        Pair("menuRollOverDates", AssistWording.MenuRollOverDates("2026-09-08 (Tuesday)", "2027-06-24 (Thursday)"),
+             AssistWording.MenuRollOverDatesForAMeeting("2026-09-08 (Tuesday)", "2027-06-24 (Thursday)"));
+        Assert.Equal(wording["menuRollOverDates"]!.ToString(),
+                     RollOverWords.Dates(RollOverFromTheMenu.DayAsWritten(new DateOnly(2026, 9, 8)),
+                                         RollOverFromTheMenu.DayAsWritten(new DateOnly(2027, 6, 24)), ClassNoun.Class));
+        Pair("menuRollOverDatesAreOld", AssistWording.MenuRollOverDatesAreOld, AssistWording.MenuRollOverDatesAreOldForAMeeting);
+        Assert.Equal(wording["rolloverCouldNotStartANewWebsiteFromTheMenu"]!.ToString(),
+                     AssistWording.RolloverCouldNotStartANewWebsiteFromTheMenu(".netlify_sites/section1.json"));
+        Assert.Equal(wording["rolloverStartedANewWebsiteFromTheMenu"]!.ToString(),
+                     AssistWording.RolloverStartedANewWebsiteFromTheMenu(".netlify_sites/section1.previous-2026-09-08_071500.json"));
+        Assert.Equal(wording["rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder"]!.ToString(),
+                     AssistWording.RolloverStartedANewWebsiteFromTheMenuDeployingToAFolder(".netlify_sites/section1.previous-2026-09-08_071500.json"));
         Assert.Equal(wording["menuAddButton"]!.ToString(), AssistWording.MenuAddButton);
         Assert.Equal(wording["menuDuplicateButton"]!.ToString(), AssistWording.MenuDuplicateButton);
         Assert.Equal(wording["duplicatedFromTheMenu"]!.ToString(), AssistWording.DuplicatedFromTheMenu("{page}", "{copy}", "2026-09-14"));

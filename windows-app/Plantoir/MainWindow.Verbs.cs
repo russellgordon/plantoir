@@ -191,6 +191,13 @@ public sealed partial class MainWindow
                     if (!await ClassDatesFirst(folder, course, number, item, root)) return;
                     await SectionVerbDialog.PlanReDate(root, verbs, course, number);
                     break;
+                case Item.RollOverToANewYear:
+                    // #954 (the mac's #897 piece B): the dates, the website
+                    // question where there is a website (nothing chosen),
+                    // then the plan. Class dates first, as Re-date Classes….
+                    if (!await ClassDatesFirst(folder, course, number, item, root)) return;
+                    await SectionVerbDialog.ChooseHowToRollOver(root, verbs, course, number);
+                    break;
                 case Item.MakeRoomForClasses:
                     if (!await ClassDatesFirst(folder, course, number, item, root)) return;
                     await SectionVerbDialog.ChooseWhereToMakeRoom(root, verbs, course, number);
@@ -227,7 +234,7 @@ public sealed partial class MainWindow
         string reason = item switch
         {
             Item.AddClass => meeting ? AssistWording.DatesForTheNextPageForAMeeting : AssistWording.DatesForTheNextPage,
-            Item.ReDateClasses => meeting ? AssistWording.DatesToReDateForAMeeting : AssistWording.DatesToReDate,
+            Item.ReDateClasses or Item.RollOverToANewYear => meeting ? AssistWording.DatesToReDateForAMeeting : AssistWording.DatesToReDate,
             _ => meeting ? AssistWording.DatesToMakeRoomForAMeeting : AssistWording.DatesToMakeRoom,
         };
         return await ShowClassDates(folder, course, section, root, reason);
