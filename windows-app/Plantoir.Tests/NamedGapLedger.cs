@@ -422,6 +422,7 @@ internal static class NamedGapLedger
     private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
     private const string Reason899W6 = "the six op kinds the mac's U2b defines (replaceText, editJSON, move, createTree, removeTree, external) and recompute run are Windows' W6 for #899, still to come (plans/899-plan.md, W6 to W11b); until it lands this app's reader takes each for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
+    private const string Reason899W7U3b = "the mac's U3b for #899 (2026-11-20): the rollover as one step, whose site markers are the op kind moveApart (judged as move, but an Undo or Redo that finds it changed since leaves it and goes on with the rest: Russell's ruling of 2026-11-19 on Q3, #959), and a step's moveApart ops move as a group, all left apart when any one is changed since (the director's decision of 2026-11-20), as is a deploy set for later the swap cannot set at an Undo or Redo (the U3b review's LOW 3); a leftover no deploy reads is the op kind setAside, judged as move and standing apart ON ITS OWN, never one of that group, and a deploy set for later put back whose job will start only at the next login is named in startsAtTheNextLogin with its own sentence, undoScheduleStartsAtTheNextLogin (U3b's fix round three, 2026-11-20; which record a deploy reads is undo.netlifyRecordCases, which W7 runs as well); Windows' W7 for #899 builds it (documentation 12, the W7 row); until it lands this app's reader takes moveApart for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
     private const string Reason899W6Traces = Reason899W6 + ". COVERAGE LOST, for W6 to restore: until U2b's contract put a move in them, W1 replayed all 20 traces call by call to their final hashes; held, each of these 15 is asserted only up to its first move and must stop exactly there, and trace-002, trace-012 and trace-020 open with a move, so they check nothing at all here until W6 replays them whole";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) has no action wired on Windows yet (W7 wires them, with 'undo could not record a step'), and no op kind that sets a folder aside (W6, with 'undo found a folder set aside'); 'undo rolled back' is written by W3's recovery";
 
@@ -656,6 +657,28 @@ internal static class NamedGapLedger
              "U2, createTree: an Undo whose content the list no longer holds is refused and the folder kept (the list is cleared, as for any content missing)",
              "U2, removeTree: a Redo whose content the list no longer holds is refused, the folder kept, only the redo dropped",
              "U2: the folder a page was moved out of, replaced since by a link to outside the working folder: Undo moves nothing out, refuses as changed since, and clears the list"),
+        Owed(UndoCheckCases, 899, V200, Reason899W7U3b,
+             "moveApart (U3b): judged as move is: the place it left free, the place it went holding it: as the step left it",
+             "moveApart (U3b): back where it was, the other place free",
+             "moveApart (U3b): a deploy wrote a new marker in the place it left: changed since, as for move (the STEP leaves it apart, stackCases)",
+             "setAside (U3b): judged as move is: the place it left free, the place it went holding it: as the step left it",
+             "setAside (U3b): back where it was, the other place free",
+             "setAside (U3b): its kept copy deleted by hand: changed since, as for move (the STEP leaves it apart on its own, stackCases)"),
+        Owed(UndoStackCases, 899, V200, Reason899W7U3b,
+             "U3b, Q3 (Russell, 2026-11-19; #959): a rollover onto a new website, a deploy writes a new marker in its place, Undo: the rest is taken back, both markers kept, the marker named as left apart, and the step leaves the undo side",
+             "U3b, Q3: and the step before it can still be undone",
+             "U3b, Q3: Redo takes the rest forward again and leaves both markers again",
+             "U3b: with no deploy between, Undo puts the marker back with the rest and leaves nothing apart",
+             "U3b, records as a group (the director's decision, 2026-11-20, on #899): a rollover onto new websites on two hosts, a deploy that reaches one host only, Undo: BOTH records are left apart, never one back and one not, so the section is never split across two websites; the rest is taken back",
+             "U3b, records as a group: with no deploy between, both records go back with the rest and nothing is left apart",
+             "U3b, records as a group: Redo after that Undo takes the rest forward and leaves both records where they are",
+             "U3b: a deploy set for later that cannot be set again at Undo (launchd refuses it, or the write is off the main thread) is left as it is and named as left apart, as a record is; the rest is taken back and the Undo is never refused for it",
+             "U3b, a leftover on its own (the review of U3b's fixes, LOW 3): a rollover that set a leftover aside, its kept copy deleted by hand, Undo: the record and the rest go back, the leftover is left as it is and named, and never keeps the record apart",
+             "U3b, a leftover on its own: Redo after that Undo takes the record and the rest forward, and leaves the leftover and names it again",
+             "U3b, a leftover is never one of the records: a deploy fills the record's place, Undo: the record stays apart, the leftover goes back with the rest",
+             "U3b, a leftover: with nothing changed between, Undo puts the record and the leftover back with the rest and leaves nothing apart",
+             "U3b: a deploy set for later put back at Undo whose job the computer will not start now, and which cannot be taken away again, starts at the next login: named as such, never as left apart and never as simply back (the re-review of U3b's fixes, LOW 2); the rest is taken back"),
+        Owed(AssistWordingKeys, 899, V200, Reason899W7U3b, "undoScheduleStartsAtTheNextLogin"),
         Owed(UndoTraces, 899, V200, Reason899W6Traces,
              "trace-002",
              "trace-003",

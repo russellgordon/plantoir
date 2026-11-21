@@ -42,7 +42,7 @@ final class UndoOpKindsTests: XCTestCase {
         let index: String = "---\ntitle: Section 1\ncreated: 2026-08-01T09:00:00.000-0400\npublish: true\n---\n# Most Recent Class\n![[Unit 1, Day 1]]\n"
         try index.write(to: indexURL, atomically: true, encoding: .utf8)
         let root: URL = made.course.directoryURL.deletingLastPathComponent().deletingLastPathComponent()
-        let path: String = try XCTUnwrap(UndoShadowPublish.relativePath(of: indexURL, under: root))
+        let path: String = try XCTUnwrap(UndoFolderPlaces.relativePath(of: indexURL, under: root))
         let op: UndoOp = UndoOp.recompute(path: path, maintainer: "sectionFrontPage", section: 1)
 
         XCTAssertTrue(UndoSectionFrontPage.rederive(op, root: root))
@@ -462,7 +462,7 @@ final class UndoOpKindsTests: XCTestCase {
         let indexURL: URL = SectionIndexPointer.indexURL(forSection: 1, in: made.course)
         try "---\ntitle: Section 1\ncreated: 2026-08-01T09:00:00.000-0400\npublish: true\n---\n# Most Recent Class\n![[Unit 1, Day 1]]\n".write(to: indexURL, atomically: true, encoding: .utf8)
         let root: URL = made.course.directoryURL.deletingLastPathComponent().deletingLastPathComponent()
-        let indexPath: String = try XCTUnwrap(UndoShadowPublish.relativePath(of: indexURL, under: root))
+        let indexPath: String = try XCTUnwrap(UndoFolderPlaces.relativePath(of: indexURL, under: root))
         let notes: String = "courses/\(made.course.code)/notes.md"
         try UndoContractReplay.write("Line one: old.\n", to: notes, in: root)
         let ops: [UndoOp] = [

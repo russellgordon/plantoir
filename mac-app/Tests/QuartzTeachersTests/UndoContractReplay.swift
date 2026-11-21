@@ -202,6 +202,26 @@ nonisolated enum UndoContractReplay {
         try Data(lines.joined(separator: "\n").utf8).write(to: url)
     }
 
+    /// What an undo or a redo left apart (U3b), or nothing.
+    static func leftApart(of outcome: UndoOutcome) -> [String] {
+        switch outcome {
+        case .undone(_, let leftApart, _), .redone(_, let leftApart, _):
+            return leftApart
+        default:
+            return []
+        }
+    }
+
+    /// What an undo or a redo named as starting at the next login.
+    static func startsAtTheNextLogin(of outcome: UndoOutcome) -> [String] {
+        switch outcome {
+        case .undone(_, _, let starts), .redone(_, _, let starts):
+            return starts
+        default:
+            return []
+        }
+    }
+
     static func outcomeWord(_ outcome: UndoOutcome) -> String {
         switch outcome {
         case .undone:
@@ -321,10 +341,10 @@ nonisolated enum UndoContractReplay {
                     if word != expect {
                         failures.append("\(where_): \(kind) came to \(word), not \(expect ?? "?")")
                     }
-                    if case .undone(let seq) = outcome, seq != int(call["seq"]) {
+                    if case .undone(let seq, _, _) = outcome, seq != int(call["seq"]) {
                         failures.append("\(where_): undid \(seq), not \(int(call["seq"]) ?? -1)")
                     }
-                    if case .redone(let seq) = outcome, seq != int(call["seq"]) {
+                    if case .redone(let seq, _, _) = outcome, seq != int(call["seq"]) {
                         failures.append("\(where_): redid \(seq), not \(int(call["seq"]) ?? -1)")
                     }
                     if case .refused(.changedSince(let first, let others), let cleared) = outcome {
@@ -514,7 +534,7 @@ nonisolated enum UndoContractReplay {
             let kind: String = string(given["kind"]) ?? ""
             let relativePath: String = string(given["path"]) ?? "page.md"
             let url: URL = place.root.appendingPathComponent(UndoOp.isSafeRelativePath(relativePath) ? relativePath : "page.md")
-            if kind == "move" {
+            if kind == "move" || kind == "moveApart" || kind == "setAside" {
                 if let from = string(given["from"]), UndoOp.isSafeRelativePath(from), let side = current["atFrom"] as? [String: Any] {
                     try self.place(side, at: place.root.appendingPathComponent(from))
                 }
@@ -676,6 +696,7 @@ nonisolated enum UndoContractReplay {
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
+        "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -737,6 +758,8 @@ nonisolated enum UndoContractReplay {
             try write(pageText, to: secondPagePath, in: rootB)
             var clockDays: Double = 0
             var last: String = ""
+            var lastLeftApart: [String] = []
+            var lastStartsAtTheNextLogin: [String] = []
             var linesBeforeTheDeploy: Int = -1
             var linesAfterTheDeploy: Int = -1
             let held: HeldStep = HeldStep()
@@ -872,9 +895,15 @@ nonisolated enum UndoContractReplay {
                 } else if value.hasPrefix("clock:") {
                     clockDays = Double(value.dropFirst("clock:".count).replacingOccurrences(of: "+", with: "")) ?? 0
                 } else if value == "undo" {
-                    last = outcomeWord(await journal().undoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places))
+                    let outcome: UndoOutcome = await journal().undoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places)
+                    last = outcomeWord(outcome)
+                    lastLeftApart = leftApart(of: outcome)
+                    lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
                 } else if value == "redo" {
-                    last = outcomeWord(await journal().redoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places))
+                    let outcome: UndoOutcome = await journal().redoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places)
+                    last = outcomeWord(outcome)
+                    lastLeftApart = leftApart(of: outcome)
+                    lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
                 } else if UndoContractKinds.calls.contains(value) {
                     if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
                         last = answered
@@ -1060,6 +1089,21 @@ nonisolated enum UndoContractReplay {
             }
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("stackCases '\(name)': the folder is there: \(!kept)")
+            }
+            if let wanted = string(testCase["cloudflareMarkers"]), UndoContractKinds.cloudflareMarkers(in: root) != wanted {
+                failures.append("stackCases '\(name)': the second host's markers are \(UndoContractKinds.cloudflareMarkers(in: root)), not \(wanted)")
+            }
+            if let wanted = string(testCase["leftoverMarkers"]), UndoContractKinds.leftoverMarkers(in: root) != wanted {
+                failures.append("stackCases '\(name)': the leftover's places are \(UndoContractKinds.leftoverMarkers(in: root)), not \(wanted)")
+            }
+            if let wanted = testCase["startsAtTheNextLogin"] as? [String], lastStartsAtTheNextLogin != wanted {
+                failures.append("stackCases '\(name)': starts at the next login \(lastStartsAtTheNextLogin), not \(wanted)")
+            }
+            if let wanted = testCase["leftApart"] as? [String], lastLeftApart != wanted {
+                failures.append("stackCases '\(name)': left apart \(lastLeftApart), not \(wanted)")
+            }
+            if let wanted = string(testCase["schoolYear"]), UndoContractKinds.schoolYear(in: root) != wanted {
+                failures.append("stackCases '\(name)': the school year is \(UndoContractKinds.schoolYear(in: root) ?? "absent"), not \(wanted)")
             }
             if testCase["nothingMovedOutside"] as? Bool == true {
                 let outsideNames: [String] = (try? FileManager.default.contentsOfDirectory(atPath: UndoContractKinds.outside(of: root).path)) ?? []

@@ -114,18 +114,22 @@ enum TodaysClassOnTheFrontPage {
         /// Written with a rename, so a reader never meets half a file. Last
         /// writer wins between two windows; the worst outcome is being asked
         /// once more.
+        ///
+        /// One step through the door (#899, U3): Not Today, answered.
         func write(courseDirectory: URL, section: Int) throws {
             let url: URL = NotToday.fileURL(courseDirectory: courseDirectory, section: section)
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(), withIntermediateDirectories: true
-            )
             let object: [String: Any] = [
                 "version": 1,
                 "day": day,
                 "class": classTitle
             ]
             let data: Data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-            try data.write(to: url, options: .atomic)
+            let step: JournaledStep = JournaledStep(
+                courseCode: courseDirectory.lastPathComponent, courseDirectory: courseDirectory,
+                section: section, maker: UndoStepMaker.sheet("notTodayOnTheFrontPage")
+            )
+            step.write(data, to: url)
+            try step.make()
         }
 
         /// Whether this record answers the question about `classTitle` today.
@@ -228,6 +232,13 @@ enum TodaysClassOnTheFrontPage {
         ) else {
             return nil
         }
+        // Either answer makes a step on the main actor (the front page, or
+        // Not Today's record): the list is read off it while the question is
+        // up, unawaited (#899, ruling 8 on U1's third round; the first review
+        // of U3a, LOW 6).
+        Task {
+            await JournaledStep.readTheListAhead()
+        }
         return Offer(
             classTitle: decision.todaysClass,
             shownTitle: decision.shown,
@@ -290,7 +301,18 @@ enum TodaysClassOnTheFrontPage {
         ) else {
             return .noLongerOffered
         }
-        guard (try? result.text.write(to: indexURL, atomically: true, encoding: .utf8)) != nil else {
+        // One step through the door (#899, U3): the teacher's own choice of
+        // class, so content of the step, not the front page's rule.
+        let step: JournaledStep = JournaledStep(
+            course: course, section: offer.sectionNumber, maker: UndoStepMaker.sheet("showTodaysClassOnTheFrontPage")
+        )
+        step.write(result.text, to: indexURL)
+        do {
+            try step.make()
+        } catch JournaledStepError.leftPartWay {
+            // The page went in and could not be put back: the read-back
+            // below says what it shows now, which is what is true.
+        } catch {
             return .couldNotSave
         }
         // Read back: the page on disk must now name the class.

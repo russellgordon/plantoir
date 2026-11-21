@@ -4449,15 +4449,40 @@ EVERY path that writes files without adding an entry, each pinned in
   whose every write failed says "changed nothing" (ruling L5);
 - **a partial undo**;
 - **a publish or hide that wrote pages and then stopped part way** (#412),
-  the page list and the whole unit: `AssistPublishPlanner.apply` throws
+  the page list and the whole unit: `AssistPublishPlanner.apply` threw
   `StoppedAfterWriting` only when at least one file was written, keeping the
   error's own words;
 - **Re-date Classes… that stopped part way** (ruling M3):
-  `SectionReDatePlanner.apply` writes page by page and now throws its own
-  `StoppedAfterWriting` with the pages written. The teacher is told
+  `SectionReDatePlanner.apply` wrote page by page and threw its own
+  `StoppedAfterWriting` with the pages written. The teacher was told
   `publishStoppedPartWay` ("Only part of the section's class dates was
   changed…") with the pages already re-dated listed — never "Nothing was
   changed", which it said until then although pages were written.
+
+**Since #899's U3 neither of those two can happen**: a publish, a whole unit
+and a re-date are each ONE step through the undo journal's door, staged and
+swapped in together or not at all (documentation 09, "U3: every daily page
+action through the door"). A page that cannot be written now writes
+nothing, so the menu's line says "changed nothing". A re-date says "Nothing
+was changed: …" with the file in the way, and so, since U3a's second
+round, does a publish, a hide and a whole unit: `publishStoppedPartWay`
+("Only part of … was changed") was true only while the write went page by
+page (the first review of U3a, MEDIUM 1). Since U3a's third round it is
+said on the Mac in ONE case, where it is true: a swap refused after some
+pages went in whose reversal could not put one back
+(`JournaledStepError.leftPartWay`), so a page holds the new content and
+what it held before is kept beside it under a hidden name the sentence
+names (the second review of U3a, MEDIUM a; documentation 09, "The third
+round"). Every action's "Nothing was …" catch says it through the runner's
+`saidWhenTheStepStopped`, which also counts the write as one with no new
+undo entry. `AssistWording` is unchanged; Windows still writes page by
+page. Nor is the Restore Section pointer added: there is nothing to put
+back. `SectionVerbsEndingTests`' three tests for these paths pin
+this (`testAPublishThatCannotWriteEveryPageWritesNone`,
+`testAWholeUnitThatCannotWriteEveryPageWritesNone`,
+`testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`), and
+`PublishStoppedPartWayTests` pins the page list, the whole unit and an
+outside assistant. `StoppedAfterWriting` is kept and no longer thrown.
 
 A first write that fails is still "changed nothing", and "Nothing was
 changed". Until #531 the depth alone decided, so each of these was written as

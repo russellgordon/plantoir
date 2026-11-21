@@ -20561,9 +20561,9 @@ off.
   this version knows `preference:<name>`, the app's own preferences store (`PlantoirDefaults.shared`, which follows `--state-dir`)
   (`UndoAppPreferences`), and a step of external ops alone needs no working
   folder. Like a move and a tree it goes in after every file's content has been swapped in, in the order of the step's ops, re-read just before it is set, and is set back if a later change cannot go in.
-  The LaunchAgent of a scheduled deploy (ruling 23) and Obsidian's vault
-  list are families a later piece defines; until then an op naming one
-  cannot be read here.
+  U3b adds `scheduledDeploy:<label>`, a deploy set for later (below,
+  "U3b: the rollover as one step"); Obsidian's vault list is a family a
+  later piece defines, and until then an op naming one cannot be read here.
 - **Whole ops stand alone.** A move, a tree and an external op are judged
   against the disk as it is, never against what an earlier op of the same
   step would leave, so no other op of a step may share their places; a step
@@ -20891,10 +20891,15 @@ the one the limits already distrust); the union of every fragment (the
 record's own readers take the union to know what has EVER been shown,
 which is the wrong question here).
 
-### The one action recorded in U1
+### The one action recorded in U1 (replaced by U3)
+
+**Since U3 this is history**: `UndoShadowPublish` is gone, and publishing and
+hiding go through the door like every other daily action ("U3: every daily
+page action through the door", below). What follows is what U1 built, kept
+for its reasons (the list read off the main actor, `canonicalPath`).
 
 Publishing and hiding pages (`AssistToolRunner.carryOut`, from the menu,
-the built-in window and an outside assistant) is recorded in shadow beside
+the built-in window and an outside assistant) was recorded in shadow beside
 today's history by `UndoShadowPublish`: before `AssistPublishPlanner.apply`
 runs, it works out what apply will write with the same functions and
 records that; afterwards the step is kept (`applied`) only if what was
@@ -20971,6 +20976,853 @@ not, and sharing unit plans are not counted (rulings 17 and 18; whether
 setting or cancelling a deploy for later is a step is held as M10), and
 `DeployCommand.releaseSite`, the rollover's "cut loose", is U4's with the
 rollover. 87 files wrote on the branch; with `dev` merged (#785a and #897c), 90: `OneSectionRestore` (an `unzip -p` that only reads), and the shared Media store's `SharedMediaStore` and `SharedMediaFiles` (U5's).
+
+### U3: every daily page action through the door
+
+U3 (#899) wires the daily page actions through the door. Each action is
+ONE step, and the step is now how the action writes. Before U3, publishing
+was recorded in shadow BESIDE its own writes (`UndoShadowPublish`, gone) and
+every other action wrote file by file. Now the action plans every file into
+a `JournaledStep` (`Models/Undo/JournaledStep.swift`) and makes the step
+once. `JournaledWrite.perform` writes the `begin` line, stages every file
+beside its target, swaps them in together and writes `applied`. While
+`undoJournalIsLive` is off this runs in SHADOW: the files are written
+exactly as planned whether or not the list could take the step (a busy or
+unwritable list leaves one trail line, `undo could not record a step`), and
+nothing is ever offered.
+
+**Reading through the plan.** An action that reads what it has just
+written now reads it from the step: `readText`, `fileExists` and
+`markdownFiles(under:onDisk:)` answer as the step will leave the disk. Make
+Room reads the pages it renamed under their new names, and the links it
+rewrote. Two actions plan more than once into one step: a whole unit,
+published or hidden class by class, and the links checklist (its pages,
+then the classes dated later it published). For those, the readers a plan
+is built from (`AssistSectionGraph.read`, `.classPages`,
+`ClassPages.summary`) read pages through `JournaledStep.planning`. That is
+set only inside `whilePlanning { }`, which never spans an `await`, so each
+class's plan sees what the classes before it planned, as it saw what they
+had written before U3. Rejected: a separate step per class. Undo would then
+take back one class of a unit, while today's history takes back the whole
+unit as one entry.
+
+**What cannot be named in a step.** Some writes cannot be named in a step:
+
+- a course not under a `courses` folder (no working folder);
+- a file reached through a link that leads outside the working folder;
+- a target that is not a plain file (a link, a folder, a file that cannot
+  be read).
+
+In shadow those files are written with one trail line by
+`JournaledStep.writePlainly`, which since U3a's second round is all or none
+like the door (the first review of U3a, LOW 3: it wrote file by file, so a
+failure part way left half an action while the reply said "Nothing was
+changed"). It stages every file beside its target and swaps them in
+together (`UndoSwap`, under a label of its own, `shadow-<pid>-<id>`, since
+the third round), each still holding what it held when
+it was planned and a page that was absent still absent. A target that was
+a link, a folder or a file that could not be read when it was planned is
+refused before anything is written, as a live step refuses it: its content
+cannot be checked, and the old `.atomic` write over a link replaced the
+teacher's link with a regular file (measured: `Data.write(.atomic)` to a
+link leaves a regular file at the link's place and the linked file
+untouched). Chosen over making the sentence true of a part-way write,
+because every caller would then need a part-way sentence and a trail count
+of its own, and live refuses the same targets anyway. Live (U7), the step
+is refused before anything changes.
+
+**The front page is the rule's, never content.** Publish, hide, a whole
+unit, re-date and the start of the year name the section's front page as a
+`recompute` op (`sectionFrontPage`) and repoint it once, after the step is
+made. The repoint is written through `UndoKeptFiles.write`.
+`SectionIndexPointer` has no writing call of its own any more. The start of
+the year used to repoint twice (once inside publish, once after its
+stray-key pass). It now repoints once, after both, which is where the
+second repoint left the page. Today's class on the front page is different:
+the class line there is the teacher's own choice, so it is content of the
+step, not the rule's.
+
+**The main actor.** The planners are synchronous and run on the main
+actor, so a step's lock and flush are taken there. That is at most 50 ms of
+lock wait in shadow, and one `F_FULLFSYNC` (4.0 ms median on the M4 Pro,
+U1's measurement). The expensive part, a process's first whole read of the
+list (100 to 380 ms at a year's 2 to 6 MB), is taken OFF the main actor
+first, by `JournaledStep.readTheListAhead()`. The runner calls it before
+every tool, Get Ready for the Start of the Year before its write, and,
+since U3a's second round (the first review, LOW 6), every sheet that makes
+a step on the main actor while the teacher reads it: the links checklist
+(`.task`), today's class and Not Today (when the question is put, inside
+`TodaysClassOnTheFrontPage.offer`, so every place that asks it reads ahead),
+the classes dated later at Deploy (`SectionVerbSheetModel.ask`), the class
+dates sheet and Course Settings (for Start the How I Teach Page…), each a
+`.task` or an unawaited `Task`, so nothing waits for the read and the order
+of effects is unchanged. `UndoReadAheadTests` pins all seven places as they
+really run (each sheet shown in a window off the screen, each question put,
+a tool of the runner, Get Ready), seen through `JournaledStep.readAheadHook`
+and an expectation, never a timed wait; it replaced a search of the source
+text (the second review of U3a, LOW 4). The step reads on from there (the
+director's ruling 8 on U1's third round).
+
+**For U7, to settle before the switch (the first review of U3a, LOW 9).**
+In shadow the main actor waits at most 0.05 s for the lock to begin a step
+(`UndoSwitch.shadowLockWaitSeconds`) and 0.05 s to finish it. Live it waits
+up to 2 s to begin (`lockWaitSeconds`) and up to 10 s to finish
+(`finishWaitSeconds`), per action, so a busy list (another window, an
+outside assistant, a scheduled deploy holding the lock) could hold the
+window for 12 s. U7 must either move the step's `make()` off the main
+actor (the planners would become async) or bound the live waits on the
+main actor to what the HIG allows a window to stall, and say which, before
+`undoJournalIsLive` is turned on. Also in `undo.laterPieces.U7`.
+
+#### The actions, their keys and makers
+
+| Action | Code | Step key | Files in the step |
+|---|---|---|---|
+| Publish Pages / Hide Pages | `AssistToolRunner.carryOut` → `AssistPublishPlanner.apply` | `publishPages` / `hidePages` | each page (editLine), front page as recompute |
+| A whole unit published or hidden | `wholeUnitRequested`, one `JournaledStep` for the unit, `planWrites` per class | `publishPages` / `hidePages` | every class and page of the unit, front page as recompute |
+| Publish Class for a Date | `carryOut` with `planningAlso` | `publishClassForADate` | the pages, and `section<N>.later-classes-kept.json` when the class would be asked about at Deploy (one step; on its own step when the publish changed nothing; written only inside a step that goes in, see "The second round") |
+| Add Next Class, in a new unit, Add Classes | `PlaceholderClassPlanner.apply` | `addNextClass` / `addNextClassInANewUnit` / `addClasses` | each new page (writeFile, before absent) |
+| Make Room for Classes | `ClassInsertionPlanner.apply` | `makeRoomForClasses` | each rename (the new name written, the old removed), each link rewritten, each date moved, each new page |
+| Duplicate Class (the window) | `duplicateClassRequested`, `ClassInsertionPlanner.apply(into:)` | `duplicateClass` | the room made and the copy, in one step. When the copy is refused after the room is planned, the room alone is made, as before U3 |
+| Duplicate as Next Class (the menu) | `duplicateAsTheNextClassFromTheMenu` | `duplicateAsTheNextClass` | the copy (a page that was absent; a page that appeared meanwhile refuses `changedSince`, which says `menuTheNextPageIsAlreadyThere`) |
+| Re-date Classes | `SectionReDatePlanner.apply` | `reDateClasses` (`rollOver` when it is a rollover's re-date) | each page re-dated, front page as recompute |
+| Class Dates (remember timetable) | `SectionTimetableStore.applyRememberTimetable` | `rememberTimetable` | the section's timetable file |
+| Add curriculum mentions | `AssistCurriculumMentions.apply` | `addCurriculumMentions` | the page |
+| Write How I Teach / start the page from Course Settings | `writeHowITeach` / `HowITeachPage.startOrFind` | `writeHowITeach` / `startHowITeachPage` | the page, `holds: course`, no section |
+| Get Ready for the Start of the Year | `StartOfYearPlanner.apply` | `getReadyForTheStartOfTheYear` | every page hidden and every stray per-section key set, front page as recompute |
+| Today's class on the front page / Not Today | `TodaysClassOnTheFrontPage.show` / `NotToday.write` | `showTodaysClassOnTheFrontPage` / `notTodayOnTheFrontPage` | the front page (content) / `section<N>.front-page-not-today.json` |
+| Publish pages links lead to (the links checklist), Not Now | `LinksChecklistPublisher.publish` / `LinksChecklistAnswered.write` | `answerTheLinksChecklist` | the pages, `section<N>.links-checklist-answered.json`, and the later classes it published kept, in ONE step (the front page is not repointed, #379 ruling F1) |
+| Classes dated later kept at Deploy | `ClassesDatedLater.keep` / `KeptRecord.write` | `keepClassesDatedLater` | `section<N>.later-classes-kept.json` |
+
+`madeBy` is the runner's surface: `menu`, `builtInAssistant:<id>`, or
+`outsideAssistant::<id>`. A planner called with no maker is a sheet's
+(`sheet`). Every step has `class: A` and the argument `pageCount`, which
+counts every file the step changes. Keys are open strings, and U7 names
+their words.
+
+#### What changed for a teacher: nothing on success, less on failure
+
+Every page an action writes is byte for byte what it wrote before U3. Each
+action records the same `AssistChange` in today's history, and Undo Last
+Change, the window's "undo that" and Undo Getting Ready answer exactly as
+before (`UndoActionStepsTests.testTodaysUndoAnswersExactlyAsBefore`; the
+whole suite's `AssistToolRunnerTests`, `SectionVerbsTests`,
+`MakeRoomForClassesTests` and `StartOfYearTests` unchanged). The tool
+surface digest and `AssistWording` are unchanged.
+
+The failure path is different, deliberately. A write that failed part way
+used to leave the earlier pages written. Now a step is all or none: an
+unreadable page stops the plan before anything is written, and a swap that
+cannot go in reverses the swaps already made. The error is Foundation's
+"could not be saved" sentence for the file the door names
+(`JournaledStepError`), so the wording is the old family.
+
+- `AssistPublishPlanner.StoppedAfterWriting` and
+  `SectionReDatePlanner.StoppedAfterWriting` are no longer thrown, so
+  `writesWithNoNewUndoEntry` no longer counts those paths. The Section
+  menu's trail line for such a failure now says "changed nothing", which is
+  true. A re-date now says "Nothing was changed: …", naming the file in the
+  way, where it used to list the pages already re-dated.
+  `SectionVerbsEndingTests` pins all three paths
+  (`testAPublishThatCannotWriteEveryPageWritesNone`,
+  `testAWholeUnitThatCannotWriteEveryPageWritesNone`,
+  `testAReDateThatCannotWriteEveryPageWritesNoneAndSaysSo`); they replace
+  the three tests that pinned the part-way writes.
+- Make Room's per-file "could not finish" counts for a failed write
+  (`linksNotUpdated`, `notReDated`) can no longer happen. A rename whose new
+  name is taken, and a new page whose name appeared meanwhile, are still
+  carried past and named.
+- A publish, a hide and a whole unit that cannot write every page now say
+  "Nothing was changed: …" with the reason, as a re-date does, and never
+  `publishStoppedPartWay` ("Only part of … was changed"), which is false of
+  a disk where nothing was written (the first review of U3a, MEDIUM 1;
+  `undo.rule.stagedThenSwapped` and ruling 4 make all-or-nothing the final
+  behaviour, not U7's to word). `AssistWording` is untouched and no
+  `assist-cases` case pins this path. `PublishStoppedPartWayTests` pins the
+  page list, the whole unit and an outside assistant; no Restore Section
+  pointer is added, since there is nothing to put back.
+- The one exception is a step left PART WAY: a swap refused after some
+  files went in whose reversal could not put one back. A page then holds
+  the new content, so "Nothing was …" would be false. The door throws
+  `JournaledStepError.leftPartWay`, and every caller says only part was
+  changed, naming where each page's earlier content is kept ("The third
+  round", below).
+
+#### The second round (the first review of U3a)
+
+- **The befores are the plan's (MEDIUM 2).** `JournaledStep.recordableChanges`
+  read each file again at `make()`, so an Obsidian edit, or a page that
+  appeared at a rename target or a new page's place, between planning and
+  making became the step's before and was written over. The bytes `plan()`
+  read when it first planned the file are now the before
+  (`plannedBefore`), so the door refuses `changedSince` and the other
+  program's file is left as it wrote it
+  (`JournaledStepTests.testAFileEditedBetweenPlanAndMakeIsRefusedAndLeftAsTheOtherProgramWroteIt`,
+  `testAPageAppearingAtANewPagesPlaceIsRefused`, and the same for a step
+  written plainly).
+- **The swap reads the kept original back (the Windows W2b review, matched
+  here).** An edit made IN PLACE by another program between the swap's
+  re-read and its rename lands in the inode the kept original links to;
+  the tidy then deleted it. After each rename the original is read back:
+  changed, it is put back over the new content and the step refused
+  `changedSince`; unreadable, put back and refused `cannotTellNow`. No
+  contract row: those are the existing refusals. On a volume without hard
+  links the original is a copy, which the race never reaches, so it is not
+  seen there (as before). `JournaledStepTests.testAnEditThatRacesTheSwapIsPutBackAndTheSwapRefused`
+  mirrors Windows' `UndoSwapTests.AnEditThatRacesTheSwapIsPutBackAndTheSwapRefused`.
+- **A reversal that cannot complete leaves the step in flight (the Windows
+  W3 review, matched here).** `UndoSwap.swap` ignored `reverse()`'s result
+  and the step was closed `failed`, so a page could be left new with its
+  original in a staged file nothing recorded. Now `reverse()` says whether
+  every swap went back; when one did not, the swap answers `notPutBack`
+  (no new refusal word: the caller says the refusal that stopped it), no
+  closing event is written, nothing is tidied, and recovery settles the
+  step from the content once the process is gone (`rule.recovery`).
+  `testAReversalThatCannotCompleteLeavesTheStepForRecovery`.
+- **A shadow swap without the list is tidied after a kill (LOW 8).** The
+  door's fallback when the list cannot take a step, and `writePlainly`, swap
+  under label `shadow` with no `begin` naming their files. Before staging,
+  `UndoShadowStaging` notes the targets in `shadow-staged/` in the list's
+  folder under this process, and removes the note when the swap ends. A
+  note whose process is gone is tidied by the next recovery and the next
+  read ahead: its `-shadow-new` and `-shadow-orig` files are removed, the
+  teacher's files left as the process left them. When the list's folder
+  cannot take the note the swap goes ahead untracked, and a leftover is
+  replaced by the next shadow swap of the same file. A swap that answered
+  `notPutBack` drops its note, since what it left may be a page's only
+  original. `testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery`.
+  (Changed in the third round, below: each swap has its own label, the note
+  is kept on `notPutBack`, and a kept original that differs from its page
+  is never tidied.)
+- **The links checklist says what is true for each refusal (LOW 7).** A
+  page the plan cannot read: the unreadable-page sentence, as before. A
+  page changed since it was checked: `linksChecklist.wording.pageChangedSince`,
+  named as the sheet names a page. A file that cannot be read just now:
+  the unreadable-page sentence. Anything else (a full disk, a file in use,
+  a list that cannot take the step once live): "Nothing was changed: …"
+  with Foundation's could-not-be-saved sentence for the file, as the
+  runner says it.
+- **Publish Class for a Date's kept record (LOW 10).** Before U3 the record
+  was written after the publish, whatever came of it: a publish refused
+  part way (a page it uses could not be written) still recorded an
+  already-visible class as kept, silencing the Deploy question for a class
+  the request never reached. Now it is written inside the publish's own
+  step, before `history.record`, so it goes in only with the pages. It is
+  not part of today's `AssistChange`, as before, so Undo Last Change leaves
+  it, as it did. `UndoActionStepsTests.testAPublishClassForADateThatIsRefusedKeepsNothing`
+  and `testPublishClassForADateKeepsTheClassItPublishesInTheSameStep`.
+- **Reading through the plan is pinned (LOW 4)** for the whole unit
+  (`testAWholeUnitReadsWhatItsEarlierClassesPlanned`: it writes what
+  publishing its classes one by one wrote), Publish Class for a Date's
+  record and the checklist's kept classes
+  (`testTheLinksChecklistKeepsTheLaterClassItPublishes`).
+- **The front page, repointed once per unit instead of once per class,
+  changes no class's plan.** Checked from the code: the repoint changes
+  only the front page's embed of a class. A publish plan follows links out
+  of the class it publishes and never reads who links in. A hide plan
+  reads who links in (`pageStillLinking`), but a class candidate stops at
+  `aClassOfItsOwn` before that, and the front page's embed names only a
+  class. So every class of a unit is planned the same with the front page
+  as it was before the unit or after any class of it.
+- **The flaky test (LOW 5).**
+  `UndoActionStepsTests.testAListThatCannotBeWrittenChangesNothingAboutAnAction`
+  failed once in three for the review, comparing the two courses' files.
+  It was not reproduced here: 15 runs alone, 26 in its class (6 and then
+  20 in a row), every one green, on the M4 Pro with other agents' builds
+  running. Read for a cause: both courses are laid out from fixed dates,
+  Add Classes dates its pages from the timetable, the copy it makes first
+  and the folder's id are outside what is compared, and a list whose lock
+  is busy for longer than 0.05 s goes through the same staged swap and
+  leaves the same files. No timed wait was added. The assertion now names
+  every file that differs and both texts, so a failure says which.
+
+#### The third round (the second review of U3a, and the Windows recovery review)
+
+The second review found one MEDIUM in three parts: a reversal that could
+not complete, in shadow (every teacher today), was said as "Nothing was
+changed", and recovery then deleted the only copy of what the page held.
+
+- **(a) A step left part way says so.** `UndoSwapResult.notPutBack` now
+  carries `keptOriginals`, the hidden name of each kept original left beside
+  a page still swapped. The door answers `JournaledWriteOutcome.leftPartWay`
+  and `JournaledStep.make()` throws `JournaledStepError.leftPartWay(refusal,
+  fileName:, keptOriginals:)`, whose description is Foundation's
+  could-not-be-saved sentence followed by "What “<page>” held before is kept
+  beside it as the hidden file “<name>”." The runner's eleven "Nothing was
+  …: …" catches go through `saidWhenTheStepStopped`, which says
+  `publishStoppedPartWay` for this case only (true there) and counts it in
+  `writesWithNoNewUndoEntry`, so the Section menu's trail does not say
+  "changed nothing". The links checklist says the same. Today's class reads
+  the front page back instead of answering "could not save": the page does
+  name the class. No new wording and no contract row: the sentence is the
+  existing key. Tests: `PublishStoppedPartWayTests.testAPublishThatCannotBePutBackIsSaidAsPartWay`,
+  `JournaledStepTests.testAReversalThatCannotCompleteLeavesTheStepForRecovery`,
+  `UndoActionStepsTests.testAChecklistPressLeftPartWaySaysOnlyPartWasChanged`
+  and `testTodaysClassLeftPartWayIsAnsweredByWhatThePageShows`.
+- **(b) A kept original that is the only copy is never tidied away.** A
+  `-orig` is a copy only when its page holds the same bytes
+  (`UndoSwap.isACopyOfItsPlace`). `UndoSwap.tidyLeftovers(keepingOnlyCopies:
+  unlessTheListCanPutBack:)` keeps every other one, except where the list
+  holds every piece of content the step's ops on that page need
+  (`UndoRecovery.listCanPutBack`: a line or a key needs none, a whole file
+  its blobs), since recovery can then put the page back from the list. It is
+  used by recovery's first tidy, before the plan (the Windows recovery
+  review's 15); by `tidyClosedSteps` (in shadow a differing original is
+  always kept, since shadow never puts a page back; live, unless the list
+  can put it back); and by pruning's tidy of a step closed unsettled (kept,
+  since pruning then deletes its content). A step that settles (completed,
+  nothing took effect, rolled back) is tidied fully. Tests:
+  `JournaledStepTests.testInShadowAReversalThatCannotCompleteKeepsTheOriginal`
+  and `testRecoveryTidiesNoOnlyCopyBeforeItKnowsTheStepSettles`; the
+  `recoveryCases` row "and on the ordinary path it is not tried again before
+  its time" pins the list check (a file in use, its content in the list:
+  nothing staged is left).
+  - **One place still removes an only copy, as the contract says today.** A
+    live step whose put-back cannot even be planned (content it needs is
+    missing) is closed `interrupted`, reason `couldNotPutBack`, and its
+    staged files are removed at that closing, as the two `recoveryCases`
+    rows on missing content and `rule.recovery` ("leaves nothing of the
+    journal's in a course") pin. Russell's ruling of 2026-11-20, 15:20,
+    replaces it: a kept original whose hash matches what the journal
+    recorded puts the page back and the step is rolled back. That changes
+    those two rows and the rule's sentence on staged files, so it is a
+    contract change and its own piece (Mac first, then Windows' W4 from the
+    same rows), not this round. The first tidy already leaves the original
+    in place for it.
+- **(c) A shadow swap without the list keeps what it must.** Each such swap
+  has a label of its own, `shadow-<pid>-<id>` (`UndoShadowStaging.newLabel`,
+  stored in its note as `Note.label`; LOW 2: one label shared by every
+  process let a dead process's note remove a running swap's staged files for
+  the same page). The note is kept when the swap answers `notPutBack`, so
+  its staged new content is found once the process is gone, and the tidy
+  keeps a kept original that differs from its page. The note goes once its
+  files are tidied; a kept original then stays beside its page under its
+  hidden name for good, which is the price of never deleting the only copy.
+  A note written before the label was stored does not decode and is left as
+  it is (no release ever wrote one). Tests:
+  `testInShadowWithoutTheListAReversalThatCannotCompleteKeepsItsNote`,
+  `testAShadowSwapWithoutTheListKilledPartWayIsTidiedByTheNextRecovery`
+  (now: the new content tidied, the original kept) and
+  `testADeadProcesssNoteLeavesAnotherSwapsStagedFiles`.
+- **Recovery before every prune (the Windows recovery review's 14).**
+  `UndoJournalWriter.recoveredInThisHold` is set by `UndoRecovery.run`, and
+  `UndoPruning.prune` returns at once without it. `JournaledWrite.finish`,
+  `clearAfterARefusal` and `clearTheListAsTheSwitchGoesLive` now run
+  recovery (`trySwapsNow: false`, so the ordinary path pays nothing for a
+  refused put-back) before they prune. Before, a dead step past the limits
+  could be closed `unsettled`, its original tidied and its content deleted,
+  though a recovery in the same hold could still have settled it.
+  `testPruningRefusesWithoutRecoveryInTheSameHold`.
+- **The checklist's "could not be read" (LOW 3)** is said for
+  `cannotTellNow` only when the file really cannot be read now
+  (`UndoItem.read` is `unreadable`); a place that is a folder or a link
+  cannot be checked and so is not written, which the could-not-be-saved
+  sentence says.
+  `testAPressThatCannotBeCheckedSaysUnreadableOnlyForAFileThatCannotBeRead`.
+- **The flaky test's cause (LOW 1).** `AssistFixture` wrote
+  `course_config.json` without `.sortedKeys`, so two fixture courses could
+  hold their keys in different orders (a dictionary's order is not fixed
+  from one run to the next) and a test comparing the two courses' files
+  failed now and then. Sorted now; `testTheFixtureWritesItsSettingsInOneOrder`
+  fails without it (measured: the keys came out unsorted).
+- **The window left between a read and the write (LOW 5).** The befores are
+  the plan's (second round), so what is left is two narrow windows. Between
+  a planner's own read of a page and `plan()`'s first read of it: the same
+  main-actor turn, with no `await` between, so another program can only
+  slip in during those microseconds, and then its file is the before and is
+  replaced as it would have been a moment earlier. Between the swap's
+  re-read and its rename: covered by the read-back of the kept original
+  after the rename on a volume with hard links (second round); on a volume
+  without them the original is a copy that the race never reaches, so such
+  an edit is not seen there.
+
+#### If the app dies part way: what is on disk
+
+Every action has the same five places to die, because every action is one
+step through the same door:
+
+1. **Before `begin` is on the disk.** Nothing changed.
+2. **After `begin`, before the first swap.** Every new content is staged
+   beside its target as a dot-file (`.<name>.plantoir-undo-<seq>-apply-new`);
+   every page is as it was.
+3. **Between swap *i* and *i*+1.** The first *i* files are new and the rest
+   old; each replaced file's original is kept beside it as a hard link
+   (`-orig`).
+4. **After the last swap, before `applied`.** Every file is new.
+5. **After `applied`.** The step is made.
+
+Live (U7), recovery puts places 2 to 4 right once the process is gone.
+Places 2 and 3 are put back to before the step: `failed`, or `rolledBack`
+with one trail line. Place 4 is completed (`done`). Nothing staged is left.
+
+In SHADOW (today), recovery never writes into a working folder. A step left
+at place 3 is recorded `interrupted` and the list cleared. Its staged new
+content is removed, and the pages stay as the process left them. That is
+the same on-disk state an action that died between two writes left before
+U3, with one addition since the third round: the kept original of each page
+that was swapped (`-orig`) differs from its page and is the only copy of
+what the page held that a teacher can reach (shadow never puts a page back
+from the list), so it stays beside the page under its hidden name.
+
+The files per action are those in the table above. The largest step a
+daily action makes is Make Room's: the renames (two files each), the links,
+the dates and the new pages, six or more files on a small section. It is
+the worst case: killed between its second and third swap, two files are new
+and the rest old, which is a half-shuffled unit.
+
+`UndoActionStepsTests.testAMakeRoomKilledPartWayIsPutBackWholeByRecovery`
+proves it. It runs the step live (`JournaledStep.modeOverride`), kills it at
+`beforeSwap(2)` and runs recovery as another process would. Every page is
+back as it was, nothing staged is left, and the step reads `rolledBack`.
+`testAShadowStepKilledPartWayLeavesNothingOfTheJournalsInTheCourse` is the
+shadow half (Add Classes, killed between its two pages). Recovery writes
+none of the teacher's files, the step reads `interrupted`, and the
+journal's own staged files are removed.
+
+That last part is new in U3. U1's `rule.recovery` said shadow recovery
+never writes into a working folder, and in U1 a shadow step staged nothing.
+Since U3 a shadow step is staged like a live one, so recovery's tidy of a
+closed step's staged files runs in shadow too. It runs only for a step whose
+every op changes a file in place; a step that moves or makes a folder is
+left for a live recovery. Measured red before the change: the dot-files
+stayed in the course.
+
+#### The action traces: through the real action code
+
+`UndoActionStepsTests.testEveryDailyActionIsOneStepThroughTheDoor` runs 20
+actions through their real code (the runner's tools on the shared
+assistant fixture, and the sheets' own writers) and reads back the one step
+each leaves: its key, its maker, its ops, and every file's whole text before
+and after. That is `contracts/undo-action-steps.json`, written by the test
+(`TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1`) and never by hand. On any
+other run the test is red when the actions record something else, with the
+moment a record carries (`answeredAt`, `recorded`) blanked.
+
+`scripts/make_undo_traces.py` makes six traces of each recorded step
+(`ACTION_TRACES_PER_STEP`): 120 `actionTraces` in
+`contracts/undo-traces.json`, beside the 20 seeded `traces`, which are
+unchanged byte for byte. Each trace makes the step from its files' befores
+(the door choosing `editLine` or `writeFile` by its own rule; the trace
+pins the op kinds), then undos, redos, hand edits of the step's files, and
+notes, then the closing run.
+`UndoActionStepsTests.testEveryActionTraceReplaysAsTheContractSays`
+replays them through the live door; `scripts/test_make_undo_traces.py`
+checks the generator. Windows reads `traces` only until it builds W7 (#949),
+so its `UndoTraceContractTests` are unchanged.
+
+#### Who owns `releaseSite` and `PublishedPagesRecord.release`: U3
+
+**U3 owns both.** They are the rollover's writes, not a deploy's and not a
+setting's:
+
+- `DeployCommand.releaseSite` moves the site markers aside when a section
+  rolls over onto a new website.
+- `PublishedPagesRecord.release` moves the record's fragments aside and
+  removes the two answered records.
+
+The rollover's ONE step is U3's (#897 piece B, seam 3). Splitting it would
+leave the rollover as two steps, which is the fault #897 B fixed in today's
+history. Since U3b both are planned into that step (below):
+`PublishedPagesRecord.release` writes nothing any more and has left the
+writer scan, and `DeployCommand.planSiteRelease` plans the markers. The
+plain `DeployCommand.releaseSite` is kept only for Keep a Copy for
+Reference, which cuts the COPY loose from the website as it makes it; that
+is part of making the copy, U4's step, so the scan's `DeployCommand.swift`
+entry now reads `waitsFor: U4`. The deploy that `DeployCommand` starts is still
+not counted (rulings 17 and 18). Schedule Deploy and Cancel Scheduled
+Deploy remain U4's (ruling 23); only the schedule a rollover REMOVES is an
+op in the rollover's step (seam 2, an `external` op).
+
+### U3b: the rollover as one step (#899, #959)
+
+Roll Over to a New Year (Section ▸ Roll Over to a New Year…, the built-in
+window's rollover, an outside assistant's `re_date_classes` with
+`rollover`/`website`) is ONE step, key `rollOver`, made through the door
+that takes every kind (`JournaledWrite.perform(ops:)`, from
+`JournaledStep.makeAsOps`). Under one begin it holds, in this order:
+
+1. every page re-dated (`editLine`, or `writeFile` when the lines cannot
+   say it), planned by `SectionReDatePlanner.apply(…, into: step)`;
+2. the two answered records removed (`writeFile`, after absent:
+   `links-checklist-answered.json`, `later-classes-kept.json`) and each
+   published-pages fragment moved into `…published-pages.previous-<stamp>/`
+   (`move`), planned by `PublishedPagesRecord.release(…, into: step)`;
+3. with "new", each site marker a deploy goes on with a site from moved
+   aside (`moveApart`), and each stale leftover brought in from the built
+   output set aside on its own (`setAside`; nothing else is moved),
+   planned by `DeployCommand.planSiteRelease`;
+4. with "new", each deploy set for later in this working folder for the
+   section turned off (`external`, target `scheduledDeploy:<label>`);
+5. the front page (`recompute`, `sectionFrontPage`), repointed by the runner
+   once the step is made, as the re-date's own step does.
+
+The same step is made when the dates are already right (the record and
+the website alone: the menu's `menuRolloverWithTheDatesAlreadyRight`, the
+window's second turn). An ordinary re-date (no `rollover`) is still its own
+`reDateClasses` step.
+
+**Nothing is said, recorded or left on the trail until the step is made.**
+The website is PLANNED (`planTheWebsite` → `PlannedWebsite`) before the
+make and FINISHED after it (`finishTheWebsite`: the sentences, the trail
+line, the window's second history entry). A step that is refused changes
+nothing and the reply is the runner's "Nothing was changed: …", so every
+sentence a teacher or an assistant hears on a failed rollover is true of
+the disk. A step refused PART WAY (a file could not be put back after the
+refusal: `JournaledStepError.leftPartWay`, U3a's third round) is never
+tried again and is said through `saidWhenTheStepStopped`, as part way, on
+all three of the rollover's paths (the review of U3b, LOW 1: the retry
+below once ran after a half-made first attempt, and the reply said
+"Nothing was changed" while a removed schedule or a moved file stayed
+changed). Two exceptions are deliberate, each true:
+
+- **A deploy set for later that cannot be removed** (its plist will not
+  go): the step is refused `couldNotWrite` on that target; the runner takes
+  that op out and makes the rest (`makeTheRolloverStep`), and the reply says
+  `rolloverCouldNotTurnOffTheScheduledPublish`, as before U3b. The failed
+  attempt leaves a `failed` step on the list, which is never offered, and
+  nothing else: the swap removes every folder it made for a place that had
+  none (`UndoSwap.swap`'s `foldersMade`, by `rmdir`, so never a folder with
+  anything in it), where a refused step once left an empty
+  `…published-pages.previous-<stamp>/` behind (the review of U3b, LOW 4).
+  A job whose files cannot be read is left out the same way. Only a plain
+  refusal is retried; a step left part way never is.
+- **The legacy Netlify marker** (`.merged_output/section<N>/.netlify_site.json`)
+  lives in the built output, a link out of the working folder, where a step
+  cannot name a place (`undo.rule.stagedThenSwapped`). **Russell ruled on
+  2026-11-20**: before the step it is brought into the working folder in the
+  current format, exactly as a deploy does on its next run, and the step
+  then names it like any other record (`moveApart`), so Undo puts it back
+  whole. `DeployCommand.moveTheLegacyMarkerIn` reuses `deploy.py`'s rule
+  (`load_netlify_marker`): the current record (`.netlify_sites/section<N>.json`)
+  is the one read; only when there is none is a legacy record that reads as
+  JSON written there (its bytes, mode 0600) and the legacy one removed.
+
+  **One question decides every record: which one would `deploy.py` read
+  right now?** (the review of U3b's fixes, round three, MEDIUM 1). It is
+  answered in one place, `DeployCommand.netlifyRecordADeployReads`, with
+  exactly `load_netlify_marker`'s rule: a current record that parses as JSON
+  wins, whatever it holds (`null` included, which names no site, so a
+  deploy starts a new website and does not migrate); else a legacy record
+  that parses, which a deploy would migrate; else none. "Parses" is
+  Python's `json.loads(path.read_text(encoding="utf-8"))`: strict UTF-8, no
+  byte order mark (Python's `json` refuses one), any JSON value
+  (`DeployCommand.parsedRecord`). The rule is pinned by
+  `contracts/shared-rules.json` → `undo.netlifyRecordCases`, 20 states, run
+  through deploy.py's OWN function by
+  `scripts/test_netlify_record_a_deploy_reads.py` and through the Swift by
+  `UndoRolloverStepTests.testWhichRecordADeployReadsIsTheContracts`; one
+  table drives both. Known to differ only on what no tool writes: Python's
+  `json` also takes `NaN` and `Infinity`, and numbers too large for a
+  double.
+
+  **The section's website is the SITE a deploy goes on with**
+  (`DeployCommand.netlifySiteADeployGoesOnWith`, round four): the record it
+  reads, and the site that record names, a JSON object's `id` (what
+  `deploy.py` takes, `site_marker.get("id")`, and only when it is not
+  empty) or, failing that, its `site_id` (the same id in every record
+  Netlify returns, which `deploy.py` writes whole). A record that names no
+  site (`null`, `{}`, `[]`, a string, an empty `id`) is not a website: a
+  deploy starts a new one from it, so a rollover moves nothing of it and
+  says the section was on no website (`menuRollOverNotDeployedYet`,
+  `rolloverHadNoWebsiteYet`), never "last year's details are kept at…" or
+  "deploying it will still replace last year's website" (round four,
+  LOWs 2 and 3: a record that is not UTF-8 had been said to be still
+  pinned, and `{}` to be last year's website). A record whose bytes cannot
+  be read at all is still pinned: what it names cannot be told now.
+
+  **Only what must move, moves** (round four). Each round before this one
+  named more of the states a leftover can be in and found another that
+  collided (review 4's MEDIUM: a broken current record and an
+  `.unreadable.json` already there were both given
+  `section<N>.unreadable.previous-<stamp>.json`, and the rollover was
+  refused for good). The question that removed the cases instead: what does
+  a file no deploy can parse need? Nothing. `load_netlify_marker` ignores
+  it wherever it sits; a deploy that finds no site writes the new one over
+  a current record that does not parse (`save_netlify_marker`, a plain
+  `write_text`), with or without a rollover; and if the rollover never
+  moves it, its Undo never has to put it back. So:
+
+  - **no site** (a deploy would start a new website now): nothing of the
+    Netlify records is brought in or moved, whatever is there; a deploy
+    starts a new website before the rollover, after it, after its Undo and
+    after its Redo;
+  - **the legacy record's site** (no current record that parses, the legacy
+    one does and names a site): it is written in the current record's place
+    and removed from the built output, as a deploy's migration does, and
+    the step moves it as the record (`moveApart`). A current record there
+    that does not parse (a migration's `write_text` killed part way) is
+    first moved out of the way to `.netlify_sites/section<N>.unreadable.json`
+    (the next free name), where the migration would have written over it,
+    and is NEVER moved again: no deploy reads it there. Before round three
+    the bring-in asked only whether a current record EXISTED, took the good
+    legacy record for a stale leftover, and after Rollover and Undo a
+    deploy found no record and made a new website;
+  - **the current record's site**: the step moves the current record
+    away, after which a deploy WOULD read a legacy record that parses, so
+    that one must leave the built output. When it says the same as the
+    current record (compared PARSED, never by bytes: `deploy.py` rewrites a
+    record it migrates with `json.dumps(indent=2)`, LOW 7) it is what a
+    migration that stopped before its removal leaves, and it is only
+    removed. Otherwise it is a STALE LEFTOVER, brought in as
+    `.netlify_sites/section<N>.from-built-output.json` (the next free name,
+    `.2`, `.3`…, LOW 5) and set aside in the step (Russell's ruling of
+    2026-11-20, evening). A legacy record that does not parse stays where it
+    is: no deploy reads it, before or after.
+
+  A legacy record whose bytes a leftover already there holds (a bring-in
+  that died before its removal) is only removed. The step (`planSiteRelease`)
+  sets every `section<N>.from-built-output[.<k>].json` aside, each as a
+  **`setAside`** op: judged and moved as `move` is, standing apart from its
+  step ON ITS OWN, never one of the group of records (below). Undo puts a
+  leftover back byte for byte where the step found it; a leftover that
+  cannot be set aside is left where it is, since no deploy reads it. A
+  leftover is never in `SiteRelease.keptFiles`; its two halves are in
+  `savedFiles`, so today's undo puts it back.
+
+  **Every kept name of a step is chosen in ONE place,
+  `DeployCommand.KeptNames`**, which knows both the disk and every name
+  this step has already chosen: a file's own name with `.previous-<stamp>`
+  before `.json`, then `.2`, `.3`… after the stamp, the first that is
+  neither (a link that leads nowhere counts as on disk). So no two ops of a
+  step share a place, and a file already at a kept name never stops a
+  rollover or pins a record (before round four, a record whose kept name
+  was taken was still pinned).
+
+  Before the rollover and after its Undo a deploy goes on with the same
+  site, in every state
+  (`testEveryRecordStateRolledOverUndoneAndRedoneLeavesADeployOnTheSameSite`:
+  each of the 20 states beside each of five sets of files already in
+  `.netlify_sites` (none; a stale leftover; an `.unreadable.json`; both and
+  a second stale leftover; the kept names this rollover would choose
+  already taken, at a moment fixed by `DeployCommand.momentForATest`),
+  rolled over, undone and redone, checking at each point the site a deploy
+  goes on with, what the reply says and that the kept file it names holds
+  last year's record, that no file already there changes, and that Undo
+  puts every one back).
+
+  The only refusal left is a record that cannot be read, written, moved or
+  removed (or a current record that is there and cannot be read at all, so
+  what a deploy reads cannot be known), said as "Nothing was changed: the
+  website record “.merged_output/section1/.netlify_site.json” could not be
+  moved to “.netlify_sites/section1.json”." (`LegacyMarkerNotMovedIn`; what
+  the bring-in changed is changed back, and a `.netlify_sites` folder it
+  made removed, so the folder is as it was). Every record is placed WHOLE
+  (`DeployCommand.placeWhole`: written beside its place as
+  `.<name>.bringing-in-<id>`, its mode set, then renamed in, never over
+  anything), so a death mid-write leaves no partial record where a deploy
+  reads one; the next bring-in removes any such half-written copy of any
+  of the section's records. This code lives in
+  `Models/LegacyNetlifyRecord.swift`, which the writer scan lists as
+  `notAStep` (the built output is outside the working folder, and the
+  bring-in is a deploy's own migration), so U4 does not take it as work.
+
+  **A step refused after the record was brought in puts it back**
+  (`LegacyMarkerBroughtIn.putBack`, from `makeTheRolloverStep`: never over
+  anything, and only while its new place still holds the same bytes; a
+  current record moved out of its way is moved back; the `.netlify_sites`
+  folder the bring-in made is removed once it is empty again, LOW 6), so
+  "Nothing was changed" is true. If any of it cannot be put back, the reply
+  says what is still moved instead: "Nothing else was changed: … The
+  website record “…” is now at “…”, where a deploy reads it; it names the
+  same website." (for a leftover: "The old website record “…” is now at
+  “…”, where no deploy reads it."; for a current record moved out of the
+  way: "The website record “…”, which no deploy could read, is now at “…”,
+  where no deploy reads it either.") (`RolloverStoppedAfterARecordMoved`,
+  `saidWhenTheRolloverStopped`). A
+  step left part way, or a process that dies, leaves it where it is: the
+  step's own `before` names it there, and recovery settles the step from
+  that. Gone with the fix round's design: the move outside the step,
+  `PlannedSiteRelease` and its `putTheLegacyMarkerBack`, the action argument
+  `legacyMarkerSetAsideOutside`, and `JournaledStep.extraArguments`, which
+  only carried it. Rejected before the ruling: naming the builds root as a
+  second place of the step (a second root in the format for one file that
+  only very old folders hold); leaving the whole website out of the step.
+
+**What changed in the order of effects, and why.** The window's rollover
+moved its markers and turned its schedule off AFTER the preview was
+rebuilt; now both go in with the step, BEFORE the rebuild, because the
+step cannot be split around it (the dates must be on disk for the
+rebuild). The window's reply, its `detail`, and today's two history
+entries (the re-date, then the website) are unchanged; the website's trail
+line now comes before the preview's. The menu's order is unchanged.
+
+**Today's in-memory undo answers exactly as before**: the menu's one entry
+(`menuRolloverChange`, the marker halves that left their place,
+`onlyTheHalvesMovedAway`), the window's two, the front page in the same
+place among the files. `RollOverFromTheMenuSafetyTests` and
+`RolloverWebsiteTests` pass unchanged.
+
+#### Q3 and #959: what stands apart from its step
+
+Russell ruled on 2026-11-19: after a rollover onto a new website and a
+deploy, Undo takes back the rest (the dates and the record), leaves both
+markers where they are, says once that the section stays on its new
+website, and the step leaves the list so earlier steps can still be undone.
+
+That needed an op whose being changed since does not refuse its step. The
+plan (above, before U3b) proposed a key, `"standsApart": true`, on a
+`move`. **Rejected**, because `undoJournal.unknown.keys` forbids it: a
+known kind never gains a key that changes what undoing it does, since an
+older reader would undo it by the old rule (here: refuse and CLEAR the
+list). So it is a kind of its own, `moveApart`: judged, made, undone and
+redone exactly as `move`, but an Undo or a Redo (`UndoCheck.plan(…,
+leavesApart: true)`) that finds its pair changed since LEAVES it, both
+places untouched, names its place in `UndoOutcome.undone(seq:, leftApart:)`
+(or `redone`), and goes on with the rest. A reader that does not know
+`moveApart` (Windows W1, a Mac before U3b) reads the step as a barrier:
+greyed, never undone in a guessed way. Making a step never leaves an op
+apart (`perform(ops:)` and recovery plan with `leavesApart` false): a step
+is made whole or not at all, and a dead process's step is put back whole
+or completed whole.
+
+"The step leaves the list" is built as the journal's ordinary Undo: the
+step moves to the redo side, and the step below it is the one Undo offers
+next. A Redo then takes the dates and the record forward again and leaves
+the markers apart again (the section is already on its new website).
+Today's Undo Last Change has no redo, which is where #959's "comes off the
+list" came from; the U7 menu greys Redo as for any other step only when
+there is none. With no deploy between, the marker is moved back from its
+kept copy (one rename, its 0600 mode kept, #961) and nothing is apart.
+
+**Records move as a group** (the director's decision of 2026-11-20, on
+#899). A section on two hosts has two records, each a `moveApart`. If a
+deploy reached one host and not the other, judging them one by one would
+put one back and leave the other: the section split across two websites.
+So `UndoCheck.plan` first asks whether any `moveApart` of the step is
+changed since (`aWebsiteRecordIsChangedSince`); if one is, every one not
+already where it is wanted is left apart and named, and U7 says once that
+the section stays on its new website. Redo the same way. **The group is the
+records a deploy reads, never a leftover** (the review of U3b's fixes,
+LOW 3): a leftover is a `setAside`, so a teacher who deletes or edits a
+leftover, or its kept copy, has it skipped and named at Undo or Redo while
+the records go back (or forward); and a record changed since keeps only the
+records apart, while the leftover goes back with the rest
+(`testALeftoverChangedOrMissingIsSkippedAndNamedAndTheRecordGoesBack`).
+`setAside` is a kind of its own for `moveApart`'s reason: a key on
+`moveApart` would be read by an older reader as a group member.
+
+The schedule stands apart too, by its family: an `external` op on
+`scheduledDeploy:` that an Undo cannot set back because the job's moment
+has gone by (`UndoExternalPlaces.canSet`, false for a moment past) is left
+off and named (#897 piece B, seam 2: never registered again for a moment
+already past). A plist with no `PLANTOIR_SCHEDULED_FOR` (older jobs) is
+never set back either: its moment cannot be known to be ahead, and its
+calendar entry has no year, so it would fire on that day next year (the
+review of U3b, LOW 2). A schedule the SWAP cannot set (launchd refuses the
+job, or the write is off the main thread) is left apart the same way and
+named after what the check left apart, never a refusal of the whole Undo
+(`UndoSwap.swap`'s `leaveApart`, given only by an Undo or a Redo): a label
+that stayed loaded would otherwise block its step, and every step under
+it, for good (the review of U3b, LOW 3). If launchd refuses and the plist
+just written cannot be taken away again, it stays in LaunchAgents and loads
+at the next login: it is neither back (it will not run at its moment unless
+the teacher logs out and in before it) nor left apart (it will run). It has
+its own answer (the review of U3b's fixes, round three, LOW 2):
+`UndoExternalPlaces.writeSaying` answers `.startsAtTheNextLogin`, the swap
+names its target in `UndoOutcome.undone(seq:, leftApart:,
+startsAtTheNextLogin:)` (or `redone`), U7 says
+`AssistWording.undoScheduleStartsAtTheNextLogin` ("The deploy set for later
+is back, but it could not be started now. It starts the next time you log
+in, so it will not run at its time unless you log out and back in before
+then."), and the trail says `scheduled deploy could not be set` with "put
+back a scheduled deploy for <moment>, but macOS would not start it now; it
+starts the next time you log in to this Mac, and will not run at its time
+unless you log out and in before then"
+(`testAScheduleWhosePlistCannotBeTakenAwayAgainStartsAtTheNextLoginAndIsSaidSo`).
+That line is written only once the WHOLE swap has gone in and the step is
+closed (`UndoExternalPlaces.noteItStartsAtTheNextLogin`, called by the
+journal after `.swapped`), never from inside the write, where a later
+target's failure would roll the swap back and refuse the Undo after the
+line had said the schedule was put back (round four, LOW 4;
+`testNoTrailLineForAScheduleWhenItsUndoIsRefused`). A schedule left apart
+writes no trail line of its own; it is named only in the outcome, which
+exists only for a swap that went in. Undone while its moment is ahead, the plist and its script
+come back byte for byte and the job is loaded again (`UndoScheduledDeploys`,
+through the action's own `LaunchControlRunning`, never the real
+`launchctl` under the suite). That runner is the main actor's, so a write
+made off the main thread answers false (a change that could not be made,
+left apart, as above): **U7 should make an Undo of such a step on the main actor**,
+or give the runner a nonisolated form, and must pass `UndoAppPlaces` (not
+the core's default `UndoAppPreferences`) as `places` to every Undo, Redo
+and recovery.
+
+Cases: `checkCases` (4 `moveApart` rows, 3 `setAside` rows), `stackCases`
+(13 U3b rows: the calls `rollOverOntoANewWebsite`,
+`rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`,
+`theScheduleCannotBeSetNow`, `rollOverSettingALeftoverAside`,
+`removeTheKeptLeftover` and `theScheduleStartsOnlyAtTheNextLogin`, keys
+`leftApart`, `schoolYear`, `cloudflareMarkers`, `leftoverMarkers` and
+`startsAtTheNextLogin`), both replayed by the Mac and the Python model
+(`plan(…, leaves_apart=True)`, its group rule, and `set_or_leave_apart` for
+a schedule the swap cannot set or that starts at the next login), and
+`netlifyRecordCases` (20 rows, above). The traces are byte-identical. The group rule
+is a rule of a step, not of one op, so it has no `checkCases` row: a check
+case holds a single op.
+
+#### If the app dies part way through a rollover
+
+The step is one door, so the five places to die are U3a's ("If the app dies
+part way" above). Its swaps go files first (the pages, the removed
+records), then the moves (fragments, markers), then the schedule. Live,
+recovery puts places 2 and 3 back to before the step (`rolledBack`): whole
+in the OLD year, marker in place, record in place, schedule registered
+again through the same places. Place 4 is completed (`done`): whole in the
+NEW year. `UndoRolloverStepTests.testARolloverKilledBetweenItsSwapsIsWholeInItsOldYearAfterRecovery`
+(killed at `beforeSwap(2)`) and `…KilledAfterItsLastSwapIsWholeInItsNewYearAfterRecovery`
+(at `beforeApplied`) prove both, and the closing line says which. A
+death between bringing in the legacy record and the step's begin leaves
+the record in its current place and the legacy one gone (or, between the
+write and the removal, both holding the same bytes): a deploy reads the
+current one, the same website, and the next rollover finishes the removal
+(`testACrashBetweenBringingInTheLegacyRecordAndTheStepLeavesAFolderADeployReads`). A leftover brought in and then killed at
+any point is the same: after the bring-in or between the swaps it is beside
+the current record (the step closed `failed` or `rolledBack`), after the
+last swap it is set aside (`done`), and never back in the built output
+(`testADifferentLeftoverKilledAtEachPointIsSettledByRecovery`). In SHADOW, recovery never writes the teacher's files (U3a's rule);
+a rollover step moves files, so its staged files are left for a live
+recovery, as for any step with a move.
+
+A list that cannot take the step in shadow changes nothing about the
+rollover: the step is made all or none WITHOUT a record
+(`JournaledStep.makeWithoutARecord`, the same staged swap with nothing
+written down in the list, noted through `UndoShadowStaging` so a kill part
+way is tidied, and judged against the bytes the plan read), and the same
+goes for a step that cannot be named in one.
+`testInShadowAListThatCannotBeWrittenChangesNothingAboutTheRollover`.
+
+#### The rollover's action traces
+
+`UndoActionStepsTests` records two more steps from the real code:
+`rollOverOntoANewWebsite` (the menu, "new": re-date, record, checklist
+answers, marker) and `rollOverKeepingTheWebsite` (the window, "same":
+re-date and record), 22 steps in all. `undo-action-steps.json` gains
+`moves` for a step that moves files (from, to, content, `standsApart`; the
+moment in a kept copy's name set to one fixed moment so the file is the
+same on every run). `scripts/make_undo_traces.py` makes six traces of each
+(132 `actionTraces`); a trace of a step with a `moveApart` may hold a
+`deploy` call (a new marker in the emptied place, nothing on the list), and
+an undo or redo after it carries `leftApart`. The 20 seeded traces and the
+120 of U3a are unchanged byte for byte.
+
+#### For U4
+
+U4 owns Schedule Deploy… and Cancel Scheduled Deploy (ruling 23) and can
+take the family whole: `UndoScheduledDeploys` reads and writes a job by its
+label, `{plist, script}` in base64, and `UndoAppPlaces` routes it. A
+schedule SET is an `external` op from not set to the job's value; cancelled,
+the reverse. It stands apart by its family, which is right for the
+rollover; whether a schedule step U4 makes should stand apart (an Undo of
+Schedule Deploy after the job has fired) is U4's to decide, and if not, U4
+gives its ops a family or kind of their own rather than changing this one.
+A settings save goes through the same door: `JournaledStep.write` for
+`course_config.json` (the door then chooses `writeFile` for it), or, finer,
+one `editJSON` per member, which U4 adds to `JournaledStep` the way U3b
+added `move` and `setExternal` (a planned list beside the files, so the step
+is made as ops: `isMixed`); `setExternal` for a preference; `places` set to `UndoAppPlaces`
+whenever a step holds an external op. (`extraArguments` is gone: nothing
+used it once the legacy record moved inside the step; a piece that needs
+an action argument adds it back with its reason.) An Undo or Redo passes
+`leaveApart` to `UndoSwap.swap`; making a step and recovery never do.
 
 ### The U1 harness
 

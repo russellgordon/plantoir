@@ -404,7 +404,9 @@ enum SectionIndexPointer {
         ) else {
             return nil
         }
-        guard (try? result.text.write(to: indexURL, atomically: true, encoding: .utf8)) != nil else {
+        // The rule's write, never content of a step (`UndoKeptFiles`): the
+        // step that set it off names it as a `recompute` op.
+        guard (try? UndoKeptFiles.write(result.text, to: indexURL)) != nil else {
             return nil
         }
         return AssistSavedFile(fileURL: indexURL, before: before, after: result.text)

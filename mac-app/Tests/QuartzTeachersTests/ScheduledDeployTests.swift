@@ -1770,9 +1770,14 @@ final class FakeLaunchControl: LaunchControlRunning {
     /// macOS turn down the NEW job and take an old one back (#237).
     var refusedPlists: [URL] = []
 
+    /// Runs as each bootstrap is asked for, before it answers (a test makes
+    /// the plist's folder refuse its removal there).
+    var onBootstrap: ((URL) -> Void)?
+
     // MARK: - Functions
 
     func bootstrap(plistURL: URL) -> String? {
+        onBootstrap?(plistURL)
         if let bootstrapFailure {
             return bootstrapFailure
         }
