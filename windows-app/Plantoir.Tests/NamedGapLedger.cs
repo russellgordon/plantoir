@@ -310,6 +310,17 @@ internal static class NamedGapLedger
     internal const string UndoTraces = "undo-traces.json → traces";
 
     /// <summary>
+    /// <c>class-planning.json</c> → <c>duplicatingAsTheNextClass.cases</c>, by
+    /// case <c>name</c>: a case whose <c>expectUndoEntries</c> this app does
+    /// not record, because the entry is the old in-memory list's and Windows'
+    /// final form is the journal step (W7 for #899). A held case must still
+    /// record NO entry here, and everything else it says is asserted exactly
+    /// (<c>AddClassContractTests.TheMenusCopyIsTheContracts</c>). Wired in by
+    /// #927 (2026-11-20).
+    /// </summary>
+    internal const string MenuCopyUndoEntries = "class-planning.json → duplicatingAsTheNextClass (expectUndoEntries)";
+
+    /// <summary>
     /// The older name each <see cref="SubjectMenuItemsUnderAnOlderName"/> entry
     /// is said under here. Every entry has exactly one, and every name here has
     /// an entry (<c>NamedGapLedgerTests</c>).
@@ -317,9 +328,8 @@ internal static class NamedGapLedger
     internal static readonly IReadOnlyDictionary<string, string> SubjectMenuItemsOlderNames =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            // #897 piece A: "Add Class…" replaced "Add Next Class" on the mac;
-            // its enablement did not change (#927).
-            ["addClass"] = "addNextClass",
+            // Empty since #927 brought Add Class… (2026-11-20); kept, with its
+            // hook, for the next item the contract renames.
         };
 
     // The milestones, spelled EXACTLY as their GitHub titles. NamedGapLedgerTests
@@ -402,7 +412,6 @@ internal static class NamedGapLedger
     // The fourth hold (2026-11-14): the mac's fourteen pieces merged at cadd8eb11.
     private const string Reason920 = "the invented sample names on the surname and website-address sheets (the mac's #891) are #920's piece of v2.0.0, with the colour pickers and the switch; until it lands Windows' sheets carry the older example names, which name nothing a teacher acts on";
     private const string Reason921 = "Settings ▸ Deploying, the tokens checked before they are saved and the Cloudflare token's end date (the mac's #696), are #921's piece of v2.0.0; until it lands Windows shows no end date and warns of none, so its older words for the TTL step are the true ones, and it records, says and explains none of the pane's events, problems or refusals";
-    private const string Reason927 = "Classes ▸ Add Class… in place of Add Next Class, with its three ways (the mac's #897 piece A), is #927's piece of v2.0.0; until it lands Windows' menus have Add Next Class, enabled exactly where the contract enables Add Class…, and none of the sheet's sentences";
     private const string Reason928 = "a preview start that does nothing while the window's own start waits, a run that never started, and a repair's Preview Again that does not survive its stop (the mac's #812 and #813) are #928's piece of v2.0.0, not built here yet";
     private const string Reason936 = "PhET simulations and the kept-downloads folder (the mac's #674) are #936's piece of v2.0.0; until it lands Windows reads no PLANTOIR_DOWNLOADED: line, explains no stop for a simulation (the raw output is shown) and has no Science simulation row on the Problems tab";
     // The same hold, after the mac's stack 13 (956defd43, #800, #829, #897 piece B, #904).
@@ -415,6 +424,7 @@ internal static class NamedGapLedger
     private const string Reason899W6 = "the six op kinds the mac's U2b defines (replaceText, editJSON, move, createTree, removeTree, external) and recompute run are Windows' W6 for #899, still to come (plans/899-plan.md, W6 to W11b); until it lands this app's reader takes each for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
     private const string Reason899W6Traces = Reason899W6 + ". COVERAGE LOST, for W6 to restore: until U2b's contract put a move in them, W1 replayed all 20 traces call by call to their final hashes; held, each of these 15 is asserted only up to its first move and must stop exactly there, and trace-002, trace-012 and trace-020 open with a move, so they check nothing at all here until W6 replays them whole";
     private const string Reason1009 = "stopping a running preview, deploy or plan share from the keyboard, with the two stop questions, their Don't ask again boxes and Settings > Deploying > Stopping (the mac's #988), is #1009's piece of v2.0.0; until it lands Windows asks no stop question and has no setting for one, so it has no change to record";
+    private const string Reason899MenuCopy = "the menu's copy of a class as the next class (#927, the mac's #897 piece A) is ONE undo entry on the mac's old in-memory list; the night-3 ruling (no new action gets an entry in the old lists, no interim states) leaves it to the journal step the mac's U3a defines and Windows' W7 copies, so until W7 lands Windows records no entry for it, and Undo Last Change does not take the copy back";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
 
     /// <summary>
@@ -678,26 +688,7 @@ internal static class NamedGapLedger
              "GitHub #696, the second ruling and review MUST 1",
              "GitHub #696, the paste rule (deployTokens.paste), in deploy.ps1's shape"),
         Owed(SectionProblemKinds, 936, V200, Reason936, "phetSimulationsNotReady"),
-        Owed(SubjectMenuItemsUnderAnOlderName, 927, V200, Reason927, "addClass"),
         Owed(AgentGuidanceWordsSaidDifferently, 946, V200, Reason946, "askFound"),
-        Owed(AssistWordingKeys, 927, V200, Reason927,
-             "menuAddClassTitle", "menuAddClassTitleForAMeeting",
-             "menuHowToAddAClass", "menuHowToAddAClassForAMeeting",
-             "menuAddClassNextInThisUnit", "menuAddClassNextInThisUnitForAMeeting",
-             "menuAddClassNextInANumberedCourse", "menuAddClassNextInANumberedCourseForAMeeting",
-             "menuAddClassInANewUnit", "menuAddClassInANewUnitForAMeeting",
-             "menuAddClassAsACopy", "menuAddClassAsACopyForAMeeting",
-             "menuAddClassInANewUnitInAModuleCourse", "menuAddClassNextInThisUnitInAModuleCourse",
-             "menuAddClassGreyedNoUnits", "menuAddClassGreyedNoUnitsForAMeeting",
-             "menuAddClassGreyedNothingToCopy", "menuAddClassGreyedNothingToCopyForAMeeting",
-             "menuAddClassGreyedRenameUnfinished", "menuAddClassGreyedRenameUnfinishedForAMeeting",
-             "menuAddClassGreyedRenameHoldsACopyInANumberedCourse", "menuAddClassGreyedRenameHoldsACopyInANumberedCourseForAMeeting",
-             "menuNeedsClassDatesFirst", "menuNeedsClassDatesFirstForAMeeting",
-             "menuPickClassToDuplicate", "menuPickClassToDuplicateForAMeeting",
-             "menuUnitWordRenameUnfinished", "menuUnitWordRenameUnfinishedForAMeeting",
-             "menuAddClassGreyedRenameHoldsANewUnit",
-             "menuAddButton", "menuDuplicateButton", "duplicatedFromTheMenu",
-             "theCopyCouldNotBeMadeHiddenFromTheMenu", "menuTheNextPageIsAlreadyThere"),
         // The mac's stack 13 (956defd43), folded into the same hold.
         Owed(SubjectMenuItems, 954, V200, Reason897RollOver, "rollOverToANewYear"),
         Owed(AssistWordingKeys, 954, V200, Reason897RollOver,
@@ -709,6 +700,13 @@ internal static class NamedGapLedger
              "rolloverANewWebsiteIsMadeAtTheNextDeploy", "rolloverCouldNotStartANewWebsiteFromTheMenu",
              "rolloverDeploysToAFolderFromTheMenu", "rolloverStartedANewWebsiteFromTheMenu",
              "rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder"),
+        // #927 (2026-11-20): the menu's copy records no entry on the old list.
+        Owed(MenuCopyUndoEntries, 899, V200, Reason899MenuCopy,
+             "the copy is the section's next class, and nothing else moves",
+             "a course-level page with the same title is not the source",
+             "a class page with no numbers in its name can be duplicated",
+             "a numbered course's copy is its next number",
+             "a source carrying a per-section publish key still gives a hidden copy"),
         Owed(LeaseLivenessCases, 956, V200, Reason829,
              "#829: a deploy typed in Terminal - bash, its start in whole seconds - is alive while that bash runs"),
         // Stack 14 (dev 39d83a0a7), folded into the same hold on 2026-11-18.

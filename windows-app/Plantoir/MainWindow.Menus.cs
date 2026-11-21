@@ -419,7 +419,7 @@ public sealed partial class MainWindow
             case Item.Forward: detail?.PreviewGoForward(); return;
             case Item.ReloadPage: detail?.PreviewReload(); return;
             case Item.PublishPages or Item.HidePages or Item.PublishClassForADate or Item.RebuildPreview
-                or Item.UndoLastChange or Item.AddNextClass or Item.ReDateClasses or Item.MakeRoomForClasses
+                or Item.UndoLastChange or Item.AddClass or Item.ReDateClasses or Item.MakeRoomForClasses
                 or Item.ClassDates:
                 _ = RunSectionVerb(item);
                 return;

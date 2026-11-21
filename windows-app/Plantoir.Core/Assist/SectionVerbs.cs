@@ -133,8 +133,90 @@ public sealed class SectionVerbs : IAsyncDisposable
     /// <summary><c>undo_last_change</c>: the last change made from the menu in this window.</summary>
     public static JsonObject UndoLastChange() => Call("undo_last_change", new JsonObject());
 
-    /// <summary><c>add_next_class</c>: the page arrives hidden, and Undo Last Change takes it away.</summary>
+    /// <summary>
+    /// Add Class…, as the next class in this unit: <c>add_next_class</c> with
+    /// the course and section only, exactly what Add Next Class sent until
+    /// #927. The page arrives hidden.
+    /// </summary>
     public static JsonObject AddNextClass(string course, int section) => Call("add_next_class", Place(course, section));
+
+    /// <summary>
+    /// Add Class…, in a new unit (#927): <c>unit: "next"</c>, the argument the
+    /// built-in assistant's "Start a new unit for the next class" phrasing
+    /// already sends, so nothing any model is shown moves.
+    /// </summary>
+    public static JsonObject AddNextClassInANewUnit(string course, int section)
+    {
+        var arguments = Place(course, section);
+        arguments["unit"] = "next";
+        return Call("add_next_class", arguments);
+    }
+
+    /// <summary>
+    /// Add Class…, as a copy of a class (or its plan, #927): the source named
+    /// by its FILE inside the course, <c>.md</c> included, in an argument only
+    /// the menu's server reads (<see cref="AssistWorkspace.MenuDuplicateArgument"/>).
+    /// Never <c>duplicate</c>, the window's title-named argument, which puts
+    /// the copy after its source and moves later classes.
+    /// </summary>
+    public static JsonObject DuplicateAsNextClass(string course, int section, string sourcePath, bool plan)
+    {
+        var arguments = Place(course, section);
+        arguments[AssistWorkspace.MenuDuplicateArgument] = sourcePath;
+        return Call(plan ? "plan_add_next_class" : "add_next_class", arguments);
+    }
+
+    /// <summary>A page's place inside its course folder, forward slashes, <c>.md</c> kept: what the copy is named by.</summary>
+    public static string CoursePath(string courseDirectory, string pagePath) =>
+        Path.GetRelativePath(courseDirectory, pagePath).Replace('\\', '/');
+
+    /// <summary>
+    /// What Add Class…'s dialog decides its ways from, read when it OPENS
+    /// (the mac's <c>SectionVerbs.addClassFacts</c>): the course's naming, the
+    /// rename's own judgement made WITHOUT clearing a stale record, and
+    /// whether the class folders hold any page but their landing pages.
+    /// REJECTED: greying on the rename record FILE alone, which held two ways
+    /// greyed for good behind a stale record.
+    /// </summary>
+    public static SubjectMenuRules.AddClassFacts AddClassFacts(Course course, int section) => new()
+    {
+        ClassPagesAreNumbered = course.Configuration.Naming.IsNumbered,
+        UnitWordRenameUnfinished = UnitWordRenamer.InterruptedRenameTarget(UnitWordRenamer.Facts(course), clearingAStaleRecord: false) is not null,
+        HasAClassPage = HasAClassPage(course, section),
+    };
+
+    private static bool HasAClassPage(Course course, int section)
+    {
+        foreach (string folder in ClassFolderRule.Names(course.Configuration.ClassFolder, course.Configuration.PerSectionFolders))
+        {
+            string root = Path.Combine(course.SectionDirectory(section), folder);
+            if (!Directory.Exists(root)) continue;
+            foreach (string page in PagePaths.MarkdownPages(root, section))
+                if (!Path.GetFileName(page).Equals("index.md", StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The course's word for a unit as a sentence says it ("module"): "unit"
+    /// in a numbered course, whose word is the pages' whole name ("Week") and
+    /// never a unit; a word in capitals (an acronym) is left as it is
+    /// (<c>addClassSheet.labelRule</c>).
+    /// </summary>
+    public static string UnitWordInASentence(ClassPageNaming naming)
+    {
+        if (naming.IsNumbered) return "unit";
+        if (naming.Word.Length > 1 && naming.Word == naming.Word.ToUpperInvariant()) return naming.Word;
+        return naming.Word.ToLowerInvariant();
+    }
+
+    /// <summary>The trail line's counts for Add Class…: how it was added, never the class's title.</summary>
+    public static string AddClassCounts(SubjectMenuRules.AddClassWay way) => way switch
+    {
+        SubjectMenuRules.AddClassWay.NextInThisUnit => "the next class in this unit",
+        SubjectMenuRules.AddClassWay.InANewUnit => "in a new unit",
+        _ => "as a copy of a class",
+    };
 
     /// <summary>
     /// <c>plan_re_date_classes</c> / <c>re_date_classes</c> onto the dates on

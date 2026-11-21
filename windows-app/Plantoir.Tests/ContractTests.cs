@@ -323,6 +323,36 @@ public class ContractTests
         Assert.Equal(wording["menuNoVisiblePages"]!.ToString(), AssistWording.MenuNoVisiblePages("{course}", "{section}"));
         Assert.Equal(wording["menuSavingACopy"]!.ToString(), AssistWording.MenuSavingACopy("{course}"));
 
+        // #927 (the mac's #897 piece A): Classes ▸ Add Class…'s dialog, with
+        // the generator's examples (a module course's word; 2026-09-14).
+        Pair("menuAddClassTitle", AssistWording.MenuAddClassTitle("{course}", "{section}"),
+             AssistWording.MenuAddClassTitleForAMeeting("{course}", "{section}"));
+        Pair("menuHowToAddAClass", AssistWording.MenuHowToAddAClass, AssistWording.MenuHowToAddAClassForAMeeting);
+        Pair("menuAddClassNextInThisUnit", AssistWording.MenuAddClassNextInThisUnit, AssistWording.MenuAddClassNextInThisUnitForAMeeting);
+        Pair("menuAddClassNextInANumberedCourse", AssistWording.MenuAddClassNextInANumberedCourse,
+             AssistWording.MenuAddClassNextInANumberedCourseForAMeeting);
+        Pair("menuAddClassInANewUnit", AssistWording.MenuAddClassInANewUnit, AssistWording.MenuAddClassInANewUnitForAMeeting);
+        Pair("menuAddClassAsACopy", AssistWording.MenuAddClassAsACopy, AssistWording.MenuAddClassAsACopyForAMeeting);
+        Assert.Equal(wording["menuAddClassInANewUnitInAModuleCourse"]!.ToString(), AssistWording.MenuAddClassInANewUnitInAModuleCourse);
+        Assert.Equal(wording["menuAddClassInANewUnitInAModuleCourse"]!.ToString(), AddClassWords.InANewUnit(ClassNoun.Class, "module"));
+        Assert.Equal(wording["menuAddClassNextInThisUnitInAModuleCourse"]!.ToString(), AssistWording.MenuAddClassNextInThisUnitInAModuleCourse);
+        Pair("menuAddClassGreyedNoUnits", AssistWording.MenuAddClassGreyedNoUnits, AssistWording.MenuAddClassGreyedNoUnitsForAMeeting);
+        Pair("menuAddClassGreyedNothingToCopy", AssistWording.MenuAddClassGreyedNothingToCopy,
+             AssistWording.MenuAddClassGreyedNothingToCopyForAMeeting);
+        Pair("menuAddClassGreyedRenameUnfinished", AssistWording.MenuAddClassGreyedRenameUnfinished,
+             AssistWording.MenuAddClassGreyedRenameUnfinishedForAMeeting);
+        Pair("menuAddClassGreyedRenameHoldsACopyInANumberedCourse", AssistWording.MenuAddClassGreyedRenameHoldsACopyInANumberedCourse,
+             AssistWording.MenuAddClassGreyedRenameHoldsACopyInANumberedCourseForAMeeting);
+        Assert.Equal(wording["menuAddClassGreyedRenameHoldsANewUnit"]!.ToString(), AssistWording.MenuAddClassGreyedRenameHoldsANewUnit);
+        Pair("menuNeedsClassDatesFirst", AssistWording.MenuNeedsClassDatesFirst, AssistWording.MenuNeedsClassDatesFirstForAMeeting);
+        Pair("menuPickClassToDuplicate", AssistWording.MenuPickClassToDuplicate, AssistWording.MenuPickClassToDuplicateForAMeeting);
+        Pair("menuUnitWordRenameUnfinished", AssistWording.MenuUnitWordRenameUnfinished, AssistWording.MenuUnitWordRenameUnfinishedForAMeeting);
+        Assert.Equal(wording["menuAddButton"]!.ToString(), AssistWording.MenuAddButton);
+        Assert.Equal(wording["menuDuplicateButton"]!.ToString(), AssistWording.MenuDuplicateButton);
+        Assert.Equal(wording["duplicatedFromTheMenu"]!.ToString(), AssistWording.DuplicatedFromTheMenu("{page}", "{copy}", "2026-09-14"));
+        Assert.Equal(wording["theCopyCouldNotBeMadeHiddenFromTheMenu"]!.ToString(), AssistWording.TheCopyCouldNotBeMadeHiddenFromTheMenu("{page}"));
+        Assert.Equal(wording["menuTheNextPageIsAlreadyThere"]!.ToString(), AssistWording.MenuTheNextPageIsAlreadyThere("{copy}"));
+
         // #475 (the rest of #489): the question about classes dated after the
         // next class, with the generator's own examples — the next class on
         // Friday, 2026-10-09, a row on Wednesday, 2026-10-14, Unit 2, Day 5

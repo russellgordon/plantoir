@@ -817,6 +817,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // proposes an ordinary next class and the teacher approves
             // something other than what runs.
             var noun = workspace.NounForCourse(course);
+            if (MenuNewUnitWaitsForARename(course, unit) is { } waiting) return Answering(waiting);
             if (!string.IsNullOrWhiteSpace(duplicate))
             {
                 var copy = workspace.PlanDuplicateClass(course, section, duplicate);
@@ -865,6 +866,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 return Answering(ClassChangeWording.Duplicated(copying.SourceTitle, copying.NewTitle),
                                  duplicated.Message);
             }
+            if (MenuNewUnitWaitsForARename(course, unit) is { } waiting) return Answering(waiting);
 
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
             if (plan.ChangesNothing)
@@ -882,6 +884,69 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             return Answering($"Added {made.Title}, dated {DateText.Iso(made.Date)}.",
                              result.Message + "\n\n" + AssistWording.ACreatedPageCanBeTakenBack);
         });
+
+    // ---- Classes ▸ Add Class…, from the menu's server only (#927) ---------------
+
+    /// <summary>
+    /// The menu's copy of a class as the next class, or null when this call
+    /// is not one: not the menu's server, not one of the two add_next_class
+    /// halves, or no <see cref="AssistWorkspace.MenuDuplicateArgument"/>.
+    /// Read by <c>plantoir-mcp</c>'s filter from the call's raw arguments,
+    /// because no schema declares the argument (the binder would drop it): the
+    /// tool surface every client is shown does not move.
+    /// </summary>
+    public CallToolResult? FromTheMenuIfACopy(string tool, IReadOnlyDictionary<string, System.Text.Json.JsonElement>? arguments)
+    {
+        if (!workspace.SpeaksFromTheMenu || arguments is null) return null;
+        bool planning = tool == "plan_add_next_class";
+        if (!planning && tool != "add_next_class") return null;
+        if (!arguments.TryGetValue(AssistWorkspace.MenuDuplicateArgument, out var path)
+            || path.ValueKind != System.Text.Json.JsonValueKind.String || string.IsNullOrWhiteSpace(path.GetString())) return null;
+        string course = arguments.TryGetValue("course", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.String ? c.GetString()! : "";
+        int section = arguments.TryGetValue("section", out var n)
+            ? n.ValueKind == System.Text.Json.JsonValueKind.Number ? n.GetInt32() : int.TryParse(n.GetString(), out int m) ? m : 0
+            : 0;
+        return DuplicateAsTheNextClassFromTheMenu(course, section, path.GetString()!, planning);
+    }
+
+    /// <summary>
+    /// Plan or make the menu's copy (<c>class-planning.json</c> →
+    /// <c>duplicatingAsTheNextClass</c>). A copy that cannot be made
+    /// certainly hidden is refused, nothing written, and the trail says so at
+    /// the plan as well as at the write.
+    /// </summary>
+    public CallToolResult DuplicateAsTheNextClassFromTheMenu(string course, int section, string sourcePath, bool planning)
+        => Guarded(() =>
+        {
+            AssistWorkspace.MenuDuplicateRequest request;
+            try { request = workspace.PlanMenuDuplicate(course, section, sourcePath); }
+            catch (AssistWorkspace.CopyCannotBeHidden refused)
+            {
+                workspace.NoteTheMenusCopyWasNotMade(workspace.Course(course).Code, section);
+                return Answering(refused.Message);
+            }
+            if (planning)
+            {
+                string card = AssistWorkspace.DescribeMenuDuplicate(request);
+                return Proposing(card, card);
+            }
+            return Answering(workspace.ApplyMenuDuplicate(request));
+        });
+
+    /// <summary>
+    /// Add Class…, in a new unit, waits for an unfinished unit-word rename
+    /// (#927): on the menu's server only, and only for <c>unit: "next"</c>, so
+    /// the window's "Start a new unit" phrasing behaves as before.
+    /// </summary>
+    private string? MenuNewUnitWaitsForARename(string course, string unit)
+    {
+        if (!workspace.SpeaksFromTheMenu || !string.Equals(unit, "next", StringComparison.OrdinalIgnoreCase)) return null;
+        var found = workspace.Course(course);
+        return Plantoir.Core.Models.UnitWordRenamer.InterruptedRenameTarget(
+                   Plantoir.Core.Models.UnitWordRenamer.Facts(found), clearingAStaleRecord: false) is null
+            ? null
+            : AddClassWords.UnitWordRenameUnfinished(found.Configuration.ClassNoun);
+    }
 
     [McpServerTool(Name = "plan_remember_timetable", Title = "Plan remembering class dates",
                    ReadOnly = true, Destructive = false)]

@@ -13,8 +13,7 @@ namespace Plantoir.Core.Models;
 /// <c>contracts/shared-rules.json</c> → <c>subjectMenus.layout</c> holds the
 /// same lists, and <c>SubjectMenuLayoutContractTests</c> checks the two agree,
 /// with the items this app does not have yet (the named gaps: Stop Showing
-/// Deployed Folder, GitHub Copilot, Roll Over to a New Year…) left out and
-/// Add Class… said under its older name, Add Next Class (#927). Which items
+/// Deployed Folder, GitHub Copilot, Roll Over to a New Year…) left out. Which items
 /// can be used is still <see cref="SubjectMenuRules"/>' job: every item here
 /// is drawn in every situation and dimmed when it cannot be used, never
 /// hidden.
@@ -63,7 +62,7 @@ public static class SubjectMenuLayout
     /// <summary>Classes ▸, group by group.</summary>
     public static IReadOnlyList<IReadOnlyList<Entry>> ClassesGroups { get; } = new List<IReadOnlyList<Entry>>
     {
-        new[] { I(Item.AddNextClass) },
+        new[] { I(Item.AddClass) },
         new[] { I(Item.ClassDates), I(Item.ReDateClasses), I(Item.MakeRoomForClasses) },
         new[] { I(Item.GetReadyForTheStartOfTheYear) },
     };
@@ -139,8 +138,7 @@ public static class SubjectMenuLayout
 
     /// <summary>
     /// The words of an item of Section ▸ or Classes ▸ on Windows: the mac's,
-    /// but for Show in File Explorer and Open in Terminal, and Add Next Class
-    /// until #927 brings Add Class…. Remove Section and Remove Scheduled
+    /// but for Show in File Explorer and Open in Terminal. Remove Section and Remove Scheduled
     /// Deploy carry no ellipsis since #990: a command that only asks for a
     /// confirmation takes none.
     /// </summary>
@@ -162,7 +160,9 @@ public static class SubjectMenuLayout
         Item.SectionShowInFinder => "Show in File Explorer",
         Item.SectionNewTerminalAtFolder => "Open in Terminal",
         Item.RemoveSection => "Remove Section",
-        Item.AddNextClass => "Add Next Class",
+        // #927: the mac's words in every course, a club included (its
+        // SubjectMenus.title); the item words go to the wording pass (#996).
+        Item.AddClass => "Add Class…",
         Item.ClassDates => "Class Dates…",
         Item.ReDateClasses => "Re-date Classes…",
         Item.MakeRoomForClasses => "Make Room for Classes…",
@@ -195,7 +195,7 @@ public static class SubjectMenuLayout
             Item.SectionShowInFinder => "ShowInFileExplorer",
             Item.SectionNewTerminalAtFolder => "OpenInTerminal",
             Item.RemoveSection => "RemoveSection",
-            Item.AddNextClass => "AddNextClass",
+            Item.AddClass => "AddClass",
             Item.ClassDates => "ClassDates",
             Item.ReDateClasses => "ReDateClasses",
             Item.MakeRoomForClasses => "MakeRoomForClasses",

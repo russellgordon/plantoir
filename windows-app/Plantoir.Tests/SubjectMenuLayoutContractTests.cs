@@ -13,8 +13,7 @@ namespace Plantoir.Tests;
 /// The mac runs the same lists in <c>SubjectMenuLayoutTests</c>. An item this
 /// app does not have yet is held open by name in <see cref="NamedGapLedger"/>
 /// (<c>subjectMenus.items</c>) and is left out of the expected menu, its
-/// neighbours keeping their order; Add Class… is expected under its older
-/// name here, Add Next Class (#927). The menu bar's drawing of these lists is
+/// neighbours keeping their order. The menu bar's drawing of these lists is
 /// <c>MenuBarUiTests</c>' <c>SectionAndClassesUiTests</c>.
 /// </summary>
 public class SubjectMenuLayoutContractTests
@@ -175,7 +174,8 @@ public class SubjectMenuLayoutContractTests
     public void MenuPathsNameTheMenuTheItemIsIn()
     {
         Assert.Equal("Classes ▸ Class Dates…", SubjectMenuLayout.Path(Item.ClassDates, "Class Dates…", ClassNoun.Class));
-        Assert.Equal("Classes ▸ Add Next Class", SubjectMenuLayout.Path(Item.AddNextClass, "Add Next Class", ClassNoun.Class));
+        Assert.Equal("Classes ▸ Add Class…", SubjectMenuLayout.Path(Item.AddClass, "Add Class…", ClassNoun.Class));
+        Assert.Equal("Meetings ▸ Add Class…", SubjectMenuLayout.Path(Item.AddClass, "Add Class…", ClassNoun.Meeting));
         Assert.Equal("Section ▸ Publish Pages…", SubjectMenuLayout.Path(Item.PublishPages, "Publish Pages…", ClassNoun.Class));
         Assert.Equal("Rename", SubjectMenuLayout.Path(Item.Rename, "Rename", ClassNoun.Class));
         // A club's trail names its menus as its menu bar does (#990, 2026-11-20 evening).
