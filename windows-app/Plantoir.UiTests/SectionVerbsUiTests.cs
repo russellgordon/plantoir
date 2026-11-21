@@ -199,9 +199,9 @@ public class SectionVerbsUiTests
     /// Year… on a deployed section shows the dates on file, says they have
     /// passed, and asks the website question with NOTHING chosen and Continue
     /// dimmed; Keep, Continue, the plan's own website and record lines, Roll
-    /// Over. The dates are already right, so this is the menu's own path: a
-    /// copy saved first, the marker kept, the trail's counts saying which way
-    /// the website went. MUST FAIL with an answer chosen when the dialog
+    /// Over: the second class re-dated, a copy saved first (the Classes
+    /// menu's), the marker kept, the trail's counts saying which way the
+    /// website went. MUST FAIL with an answer chosen when the dialog
     /// opens, or Continue live before one is.
     /// </summary>
     [UiFact]
