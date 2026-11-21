@@ -259,6 +259,34 @@ public sealed class UndoRecoveryTests
         public void Rederive(UndoOp op, string root) => throw new InvalidOperationException("no runner");
     }
 
+    // ---- Kept originals the list gives (W4c) ------------------------------------------
+
+    /// <summary>
+    /// A step that died with every page swapped and its swap's tidy cut short
+    /// is completed, and a kept original whose bytes are exactly what the list
+    /// gives for its page (the line op undone from what the page holds now)
+    /// is not the only copy of anything: the settled tidy removes it, and no
+    /// "undo kept what a page held" line names it (the mac's listHolds, U3c).
+    /// </summary>
+    [Fact]
+    public void ACompletedStepsKeptOriginalThatTheListGivesIsTidied()
+    {
+        using UndoScribe scribe = Scribe();
+        scribe.WritePage("A", First, Old(First));
+        long seq = scribe.Fold().NextSeq;
+        scribe.Append(scribe.BeginLine(seq, scribe.OpsFor(First, Old(First), New(First)), "A", pid: UndoScribe.AProcessThatIsGone));
+        scribe.WritePage("A", First, New(First));
+        string kept = UndoSwap.BesidePath(scribe.FullPath("A", First), $"{seq}-apply", "orig");
+        File.WriteAllBytes(kept, Old(First));
+
+        scribe.Door().Recover();
+
+        Assert.Equal(UndoStepState.Done, scribe.Fold().Steps[seq].State);
+        Assert.False(File.Exists(kept), "a kept original the list gives was left beside its page");
+        lock (scribe.TrailLines)
+            Assert.DoesNotContain(scribe.TrailLines, line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatAPageHeld);
+    }
+
     // ---- The closed-step tidy -----------------------------------------------------------
 
     /// <summary>
