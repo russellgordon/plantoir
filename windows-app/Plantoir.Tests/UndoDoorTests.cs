@@ -167,7 +167,7 @@ public sealed class UndoDoorTests : IDisposable
         Assert.Equal(2, maintainers.Rederived);
     }
 
-    /// <summary>The one entry for every kind: a step holding an op this version cannot read yet (U2b's <c>move</c>, W6's) is refused before anything is written.</summary>
+    /// <summary>The one entry for every kind: a step holding an op this version cannot read yet (U5's <c>trash</c>, still reserved) is refused before anything is written.</summary>
     [Fact]
     public void AStepGivenAsOpsOfAKindThisVersionCannotReadIsRefusedBeforeAnythingIsWritten()
     {
@@ -176,7 +176,7 @@ public sealed class UndoDoorTests : IDisposable
         var draft = new UndoOpsDraft
         {
             ActionKey = "rollOver", MadeBy = "menu", WorkingFolder = Folder, Course = "TST1O", Section = 1, Holds = "section",
-            Ops = [new JsonObject { ["kind"] = "move", ["from"] = APage, ["to"] = "courses/TST1O/Section 1/b.md" }],
+            Ops = [new JsonObject { ["kind"] = "trash", ["path"] = APage, ["resultingPath"] = "$R123.md", ["digest"] = new string('a', 64) }],
         };
         UndoOutcome outcome = new UndoDoor(journal, UndoMode.Live).Perform(draft);
         Assert.Equal("notReadable", outcome.Word);

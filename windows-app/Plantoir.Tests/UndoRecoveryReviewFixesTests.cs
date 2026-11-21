@@ -71,6 +71,32 @@ public sealed class UndoRecoveryReviewFixesTests : IDisposable
     }
 
     /// <summary>
+    /// The final sweep of W3 and W4: a step left in flight for a recovery that
+    /// re-derives is KEPT, so pruning stops there; a step newer in sequence
+    /// (done, and past the limits too) is never pruned while it is kept (limits:
+    /// one oldest run only, never a step newer than one kept).
+    /// </summary>
+    [Fact]
+    public void PruningStopsAtAStepLeftForARederivingRecovery()
+    {
+        using UndoScribe scribe = Scribe();
+        UndoStepDraft withTheFrontPage = scribe.Draft("A", [(First, New(First))]) with
+        {
+            Recomputes = [new JsonObject { ["kind"] = "recompute", ["maintainer"] = UndoOp.SectionFrontPage, ["path"] = FrontPage, ["section"] = 1 }],
+        };
+        Assert.Equal(UndoOutcomeKind.StoppedByATest, scribe.Door(StopAt("beforeApplied"), UndoScribe.AProcessThatIsGone).Perform(withTheFrontPage).Kind);
+        long kept = scribe.Fold().Steps.Keys.Max();
+        UndoOutcome newer = scribe.Door().Perform(scribe.Draft("A", [(Second, New(Second))]) with { Course = "ZZZ8O" });
+        Assert.Equal(UndoOutcomeKind.Applied, newer.Kind);
+        scribe.Clock.SetDaysFromStart((UndoLimits.DaysKept + UndoLimits.Grace + TimeSpan.FromDays(2)).TotalDays);
+
+        UndoOutcome other = scribe.Door().Perform(scribe.Draft("A", [(Third, New(Third))]) with { Course = "ZZZ9O" });
+        Assert.Equal(UndoOutcomeKind.Applied, other.Kind);
+        Assert.Equal(UndoStepState.Begun, scribe.Fold().Steps[kept].State);
+        Assert.Equal(UndoStepState.Done, scribe.Fold().Steps[newer.Seq!.Value].State);
+    }
+
+    /// <summary>
     /// LOW 3: a closing this process cannot write (the list in use by another
     /// program at that moment, so every reading is stale) is noted as given up
     /// without reading the list, so the next Undo's recovery settles it by
