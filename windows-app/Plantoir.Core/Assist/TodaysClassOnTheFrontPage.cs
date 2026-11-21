@@ -206,10 +206,10 @@ public static class TodaysClassOnTheFrontPage
             return Outcome.CouldNotSave;
         }
         ActivityTrail.Note(ActivityTrail.Event.PutTodaysClassOnTheFrontPage,
-            $"{course.Code}/{section} · put today's class on the front page — {asked.Show} in place of {again.Shows}");
+            $"put today's class on the front page — {asked.Show} in place of {again.Shows}", course.Code, section);
         return Outcome.Written;
     }
 
     private static void Note(Course course, int section, string what) =>
-        ActivityTrail.Note(ActivityTrail.Event.LeftTheFrontPageAsItWas, $"{course.Code}/{section} · {what}");
+        ActivityTrail.Note(ActivityTrail.Event.LeftTheFrontPageAsItWas, what, course.Code, section);
 }
