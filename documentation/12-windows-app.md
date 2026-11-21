@@ -2185,6 +2185,16 @@ five times; 23 s became under a second. The product's behaviour, one
 remembered page silently not saved when the file is held, is a separate
 matter and is not changed here.
 
+### A file another program holds for a moment (#953, #874)
+
+**#953**
+
+On Windows a rename onto a file another program has open without delete sharing is refused (access denied); with no sharing at all a read is refused too (a sharing violation). `HeldFiles` is the one place that asks again: a sharing or lock violation, or an access-denied rename whose target (or temporary) cannot be opened for delete access with full sharing because of a sharing violation, is a hold; anything else (a deny rule, a read-only file, a reference lock) is a permission and is said at once, never retried. The bound is the one already accepted (`ObsidianFigureAddOns.Retrying`), not tuned. The guidance notice keeps the contract's `couldNotWrite` with the system's own sentence for the hold, and the file is named on the trail line. A refused read is its own answer, never "empty", and nothing that follows it writes.
+
+**#874**
+
+`CourseConfiguration.ReadBytes` is the one reader of `course_config.json`; a source-text test (`CourseSettingsHeldFileTests.EveryReaderOfTheSettingsGoesThroughTheOneReader`) fails on any `File.ReadAll*` of a settings path elsewhere in product code (CourseRestorer.cs excepted by name). During a build's `os.replace` (on Windows `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`) the old file is delete-pending for a moment and an open of it gets ACCESS DENIED, which the delete-access probe cannot tell from a deny rule; so every access denied on a file that is there is asked again for the bound and, if it lasts, refused in the system's words, never read as "not there". Discovery keeps the run's last good read of each settings file, so a course never leaves the sidebar while a build swaps its file, and the reference doors answer from it, failing closed with no earlier read. A Save whose merge read is refused by a hold is refused, rather than writing the window's whole copy over what a build may just have written; the sentence is `HeldFiles.InUseSentence`, the Undo line's "is in use by another program". Measured with a real second PowerShell process holding the file (`FileShare.None` and `FileShare.Read`).
+
 ### And when the failure IS real: a red contract test is a handover
 
 Everything above is about telling a genuine failure from a crash or an empty
