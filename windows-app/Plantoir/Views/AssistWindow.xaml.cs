@@ -596,8 +596,7 @@ public sealed partial class AssistWindow : Window
             },
             // Read from disk at the call: a course marked by hand while this
             // window was open is refused all the same (doors 2-4).
-            CourseIsKeptForReference = () => Workspace.DiscoverCourses(_folder)
-                .Any(c => c.Code.Equals(_course.Code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
+            CourseIsKeptForReference = () => Workspace.CourseIsKeptForReference(_folder, _course.Code),
             // "What does Unit 2, Day 3 in SPH3U link to?": SPH3U is a course
             // because it is a code in the shipped lists, not because of its
             // shape (#305 / mac #167).

@@ -1189,7 +1189,14 @@ public sealed partial class CourseSettingsView : UserControl
         // Counts this copy's unsaved exclusion changes and says so on the
         // trail before the file is read back (#348): the click lines stay,
         // and this one says they were taken back.
-        CourseSettingsExclusions.Revert(Config, _course.Code, _course.ConfigFilePath);
+        // Refused (#874: the file could not be read just now): the edits stay
+        // in the form, and the line a Save's failure uses says so and why.
+        if (!CourseSettingsExclusions.Revert(Config, _course.Code, _course.ConfigFilePath, out string? notReverted))
+        {
+            SaveStatus.Text = notReverted ?? "";
+            SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+            return;
+        }
         BuildForm();
         RefreshDirtyState();
         HeaderName.Text = Config.CourseName;
@@ -1321,7 +1328,7 @@ public sealed partial class CourseSettingsView : UserControl
             SettingsSavedLine.PrintingSnapshot? printingBefore = null;
             try
             {
-                var onDisk = CourseConfiguration.FromBytes(File.ReadAllBytes(_course.ConfigFilePath));
+                var onDisk = CourseConfiguration.Load(_course.ConfigFilePath);
                 before = onDisk.AllDeployDestinations;
                 printingBefore = SettingsSavedLine.PrintingSnapshot.From(onDisk);
             }
