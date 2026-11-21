@@ -41,7 +41,7 @@ public class ReferenceInterfaceTests
     }
 
     /// <summary>
-    /// #527: a reference section's ROW offers no Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987), so
+    /// #527: a reference section's ROW offers no Remove Scheduled Deploy (Cancel Scheduled Deploy… until #987), so
     /// it agrees with the menu bar (<c>subjectMenus</c> leaves
     /// cancelScheduledDeploy out for a course kept for reference). Nothing is
     /// left for one to stop: every read of the folder turns such a deploy off

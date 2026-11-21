@@ -139,15 +139,18 @@ struct QuartzTeachersApp: App {
             }
             // The menu bar reads Plantoir · File · Edit · View · Course ·
             // Section · Window · Help (#457). File works with no window open;
-            // View carries the preview's Back, Forward and Reload Page; Course
-            // and Section carry every action on a course or a section, which
-            // the context menus and buttons also reach. Edit is the system's
+            // View carries the preview's Back, Forward and Reload Page; Course,
+            // Section and Classes carry every action on a course or a section,
+            // which the context menus and buttons also reach. Classes follows
+            // Section (#990, grouping A): courses hold sections, sections hold
+            // classes, and SubjectMenuLayout says which items each holds. Edit is the system's
             // own again: Rename moved to Course, where a teacher looks for
             // "do something to this course".
             FileCommands(openWindow: openWindow)
             ViewCommands()
             CourseMenu()
-            SectionMenu()
+            SectionMenu(layout: .section)
+            SectionMenu(layout: .classes)
             // Plantoir Help opens plantoir.app's support page, in place of
             // the system's "Help isn't available" (#457, the HIG sweep).
             CommandGroup(replacing: .help) {

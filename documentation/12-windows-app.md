@@ -8118,15 +8118,16 @@ when they land.
 | Menu | Items (Windows key) |
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
-| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
-| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| Course | Add Section…, Copy a Page from This Course… (Ctrl+Shift+K since #990) · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
+| Section | Since #990 (grouping A, drawn from `subjectMenus.layout`; "Section and Classes, drawn from the contract (#990)" below): Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Rebuild Preview (Ctrl+Shift+B), Open in Browser · Publish Class for a Date…, Publish Pages…, Hide Pages…, Publish Pages That Links Lead To…, Undo Last Change, Undo Getting Ready for the Start of the Year… · Deploy… (Ctrl+Shift+D), Schedule Deploy…, Remove Scheduled Deploy (Cancel Scheduled Deploy… until #987; no ellipsis since #990) · Revise With ▸ · Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section (no ellipsis since #990) |
+| Classes | Since #990: Add Next Class (Add Class… with #927) · Class Dates…, Re-date Classes…, Make Room for Classes… · Get Ready for the Start of the Year… (Roll Over to a New Year… joins with #954) |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
 **One table, in code** (`Plantoir/MainWindow.Menus.cs`): every item is built
 by one `Add(…)` that carries its contract item (`SubjectMenuRules.Item`), its
 key and its AutomationId, so an item cannot exist without its rule or its id.
-The menu bar's XAML holds five empty `MenuBarItem`s and nothing else.
+The menu bar's XAML holds six empty `MenuBarItem`s (five until #990 added Classes) and nothing else.
 
 **Which items can be used** is `Plantoir.Core/Models/SubjectMenuRules.cs`, a
 port of the mac's `SubjectMenuRules.enabledItems`, run by
@@ -8233,7 +8234,8 @@ O follow the mac's ⇧⌘ letters. **Not Ctrl+Alt+anything**: on many European
 layouts AltGr IS Ctrl+Alt, so a Ctrl+Alt key fires while a teacher types @,
 € or { — so Add Section… has no key here (the mac's ⌥⌘N). **Not Ctrl+Shift+C**
 for Copy a Page: it is the browser's inspect-element key and a teacher who has
-used one expects that; Copy a Page has no key. **Settings… lost its "Ctrl+,"
+used one expects that; Copy a Page had no key until Russell ruled Ctrl+Shift+K
+on #990 (2026-11-20), the mac's ⇧⌘K. **Settings… lost its "Ctrl+,"
 label**: it was drawn with nothing behind it, and a comma key measured above
 does not fire. Ctrl+Shift+B was kept free for 2B's Rebuild Preview, which has it now.
 
@@ -8345,9 +8347,87 @@ this app's own Undo plan gives it Edit ▸ Redo (W11b), so Preview cannot follow
 the mac to Ctrl+Y. Ctrl+Shift+P is not a Windows reserved key (the reason the
 mac moved, Page Setup, is a macOS convention). Whether Windows moves Preview,
 Rebuild Preview, or gives Copy a Page a key (it has none: Ctrl+Shift+C is the
-browser's inspect-element key) is Russell's question, asked on #990's
-hand-back; until he rules, Preview stays Ctrl+Shift+P, Rebuild Preview
-Ctrl+Shift+B and Copy a Page keyless.
+browser's inspect-element key) was Russell's question, asked on #990's
+hand-back. **Ruled 2026-11-20:** Preview stays Ctrl+Shift+P, Rebuild Preview
+Ctrl+Shift+B, and Copy a Page takes Ctrl+Shift+K (Ctrl+Y is Redo on Windows).
+Ctrl+Shift+K was checked against every key in the app before it was given:
+no `KeyboardAccelerator`, `KeyDown` or `PreviewKeyDown` handler in
+`Plantoir/` names K (they name Enter, Up, Delete, Escape, Space, the arrows
+and the modifier keys), and no other menu item carries it.
+
+### Section and Classes, drawn from the contract (#990, grouping A)
+
+Russell's ruling of 2026-11-20 on #990 (the mac's D27, the Section menu's
+length; the mac's write-up and the HIG sentences are in [09 → "Section and
+Classes: two menus drawn from the contract"](09-mac-app.md#section-and-classes-two-menus-drawn-from-the-contract-990-grouping-a)):
+the Section menu splits into **Section**, the website jobs, and **Classes**
+after it, the class calendar. Windows' menu bar reads File · Course ·
+Section · Classes · View · Help: Windows keeps its own order with View after
+the app's menus (#488), and both read Course, Section, Classes, most to least
+general (`subjectMenus.layout.menuBar`).
+
+**Drawn from data.** `contracts/shared-rules.json` → `subjectMenus.layout`
+says which menu each section item is in, in groups.
+`Plantoir.Core/Models/SubjectMenuLayout.cs` holds the same lists for the
+items Windows has, and `MainWindow.BuildLayoutMenu` draws both menus from
+them, a separator before every group but the first; an item's words
+(`SubjectMenuLayout.TitleHere`: Show in File Explorer and Open in Terminal
+are Windows' own) and AutomationId (`AutomationIdHere`: the menu's contract
+name, then the item's; the Section ids are #488's, unchanged, and the Classes
+ones are new, `classesClassDates` and so on) are this app's. Keys did not
+move: Preview Ctrl+Shift+P, Rebuild Preview Ctrl+Shift+B, Deploy…
+Ctrl+Shift+D, Open in Obsidian Ctrl+Shift+O on the live one. The trail's menu
+path (`SectionVerbDialog.MenuPath`) takes its menu from the layout, so it
+reads "Classes ▸ Re-date Classes… — carried out" now.
+
+**What Windows does not have yet** is left out by its named gap, and its
+neighbours keep their order: Stop Showing Deployed Folder (#889), GitHub
+Copilot (#884), Roll Over to a New Year… (#954); Add Class… is drawn as Add
+Next Class until #927. `SubjectMenuLayoutContractTests` builds the expected
+menus from the contract less those gaps and compares them with
+`SubjectMenuLayout`; the day a gap closes, the item must be added to the
+Windows lists, in its place, or the test goes red. The two Undo items stay in
+Section, last in the publishing group, until W11b. Change Deploy Time… (#525)
+has its place reserved in `layout.reservedPlaces`.
+
+**Ellipses.** Remove Section and Remove Scheduled Deploy lost theirs (ruled
+on #990: a command that only asks for a confirmation takes none), in the
+menu bar and on the section row's right-click menu.
+
+**Name the real menu** (Russell, 2026-11-20). The copy the menu's server
+saves before a change names the menu the item is in: the window sends it in
+the tools/call request's `_meta` (`plantoirMenu`: `section` or `classes`,
+`McpClient.MenuOfTheNextCalls`, set by `SectionVerbs.Perform` from
+`SubjectMenuLayout.MenuContaining`), never as a tool argument, so no tool's
+schema changed; `plantoir-mcp`'s call filter sets
+`AssistWorkspace.MenuOfTheChange` for that one call. A Classes copy is
+`_classes-section<N>`, listed as "before a change from the Classes menu"
+("Classes menu, Section N" in All Backups), with "the Classes menu backed up
+the course as …" on the trail; a Section copy keeps `_menu-section<N>`. The
+two menus' copies are pruned together, five between them. The sentences that
+cover both menus (`NothingToUndoFromTheMenu`, `SectionIsChangingFromTheMenu`)
+say "the Section or Classes menu" (`SubjectMenuLayout.EitherMenu`). Tests:
+`SectionMenuServerTests.ACopyBeforeAClassesItemIsNamedForTheClassesMenu`,
+`ContractTests` (zipNames, with the words), and
+`SubjectMenuLayoutContractTests.TheMenusCopyLineNamesTheRealMenu`.
+
+**Tests.** `SubjectMenuLayoutContractTests` (the groups, the submenu, every
+section item in one menu once, the bar's order in `MainWindow.xaml`, menu
+paths); `RemovalQuestionsContractTests` (the words); and, through the real
+window, `SectionAndClassesUiTests` in `MenuBarUiTests.cs`: the bar's order,
+both menus line for line against the layout with every item drawn and
+dimmed on a course row, the Classes items live on a section row, Classes ▸
+Class Dates… opening and its trail line, and Copy a Page on Ctrl+Shift+K.
+A `MenuFlyoutSeparator` has no UI Automation element at all (measured in
+the VM, 2026-11-20, with FlaUI's RAW view walker under the open flyout's
+`MenuFlyout` and its `Popup`: the items and their text, nothing else; WinUI
+gives the separator no automation peer), so it cannot be read as structure.
+The test reads it where it is drawn, from the gaps between items' rectangles compared with each other, never with a number of pixels (`SeparatorGaps`): every gap inside a group is one drawn spacing rounded to device pixels, and every gap across a separator is that spacing plus the separator, so the sorted gaps are split at their widest jump, and the split counts only when that jump is wider than the spread inside either set; otherwise the test fails saying the separators cannot be read. At 100% that is 4 or 5 pixels inside a group and 7 or 8 across (measured in the VM, 2026-11-20); the rule does not depend on those numbers. Its plain facts are `SeparatorGapsRuleTests` (one case the old "more than 1 pixel over the smallest" rule misread). The groups themselves are
+pinned without pixels by `SubjectMenuLayoutContractTests`. With
+`PLANTOIR_UI_CAPTURE_DIR` set it also saves a picture of each menu open on a
+section row.
+
+**In a club the Classes menu is titled Meetings** (Russell, 2026-11-20 evening, on #990), live with the selection: `SubjectMenuLayout.Title(menu, ClassNoun)` takes the selected course's noun, read in `ApplyMenuEnablement` (not part of `Situation`, which holds only what greys an item and is pinned against `situationKeys`). The noun decides it, not the club code, because the noun is what a club's sentences are chosen by. Backups name the menus by the noun of the backup's course when drawn (`WorkspaceViewModel.ClassNounOf`, `SubjectMenuLayout.NounOfCourse`: a course no longer in the folder is read by its code). The in-app assistant's refusal while the menu changes the section names "the Section or Meetings menu" through `AssistAgent.CourseNoun` and `AssistToolRunner.CourseNoun`, set by the window. `NothingToUndoFromTheMenu` keeps "Section or Classes": there is no course to read a noun from, and the item leaves with U7/W11b. The mac's account is documentation 09, "In a club the menu is titled Meetings".
 
 ### What does NOT exist here: File with no window
 
@@ -17412,9 +17492,45 @@ recording and the trail event `undo could not record a step` move to W7.
 | W4 | doc 12's step 7 and the scaffolding: where the list lives (following `--state-dir`), `madeBy` from `AssistWorkspace.Surface` (L1), the writer scan | W2a merged; no longer after W3 |
 | W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
 | W6 | the reserved op kinds and running `recompute` | the mac's U2 |
-| W7 | every daily page action through the door, publish and hide recorded (M1), `undo could not record a step`; replay `undo-traces.json` → `actionTraces` (120, from `undo-action-steps.json`: an `action` call is a step given as each file's before and after, its ops worked out by the door's rule, and the trace pins the op kinds), and the one sentence U3 added to `rule.recovery` (shadow recovery removes the staged files of a closed step whose every op changes a file in place) ; from U3b, the rollover as ONE step (documentation 09, "U3b: the rollover as one step"): the new op kind `moveApart` (judged as `move`; an Undo or Redo that finds it changed since leaves it, names it in `leftApart`, and goes on: Russell's ruling of 2026-11-19 on Q3, #959), the `external` family `scheduledDeploy:<name>` with Windows' own value for its Task Scheduler job (removed by the rollover; set back only while its moment is ahead, otherwise left apart and named), a recorded step's `moves` in `undo-action-steps.json`, an action trace's `deploy` call and `leftApart`, and the 4 `moveApart` checkCases and 8 U3b stackCases (calls `rollOverOntoANewWebsite`, `rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`, `theScheduleCannotBeSetNow`; keys `leftApart`, `schoolYear`, `cloudflareMarkers`). From U3b's second round: a step's `moveApart` records move as a GROUP (any one changed since leaves every one apart, so a section is never split across two websites); a schedule the swap cannot set at an Undo or Redo (the scheduler refuses the task) is left apart and named, never a refusal; a job whose moment is not recorded is never set back; a refused swap removes the empty folders it made; the legacy Netlify record in the built output is brought into `.netlify_sites` BEFORE the step (never a refusal: Russell, 2026-11-20 evening); refused, nothing changed, only when a record cannot be read, written or removed; a step then refused moves it back, or says what moved. From U3b's fix round three: ONE question decides every record, which one a deploy reads now (`undo.netlifyRecordCases`, 13 rows run through deploy.py's own `load_netlify_marker` by `scripts/test_netlify_record_a_deploy_reads.py`, which Windows' Python already runs; W7 runs the rows through its own reader too): a current record that parses wins, else a legacy one that parses (migrated into the current place, a current record that does not parse first moved to `section<N>.unreadable.json`), else none. Every other record is a LEFTOVER (`section<N>.from-built-output.json` and `section<N>.unreadable.json`, each `.2`, `.3`… when the name is taken, never a refusal; a legacy record saying the same as the current one, compared parsed, is only removed) and is set aside by the step as the new op kind `setAside` (judged as `move`, standing apart ON ITS OWN, never one of the group: 3 checkCases, 4 stackCases, calls `rollOverSettingALeftoverAside` and `removeTheKeptLeftover`, key `leftoverMarkers`); a section with only leftovers is said to have had no website. A schedule put back whose task will only start at the next login is named in `startsAtTheNextLogin` (an Undo outcome of its own, sentence `undoScheduleStartsAtTheNextLogin`, 1 stackCase, call `theScheduleStartsOnlyAtTheNextLogin`), never as left apart. Until W7 a reader that does not know `moveApart` reads the step as a barrier, which is safe; the rows (and the wording key) belong on the named-gap ledger against #899 for W7 | the mac's U3 (U3a landed the daily actions; U3b the rollover), and #900 and #927 where they rewrite a writer |
+| W7 | every daily page action through the door, publish and hide recorded (M1), `undo could not record a step`; replay `undo-traces.json` → `actionTraces` (120, from `undo-action-steps.json`: an `action` call is a step given as each file's before and after, its ops worked out by the door's rule, and the trace pins the op kinds), and the one sentence U3 added to `rule.recovery` (shadow recovery removes the staged files of a closed step whose every op changes a file in place) ; from U3b, the rollover as ONE step (documentation 09, "U3b: the rollover as one step"): the new op kind `moveApart` (judged as `move`; an Undo or Redo that finds it changed since leaves it, names it in `leftApart`, and goes on: Russell's ruling of 2026-11-19 on Q3, #959), the `external` family `scheduledDeploy:<name>` with Windows' own value for its Task Scheduler job (removed by the rollover; set back only while its moment is ahead, otherwise left apart and named), a recorded step's `moves` in `undo-action-steps.json`, an action trace's `deploy` call and `leftApart`, and the 4 `moveApart` checkCases and 8 U3b stackCases (calls `rollOverOntoANewWebsite`, `rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`, `theScheduleCannotBeSetNow`; keys `leftApart`, `schoolYear`, `cloudflareMarkers`). From U3b's second round: a step's `moveApart` records move as a GROUP (any one changed since leaves every one apart, so a section is never split across two websites); a schedule the swap cannot set at an Undo or Redo (the scheduler refuses the task) is left apart and named, never a refusal; a job whose moment is not recorded is never set back; a refused swap removes the empty folders it made; the legacy Netlify record in the built output is brought into `.netlify_sites` BEFORE the step (never a refusal: Russell, 2026-11-20 evening); refused, nothing changed, only when a record cannot be read, written or removed; a step then refused moves it back, or says what moved. From U3b's fix round three: ONE question decides every record, which one a deploy reads now (`undo.netlifyRecordCases`, 20 rows run through deploy.py's own `load_netlify_marker` by `scripts/test_netlify_record_a_deploy_reads.py`, which Windows' Python already runs; W7 runs the rows through its own reader too): a current record that parses wins, else a legacy one that parses (migrated into the current place; a current record that does not parse is first moved to `section<N>.unreadable.json` and never moved again), else none; a record that names no site (`null`, `{}`, `[]`, a string, an empty `id`) is no website, so nothing is brought in or moved and the section is said to have had no website. Only what a deploy reads moves, plus a legacy record that parses and differs from the current one: that one is the LEFTOVER `section<N>.from-built-output.json` (`.2`, `.3`… when the name is taken, never a refusal) and is set aside by the step as the new op kind `setAside` (judged as `move`, standing apart ON ITS OWN, never one of the group: 3 checkCases, 4 stackCases, calls `rollOverSettingALeftoverAside` and `removeTheKeptLeftover`, key `leftoverMarkers`); a legacy record saying the same as the current one, compared parsed, is only removed; a record a deploy cannot parse is NOT moved (it stays in the built output), and `section<N>.unreadable.json` is no `setAside` leftover. Corrections in documentation 12, "The rollover, U3b fix round four". A schedule put back whose task will only start at the next login is named in `startsAtTheNextLogin` (an Undo outcome of its own, sentence `undoScheduleStartsAtTheNextLogin`, 1 stackCase, call `theScheduleStartsOnlyAtTheNextLogin`), never as left apart. Until W7 a reader that does not know `moveApart` reads the step as a barrier, which is safe; the rows (and the wording key) belong on the named-gap ledger against #899 for W7 | the mac's U3 (U3a landed the daily actions; U3b the rollover), and #900 and #927 where they rewrite a writer |
 | W8 | settings (`editJSON`, never `writeFile`, on `course_config.json`), renames, New Course, reference courses; rollover and restore | the mac's U4; #897 B; #909 and #873 |
 | W9 | Delete Backup and Delete Archive to the Recycle Bin | the mac's U5 and Windows' 785a (#912) |
 | W10 | the offer to deploy after an Undo or Redo | the mac's U6, and W5 |
 | W11a | the flip, recovery at a windowed launch, holds, reach, titles, `undo_last_change`'s body, today's three histories retired | the mac's U7; #904/#829 |
 | W11b | Edit ▸ Undo and Redo, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, typing first, the two-process UI test | W11a |
+
+### The rollover, U3b fix round four: corrections to the W7 row (#899, 2026-11-20)
+
+Corrections to the W7 row's U3b passage ("From U3b's fix round three: ..."),
+made true by fix round four:
+
+- `undo.netlifyRecordCases` is now 20 rows (was 13). New field
+  `currentEndsWithAByteThatIsNotUTF8` (the byte FF follows the row's text).
+  `site` is the id a deploy GOES ON WITH: `site_marker.get("id")`, null when
+  absent or empty, or when the record is not an object.
+- The section's website is that site. A Netlify record that names no site
+  (`null`, `{}`, `[]`, a string, an empty `id`) is not a website: a rollover
+  moves nothing of it and says the section was on no website. A record whose
+  bytes cannot be read at all stays "still pinned" (cannot tell now).
+- Only what must move, moves. With no site, nothing is brought in or moved.
+  With the legacy record's site, it is brought into the current place (a
+  current record there that does not parse first moved to
+  `section<N>.unreadable.json`, NEVER moved again). With the current record's
+  site, a legacy record that parses and differs is brought in as
+  `section<N>.from-built-output.json` and set aside by the step (`setAside`);
+  one that says the same is removed; one that does not parse stays in the
+  built output. Delete from the row: `section<N>.unreadable.json` as a
+  `setAside` leftover, and "a section<N>.json that does not parse" set aside.
+- Every kept name of a step comes from one chooser (Mac:
+  `DeployCommand.KeptNames`): the file's own name with `.previous-<stamp>`
+  before `.json`, then `.2`, `.3`… after the stamp, the first neither on disk
+  nor already chosen in the step. A record's kept name that is taken no
+  longer leaves the record pinned.
+- The "starts at the next login" trail line is written only after the whole
+  swap has gone in (Mac: `UndoExternalPlaces.noteItStartsAtTheNextLogin`,
+  called by the journal after `.swapped`), never inside the write.
+
+No contract row Windows runs today changed (Windows has no walk over
+`netlifyRecordCases`; `scripts/test_netlify_record_a_deploy_reads.py` runs
+there through `PythonToolchainTests` and passes on the new rows), so nothing
+new is held in `NamedGapLedger.cs`.

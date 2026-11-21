@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The Course and Section menus (#457): every action a teacher can take on a
-/// course or a section, in the menu bar, between View and Window.
+/// The Course, Section and Classes menus (#457; Classes since #990): every
+/// action a teacher can take on a course or a section, in the menu bar,
+/// between View and Window.
 ///
 /// The context menus and the windows' own buttons stay as second routes and
 /// call the SAME code — the sidebar's `performMenuItem`, the section window's
@@ -173,10 +174,21 @@ struct CourseMenu: Commands {
     }
 }
 
-/// The Section menu.
+/// The Section menu and the Classes menu (#990, Russell's ruling of
+/// 2026-11-20: grouping A). One type draws either, from
+/// `SubjectMenuLayout`, which says which items each holds and in what groups
+/// (`contracts/shared-rules.json` → `subjectMenus.layout`), so the split is
+/// data both apps draw. Both act on the selected section. A separator goes
+/// between groups; every item is drawn in every situation and dimmed when
+/// `SubjectMenuRules` greys it, never hidden (The menu bar: "If a menu bar
+/// item isn't actionable, disable the action instead of hiding it from the
+/// menu").
 struct SectionMenu: Commands {
 
     // MARK: - Stored properties
+
+    /// Which of the two menus this one is.
+    let layout: SubjectMenuLayout.Menu
 
     @FocusedValue(\.workspace) var workspace: WorkspaceModel?
     @FocusedValue(\.sidebarMenu) var sidebar: SidebarMenuCommands?
@@ -202,23 +214,158 @@ struct SectionMenu: Commands {
         return AppSettings.shared.previewOpensAt
     }
 
-    /// "Remove Scheduled Deploy…", the same whether or not it can be used
-    /// (#987, Russell 2026-11-18: the verb for taking away a scheduled
-    /// deploy is Remove, not Cancel, so the question's own Cancel is not a
-    /// second "cancel"). It was "Cancel Deploy at 6:30 AM…", and "Cancel
-    /// Deploy at…" while greyed; the time is in the question it opens and
-    /// on the sidebar's clock.
-    var cancelTitle: String {
-        return ScheduledDeployRemovalWording.menuItem
+    /// The menu's groups, numbered so a separator can go before every group
+    /// but the first.
+    var numberedGroups: [NumberedGroup] {
+        var numbered: [NumberedGroup] = []
+        var position: Int = 0
+        for group in SubjectMenuLayout.groups(of: layout) {
+            numbered.append(NumberedGroup(position: position, entries: group))
+            position += 1
+        }
+        return numbered
+    }
+
+    // MARK: - Types
+
+    /// One group of the layout, with its place in the menu.
+    struct NumberedGroup: Identifiable {
+
+        // MARK: - Stored properties
+
+        let position: Int
+        let entries: [SubjectMenuLayout.Entry]
+
+        // MARK: - Computed properties
+
+        var id: Int {
+            return position
+        }
     }
 
     // MARK: - Body
 
     var body: some Commands {
-        CommandMenu("Section") {
+        // The title follows the selected course: Classes, or Meetings in a
+        // club (#990, Russell, 2026-11-20 evening), as the items follow it;
+        // Classes with no window in front.
+        CommandMenu(SubjectMenuLayout.title(of: layout, noun: sidebar?.classNoun ?? .class)) {
             let current: SubjectMenuRules.Situation = situation
             let enabled: Set<SubjectMenuRules.Item> = SubjectMenuRules.enabledItems(current)
 
+            ForEach(numberedGroups) { group in
+                if group.position > 0 {
+                    Divider()
+                }
+                ForEach(group.entries, id: \.self) { entry in
+                    line(for: entry, current: current, enabled: enabled)
+                }
+            }
+        }
+    }
+
+    // MARK: - Functions
+
+    /// The menu's title for an item (#990: Remove Section and Remove
+    /// Scheduled Deploy carry no ellipsis, since a command that only asks
+    /// for a confirmation takes none: "Append an ellipsis to a menu item's
+    /// label when the action requires more information before it can
+    /// complete", Menus). The menu draws Preview with `previewItem`, titled
+    /// by the setting; this is its resting title, for a menu path.
+    static func title(for item: SubjectMenuRules.Item) -> String? {
+        switch item {
+        case .preview:
+            return PreviewStartPageWording.preview
+        case .rebuildPreview:
+            return "Rebuild Preview"
+        case .openInBrowser:
+            // One Open in Browser for both (#850): the preview while one
+            // shows, the deployed folder otherwise.
+            return DeployedFolderWording.menuItem
+        case .stopShowingDeployedFolder:
+            return DeployedFolderWording.stopMenuItem
+        case .publishClassForADate:
+            return "Publish Class for a Date…"
+        case .publishPages:
+            return "Publish Pages…"
+        case .hidePages:
+            return "Hide Pages…"
+        case .publishPagesLinksLeadTo:
+            return LinksChecklistWording.menuItem
+        case .undoLastChange:
+            return "Undo Last Change"
+        case .undoGettingReady:
+            return StartOfYearWording.undoMenuItem
+        case .deploy:
+            return "Deploy…"
+        case .scheduleDeploy:
+            return "Schedule Deploy…"
+        case .cancelScheduledDeploy:
+            // #987: Remove, not Cancel, and the same title whether or not it
+            // can be used; the time is in the question it opens.
+            return ScheduledDeployRemovalWording.menuItem
+        case .sectionOpenInObsidian:
+            return "Open in Obsidian"
+        case .sectionShowInFinder:
+            return "Show in Finder"
+        case .sectionNewTerminalAtFolder:
+            return "New Terminal at Folder"
+        case .removeSection:
+            return "Remove Section"
+        case .addClass:
+            // #897: ONE item whose sheet asks how the class is added. An
+            // ellipsis: a choice follows.
+            return "Add Class…"
+        case .classDates:
+            return "Class Dates…"
+        case .reDateClasses:
+            return "Re-date Classes…"
+        case .makeRoomForClasses:
+            return "Make Room for Classes…"
+        case .rollOverToANewYear:
+            // #897 piece B: an ellipsis (a choice and a plan follow); no key;
+            // not on the row's right-click menu, being once a year.
+            return "Roll Over to a New Year…"
+        case .getReadyForTheStartOfTheYear:
+            return StartOfYearWording.menuItem
+        case .sectionReviseWithClaude, .sectionReviseWithCodex, .sectionReviseWithCopilot,
+             .sectionReviseWithLocalAssistant:
+            // Drawn inside Revise With ▸ by `ReviseWithMenu`, which titles them.
+            return nil
+        case .openWorkingFolder, .openRecent, .newCourse, .importCoursesForReference, .restoreFromArchive,
+             .reloadCourses, .addSection, .copyAPage, .saveCourseSettings, .revertCourseSettings, .rename,
+             .setSchoolYear, .moveToGroup, .keepACopyForReference, .backUpNow, .restoreFromBackup,
+             .courseReviseWithClaude, .courseReviseWithCodex, .courseReviseWithCopilot,
+             .courseReviseWithLocalAssistant, .courseOpenInObsidian, .courseShowInFinder,
+             .courseNewTerminalAtFolder, .deleteBackup, .deleteArchive, .removeCourse,
+             .back, .forward, .reloadPage:
+            // File, Course and View items: not in Section or Classes. No
+            // `default`, so a new item does not compile until it is placed
+            // here or given its title (#990 review, LOW c).
+            return nil
+        }
+    }
+
+    /// One line of the layout: an item, with its key where it has one, or
+    /// a submenu.
+    @ViewBuilder
+    func line(
+        for entry: SubjectMenuLayout.Entry,
+        current: SubjectMenuRules.Situation,
+        enabled: Set<SubjectMenuRules.Item>
+    ) -> some View {
+        switch entry {
+        case .submenu(.sectionReviseWith):
+            ReviseWithMenu(
+                presence: presence,
+                claude: .sectionReviseWithClaude,
+                codex: .sectionReviseWithCodex,
+                copilot: .sectionReviseWithCopilot,
+                localAssistant: .sectionReviseWithLocalAssistant,
+                enabled: enabled,
+                run: run
+            )
+        case .item(.preview):
             // The menu item IS the teacher pressing the Preview button, so it
             // runs the button's own action — including the question about
             // today's class on the front page (#397; class-planning.json →
@@ -246,24 +393,7 @@ struct SectionMenu: Commands {
                     }
                     .keyboardShortcut("y", modifiers: [.command])
             }
-            item("Deploy…", .deploy, enabled)
-                .keyboardShortcut("d", modifiers: [.command, .shift])
-            // One Open in Browser for both (#850): the preview while one
-            // shows, the deployed folder otherwise.
-            item(DeployedFolderWording.menuItem, .openInBrowser, enabled)
-            item(DeployedFolderWording.stopMenuItem, .stopShowingDeployedFolder, enabled)
-
-            Divider()
-
-            // The assistant's own functions (#457 batch B), run through the
-            // tools' own code by the section window (`SectionVerbs`) — never
-            // through a model, so a teacher who declined the assistant has
-            // every one of them. The ellipsis items show the plan before
-            // anything changes; Rebuild Preview and Undo Last Change act
-            // at once.
-            item("Publish Pages…", .publishPages, enabled)
-            item("Hide Pages…", .hidePages, enabled)
-            item("Publish Class for a Date…", .publishClassForADate, enabled)
+        case .item(.rebuildPreview):
             // ⇧⌘Y (#990, Russell 2026-11-18): the Shift partner of Preview's
             // ⌘Y. It was ⇧⌘B, which added Shift to ⌘B (Bold) for an
             // unrelated command. ⇧⌘Y is in no row of the HIG's standard
@@ -275,64 +405,24 @@ struct SectionMenu: Commands {
             // the running app (documentation/09 → "Mac conventions").
             item("Rebuild Preview", .rebuildPreview, enabled)
                 .keyboardShortcut("y", modifiers: [.command, .shift])
-            // No key: ⌘Z belongs to text editing in Edit, and a key that took
-            // back a page change from inside a text field would be a surprise
-            // nobody could undo.
-            item("Undo Last Change", .undoLastChange, enabled)
-
-            Divider()
-
-            // #897: ONE item whose sheet asks how the class is added — the
-            // next class in this unit, in a new unit, or a copy (Russell,
-            // 2026-11-13 night). It replaces Add Next Class, which had no key
-            // equivalent, so it has none either. An ellipsis: a choice follows.
-            item("Add Class…", .addClass, enabled)
-            item("Re-date Classes…", .reDateClasses, enabled)
-            item("Make Room for Classes…", .makeRoomForClasses, enabled)
-            item("Class Dates…", .classDates, enabled)
-
-            Divider()
-
-            item("Schedule Deploy…", .scheduleDeploy, enabled)
-            item(cancelTitle, .cancelScheduledDeploy, enabled)
-
-            Divider()
-
-            // #897 piece B (Russell's ruling): above Get Ready, since the
-            // year's order is the dates and the website, then the drafts.
-            // An ellipsis (a choice and a plan follow); no key; not on the
-            // row's right-click menu, being once a year.
-            item("Roll Over to a New Year…", .rollOverToANewYear, enabled)
-            item(StartOfYearWording.menuItem, .getReadyForTheStartOfTheYear, enabled)
-            item(StartOfYearWording.undoMenuItem, .undoGettingReady, enabled)
-            item(LinksChecklistWording.menuItem, .publishPagesLinksLeadTo, enabled)
-
-            Divider()
-
-            ReviseWithMenu(
-                presence: presence,
-                claude: .sectionReviseWithClaude,
-                codex: .sectionReviseWithCodex,
-                copilot: .sectionReviseWithCopilot,
-                localAssistant: .sectionReviseWithLocalAssistant,
-                enabled: enabled,
-                run: run
-            )
-
-            Divider()
-
+        case .item(.deploy):
+            item("Deploy…", .deploy, enabled)
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+        case .item(.sectionOpenInObsidian):
+            // ⇧⌘O sits on whichever Open in Obsidian is live: this one while
+            // a SECTION row is selected (see CourseMenu).
             item("Open in Obsidian", .sectionOpenInObsidian, enabled)
                 .keyboardShortcut(current.row == .section ? KeyboardShortcut("o", modifiers: [.command, .shift]) : nil)
-            item("Show in Finder", .sectionShowInFinder, enabled)
-            item("New Terminal at Folder", .sectionNewTerminalAtFolder, enabled)
-
-            Divider()
-
-            item("Remove Section…", .removeSection, enabled)
+        case .item(let plain):
+            // No key on the rest. Undo Last Change in particular: ⌘Z
+            // belongs to text editing in Edit, and a key that took back a
+            // page change from inside a text field would be a surprise
+            // nobody could undo.
+            // A layout item with no title draws its raw name, and
+            // `SubjectMenuLayoutTests` fails on it.
+            item(SectionMenu.title(for: plain) ?? plain.rawValue, plain, enabled)
         }
     }
-
-    // MARK: - Functions
 
     /// Section ▸ Preview asking for one start page (#504). Titled by
     /// `PreviewStartPage` — the same function as the toolbar button.
@@ -352,6 +442,11 @@ struct SectionMenu: Commands {
         .disabled(!enabled.contains(item))
     }
 
+    /// The assistant's own functions (#457 batch B) and the window's own
+    /// buttons run through the section window (`SectionVerbs`) — never
+    /// through a model, so a teacher who declined the assistant has every
+    /// one of them; the rest go to the sidebar's code, as the row's context
+    /// menu does.
     func run(_ item: SubjectMenuRules.Item) {
         MenuRoute.run(item, in: workspace?.window) {
             switch item {

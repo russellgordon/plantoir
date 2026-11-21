@@ -153,7 +153,14 @@ builder.Services.AddMcpServer(options =>
                 return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
         }
         var topBefore = workspace.TopOfTheUndoList;
-        var result = await next(context, cancellation);
+        // #990: the window names the menu its item is in, in the call's _meta,
+        // so the copy saved before it names Section or Classes. One call at a
+        // time on the menu's server, and back to Section after it.
+        workspace.MenuOfTheChange = AssistWorkspace.MenuNamed(
+            context.Params?.Meta?[AssistWorkspace.MenuMetaKey]?.GetValue<string>());
+        CallToolResult result;
+        try { result = await next(context, cancellation); }
+        finally { workspace.MenuOfTheChange = Plantoir.Core.Models.SubjectMenuLayout.Menu.Section; }
         return PlantoirTools.AfterCall(workspace, topBefore, Text(arguments, "course"), Number(arguments, "section"), result);
     }));
 

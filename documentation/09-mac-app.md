@@ -7864,7 +7864,7 @@ anything was written. What it found, and what is true now:
 
 | | Before (dev, 2026-10-08) | Since #457 |
 |---|---|---|
-| Menus | Plantoir · File · Edit · View (empty) · **Preview** · Window · Help | Plantoir · File · Edit · View · **Course** · **Section** · Window · Help |
+| Menus | Plantoir · File · Edit · View (empty) · **Preview** · Window · Help | Plantoir · File · Edit · View · **Course** · **Section** · Window · Help (and **Classes** after Section since #990) |
 | File | **New ▸** New Plantoir Window ⌘N / New Assistant Window; Open Working Folder… ⌘O, Import…, Restore from Archive…, Reload Courses ⇧⌘R — all greyed with no window | New Window ⌘N, New Course… ⇧⌘N · Open Working Folder… ⌘O, Open Recent ▸ · Import…, Restore from Archive…, Reload Courses ⇧⌘R · Close ⌘W |
 | Edit | the system's, plus **Rename Course** | the system's only |
 | View | nothing of Plantoir's | Back ⌘[, Forward ⌘], Reload Page ⌘R, before the system's items |
@@ -7874,6 +7874,120 @@ anything was written. What it found, and what is true now:
 The whole tree is pinned by `MenuBarTreeTests` against
 `mac-app/Tests/Goldens/menu-bar.txt`, read out of the real menu bar — titles,
 keys and dividers, never enablement (that is `subjectMenus`' job).
+
+### Section and Classes: two menus drawn from the contract (#990, grouping A)
+
+Russell, 2026-11-20, through the dialog, choosing grouping A of the
+proposal for D27 (the Section menu's length; the proposal, with its HIG
+sentences, is `reference/990-section-menu-proposal.md` in the private setup
+repository). The Section menu had 23 commands and a submenu in 9 groups;
+it is now two menus, and the menu bar reads Plantoir · File · Edit · View ·
+Course · **Section** · **Classes** · Window · Help.
+
+```text wrap
+Section: Preview ⌘Y (⌥⌘Y alternate), Rebuild Preview ⇧⌘Y, Open in Browser, Stop Showing Deployed Folder | Publish Class for a Date…, Publish Pages…, Hide Pages…, Publish Pages That Links Lead To…, Undo Last Change, Undo Getting Ready for the Start of the Year… | Deploy… ⇧⌘D, Schedule Deploy…, Remove Scheduled Deploy | Revise With ▸ | Open in Obsidian, Show in Finder, New Terminal at Folder | Remove Section
+Classes: Add Class… | Class Dates…, Re-date Classes…, Make Room for Classes… | Roll Over to a New Year…, Get Ready for the Start of the Year…
+```
+
+**Why.** HIG, Menus (read 2026-11-20): "If a menu is too long, consider
+dividing it into separate menus", and "Prefer keeping all logically related
+commands in the same group, even if the commands don't all have the same
+importance". The menu bar: "Your app's custom menus appear in the menu bar
+between the View menu and the Window menu", "Prefer short, one-word menu
+titles", and "As much as possible, reflect your app's hierarchy in
+app-specific menus": courses hold sections, sections hold classes. Section
+holds what is done to the section's website, in a teaching day's order (look
+at it, choose what students see, send it); Classes holds the class calendar.
+Rebuild Preview joined Preview, Publish Pages That Links Lead To… joined the
+publishing items, and the deploy schedule joined Deploy…. REJECTED: grouping
+B (the same order in one menu, 22 commands, no shorter) and grouping C
+(three submenus in one menu, against "Use submenus sparingly").
+
+**The split is data.** `contracts/shared-rules.json` →
+`subjectMenus.layout` says which menu each section item is in, in groups, and
+both apps draw their two menus from it: the mac's
+`Models/SubjectMenuLayout.swift` holds the same lists, and one `SectionMenu`
+type draws either menu (`SectionMenu(layout: .section)`,
+`SectionMenu(layout: .classes)`) by walking the groups, a `Divider` before
+every group but the first, with the item's title from
+`SectionMenu.title(for:)` and its key where it has one. The keys did not
+move. `SubjectMenuLayoutTests` checks the lists against the contract, the
+real menu bar's order against `layout.menuBar.mac`, the real Section and
+Classes menus line for line against the lists, that with no Plantoir window
+in front every item is drawn and none can be pressed (dimmed, never hidden),
+that the two menus carry exactly the ruled keys, and that menu paths follow
+the item. A trail line's menu path (`SectionVerbs.menuPath`) takes its menu
+from the layout, so "Classes ▸ Re-date Classes… — carried out" moved with the
+item.
+
+**Left where they are.** The two Undo items stay in Section, last in the
+publishing group, until #899 U7 folds them into Edit ▸ Undo. Change Deploy
+Time… (#525) is not built; its place is in `layout.reservedPlaces`, between
+Schedule Deploy… and Remove Scheduled Deploy, and a test fails the day it
+becomes an item without a place in the layout.
+
+**Ellipses** (ruled on #990, 2026-11-20: "an ellipsis goes on a command only
+when more information must be provided … a confirmation does not count"):
+Remove Section and Remove Scheduled Deploy lost theirs, in the menu bar and
+on the section row's right-click menu
+(`ScheduledDeployRemovalWording.menuItem`, the contract's
+`scheduledDeployCancellation.removingOne.words.menuItem`). Deploy…'s is
+#996's.
+
+**Menu paths.** `help/menu-paths.json`, `help/outline.json`, the two menu
+sentences that named Section ▸ Class Dates… (`menuNeedsClassDatesFirst`,
+`menuRollOverDatesAreOld`) and the comments that named the five moved items
+say Classes now. A club's twins of those two sentences name "the Classes menu"
+(below). The
+three Undo sentences that name Section ▸ Undo Last Change are U7's and stay.
+
+**Name the real menu** (Russell, 2026-11-20, on #990). A sentence that says
+where a change came from names the menu the action is in, read from
+`SubjectMenuLayout`, never typed: the copy saved before a Classes item is
+`<CODE>_backup_<stamp>_classes-section<N>.zip`, listed as "before a change
+from the Classes menu to Section N" ("The Classes menu, Section N" in the
+Backups window), and its trail line reads "the Classes menu backed up the
+course as …". A Section item's copy keeps `_menu-section<N>`, the name every
+menu copy had before the split, so an older copy reads as it was written.
+`SectionVerbs.perform` tells the runner the item's menu for one call
+(`AssistToolRunner.menuMakingTheChange`). The menus' copies are pruned
+together, five between them (`course-management.json` → `backups.pruneCases`,
+`zipNames`). A sentence that covers both menus says "the Section or Classes
+menu" (`SubjectMenuLayout.eitherMenu`): `nothingToUndoFromTheMenu`,
+`sectionIsChangingFromTheMenu` and the Help pages' Undo and greyed-item
+lines. A released app before #990 does not know the
+`classes-section` piece and leaves such a copy unlisted, as `zipNames` does
+with any maker it does not know. Get Ready for the Start of the Year… saves
+the teacher's own kind of copy ("made by you"), as before.
+
+**In a club the menu is titled Meetings** (Russell, 2026-11-20 evening, on
+#990: "in a club the menu itself is titled Meetings, on both platforms, so
+no sentence a club's teacher reads says 'class'"). `SubjectMenuLayout.title(of:noun:)`
+takes the course's class noun (`class_noun`) with no default: Classes for
+`.class`, Meetings for `.meeting`; Section never changes
+(`subjectMenus.layout` → `titleForAMeeting`). The NOUN decides it, not the
+club code, because the noun is what every club sentence is chosen by (the
+`…ForAMeeting` keys), so a sentence that names the menu always names the one
+on the screen. The title follows the selection live: the sidebar publishes the
+selected course's noun in `SidebarMenuCommands.classNoun` (beside the
+situation, not in it, since it greys nothing), and `SectionMenu`'s
+`CommandMenu` title reads it, Classes with no window in front. Every sentence
+that names the menu for a club follows: the two club sentences ("Add them
+from the Meetings menu"), `sectionIsChangingFromTheMeetingsMenu` ("the
+Section or Meetings menu"), the trail's backup lines and "ran from a menu"
+paths ("Meetings ▸ Make Room for Classes…"), and the Backups list's
+sentences, which read the noun of the backup's course when drawn
+(`WorkspaceModel.classNoun(ofCourse:)`; a backup of a course no longer in
+the folder is read by its code, a club's code meaning meetings). The file
+name does not change. `ClubNounTests` checks every club sentence for "class"
+with no exception for menu titles. `nothingToUndoFromTheMenu` keeps "the
+Section or Classes menu": with nothing to undo there is no course to read a
+noun from, and the item leaves with #899 U7. The HIG has no sentence on a
+menu title that follows the selection; the nearest, Menus, has an item's
+"changeable label that describes an item's current state", and The menu
+bar's "Always show the same set of menu items" is kept: only the title
+changes. `SectionAndClassesMenusUITests.testTheClassesMenuIsTitledMeetingsWhileAClubIsSelected`
+proves it live in the real menu bar.
 
 ### The shape: one focused value per OWNER of the state
 
@@ -8205,7 +8319,7 @@ Two things only the built-in assistant's window could do had no menu item:
 starting a new unit, and duplicating a class as the next one (the audit of
 #897; the record is in [documentation/10](10-local-ai-assistant.md#what-only-the-built-in-assistant-could-do-and-where-it-is-on-the-menus-897)).
 Russell ruled, on the night of 2026-11-13, that they are not items of their
-own: **Section ▸ Add Class…** replaces Add Next Class and its sheet asks how
+own: **Section ▸ Add Class…** (Classes ▸ Add Class… since #990) replaces Add Next Class and its sheet asks how
 the class is added. The ways are data, in this order
 (`SubjectMenuRules.AddClassWay`; `shared-rules.json` →
 `subjectMenus.addClassSheet`):
@@ -8247,7 +8361,7 @@ of the menu's situation. REJECTED: reading them with the window's " — Edited"
 marker and greying the item on them (the implementation review's finding 9:
 it changed nothing anyone sees, since the item is never greyed for them, and
 it walked the class folders on the main thread on every window activation). The trail line
-is `ran from a menu` with "Section ▸ Add Class…" and the way in its counts.
+is `ran from a menu` with "Classes ▸ Add Class…" (Section ▸ until #990) and the way in its counts.
 
 **The copy, read on `.menu` only.** `duplicateFileFromTheMenu`
 (`AssistToolRunner.menuDuplicateFileArgument`) is read when the runner's
@@ -8482,7 +8596,7 @@ sheet says it was turned off and to set it again. Re-registering it is an
 operation #899's journal does not have yet (amendment 15), so it is listed for
 #899 rather than built here.
 
-The trail line is `ran from a menu` with "Section ▸ Roll Over to a New Year…"
+The trail line is `ran from a menu` with "Classes ▸ Roll Over to a New Year…" (Section ▸ until #990)
 and the website in its counts ("website: new", "website: kept", "website: not
 deployed yet", "website: deploys to a folder", "website: kept, a new one would
 have the same address"), read from what the call sent, so an unanswered

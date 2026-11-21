@@ -79,6 +79,12 @@ final class AssistToolRunner {
 
     private let surface: Surface
 
+    /// On `.menu`: which menu the running item is in (#990, "name the real
+    /// menu"), set by `SectionVerbs.perform` from `SubjectMenuLayout` for the
+    /// length of one call, so the copy it saves and its trail line name
+    /// Section or Classes. Section otherwise.
+    var menuMakingTheChange: SubjectMenuLayout.Menu = .section
+
     /// Where the courses are.
     private let workspace: WorkspaceModel
 
@@ -1983,7 +1989,7 @@ final class AssistToolRunner {
         var maker: BackupMaker = .assistant(sectionNumber: sectionNumber)
         var event: ActivityTrail.Event = .assistantBackedUpACourse
         if surface == .menu {
-            maker = .menu(sectionNumber: sectionNumber)
+            maker = .menu(sectionNumber: sectionNumber, inMenu: menuMakingTheChange)
             event = .sectionMenuBackedUpACourse
         }
         do {
@@ -1998,7 +2004,9 @@ final class AssistToolRunner {
                 line = ActivityTrail.sectionMenuBackedUpLine(
                     fileName: backupURL.lastPathComponent,
                     bytes: bytes,
-                    seconds: Date().timeIntervalSince(started)
+                    seconds: Date().timeIntervalSince(started),
+                    inMenu: menuMakingTheChange,
+                    noun: course.configuration.classNoun
                 )
             }
             ActivityTrail.note(event, line, course: code, section: sectionNumber)
@@ -2006,7 +2014,10 @@ final class AssistToolRunner {
         } catch {
             var line: String = ActivityTrail.assistantCouldNotBackUpLine(reason: error.localizedDescription)
             if surface == .menu {
-                line = ActivityTrail.sectionMenuCouldNotBackUpLine(reason: error.localizedDescription)
+                line = ActivityTrail.sectionMenuCouldNotBackUpLine(
+                    reason: error.localizedDescription, inMenu: menuMakingTheChange,
+                    noun: course.configuration.classNoun
+                )
             }
             ActivityTrail.note(event, line, course: code, section: sectionNumber)
             throw error
@@ -2515,7 +2526,7 @@ final class AssistToolRunner {
             sectionText = String(section)
         }
         return AssistToolOutcome.refused(AssistWording.sectionIsChangingFromTheMenu(
-            course: code, section: sectionText
+            course: code, section: sectionText, noun: classNoun(ofCourse: code)
         ))
     }
 
@@ -3334,6 +3345,14 @@ final class AssistToolRunner {
             plainNextUnit: next.unit,
             plainNextDay: next.day
         )
+    }
+
+    /// What the course with this code calls its class pages, for a trail
+    /// line from a menu that names the Classes menu by the title the course's
+    /// menu bar gives it (Meetings in a club, #990); Classes' noun when the
+    /// folder has no such course.
+    func classNoun(ofCourse code: String) -> ClassNoun {
+        return course(withCode: code)?.configuration.classNoun ?? .class
     }
 
     /// The course with this code, or nil when the working folder no longer has
@@ -4605,7 +4624,7 @@ final class AssistToolRunner {
 
     // MARK: - Duplicating a class as the next one, from the menu (#897)
 
-    /// The argument Section ▸ Add Class…, as a copy of a class, names its
+    /// The argument Classes ▸ Add Class…, as a copy of a class, names its
     /// source by:
     /// the page's path inside the course folder, ".md" included
     /// (`SectionVerbs.coursePath(ofPageAt:in:)`).
@@ -4847,7 +4866,11 @@ final class AssistToolRunner {
         }
         ActivityTrail.note(
             .classCopyNotMade,
-            "did not copy a class from the Section menu — the copy could not be made certainly "
+            // Add Class…, as a copy, is in the Classes menu (#990): the line
+            // names the menu the layout puts it in, by the title the course's
+            // menu bar gives it (Meetings in a club).
+            "did not copy a class from the \(SubjectMenuLayout.title(of: SubjectMenuLayout.menu(containing: .addClass) ?? .classes, noun: located.course.configuration.classNoun)) menu — "
+            + "the copy could not be made certainly "
             + "hidden, so nothing was written",
             course: located.course.code, section: located.sectionNumber
         )
@@ -4924,7 +4947,7 @@ final class AssistToolRunner {
                     + "last year's. Last year's details are kept, and any deploy set to happen "
                     + "on its own is turned off."
                     : "Keep deploying this section to the same website as last year."
-                // Section ▸ Roll Over to a New Year… (#897 piece B): the card
+                // Classes ▸ Roll Over to a New Year… (#897 piece B): the card
                 // also says the dates need nothing and what is set aside. What
                 // the model reads (`plan`) is the window's, byte for byte.
                 // On "new" the card says it as the other branch does ("It
@@ -5035,7 +5058,7 @@ final class AssistToolRunner {
     /// whole year at once rather than the website and not the dates.
     static let menuRolloverChange: String = "rolled the section over to a new year"
 
-    /// Section ▸ Roll Over to a New Year… on a section whose dates are
+    /// Classes ▸ Roll Over to a New Year… on a section whose dates are
     /// already right (#897 piece B). A copy of the course is saved first,
     /// which the window's path does not do here (the plan review's amendment
     /// 11: a teacher who ran Re-date Classes… first lands exactly here), and

@@ -247,7 +247,7 @@ enum OneSectionRestore {
             madeFor = nil
         case .assistant(let sectionNumber):
             madeFor = sectionNumber
-        case .menu(let sectionNumber):
+        case .menu(let sectionNumber, _):
             madeFor = sectionNumber
         }
         guard let sectionNumber = madeFor else {

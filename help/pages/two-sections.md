@@ -59,6 +59,6 @@ Nothing has been sent to students by these steps. Hiding a page changes your cou
 
 ## If it does not work
 
-- **{{menu:undoLastChange}} is greyed.** It is live only when the last change made from the Section menu in this window was made in the section that is selected. Select Section 2 and look again. [Show or hide pages for a section](page:publish-pages) lists the other times it is greyed.
+- **{{menu:undoLastChange}} is greyed.** It is live only when the last change from the Section or Classes menu in this window was in the selected section. Select Section 2 and look again. [Show or hide pages for a section](page:publish-pages) lists the other times it is greyed.
 - **A page was not put back.** Undo leaves alone a page that has been edited since the change, and says so.
 - **The section had already been deployed.** Undo does not change a website that students can already see. Deploy the section again when you want that website to match.

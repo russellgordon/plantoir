@@ -213,7 +213,8 @@ extension SectionDetailView {
             runAtOnce(SectionVerbs.rebuildPreview(course: course.code, section: sectionNumber), item: item, verbs: verbs,
                       title: AssistWording.menuRebuildPreviewTitle)
         case .classDates:
-            SectionVerbs.noteRan(item, ending: "opened", counts: "", courseCode: course.code, sectionNumber: sectionNumber)
+            SectionVerbs.noteRan(item, ending: "opened", counts: "", courseCode: course.code, sectionNumber: sectionNumber,
+                                 noun: course.configuration.classNoun)
             let model: SectionVerbSheetModel = SectionVerbSheetModel(
                 kind: .classDates, course: course, sectionNumber: sectionNumber, title: "", item: item
             )
@@ -443,7 +444,8 @@ extension SectionDetailView {
             model.stage = .finished
             if let item = model.item {
                 SectionVerbs.noteRan(item, ending: "changed nothing", counts: countsLine(model),
-                                     courseCode: course.code, sectionNumber: sectionNumber)
+                                     courseCode: course.code, sectionNumber: sectionNumber,
+                                     noun: course.configuration.classNoun)
             }
         }
     }
