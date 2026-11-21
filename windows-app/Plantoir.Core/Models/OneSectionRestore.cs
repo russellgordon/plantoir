@@ -1,3 +1,5 @@
+using System.IO.Compression;
+
 namespace Plantoir.Core.Models;
 
 /// <summary>
@@ -43,4 +45,135 @@ public static class OneSectionRestore
         new OutsideFile(".netlify_sites/section{N}.json", false, Treatment.LeftAsItIs),
         new OutsideFile(".cloudflare_sites/section{N}.json", false, Treatment.LeftAsItIs),
     };
+    // ---- When one section is offered (step 2 of #911) ----------------------
+
+    /// <summary>Why a backup's naming does not fit the course now.</summary>
+    public enum NamingDifference
+    {
+        /// <summary>The word for a unit, the class page scheme or the class folder.</summary>
+        ClassPages,
+        /// <summary>A folder the backup lists has been renamed or removed since.</summary>
+        Folders,
+    }
+
+    /// <summary>
+    /// The facts about naming that decide whether a backup's class pages
+    /// still mean anything in the course as it is now (the mac's
+    /// <c>OneSectionRestore.Naming</c>).
+    /// </summary>
+    public sealed record Naming(string Word, ClassPageScheme Scheme, string ClassFolder,
+                                IReadOnlyList<string> SharedFolders, IReadOnlyList<string> PerSectionFolders)
+    {
+        /// <summary>The naming a course's settings record.</summary>
+        public static Naming Of(CourseConfiguration configuration) => new(
+            configuration.UnitWord,
+            ClassPageSchemes.Reading(configuration.ClassPageSchemeRaw),
+            ClassFolderRule.Name(configuration.ClassFolder, configuration.PerSectionFolders),
+            configuration.SharedFolders,
+            configuration.PerSectionFolders);
+
+        /// <summary>
+        /// What stands between a backup made under <paramref name="backup"/>
+        /// and a course named as this one now, or null when one section can be
+        /// put back. A folder ADDED since never counts: every preview build
+        /// adds new top-level folders to these lists
+        /// (<c>build_site.preflight_update_course_config</c>, measured on the
+        /// mac), so an exact comparison would withdraw the offer after any new
+        /// folder. A folder the backup lists that is gone now does: a rename
+        /// rewrote every page's links to the new name.
+        /// </summary>
+        public NamingDifference? DifferenceFromBackup(Naming backup)
+        {
+            if (Word != backup.Word || Scheme != backup.Scheme || ClassFolder != backup.ClassFolder)
+                return NamingDifference.ClassPages;
+            foreach (string folder in backup.SharedFolders)
+                if (!SharedFolders.Contains(folder)) return NamingDifference.Folders;
+            foreach (string folder in backup.PerSectionFolders)
+                if (!PerSectionFolders.Contains(folder)) return NamingDifference.Folders;
+            return null;
+        }
+    }
+
+    /// <summary>What a backup zip holds that the offer needs: its <c>section&lt;N&gt;\</c> folders, and its naming (null when its settings could not be read).</summary>
+    public sealed record BackupFacts(IReadOnlySet<int> SectionsInside, Naming? Naming);
+
+    /// <summary>
+    /// The section a backup offers to put back on its own, or null for
+    /// today's whole-course question (the mac's <c>offeredSection</c>,
+    /// <c>offerCases</c>): the backup was made for ONE section, by the
+    /// Section menu or the assistant; that section is in the course now; the
+    /// course is not kept for reference; no rename is half done; the zip holds
+    /// the section's folder; and the course names its class pages the way the
+    /// backup did.
+    /// </summary>
+    public static int? OfferedSection(BackupMaker maker, bool sectionExistsNow, bool keptForReference,
+                                      bool renameUnfinished, bool backupHasTheSection, bool namingSameAsNow)
+    {
+        int? madeFor = maker switch
+        {
+            BackupMaker.Assistant assistant => assistant.SectionNumber,
+            BackupMaker.Menu menu => menu.SectionNumber,
+            _ => null,
+        };
+        if (madeFor is null) return null;
+        if (!sectionExistsNow || keptForReference || renameUnfinished) return null;
+        if (!backupHasTheSection || !namingSameAsNow) return null;
+        return madeFor;
+    }
+
+    /// <summary>
+    /// Whether a rename of the course's word for a unit, or of its folders,
+    /// did not finish: its record is still on disk. The cheap fact, as the
+    /// mac asks it, never the walk that can clear the record.
+    /// </summary>
+    public static bool RenameIsUnfinished(string courseDirectory) =>
+        File.Exists(UnitWordRenamer.RenameMarkerPath(courseDirectory))
+        || File.Exists(SpecialFolderRenamer.RenameRecordPath(courseDirectory));
+
+    /// <summary>
+    /// Reads what the offer needs from a backup zip, once, when the dialog is
+    /// about to open (never while it draws): which section folders its
+    /// listing holds, and its naming from its <c>course_config.json</c> entry
+    /// alone, read from the entry's stream. Nothing is unpacked. A zip that
+    /// cannot be read holds nothing, so it is never offered.
+    /// </summary>
+    public static BackupFacts ReadFacts(string zipPath)
+    {
+        var sections = new HashSet<int>();
+        try
+        {
+            using var archive = ZipFile.OpenRead(zipPath);
+            ZipArchiveEntry? settings = null;
+            foreach (var entry in archive.Entries)
+            {
+                string name = entry.FullName.Replace('\\', '/');
+                string[] parts = name.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2 && parts[1] == "course_config.json" && !name.EndsWith('/')) settings = entry;
+                // "ICS3U/section2/" (the folder's own entry) or anything inside
+                // it; a FILE called "section2" at the course's root is not one.
+                bool isTheFolderItself = parts.Length == 2 && name.EndsWith('/');
+                if ((isTheFolderItself || parts.Length >= 3) && CourseRestorer.NamesASectionFolder(parts[1])
+                    && int.TryParse(parts[1].AsSpan("section".Length), System.Globalization.NumberStyles.None,
+                                    System.Globalization.CultureInfo.InvariantCulture, out int number))
+                    sections.Add(number);
+            }
+            Naming? naming = null;
+            if (settings is not null)
+            {
+                try
+                {
+                    using var stream = settings.Open();
+                    using var bytes = new MemoryStream();
+                    stream.CopyTo(bytes);
+                    naming = Naming.Of(CourseConfiguration.FromBytes(bytes.ToArray()));
+                }
+                catch (Exception) { naming = null; }
+            }
+            return new BackupFacts(sections, naming);
+        }
+        catch (Exception)
+        {
+            return new BackupFacts(new HashSet<int>(), null);
+        }
+    }
 }
