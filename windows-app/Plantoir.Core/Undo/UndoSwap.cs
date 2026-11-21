@@ -94,6 +94,9 @@ internal sealed class UndoSeams
     /// <summary>A test's: putting the original of the swap at this index back fails, as a rename refused for good does (the mac's putBackFailsAt).</summary>
     internal Func<int, bool>? PutBackFailsAt { get; init; }
 
+    /// <summary>A test's: clearing the Hidden attribute the swap set on the kept original at this index fails, as an attribute that will not take does (W7a part two, review 1, LOW 1).</summary>
+    internal Func<int, bool>? ShowingTheKeptFileFailsAt { get; init; }
+
     /// <summary>The POSIX-semantics rename answers "not supported" (87), as on a network share, so every swap takes the fallback (M5).</summary>
     internal bool PosixRenameIsNotSupported { get; init; }
 
@@ -260,9 +263,12 @@ internal static class UndoSwap
                     else
                     {
                         // Shown again before it is the page again; hidden
-                        // again if it stays under its kept name.
-                        ShowTheKeptFile(original);
-                        if (RenameWithRetries(original.Path, target.FullPath, replace: true, seams) != 0)
+                        // again if it stays under its kept name. Not shown,
+                        // it is never renamed onto the page: it stays Hidden
+                        // under its kept name, left for recovery, so a page
+                        // is never left Hidden (part two, review 1, LOW 1).
+                        if (!ShowTheKeptFile(original, seams?.ShowingTheKeptFileFailsAt?.Invoke(index) == true)) whole = false;
+                        else if (RenameWithRetries(original.Path, target.FullPath, replace: true, seams) != 0)
                         {
                             whole = false;
                             HideTheKeptFile(original);
@@ -525,16 +531,18 @@ internal static class UndoSwap
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
-    /// <summary>Clears the Hidden attribute the swap set, before a kept original is renamed back to be the page.</summary>
-    private static void ShowTheKeptFile(UndoStagedFile kept)
+    /// <summary>Clears the Hidden attribute the swap set, before a kept original is renamed back to be the page. False when it is still Hidden, so it must not be renamed onto the page.</summary>
+    private static bool ShowTheKeptFile(UndoStagedFile kept, bool failsForATest = false)
     {
-        if (!kept.HiddenByTheSwap) return;
+        if (!kept.HiddenByTheSwap) return true;
+        if (failsForATest) return false;
         try
         {
             File.SetAttributes(kept.Path, File.GetAttributes(kept.Path) & ~FileAttributes.Hidden);
             kept.HiddenByTheSwap = false;
+            return true;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
     }
 
     /// <summary>The place a staged name stands beside: the name between its leading dot and its LAST <c>.plantoir-undo-</c>, or null.</summary>

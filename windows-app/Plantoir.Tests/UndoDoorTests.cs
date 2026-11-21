@@ -318,11 +318,20 @@ public sealed class UndoDoorTests : IDisposable
     /// IS a copy of its readable page (the other side of the test above,
     /// where the page is held and the kept original stays).
     /// </summary>
-    [Fact]
-    public void PruningsTidyRemovesAKeptOriginalThatIsACopyOfItsPage()
+    // Once with the kept original marked Hidden, as the swap leaves one (W7a
+    // part two, review 1, LOW 3): pruning's tidy finds it all the same.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PruningsTidyRemovesAKeptOriginalThatIsACopyOfItsPage(bool hidden)
     {
         string copy = UndoSwap.BesidePath(Full("courses/TST1O/Section 1/c.md"), "1-apply", "orig");
-        PruneADeadStepAfter(() => File.WriteAllBytes(copy, Old));
+        PruneADeadStepAfter(() =>
+        {
+            if (File.Exists(copy)) File.SetAttributes(copy, FileAttributes.Normal);
+            File.WriteAllBytes(copy, Old);
+            if (hidden) File.SetAttributes(copy, FileAttributes.Hidden | FileAttributes.Archive);
+        });
         Assert.False(File.Exists(copy), "a kept original that is a copy of its page was left by pruning's tidy");
         Assert.Equal(Old, File.ReadAllBytes(Full("courses/TST1O/Section 1/c.md")));
     }

@@ -268,8 +268,12 @@ public sealed class UndoRecoveryTests
     /// is not the only copy of anything: the settled tidy removes it, and no
     /// "undo kept what a page held" line names it (the mac's listHolds, U3c).
     /// </summary>
-    [Fact]
-    public void ACompletedStepsKeptOriginalThatTheListGivesIsTidied()
+    // W7a part two, review 1, LOW 3: once with the kept original marked
+    // Hidden, as the swap leaves one; the tidy finds it all the same.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ACompletedStepsKeptOriginalThatTheListGivesIsTidied(bool hidden)
     {
         using UndoScribe scribe = Scribe();
         scribe.WritePage("A", First, Old(First));
@@ -278,6 +282,7 @@ public sealed class UndoRecoveryTests
         scribe.WritePage("A", First, New(First));
         string kept = UndoSwap.BesidePath(scribe.FullPath("A", First), $"{seq}-apply", "orig");
         File.WriteAllBytes(kept, Old(First));
+        if (hidden) File.SetAttributes(kept, FileAttributes.Hidden | FileAttributes.Archive);
 
         scribe.Door().Recover();
 
@@ -318,6 +323,9 @@ public sealed class UndoRecoveryTests
         foreach (string staged in left)
         {
             Assert.EndsWith("-orig", staged);
+            // LOW 3 of W7a part two's review 1: what the closed-step tidy met
+            // and kept is a kept original the swap marked Hidden.
+            Assert.True(File.GetAttributes(staged).HasFlag(FileAttributes.Hidden), "the kept original the tidy met was not Hidden: " + staged);
             string place = Path.Combine(Path.GetDirectoryName(staged)!, UndoSwap.PlaceOfStagedName(Path.GetFileName(staged))!);
             Assert.False(UndoSwap.IsACopyOfItsPlace(staged, place), "a copy of its page was left: " + staged);
         }

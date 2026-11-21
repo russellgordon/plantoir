@@ -414,6 +414,32 @@ public sealed class UndoSwapTests : IDisposable
         Assert.Empty(StagedLeft());
     }
 
+    /// <summary>
+    /// W7a part two, review 1, LOW 1: when the Hidden attribute the swap set on
+    /// a kept original cannot be cleared, the put-back does not go ahead. The
+    /// page keeps what the swap wrote and is not Hidden; the kept file stays
+    /// Hidden under its kept name, holding the page's earlier content.
+    /// </summary>
+    [Fact]
+    public void AKeptFileThatCannotBeShownIsNeverPutBackSoNoPageIsLeftHidden()
+    {
+        string first = Page("courses/A/a.md", Old);
+        string second = Page("courses/A/b.md", Old);
+        File.SetAttributes(second, FileAttributes.ReadOnly);
+
+        UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New), Target("courses/A/b.md", Old, New)], "1-undo", _root,
+                                              new UndoSeams { ShowingTheKeptFileFailsAt = index => index == 0 });
+
+        File.SetAttributes(second, FileAttributes.Normal);
+        Assert.IsType<UndoSwapResult.Refused>(result);
+        Assert.False(File.GetAttributes(first).HasFlag(FileAttributes.Hidden), "the page was left Hidden");
+        Assert.Equal(New, File.ReadAllBytes(first));
+        string kept = UndoSwap.BesidePath(first, "1-undo", "orig");
+        Assert.True(File.Exists(kept), "the kept original is gone");
+        Assert.Equal(Old, File.ReadAllBytes(kept));
+        Assert.True(File.GetAttributes(kept).HasFlag(FileAttributes.Hidden), "the kept original was shown");
+    }
+
     private UndoSwapTarget FolderTakenOut(string relative)
     {
         string full = Path.Combine(_root, relative.Replace('/', Path.DirectorySeparatorChar));
