@@ -12,6 +12,36 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 76364b50b — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
+## 2026-11-21 — #1035 and #953's deny test: the harness's key rules run in the merge gate; the permission test split
+
+#### #1035: the harness's key rules run in the merge gate
+
+- **#1035 (2026-11-21): `HarnessSourceRuleTests` moved from `Plantoir.UiTests` to `Plantoir.Tests`**, so the merge gate (which builds and runs `Plantoir.Tests` only; read from `C:\vm-setup\win-suite-int-d4.ps1`) now runs the key rules. On `dev` 41f30f5c6 two of them had been failing unseen: `StopByKeyboardUiTests.AHeldEscapeOpensTheQuestion_AndItsRepeatsDoNotAnswerIt` sent a bare key-down Escape (#1009), and `MenuBarUiTests.CopyAPageAnswersCtrlShiftK` named `KEY_K`, not watched (#990).
+- The rule tests read the UI test sources from `windows-app/Plantoir.UiTests` and the watched keys from `HeldKeys.cs`'s own `Watched` array, so there is one copy of each. `Plantoir.Tests` is plain `net9.0` and cannot load FlaUI, so keys are compared by NAME: the three `VirtualKeyShort.ENTER` in the UI tests are now `RETURN` (the same key, 0x0D), the spelling `Watched` uses. A new test file `TheWatchedListIsReadFromHeldKeys` pins that the list is really read.
+- The held-key imitation (several key-downs, one key-up) is now one helper, `HeldKeys.HoldWithRepeats(key, firstDelayMs, repeats, repeatMs, whileHeld)`, with its release in a `finally`; it is the one method on the rule's allowed list (it replaces `PageTablesUiTests.HeldSpace` there, which now calls it). `StopByKeyboardUiTests`' held Escape calls it too, so a failing step can no longer leave Escape down. `KEY_K` is in `HeldKeys.Watched`.
+- `TheHeldKeyMessageNamesTheTestsAndTheFix` stays in the UI project, in `HeldKeysMessageTests.cs` (it tests `HeldKeys` itself, not the sources).
+- Proved on VM B (see the must-fail lines below).
+
+Must-fail (scratch commit db41c4f50, never pushed: `KEY_K` taken out of `Watched`, a bare `Keyboard.Press(VirtualKeyShort.ESCAPE)` put back in `StopByKeyboardUiTests`, the helper's `finally` turned into a `catch`):
+
+```text wrap
+VM B, fixed 4352d97a7: HarnessSourceRuleTests (Plantoir.Tests, run-tests.ps1 -Filter) Passed 5 of 5.
+VM B, fixed 4352d97a7: StopByKeyboardUiTests + MenuBarUiTests + PageTablesUiTests + HeldKeysMessageTests: PASSED - 18 passed, 0 skipped, 18 total (10 m 54 s).
+VM B, broken db41c4f50: Failed 3, Passed 2:
+Failed Plantoir.Tests.HarnessSourceRuleTests.EveryKeyATestNamesIsWatched: HeldKeys.Watched does not watch these keys a test names (add the key there, spelled the same way): KEY_K (MenuBarUiTests.cs:478)
+Failed Plantoir.Tests.HarnessSourceRuleTests.NoTestSendsAKeyDownWithNoKeyUp: These send a key DOWN and never UP ... StopByKeyboardUiTests.cs:424 (in AHeldEscapeOpensTheQuestion_AndItsRepeatsDoNotAnswerIt)
+Failed Plantoir.Tests.HarnessSourceRuleTests.TheAllowedMethodStillReleasesItsKey: Assert.Contains() Failure: Not found: "finally { Keyboard.Release("
+```
+
+Logs: `vm-tools/runs/1035/prove.log`, `vm-tools/runs/1035/prove-ui.log`.
+
+#### #953's permission test split, so the merge gate's PC run is honest
+
+- **#953's permission test split so the merge gate's PC run is honest.** `AgentGuidanceTests.APermissionIsRefusedAtOnceAndNotSaidAsInUse` failed on the PC over SSH (`Assert.Equal() Failure: Expected: "Access is denied." Actual: null`). Measured on the PC over SSH (2026-11-21, a PowerShell probe sent over SSH, calling `MoveFileEx` with replace in `%TEMP%`): the account is elevated with `SeBackupPrivilege`, `SeRestorePrivilege` and `SeTakeOwnershipPrivilege` enabled. A read-only target refuses the rename (error 5), but the file's deny rule (Delete and WriteData), the folder's deny rule (DeleteSubdirectoriesAndFiles) and both together all let the rename through (0), and so does a write in place. The listing probe of `DenyBitesFact` reads "does not bite" there too, so it would have skipped the test, but only by luck: it probes listing, not replacing.
+- The test is now two. `AReadOnlyFileIsRefusedAtOnceAndNotSaidAsInUse` is a plain `[Fact]` that runs everywhere and now also checks that no temporary is left. `ADenyRuleIsRefusedAtOnceAndSaidAsAccessDenied` is a `[DenyReplaceBitesFact]`. That new attribute sits beside the test in `AgentGuidanceTests.cs`, the way `DenyReadBitesFact` sits in `UndoCheckContractTests.cs`. Its probe applies the test's own two rules (shared through `FileDeny()` and `FolderDeny()`) to a temporary file and makes the same `File.Move(…, overwrite: true)`. Where the rename goes through, the test is skipped with a sentence that says why and names the tests that cover the rest. No assertion was weakened.
+- Proof: on the PC over SSH (`953-deny-p1`, head 4567ce847), both builds passed and `AgentGuidanceTests` had 22 passed, 1 skipped (the deny half, with its reason) and 0 failed. On VM B (same head), 23 of 23 passed, the deny half among them. Must-fail on VM B (scratch 7307a036f, `HeldFiles.Replace` asks again after every access-denied rename, the pre-#953 behaviour): both halves fail, the read-only one at line 556 (`Assert.NotEqual() Failure: Strings are equal`, said as in use) and the deny one at line 590 (`Assert.Equal() Failure: Strings differ`).
+- What the PC can tell us about deny rules is still limited: over SSH the deny-rule tests cannot run there. The VMs are where they run (whether they bite in the PC's desktop session was not measured).
+
 ## 2026-11-21 — Lane F, Windows test reliability: #971, #964, #916 items 3 and 4, #770
 
 Branch `issue/770-win-test-reliability`. Issues #971, #964, #916 items 3 and 4, #770. All runs in the second Windows VM (B, Windows 11 ARM64, account `russellgordon`); logs on the main Mac under `vm-tools/runs/night4-f/`, the per-run test output in the VM under `C:\vm-setup\770f\`. Guest scripts `vm-tools/guest/770f-run.ps1` (named filter sets, repeats, hang bound, own TEMP, CPU spinners), `770f-build-ui.ps1`, `770f-cat.ps1`, `964-hang.ps1`.
@@ -137,7 +167,7 @@ Each behaviour reverted in a scratch branch (`scratch/874-mf-*`, deleted after),
 | F: `RevertToFile` discards the edits on a held file | `HeldWhole…`, CourseSettingsHeldFileTests.cs:100, `Assert.False() Failure Expected: False Actual: True` |
 | E: `FileInUseException` without the sharing-violation code | `ARenameOntoAHeldFile…`, HeldFilesTests.cs:51 `Expected: -2147024864 Actual: -2146232800`; `AddOntoAHeldFile…`, AgentGuidanceTests.cs:518 `Actual: "could not be written"` |
 | G: `DiscoverCourses` drops a held course | `HeldWhole…`, :106, `Assert.Single() Failure: The collection was empty` |
-| J: every access-denied rename asked again (no probe) | `AReadOnlyFileIsAPermission…`, HeldFilesTests.cs:76 `Value is the exact type FileInUseException`; `AgentGuidanceTests.APermissionIsRefusedAtOnce…`, :551 `Assert.Empty() Failure` |
+| J: every access-denied rename asked again (no probe) | `AReadOnlyFileIsAPermission…`, HeldFilesTests.cs:76 `Value is the exact type FileInUseException`; `AgentGuidanceTests.AReadOnlyFileIsRefusedAtOnceAndNotSaidAsInUse` (then one test, `APermissionIsRefusedAtOnce…`; since #953 two, with `ADenyRuleIsRefusedAtOnceAndSaidAsAccessDenied`, skipped where a deny rule cannot stop a rename, as over SSH on the PC), :551 `Assert.Empty() Failure` |
 
 Not reverted: `ATemporaryIsHiddenUniqueAndBesideItsFile` (reads the name's shape), `TheScanSeesBothShapesOfAReader` (the scan's own self-test; H proves the scan), `AFileThatIsNotValidJsonReadsAsNothingRememberedAndIsReplaced` (pins today's behaviour, unchanged). A first version of the refused-read tests used a holder sharing delete; it passed under A and B (Windows refuses a replace onto ANY open file without POSIX rename, so the write could not land either way), and was replaced by the race the issue names, driven by the pause.
 
@@ -978,7 +1008,7 @@ Branch `issue/641-ui-harness`.
   - `RealTrailUntouchedUiTests` drives both writers. It fails on an added real-trail line that names the run's folder or its one-off course code.
   - The launchers' refusal lines still bypass it: #664 (both platforms, v1.9.0).
 - **#638:** 24 FlaUI key-downs had no key-up. They are now `Keyboard.Type`, or `using (Keyboard.Pressing(...))` for a held modifier.
-  - `HarnessSourceRuleTests` (plain facts) keeps them out. The one exception, allowed by name, is `PageTablesUiTests.HeldSpace`.
+  - `HarnessSourceRuleTests` (plain facts) keeps them out. The one exception, allowed by name, is `HeldKeys.HoldWithRepeats` (it was `PageTablesUiTests.HeldSpace` until #1035). Since #1035 the rules run in the unit project `Plantoir.Tests`, which the merge gate runs, not in the UI test project.
   - `HeldKeys` releases any key still down. `DrivenApp.Dispose` records it without throwing, and the `HeldKeyLedger` collection fixture fails the cleanup naming the keys and tests. This was seen working when F2 was put back to a bare key-down.
 - **Measured** (i5-8365U, RDP session, other worktrees' unit runs on the PC at times):
   - Full UI run 1: **101/101**, 51 m 13 s, OpenRecentUiTests and PreviewStartPageUiTests included.
