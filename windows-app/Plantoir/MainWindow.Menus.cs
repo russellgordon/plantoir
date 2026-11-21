@@ -415,6 +415,14 @@ public sealed partial class MainWindow
             case Item.Preview: detail?.PressPreview(opposite: false); return;
             case Item.Deploy: detail?.PressDeploy(); return;
             case Item.OpenInBrowser: detail?.PressOpenInBrowser(); return;
+            case Item.StopShowingDeployedFolder:
+                // #889: every show of the selected section, and a start still under way.
+                if (Workspace.Selection is SidebarSelection.SectionItem(var stopCode, var stopNumber)
+                    && Workspace.WorkspacePath is { } stopFolder
+                    && Workspace.Courses.FirstOrDefault(c => c.Code == stopCode) is { } stopCourse)
+                    DeployedFolderOpening.Stop(stopCourse, stopNumber, stopFolder);
+                ApplyMenuEnablement();
+                return;
             case Item.Back: detail?.PreviewGoBack(); return;
             case Item.Forward: detail?.PreviewGoForward(); return;
             case Item.ReloadPage: detail?.PreviewReload(); return;
@@ -425,6 +433,22 @@ public sealed partial class MainWindow
                 return;
         }
         if (!Sidebar.Perform(item)) App.LogDiagnostic($"menu item {item} has no route yet");
+    }
+
+    /// <summary>
+    /// The section row's Open in Browser (#889), its row already selected: the
+    /// one Open in Browser, so the preview while one shows there, the deployed
+    /// folder otherwise, said on the trail as from the sidebar.
+    /// </summary>
+    internal void OpenInBrowserFromARow(Course course, int section)
+    {
+        if (SelectedSectionDetail() is { HasPreview: true } detail)
+        {
+            detail.PressOpenInBrowser();
+            return;
+        }
+        if (Workspace.WorkspacePath is { } folder)
+            _ = DeployedFolderOpening.OpenAsync(course, section, folder, DeployedFolderFrom.Sidebar, Content?.XamlRoot);
     }
 
     /// <summary>The section window on screen, only when it is the selected section's.</summary>
@@ -508,6 +532,12 @@ public sealed partial class MainWindow
             LastChangeIsHere = course is not null && sectionNumber is int changedIn && LastMenuChangeIsIn(course.Code, changedIn),
             VerbIsRunning = folder is not null && course is not null && sectionNumber is int runningIn
                             && AVerbIsRunningOn(folder, course.Code, runningIn),
+            // #889: read now, from the saved settings and the disk (offeredWhen:
+            // a menu opening is one of its events), and this app's shows.
+            DeployedFolderReady = folder is not null && course is not null && sectionNumber is int offeredIn
+                                  && DeployedFolderOpening.Offer(course, offeredIn, folder).Decision.Kind == DeployedFolderOffer.Kind.Offered,
+            DeployedFolderShown = folder is not null && course is not null && sectionNumber is int shownIn
+                                  && DeployedFolderOpening.IsShown(course, shownIn, folder),
             CanGoBack = detail?.CanGoBack == true,
             CanGoForward = detail?.CanGoForward == true,
         };

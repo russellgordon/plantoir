@@ -71,6 +71,8 @@ public static class SubjectMenuRules
         Preview,
         Deploy,
         OpenInBrowser,
+        /// <summary>Section ▸ Stop Showing Deployed Folder (#889, the mac's #850): live while this app shows the section's deployed folder.</summary>
+        StopShowingDeployedFolder,
         ScheduleDeploy,
         CancelScheduledDeploy,
         GetReadyForTheStartOfTheYear,
@@ -154,6 +156,10 @@ public static class SubjectMenuRules
         public bool LastChangeIsHere { get; init; }
         /// <summary>One of the assistant's functions is running on the selected section.</summary>
         public bool VerbIsRunning { get; init; }
+        /// <summary>The selected section's deployed folder can be opened in the browser (<c>deployedFolderInBrowser.offeredCases</c> says offered, #889).</summary>
+        public bool DeployedFolderReady { get; init; }
+        /// <summary>This app is showing the selected section's deployed folder in the browser (#889).</summary>
+        public bool DeployedFolderShown { get; init; }
         public bool CanGoBack { get; init; }
         public bool CanGoForward { get; init; }
     }
@@ -219,7 +225,11 @@ public static class SubjectMenuRules
         {
             if (situation.PreviewButtonEnabled) enabled.Add(Item.Preview);
             if (situation.DeployButtonEnabled && isLive) enabled.Add(Item.Deploy);
-            if (situation.PreviewIsShowing) enabled.Add(Item.OpenInBrowser);
+            // One Open in Browser for both (#889, the mac's #850, Russell
+            // 2026-11-13): the preview while one shows, the deployed folder
+            // otherwise. Stop writes nothing, so nothing holds it back.
+            if (situation.PreviewIsShowing || situation.DeployedFolderReady) enabled.Add(Item.OpenInBrowser);
+            if (situation.DeployedFolderShown) enabled.Add(Item.StopShowingDeployedFolder);
             // Neither on a course kept for reference: nothing deploys from one,
             // and the menu bar may not disagree with its row (the mac's ruling
             // on #457's implementation review).

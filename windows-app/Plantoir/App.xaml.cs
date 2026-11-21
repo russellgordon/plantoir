@@ -294,6 +294,19 @@ public partial class App : Application
         // that STARTED Plantoir is routed once its windows are open.
         var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         _uiThread = dispatcher;
+        // #889 (the mac's #850): a deployed folder shown in the browser. Its
+        // ports are remembered in the settings, written on this thread only;
+        // its trail lines come from the registry's Happened event (counts
+        // only, never a path or an address), whatever thread raised it.
+        Plantoir.Core.Models.DeployedFolderShows.Diagnostic = LogDiagnostic;
+        Plantoir.Core.Models.DeployedFolderShows.Shared.RememberPortsIn(Settings, action => dispatcher.TryEnqueue(() => action()));
+        Plantoir.Core.Models.DeployedFolderShows.Shared.Happened += happening =>
+            Plantoir.Core.Scripting.ActivityTrail.Note(happening switch
+            {
+                Plantoir.Core.Models.DeployedFolderHappening.Opened => Plantoir.Core.Scripting.ActivityTrail.Event.DeployedFolderOpenedInTheWebBrowser,
+                Plantoir.Core.Models.DeployedFolderHappening.Stopped => Plantoir.Core.Scripting.ActivityTrail.Event.DeployedFolderNoLongerShown,
+                _ => Plantoir.Core.Scripting.ActivityTrail.Event.DeployedFolderCouldNotBeOpened,
+            }, happening.TrailLine, happening.CourseCode, happening.SectionNumber);
         Services.ScheduledPublishNotifier.Register(argument =>
             dispatcher.TryEnqueue(() => Services.ScheduledPublishNotifier.Route(argument)));
         string? launchedBy = Services.ScheduledPublishNotifier.LaunchedFromAToast();
@@ -476,6 +489,10 @@ public partial class App : Application
         try { Plantoir.Core.Scripting.ActivityTrail.NoteClosed(Services.SessionEnding.ClosingReason(_installerStarted)); }
         catch (Exception ex) { LogDiagnostic($"closing line: {ex.Message}"); }
         WorkspaceViewModel.IsTerminating = true;
+        // #889: every deployed folder shown stops with Plantoir, never asked
+        // about (quittingWhileWorkIsUnderWay: nothing is built or written).
+        try { Plantoir.Core.Models.DeployedFolderShows.Shared.StopEverything(); }
+        catch (Exception ex) { LogDiagnostic($"deployed folders at quit: {ex.Message}"); }
         FolderContainers.ReleaseEverythingAtQuit(
             Settings.RememberedWindows.Select(w => w.Path).Distinct().ToList());
         LogDiagnostic("QuitTime: calling Current.Exit");

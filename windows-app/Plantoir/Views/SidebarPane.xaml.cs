@@ -1209,6 +1209,7 @@ public sealed partial class SidebarPane : UserControl
         // The vault is the COURSE folder even for a section — the section is
         // a subfolder within it, and Obsidian reveals the SECTION's folder.
         menu.Items.Add(ObsidianItem(course, number, row));
+        AddDeployedFolderItems(menu, course, number, row);
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));

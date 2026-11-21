@@ -12,8 +12,8 @@ namespace Plantoir.Core.Models;
 /// menus from these lists (<c>MainWindow.Menus.cs</c>), so the split is data:
 /// <c>contracts/shared-rules.json</c> → <c>subjectMenus.layout</c> holds the
 /// same lists, and <c>SubjectMenuLayoutContractTests</c> checks the two agree,
-/// with the items this app does not have yet (the named gaps: Stop Showing
-/// Deployed Folder, GitHub Copilot, Roll Over to a New Year…) left out. Which items
+/// with the items this app does not have yet (the named gaps: GitHub
+/// Copilot, Roll Over to a New Year…) left out. Which items
 /// can be used is still <see cref="SubjectMenuRules"/>' job: every item here
 /// is drawn in every situation and dimmed when it cannot be used, never
 /// hidden.
@@ -47,7 +47,7 @@ public static class SubjectMenuLayout
     /// </summary>
     public static IReadOnlyList<IReadOnlyList<Entry>> SectionGroups { get; } = new List<IReadOnlyList<Entry>>
     {
-        new[] { I(Item.Preview), I(Item.RebuildPreview), I(Item.OpenInBrowser) },
+        new[] { I(Item.Preview), I(Item.RebuildPreview), I(Item.OpenInBrowser), I(Item.StopShowingDeployedFolder) },
         new[]
         {
             I(Item.PublishClassForADate), I(Item.PublishPages), I(Item.HidePages), I(Item.PublishPagesLinksLeadTo),
@@ -146,7 +146,8 @@ public static class SubjectMenuLayout
     {
         Item.Preview => "Preview",
         Item.RebuildPreview => "Rebuild Preview",
-        Item.OpenInBrowser => "Open in Browser",
+        Item.OpenInBrowser => DeployedFolderWording.MenuItem,
+        Item.StopShowingDeployedFolder => DeployedFolderWording.StopMenuItem,
         Item.PublishClassForADate => "Publish Class for a Date…",
         Item.PublishPages => "Publish Pages…",
         Item.HidePages => "Hide Pages…",
@@ -182,6 +183,7 @@ public static class SubjectMenuLayout
             Item.Preview => "Preview",
             Item.RebuildPreview => "RebuildPreview",
             Item.OpenInBrowser => "OpenInBrowser",
+            Item.StopShowingDeployedFolder => "StopShowingDeployedFolder",
             Item.PublishClassForADate => "PublishClassForADate",
             Item.PublishPages => "PublishPages",
             Item.HidePages => "HidePages",

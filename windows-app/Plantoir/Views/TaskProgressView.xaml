@@ -60,12 +60,19 @@
                      reaches UI Automation (bundle 11, W3 — #214's measurement). -->
                 <TextBlock Text="Your website was deployed to a folder — upload it to your web host whenever you're ready."
                            AutomationProperties.AutomationId="publishedFolderSentence" />
-                <Button x:Name="FolderResultButton" Content="Show in File Explorer"
-                        AutomationProperties.AutomationId="publishedFolderButton"
-                        Click="FolderResult_Click" />
-                <TextBlock Opacity="0.7" FontSize="12" TextWrapping="Wrap"
-                           AutomationProperties.AutomationId="publishedFolderRenderNote"
-                           Text="Opened straight from the folder, the pages won't look right — the site only displays properly once it's on your web host." />
+                <!-- #889 (the mac's #850): Open in Browser beside the folder
+                     button, and renderNote under them; its words are set in
+                     code from DeployedFolderWording. -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="FolderResultButton" Content="Show in File Explorer"
+                            AutomationProperties.AutomationId="publishedFolderButton"
+                            Click="FolderResult_Click" />
+                    <Button x:Name="FolderResultBrowserButton" Visibility="Collapsed"
+                            AutomationProperties.AutomationId="publishedFolderBrowserButton"
+                            Click="FolderResultBrowser_Click" />
+                </StackPanel>
+                <TextBlock x:Name="FolderResultRenderNote" Opacity="0.7" FontSize="12" TextWrapping="Wrap"
+                           AutomationProperties.AutomationId="publishedFolderRenderNote" />
             </StackPanel>
             <StackPanel x:Name="AwaitingNotice" Orientation="Horizontal" Spacing="6" Visibility="Collapsed"
                         AutomationProperties.AutomationId="awaitingInputNotice">

@@ -398,7 +398,6 @@ internal static class NamedGapLedger
     // #884's first part (2026-11-13): the mac's #783 and #850 merged into dev.
     private const string Reason884Door = "GitHub Copilot as a third outside door (its launcher, detection, menu items and buttons) is #884's piece of v2.0.0, not built here yet";
     private const string Reason884Naming = "naming the assistant at work through {assistant} needs plantoir-mcp to write the door's key as the assist lease's fifth line (#884 item 7, with WorkLease); until then every Windows hold names none, and the contract's anyAssistant for that names GitHub Copilot, which a Windows teacher cannot open yet, so the older 'Claude or Codex' words stay the true ones";
-    private const string Reason889 ="Open in Browser for a section deployed to a folder is #889's piece of v2.0.0 (the mac's #850), not built here yet";
 
     // #868's held-by-name piece (2026-11-13): the mac's #835 part 3 and #855 merged into dev.
     private const string Reason868Sections = "a build, preview or deploy holding only its own section (a work lease's sixth line, the mac's #835 part 3) is #868's piece of v2.0.0; until it lands every Windows lease holds the whole course and a lease's sixth line is read as course-wide, so no hold here is ever on one section and the course-wide sentence is the true one";
@@ -524,10 +523,6 @@ internal static class NamedGapLedger
              "backupKeptForAClaudeSession", "backupsKeptForAClaudeSession",
              "finishTheClaudeSessionToDeleteItsBackup", "finishTheClaudeSessionToDeleteItsBackups"),
         Owed(TrailLineSaidDifferently, 884, V200, Reason884Naming, "outside session held a course"),
-        Owed(ActivityTrailEvents, 889, V200, Reason889,
-             "deployed folder opened in the web browser", "deployed folder no longer shown", "deployed folder could not be opened"),
-        Owed(SubjectMenuItems, 889, V200, Reason889, "stopShowingDeployedFolder"),
-        Owed(SubjectMenuSituationKeys, 889, V200, Reason889, "deployedFolderReady", "deployedFolderShown"),
 
         // ---- #868's held-by-name piece (2026-11-13): what the mac's #835
         // part 3 (holds narrow to the section) and #855 (Set Up an

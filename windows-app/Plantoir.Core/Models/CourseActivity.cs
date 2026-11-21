@@ -67,7 +67,8 @@ public static class CourseActivity
     public static QuitConfirmation.UnderWay UnderWay()
     {
         lock (_gate)
-            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Count, 0);
+            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Count, 0,
+                                                 DeployedFolderShows.Shared.Count);
     }
 
     public static bool IsPreviewing(string folderPath, string courseCode) =>
