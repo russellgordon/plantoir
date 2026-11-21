@@ -618,7 +618,9 @@ final class RollOverFromTheMenuTests: XCTestCase {
         for folder in [".netlify_sites", ".cloudflare_sites"] {
             let marker: URL = course.directoryURL.appendingPathComponent(folder).appendingPathComponent("section1.json")
             try FileManager.default.createDirectory(at: marker.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try "{\"site\":\"last-year\"}".write(to: marker, atomically: true, encoding: .utf8)
+            // Each names its site (`id`), as a real record does: a record
+            // naming none is not a website (#899 U3b, round four).
+            try "{\"id\":\"last-year\"}".write(to: marker, atomically: true, encoding: .utf8)
             written.append(marker)
         }
         written.append(try writeLegacyMarker(in: course))

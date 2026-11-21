@@ -423,11 +423,20 @@ enum DeployCommand {
             guard FileManager.default.fileExists(atPath: markerURL.path) else {
                 continue
             }
-            if destinationType == "netlify" && netlifySite == nil {
-                // No deploy goes on with a site from it (it does not parse,
-                // or it names no site): not the section's website, never
-                // moved and never pinned (round four, LOWs 2 and 3).
-                continue
+            if destinationType == "netlify" {
+                guard (try? Data(contentsOf: markerURL)) != nil else {
+                    // Its bytes cannot be read at all: what it names cannot
+                    // be told now, so it is still pinned (11-19 #4).
+                    stillPinned.append(nameForTeacher(markerURL))
+                    continue
+                }
+                if netlifySite == nil {
+                    // Read, and no deploy goes on with a site from it (it
+                    // does not parse, or it names no site): not the
+                    // section's website, never moved and never pinned
+                    // (round four, LOWs 2 and 3).
+                    continue
+                }
             }
             guard let contents = try? String(contentsOf: markerURL, encoding: .utf8) else {
                 stillPinned.append(nameForTeacher(markerURL))
