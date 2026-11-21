@@ -1020,6 +1020,29 @@ nonisolated extension UndoCheck {
             guard let from = op.from, let to = op.to else {
                 return .neither
             }
+            if op.isCaseOnlyMove, let spelled = UndoMoveSide.spellingListed(
+                from: root.appendingPathComponent(from), to: root.appendingPathComponent(to)
+            ) {
+                // One place, two spellings (U4b): judged by the spelling its
+                // folder lists, holding the content.
+                switch spelled {
+                case .cannotRead:
+                    return .cannotTell
+                case .another:
+                    return .neither
+                case .to, .from:
+                    let side: UndoMoveSide = spelled == .to
+                        ? UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)
+                        : UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
+                    if side == .cannotRead {
+                        return .cannotTell
+                    }
+                    if side != .holdsTheContent {
+                        return .neither
+                    }
+                    return spelled == .to ? .after : .before
+                }
+            }
             let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
             let atTo: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)
             if atFrom == .cannotRead || atTo == .cannotRead {
@@ -1105,6 +1128,46 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
     /// taken back (U4b, opKinds.wholeOps): `.absent` leaves it out of the
     /// listing. A swap passes its own kept originals inside a moved folder
     /// as `.absent`, so the move's pair is judged without them.
+    /// U4b, a capitalisation-only move: which spelling the folder holding
+    /// `from` and `to` lists, when the two are ONE item there (a
+    /// case-insensitive volume: the same device and file number at both
+    /// spellings). Nil when they are not one item (a case-sensitive volume,
+    /// or nothing there), so the move is judged as any move is.
+    static func spellingListed(from: URL, to: URL) -> UndoCaseOnlySpelling? {
+        var atFrom: stat = stat()
+        var atTo: stat = stat()
+        let foundFrom: Int32 = from.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &atFrom)
+        }
+        let foundTo: Int32 = to.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &atTo)
+        }
+        if foundFrom != 0 || foundTo != 0 || atFrom.st_dev != atTo.st_dev || atFrom.st_ino != atTo.st_ino {
+            return nil
+        }
+        let folder: URL = from.deletingLastPathComponent()
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            return .cannotRead
+        }
+        let wanted: String = from.lastPathComponent.lowercased()
+        for name in names where name.lowercased() == wanted {
+            if name == to.lastPathComponent {
+                return .to
+            }
+            if name == from.lastPathComponent {
+                return .from
+            }
+            return .another
+        }
+        return .another
+    }
+
     static func read(_ op: UndoOp, at url: URL, overriding: [String: UndoItem] = [:]) -> UndoMoveSide {
         if let sha = op.sha {
             var item: UndoItem = UndoItem.read(at: url)
@@ -1412,4 +1475,14 @@ nonisolated enum UndoMaintainers {
         }
         await rederive(record.step.ops, root: root)
     }
+}
+
+/// Which spelling a folder lists for a capitalisation-only move's one item
+/// (U4b, `UndoMoveSide.spellingListed`).
+nonisolated enum UndoCaseOnlySpelling: Equatable, Sendable {
+    case from
+    case to
+    /// A third spelling (renamed by hand since), or no entry at all.
+    case another
+    case cannotRead
 }

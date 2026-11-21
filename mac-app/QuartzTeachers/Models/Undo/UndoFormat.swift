@@ -932,7 +932,9 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             if !UndoOp.isSafeRelativePath(from) || !UndoOp.isSafeRelativePath(to) {
                 return false
             }
-            if UndoOp.placesOverlap(from, to) {
+            // One exception (U4b): a capitalisation-only rename, the two
+            // spellings one place on a case-insensitive volume.
+            if UndoOp.placesOverlap(from, to) && !op.isCaseOnlyMove {
                 return false
             }
             return (op.sha != nil) != (op.listingSha != nil)
@@ -1021,7 +1023,26 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         if place != newPlace && !place.hasPrefix(newPlace + "/") {
             return false
         }
+        if move.isCaseOnlyMove {
+            // The two spellings are one place: the edit is named at the new
+            // spelling, never at the old one, as spelled.
+            return path != from && !path.hasPrefix(from + "/")
+        }
         return !UndoOp.placesOverlap(from, path)
+    }
+
+    /// U4b: a `move` whose `from` and `to` are spelled alike but for case,
+    /// and differ in their last part only (`Media` to `media`): a
+    /// capitalisation-only rename, readable although the two places overlap
+    /// as `placesOverlap` compares them (opKinds.move). On a case-insensitive
+    /// volume the two spellings are one place, judged by the spelling its
+    /// folder lists (`UndoMoveSide.spellingListed`); on a case-sensitive one
+    /// they are two places, judged as any move.
+    var isCaseOnlyMove: Bool {
+        guard knownKind == .move, let from, let to, from != to, from.lowercased() == to.lowercased() else {
+            return false
+        }
+        return (from as NSString).deletingLastPathComponent == (to as NSString).deletingLastPathComponent
     }
 
     /// The place `path`, named inside a move's `to`, had before the move:

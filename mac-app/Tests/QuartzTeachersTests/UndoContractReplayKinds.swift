@@ -37,8 +37,15 @@ nonisolated enum UndoContractKinds {
         "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
         "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
         "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
-        "stepEditingInsideAMovesFrom",
+        "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
     ]
+
+    /// U4b: the three spellings of the folder a capitalisation-only rename
+    /// moves (`renameAFolderInCaseOnly`), one place on a case-insensitive
+    /// volume.
+    static let caseOnlyFrom: String = "courses/TST1O/Media"
+    static let caseOnlyTo: String = "courses/TST1O/media"
+    static let caseOnlyByHand: String = "courses/TST1O/MEDIA"
 
     /// U4b: the folder `moveAFolderWithAPageEditedInside` moves, and where.
     static let mediaFolder: String = "courses/TST1O/media"
@@ -281,6 +288,29 @@ nonisolated enum UndoContractKinds {
                 path: renamedFolder + "/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
             )
             return word(JournaledWrite.perform(ops: draft(ops: [move, edit], blobs: [], root: root, action: "renameFolder"), in: journal, mode: .live, places: places))
+        case "renameAFolderInCaseOnly":
+            // U4b: one step, the folder renamed in its capitals only, then a
+            // page inside it edited, named at the new spelling.
+            if !somethingIsAt(caseOnlyFrom, in: root) {
+                for (name, content) in mediaFiles {
+                    try UndoContractReplay.write(content, to: caseOnlyFrom + "/" + name, in: root)
+                }
+            }
+            guard let listingSha = UndoTreeReading.read(at: root.appendingPathComponent(caseOnlyFrom)).listingSha else {
+                return "noFolderToMove"
+            }
+            let move: UndoOp = UndoOp.moveFolder(from: caseOnlyFrom, to: caseOnlyTo, listingSha: listingSha)
+            let edit: UndoOp = UndoOp.replaceText(
+                path: caseOnlyTo + "/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+            )
+            return word(JournaledWrite.perform(ops: draft(ops: [move, edit], blobs: [], root: root, action: "renameFolder"), in: journal, mode: .live, places: places))
+        case "spellTheFolderAnotherWay":
+            let listed: URL = root.appendingPathComponent(caseOnlyFolderSpelling(in: root) ?? caseOnlyTo)
+            // rename(2), as a Finder rename does: one item, a new spelling.
+            if Darwin.rename(listed.path, root.appendingPathComponent(caseOnlyByHand).path) != 0 {
+                return "couldNotRename"
+            }
+            return nil
         case "addAFileInsideTheMovedFolder":
             try UndoContractReplay.write("C\n", to: renamedFolder + "/c.md", in: root)
             return nil
@@ -335,6 +365,36 @@ nonisolated enum UndoContractKinds {
             }
         }
         return place + ", " + page
+    }
+
+    /// The spelling courses/TST1O lists for the folder a capitalisation-only
+    /// rename moves, as a path, or nil when it lists none (U4b).
+    static func caseOnlyFolderSpelling(in root: URL) -> String? {
+        let parent: String = (caseOnlyTo as NSString).deletingLastPathComponent
+        let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(parent).path)) ?? []
+        for name in names where name.lowercased() == "media" {
+            return parent + "/" + name
+        }
+        return nil
+    }
+
+    /// U4b's `caseOnlyFolder`: the spelling listed, then what its a.md
+    /// holds (new, old, byHand, none).
+    static func caseOnlyFolder(in root: URL) -> String {
+        guard let folder = caseOnlyFolderSpelling(in: root) else {
+            return "none"
+        }
+        var page: String = "none"
+        if let text = text(at: folder + "/a.md", in: root) {
+            if text.contains("Line one: new.") {
+                page = "new"
+            } else if text.contains("Line one: old.") {
+                page = "old"
+            } else {
+                page = "byHand"
+            }
+        }
+        return (folder as NSString).lastPathComponent + ", " + page
     }
 
     static func somethingIsAt(_ path: String, in root: URL) -> Bool {

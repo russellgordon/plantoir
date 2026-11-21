@@ -22253,6 +22253,59 @@ the switch stays off. Rename folder through the door is NOT in this part
   `.withoutOverwriting` (the sweep, LOW 3), and `undo.laterPieces.U4` says
   what U4a landed and what U4b still owes (LOW 4).
 
+### U4b, second part: an edit inside a moved folder, its recovery, and a capitalisation-only rename (#899)
+
+- **The order rule** (`opKinds.wholeOps`' one exception, commit 2410aed27):
+  an edit named at a move's new place, after the move, is made and redone
+  after it and taken back before it; the move is judged as if its own edits
+  there were taken back. Five `stackCases` rows ("U4b, ...").
+- **Recovery settles a step killed between its move and its edits whole, by
+  content.** `UndoRecovery.fileStates` reads a carried edit where its folder
+  is NOW (`placeNow`: under the move's `from` while the folder is still, or
+  again, there; before the fix such an edit read as "neither" and the step
+  was closed as interrupted, the list cleared, at every kill point but the
+  middle ones) and judges the carrying move as if the step's edits inside
+  were taken back, without the step's own staged files and kept originals
+  inside the folder (`carryingMoveState`; before the fix the undo's kept
+  copy of the page, kept by the first tidy as differing from its page, made
+  the folder "changed since"). Its tidy and `listHolds` also look beside the
+  carried page at the folder's old place (`placesStagedBeside`), so a kept
+  copy the folder took with it when it moved back is removed once the list
+  holds what it holds. Eleven `recoveryCases` rows (`withAMovedFolder`; each
+  kill point of a step, an undo and a redo, and one with a kept copy left
+  inside the folder moved back), run from the JSON and modelled in
+  `make_undo_traces.py` (`swap_groups`, `stopped_part_way`, `recover`; the
+  model holds no staged files, so the left-out kept copies are the Swift
+  replay's alone). Measured before the fix: seven of the first ten rows
+  failed. Not settled here, for U7: a step killed after its edit went in
+  and then edited by hand elsewhere puts its other pages back through a
+  plan that does not leave the step's own kept copy inside the folder out,
+  so the folder is then refused as changed since too and the step is closed
+  as interrupted without those pages put back (the list is cleared either
+  way).
+- **A capitalisation-only rename** (`Media` to `media`; `opKinds.move` now
+  says so). The pair rule as written found both places holding the folder
+  on a case-insensitive volume, and the contract called such a move
+  unreadable, so the rename the teacher asked for could be neither one step
+  nor undone (invariant 1). Now a `move` whose `from` and `to` are spelled
+  alike but for case, in the last part only (`UndoOp.isCaseOnlyMove`), is
+  readable; where the two spellings are ONE item (the same device and file
+  number, `UndoMoveSide.spellingListed`) it is judged by the spelling the
+  folder lists (as `to` holding the content: as the step left it; as `from`:
+  as before; a third spelling or other content: changed since), and the swap
+  renames it only while the folder lists the spelling it leaves. Where they
+  are two items (a case-sensitive volume) it is any move. Measured on this
+  Mac's APFS (case-insensitive): `renamex_np(RENAME_EXCL)` renames `Media`
+  to `media` and returns 0, so the same rename serves; the notes' guess
+  that it refuses was wrong. An edit the rename carries is named at the new
+  spelling, never the old one as spelled. A move whose folders above the
+  last part differ in case stays unreadable. Rows: three `checkCases` (the
+  old "not readable" row replaced) and one more for a folder above, three
+  `stackCases` (undo, undo and redo, and a third spelling by hand since).
+  Rejected: two moves through a middle name (they share a place, which
+  `wholeOps` forbids), and a removeTree with a createTree (they overlap the
+  same way).
+
 ### The U1 harness
 
 Every core file in `Models/Undo/` except `UndoAppSeams.swift` and

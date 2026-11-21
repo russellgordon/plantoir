@@ -704,7 +704,7 @@ nonisolated enum UndoContractReplay {
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
-        "movedFolder",
+        "movedFolder", "caseOnlyFolder",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1214,6 +1214,9 @@ nonisolated enum UndoContractReplay {
             }
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("stackCases '\(name)': the folder is there: \(!kept)")
+            }
+            if let wanted = string(testCase["caseOnlyFolder"]), UndoContractKinds.caseOnlyFolder(in: root) != wanted {
+                failures.append("stackCases '\(name)': the folder renamed in its capitals is \(UndoContractKinds.caseOnlyFolder(in: root)), not \(wanted)")
             }
             if let wanted = string(testCase["movedFolder"]), UndoContractKinds.movedFolder(in: root) != wanted {
                 failures.append("stackCases '\(name)': the moved folder is \(UndoContractKinds.movedFolder(in: root)), not \(wanted)")

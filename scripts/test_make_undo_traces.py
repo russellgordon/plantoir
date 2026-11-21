@@ -342,7 +342,7 @@ def readable_op(op):
     if kind in ("move", "moveApart", "setAside"):
         if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
             return False
-        if overlap(op["from"], op["to"]):
+        if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op):
             return False
         return ("sha" in op) != ("listingSha" in op)
     if kind == "external":
@@ -553,7 +553,7 @@ class ContractCaseTests(unittest.TestCase):
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "rederived", "nothingMovedOutside",
+                  "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "caseOnlyFolder", "rederived", "nothingMovedOutside",
                   "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
                   "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin"}
 
@@ -701,6 +701,22 @@ class ContractCaseTests(unittest.TestCase):
             edit = {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
                     "contextBefore": "Line one: ", "contextAfter": ".\n"}
             return model.ops_step([move, edit])
+        if call == "renameAFolderInCaseOnly":
+            spellings = [self.CASE_ONLY_FROM, self.CASE_ONLY_TO, self.CASE_ONLY_BY_HAND]
+            if all(traces.folder_of_pages(pages, spelling) is None for spelling in spellings):
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.CASE_ONLY_FROM + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.CASE_ONLY_FROM)
+            if tree is None:
+                return "noFolderToMove"
+            move = {"kind": "move", "from": self.CASE_ONLY_FROM, "to": self.CASE_ONLY_TO, "listingSha": traces.listing_sha(tree)}
+            edit = {"kind": "replaceText", "path": self.CASE_ONLY_TO + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}
+            return model.ops_step([move, edit])
+        if call == "spellTheFolderAnotherWay":
+            for path in [path for path in pages if isinstance(path, str) and path.startswith(self.CASE_ONLY_TO + "/")]:
+                pages[self.CASE_ONLY_BY_HAND + path[len(self.CASE_ONLY_TO):]] = pages.pop(path)
+            return None
         if call == "addAFileInsideTheMovedFolder":
             pages[self.RENAMED + "/c.md"] = "C\n"
             return None
@@ -719,6 +735,21 @@ class ContractCaseTests(unittest.TestCase):
     MEDIA = "courses/TST1O/media"
     RENAMED = "courses/TST1O/renamed"
     MEDIA_FILES = {"a.md": "Intro.\nLine one: old.\nEnd.\n", "b.md": "B\n"}
+    CASE_ONLY_FROM = "courses/TST1O/Media"
+    CASE_ONLY_TO = "courses/TST1O/media"
+    CASE_ONLY_BY_HAND = "courses/TST1O/MEDIA"
+
+    def case_only_folder(self, model):
+        """U4b's caseOnlyFolder: the spelling the folder is listed under,
+        then what its a.md holds. The model keys pages as spelled."""
+        for spelling in (self.CASE_ONLY_FROM, self.CASE_ONLY_TO, self.CASE_ONLY_BY_HAND):
+            if traces.folder_of_pages(model.pages, spelling) is not None:
+                text = model.pages.get(spelling + "/a.md")
+                page = "none"
+                if text is not None:
+                    page = "new" if "Line one: new." in text else "old" if "Line one: old." in text else "byHand"
+                return spelling.rsplit("/", 1)[1] + ", " + page
+        return "none"
 
     def moved_folder(self, model):
         """U4b's movedFolder: which place holds the folder, then what its
@@ -754,7 +785,7 @@ class ContractCaseTests(unittest.TestCase):
                   "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
                   "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
                   "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
-                  "stepEditingInsideAMovesFrom")
+                  "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -991,6 +1022,8 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(model.starts_at_the_next_login, case["startsAtTheNextLogin"])
                 if "movedFolder" in case:
                     self.assertEqual(self.moved_folder(model), case["movedFolder"])
+                if "caseOnlyFolder" in case:
+                    self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
                 if "folderKept" in case:
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:

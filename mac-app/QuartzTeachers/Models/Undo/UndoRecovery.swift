@@ -795,6 +795,10 @@ nonisolated enum UndoRecovery {
                 overriding[inside] = takenBack
             }
         }
+        if move.isCaseOnlyMove {
+            // One place under two spellings: the same files either way.
+            return UndoCheck.wholeState(of: move, root: root, places: places, overridingTo: overriding, overridingFrom: overriding)
+        }
         if atItsOldPlace {
             return UndoCheck.wholeState(of: move, root: root, places: places, overridingFrom: overriding)
         }

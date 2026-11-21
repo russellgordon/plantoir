@@ -896,8 +896,27 @@ def move_carries(move, edit):
     place, new_place = edit["path"].lower(), move["to"].lower()
     if place != new_place and not place.startswith(new_place + "/"):
         return False
+    if is_case_only_move(move):
+        # One place under two spellings: named at the new one, as spelled.
+        return edit["path"] != move["from"] and not edit["path"].startswith(move["from"] + "/")
     old_place = move["from"].lower()
     return not (place == old_place or place.startswith(old_place + "/") or old_place.startswith(place + "/"))
+
+
+def is_case_only_move(op):
+    """UndoOp.isCaseOnlyMove (U4b): a move whose from and to are spelled
+    alike but for case, in their last part only. The model's pages are
+    keyed as spelled, as on a case-sensitive volume, where the ordinary
+    pair rule gives the answers the spelling a case-insensitive folder
+    lists gives."""
+    if op.get("kind") != "move":
+        return False
+    source, destination = op.get("from"), op.get("to")
+    if not isinstance(source, str) or not isinstance(destination, str) or source == destination:
+        return False
+    if source.lower() != destination.lower():
+        return False
+    return source.rsplit("/", 1)[0] == destination.rsplit("/", 1)[0] if "/" in source else "/" not in destination
 
 
 def carried_edits(ops):

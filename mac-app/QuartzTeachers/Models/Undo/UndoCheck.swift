@@ -1091,7 +1091,21 @@ nonisolated enum UndoSwap {
                 // The pair once more, just before the rename: the content at
                 // the place it leaves, nothing where it goes.
                 let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: from, overriding: ownFilesInside(from))
-                let atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url)
+                var atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url)
+                if op.isCaseOnlyMove, let spelled = UndoMoveSide.spellingListed(from: from, to: target.url) {
+                    // One item under two spellings (U4b): it goes in only
+                    // while its folder lists the spelling it leaves, and the
+                    // rename then replaces nothing (measured: RENAME_EXCL
+                    // renames `Media` to `media` on APFS, case-insensitive).
+                    switch spelled {
+                    case .from:
+                        atTarget = .free
+                    case .cannotRead:
+                        atTarget = .cannotRead
+                    case .to, .another:
+                        atTarget = .holdsSomethingElse
+                    }
+                }
                 if atFrom == .cannotRead || atTarget == .cannotRead {
                     refusal = .cannotTellNow(path: target.relativePath)
                 } else if atFrom != .holdsTheContent || atTarget != .free {
