@@ -176,6 +176,8 @@ public sealed class PublishingChoiceView
         pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _pathBox = new TextBox { Text = getPath(), PlaceholderText = "Folder" };
         AutomationProperties.SetAutomationId(_pathBox, "deployFolderField");
+        // The mac's name for it, "Folder" (#1012, #1020): the placeholder alone is not one.
+        AutomationProperties.SetName(_pathBox, "Folder");
         pathRow.Children.Add(_pathBox);
         var chooseButton = new Button { Content = "Choose…" };
         AutomationProperties.SetAutomationId(chooseButton, "deployFolderChooseButton");
@@ -404,6 +406,7 @@ public sealed class PublishingChoiceView
                     PlaceholderText = "Folder",
                 };
                 AutomationProperties.SetAutomationId(folderBox, $"additionalDeployFolderField-{type}");
+                AutomationProperties.SetName(folderBox, "Folder");
                 pathRow.Children.Add(folderBox);
                 var chooseAdditional = new Button { Content = "Choose…" };
                 Grid.SetColumn(chooseAdditional, 1);
