@@ -283,7 +283,16 @@ public sealed class UndoRecoveryTests
         scribe.PutFolderBack("B");
         Assert.NotEmpty(UndoStepContractTests.StagedFilesUnder(scribe.FullPath("B", "")));
         scribe.Door().Recover();
-        Assert.Empty(UndoStepContractTests.StagedFilesUnder(scribe.FullPath("B", "")));
+        // Everything staged goes but a kept original that differs from its
+        // page: the only copy of what the page held (W4c, the mac's U3c).
+        List<string> left = UndoStepContractTests.StagedFilesUnder(scribe.FullPath("B", "")).ToList();
+        Assert.NotEmpty(left);
+        foreach (string staged in left)
+        {
+            Assert.EndsWith("-orig", staged);
+            string place = Path.Combine(Path.GetDirectoryName(staged)!, UndoSwap.PlaceOfStagedName(Path.GetFileName(staged))!);
+            Assert.False(UndoSwap.IsACopyOfItsPlace(staged, place), "a copy of its page was left: " + staged);
+        }
     }
 
     // ---- A recovery that is itself stopped ---------------------------------------------

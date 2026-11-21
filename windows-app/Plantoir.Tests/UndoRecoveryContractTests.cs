@@ -86,7 +86,8 @@ public sealed class UndoRecoveryContractTests
             Assert.True(KeysChecked.Contains(key.Name), "a key this replay does not check: " + key.Name);
 
         string work = recoveryCase.GetProperty("work").GetString()!;
-        string stopAt = recoveryCase.GetProperty("stopAt").GetString()!;
+        // editRacesTheSwap's row has no kill point: the step is left part way by the race itself.
+        string stopAt = recoveryCase.TryGetProperty("stopAt", out JsonElement stop) ? stop.GetString()! : "none";
         bool shadow = recoveryCase.TryGetProperty("mode", out JsonElement mode) && mode.GetString() == "shadow";
         bool wholeFile = Flag(recoveryCase, "wholeFile");
         UndoMode undoMode = shadow ? UndoMode.Shadow : UndoMode.Live;

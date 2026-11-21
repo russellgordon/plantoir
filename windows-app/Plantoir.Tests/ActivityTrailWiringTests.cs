@@ -35,6 +35,15 @@ public class ActivityTrailWiringTests
         // NotePrompt writes "asked a question" plus the redacted sentence on
         // its own marked line; it is the "assistant asked" event's writer.
         [ActivityTrail.Event.AssistantAsked] = "ActivityTrail.NotePrompt(",
+        // Undo's lines go through the sink the app's start-up gives the door
+        // (UndoForThisProcess passes UndoTrail.ToTheActivityTrail, whose
+        // switch names each event and calls Note(line.Event, …)).
+        [ActivityTrail.Event.UndoRolledBack] = "UndoTrail.ToTheActivityTrail)",
+        [ActivityTrail.Event.UndoFoundAFolderSetAside] = "UndoTrail.ToTheActivityTrail)",
+        [ActivityTrail.Event.UndoCouldNotPutBack] = "UndoTrail.ToTheActivityTrail)",
+        [ActivityTrail.Event.UndoKeptWhatAPageHeld] = "UndoTrail.ToTheActivityTrail)",
+        [ActivityTrail.Event.UndoKeptWhatItReplaced] = "UndoTrail.ToTheActivityTrail)",
+        [ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay] = "UndoTrail.ToTheActivityTrail)",
     };
 
     private static string ProductSourceRoot

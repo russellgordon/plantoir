@@ -234,7 +234,12 @@ public sealed class UndoDoorTests : IDisposable
         string stagedNew = UndoSwap.BesidePath(Full(APage), "1-apply", "new");
         string stagedOrig = UndoSwap.BesidePath(Full(APage), "1-undo", "orig");
         string anotherStepsFile = UndoSwap.BesidePath(Full(APage), "17-apply", "new");
-        foreach (string staged in new[] { stagedNew, stagedOrig, anotherStepsFile }) File.WriteAllBytes(staged, New);
+        // A kept original that differs from its page is the only copy of what
+        // it holds and stays (W4c, the mac's U3c: pruning's tidy keeps it);
+        // one that is a copy of its page goes.
+        string onlyCopy = UndoSwap.BesidePath(Full(APage), "1-apply", "orig");
+        foreach (string staged in new[] { stagedNew, anotherStepsFile, onlyCopy }) File.WriteAllBytes(staged, New);
+        File.WriteAllBytes(stagedOrig, Old);
 
         // Sixty-one days on, a step on another page prunes: the dead step is past the limits.
         _clock.Advance(TimeSpan.FromDays(61));
@@ -250,6 +255,7 @@ public sealed class UndoDoorTests : IDisposable
         Assert.False(File.Exists(stagedNew), "a staged file of the step closed unsettled was left beside the page");
         Assert.False(File.Exists(stagedOrig), "a staged file of the step closed unsettled was left beside the page");
         Assert.True(File.Exists(anotherStepsFile), "another step's staged file was removed");
+        Assert.True(File.Exists(onlyCopy), "a kept original that is the only copy of what it holds was removed");
         Assert.Equal(Old, File.ReadAllBytes(Full(APage)));
     }
 

@@ -541,8 +541,17 @@ internal sealed class UndoDenials : IDisposable
     private void Deny(FileSystemInfo item, System.Security.AccessControl.FileSystemRights rights)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("a deny entry is Windows'");
-        var rule = new System.Security.AccessControl.FileSystemAccessRule(
-            System.Security.Principal.WindowsIdentity.GetCurrent().User!, rights, System.Security.AccessControl.AccessControlType.Deny);
+        // On a folder, inherited by what is made inside it: measured on the PC
+        // (2026-11-20), a deny of CreateFiles and CreateDirectories on a folder
+        // alone still let a folder be made inside it, and the list writes each
+        // blob into a folder of its own (content\ab\…).
+        var rule = item is DirectoryInfo
+            ? new System.Security.AccessControl.FileSystemAccessRule(
+                System.Security.Principal.WindowsIdentity.GetCurrent().User!, rights,
+                System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+                System.Security.AccessControl.PropagationFlags.None, System.Security.AccessControl.AccessControlType.Deny)
+            : new System.Security.AccessControl.FileSystemAccessRule(
+                System.Security.Principal.WindowsIdentity.GetCurrent().User!, rights, System.Security.AccessControl.AccessControlType.Deny);
         if (item is DirectoryInfo folder)
         {
             System.Security.AccessControl.DirectorySecurity security = folder.GetAccessControl();
