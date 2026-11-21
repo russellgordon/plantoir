@@ -303,7 +303,7 @@ def readable_op(op):
     for key in ("beforeSha", "afterSha", "sha", "listingSha"):
         if key in op and op[key] is not None and not is_blob_name(op[key]):
             return False
-    if kind in ("move", "moveApart"):
+    if kind in ("move", "moveApart", "setAside"):
         if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
             return False
         if overlap(op["from"], op["to"]):
@@ -351,7 +351,7 @@ def readable_op(op):
     return True
 
 
-KINDS_KNOWN = ("writeFile", "editLine", "recompute", "replaceText", "editJSON", "move", "moveApart",
+KINDS_KNOWN = ("writeFile", "editLine", "recompute", "replaceText", "editJSON", "move", "moveApart", "setAside",
                "createTree", "removeTree", "external")
 EXTERNAL_TARGETS_KNOWN = ("preference", "scheduledDeploy")
 MAINTAINERS_KNOWN = ("sectionFrontPage",)
@@ -368,7 +368,7 @@ def readable_step(step):
         if not readable_op(op):
             return False
     # opKinds.wholeOps: no other op shares a whole op's places.
-    whole = ("move", "moveApart", "createTree", "removeTree", "external")
+    whole = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
     for index, op in enumerate(step["ops"]):
         if op["kind"] not in whole:
             continue
@@ -463,7 +463,7 @@ class ContractCaseTests(unittest.TestCase):
                 if kind == "recompute":
                     # No check (opKinds.recompute): re-derived, never compared.
                     state = "after"
-                elif kind in ("move", "moveApart"):
+                elif kind in ("move", "moveApart", "setAside"):
                     state = traces.move_state(op, current["atFrom"], current["atTo"])
                 elif kind in ("createTree", "removeTree"):
                     state = traces.tree_state(op, current)
@@ -514,7 +514,7 @@ class ContractCaseTests(unittest.TestCase):
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
                   "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-                  "leftApart", "schoolYear", "cloudflareMarkers"}
+                  "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
     MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
@@ -528,6 +528,9 @@ class ContractCaseTests(unittest.TestCase):
     CLOUDFLARE_FROM = "courses/TST1O/.cloudflare_sites/section1.json"
     CLOUDFLARE_TO = "courses/TST1O/.cloudflare_sites/section1.previous.json"
     CLOUDFLARE_MARKER = "{\"project\": \"tst1o-s1-2025\"}\n"
+    LEFTOVER_FROM = "courses/TST1O/.netlify_sites/section1.from-built-output.json"
+    LEFTOVER_TO = "courses/TST1O/.netlify_sites/section1.from-built-output.previous.json"
+    LEFTOVER = "{\"site_id\": \"ccc-333\"}\n"
     SCHEDULE = "scheduledDeploy:org.plantoir.deploy.undo-cases"
     SCHEDULE_VALUE = {"plist": "cGxpc3Q=", "script": "c2NyaXB0"}
 
@@ -571,6 +574,25 @@ class ContractCaseTests(unittest.TestCase):
             pages[self.SCHEDULE] = self.SCHEDULE_VALUE
             year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
             return model.ops_step([year, {"kind": "external", "target": self.SCHEDULE, "before": self.SCHEDULE_VALUE}])
+        if call == "rollOverSettingALeftoverAside":
+            # U3b, the review of U3b's fixes, LOW 3: the year, the record as
+            # a `moveApart`, and a leftover no deploy reads as a `setAside`.
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.LEFTOVER_FROM) is None and pages.get(self.LEFTOVER_TO) is None:
+                pages[self.LEFTOVER_FROM] = self.LEFTOVER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            marker = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(self.OLD_MARKER)}
+            leftover = {"kind": "setAside", "from": self.LEFTOVER_FROM, "to": self.LEFTOVER_TO, "sha": traces.sha(self.LEFTOVER)}
+            return model.ops_step([year, marker, leftover])
+        if call == "removeTheKeptLeftover":
+            pages.pop(self.LEFTOVER_TO, None)
+            return None
+        if call == "theScheduleStartsOnlyAtTheNextLogin":
+            model.schedules_start_at_the_next_login = True
+            return None
         if call == "theScheduleCannotBeSetNow":
             model.refuses_schedules = True
             return None
@@ -642,7 +664,18 @@ class ContractCaseTests(unittest.TestCase):
     KIND_CALLS = ("moveTheMarker", "rollOverOntoANewWebsite", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
                   "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
                   "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
-                  "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow")
+                  "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
+                  "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin")
+
+    def leftover_markers(self, model):
+        source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
+        if source is None and destination == self.LEFTOVER:
+            return "moved"
+        if source == self.LEFTOVER and destination is None:
+            return "movedBack"
+        if source is None and destination is None:
+            return "gone"
+        return (source, destination)
 
     def cloudflare_markers(self, model):
         source, destination = model.pages.get(self.CLOUDFLARE_FROM), model.pages.get(self.CLOUDFLARE_TO)
@@ -829,6 +862,10 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(self.markers(model), case["markers"])
                 if "cloudflareMarkers" in case:
                     self.assertEqual(self.cloudflare_markers(model), case["cloudflareMarkers"])
+                if "leftoverMarkers" in case:
+                    self.assertEqual(self.leftover_markers(model), case["leftoverMarkers"])
+                if "startsAtTheNextLogin" in case:
+                    self.assertEqual(model.starts_at_the_next_login, case["startsAtTheNextLogin"])
                 if "folderKept" in case:
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:

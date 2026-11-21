@@ -238,6 +238,44 @@ final class RollOverFromTheMenuTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: broughtIn), legacyBytes, "the leftover back byte for byte, beside the current record")
     }
 
+    /// The same case with the legacy record holding the Netlify record's
+    /// OWN bytes, as a deploy's migration that stopped before removing it
+    /// leaves them (put back after the re-review's round, which had turned
+    /// the case above into a different leftover): it says what the current
+    /// record says, so the bring-in only removes it, and the one undo puts
+    /// the Netlify record back in its current place, never the legacy one in
+    /// the built output and never a leftover beside it.
+    func testANewWebsiteFromTheMenuWithTheSameRecordInTheBuiltOutputIsOneChange() async throws {
+        let made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: .menu, for: self)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        _ = RollOverFromTheMenuTests.countCopies(of: made)
+        var markers: [URL] = try RollOverFromTheMenuTests.writeEveryMarker(in: made.course)
+        let legacy: URL = markers.removeLast()
+        try Data(contentsOf: markers[0]).write(to: legacy)
+        let broughtIn: URL = made.course.directoryURL.appendingPathComponent(".netlify_sites/section1.from-built-output.json")
+
+        let changesBefore: Int = made.runner.changeCount
+        let outcome: AssistToolOutcome = await made.runner.run(
+            call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "new", planning: false)
+        )
+        XCTAssertEqual(made.runner.changeCount, changesBefore + 1, "one rollover, one undo entry: \(outcome.summary)")
+        for marker in markers {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path), marker.path)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the finished migration's leftover is removed")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: broughtIn.path), "never brought in as a leftover")
+
+        _ = await made.runner.run(call: SectionVerbs.undoLastChange())
+        XCTAssertEqual(made.runner.changeCount, changesBefore)
+        for marker in markers {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "one undo puts \(marker.lastPathComponent) back")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "the record stays in its current place")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: broughtIn.path))
+    }
+
     /// A new website from the menu on Cloudflare, rolled over from last
     /// year's: the finished line promises no question about a name, which
     /// Cloudflare never asks (the Fable sweep's T1). The window's line, run

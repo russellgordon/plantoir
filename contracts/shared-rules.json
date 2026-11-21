@@ -49192,6 +49192,64 @@
         "redo": "notReadable"
       },
       {
+        "name": "setAside (U3b): judged as move is: the place it left free, the place it went holding it: as the step left it",
+        "op": {
+          "kind": "setAside",
+          "from": "courses/TST1O/.netlify_sites/section1.from-built-output.json",
+          "to": "courses/TST1O/.netlify_sites/section1.from-built-output.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"ccc-333\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"ccc-333\"}\n"
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "setAside (U3b): back where it was, the other place free",
+        "op": {
+          "kind": "setAside",
+          "from": "courses/TST1O/.netlify_sites/section1.from-built-output.json",
+          "to": "courses/TST1O/.netlify_sites/section1.from-built-output.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"ccc-333\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"ccc-333\"}\n"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "setAside (U3b): its kept copy deleted by hand: changed since, as for move (the STEP leaves it apart on its own, stackCases)",
+        "op": {
+          "kind": "setAside",
+          "from": "courses/TST1O/.netlify_sites/section1.from-built-output.json",
+          "to": "courses/TST1O/.netlify_sites/section1.from-built-output.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"ccc-333\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince",
+        "why": "The op's own verdict is move's; only an Undo or a Redo of its step leaves a setAside that is changed since where it is and goes on, never with the step's moveApart records (opKinds.setAside)."
+      },
+      {
         "name": "move: back where it was, the other place free",
         "op": {
           "kind": "move",
@@ -51256,6 +51314,103 @@
         ]
       },
       {
+        "name": "U3b, a leftover on its own (the review of U3b's fixes, LOW 3): a rollover that set a leftover aside, its kept copy deleted by hand, Undo: the record and the rest go back, the leftover is left as it is and named, and never keeps the record apart",
+        "calls": [
+          "rollOverSettingALeftoverAside",
+          "removeTheKeptLeftover",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "markers": "movedBack",
+        "leftoverMarkers": "gone",
+        "schoolYear": "2025-2026",
+        "leftApart": [
+          "courses/TST1O/.netlify_sites/section1.from-built-output.json"
+        ]
+      },
+      {
+        "name": "U3b, a leftover on its own: Redo after that Undo takes the record and the rest forward, and leaves the leftover and names it again",
+        "calls": [
+          "rollOverSettingALeftoverAside",
+          "removeTheKeptLeftover",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "markers": "moved",
+        "leftoverMarkers": "gone",
+        "schoolYear": "2026-2027",
+        "leftApart": [
+          "courses/TST1O/.netlify_sites/section1.from-built-output.json"
+        ]
+      },
+      {
+        "name": "U3b, a leftover is never one of the records: a deploy fills the record's place, Undo: the record stays apart, the leftover goes back with the rest",
+        "calls": [
+          "rollOverSettingALeftoverAside",
+          "deployANewMarker",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "markers": "bothKept",
+        "leftoverMarkers": "movedBack",
+        "schoolYear": "2025-2026",
+        "leftApart": [
+          "courses/TST1O/.netlify_sites/section1.json"
+        ]
+      },
+      {
+        "name": "U3b, a leftover: with nothing changed between, Undo puts the record and the leftover back with the rest and leaves nothing apart",
+        "calls": [
+          "rollOverSettingALeftoverAside",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "markers": "movedBack",
+        "leftoverMarkers": "movedBack",
+        "schoolYear": "2025-2026",
+        "leftApart": []
+      },
+      {
+        "name": "U3b: a deploy set for later put back at Undo whose job the computer will not start now, and which cannot be taken away again, starts at the next login: named as such, never as left apart and never as simply back (the re-review of U3b's fixes, LOW 2); the rest is taken back",
+        "calls": [
+          "rollOverTurningOffASchedule",
+          "theScheduleStartsOnlyAtTheNextLogin",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "schoolYear": "2025-2026",
+        "leftApart": [],
+        "startsAtTheNextLogin": [
+          "scheduledDeploy:org.plantoir.deploy.undo-cases"
+        ]
+      },
+      {
         "name": "U2, createTree: a folder made is taken out by Undo and made again by Redo",
         "calls": [
           "makeAFolder",
@@ -51510,7 +51665,96 @@
         "nothingMovedOutside": true
       }
     ],
-    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a begin and applied, readable as lines, whose only op is of a kind no reader knows (`aKindNobodyKnows`, with from, to and blobs naming a blob it put in content/; U1's used `move`, which U2 defines); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to. U2's calls (contracts/undo-traces.json's folder A, each a step through the door that plans it forward as a Redo would, JournaledWrite.perform(ops:)): `moveTheMarker` moves courses/TST1O/.netlify_sites/section1.json (made first, holding {\"site_id\": \"aaa-111\"}, when neither place holds it) to section1.previous.json beside it, one `move`; `deployANewMarker` writes a new marker ({\"site_id\": \"bbb-222\"}) in the place the move emptied, as a deploy after a rollover onto a new website does, and nothing to the list; `makeAFolder` makes courses/TST1O/extra (a.md, sub/b.md) as one `createTree`; `addAFileToTheFolder` adds a file inside it by hand; `removeTheFolder` removes it, one `removeTree`; `editTheSettings` sets courses/TST1O/settings.json's school_year (made first holding 2025-2026) to 2026-2027, or back, one `editJSON`; `editTheSettingsByHand` sets it to 2030-2031 by hand; `editAHunk` turns `Line one: old.` in courses/TST1O/notes.md into `new`, or back, one `replaceText`; `setAPreference` sets the preference undoCasesPreference to b (or back to a), one `external`, in a step with no working folder; `changeThePreferenceByHand` sets it to z; `forgetTheMaintainer` takes away the runner of the sectionFrontPage maintainer (UndoMaintainers), which every case otherwise has. markers is what the two marker places hold after the last call (moved: only the moved copy; movedBack: only the original place; bothKept: the new marker in the original place and the moved copy beside it); folderKept whether the made folder is there; rederived how many times the front page's maintainer ran. No case leaves a staged file anywhere in the working folder. `stepFromAnotherVersion:twoWholeOpsOnOnePlace` adds two createTree ops, one inside the other, which breaks opKinds.wholeOps. `moveThePageAside` moves courses/TST1O/old/a.md (made first) to courses/TST1O/a.md, one `move`; `linkItsOldFolderOutside` replaces courses/TST1O/old by a link to a folder beside the working folder; nothingMovedOutside says nothing reached that folder. U3b's call: `rollOverOntoANewWebsite` is ONE step of two ops: courses/TST1O/settings.json's school_year set from 2025-2026 to 2026-2027 (editJSON; the file made first as editTheSettings makes it) and the marker moved as moveTheMarker moves it, as a `moveApart`. `rollOverOntoNewWebsitesOnTwoHosts` is ONE step of three ops: the same school_year, the same Netlify marker as a `moveApart`, and a second host's marker courses/TST1O/.cloudflare_sites/section1.json (made first, holding {\"project\": \"tst1o-s1-2025\"}, when neither place holds it) moved to section1.previous.json beside it, also a `moveApart`; cloudflareMarkers says what that second pair holds, as markers does (moved, movedBack). `rollOverTurningOffASchedule` is ONE step of two ops: the same school_year, and the external target scheduledDeploy:org.plantoir.deploy.undo-cases (set first to {\"plist\": \"cGxpc3Q=\", \"script\": \"c2NyaXB0\"}) removed; `theScheduleCannotBeSetNow` makes every later write to a scheduledDeploy target fail, as a launchd refusal does. leftApart is what the last undo or redo named as left apart (opKinds.moveApart: the places, in order; [] for none); schoolYear the settings file's school_year after the last call.",
+    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a begin and applied, readable as lines, whose only op is of a kind no reader knows (`aKindNobodyKnows`, with from, to and blobs naming a blob it put in content/; U1's used `move`, which U2 defines); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to. U2's calls (contracts/undo-traces.json's folder A, each a step through the door that plans it forward as a Redo would, JournaledWrite.perform(ops:)): `moveTheMarker` moves courses/TST1O/.netlify_sites/section1.json (made first, holding {\"site_id\": \"aaa-111\"}, when neither place holds it) to section1.previous.json beside it, one `move`; `deployANewMarker` writes a new marker ({\"site_id\": \"bbb-222\"}) in the place the move emptied, as a deploy after a rollover onto a new website does, and nothing to the list; `makeAFolder` makes courses/TST1O/extra (a.md, sub/b.md) as one `createTree`; `addAFileToTheFolder` adds a file inside it by hand; `removeTheFolder` removes it, one `removeTree`; `editTheSettings` sets courses/TST1O/settings.json's school_year (made first holding 2025-2026) to 2026-2027, or back, one `editJSON`; `editTheSettingsByHand` sets it to 2030-2031 by hand; `editAHunk` turns `Line one: old.` in courses/TST1O/notes.md into `new`, or back, one `replaceText`; `setAPreference` sets the preference undoCasesPreference to b (or back to a), one `external`, in a step with no working folder; `changeThePreferenceByHand` sets it to z; `forgetTheMaintainer` takes away the runner of the sectionFrontPage maintainer (UndoMaintainers), which every case otherwise has. markers is what the two marker places hold after the last call (moved: only the moved copy; movedBack: only the original place; bothKept: the new marker in the original place and the moved copy beside it); folderKept whether the made folder is there; rederived how many times the front page's maintainer ran. No case leaves a staged file anywhere in the working folder. `stepFromAnotherVersion:twoWholeOpsOnOnePlace` adds two createTree ops, one inside the other, which breaks opKinds.wholeOps. `moveThePageAside` moves courses/TST1O/old/a.md (made first) to courses/TST1O/a.md, one `move`; `linkItsOldFolderOutside` replaces courses/TST1O/old by a link to a folder beside the working folder; nothingMovedOutside says nothing reached that folder. U3b's call: `rollOverOntoANewWebsite` is ONE step of two ops: courses/TST1O/settings.json's school_year set from 2025-2026 to 2026-2027 (editJSON; the file made first as editTheSettings makes it) and the marker moved as moveTheMarker moves it, as a `moveApart`. `rollOverOntoNewWebsitesOnTwoHosts` is ONE step of three ops: the same school_year, the same Netlify marker as a `moveApart`, and a second host's marker courses/TST1O/.cloudflare_sites/section1.json (made first, holding {\"project\": \"tst1o-s1-2025\"}, when neither place holds it) moved to section1.previous.json beside it, also a `moveApart`; cloudflareMarkers says what that second pair holds, as markers does (moved, movedBack). `rollOverTurningOffASchedule` is ONE step of two ops: the same school_year, and the external target scheduledDeploy:org.plantoir.deploy.undo-cases (set first to {\"plist\": \"cGxpc3Q=\", \"script\": \"c2NyaXB0\"}) removed; `theScheduleCannotBeSetNow` makes every later write to a scheduledDeploy target fail, as a launchd refusal does. leftApart is what the last undo or redo named as left apart (opKinds.moveApart: the places, in order; [] for none); schoolYear the settings file's school_year after the last call. `rollOverSettingALeftoverAside` is ONE step of three ops: the same school_year, the same Netlify marker as a `moveApart`, and a leftover courses/TST1O/.netlify_sites/section1.from-built-output.json (made first, holding {\"site_id\": \"ccc-333\"}, when neither place holds it) moved to section1.from-built-output.previous.json beside it, a `setAside`; `removeTheKeptLeftover` deletes that kept copy by hand; leftoverMarkers says what the leftover's pair holds, as markers does (moved, movedBack; gone: neither place holds it). `theScheduleStartsOnlyAtTheNextLogin` makes every later write that sets a scheduledDeploy target answer that the job is back on disk and was not started now, so it starts at the next login, as a launchd refusal whose plist cannot be taken away again does; startsAtTheNextLogin is what the last undo or redo named so (the targets, in order; absent: none).",
+    "netlifyRecordCasesHow": "U3b, the review of U3b's fixes, round three: which Netlify record a deploy of a section reads, by deploy.py's own rule (scripts/deploy.py load_netlify_marker): a current record (courses/<CODE>/.netlify_sites/section<N>.json) that parses as JSON wins, whatever it holds; else a legacy record (.merged_output/section<N>/.netlify_site.json, in the built output) that parses, which the deploy migrates; else none, and the deploy starts a new website. `current` and `legacy` are each file's text, absent when the file is not there (`currentStartsWithAByteOrderMark`: the current record's bytes start with the UTF-8 byte order mark, EF BB BF, before that text; a JSON reader may drop the mark from a string, so it is never written inside one); `reads` is current, legacy or none; `site` the `id` of what the deploy then goes on with (null: none, a new website). The record a deploy reads is the section's website; every other record is a leftover no deploy reads, and a leftover never decides anything: a rollover onto a new website and its Undo leave a deploy reading the same site in every one of these states. scripts/test_netlify_record_a_deploy_reads.py runs every row through deploy.py's own function; the Mac runs them through DeployCommand.netlifyRecordADeployReads, and rolls each over, undoes and redoes it (UndoRolloverStepTests). Known to differ only on what no tool writes: Python's json also takes NaN and Infinity, and numbers too large for a double.",
+    "netlifyRecordCases": [
+      {
+        "name": "only the legacy record, in the built output",
+        "legacy": "{\"id\": \"legacy-good\"}",
+        "reads": "legacy",
+        "site": "legacy-good"
+      },
+      {
+        "name": "only the current record",
+        "current": "{\"id\": \"current-site\"}",
+        "reads": "current",
+        "site": "current-site"
+      },
+      {
+        "name": "both, the same bytes",
+        "current": "{\"id\": \"current-site\"}",
+        "legacy": "{\"id\": \"current-site\"}",
+        "reads": "current",
+        "site": "current-site"
+      },
+      {
+        "name": "both, the same site, the current record written as deploy.py's migration writes it (indent 2) beside the legacy one's own bytes",
+        "current": "{\n  \"id\": \"current-site\"\n}",
+        "legacy": "{\"id\":\"current-site\"}",
+        "reads": "current",
+        "site": "current-site"
+      },
+      {
+        "name": "both, each valid, different sites",
+        "current": "{\"id\": \"current-site\"}",
+        "legacy": "{\"id\": \"legacy-other\"}",
+        "reads": "current",
+        "site": "current-site"
+      },
+      {
+        "name": "the current record is not JSON (a migration's write_text killed part way), the legacy one is good",
+        "current": "{\"id\": \"cur",
+        "legacy": "{\"id\": \"legacy-good\"}",
+        "reads": "legacy",
+        "site": "legacy-good"
+      },
+      {
+        "name": "the current record is good, the legacy one is not JSON",
+        "current": "{\"id\": \"current-site\"}",
+        "legacy": "not json",
+        "reads": "current",
+        "site": "current-site"
+      },
+      {
+        "name": "both are not JSON",
+        "current": "{\"id\": \"cur",
+        "legacy": "not json",
+        "reads": "none",
+        "site": null
+      },
+      {
+        "name": "neither is there",
+        "reads": "none",
+        "site": null
+      },
+      {
+        "name": "only a legacy record that is not JSON",
+        "legacy": "not json",
+        "reads": "none",
+        "site": null
+      },
+      {
+        "name": "only a current record that is not JSON",
+        "current": "{\"id\": \"cur",
+        "reads": "none",
+        "site": null
+      },
+      {
+        "name": "a current record that is JSON null, and a good legacy one: the current record wins and names no site, so a deploy starts a new website and the legacy one is not migrated",
+        "current": "null",
+        "legacy": "{\"id\": \"legacy-good\"}",
+        "reads": "current",
+        "site": null
+      },
+      {
+        "name": "a current record that starts with a byte order mark (Python's json refuses one), and a good legacy one",
+        "current": "{\"id\": \"current-site\"}",
+        "currentStartsWithAByteOrderMark": true,
+        "legacy": "{\"id\": \"legacy-good\"}",
+        "reads": "legacy",
+        "site": "legacy-good"
+      }
+    ],
     "stepCases": [
       {
         "name": "two pages, the second changed by hand since: nothing written, the second named",

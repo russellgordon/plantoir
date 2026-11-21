@@ -380,6 +380,7 @@
     "undoDoesNotReachTheLiveSite" : "If you had already deployed this section, undoing it here does not change what students see. Deploy again when you want the live site to match.",
     "undoIsStillAvailable" : "That change is still on the list, so you can ask me to undo it again once you have dealt with the pages I left alone.",
     "undoIsStillAvailableFromTheMenu" : "That change is still the last one, so Section ▸ Undo Last Change can take it back once you have dealt with the pages left alone.",
+    "undoScheduleStartsAtTheNextLogin" : "The deploy set for later is back, but it could not be started now. It starts the next time you log in, so it will not run at its time unless you log out and back in before then.",
     "unitAlreadyHidden" : "Unit 4 is already hidden.",
     "unitAlreadyPublished" : "Unit 4 has already been published.",
     "wentRoundWithoutFinishing" : "I've gone round several times without finishing, so nothing was changed. Tell me what you'd like me to do next.",

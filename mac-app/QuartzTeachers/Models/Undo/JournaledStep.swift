@@ -155,10 +155,12 @@ nonisolated final class JournaledStep {
 
     /// Each file planned to be MOVED (U3b: the rollover's record fragments
     /// and markers), in the order planned: where it is, where it goes, the
-    /// SHA-256 of its bytes when planned, and whether it stands apart from
-    /// the rest of the step (`moveApart`: the website's markers, Russell's
-    /// ruling of 2026-11-19 on Q3).
-    private(set) var plannedMoves: [(from: URL, to: URL, sha: String, standsApart: Bool)] = []
+    /// SHA-256 of its bytes when planned, and the kind of op it is: `move`,
+    /// `moveApart` (a website record a deploy reads, which stands apart from
+    /// the rest of the step with the other records, as a group: Russell's
+    /// ruling of 2026-11-19 on Q3, the director's decision of 2026-11-20),
+    /// or `setAside` (a leftover no deploy reads, which stands apart ALONE).
+    private(set) var plannedMoves: [(from: URL, to: URL, sha: String, kind: UndoOpKind)] = []
 
     /// Each `external` op planned (U3b: the deploy set for later a rollover
     /// removes), in order.
@@ -300,10 +302,26 @@ nonisolated final class JournaledStep {
     /// finds the pair changed since, and the rest of the step goes ahead.
     @discardableResult
     func move(_ from: URL, to: URL, standsApart: Bool = false) -> Bool {
+        return planAMove(from, to: to, kind: standsApart ? .moveApart : .move)
+    }
+
+    /// Plans a LEFTOVER no deploy reads to be set aside (`setAside`, #899
+    /// U3b): moved as `move` is, standing apart on its own, never one of the
+    /// group of website records (`moveApart`), so a leftover that is changed
+    /// or missing since is left as it is and named by an Undo or a Redo,
+    /// and never decides where the section's records go (the review of U3b's
+    /// fixes, LOW 3). False, planning nothing, when it cannot be read now.
+    @discardableResult
+    func setAside(_ from: URL, to: URL) -> Bool {
+        return planAMove(from, to: to, kind: .setAside)
+    }
+
+    /// Plans one move of the given kind, judged by its bytes now.
+    private func planAMove(_ from: URL, to: URL, kind: UndoOpKind) -> Bool {
         guard case .file(let data) = UndoItem.read(at: from) else {
             return false
         }
-        plannedMoves.append((from: from, to: to, sha: UndoHash.sha256(of: data), standsApart: standsApart))
+        plannedMoves.append((from: from, to: to, sha: UndoHash.sha256(of: data), kind: kind))
         return true
     }
 
@@ -608,9 +626,12 @@ nonisolated final class JournaledStep {
                   let to = UndoFolderPlaces.relativePath(of: planned.to, under: root) else {
                 return nil
             }
-            if planned.standsApart {
+            switch planned.kind {
+            case .moveApart:
                 result.append(UndoOp.moveFileApart(from: from, to: to, sha: planned.sha))
-            } else {
+            case .setAside:
+                result.append(UndoOp.setFileAside(from: from, to: to, sha: planned.sha))
+            default:
                 result.append(UndoOp.moveFile(from: from, to: to, sha: planned.sha))
             }
         }

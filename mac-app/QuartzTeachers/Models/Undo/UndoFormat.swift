@@ -754,19 +754,20 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         guard let kind = knownKind else {
             return false
         }
-        return kind == .move || kind == .moveApart || kind == .createTree || kind == .removeTree || kind == .external
+        return kind == .move || kind == .moveApart || kind == .setAside || kind == .createTree || kind == .removeTree || kind == .external
     }
 
     /// Whether an undo or a redo that finds this op changed since leaves it
     /// where it is and goes on with the rest of the step, reporting it
-    /// (`moveApart`, and an `external` op on a scheduled deploy: the
-    /// rollover's markers and the schedule it removed, U3b). Making the
+    /// (`moveApart`, `setAside`, and an `external` op on a scheduled deploy:
+    /// the rollover's records, its leftovers and the schedule it removed,
+    /// U3b). Making the
     /// step never leaves one apart: a step is made whole or not at all.
     var standsApart: Bool {
         guard let kind = knownKind else {
             return false
         }
-        if kind == .moveApart {
+        if kind == .moveApart || kind == .setAside {
             return true
         }
         if kind == .external, let target = target {
@@ -858,6 +859,16 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         return op
     }
 
+    /// A leftover file set aside, standing apart from its step on its own
+    /// (`setAside`).
+    static func setFileAside(from: String, to: String, sha: String) -> UndoOp {
+        var op: UndoOp = UndoOp(kind: UndoOpKind.setAside.rawValue, path: nil)
+        op.from = from
+        op.to = to
+        op.sha = sha
+        return op
+    }
+
     static func moveFolder(from: String, to: String, listingSha: String) -> UndoOp {
         var op: UndoOp = UndoOp(kind: UndoOpKind.move.rawValue, path: nil)
         op.from = from
@@ -900,7 +911,7 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             return false
         }
         switch kind {
-        case .move, .moveApart:
+        case .move, .moveApart, .setAside:
             // No `path`: `from` and `to` follow path's rules, differ, and
             // neither holds the other. Exactly one of a file's `sha` and a
             // folder's `listingSha`.
@@ -967,7 +978,7 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
                 return false
             }
             return blobs.contains(listingSha)
-        case .move, .moveApart, .external:
+        case .move, .moveApart, .setAside, .external:
             return false
         }
     }
@@ -1042,6 +1053,15 @@ nonisolated enum UndoOpKind: String, Sendable {
     /// never a key on `move`: an older reader would undo a key's meaning by
     /// the old rule (`undoJournal.unknown.keys`).
     case moveApart
+    /// U3b: a move judged as `move` is, which stands apart from its step ON
+    /// ITS OWN: a leftover no deploy reads, set aside by a rollover (an old
+    /// website record brought in from the built output, or a current record
+    /// no deploy can read). An undo or a redo that finds its pair changed
+    /// since leaves it and names it, as for `moveApart`, but it is never one
+    /// of the step's group of `moveApart` records: a file no deploy reads
+    /// never decides which website the section is on (the review of U3b's
+    /// fixes, LOW 3). Its own kind for the reason `moveApart` is.
+    case setAside
     /// U2: a folder made, with everything in it.
     case createTree
     /// U2: a folder removed, with everything in it kept in the list.

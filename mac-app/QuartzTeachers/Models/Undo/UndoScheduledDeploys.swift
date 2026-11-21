@@ -108,8 +108,18 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
     }
 
     func write(_ target: String, _ value: UndoJSON?) -> Bool {
+        return writeSaying(target, value) != .notWritten
+    }
+
+    /// Sets or removes the job. A job launchd refuses now whose plist cannot
+    /// be taken away again stays in LaunchAgents and loads at the next
+    /// login: neither set back (it will not run at its moment unless the
+    /// teacher logs out and in first) nor left apart (it will run), so it
+    /// has its own answer, `startsAtTheNextLogin`, and its own trail line
+    /// (the re-review of U3b's fixes, LOW 2).
+    func writeSaying(_ target: String, _ value: UndoJSON?) -> UndoExternalWrite {
         guard let label = UndoScheduledDeploys.label(of: target), Thread.isMainThread else {
-            return false
+            return .notWritten
         }
         let plistURL: URL = ScheduledDeploy.plistURL(label: label)
         let scriptURL: URL = ScheduledDeploy.scriptURL(label: label)
@@ -121,7 +131,7 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
                 do {
                     try FileManager.default.removeItem(at: plistURL)
                 } catch {
-                    return false
+                    return .notWritten
                 }
             }
             let job: LaunchControlRunning = runner
@@ -129,10 +139,10 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
                 job.bootOut(label: label)
             }
             try? FileManager.default.removeItem(at: scriptURL)
-            return true
+            return .written
         }
         guard let files = UndoScheduledDeploys.files(in: value) else {
-            return false
+            return .notWritten
         }
         do {
             if let script = files.script {
@@ -151,7 +161,7 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
             if files.script != nil {
                 try? FileManager.default.removeItem(at: scriptURL)
             }
-            return false
+            return .notWritten
         }
         let job: LaunchControlRunning = runner
         let refusal: String? = MainActor.assumeIsolated {
@@ -159,20 +169,63 @@ nonisolated struct UndoScheduledDeploys: UndoExternalPlaces, @unchecked Sendable
         }
         if refusal != nil {
             // launchd refused it now. If its plist cannot be taken away
-            // again, it stays in LaunchAgents and loads at the next login,
-            // so the job IS set back, its files as the value says: answered
-            // true (never "left apart" while a job that will run is there;
-            // the re-review of U3b, LOW 4). Its script stays with it.
+            // again, it stays in LaunchAgents and loads at the next login:
+            // never said to be left apart (it will run), never said to be
+            // back (it will not run at its moment unless the teacher logs
+            // out and in first). Its script stays with it.
             if (try? FileManager.default.removeItem(at: plistURL)) == nil
                 && FileManager.default.fileExists(atPath: plistURL.path) {
-                return true
+                let plist: Data = files.plist
+                MainActor.assumeIsolated {
+                    UndoScheduledDeploys.noteItStartsAtTheNextLogin(plist: plist)
+                }
+                return .startsAtTheNextLogin
             }
             if files.script != nil {
                 try? FileManager.default.removeItem(at: scriptURL)
             }
-            return false
+            return .notWritten
         }
-        return true
+        return .written
+    }
+
+    /// The trail line for a deploy set for later that Undo or Redo put back
+    /// and macOS would not start now: it starts at the next login. Names
+    /// the course, the section and the moment from the job's own plist.
+    @MainActor
+    static func noteItStartsAtTheNextLogin(plist data: Data) {
+        var line: String = "put back a scheduled deploy"
+        if let moment = UndoScheduledDeploys.scheduledFor(plist: data) {
+            line += " for " + ScheduledDeploy.dayAndTimeText(moment)
+        }
+        line += ", but macOS would not start it now; it starts the next time you log in to this Mac, "
+            + "and will not run at its time unless you log out and in before then"
+        if let place = UndoScheduledDeploys.courseAndSection(plist: data) {
+            ActivityTrail.note(.scheduledDeployCouldNotBeSet, line, course: place.course, section: place.section)
+            return
+        }
+        ActivityTrail.note(.scheduledDeployCouldNotBeSet, line)
+    }
+
+    /// The course and section a job deploys, from the arguments its plist
+    /// runs (`--scheduled-section <folder> <course> <section>`), or nil.
+    static func courseAndSection(plist data: Data) -> (course: String, section: Int)? {
+        guard let decoded = try? PropertyListSerialization.propertyList(from: data, format: nil),
+              let plist = decoded as? [String: Any],
+              let arguments = plist["ProgramArguments"] as? [String] else {
+            return nil
+        }
+        var index: Int = 0
+        while index < arguments.count {
+            if arguments[index] == ScheduledDeploy.sectionFlag && index + 3 < arguments.count {
+                guard let section = Int(arguments[index + 3]) else {
+                    return nil
+                }
+                return (course: arguments[index + 2], section: section)
+            }
+            index += 1
+        }
+        return nil
     }
 
     /// The two files a value holds, or nil when it is not this family's shape.
@@ -238,6 +291,13 @@ nonisolated struct UndoAppPlaces: UndoExternalPlaces, @unchecked Sendable {
             return schedules.write(target, value)
         }
         return preferences.write(target, value)
+    }
+
+    func writeSaying(_ target: String, _ value: UndoJSON?) -> UndoExternalWrite {
+        if UndoScheduledDeploys.label(of: target) != nil {
+            return schedules.writeSaying(target, value)
+        }
+        return preferences.writeSaying(target, value)
     }
 
     func canSet(_ target: String, _ value: UndoJSON?) -> Bool {

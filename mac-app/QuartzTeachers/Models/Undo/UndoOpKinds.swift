@@ -1008,7 +1008,7 @@ nonisolated extension UndoCheck {
     /// the destination alone.
     static func wholeState(of op: UndoOp, root: URL, places: UndoExternalPlaces) -> UndoOpState {
         switch op.knownKind {
-        case .move, .moveApart:
+        case .move, .moveApart, .setAside:
             guard let from = op.from, let to = op.to else {
                 return .neither
             }
@@ -1193,6 +1193,23 @@ nonisolated protocol UndoExternalPlaces: Sendable {
     /// moment has gone by, which is never registered again (#897 piece B,
     /// seam 2). True for everything else.
     func canSet(_ target: String, _ value: UndoJSON?) -> Bool
+    /// Sets the target as `write` does, and says how it went: written, not
+    /// written, or written to start only at the next login (a deploy set
+    /// for later whose plist is back in LaunchAgents but which launchd
+    /// would not load now, and whose plist could not be taken away again:
+    /// the re-review of U3b's fixes, LOW 2). Every family but a deploy set
+    /// for later answers from `write`.
+    func writeSaying(_ target: String, _ value: UndoJSON?) -> UndoExternalWrite
+}
+
+/// How setting an `external` target went (`UndoExternalPlaces.writeSaying`).
+nonisolated enum UndoExternalWrite: Equatable, Sendable {
+    case written
+    case notWritten
+    /// A deploy set for later is back on disk, its files as the value says,
+    /// and launchd would not load it now: it starts at the next login, and
+    /// will not run at its moment unless the teacher logs out and in first.
+    case startsAtTheNextLogin
 }
 
 nonisolated extension UndoExternalPlaces {
@@ -1201,6 +1218,10 @@ nonisolated extension UndoExternalPlaces {
 
     func canSet(_ target: String, _ value: UndoJSON?) -> Bool {
         return true
+    }
+
+    func writeSaying(_ target: String, _ value: UndoJSON?) -> UndoExternalWrite {
+        return write(target, value) ? .written : .notWritten
     }
 }
 

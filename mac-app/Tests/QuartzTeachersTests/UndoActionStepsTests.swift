@@ -1245,14 +1245,14 @@ final class UndoActionStepsTests: XCTestCase {
                     if word != expect {
                         failures.append("\(where_): \(kind) came to \(word), not \(expect ?? "?")")
                     }
-                    if case .undone(let seq, _) = outcome, seq != UndoContractReplay.int(call["seq"]) {
+                    if case .undone(let seq, _, _) = outcome, seq != UndoContractReplay.int(call["seq"]) {
                         failures.append("\(where_): undid \(seq)")
                     }
                     let leftApart: [String] = UndoContractReplay.leftApart(of: outcome)
                     if leftApart != (call["leftApart"] as? [String] ?? []) {
                         failures.append("\(where_): left apart \(leftApart), not \(call["leftApart"] as? [String] ?? [])")
                     }
-                    if case .redone(let seq, _) = outcome, seq != UndoContractReplay.int(call["seq"]) {
+                    if case .redone(let seq, _, _) = outcome, seq != UndoContractReplay.int(call["seq"]) {
                         failures.append("\(where_): redid \(seq)")
                     }
                     if case .refused(.changedSince(let first, let others), let cleared) = outcome {

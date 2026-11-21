@@ -157,7 +157,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/DeployTokens/DeployTokenPanel.swift": (1, "notAStep: runs deploy.sh --token through /bin/bash in its mode with no course and no section (#696): the teacher's deploy tokens, which are credentials and not on the list (ruling 8), in the launcher's token store outside every course"),
         "Models/FolderContainers.swift": (2, "notAStep: the website builder's containers, through a shell, outside every course"),
         "Models/FolderScaffold.swift": (1, "waitsFor: U4 (a new working folder's scaffold, made with New Course)"),
-        "Models/LegacyNetlifyRecord.swift": (12, "notAStep: moveTheLegacyMarkerIn brings the legacy Netlify record out of the built output (outside the working folder, where no step can name a place) into .netlify_sites before the rollover's step, as deploy.py's own migration does (load_netlify_marker), or beside the current record as a stale leftover the step then sets aside; LegacyMarkerBroughtIn.putBack moves it back for a step then refused (Russell's rulings of 2026-11-20). Never a step, by ruling"),
+        "Models/LegacyNetlifyRecord.swift": (14, "notAStep: moveTheLegacyMarkerIn brings the legacy Netlify record out of the built output (outside the working folder, where no step can name a place) into .netlify_sites before the rollover's step, as deploy.py's own migration does (load_netlify_marker), moving a current record no deploy can read out of its way first, or brings it in as a leftover no deploy reads, which the step then sets aside; LegacyMarkerBroughtIn.putBack moves it back for a step then refused, and removes the .netlify_sites folder it made when it is empty again (rmdir, counted: Russell's rulings of 2026-11-20; the review of U3b's fixes, round three). Never a step, by ruling"),
         "Models/ObsidianFigureAddOns.swift": (11, "waitsFor: U4"),
         "Models/OneSectionRestore.swift": (1, "notAStep: `unzip -p` reads a backup's course_config.json to its output and writes nothing; the restore itself is CourseRestorer's (U5)"),
         "Models/PlanSharing.swift": (7, "notAStep: sharing unit plans and stopping (ruling 18); its releasePlanMarkers runs inside a reference copy, which is U4's"),
@@ -312,6 +312,19 @@ final class UndoWriterScanTests: XCTestCase {
             total += count
         }
         XCTAssertEqual(total, 9)
+    }
+
+    /// The `rmdir` that removes a folder a bring-in made once it is empty
+    /// (`DeployCommand.removeIfEmpty`, inside a closure that returns it) is
+    /// counted, as every bare C call that writes is (`bareWritingCalls`;
+    /// the review of U3b's fixes, LOW 8, checked).
+    func testTheScanCountsTheRmdirThatRemovesAnEmptyFolder() {
+        let source: String = "        _ = folder.withUnsafeFileSystemRepresentation { path in\n            return rmdir(path)\n        }"
+        var count: Int = 0
+        for code in UndoWriterScanTests.codeLines(of: source) {
+            count += UndoWriterScanTests.writingCallCount(inCode: code)
+        }
+        XCTAssertEqual(count, 1)
     }
 
     func testEveryReasonIsOneOfTheThreeKinds() {

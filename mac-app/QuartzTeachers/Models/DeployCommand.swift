@@ -333,21 +333,28 @@ enum DeployCommand {
     }
 
     /// `releaseSite`, PLANNED into the rollover's ONE step instead of
-    /// written (#899 U3b; #897 piece B, seams 1 and 3): each marker in the
-    /// course's own folders becomes one `moveApart`, judged as a pair and
-    /// standing apart from the rest of the step, so an Undo after a deploy
-    /// has filled the marker's place leaves both where they are and takes
-    /// back the rest (Russell's ruling of 2026-11-19 on Q3; #959). A marker
-    /// that cannot be read, or whose kept name is taken, is still pinned,
-    /// as before.
+    /// written (#899 U3b; #897 piece B, seams 1 and 3): each record a deploy
+    /// reads becomes one `moveApart`, the section's records standing apart
+    /// from the rest of the step as a GROUP, so an Undo after a deploy has
+    /// filled a record's place leaves every record where it is and takes
+    /// back the rest (Russell's ruling of 2026-11-19 on Q3; #959; the
+    /// director's decision of 2026-11-20). A record that cannot be read, or
+    /// whose kept name is taken, is still pinned, as before.
     ///
     /// The legacy marker in the built output is brought into the working
-    /// folder first (`moveTheLegacyMarkerIn`), so it is planned here like
-    /// any other marker, and a stale one brought in beside the current
-    /// record is set aside here too, as a `moveApart` (its kept name
-    /// `section<N>.from-built-output.previous-<stamp>.json`), one of the
-    /// section's records that move as a group. When it cannot be brought
-    /// in, this throws that refusal and nothing has been planned or changed.
+    /// folder first (`moveTheLegacyMarkerIn`), so the record a deploy reads
+    /// is planned here like any other. Every LEFTOVER no deploy reads (one
+    /// brought in from the built output, a current record no deploy can
+    /// read) is set aside here too, each a `setAside` op on its own, kept as
+    /// `<its name>.previous-<stamp>.json`: never one of the records, never
+    /// in `keptFiles` (a leftover is not a website the section was on, the
+    /// review of U3b's fixes, LOW 4; its two halves are in `savedFiles`, so
+    /// today's undo puts it back), and never decisive, so a leftover
+    /// changed or missing by Undo or Redo is left and named and the records
+    /// still go back (LOW 3). A leftover that cannot be set aside is left
+    /// where it is: no deploy reads it. When the legacy record cannot be
+    /// brought in, this throws that refusal and nothing has been planned or
+    /// changed.
     static func planSiteRelease(
         forSection sectionNumber: Int,
         in course: Course,
@@ -355,9 +362,11 @@ enum DeployCommand {
         into step: JournaledStep
     ) throws(LegacyMarkerNotMovedIn) -> PlannedRelease {
         let broughtIn: LegacyMarkerBroughtIn? = try moveTheLegacyMarkerIn(forSection: sectionNumber, in: course)
+        let reads: NetlifyRecordADeployReads = netlifyRecordADeployReads(forSection: sectionNumber, in: course)
         var keptFiles: [String] = []
         var savedFiles: [AssistSavedFile] = []
         var stillPinned: [String] = []
+        var leftovers: [URL] = []
 
         for destinationType in CourseConfiguration.knownDeployTargetTypes {
             guard let markerURL = firstDeployMarkerURL(
@@ -372,6 +381,12 @@ enum DeployCommand {
                 stillPinned.append(nameForTeacher(markerURL))
                 continue
             }
+            if destinationType == "netlify" && reads != .current {
+                // There and readable, and no deploy reads it (it is not
+                // JSON): a leftover, never the section's website.
+                leftovers.append(markerURL)
+                continue
+            }
             let keptURL: URL = markerURL.deletingLastPathComponent()
                 .appendingPathComponent(releasedMarkerName(forSection: sectionNumber, at: moment))
             if FileManager.default.fileExists(atPath: keptURL.path)
@@ -384,22 +399,23 @@ enum DeployCommand {
             savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
         }
 
-        // The stale leftover brought in beside the current record (now or
-        // by an earlier rollover that stopped before its step).
-        let leftoverURL: URL = broughtInLeftoverURL(forSection: sectionNumber, in: course)
-        if FileManager.default.fileExists(atPath: leftoverURL.path) {
-            let keptURL: URL = leftoverURL.deletingLastPathComponent()
-                .appendingPathComponent("section\(sectionNumber).from-built-output.previous-" + stamp(moment) + ".json")
-            if let data = try? Data(contentsOf: leftoverURL),
-               !FileManager.default.fileExists(atPath: keptURL.path),
-               step.move(leftoverURL, to: keptURL, standsApart: true) {
-                let contents: String = String(decoding: data, as: UTF8.self)
-                keptFiles.append(nameForTeacher(keptURL))
-                savedFiles.append(AssistSavedFile(fileURL: leftoverURL, before: contents, after: nil))
-                savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
-            } else {
-                stillPinned.append(nameForTeacher(leftoverURL))
+        // The leftovers brought in (now or by an earlier rollover that
+        // stopped before its step), each set aside on its own.
+        for leftover in leftoverURLs(forSection: sectionNumber, in: course) {
+            leftovers.append(leftover)
+        }
+        for leftover in leftovers {
+            let keptURL: URL = keptLeftoverURL(leftover, forSection: sectionNumber, stamp: stamp(moment))
+            guard let data = try? Data(contentsOf: leftover),
+                  !FileManager.default.fileExists(atPath: keptURL.path),
+                  step.setAside(leftover, to: keptURL) else {
+                continue
             }
+            // In today's undo with the records (never in `keptFiles`), so
+            // Undo Last Change puts a leftover back where the step found it.
+            let contents: String = String(decoding: data, as: UTF8.self)
+            savedFiles.append(AssistSavedFile(fileURL: leftover, before: contents, after: nil))
+            savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
         }
 
         return PlannedRelease(

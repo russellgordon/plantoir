@@ -5437,6 +5437,11 @@ final class AssistToolRunner {
         /// step, put back if the step is then refused.
         var broughtIn: DeployCommand.LegacyMarkerBroughtIn? = nil
 
+        /// The leftovers no deploy reads, set aside in the step when the
+        /// section was on no website (`release` is then nil): their halves,
+        /// for today's undo.
+        var leftoverFiles: [AssistSavedFile] = []
+
         /// The deploys set for later planned to be removed, as targets.
         var schedules: [String] = []
 
@@ -5454,8 +5459,8 @@ final class AssistToolRunner {
     }
 
     /// A rollover's step refused after the legacy marker was brought in
-    /// from the built output, and the marker could not be put back: what
-    /// moved, said after "Nothing else was changed:".
+    /// from the built output, and the bring-in could not wholly be put back:
+    /// what is still moved, said after "Nothing else was changed:".
     struct RolloverStoppedAfterARecordMoved: Error, LocalizedError {
 
         // MARK: - Stored properties
@@ -5463,34 +5468,60 @@ final class AssistToolRunner {
         /// What the step was refused with, said first.
         let underlyingSaid: String
 
-        /// The legacy marker, and its place now, as a teacher would find them.
+        /// The legacy marker, as a teacher would find it.
         let legacyName: String
 
-        let placeName: String
+        /// Where its bytes still are, as a teacher would find it, or nil
+        /// when it is back in the built output.
+        let placeName: String?
 
-        /// Whether it went to the current record's place (a deploy reads it
-        /// there), or beside it as a stale leftover (no deploy reads it).
+        /// Whether that place is the current record's (a deploy reads it
+        /// there), or a leftover's (no deploy reads it).
         let isTheCurrentRecord: Bool
 
-        // MARK: - Initializer
-
-        init(underlying: Error, broughtIn: DeployCommand.LegacyMarkerBroughtIn) {
-            self.underlyingSaid = underlying.localizedDescription
-            self.legacyName = broughtIn.legacyName
-            self.placeName = broughtIn.placeName
-            self.isTheCurrentRecord = broughtIn.placeURL.lastPathComponent.hasSuffix(".from-built-output.json") == false
-        }
+        /// The current record no deploy could read, and where it still is,
+        /// set aside, as a teacher would find them; nil when it went back.
+        let unreadable: (currentName: String, asideName: String)?
 
         // MARK: - Computed properties
 
         var errorDescription: String? {
-            if isTheCurrentRecord {
-                return underlyingSaid
-                    + " The website record “\(legacyName)” is now at “\(placeName)”, "
-                    + "where a deploy reads it; it names the same website."
+            var said: String = underlyingSaid
+            if let placeName {
+                if isTheCurrentRecord {
+                    said += " The website record “\(legacyName)” is now at “\(placeName)”, "
+                        + "where a deploy reads it; it names the same website."
+                } else {
+                    said += " The old website record “\(legacyName)” is now at “\(placeName)”, where no deploy reads it."
+                }
             }
-            return underlyingSaid
-                + " The old website record “\(legacyName)” is now at “\(placeName)”, where no deploy reads it."
+            if let unreadable {
+                said += " The website record “\(unreadable.currentName)”, which no deploy could read, "
+                    + "is now at “\(unreadable.asideName)”, where no deploy reads it either."
+            }
+            return said
+        }
+
+        // MARK: - Initializer
+
+        init(underlying: Error, broughtIn: DeployCommand.LegacyMarkerBroughtIn, stillMoved: DeployCommand.LegacyMarkerNotPutBack) {
+            self.underlyingSaid = underlying.localizedDescription
+            self.legacyName = broughtIn.legacyName
+            if let recordStillAt = stillMoved.recordStillAt {
+                self.placeName = DeployCommand.nameForTeacher(recordStillAt)
+                self.isTheCurrentRecord = recordStillAt == broughtIn.currentURL
+            } else {
+                self.placeName = nil
+                self.isTheCurrentRecord = false
+            }
+            if let unreadableStillAt = stillMoved.unreadableStillAt {
+                self.unreadable = (
+                    currentName: DeployCommand.nameForTeacher(broughtIn.currentURL),
+                    asideName: DeployCommand.nameForTeacher(unreadableStillAt)
+                )
+            } else {
+                self.unreadable = nil
+            }
         }
     }
 
@@ -5546,10 +5577,10 @@ final class AssistToolRunner {
                 guard let broughtIn = planned.broughtIn else {
                     throw error
                 }
-                if broughtIn.putBack() {
+                guard let stillMoved = broughtIn.putBack() else {
                     throw error
                 }
-                throw RolloverStoppedAfterARecordMoved(underlying: error, broughtIn: broughtIn)
+                throw RolloverStoppedAfterARecordMoved(underlying: error, broughtIn: broughtIn, stillMoved: stillMoved)
             }
         }
     }
@@ -5632,6 +5663,10 @@ final class AssistToolRunner {
             return planned
         }
         guard release.releasedAnything else {
+            // Leftovers alone (a record no deploy reads) are not a website
+            // the section was on: the true words are "had no website yet"
+            // (the review of U3b's fixes, LOW 4).
+            planned.leftoverFiles = release.savedFiles
             // Still pinned is NOT the same as never published, and telling a
             // teacher the wrong one of those is telling them the opposite of
             // the truth about the only fact this feature turns on.
@@ -5673,7 +5708,20 @@ final class AssistToolRunner {
             if let note = planned.note {
                 ActivityTrail.note(note.event, note.line, course: course.code, section: sectionNumber)
             }
-            return (planned.said, [])
+            if planned.leftoverFiles.isEmpty {
+                return (planned.said, [])
+            }
+            if recordsItsOwnChange {
+                history.record(AssistChange(
+                    whatHappened: "set aside old website records no deploy reads for Section \(sectionNumber)",
+                    courseCode: course.code,
+                    sectionNumber: sectionNumber,
+                    rebuildsThePreview: false,
+                    files: planned.leftoverFiles
+                ))
+                return (planned.said, planned.leftoverFiles)
+            }
+            return (planned.said, AssistToolRunner.onlyTheHalvesMovedAway(planned.leftoverFiles))
         }
         let fromTheMenu: Bool = surface == .menu
         if recordsItsOwnChange {

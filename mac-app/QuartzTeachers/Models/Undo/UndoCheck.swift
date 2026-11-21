@@ -127,7 +127,7 @@ nonisolated enum UndoCheck {
             return UndoJSONMember.state(of: op, in: item)
         case .recompute:
             return .after
-        case .move, .moveApart, .createTree, .removeTree, .external, .none:
+        case .move, .moveApart, .setAside, .createTree, .removeTree, .external, .none:
             return .neither
         }
     }
@@ -442,7 +442,7 @@ nonisolated enum UndoCheck {
             return UndoHunk.moved(op, from: item, direction: direction)
         case .editJSON:
             return UndoJSONMember.moved(op, from: item, direction: direction)
-        case .recompute, .move, .moveApart, .createTree, .removeTree, .external, .none:
+        case .recompute, .move, .moveApart, .setAside, .createTree, .removeTree, .external, .none:
             return item
         }
     }
@@ -452,7 +452,7 @@ nonisolated enum UndoCheck {
     /// when content it needs is there and cannot be read.
     static func wholeTarget(_ op: UndoOp, direction: UndoDirection, root: URL, journal: UndoJournal) throws -> UndoSwapTarget? {
         switch op.knownKind {
-        case .move, .moveApart:
+        case .move, .moveApart, .setAside:
             guard let from = op.from, let to = op.to else {
                 return nil
             }
@@ -629,7 +629,8 @@ nonisolated enum UndoSwap {
         label: String,
         places: UndoExternalPlaces = UndoAppPreferences(),
         root: URL? = nil,
-        leaveApart: ((String) -> Void)? = nil
+        leaveApart: ((String) -> Void)? = nil,
+        startsAtTheNextLogin: ((String) -> Void)? = nil
     ) -> UndoSwapResult {
         var staged: [URL?] = []
         var originals: [URL?] = []
@@ -953,8 +954,18 @@ nonisolated enum UndoSwap {
             case .setExternal(let externalTarget, let expected, let value):
                 if !UndoCheck.externalMatches(places.read(externalTarget), expected) {
                     refusal = .changedSince(firstPath: target.relativePath, others: 0)
-                } else if !places.write(externalTarget, value) {
-                    refusal = .couldNotWrite(path: target.relativePath)
+                } else {
+                    switch places.writeSaying(externalTarget, value) {
+                    case .written:
+                        break
+                    case .notWritten:
+                        refusal = .couldNotWrite(path: target.relativePath)
+                    case .startsAtTheNextLogin:
+                        // Set back, and launchd would not load it now: it
+                        // starts at the next login. Named on its own, never
+                        // as left apart (the re-review of U3b's fixes, LOW 2).
+                        startsAtTheNextLogin?(target.relativePath)
+                    }
                 }
                 if refusal != nil, let leaveApart, externalTarget.hasPrefix(UndoOp.scheduledDeployFamily + ":") {
                     // Left as it is and named, the rest goes on: an Undo or
@@ -1449,8 +1460,15 @@ nonisolated enum UndoOutcome: Equatable, Sendable {
     /// is (a rollover's marker after a deploy filled its place, a deploy set
     /// for later whose moment has gone by), by place, for U7 to say once
     /// (Russell's ruling of 2026-11-19 on Q3). Empty for every other step.
-    case undone(seq: Int, leftApart: [String] = [])
-    case redone(seq: Int, leftApart: [String] = [])
+    ///
+    /// `startsAtTheNextLogin`: the deploys set for later this put back
+    /// whose plist is in LaunchAgents and which launchd would not load now,
+    /// by target: each starts the next time the teacher logs in, and will
+    /// not run at its moment unless they log out and in before it
+    /// (`AssistWording.undoScheduleStartsAtTheNextLogin`; the re-review of U3b's
+    /// fixes, LOW 2). Empty for every other step.
+    case undone(seq: Int, leftApart: [String] = [], startsAtTheNextLogin: [String] = [])
+    case redone(seq: Int, leftApart: [String] = [], startsAtTheNextLogin: [String] = [])
     case nothingToUndo
     case nothingToRedo
     /// A newer step is still being made, undone or redone
@@ -1532,7 +1550,7 @@ nonisolated extension UndoJournal {
     ) async -> UndoOutcome {
         await UndoRecovery.recoverAndRederive(self, resolveRoot: resolveRoot, places: places)
         let outcome: UndoOutcome = undoNewest(resolveRoot: resolveRoot, places: places)
-        if case .undone(let seq, _) = outcome {
+        if case .undone(let seq, _, _) = outcome {
             await UndoMaintainers.rederive(stepNumbered: seq, in: self, resolveRoot: resolveRoot)
         }
         return outcome
@@ -1546,7 +1564,7 @@ nonisolated extension UndoJournal {
     ) async -> UndoOutcome {
         await UndoRecovery.recoverAndRederive(self, resolveRoot: resolveRoot, places: places)
         let outcome: UndoOutcome = redoNewest(resolveRoot: resolveRoot, places: places)
-        if case .redone(let seq, _) = outcome {
+        if case .redone(let seq, _, _) = outcome {
             await UndoMaintainers.rederive(stepNumbered: seq, in: self, resolveRoot: resolveRoot)
         }
         return outcome
@@ -1666,10 +1684,14 @@ nonisolated extension UndoJournal {
         // What the check left apart, then what the swap could not set and
         // left apart (a deploy set for later launchd refused).
         var everyPlaceLeftApart: [String] = leftApart
+        var everyScheduleStartingAtTheNextLogin: [String] = []
         let swapped: UndoSwapResult = UndoSwap.swap(
             targets, label: label, places: places, root: root,
             leaveApart: { place in
                 everyPlaceLeftApart.append(place)
+            },
+            startsAtTheNextLogin: { place in
+                everyScheduleStartingAtTheNextLogin.append(place)
             }
         )
         switch swapped {
@@ -1697,9 +1719,9 @@ nonisolated extension UndoJournal {
         _ = recomputes
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
         if direction == .backward {
-            return .undone(seq: seq, leftApart: everyPlaceLeftApart)
+            return .undone(seq: seq, leftApart: everyPlaceLeftApart, startsAtTheNextLogin: everyScheduleStartingAtTheNextLogin)
         }
-        return .redone(seq: seq, leftApart: everyPlaceLeftApart)
+        return .redone(seq: seq, leftApart: everyPlaceLeftApart, startsAtTheNextLogin: everyScheduleStartingAtTheNextLogin)
     }
 
     /// What a refusal that can never succeed does to the list. The page was

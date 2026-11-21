@@ -751,7 +751,9 @@ def plan(ops, backward, pages_by_path, content_missing=False, leaves_apart=False
     of 2026-11-19 on Q3), as is an external op on a scheduledDeploy. The
     step's moveApart ops (a section's website records) go as a GROUP: when
     any one is changed since, every one not already where it is wanted is
-    left apart (the director's decision of 2026-11-20, on #899)."""
+    left apart (the director's decision of 2026-11-20, on #899). A
+    `setAside` (a leftover no deploy reads) stands apart ON ITS OWN, never
+    one of that group (the review of U3b's fixes, LOW 3)."""
     ordered = list(reversed(ops)) if backward else list(ops)
     group_stays_apart = leaves_apart and any(
         op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
@@ -842,14 +844,14 @@ def plan(ops, backward, pages_by_path, content_missing=False, leaves_apart=False
     return ("ready", changes, left_apart)
 
 
-WHOLE_KINDS = ("move", "moveApart", "createTree", "removeTree", "external")
+WHOLE_KINDS = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
 SCHEDULED_DEPLOY = "scheduledDeploy:"
 
 
 def stands_apart(op):
-    """UndoOp.standsApart: a moveApart, or an external op on a deploy set
-    for later."""
-    if op["kind"] == "moveApart":
+    """UndoOp.standsApart: a moveApart, a setAside, or an external op on a
+    deploy set for later."""
+    if op["kind"] in ("moveApart", "setAside"):
         return True
     return op["kind"] == "external" and op.get("target", "").startswith(SCHEDULED_DEPLOY)
 
@@ -861,10 +863,16 @@ def set_or_leave_apart(model, result):
     after what the check left apart; the rest goes in."""
     changes = {}
     left_apart = list(result[2])
+    model.starts_at_the_next_login = []
     for path, text in result[1].items():
         if model.refuses_schedules and path.startswith(SCHEDULED_DEPLOY):
             left_apart.append(path)
             continue
+        if model.schedules_start_at_the_next_login and path.startswith(SCHEDULED_DEPLOY) and text is not None:
+            # Back on disk, not started now: it starts at the next login,
+            # named so, never as left apart (the re-review of U3b's fixes,
+            # LOW 2; UndoExternalWrite.startsAtTheNextLogin).
+            model.starts_at_the_next_login.append(path)
         changes[path] = text
     return changes, left_apart
 LINKED_OUTSIDE = "\0linkedOutside"
@@ -885,7 +893,7 @@ def page_item(value):
 
 def whole_state(op, pages):
     kind = op["kind"]
-    if kind in ("move", "moveApart"):
+    if kind in ("move", "moveApart", "setAside"):
         return move_state(op, page_item(pages.get(op["from"])), page_item(pages.get(op["to"])))
     if kind in ("createTree", "removeTree"):
         return tree_state(op, page_item(pages.get(op["path"])))
@@ -897,7 +905,7 @@ def whole_state(op, pages):
 
 def whole_moved(op, backward, pages):
     kind = op["kind"]
-    if kind in ("move", "moveApart"):
+    if kind in ("move", "moveApart", "setAside"):
         source, destination = (op["to"], op["from"]) if backward else (op["from"], op["to"])
         return {destination: pages.get(source), source: None}
     if kind in ("createTree", "removeTree"):
@@ -969,6 +977,8 @@ class Model:
         self.linked_outside = set()   # folders replaced by a link to outside
         self.rederived = 0   # how many times a recompute's runner ran
         self.refuses_schedules = False   # every write to a scheduledDeploy fails
+        self.schedules_start_at_the_next_login = False   # a scheduledDeploy set back is not started now
+        self.starts_at_the_next_login = []   # what the last undo or redo named so
 
     # -- the fold -----------------------------------------------------
 
