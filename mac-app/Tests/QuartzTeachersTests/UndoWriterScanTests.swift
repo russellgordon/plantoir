@@ -149,14 +149,13 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/BuildOutputLocation.swift": (25, "notAStep: the built websites' folder and its move out of the working folder"),
         "Models/BuilderWarmUp.swift": (10, "notAStep: the builder cache of #836 (class D), and the shell and launchers it warms the builder with"),
         "Models/CourseArchiver.swift": (6, "waitsFor: U5"),
-        "Models/CourseConfiguration.swift": (2, "waitsFor: U4"),
+        "Models/CourseConfiguration.swift": (2, "waitsFor: U4b (`recordOnDisk`: the folder and unit-word renames), U4b (`write(to:)`: Rename Course), U4c (`write(to:)`: Add Section), U4d (`write(to:)`: Keep a Copy) and U5 (`write(to:)`: archive and restore); Course Settings' Save and Set School Year plan into a step since U4a (`planWrite(to:into:)`, `writeAsOneStep`)"),
         "Models/CoursePageCopier.swift": (3, "waitsFor: U4"),
         "Models/CourseRenamer.swift": (3, "waitsFor: U4"),
         "Models/CourseRestorer.swift": (29, "waitsFor: U5"),
         "Models/DeployCommand.swift": (3, "waitsFor: U4 (releaseSite's plain moves serve only Keep a Copy for Reference, on the copy it makes, U4's step; the rollover PLANS its markers into its one step, planSiteRelease, U3b; the deploy.sh it names is not counted, rulings 17 and 18)"),
         "Models/DeployTokens/DeployTokenPanel.swift": (1, "notAStep: runs deploy.sh --token through /bin/bash in its mode with no course and no section (#696): the teacher's deploy tokens, which are credentials and not on the list (ruling 8), in the launcher's token store outside every course"),
         "Models/FolderContainers.swift": (2, "notAStep: the website builder's containers, through a shell, outside every course"),
-        "Models/FolderScaffold.swift": (1, "waitsFor: U4 (a new working folder's scaffold, made with New Course)"),
         "Models/LegacyNetlifyRecord.swift": (14, "notAStep: moveTheLegacyMarkerIn brings the legacy Netlify record out of the built output (outside the working folder, where no step can name a place) into .netlify_sites before the rollover's step, as deploy.py's own migration does (load_netlify_marker), moving a current record no deploy can read out of its way first, or brings it in as a leftover no deploy reads, which the step then sets aside; LegacyMarkerBroughtIn.putBack moves it back for a step then refused, and removes the .netlify_sites folder it made when it is empty again (rmdir, counted: Russell's rulings of 2026-11-20; the review of U3b's fixes, round three). Never a step, by ruling"),
         "Models/ObsidianFigureAddOns.swift": (11, "waitsFor: U4"),
         "Models/OneSectionRestore.swift": (1, "notAStep: `unzip -p` reads a backup's course_config.json to its output and writes nothing; the restore itself is CourseRestorer's (U5)"),
@@ -211,12 +210,9 @@ final class UndoWriterScanTests: XCTestCase {
         "Scripting/ProblemReport.swift": (7, "notAStep: problem reports and their records, outside every course"),
         "Scripting/ProblemReportBuilder.swift": (6, "notAStep: a problem report's working folder, outside every course"),
         "Scripting/ScriptRunner.swift": (2, "waitsFor: U4 (runs the launchers through /bin/bash: setup.sh makes a course for New Course, preview.sh rewrites course_config.json in its preflight; deploy.sh is not counted, rulings 17 and 18)"),
-        "Views/CourseSettings/CourseSettingsView.swift": (2, "waitsFor: U4"),
-        "Views/CourseSettings/StringListEditorView.swift": (3, "waitsFor: U4"),
         "Views/Helpers/FolderActions.swift": (5, "waitsFor: U5"),
         "Views/Section/SectionDetailView.swift": (1, "waitsFor: U4 (starts preview.sh, as AssistSiteWork)"),
         "Views/SidebarView.swift": (4, "waitsFor: U5"),
-        "Views/Wizard/SetSchoolYearSheet.swift": (1, "waitsFor: U4"),
     ]
 
     // MARK: - Tests

@@ -182,8 +182,12 @@ final class UndoShadowPublishTests: XCTestCase {
     /// The trail lines name codes and counts, never a page.
     func testTheTrailLinesSayWhatHappened() {
         XCTAssertEqual(
-            UndoTrail.couldNotRecordLine(action: "publishPages", course: "ICS3U", section: 1, mode: .shadow, why: "the list was busy"),
+            UndoTrail.couldNotRecordLine(action: "publishPages", course: "ICS3U", section: 1, change: .wentAhead, why: "the list was busy"),
             "ICS3U/1 · the undo list could not record publishPages: the list was busy. The change went ahead (the list is not in use yet)."
+        )
+        XCTAssertEqual(
+            UndoTrail.couldNotRecordLine(action: "publishPages", course: "ICS3U", section: 1, change: .nothingWasChanged, why: "a file it writes cannot be named in a step"),
+            "ICS3U/1 · the undo list could not record publishPages: a file it writes cannot be named in a step. Nothing was changed."
         )
         XCTAssertEqual(
             UndoTrail.rolledBackLine(course: "ICS3U", section: 1, phase: .begin, files: 2),
