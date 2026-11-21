@@ -475,6 +475,12 @@ public sealed class AgentGuidanceTests : IDisposable
         Assert.Equal(AgentGuidance.Signature("NEW"), AgentGuidanceDeclined.SignatureFor(first.FilePath));
         Assert.Null(AgentGuidanceDeclined.SignatureFor(second.FilePath));
 
+        // A holder that refuses reading but lets the file be replaced: only the three-way read stops the write.
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new FileStream(stored, FileMode.Open, FileAccess.Read, FileShare.Write | FileShare.Delete))
+            Assert.False(AgentGuidanceDeclined.Remember(second));
+        Assert.Equal(before, File.ReadAllBytes(stored));
+
         // Held by a reader without delete sharing: the read works, the rename is refused past the bound.
         var pauses = new List<int>();
         using (HeldFiles.PausingWith(pauses.Add))

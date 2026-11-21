@@ -112,6 +112,29 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
         Assert.Empty(Temporaries());
     }
 
+    /// <summary>
+    /// The decisive shape for the merge read: a second process refuses
+    /// READING but lets the file be replaced (it shares delete), so a Save
+    /// that took the refused read as "unreadable" would write its whole copy
+    /// over the file. It must refuse instead.
+    /// </summary>
+    [Fact]
+    public void AReadRefusedByAHolderThatAllowsReplacingStillRefusesTheSave()
+    {
+        var window = CourseConfiguration.Load(ConfigPath);
+        window.Values["show_reading_time"] = true;
+        File.WriteAllText(ConfigPath, """{"hidden":["Media"],"show_reading_time":false,"footer_html":"from a build"}""");
+        byte[] before = File.ReadAllBytes(ConfigPath);
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new SecondProcessHold(ConfigPath, FileShare.Write | FileShare.Delete))
+        {
+            var refused = Assert.Throws<FileInUseException>(() => window.Write(ConfigPath));
+            Assert.Equal(HeldFiles.InUseSentence("course_config.json"), refused.Message);
+        }
+        Assert.Equal(before, File.ReadAllBytes(ConfigPath));
+        Assert.Empty(Temporaries());
+    }
+
     [Fact]
     public void HeldByAReaderTheRenameIsRefusedPastTheBoundAndTheFileIsUnchanged()
     {

@@ -241,6 +241,15 @@ public class LastViewedPagesTests : IDisposable
         Assert.Equal("A", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
         Assert.Equal("B", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 2));
         Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 3));
+
+        // The decisive shape: a holder that refuses READING but lets the file
+        // be replaced (it shares delete). A write after the refused read
+        // would land here, so only the three-way read keeps the list.
+        using (HeldFiles.PausingWith(_ => { }))
+        using (new FileStream(LastViewedPages.FilePath, FileMode.Open, FileAccess.Read, FileShare.Write | FileShare.Delete))
+            Assert.False(LastViewedPages.Remember(@"C:\Courses", "ICS3U", 3, "C"));
+        Assert.Equal("A", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+        Assert.Equal("B", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 2));
     }
 
     [Fact]
