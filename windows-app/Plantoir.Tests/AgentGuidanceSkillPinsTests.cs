@@ -229,4 +229,54 @@ public partial class AgentGuidanceTests
         Assert.True(problems.Count == 0, string.Join("\n", problems));
         Assert.True(macrosChecked > 0, "starterMacros names no macro");
     }
+
+    /// <summary>
+    /// #796 (the mac's handouts test, its #765 part): the hints wrapper
+    /// <c>handoutsSkill.hintsStarter</c> is written in both homes, defines
+    /// <c>\showhints</c>, is named in the skill in backticks and is not one of
+    /// <c>starters</c> (every starter defines <c>\showanswers</c>, and it does
+    /// not); and each skill in <c>offeredTemplate.namedIn</c> names
+    /// <c>offeredTemplate.name</c> exactly once, white space folded, so a
+    /// rename is the contract's value and one sentence per skill.
+    /// </summary>
+    [Fact]
+    public void TheHintsWrapperIsWrittenAndTheOfferedTemplateIsNamedOnce()
+    {
+        var guidance = Contract["handoutsSkill"]!;
+        string skillName = guidance["skill"]!.ToString();
+        string hintsStarter = guidance["hintsStarter"]!.ToString();
+        List<string> starters = TextsIn(guidance["starters"]!);
+        var offeredTemplate = guidance["offeredTemplate"]!;
+        string templateName = offeredTemplate["name"]!.ToString();
+        List<string> templateNamedIn = TextsIn(offeredTemplate["namedIn"]!);
+        Assert.NotEmpty(templateNamedIn);
+        Assert.False(starters.Contains(hintsStarter), "every starter defines \\showanswers, and the hints wrapper does not");
+        Assert.Empty(Pass().Failures);
+
+        var problems = new List<string>();
+        foreach (string home in AgentGuidance.SkillHomes)
+        {
+            string skill = ReadUtf8(WrittenPath(home, skillName, "SKILL.md"));
+            string hintsPath = WrittenPath(home, skillName, hintsStarter);
+            if (!File.Exists(hintsPath))
+                problems.Add($"{home}: {hintsStarter} is not written");
+            else if (!ReadUtf8(hintsPath).Contains("\\showhints", StringComparison.Ordinal))
+                problems.Add($"{home}: {hintsStarter} must define \\showhints");
+            if (!skill.Contains("`" + hintsStarter + "`", StringComparison.Ordinal))
+                problems.Add($"{home}: the skill must name {hintsStarter}");
+            foreach (string naming in templateNamedIn)
+            {
+                string namingPath = WrittenPath(home, naming, "SKILL.md");
+                if (!File.Exists(namingPath))
+                {
+                    problems.Add($"{home}: offeredTemplate.namedIn names {naming}, and no such skill is written");
+                    continue;
+                }
+                int times = TimesFound(FoldingWhiteSpace(ReadUtf8(namingPath)), FoldingWhiteSpace(templateName));
+                if (times != 1)
+                    problems.Add($"{home}: {naming} must name the template {templateName} exactly once, and names it {times} times");
+            }
+        }
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+    }
 }
