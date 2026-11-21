@@ -385,7 +385,7 @@ public sealed partial class AssistWorkspace
         try
         {
             var resolutions = WikiLinks.Resolve(
-                WikiLinks.PageLinks(File.ReadAllText(keyLinks)), course.DirectoryPath, sectionNumber, keyLinks);
+                WikiLinks.PageLinks(ReadPlanned(keyLinks)), course.DirectoryPath, sectionNumber, keyLinks);
             foreach (var resolution in resolutions)
                 if (resolution.Outcome == LinkOutcome.Resolved)
                     protectedPaths.Add(Path.GetFullPath(resolution.Path!));
@@ -441,7 +441,7 @@ public sealed partial class AssistWorkspace
             try
             {
                 foreach (var resolution in WikiLinks.Resolve(
-                             WikiLinks.PageLinks(File.ReadAllText(keyLinks)), course.DirectoryPath, section, keyLinks))
+                             WikiLinks.PageLinks(ReadPlanned(keyLinks)), course.DirectoryPath, section, keyLinks))
                     if (resolution.Outcome == LinkOutcome.Resolved)
                         reference.Add(Path.GetFullPath(resolution.Path!));
             }
@@ -471,7 +471,7 @@ public sealed partial class AssistWorkspace
     public static DateOnly? DateOf(Course course, int sectionNumber, string pagePath)
     {
         bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, pagePath);
-        try { return PageFrontmatter.CreatedOn(File.ReadAllText(pagePath), sectionNumber, sectionLocal); }
+        try { return PageFrontmatter.CreatedOn(ReadPlanned(pagePath), sectionNumber, sectionLocal); }
         catch { return null; }
     }
 
@@ -724,7 +724,7 @@ public sealed partial class AssistWorkspace
         foreach (var page in pagesList)
         {
             string fullPath = PagePaths.ResolveInside(_folder, page.RelativePath);
-            string text = File.ReadAllText(fullPath);
+            string text = ReadPlanned(fullPath);
             var targets = new List<string>();
             foreach (var resolution in WikiLinks.Resolve(WikiLinks.PageLinks(text), course.DirectoryPath, section, fullPath))
             {
@@ -1184,7 +1184,7 @@ public sealed partial class AssistWorkspace
     {
         try
         {
-            string text = File.ReadAllText(PagePaths.ResolveInside(_folder, relativePath));
+            string text = ReadPlanned(PagePaths.ResolveInside(_folder, relativePath));
             return PageFrontmatter.SetDraft(text, key, draft, section).Edit.NoRoomForAKey;
         }
         catch { return false; }
@@ -1273,7 +1273,7 @@ public sealed partial class AssistWorkspace
     {
         var found = new List<string>();
         string text;
-        try { text = File.ReadAllText(page); } catch { return found; }
+        try { text = ReadPlanned(page); } catch { return found; }
 
         foreach (var resolution in WikiLinks.Resolve(
                      WikiLinks.PageLinks(text), course.DirectoryPath, section, page))
@@ -1395,7 +1395,7 @@ public sealed partial class AssistWorkspace
             bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, target);
             try
             {
-                var visibility = PageFrontmatter.Visibility(File.ReadAllText(target), section);
+                var visibility = PageFrontmatter.Visibility(ReadPlanned(target), section);
                 if (visibility is PageVisibility.Visible or PageVisibility.SaysNothing) continue;
             }
             catch { }
@@ -1450,7 +1450,7 @@ public sealed partial class AssistWorkspace
 
         string indexPath = SectionIndex.PathFor(course, section);
         string indexText;
-        try { indexText = File.ReadAllText(indexPath); }
+        try { indexText = ReadPlanned(indexPath); }
         catch { return null; }
 
         var pointer = PointerFor(course, section, newest);
@@ -1498,7 +1498,7 @@ public sealed partial class AssistWorkspace
                 // "Hidden" is the question here, and the file answers the
                 // opposite one, so it has to be read in draft terms. REPORTING,
                 // so a flag this app will not read collapses to visible.
-                return PageFrontmatter.StoredDraft(File.ReadAllText(full), section) ?? false;
+                return PageFrontmatter.StoredDraft(ReadPlanned(full), section) ?? false;
             }
             catch { return false; }
         });
@@ -1516,7 +1516,7 @@ public sealed partial class AssistWorkspace
                 // "Hidden" is the question here, and the file answers the
                 // opposite one, so it has to be read in draft terms. REPORTING,
                 // so a flag this app will not read collapses to visible.
-                return PageFrontmatter.StoredDraft(File.ReadAllText(path), section) ?? false;
+                return PageFrontmatter.StoredDraft(ReadPlanned(path), section) ?? false;
             }
             catch { return false; }
         }
@@ -1528,7 +1528,7 @@ public sealed partial class AssistWorkspace
     {
         bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, pagePath);
         string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-        string text = File.ReadAllText(pagePath);
+        string text = ReadPlanned(pagePath);
         bool isFolderIndex = Path.GetFileName(pagePath).Equals("index.md", StringComparison.OrdinalIgnoreCase);
         // The shared rule (contracts/class-planning.json -> classFolder), against
         // the path relative to the SECTION. This used to test the whole absolute
@@ -1899,8 +1899,16 @@ public sealed partial class AssistWorkspace
     /// be encouraged to use an LLM for bulk edits, and an LLM can make a mess
     /// that is hard to undo" — so undo is a real button here, not advice.
     /// </summary>
+    /// <param name="keepingTheClassByItsDate">
+    /// Publish Class for a Date (#475, #899 W7a): the step's key is
+    /// <c>publishClassForADate</c>, and a class it publishes that the question
+    /// at Deploy would ask about is kept at its date in
+    /// <c>section&lt;N&gt;.later-classes-kept.json</c> INSIDE the same step,
+    /// so the record goes in only with the pages (the mac's U3 LOW 10); when
+    /// the pages change nothing, the record is the step's only file.
+    /// </param>
     public async Task<AssistResult> Apply(PublishPlan plan, bool preview = true, IProgress<string>? progress = null,
-                                          CancellationToken cancellation = default)
+                                          CancellationToken cancellation = default, bool keepingTheClassByItsDate = false)
     {
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
@@ -1945,43 +1953,52 @@ public sealed partial class AssistWorkspace
         // ONE step for the whole action, made once through the door (#899
         // W7a): every page planned first, nothing written until the step is
         // made, all of it or none (undo.rule.stagedThenSwapped).
-        var step = NewUndoStep(plan.Hiding ? "hidePages" : "publishPages", course.Code, section);
+        var step = NewUndoStep(keepingTheClassByItsDate ? "publishClassForADate" : plan.Hiding ? "hidePages" : "publishPages",
+                               course.Code, section);
         try
         {
-            foreach (var page in plan.Changing)
+            _planningThrough = step;
+            try
             {
-                // Named as it happens, so a teacher watching the conversation
-                // sees the work go by page by page rather than a silence with
-                // a count at the end.
-                progress?.Report($"Editing “{page.Title}”…");
-                string full = PagePaths.ResolveInside(_folder, page.RelativePath);
-                string text = step.ReadText(full);
-                var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
-                // Edited since the plan into a shape with no room: named, never
-                // counted as done (#308).
-                if (edit.NoRoomForAKey) { declined.Add(page.DisplayTitle); continue; }
-                if (!edit.Changed) continue;
-                step.Write(full, updated);
-                changed.Add(page.Title);
-            }
-
-            // Pages only this class uses take its date.
-            string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
-            foreach (var date in plan.InheritedDates.Where(d => d.WillChange))
-            {
-                try
+                foreach (var page in plan.Changing)
                 {
-                    string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                    var (updated, moved) = PageFrontmatter.SetCreated(
-                        step.ReadText(full), date.FrontmatterKey, date.New, tail);
-                    if (moved) step.Write(full, updated);
+                    // Named as it happens, so a teacher watching the conversation
+                    // sees the work go by page by page rather than a silence with
+                    // a count at the end.
+                    progress?.Report($"Editing “{page.Title}”…");
+                    string full = PagePaths.ResolveInside(_folder, page.RelativePath);
+                    string text = step.ReadText(full);
+                    var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
+                    // Edited since the plan into a shape with no room: named, never
+                    // counted as done (#308).
+                    if (edit.NoRoomForAKey) { declined.Add(page.DisplayTitle); continue; }
+                    if (!edit.Changed) continue;
+                    step.Write(full, updated);
+                    changed.Add(page.Title);
                 }
-                catch { }
-            }
 
-            // And the front page catches up with what is now published: kept
-            // true by its rule, re-derived once after the step.
-            if (plan.Index is { WillChange: true }) step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
+                // Pages only this class uses take its date.
+                string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+                foreach (var date in plan.InheritedDates.Where(d => d.WillChange))
+                {
+                    try
+                    {
+                        string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                        var (updated, moved) = PageFrontmatter.SetCreated(
+                            step.ReadText(full), date.FrontmatterKey, date.New, tail);
+                        if (moved) step.Write(full, updated);
+                    }
+                    catch { }
+                }
+
+                // The kept record, read as the pages will be (Publish Class for a Date).
+                if (keepingTheClassByItsDate) KeepTheClassesPublishedByTheirDate(plan, step);
+
+                // And the front page catches up with what is now published: kept
+                // true by its rule, re-derived once after the step.
+                if (plan.Index is { WillChange: true }) step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
+            }
+            finally { _planningThrough = null; }
 
             MakeTheUndoStep(step);
             if (changed.Count > 0)
@@ -2223,7 +2240,7 @@ public sealed partial class AssistWorkspace
         using var recording = UndoHistory.Record(_undo,
             $"{verb} {course.Configuration.UnitWord} {unit} in {course.Code} Section {section}");
 
-        bool changedAnything = false;
+        bool changedAnything;
         var changed = new List<string>();
         var declined = new List<string>();
         void Decline(string title)
@@ -2231,60 +2248,67 @@ public sealed partial class AssistWorkspace
             if (!declined.Contains(title, StringComparer.OrdinalIgnoreCase)) declined.Add(title);
         }
 
+        // ONE step for the whole unit (#899 W7a; the mac's
+        // `publishPagesAWholeUnit`, key publishPages / hidePages): every class
+        // planned into it in order, each planned SEEING the classes before it
+        // (the planners read through the step while it is planned), nothing
+        // written until the step is made, all of it or none
+        // (undo.rule.stagedThenSwapped). The front page is named once and
+        // re-derived once after the step, never written per class.
+        var step = NewUndoStep(publishing ? "publishPages" : "hidePages", course.Code, section);
         try
         {
-            foreach (var page in unitPages)
+            _planningThrough = step;
+            try
             {
-                var pagePlan = PlanPublish(
-                    course.Code, section, new[] { page.RelativePath }, draft: !publishing, publishes: publishing);
-                foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
-
-                if (pagePlan.ChangesNothing) continue;
-
-                foreach (var change in pagePlan.Changing)
+                foreach (var page in unitPages)
                 {
-                    progress?.Report($"Editing “{change.Title}”…");
-                    string full = PagePaths.ResolveInside(_folder, change.RelativePath);
-                    string text = File.ReadAllText(full);
-                    var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
-                    if (edit.NoRoomForAKey) { Decline(change.DisplayTitle); continue; }
-                    if (!edit.Changed) continue;
-                    Save(full, updated);
-                    if (!changed.Contains(change.Title)) changed.Add(change.Title);
-                    changedAnything = true;
-                }
+                    var pagePlan = PlanPublish(
+                        course.Code, section, new[] { page.RelativePath }, draft: !publishing, publishes: publishing);
+                    foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
 
-                string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
-                foreach (var date in pagePlan.InheritedDates.Where(d => d.WillChange))
-                {
-                    try
+                    if (pagePlan.ChangesNothing) continue;
+
+                    foreach (var change in pagePlan.Changing)
                     {
-                        string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                        var (updated, moved) = PageFrontmatter.SetCreated(
-                            File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-                        if (moved)
-                        {
-                            Save(full, updated);
-                            changedAnything = true;
-                        }
+                        progress?.Report($"Editing “{change.Title}”…");
+                        string full = PagePaths.ResolveInside(_folder, change.RelativePath);
+                        string text = step.ReadText(full);
+                        var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
+                        if (edit.NoRoomForAKey) { Decline(change.DisplayTitle); continue; }
+                        if (!edit.Changed) continue;
+                        step.Write(full, updated);
+                        if (!changed.Contains(change.Title)) changed.Add(change.Title);
                     }
-                    catch { }
-                }
 
-                if (pagePlan.Index is { WillChange: true } index)
-                {
-                    ApplyIndexChange(index, tail);
-                    changedAnything = true;
+                    string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+                    foreach (var date in pagePlan.InheritedDates.Where(d => d.WillChange))
+                    {
+                        try
+                        {
+                            string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                            var (updated, moved) = PageFrontmatter.SetCreated(
+                                step.ReadText(full), date.FrontmatterKey, date.New, tail);
+                            if (moved) step.Write(full, updated);
+                        }
+                        catch { }
+                    }
+
+                    if (pagePlan.Index is { WillChange: true })
+                        step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
                 }
             }
+            finally { _planningThrough = null; }
 
+            changedAnything = MakeTheUndoStep(step);
             recording.Done();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            // changedAnything is set after each write, so it says whether
-            // one landed before the failure (#550).
-            StoppedWhileWriting(changedAnything, error);
+            // Part way only when the door left a file holding the new content
+            // (its earlier content kept beside it); otherwise nothing was
+            // written, and "Nothing was changed" is true (#550, W7a).
+            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
             throw;
         }
 
@@ -2846,7 +2870,7 @@ public sealed partial class AssistWorkspace
             string key = PageFrontmatter.CreatedKeyFor(section, sectionLocal);
             try
             {
-                string? raw = PageFrontmatter.StoredText(File.ReadAllText(path), key);
+                string? raw = PageFrontmatter.StoredText(ReadPlanned(path), key);
                 if (raw is { Length: > 10 }) return raw[10..];
             }
             catch { }
@@ -4866,8 +4890,29 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>A step for one daily action, made by this workspace's surface (#899 W7a): <c>madeBy</c> is <c>menu</c>, <c>builtInAssistant:&lt;id&gt;</c> or <c>outsideAssistant::&lt;id&gt;</c>.</summary>
-    internal UndoActionStep NewUndoStep(string actionKey, string courseCode, int section) =>
-        new(new UndoStepMaker(UndoMadeBy, actionKey), _folder, courseCode, section, undo: UndoList);
+    internal UndoActionStep NewUndoStep(string actionKey, string courseCode, int section)
+    {
+        UndoForThisProcess list = UndoList ?? UndoForThisProcess.Current;
+        UndoDoor? door = UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail);
+        return new(new UndoStepMaker(UndoMadeBy, actionKey), _folder, courseCode, section, undo: list, door: door);
+    }
+
+    /// <summary>A test's seams for the door every step of this workspace goes through (a put-back that fails, a kill point); none in the app.</summary>
+    internal UndoSeams? UndoSeams { get; init; }
+
+    /// <summary>
+    /// The step an action is planning through, or null (#899 W7a): while one
+    /// is set, the planners (<see cref="PlanPublish"/>, <see cref="IndexChangeFor"/>,
+    /// <see cref="WriterDeclines"/>, the visibility reads) read each page as
+    /// the step will leave it, so an action that plans one class after
+    /// another inside ONE step (a whole unit) plans each seeing the ones
+    /// before it, as it did when each was written to the disk first.
+    /// </summary>
+    private UndoActionStep? _planningThrough;
+
+    /// <summary>A page's text for a planner: through the step being planned, else the disk's.</summary>
+    private string ReadPlanned(string path) =>
+        _planningThrough is { } step ? step.ReadText(path) : File.ReadAllText(path);
 
     /// <summary>The list a step goes to: this process's, or a test's own.</summary>
     internal UndoForThisProcess? UndoList { get; init; }
@@ -4888,8 +4933,10 @@ public sealed partial class AssistWorkspace
     /// exactly what <see cref="Save"/> used to: each file's text before and
     /// after, the front page as the door re-derived it included.
     /// </summary>
-    internal void MakeTheUndoStep(UndoActionStep step, IReadOnlyList<string>? frontPages = null)
+    /// <returns>Whether the step changed any file, the re-derived front page included.</returns>
+    internal bool MakeTheUndoStep(UndoActionStep step, IReadOnlyList<string>? frontPages = null)
     {
+        bool changedAny = false;
         var changes = step.ChangedFiles;
         var frontBefore = new List<(string Path, string? Text)>();
         foreach (string page in frontPages ?? step.FrontPages)
@@ -4901,6 +4948,11 @@ public sealed partial class AssistWorkspace
         step.Make();
         foreach (var (path, before, after, beforeBytes) in changes)
         {
+            changedAny = true;
+            // Beside the pages, never part of today's change (the kept record
+            // of Publish Class for a Date, as on the mac): Undo Last Change
+            // leaves it, as it did.
+            if (!step.TodaysUndoKeeps(path)) continue;
             _undo?.Touch(path, before, beforeBytes);
             _undo?.Wrote(path, after);
         }
@@ -4909,9 +4961,11 @@ public sealed partial class AssistWorkspace
             string? after = null;
             try { if (File.Exists(path)) after = File.ReadAllText(path); } catch { }
             if (after == before) continue;
+            changedAny = true;
             _undo?.Touch(path, before);
             _undo?.Wrote(path, after);
         }
+        return changedAny;
     }
 
     private void Save(string path, string text)

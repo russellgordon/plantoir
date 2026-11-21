@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Models;
 using Plantoir.Core.Undo;
 
 namespace Plantoir.Tests;
@@ -178,16 +179,22 @@ public sealed class UndoActionStepTests : IDisposable
         var workspace = new AssistWorkspace(Folder, new NoLaunchers(), undo: history) { Surface = AssistSurface.Menu, UndoList = List() };
         PublishPlan plan = workspace.PlanPublish("ICS3U", 1, ["Unit 1, Day 2"], draft: false, publishes: true);
 
+        string indexBefore = File.ReadAllText(Full(Index));
+
         workspace.Apply(plan, preview: false).GetAwaiter().GetResult();
 
-        Assert.NotEqual(Class(2, draft: true), File.ReadAllText(Full(Day2)));
+        // Review 1, LOW: what the publish wrote, exactly, and the front page in today's entry.
+        Assert.False(PageFrontmatter.IsDraft(File.ReadAllText(Full(Day2)), 1), "Day 2 was not published");
+        Assert.Contains("![[Unit 1, Day 2]]", File.ReadAllText(Full(Index)));
         JsonObject begin = Assert.Single(Begins());
         Assert.Equal("publishPages", (string?)begin["step"]!["action"]!["key"]);
         Assert.Equal("menu", (string?)begin["step"]!["madeBy"]);
         UndoHistory.Entry entry = Assert.Single(history.Entries);
         Assert.Equal(Class(2, draft: true), entry.Files[Full(Day2)].Before);
+        Assert.Equal(indexBefore, entry.Files[Full(Index)].Before);
         history.Undo();
         Assert.Equal(Class(2, draft: true), File.ReadAllText(Full(Day2)));
+        Assert.Equal(indexBefore, File.ReadAllText(Full(Index)));
     }
 
     /// <summary>A door over <paramref name="list"/>'s journal with seams, or with maintainers of a test's own.</summary>

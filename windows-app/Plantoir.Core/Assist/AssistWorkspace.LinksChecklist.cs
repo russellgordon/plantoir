@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Plantoir.Core.Models;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -480,21 +481,49 @@ public sealed partial class AssistWorkspace
     /// (Publish Class for a Date…, <c>publish_class_on</c>). A class that
     /// would not be asked about — tomorrow's — leaves no record.
     /// </summary>
-    internal void KeepTheClassesItPublished(Course course, int section, IEnumerable<string> places)
+    internal void KeepTheClassesItPublished(Course course, int section, IEnumerable<string> places, UndoActionStep? step = null)
     {
         var published = places.Select(ClassesDatedLater.PlaceKey).ToHashSet(StringComparer.Ordinal);
-        var kept = ClassesDatedLater.FlaggedIn(course, section, Today())
+        Func<string, string>? readPage = step is null ? null : step.ReadText;
+        Func<string, string?>? readRecord = step is null ? null : step.ReadTextIfAny;
+        var kept = ClassesDatedLater.FlaggedIn(course, section, Today(), readPage, readRecord)
             .Where(page => published.Contains(page.Place))
             .ToList();
-        LaterClassesKept.Keep(course.DirectoryPath, section, kept);
+        if (step is null)
+        {
+            LaterClassesKept.Keep(course.DirectoryPath, section, kept);
+            return;
+        }
+        // Planned into the action's own step: written only if the pages are
+        // (#899 W7a), and never part of today's in-memory undo, as before.
+        if (LaterClassesKept.RecordKeeping(LaterClassesKept.Read(course.DirectoryPath, section, readRecord), kept) is { } record)
+            step.Write(LaterClassesKept.PathFor(course.DirectoryPath, section), record, todaysUndoKeepsIt: false);
     }
 
-    /// <summary>The classes a publish by DATE published, kept at that date (#475): the teacher named the day.</summary>
-    public void KeepTheClassesPublishedByTheirDate(PublishPlan plan)
+    /// <summary>The classes a publish by DATE published, kept at that date (#475): the teacher named the day. Planned into <paramref name="step"/>.</summary>
+    internal void KeepTheClassesPublishedByTheirDate(PublishPlan plan, UndoActionStep step)
     {
         var course = Course(plan.CourseCode);
         KeepTheClassesItPublished(course, plan.SectionNumber, plan.NamedPages.Select(page =>
-            ClassesDatedLater.PlaceOf(course.DirectoryPath, PagePaths.ResolveInside(_folder, page.RelativePath))));
+            ClassesDatedLater.PlaceOf(course.DirectoryPath, PagePaths.ResolveInside(_folder, page.RelativePath))), step);
+    }
+
+    /// <summary>
+    /// Publish Class for a Date whose pages needed no change (#899 W7a): a
+    /// class it names that the question at Deploy would ask about is still
+    /// kept at its date, on a step of its own (<c>publishClassForADate</c>),
+    /// as the mac's does. A record that cannot be written costs the question
+    /// once more, nothing else (<see cref="LaterClassesKept"/>).
+    /// </summary>
+    public void KeepTheClassesPublishedByTheirDateOnAStepOfTheirOwn(PublishPlan plan)
+    {
+        var step = NewUndoStep("publishClassForADate", plan.CourseCode, plan.SectionNumber);
+        try
+        {
+            KeepTheClassesPublishedByTheirDate(plan, step);
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
     /// <summary>Not Now: nothing written but the answer; every row left (0 followers, since the press leaves every row).</summary>

@@ -90,6 +90,8 @@ internal sealed class UndoActionStep
     private readonly Dictionary<string, byte[]?> _after = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _shownAs = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<(string FullPath, long Section)> _frontPages = [];
+    /// <summary>Planned files today's in-memory undo does not keep (a record beside the pages).</summary>
+    private readonly HashSet<string> _notForToday = new(StringComparer.OrdinalIgnoreCase);
 
     // ---- Initializer ---------------------------------------------------------------
 
@@ -156,7 +158,23 @@ internal sealed class UndoActionStep
     // ---- Functions -------------------------------------------------------------------
 
     /// <summary>Plans <paramref name="text"/> as the file's content, written as <c>File.WriteAllText</c> writes it (UTF-8, no byte-order mark).</summary>
-    internal void Write(string fullPath, string text) => Plan(fullPath, new UTF8Encoding(false).GetBytes(text));
+    /// <param name="todaysUndoKeepsIt">False for a file beside the pages that today's in-memory undo (<c>UndoHistory</c>) never kept, such as <c>later-classes-kept.json</c>: it is in the step, and Undo Last Change leaves it.</param>
+    internal void Write(string fullPath, string text, bool todaysUndoKeepsIt = true)
+    {
+        Plan(fullPath, new UTF8Encoding(false).GetBytes(text));
+        if (!todaysUndoKeepsIt) _notForToday.Add(Path.GetFullPath(fullPath));
+    }
+
+    /// <summary>Whether today's in-memory undo is told of this planned file.</summary>
+    internal bool TodaysUndoKeeps(string fullPath) => !_notForToday.Contains(Path.GetFullPath(fullPath));
+
+    /// <summary>The file's text as the step will leave it, or null when it is (or will be) absent.</summary>
+    internal string? ReadTextIfAny(string fullPath)
+    {
+        string key = Path.GetFullPath(fullPath);
+        if (_after.TryGetValue(key, out byte[]? planned)) return TextOf(planned);
+        return File.Exists(fullPath) ? File.ReadAllText(fullPath) : null;
+    }
 
     /// <summary>The file's text as the step will leave it: what is planned, else the disk's.</summary>
     internal string ReadText(string fullPath)
