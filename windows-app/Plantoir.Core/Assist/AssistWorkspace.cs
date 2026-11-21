@@ -1,3 +1,4 @@
+using Plantoir.Core.Undo;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 
@@ -1941,10 +1942,10 @@ public sealed partial class AssistWorkspace
 
         var changed = new List<string>();
         var declined = plan.CannotBeAddedTo.Select(p => p.DisplayTitle).ToList();
-        // Whether a file has been written yet: a failure after one is a write
-        // with no undo entry (the recording is abandoned), and before one it
-        // changed nothing (#550, the mac's #531).
-        bool wrote = false;
+        // ONE step for the whole action, made once through the door (#899
+        // W7a): every page planned first, nothing written until the step is
+        // made, all of it or none (undo.rule.stagedThenSwapped).
+        var step = NewUndoStep(plan.Hiding ? "hidePages" : "publishPages", course.Code, section);
         try
         {
             foreach (var page in plan.Changing)
@@ -1954,19 +1955,15 @@ public sealed partial class AssistWorkspace
                 // a count at the end.
                 progress?.Report($"Editing “{page.Title}”…");
                 string full = PagePaths.ResolveInside(_folder, page.RelativePath);
-                string text = File.ReadAllText(full);
+                string text = step.ReadText(full);
                 var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
                 // Edited since the plan into a shape with no room: named, never
                 // counted as done (#308).
                 if (edit.NoRoomForAKey) { declined.Add(page.DisplayTitle); continue; }
                 if (!edit.Changed) continue;
-                Save(full, updated);
-                wrote = true;
+                step.Write(full, updated);
                 changed.Add(page.Title);
             }
-            if (changed.Count > 0)
-                progress?.Report($"Changed {changed.Count} page{(changed.Count == 1 ? "" : "s")}.");
-            NoteSettingsLeftAsTheyWere(act, declined.Count, course.Code, section);
 
             // Pages only this class uses take its date.
             string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
@@ -1976,20 +1973,28 @@ public sealed partial class AssistWorkspace
                 {
                     string full = PagePaths.ResolveInside(_folder, date.RelativePath);
                     var (updated, moved) = PageFrontmatter.SetCreated(
-                        File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-                    if (moved) { Save(full, updated); wrote = true; }
+                        step.ReadText(full), date.FrontmatterKey, date.New, tail);
+                    if (moved) step.Write(full, updated);
                 }
                 catch { }
             }
 
-            // And the front page catches up with what is now published.
-            if (plan.Index is { WillChange: true } index) { ApplyIndexChange(index, tail); wrote = true; }
+            // And the front page catches up with what is now published: kept
+            // true by its rule, re-derived once after the step.
+            if (plan.Index is { WillChange: true }) step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
 
+            MakeTheUndoStep(step);
+            if (changed.Count > 0)
+                progress?.Report($"Changed {changed.Count} page{(changed.Count == 1 ? "" : "s")}.");
+            NoteSettingsLeftAsTheyWere(act, declined.Count, course.Code, section);
             recording.Done();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            StoppedWhileWriting(wrote, error);
+            // Part way only when the door left a file holding the new content
+            // (its earlier content kept beside it); otherwise nothing was
+            // written, and "Nothing was changed" is true (#550, W7a).
+            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
             throw;
         }
 
@@ -4858,6 +4863,55 @@ public sealed partial class AssistWorkspace
             - [ ]
 
             """;
+    }
+
+    /// <summary>A step for one daily action, made by this workspace's surface (#899 W7a): <c>madeBy</c> is <c>menu</c>, <c>builtInAssistant:&lt;id&gt;</c> or <c>outsideAssistant::&lt;id&gt;</c>.</summary>
+    internal UndoActionStep NewUndoStep(string actionKey, string courseCode, int section) =>
+        new(new UndoStepMaker(UndoMadeBy, actionKey), _folder, courseCode, section, undo: UndoList);
+
+    /// <summary>The list a step goes to: this process's, or a test's own.</summary>
+    internal UndoForThisProcess? UndoList { get; init; }
+
+    /// <summary>This workspace's conversation, as a step's <c>madeBy</c> names it (one per workspace: the window's or the outside assistant's session).</summary>
+    private readonly string _undoConversation = Guid.NewGuid().ToString("D");
+
+    /// <summary>Who makes this workspace's steps (<c>undoJournal.madeBy</c>).</summary>
+    internal string UndoMadeBy => Surface switch
+    {
+        AssistSurface.Menu => "menu",
+        AssistSurface.LocalWindow => "builtInAssistant:" + _undoConversation,
+        _ => "outsideAssistant::" + _undoConversation,
+    };
+
+    /// <summary>
+    /// Makes the step, then tells today's in-memory undo (<c>UndoHistory</c>)
+    /// exactly what <see cref="Save"/> used to: each file's text before and
+    /// after, the front page as the door re-derived it included.
+    /// </summary>
+    internal void MakeTheUndoStep(UndoActionStep step, IReadOnlyList<string>? frontPages = null)
+    {
+        var changes = step.ChangedFiles;
+        var frontBefore = new List<(string Path, string? Text)>();
+        foreach (string page in frontPages ?? step.FrontPages)
+        {
+            string? text = null;
+            try { if (File.Exists(page)) text = File.ReadAllText(page); } catch { }
+            frontBefore.Add((page, text));
+        }
+        step.Make();
+        foreach (var (path, before, after) in changes)
+        {
+            _undo?.Touch(path, before);
+            _undo?.Wrote(path, after);
+        }
+        foreach (var (path, before) in frontBefore)
+        {
+            string? after = null;
+            try { if (File.Exists(path)) after = File.ReadAllText(path); } catch { }
+            if (after == before) continue;
+            _undo?.Touch(path, before);
+            _undo?.Wrote(path, after);
+        }
     }
 
     private void Save(string path, string text)

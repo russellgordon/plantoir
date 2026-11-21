@@ -335,6 +335,12 @@ public static class ActivityTrail
         /// </summary>
         UndoRefusedForAChangeLeftPartWay,
         /// <summary>
+        /// The list could not take a daily action's step, or a file it writes
+        /// cannot be named in one: the action's key, the course and section, a
+        /// word for why, and what became of the change (#899 W7a). Never page text.
+        /// </summary>
+        UndoCouldNotRecordAStep,
+        /// <summary>
         /// A whole course was put back, from one of its backups (Restore…) or
         /// from Archived: the code it shows, its folder, the zip's FILE NAME,
         /// what became of the course as it was first (the archive made of it,
@@ -932,6 +938,7 @@ public static class ActivityTrail
         Event.UndoKeptWhatAPageHeld => "undo kept what a page held",
         Event.UndoKeptWhatItReplaced => "undo kept what it replaced",
         Event.UndoRefusedForAChangeLeftPartWay => "undo refused for a change left part way",
+        Event.UndoCouldNotRecordAStep => "undo could not record a step",
         Event.CourseRestoredFromABackup => "course restored from a backup",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",

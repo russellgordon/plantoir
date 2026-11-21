@@ -64,6 +64,13 @@ internal enum UndoOutcomeKind
 /// <summary>How the door went: a step made, an undo, a redo.</summary>
 internal sealed record UndoOutcome(UndoOutcomeKind Kind, long? Seq = null, UndoRefusal? Refusal = null, bool ClearedTheList = false)
 {
+    /// <summary>
+    /// A refused step whose swap could not be reversed (W7a; the mac's
+    /// <c>leftPartWay</c>): a file holds the new content while what it held
+    /// before is kept beside it. Never said as "Nothing was changed".
+    /// </summary>
+    internal bool LeftPartWay { get; init; }
+
     /// <summary>The word the contract spells it with: a refusal's own word, otherwise the outcome's.</summary>
     internal string Word => Kind == UndoOutcomeKind.Refused
         ? Refusal!.Word
@@ -234,18 +241,28 @@ internal sealed class UndoDoor
         }
         catch (Exception error) when (IsAFailureOfTheList(error))
         {
-            if (Live) return new UndoOutcome(UndoOutcomeKind.CouldNotRecordTheStep);
+            string why = WordFor(error);
+            if (Live)
+            {
+                CouldNotRecord(draft, why, UndoUnrecordedChange.NothingWasChanged);
+                return new UndoOutcome(UndoOutcomeKind.CouldNotRecordTheStep);
+            }
             // Shadow: the change goes ahead exactly as it would have
             // (rule.shadow), the files a rule keeps true re-derived as on the
             // recorded path: a list that failed never leaves the section's
             // front page stale (the mac's performAndRederive re-derives on
-            // appliedWithoutARecord; W4's review, MEDIUM).
+            // appliedWithoutARecord; W4's review, MEDIUM). One trail line says
+            // what became of it, once that is known (W7a; the mac's
+            // UndoTrailHook.couldNotRecord).
             switch (UndoSwap.Swap(targets, "shadow", draft.WorkingFolder, _seams))
             {
-                case UndoSwapResult.Refused refused: return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: refused.Refusal);
+                case UndoSwapResult.Refused refused:
+                    CouldNotRecord(draft, why, refused.LeftPartWay ? UndoUnrecordedChange.StoppedPartWay : UndoUnrecordedChange.NothingWasChanged);
+                    return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: refused.Refusal) { LeftPartWay = refused.LeftPartWay };
                 case UndoSwapResult.StoppedByATest: return new UndoOutcome(UndoOutcomeKind.StoppedByATest);
             }
             Rederive(OpsOf(ops), draft.WorkingFolder);
+            CouldNotRecord(draft, why, UndoUnrecordedChange.WentAhead);
             return new UndoOutcome(UndoOutcomeKind.AppliedWithoutARecord);
         }
         return MakeTheStep(seq, targets, draft.WorkingFolder, ops);
@@ -381,6 +398,22 @@ internal sealed class UndoDoor
     /// failure at all in shadow, where nothing the list does may stop or change
     /// the teacher's action (<c>rule.shadow</c>; W4).
     /// </summary>
+    /// <summary>
+    /// A word for why the list could not take a step, never the error's own
+    /// description, which can carry a path (the mac's <c>UndoTrailHook.word</c>).
+    /// </summary>
+    internal static string WordFor(Exception error) => error switch
+    {
+        UndoJournalException { Failure: UndoJournalFailure.LockBusy } => "the list was busy",
+        UndoJournalException { Failure: UndoJournalFailure.ListNotReadable } or UndoListUnreadableException => "the list could not be read",
+        _ => "the list could not be written",
+    };
+
+    /// <summary>The "undo could not record a step" line for a step given as files (W7a).</summary>
+    private void CouldNotRecord(UndoStepDraft draft, string why, UndoUnrecordedChange change) =>
+        _trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoCouldNotRecordAStep, draft.Course, draft.Section,
+                                         UndoTrail.CouldNotRecordWords(draft.ActionKey, why, change)));
+
     private bool IsAFailureOfTheList(Exception error) =>
         error is UndoJournalException or IOException or UnauthorizedAccessException || !Live;
 
@@ -758,7 +791,7 @@ internal sealed class UndoDoor
             case UndoSwapResult.Refused { LeftPartWay: true } partWay:
                 // Half applied: left in flight for recovery, never failed (LOW 1).
                 Abandon(seq, UndoStepState.Begun);
-                return new UndoOutcome(UndoOutcomeKind.Refused, seq, partWay.Refusal);
+                return new UndoOutcome(UndoOutcomeKind.Refused, seq, partWay.Refusal) { LeftPartWay = true };
             case UndoSwapResult.Refused refused:
                 Finish(seq, "failed", "begin", "refused");
                 return new UndoOutcome(UndoOutcomeKind.Refused, seq, refused.Refusal);

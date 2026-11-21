@@ -41,8 +41,26 @@ internal sealed record UndoTrailLine(ActivityTrail.Event Event, string? Course, 
 /// given a sink for them; the app's start-up (W4) passes
 /// <see cref="ToTheActivityTrail"/>, a test passes a list.
 /// </summary>
+/// <summary>What became of a change the list could not record (the mac's <c>UndoUnrecordedChange</c>).</summary>
+internal enum UndoUnrecordedChange { WentAhead, NothingWasChanged, StoppedPartWay, MadeButNotClosed }
+
 internal static class UndoTrail
 {
+    /// <summary>
+    /// <c>the undo list could not record publishPages: the list was busy. The
+    /// change went ahead (the list is not in use yet).</c> (the mac's
+    /// <c>couldNotRecordLine</c>; <c>activityTrail.mustRecord</c>'s "undo could
+    /// not record a step"). The course and section go in front, as every line.
+    /// </summary>
+    internal static string CouldNotRecordWords(string action, string why, UndoUnrecordedChange change) =>
+        $"the undo list could not record {action}: {why}. " + change switch
+        {
+            UndoUnrecordedChange.WentAhead => "The change went ahead (the list is not in use yet).",
+            UndoUnrecordedChange.NothingWasChanged => "Nothing was changed.",
+            UndoUnrecordedChange.StoppedPartWay => "The change stopped part way; what a file held before is kept beside it.",
+            _ => "The change was made; its record is finished at the next chance.",
+        };
+
     /// <summary><c>the undo list put back 2 files left part way by a change that stopped</c>.</summary>
     internal static string RolledBackWords(UndoPhase phase, int files)
     {
@@ -188,6 +206,7 @@ internal static class UndoTrail
         ActivityTrail.Event written = line.Event switch
         {
             ActivityTrail.Event.UndoRolledBack => ActivityTrail.Event.UndoRolledBack,
+            ActivityTrail.Event.UndoCouldNotRecordAStep => ActivityTrail.Event.UndoCouldNotRecordAStep,
             ActivityTrail.Event.UndoFoundAFolderSetAside => ActivityTrail.Event.UndoFoundAFolderSetAside,
             ActivityTrail.Event.UndoCouldNotPutBack => ActivityTrail.Event.UndoCouldNotPutBack,
             ActivityTrail.Event.UndoKeptWhatAPageHeld => ActivityTrail.Event.UndoKeptWhatAPageHeld,
