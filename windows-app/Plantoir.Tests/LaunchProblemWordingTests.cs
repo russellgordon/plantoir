@@ -50,7 +50,8 @@ public class LaunchProblemWordingTests
             Assert.Equal(PreviewStarts.RunStanding.CouldNotStart,
                          PreviewStarts.HowTheRunStands(runner.IsRunning, runner.LastExitCode, runner.LaunchProblem));
 
-            Assert.Equal(ScriptRunner.FolderIsMissingAPiece + " (the working folder has no preview.ps1)",
+            Assert.Equal("the preview could not start, and the teacher was told why: "
+                         + ScriptRunner.FolderIsMissingAPiece + " (the working folder has no preview.ps1)",
                          PreviewStarts.CouldNotStartLine(runner.LaunchProblem!, runner.LaunchProblemDetail));
         }
         finally

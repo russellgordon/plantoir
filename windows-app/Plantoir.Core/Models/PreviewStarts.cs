@@ -90,7 +90,8 @@ public static class PreviewStarts
 
     /// <summary>The trail line for a run that never started: the sentence shown, then the detail nobody was shown.</summary>
     public static string CouldNotStartLine(string sentence, string? detail) =>
-        detail is null ? sentence : sentence + " (" + detail + ")";
+        "the preview could not start, and the teacher was told why: " + sentence
+        + (detail is null ? "" : " (" + detail + ")");
 }
 
 /// <summary>

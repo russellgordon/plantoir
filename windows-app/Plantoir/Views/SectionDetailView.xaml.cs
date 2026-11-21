@@ -1884,7 +1884,7 @@ public sealed partial class SectionDetailView : UserControl
     {
         if (!PreviewStarts.AStartIsUnderWay(_previewBuildRecord is not null || _isWaitingForServer, _lease)) return false;
         ActivityTrail.Note(ActivityTrail.Event.PreviewAlreadyStarting,
-                           "a preview start did nothing: this window's own start was still waiting for a stop or building",
+                           "asked to preview while this window's preview was still starting: the start already under way goes on, and nothing else was started",
                            _course.Code, _sectionNumber);
         return true;
     }

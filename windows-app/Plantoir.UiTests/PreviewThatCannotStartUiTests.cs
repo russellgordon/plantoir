@@ -55,8 +55,8 @@ public class PreviewThatCannotStartUiTests
         Assert.Contains(ScriptRunner.FolderIsMissingAPiece, DrivenApp.TextsUnder(app.Window));
         Assert.False(PreviewRuns(app), "the Preview button reads Stop for a run that never started");
         string trail = MenuBar.Trail(app);
-        Assert.Contains("preview could not start", trail);
-        Assert.Contains("the working folder has no preview.ps1", trail);
+        Assert.Contains("the preview could not start, and the teacher was told why: "
+                        + ScriptRunner.FolderIsMissingAPiece + " (the working folder has no preview.ps1)", trail);
 
         // The launcher is back: the next press is not swallowed.
         File.Move(aside, launcher);
@@ -64,7 +64,7 @@ public class PreviewThatCannotStartUiTests
         app.Find("previewButton", "the Preview button").AsButton().Invoke();
         Assert.True(app.WaitAnsweringDialogs(() => PreviewRuns(app), TimeSpan.FromSeconds(60)),
                     "the Preview after a run that could not start did not start" + app.AnsweredSoFar);
-        Assert.DoesNotContain("preview already starting", MenuBar.Trail(app));
+        Assert.DoesNotContain("this window's preview was still starting", MenuBar.Trail(app));
     }
 
     /// <summary>A picture of the window with the alert up, for the review, in the temp folder's <c>plantoir-ui-captures</c>.</summary>
