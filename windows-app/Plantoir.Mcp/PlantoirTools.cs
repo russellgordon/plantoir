@@ -700,7 +700,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             var noun = workspace.NounForCourse(course);
-            if (plan.ChangesNothing) return Answering(plan.Describe());
+            // Nothing to add still tells a club's teacher why in its own noun (#1027 review 2, M2).
+            if (plan.ChangesNothing)
+                return noun == ClassNoun.Meeting ? Answering(plan.Describe(noun), plan.Describe()) : Answering(plan.Describe());
             string forTheModel = plan.Describe();
             string card = plan.Describe(noun);
             // Once other classes move, Undo Last Change will not take this

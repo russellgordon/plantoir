@@ -107,11 +107,12 @@ public sealed partial class MainWindow
         if (Verbs() is not { } verbs) return null;
         // Its "ran from a menu" line names Hide Pages…, whose call it is, and
         // says where it came from, as the mac's does.
+        // A club's line says Meetings ▸ and counts meetings (#990, #1027).
+        var noun = Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun ?? ClassNoun.Class;
         var answer = await verbs.Perform(SectionVerbs.HidePages(code, section, places, plan: false),
-                                         SectionVerbDialog.MenuPath(Item.HidePages, Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun ?? ClassNoun.Class), code, section,
+                                         SectionVerbDialog.MenuPath(Item.HidePages, noun), code, section,
                                          SubjectMenuLayout.MenuContaining(Item.HidePages),
-                                         ClassesDatedLater.UntickedAtDeployCounts(places.Count,
-                                             Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun ?? ClassNoun.Class),
+                                         ClassesDatedLater.UntickedAtDeployCounts(places.Count, noun),
                                          previewFollows: false);
         ApplyMenuEnablement();
         return answer;

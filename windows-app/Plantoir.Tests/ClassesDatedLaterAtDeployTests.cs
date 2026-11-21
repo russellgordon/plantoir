@@ -405,6 +405,9 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Assert.Equal("3 classes dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(3));
         string body = MethodBody(ViewSource("MainWindow.Verbs.cs"),
                                  "internal async Task<AssistToolAnswer?> HideClassesForTheDeploy(");
-        Assert.Contains("ClassesDatedLater.UntickedAtDeployCounts(places.Count)", body);
+        Assert.Equal("3 meetings dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(3, ClassNoun.Meeting));
+        // Counted in the section's course's noun (#1027): a club's line counts meetings.
+        Assert.Contains("ClassesDatedLater.UntickedAtDeployCounts(places.Count, noun)", body);
+        Assert.Contains("var noun = Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun", body);
     }
 }
