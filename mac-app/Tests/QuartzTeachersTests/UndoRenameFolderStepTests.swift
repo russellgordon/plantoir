@@ -49,6 +49,8 @@ final class UndoRenameFolderStepTests: XCTestCase {
         JournaledStep.modeOverride = nil
         UndoKillPoints.hook = nil
         UndoKillPoints.fileInUseAtSwap = nil
+        UndoKillPoints.putBackFailsAt = nil
+        UndoKillPoints.beforeTheRename = nil
         ActivityTrail.store = previousTrail
         try? FileManager.default.removeItem(at: listFolder)
         try? FileManager.default.removeItem(at: root)
@@ -482,6 +484,11 @@ final class UndoRenameFolderStepTests: XCTestCase {
         _ = await CourseSettingsView(course: course).renameFolder("Concepts", to: "Ideas", scope: .shared)
         UndoKillPoints.hook = nil
         try recoverInShadow()
+        // Nothing left behind (part four's review, L3): the step's own
+        // staged files are tidied by shadow recovery, as before U4b a killed
+        // rename left no dot-files. MUST FAIL with shadow tidying only steps
+        // of files.
+        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left beside a page or the settings")
         XCTAssertEqual(pages(of: course)["Ideas/Arrays.md"], Data("See [[Concepts/Loops]].\n".utf8), "the kill left the move in, not the page")
         XCTAssertEqual(try settings(of: course)["shared_folders"] as? [String], ["Concepts"], "the kill left the settings as they were")
 
@@ -521,5 +528,164 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertNil(target, "a mixture is not an interrupted rename (today's rule, owed to U7)")
         let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
         XCTAssertTrue(FileManager.default.fileExists(atPath: record.path), "the record is kept")
+    }
+
+    // MARK: - Off the main actor, links, part-way sentences (part four's review)
+
+    /// The rename's check and swap, which read and hash every file in each
+    /// moved folder, run OFF the main actor (part four's review, M1): the
+    /// swap is held at its first page while the main actor runs, sees the
+    /// rename under way with Save disabled, and a second rename is refused
+    /// with nothing changed. An event, not a time: the hold opens only when
+    /// the main actor opens it, and a swap on the main thread is recorded
+    /// and not held. MUST FAIL with `step.make()` called on the main actor
+    /// (the swap is reached on the main thread).
+    func testTheRenameIsMadeOffTheMainActorAndNothingElseStartsMeanwhile() async throws {
+        let course: Course = try course()
+        course.configuration.courseName = "Computer Science"
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        XCTAssertTrue(view.saveIsEnabled, "an unsaved edit makes Save enabled before the rename")
+        let reached: XCTestExpectation = XCTestExpectation(description: "the swap reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        UndoKillPoints.beforeTheRename = { @Sendable (index: Int, place: URL) in
+            gate.arrive()
+        }
+        let first: Task<RenameResult, Never> = Task { @MainActor in
+            return await view.renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        }
+        await fulfillment(of: [reached])
+
+        XCTAssertEqual(gate.wasOnTheMainThread, false, "the swap ran on the main thread")
+        XCTAssertTrue(course.isRenamingAFolder)
+        XCTAssertFalse(view.saveIsEnabled, "Save is disabled while the rename is under way")
+        let second: RenameResult = await view.renameFolder("Concepts", to: "Ideas", scope: .shared)
+        XCTAssertNotNil(failed(second), "\(second)")
+        XCTAssertEqual(listed(course.directoryURL).contains("Concepts"), true, "the second rename changed nothing")
+        gate.open()
+        let result: RenameResult = await first.value
+
+        XCTAssertNotNil(renamed(result), "\(result)")
+        XCTAssertFalse(course.isRenamingAFolder)
+        XCTAssertTrue(view.saveIsEnabled)
+        XCTAssertEqual(try journal().read().records.count, 1, "one step: the second rename never began")
+    }
+
+    /// A folder holding a symbolic link is renamed as before U4b (part
+    /// four's review, L4), the link moved as a link and never followed (it
+    /// leads nowhere), and the step undoes and redoes. MUST FAIL with a link
+    /// read as not a folder (`.notATree`: refused, cannot tell now).
+    func testAFolderHoldingASymbolicLinkIsRenamedWithTheLinkMovedAsALink() async throws {
+        let course: Course = try course()
+        let link: URL = course.directoryURL.appendingPathComponent("section1/Tasks/Handout.pdf")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "/nowhere/Handout.pdf")
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        XCTAssertNotNil(renamed(result), "\(result)")
+        let moved: String = course.directoryURL.appendingPathComponent("section1/Assessments/Handout.pdf").path
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: moved), "/nowhere/Handout.pdf")
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in self.root }), .undone(seq: 1))
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: link.path), "/nowhere/Handout.pdf")
+        XCTAssertEqual(journal().redoNewest(resolveRoot: { _ in self.root }), .redone(seq: 1))
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: moved), "/nowhere/Handout.pdf")
+    }
+
+    /// A per-section rename refused at its second section whose first
+    /// section's folder then cannot be moved back says so, naming that
+    /// folder at its new name (part four's review, L1): "was not renamed"
+    /// would be false of the disk. MUST FAIL with the old sentence.
+    func testARenameStoppedWithAFolderLeftRenamedSaysWhichFolder() async throws {
+        let course: Course = try course()
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index == 1 }
+        UndoKillPoints.putBackFailsAt = { @Sendable (index: Int) in index == 0 }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        let said: String = try XCTUnwrap(failed(result), "\(result)")
+        XCTAssertNotNil(pages(of: course)["section1/Assessments/Quiz 1.md"], "the first section's folder was left renamed")
+        XCTAssertTrue(said.hasPrefix("“Tasks” was renamed only in part"), said)
+        XCTAssertTrue(said.contains("“section1/Assessments”"), said)
+        XCTAssertFalse(said.contains("section2"), said)
+    }
+
+    /// A rename refused as changed since and planned again, whose re-plan
+    /// is then refused (its destination appeared), leaves no record behind
+    /// (part four's review, L2): nothing was changed, so the one-section
+    /// restore is offered as before. MUST FAIL with the record cleared only
+    /// at the end.
+    func testARetryWhoseReplanIsRefusedLeavesNoRecord() async throws {
+        let course: Course = try course()
+        // Once the step has begun: a teacher's file appears inside section
+        // 1's folder (the step is refused as changed since, nothing changed)
+        // and a folder at section 2's new name (the re-plan is refused).
+        let mine: URL = course.directoryURL.appendingPathComponent("section1/Tasks/Mine.md")
+        let appeared: URL = course.directoryURL.appendingPathComponent("section2/Assessments")
+        UndoKillPoints.hook = { @Sendable (reached: UndoKillPoint) in
+            if reached == .afterBegin && !FileManager.default.fileExists(atPath: appeared.path) {
+                try? "Mine.\n".write(to: mine, atomically: true, encoding: .utf8)
+                try? FileManager.default.createDirectory(at: appeared, withIntermediateDirectories: true)
+            }
+            return false
+        }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        XCTAssertNotNil(failed(result), "\(result)")
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path), "the record is left after a refused re-plan")
+    }
+}
+
+/// Holds a rename's swap at its first page until the main actor opens it,
+/// and records whether it was reached on the main thread (then it does not
+/// hold, so a swap on the main actor fails the test rather than hanging it).
+final class RenameHold: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    let reached: XCTestExpectation
+
+    let condition: NSCondition = NSCondition()
+
+    var hasArrived: Bool = false
+
+    var isOpen: Bool = false
+
+    var wasOnTheMainThread: Bool? = nil
+
+    // MARK: - Initializer
+
+    init(reached: XCTestExpectation) {
+        self.reached = reached
+    }
+
+    // MARK: - Functions
+
+    func arrive() {
+        condition.lock()
+        if hasArrived {
+            condition.unlock()
+            return
+        }
+        hasArrived = true
+        let onMain: Bool = Thread.isMainThread
+        wasOnTheMainThread = onMain
+        condition.unlock()
+        reached.fulfill()
+        if onMain {
+            return
+        }
+        condition.lock()
+        while !isOpen {
+            condition.wait()
+        }
+        condition.unlock()
+    }
+
+    func open() {
+        condition.lock()
+        isOpen = true
+        condition.broadcast()
+        condition.unlock()
     }
 }

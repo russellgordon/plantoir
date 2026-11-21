@@ -604,6 +604,12 @@ struct CourseSettingsView: View {
     }
 
     var saveIsEnabled: Bool {
+        // Not while a Rename folder is under way (#899 U4b): the rename's
+        // step changes the settings file, and a Save between its plan and
+        // its swap would be refused or would race it.
+        if course.isRenamingAFolder {
+            return false
+        }
         return SaveEnablement.saveIsEnabled(
             hasUnsavedChanges: course.configuration.hasUnsavedChanges, holdingProblem: holdingProblem
         )
@@ -776,6 +782,11 @@ struct CourseSettingsView: View {
     }
 
     func save() {
+        if course.isRenamingAFolder {
+            // Every control that saves is disabled meanwhile; this is the
+            // same rule for any path that reaches here anyway.
+            return
+        }
         saveProblem = nil
         if let holdingProblem {
             saveProblem = holdingProblem.sentence
@@ -1092,6 +1103,18 @@ struct CourseSettingsView: View {
     /// know, which is what the old order (disk first, settings after) could
     /// leave behind.
     func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) async -> RenameResult {
+        // One rename at a time per course, and no Save meanwhile: every
+        // control that starts either is disabled while this is true, so this
+        // guard is reached only by a path that is not a control.
+        if course.isRenamingAFolder {
+            return .failed(SpecialFolderRenamer.nothingWasChanged(
+                renaming: oldName, said: JournaledStepError.anotherChangeIsUnderWay.localizedDescription
+            ))
+        }
+        course.isRenamingAFolder = true
+        defer {
+            course.isRenamingAFolder = false
+        }
         let courseDirectory: URL = course.directoryURL
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
         // Read BEFORE the move, while the folder still has its old name: which
@@ -1148,15 +1171,34 @@ struct CourseSettingsView: View {
                 )
             }
             do {
-                try step.make()
+                // The check and the swap read and hash every file in each
+                // moved folder: OFF the main actor, so the window stays live
+                // (U4b part four's review, M1). The list's one lock is taken
+                // inside, as for every step, so the order of steps holds.
+                try await SpecialFolderRenamer.make(step)
             } catch JournaledStepError.refused(.changedSince, _) where attempts < 3 {
                 // A page or a setting the step changes was changed between the
                 // plan and the make (a build's preflight, Obsidian): planned
                 // again from the disk as it is then, as Save does.
+                // Nothing was changed (a refusal comes only once everything
+                // is put back), so the record goes before the re-plan, which
+                // may itself be refused (part four's review, L2); the next
+                // make writes it again.
+                SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
                 attempts += 1
                 continue
             } catch let partWay as JournaledStepError {
                 if case .leftPartWay = partWay {
+                    // Said as the disk is: a folder whose move back failed is
+                    // named at its new name (part four's review, L1).
+                    let leftRenamed: [String] = SpecialFolderRenamer.foldersLeftAtTheirNewName(
+                        planned.moves, courseDirectory: courseDirectory
+                    )
+                    if !leftRenamed.isEmpty {
+                        return .failed(SpecialFolderRenamer.renamedOnlyInPart(
+                            renaming: oldName, to: newName, places: leftRenamed, said: partWay.localizedDescription
+                        ))
+                    }
                     return .failed(SpecialFolderRenamer.stoppedPartWay(
                         renaming: oldName, said: partWay.localizedDescription
                     ))

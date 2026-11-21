@@ -126,8 +126,9 @@ nonisolated enum UndoRecovery {
         // pages like a live one, so one closed interrupted would otherwise
         // leave its dot-files in the course until the switch flips. Shadow
         // removes only the journal's own staged FILES, never a folder set
-        // aside (steps that move or make folders are left to a live
-        // recovery), so it still writes nothing of the teacher's.
+        // aside (steps that make or take out folders are left to a live
+        // recovery; a step that moves them whole sets none aside, U4b), so
+        // it still writes nothing of the teacher's.
         tidyClosedSteps(writer, resolveRoot: resolveRoot, onlyStepsOfFiles: mode == .shadow, mode: mode)
         // And what a shadow swap without the list left when its process
         // died (`UndoShadowStaging`; the first review of U3a, LOW 8).
@@ -176,7 +177,7 @@ nonisolated enum UndoRecovery {
             guard let record = writer.fold.records[seq], record.phase == .interrupted else {
                 continue
             }
-            if onlyStepsOfFiles && !UndoRecovery.changesOnlyFiles(record.step) {
+            if onlyStepsOfFiles && !UndoRecovery.changesOnlyFilesAndMoves(record.step) {
                 continue
             }
             let key: String = writer.journal.folderURL.standardizedFileURL.path + "#" + String(seq)
@@ -205,6 +206,27 @@ nonisolated enum UndoRecovery {
     /// Whether every op of the step changes a file in place (`writeFile`,
     /// `editLine`, `replaceText`, `editJSON`) or is a `recompute`: nothing
     /// it stages is a folder or a moved item.
+    /// Whether a step changes only files and moves files or folders whole
+    /// (U4b: Rename folder): the steps whose staged files shadow tidies. A
+    /// move sets nothing aside, so all its tidy removes is the step's own
+    /// staged files beside its pages, at each page's place and, for a page a
+    /// move carries, at its place before the move; a kept original that
+    /// differs from its page stays (part four's review, L3: with the switch
+    /// off a killed rename's dot-files stayed until the switch flipped).
+    /// A step that makes or takes out a folder, or stands apart, is still
+    /// left to a live recovery.
+    static func changesOnlyFilesAndMoves(_ step: UndoStep) -> Bool {
+        for op in step.ops {
+            switch op.knownKind {
+            case .writeFile, .editLine, .replaceText, .editJSON, .recompute, .move:
+                continue
+            default:
+                return false
+            }
+        }
+        return true
+    }
+
     static func changesOnlyFiles(_ step: UndoStep) -> Bool {
         for op in step.ops {
             switch op.knownKind {

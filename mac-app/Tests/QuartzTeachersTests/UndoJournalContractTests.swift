@@ -69,14 +69,16 @@ final class UndoJournalContractTests: XCTestCase {
         XCTAssertEqual(result.failures, [])
     }
 
-    /// An editJSON move changes only its member's bytes, the same on both
-    /// platforms (the hard review of U2b, LOW a).
+    /// Every number spelling in `undo.numberSpellingCases` is read by this
+    /// Mac's JSON reader as the row says (the W6 sweep, Mac low 2).
     func testNumberSpellingCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runNumberSpellingCases()
         XCTAssertGreaterThanOrEqual(result.cases, 37)
         XCTAssertEqual(result.failures, [])
     }
 
+    /// An editJSON move changes only its member's bytes, the same on both
+    /// platforms (the hard review of U2b, LOW a).
     func testEditJSONCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runEditJSONCases()
         XCTAssertGreaterThanOrEqual(result.cases, 6)

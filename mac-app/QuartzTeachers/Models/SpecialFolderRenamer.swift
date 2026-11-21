@@ -90,6 +90,17 @@ nonisolated struct FolderRenamePlan: Sendable {
     }
 }
 
+/// A planned step handed to the task that makes it off the main actor.
+/// Unchecked, and safe for one reason only: the planner hands the step over
+/// and does not touch it again until the task has finished
+/// (`SpecialFolderRenamer.make`).
+nonisolated struct StepHandedOver: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    let step: JournaledStep
+}
+
 /// Something that stopped a rename before it could start.
 struct FolderRenameProblem: LocalizedError {
 
@@ -523,6 +534,29 @@ enum SpecialFolderRenamer {
         }
     }
 
+    /// Makes a planned rename's step OFF the main actor (U4b part four's
+    /// review, M1): the door's check and its swap each read and hash every
+    /// file in every moved folder, a megabyte at a time, which on the main
+    /// actor froze the window for about half a second per gigabyte. The
+    /// caller awaits it, showing the rename under way.
+    ///
+    /// The two reads are kept, not shared: the check is the step's judgement
+    /// under the lock (the contract's `opKinds.move` rule, the same for a
+    /// make, a Redo and recovery's put-back), and the swap's read is its last
+    /// look just before the rename. Letting the first stand for the second
+    /// would leave the time between them (staging every page) unseen, and
+    /// letting the second stand for the first would make a forward move a
+    /// case of its own in the contract.
+    ///
+    /// The step is handed over whole: the caller plans it, then touches it
+    /// no more until this returns.
+    nonisolated static func make(_ step: JournaledStep) async throws {
+        let handed: StepHandedOver = StepHandedOver(step: step)
+        try await Task.detached(priority: .userInitiated) {
+            try handed.step.make()
+        }.value
+    }
+
     /// The sentence when a rename's step is refused and nothing was changed
     /// (`shared-rules.json` → `undo.wording.renameFolderNothingWasChanged`).
     nonisolated static func nothingWasChanged(renaming oldName: String, said: String) -> String {
@@ -534,6 +568,46 @@ enum SpecialFolderRenamer {
     /// names each file kept beside its page.
     nonisolated static func stoppedPartWay(renaming oldName: String, said: String) -> String {
         return "“\(oldName)” was not renamed, and Plantoir could not put everything back as it was: \(said)"
+    }
+
+    /// The sentence when a rename's step stopped part way with a folder
+    /// still at its new name, because its move back failed
+    /// (`undo.wording.renameFolderRenamedOnlyInPart`): `places` are those
+    /// folders inside the course, spelled with their new name.
+    nonisolated static func renamedOnlyInPart(renaming oldName: String, to newName: String, places: [String], said: String) -> String {
+        var joined: String = ""
+        for place in places {
+            if !joined.isEmpty {
+                joined += ", "
+            }
+            joined += "“" + place + "”"
+        }
+        return "“\(oldName)” was renamed only in part, and Plantoir could not put everything back as it was. "
+            + "Still called “\(newName)”: \(joined). \(said)"
+    }
+
+    /// Each planned folder that is at its new name and not at its old one
+    /// now, by its path inside the course: what a rename stopped part way
+    /// left renamed.
+    nonisolated static func foldersLeftAtTheirNewName(_ moves: [FolderRenamePlan.Move], courseDirectory: URL) -> [String] {
+        var result: [String] = []
+        let prefix: String = courseDirectory.standardizedFileURL.path + "/"
+        for move in moves {
+            let isCaseOnly: Bool = move.from.lastPathComponent.caseInsensitiveCompare(move.to.lastPathComponent) == .orderedSame
+            let atTo: Bool = UndoTreeReading.read(at: move.to) != .absent
+            let atFrom: Bool = UndoTreeReading.read(at: move.from) != .absent
+            var leftRenamed: Bool = atTo && !atFrom
+            if isCaseOnly {
+                let listed: [String] = (try? FileManager.default.contentsOfDirectory(atPath: move.to.deletingLastPathComponent().path)) ?? []
+                leftRenamed = listed.contains(move.to.lastPathComponent)
+            }
+            if !leftRenamed {
+                continue
+            }
+            let path: String = move.to.standardizedFileURL.path
+            result.append(path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : move.to.lastPathComponent)
+        }
+        return result
     }
 
     /// Where a page is once the folders move: under a move's `to` when it

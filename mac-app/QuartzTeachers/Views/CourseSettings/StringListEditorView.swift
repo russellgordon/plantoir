@@ -459,6 +459,7 @@ struct StringListEditorView: View {
                 // label of its own.
                 .accessibilityLabel(Text("New name"))
                 .accessibilityIdentifier("renameField")
+                .disabled(isRenaming)
                 .onSubmit {
                     Task { await performRename(of: item, finishing: finishing) }
                 }
@@ -474,14 +475,23 @@ struct StringListEditorView: View {
             }
             HStack {
                 Spacer()
+                // Disabled, visibly, while the rename is under way (#899
+                // U4b): its folders, pages and settings go in all or none,
+                // and halting it part way is the one thing it must never do
+                // (the HIG's progress indicators: offer Cancel only where
+                // halting has no bad side effect).
                 Button("Cancel", role: .cancel) {
                     pendingRename = nil
                 }
                 .keyboardShortcut(.cancelAction)
+                .disabled(isRenaming)
                 if isRenaming {
+                    // A spinner, in the one place the sheet's work is shown:
+                    // the rename's length cannot be measured ahead.
                     ProgressView()
                         .controlSize(.small)
                         .padding(.trailing, 4)
+                        .accessibilityLabel(Text("Renaming"))
                 }
                 Button("Rename") {
                     Task { await performRename(of: item, finishing: finishing) }
@@ -492,6 +502,7 @@ struct StringListEditorView: View {
         .padding([.horizontal, .bottom], 20)
         .sheetTitle(SpecialNames.renameFolderTitle(for: item))
         .frame(width: 420)
+        .interactiveDismissDisabled(isRenaming)
     }
 
     // MARK: - Functions

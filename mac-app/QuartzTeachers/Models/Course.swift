@@ -17,6 +17,13 @@ class Course: Identifiable {
     /// The loaded `course_config.json` for this course.
     let configuration: CourseConfiguration
 
+    /// Whether a Rename folder is under way for this course (#899 U4b): its
+    /// check and swap run off the main actor, so the window stays live while
+    /// every file in the moved folders is read. While it is true, Save
+    /// (button and ⌘S) and a second rename are disabled, visibly, and the
+    /// rename sheet's Cancel with them: a rename cannot be halted part way.
+    var isRenamingAFolder: Bool = false
+
     // MARK: - Computed properties
 
     var id: String {

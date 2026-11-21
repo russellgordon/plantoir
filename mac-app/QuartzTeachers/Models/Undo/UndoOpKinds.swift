@@ -759,6 +759,13 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
 
     let files: [File]
 
+    /// Each symbolic link inside, by its path, with the SHA-256 of the
+    /// bytes it holds (its target as written, never what it leads to): a
+    /// link is listed, never followed (U4b part four's review, L4: a folder
+    /// holding a link is renamed as before, the link moved as a link). A
+    /// listing with a link is never made from its blobs (`make`).
+    var links: [File] = []
+
     /// The one name a listing passes over, wherever it is: the Finder's
     /// `.DS_Store`.
     static let ignoredName: String = ".DS_Store"
@@ -773,6 +780,9 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
         }
         for file in files {
             entries.append((path: file.path, line: "file " + file.sha + " " + file.path + "\n"))
+        }
+        for link in links {
+            entries.append((path: link.path, line: "link " + link.sha + " " + link.path + "\n"))
         }
         entries.sort { first, second in
             return first.path.utf8.lexicographicallyPrecedes(second.path.utf8)
@@ -801,6 +811,7 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
         }
         var folders: [String] = []
         var files: [File] = []
+        var links: [File] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
             if line.hasPrefix("folder ") {
                 let path: String = String(line.dropFirst("folder ".count))
@@ -819,11 +830,22 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
                     return nil
                 }
                 files.append(File(path: path, sha: sha))
+            } else if line.hasPrefix("link ") {
+                let rest: Substring = line.dropFirst("link ".count)
+                guard let space = rest.firstIndex(of: " ") else {
+                    return nil
+                }
+                let sha: String = String(rest[rest.startIndex..<space])
+                let path: String = String(rest[rest.index(after: space)...])
+                if !UndoOp.isBlobName(sha) || !UndoOp.isSafeRelativePath(path) {
+                    return nil
+                }
+                links.append(File(path: path, sha: sha))
             } else {
                 return nil
             }
         }
-        let listing: UndoTreeListing = UndoTreeListing(folders: folders, files: files)
+        let listing: UndoTreeListing = UndoTreeListing(folders: folders, files: files, links: links)
         if listing.data != data {
             return nil
         }
@@ -875,12 +897,13 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         }
         var folders: [String] = []
         var files: [UndoTreeListing.File] = []
+        var links: [UndoTreeListing.File] = []
         var contents: [String: Data] = [:]
         var couldNotRead: Bool = false
-        if !walk(url, prefix: "", keepingContents: keepingContents, folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
+        if !walk(url, prefix: "", keepingContents: keepingContents, folders: &folders, files: &files, links: &links, contents: &contents, couldNotRead: &couldNotRead) {
             return couldNotRead ? .cannotRead : .notATree
         }
-        return .tree(UndoTreeListing(folders: folders, files: files), contents: contents)
+        return .tree(UndoTreeListing(folders: folders, files: files, links: links), contents: contents)
     }
 
     private static func walk(
@@ -889,6 +912,7 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         keepingContents: Bool,
         folders: inout [String],
         files: inout [UndoTreeListing.File],
+        links: inout [UndoTreeListing.File],
         contents: inout [String: Data],
         couldNotRead: inout Bool
     ) -> Bool {
@@ -920,7 +944,7 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
             let type: mode_t = information.st_mode & S_IFMT
             if type == S_IFDIR {
                 folders.append(path)
-                if !walk(url, prefix: path, keepingContents: keepingContents, folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
+                if !walk(url, prefix: path, keepingContents: keepingContents, folders: &folders, files: &files, links: &links, contents: &contents, couldNotRead: &couldNotRead) {
                     return false
                 }
             } else if type == S_IFREG {
@@ -938,6 +962,13 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
                     }
                     files.append(UndoTreeListing.File(path: path, sha: sha))
                 }
+            } else if type == S_IFLNK {
+                // Listed by what it holds, never followed.
+                guard let target = linkTarget(at: url) else {
+                    couldNotRead = true
+                    return false
+                }
+                links.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: target)))
             } else {
                 return false
             }
@@ -945,10 +976,30 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         return true
     }
 
+    /// The bytes a symbolic link holds, read with `readlink`: the link
+    /// itself, never what it leads to. Nil when it cannot be read.
+    static func linkTarget(at url: URL) -> Data? {
+        var buffer: [UInt8] = [UInt8](repeating: 0, count: Int(PATH_MAX) + 1)
+        let count: Int = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return readlink(path, &buffer, buffer.count)
+        }
+        if count < 0 {
+            return nil
+        }
+        return Data(buffer[0..<count])
+    }
+
     /// Makes the folder a listing describes at a NEW place, with every
     /// file's content as given. False, with whatever it made removed, when
-    /// a file's content is missing or a write fails.
+    /// a file's content is missing or a write fails. A listing holding a
+    /// link is never made: a link is moved, never written from a blob.
     static func make(_ listing: UndoTreeListing, contents: [String: Data], at url: URL) -> Bool {
+        if !listing.links.isEmpty {
+            return false
+        }
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
         } catch {
@@ -1210,7 +1261,7 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
                     return .holdsSomethingElse
                 }
             }
-            let judged: UndoTreeListing = UndoTreeListing(folders: listing.folders, files: files)
+            let judged: UndoTreeListing = UndoTreeListing(folders: listing.folders, files: files, links: listing.links)
             return judged.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
         }
     }
