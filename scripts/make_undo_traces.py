@@ -762,6 +762,12 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
     rename, judged by its hash), so no kept original is ever looked for
     for one (the merge of U3b and U3c)."""
     ordered = list(reversed(ops)) if backward else list(ops)
+    # U4b (opKinds.wholeOps' order): an edit named inside a move's new place,
+    # after the move, is carried by it. Forward it is judged where the file
+    # is before the move and made after it; backward it is taken back first,
+    # and the move is judged as if it were.
+    carriers = carried_edits(ops)
+    moving_now = set()
     group_stays_apart = leaves_apart and any(
         op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
     )
@@ -787,7 +793,17 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             continue
         if kind in WHOLE_KINDS:
             # Judged whole against what is there (opKinds.wholeOps).
-            state = whole_state(op, pages_by_path)
+            seen = pages_by_path
+            carries = any(carrier is op for carrier in carriers.values())
+            if backward and carries:
+                seen = dict(pages_by_path)
+                for path, carrier in carriers.items():
+                    if carrier is op and path in working:
+                        if working[path] is None:
+                            seen.pop(path, None)
+                        else:
+                            seen[path] = working[path]
+            state = whole_state(op, seen)
             place = op.get("path") or op.get("from") or op.get("target")
             if group_stays_apart and kind == "moveApart" and state in ("neither", wanted_from):
                 left_apart.append(place)
@@ -805,11 +821,17 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                 # A tree is never made or taken out unless the list holds
                 # everything needed to make it (the hard review of U2b, HIGH 2).
                 return ("contentMissing", place)
-            whole_changes.update(whole_moved(op, backward, pages_by_path))
+            if carries and not backward:
+                moving_now.add(op["to"])
+            whole_changes.update(whole_moved(op, backward, seen))
             continue
         path = op["path"]
         if path not in original:
-            original[path] = pages_by_path.get(path)
+            read_path = path
+            carrier = carriers.get(path)
+            if carrier is not None and carrier["to"] in moving_now:
+                read_path = carrier["from"] + path[len(carrier["to"]):]
+            original[path] = pages_by_path.get(read_path)
             working[path] = original[path]
         state = op_state(op, working[path])
         if state == "neither":
@@ -847,12 +869,64 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             working[path] = moving(op, source, target, working[path])
     if in_the_way:
         return ("changedSince", in_the_way[0], len(in_the_way) - 1)
-    changes = {}
+    file_changes = {}
     for path in original:
         if original[path] != working[path]:
-            changes[path] = working[path]
-    changes.update(whole_changes)
+            file_changes[path] = working[path]
+    # Forward, a carried edit goes in after its move; backward, before it.
+    changes = {}
+    if backward:
+        changes.update(file_changes)
+        changes.update(whole_changes)
+    else:
+        changes.update(whole_changes)
+        changes.update(file_changes)
     return ("ready", changes, left_apart)
+
+
+EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
+
+
+def move_carries(move, edit):
+    """UndoOp.moveCarries: an edit of the file a move moved, or of a file
+    inside the folder it moved, named at the new place and nothing inside
+    the old one (U4b, opKinds.wholeOps). Compared without regard to case."""
+    if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
+        return False
+    place, new_place = edit["path"].lower(), move["to"].lower()
+    if place != new_place and not place.startswith(new_place + "/"):
+        return False
+    old_place = move["from"].lower()
+    return not (place == old_place or place.startswith(old_place + "/") or old_place.startswith(place + "/"))
+
+
+def carried_edits(ops):
+    """Each edit's path a move of the step carries (the edit after the
+    move), with that move."""
+    found = {}
+    for index, move in enumerate(ops):
+        for edit in ops[index + 1:]:
+            if move_carries(move, edit):
+                found[edit["path"]] = move
+    return found
+
+
+def folder_of_pages(pages, place):
+    """A folder the model holds as its files (U4b): the files under `place`
+    as a tree, or None when it holds none."""
+    prefix = place + "/"
+    files = {}
+    folders = set()
+    for path, value in pages.items():
+        if isinstance(path, str) and path.startswith(prefix) and value is not None and not isinstance(value, tuple):
+            inside = path[len(prefix):]
+            files[inside] = value
+            parts = inside.split("/")[:-1]
+            for depth in range(1, len(parts) + 1):
+                folders.add("/".join(parts[:depth]))
+    if not files:
+        return None
+    return {"folders": sorted(folders), "files": files}
 
 
 WHOLE_KINDS = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
@@ -905,7 +979,13 @@ def page_item(value):
 def whole_state(op, pages):
     kind = op["kind"]
     if kind in ("move", "moveApart", "setAside"):
-        return move_state(op, page_item(pages.get(op["from"])), page_item(pages.get(op["to"])))
+        def side(place):
+            if pages.get(place) is None and "listingSha" in op:
+                tree = folder_of_pages(pages, place)
+                if tree is not None:
+                    return {"tree": tree}
+            return page_item(pages.get(place))
+        return move_state(op, side(op["from"]), side(op["to"]))
     if kind in ("createTree", "removeTree"):
         return tree_state(op, page_item(pages.get(op["path"])))
     target = op["target"]
@@ -918,6 +998,17 @@ def whole_moved(op, backward, pages):
     kind = op["kind"]
     if kind in ("move", "moveApart", "setAside"):
         source, destination = (op["to"], op["from"]) if backward else (op["from"], op["to"])
+        if pages.get(source) is None and "listingSha" in op:
+            # A folder held as its files: each one moves (U4b).
+            moved = {}
+            prefix = source + "/"
+            for path, value in pages.items():
+                if isinstance(path, str) and path.startswith(prefix):
+                    moved[path] = None
+            for path, value in pages.items():
+                if isinstance(path, str) and path.startswith(prefix):
+                    moved[destination + path[len(source):]] = value
+            return moved
         return {destination: pages.get(source), source: None}
     if kind in ("createTree", "removeTree"):
         makes = (kind == "createTree") != backward

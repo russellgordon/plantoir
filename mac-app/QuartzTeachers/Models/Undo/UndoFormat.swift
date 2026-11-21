@@ -378,6 +378,13 @@ nonisolated struct UndoStep: Codable, Equatable, Sendable {
                         if let target = op.target, second.target == target {
                             return false
                         }
+                        // U4b: an edit inside what a move moved, named at its
+                        // new place and written after it, is the one op that
+                        // may share a move's place (opKinds.wholeOps' order).
+                        if other > index && UndoOp.moveCarries(op, second) {
+                            other += 1
+                            continue
+                        }
                         for mine in op.pathsNamed {
                             for theirs in second.pathsNamed where UndoOp.placesOverlap(mine, theirs) {
                                 return false
@@ -713,7 +720,11 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         if let afterSha {
             names.append(afterSha)
         }
-        if let listingSha, !names.contains(listingSha) {
+        // A moved folder's listing is never a blob: the folder itself is
+        // what moves (opKinds.move). Found by the first folder moved through
+        // the door (U4b).
+        let isAMove: Bool = knownKind == .move || knownKind == .moveApart || knownKind == .setAside
+        if let listingSha, !isAMove, !names.contains(listingSha) {
             names.append(listingSha)
         }
         return names
@@ -981,6 +992,42 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         case .move, .moveApart, .setAside, .external:
             return false
         }
+    }
+
+    /// Whether `edit` is an edit (a `writeFile`, an `editLine`, a
+    /// `replaceText` or an `editJSON`) of the file a `move` moved, or of a
+    /// file inside the folder it moved, named at the NEW place and naming
+    /// nothing inside the old one (U4b, opKinds.wholeOps). Such an edit is
+    /// made, and redone, after the move, and taken back before it; the move
+    /// is judged against what it holds once that step's own edits inside
+    /// are taken back. Whether it comes after the move in the step's ops is
+    /// the caller's to check. Places compared as `placesOverlap` compares
+    /// them, without regard to case.
+    static func moveCarries(_ move: UndoOp, _ edit: UndoOp) -> Bool {
+        guard move.knownKind == .move, let from = move.from, let to = move.to, let path = edit.path else {
+            return false
+        }
+        switch edit.knownKind {
+        case .writeFile, .editLine, .replaceText, .editJSON:
+            break
+        default:
+            return false
+        }
+        if edit.from != nil || edit.to != nil || edit.target != nil {
+            return false
+        }
+        let place: String = path.lowercased()
+        let newPlace: String = to.lowercased()
+        if place != newPlace && !place.hasPrefix(newPlace + "/") {
+            return false
+        }
+        return !UndoOp.placesOverlap(from, path)
+    }
+
+    /// The place `path`, named inside a move's `to`, had before the move:
+    /// the same path under its `from`.
+    static func placeBeforeTheMove(_ path: String, from: String, to: String) -> String {
+        return from + String(path.dropFirst(to.count))
     }
 
     /// Whether two places are the same, or one is a folder holding the

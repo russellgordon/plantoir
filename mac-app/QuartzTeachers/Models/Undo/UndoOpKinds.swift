@@ -1006,14 +1006,14 @@ nonisolated extension UndoCheck {
     /// free, either holding something else) is a change since, so an undo
     /// leaves BOTH where they are and takes nothing back, and never deletes
     /// the destination alone.
-    static func wholeState(of op: UndoOp, root: URL, places: UndoExternalPlaces) -> UndoOpState {
+    static func wholeState(of op: UndoOp, root: URL, places: UndoExternalPlaces, overridingTo: [String: UndoItem] = [:]) -> UndoOpState {
         switch op.knownKind {
         case .move, .moveApart, .setAside:
             guard let from = op.from, let to = op.to else {
                 return .neither
             }
             let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(from))
-            let atTo: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(to))
+            let atTo: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)
             if atFrom == .cannotRead || atTo == .cannotRead {
                 return .cannotTell
             }
@@ -1092,9 +1092,18 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
 
     // MARK: - Functions
 
-    static func read(_ op: UndoOp, at url: URL) -> UndoMoveSide {
+    /// `overriding` gives, for a path inside the place ("" for a file
+    /// moved itself), what it would hold once the step's own edits there are
+    /// taken back (U4b, opKinds.wholeOps): `.absent` leaves it out of the
+    /// listing. A swap passes its own kept originals inside a moved folder
+    /// as `.absent`, so the move's pair is judged without them.
+    static func read(_ op: UndoOp, at url: URL, overriding: [String: UndoItem] = [:]) -> UndoMoveSide {
         if let sha = op.sha {
-            switch UndoItem.read(at: url) {
+            var item: UndoItem = UndoItem.read(at: url)
+            if let given = overriding[""], item != .absent {
+                item = given
+            }
+            switch item {
             case .absent:
                 return .free
             case .file(let data):
@@ -1113,7 +1122,25 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
         case .cannotRead:
             return .cannotRead
         case .tree(let listing, _):
-            return listing.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
+            if overriding.isEmpty {
+                return listing.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
+            }
+            var files: [UndoTreeListing.File] = []
+            for file in listing.files where overriding[file.path] == nil {
+                files.append(file)
+            }
+            for (path, given) in overriding {
+                switch given {
+                case .absent:
+                    continue
+                case .file(let data):
+                    files.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: data)))
+                case .notAFile, .unreadable:
+                    return .holdsSomethingElse
+                }
+            }
+            let judged: UndoTreeListing = UndoTreeListing(folders: listing.folders, files: files)
+            return judged.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
         }
     }
 }

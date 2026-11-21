@@ -414,6 +414,10 @@ def readable_step(step):
                 continue
             if op.get("target") is not None and other.get("target") == op.get("target"):
                 return False
+            if other_index > index and traces.move_carries(op, other):
+                # U4b: an edit inside what a move moved, at its new place,
+                # after the move (opKinds.wholeOps' order).
+                continue
             theirs = [other[key] for key in ("path", "from", "to") if key in other]
             if any(overlap(a, b) for a in mine for b in theirs):
                 return False
@@ -549,7 +553,7 @@ class ContractCaseTests(unittest.TestCase):
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
+                  "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "rederived", "nothingMovedOutside",
                   "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
                   "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin"}
 
@@ -686,7 +690,53 @@ class ContractCaseTests(unittest.TestCase):
         if call == "forgetTheMaintainer":
             model.maintainer_registered = False
             return None
+        if call == "moveAFolderWithAPageEditedInside":
+            if traces.folder_of_pages(pages, self.MEDIA) is None and traces.folder_of_pages(pages, self.RENAMED) is None:
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.MEDIA + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.MEDIA)
+            if tree is None:
+                return "noFolderToMove"
+            move = {"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)}
+            edit = {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}
+            return model.ops_step([move, edit])
+        if call == "addAFileInsideTheMovedFolder":
+            pages[self.RENAMED + "/c.md"] = "C\n"
+            return None
+        if call == "editThePageInsideByHand":
+            pages[self.RENAMED + "/a.md"] = "Hand.\n"
+            return None
+        if call == "stepEditingInsideAMovesFrom":
+            ops = [{"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": "a" * 64},
+                   {"kind": "replaceText", "path": self.MEDIA + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}]
+            seq = model.begin(ops, readable=readable_step({"ops": ops}))
+            model.find(seq)["phase"] = "done"
+            return None
         self.fail("unknown call " + call)
+
+    MEDIA = "courses/TST1O/media"
+    RENAMED = "courses/TST1O/renamed"
+    MEDIA_FILES = {"a.md": "Intro.\nLine one: old.\nEnd.\n", "b.md": "B\n"}
+
+    def moved_folder(self, model):
+        """U4b's movedFolder: which place holds the folder, then what its
+        a.md holds."""
+        at_new = traces.folder_of_pages(model.pages, self.RENAMED) is not None
+        at_old = traces.folder_of_pages(model.pages, self.MEDIA) is not None
+        place, folder = "neither", self.RENAMED
+        if at_new and at_old:
+            place = "both"
+        elif at_new:
+            place = "renamed"
+        elif at_old:
+            place, folder = "media", self.MEDIA
+        text = model.pages.get(folder + "/a.md")
+        page = "none"
+        if text is not None:
+            page = "new" if "Line one: new." in text else "old" if "Line one: old." in text else "byHand"
+        return place + ", " + page
 
     def markers(self, model):
         source, destination = model.pages.get(self.MARKER_FROM), model.pages.get(self.MARKER_TO)
@@ -702,7 +752,9 @@ class ContractCaseTests(unittest.TestCase):
                   "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
                   "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
                   "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
-                  "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin")
+                  "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
+                  "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
+                  "stepEditingInsideAMovesFrom")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -937,6 +989,8 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(self.leftover_markers(model), case["leftoverMarkers"])
                 if "startsAtTheNextLogin" in case:
                     self.assertEqual(model.starts_at_the_next_login, case["startsAtTheNextLogin"])
+                if "movedFolder" in case:
+                    self.assertEqual(self.moved_folder(model), case["movedFolder"])
                 if "folderKept" in case:
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:

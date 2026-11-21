@@ -36,7 +36,14 @@ nonisolated enum UndoContractKinds {
         "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
         "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
         "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
+        "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
+        "stepEditingInsideAMovesFrom",
     ]
+
+    /// U4b: the folder `moveAFolderWithAPageEditedInside` moves, and where.
+    static let mediaFolder: String = "courses/TST1O/media"
+    static let renamedFolder: String = "courses/TST1O/renamed"
+    static let mediaFiles: [String: String] = ["a.md": "Intro.\nLine one: old.\nEnd.\n", "b.md": "B\n"]
 
     static let asidePage: String = "courses/TST1O/old/a.md"
     static let asidePageMoved: String = "courses/TST1O/a.md"
@@ -258,6 +265,41 @@ nonisolated enum UndoContractKinds {
             try FileManager.default.createDirectory(at: outside(of: root), withIntermediateDirectories: true)
             try FileManager.default.createSymbolicLink(at: old, withDestinationURL: outside(of: root))
             return nil
+        case "moveAFolderWithAPageEditedInside":
+            // U4b: one step, the folder moved and then a page inside it
+            // edited, named at its new place (opKinds.wholeOps' order).
+            if !somethingIsAt(mediaFolder, in: root) && !somethingIsAt(renamedFolder, in: root) {
+                for (name, content) in mediaFiles {
+                    try UndoContractReplay.write(content, to: mediaFolder + "/" + name, in: root)
+                }
+            }
+            guard let listingSha = UndoTreeReading.read(at: root.appendingPathComponent(mediaFolder)).listingSha else {
+                return "noFolderToMove"
+            }
+            let move: UndoOp = UndoOp.moveFolder(from: mediaFolder, to: renamedFolder, listingSha: listingSha)
+            let edit: UndoOp = UndoOp.replaceText(
+                path: renamedFolder + "/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+            )
+            return word(JournaledWrite.perform(ops: draft(ops: [move, edit], blobs: [], root: root, action: "renameFolder"), in: journal, mode: .live, places: places))
+        case "addAFileInsideTheMovedFolder":
+            try UndoContractReplay.write("C\n", to: renamedFolder + "/c.md", in: root)
+            return nil
+        case "editThePageInsideByHand":
+            try? FileManager.default.removeItem(at: root.appendingPathComponent(renamedFolder + "/a.md"))
+            try UndoContractReplay.write("Hand.\n", to: renamedFolder + "/a.md", in: root)
+            return nil
+        case "stepEditingInsideAMovesFrom":
+            // Written as another version might write it, changing nothing:
+            // an edit naming a path inside the place a move leaves.
+            let next: Int = try journal.read().highestSeq + 1
+            let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: root)
+            let moment: String = UndoMoment.text(Date())
+            let ops: String = "[{\"kind\":\"move\",\"from\":\"\(mediaFolder)\",\"to\":\"\(renamedFolder)\",\"listingSha\":\"\(String(repeating: "a", count: 64))\"},"
+                + "{\"kind\":\"replaceText\",\"path\":\"\(mediaFolder)/a.md\",\"before\":\"old\",\"after\":\"new\",\"contextBefore\":\"Line one: \",\"contextAfter\":\".\\n\"}]"
+            let begin: String = "{\"v\":1,\"seq\":\(next),\"event\":\"begin\",\"at\":\"\(moment)\",\"step\":{\"seq\":\(next),\"madeAt\":\"\(moment)\",\"workingFolder\":{\"id\":\"\(folderID)\",\"pathAtTheTime\":\"\(root.path)\"},\"ops\":\(ops)}}"
+            try UndoContractReplay.appendRaw(begin, to: journal)
+            try UndoContractReplay.appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\"}", to: journal)
+            return nil
         case "forgetTheMaintainer":
             UndoMaintainers.forget("sectionFrontPage")
             return nil
@@ -267,6 +309,38 @@ nonisolated enum UndoContractKinds {
     }
 
     /// What `markers` says of the two places a rollover's marker move names.
+    /// U4b's `movedFolder`: which place holds the folder (renamed, media,
+    /// both or neither), then what its a.md holds (new, old, byHand, none).
+    static func movedFolder(in root: URL) -> String {
+        let atNew: Bool = somethingIsAt(renamedFolder, in: root)
+        let atOld: Bool = somethingIsAt(mediaFolder, in: root)
+        var place: String = "neither"
+        var folder: String = renamedFolder
+        if atNew && atOld {
+            place = "both"
+        } else if atNew {
+            place = "renamed"
+        } else if atOld {
+            place = "media"
+            folder = mediaFolder
+        }
+        var page: String = "none"
+        if let text = text(at: folder + "/a.md", in: root) {
+            if text.contains("Line one: new.") {
+                page = "new"
+            } else if text.contains("Line one: old.") {
+                page = "old"
+            } else {
+                page = "byHand"
+            }
+        }
+        return place + ", " + page
+    }
+
+    static func somethingIsAt(_ path: String, in root: URL) -> Bool {
+        return UndoItem.read(at: root.appendingPathComponent(path)) != .absent
+    }
+
     static func markers(in root: URL) -> String {
         let from: String? = text(at: markerFrom, in: root)
         let to: String? = text(at: markerTo, in: root)

@@ -240,6 +240,15 @@ nonisolated enum UndoCheck {
         let groupStaysApart: Bool = leavesApart && UndoCheck.aWebsiteRecordIsChangedSince(
             ordered, direction: direction, root: root, places: places
         )
+        // U4b (opKinds.wholeOps' order): each edit named inside a move's new
+        // place, after the move in the step, is carried by that move. Going
+        // forward it is judged where the file is before the move and made
+        // after it; going back it is taken back first, and the move is
+        // judged as if it were.
+        let carriers: [String: UndoOp] = UndoCheck.carriers(in: ops)
+        var movingNow: Set<String> = []
+        var stagedAtItsTurn: Set<String> = []
+        var leadingTargets: [UndoSwapTarget] = []
 
         for op in ordered {
             guard let kind = op.knownKind else {
@@ -268,7 +277,18 @@ nonisolated enum UndoCheck {
                 continue
             }
             if op.isWhole {
-                let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: places)
+                var overridingTo: [String: UndoItem] = [:]
+                var carriesEdits: Bool = false
+                if let to = op.to {
+                    for (path, carrier) in carriers where carrier == op {
+                        carriesEdits = true
+                        if direction == .backward, let item = working[path] {
+                            let inside: String = path.count == to.count ? "" : String(path.dropFirst(to.count + 1))
+                            overridingTo[inside] = item
+                        }
+                    }
+                }
+                let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: places, overridingTo: overridingTo)
                 let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
                 if verdict == .alreadyBack || verdict == .alreadyRedone {
                     continue
@@ -310,6 +330,11 @@ nonisolated enum UndoCheck {
                     }
                     continue
                 }
+                if carriesEdits && direction == .forward, let to = op.to {
+                    movingNow.insert(to)
+                    leadingTargets.append(target)
+                    continue
+                }
                 wholeTargets.append(target)
                 continue
             }
@@ -317,7 +342,12 @@ nonisolated enum UndoCheck {
                 return .refused(.notReadable)
             }
             if original[path] == nil {
-                let item: UndoItem = UndoItem.read(at: root.appendingPathComponent(path))
+                var readPath: String = path
+                if let carrier = carriers[path], let from = carrier.from, let to = carrier.to, movingNow.contains(to) {
+                    readPath = UndoOp.placeBeforeTheMove(path, from: from, to: to)
+                    stagedAtItsTurn.insert(path)
+                }
+                let item: UndoItem = UndoItem.read(at: root.appendingPathComponent(readPath))
                 original[path] = item
                 working[path] = item
                 pathsInOrder.append(path)
@@ -394,7 +424,8 @@ nonisolated enum UndoCheck {
             return .refused(.contentMissing(path: missingContentPath))
         }
 
-        var targets: [UndoSwapTarget] = []
+        // Going forward, a move that carries edits goes in before them.
+        var targets: [UndoSwapTarget] = leadingTargets
         for path in pathsInOrder {
             let before: UndoItem = original[path] ?? .absent
             let after: UndoItem = working[path] ?? .absent
@@ -405,13 +436,34 @@ nonisolated enum UndoCheck {
                 url: root.appendingPathComponent(path),
                 relativePath: path,
                 expected: before.data,
-                replacement: after.data
+                replacement: after.data,
+                stagesAtItsTurn: stagedAtItsTurn.contains(path)
             ))
         }
         for target in wholeTargets {
             targets.append(target)
         }
         return .ready(targets: targets, recomputes: recomputes, leftApart: leftApart)
+    }
+
+    /// Each edit's path a move of the step carries (`UndoOp.moveCarries`,
+    /// the edit after the move), with that move.
+    static func carriers(in ops: [UndoOp]) -> [String: UndoOp] {
+        var found: [String: UndoOp] = [:]
+        var index: Int = 0
+        while index < ops.count {
+            let move: UndoOp = ops[index]
+            var later: Int = index + 1
+            while later < ops.count {
+                let edit: UndoOp = ops[later]
+                if let path = edit.path, UndoOp.moveCarries(move, edit) {
+                    found[path] = move
+                }
+                later += 1
+            }
+            index += 1
+        }
+        return found
     }
 
     /// Whether any `moveApart` op of a step (a website record) is changed
@@ -597,14 +649,20 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
 
     let change: UndoSwapChange
 
+    /// A file inside a folder this same swap moves in first (U4b): staged at
+    /// its turn, once the move has gone in, never beforehand, when its
+    /// folder is not there yet.
+    let stagesAtItsTurn: Bool
+
     // MARK: - Initializer
 
-    init(url: URL, relativePath: String, expected: Data?, replacement: Data?) {
+    init(url: URL, relativePath: String, expected: Data?, replacement: Data?, stagesAtItsTurn: Bool = false) {
         self.url = url
         self.relativePath = relativePath
         self.expected = expected
         self.replacement = replacement
         self.change = .file
+        self.stagesAtItsTurn = stagesAtItsTurn
     }
 
     init(url: URL, relativePath: String, change: UndoSwapChange) {
@@ -613,6 +671,7 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
         self.expected = nil
         self.replacement = nil
         self.change = change
+        self.stagesAtItsTurn = false
     }
 }
 
@@ -743,6 +802,82 @@ nonisolated enum UndoSwap {
             foldersMade = []
         }
 
+        /// Writes a file's new content beside it under this swap's staged
+        /// name: the staged URL, or nil (with anything part-made removed)
+        /// when the disk is full or the folder will not take a new file.
+        func stageAFile(_ target: UndoSwapTarget, at targetIndex: Int, replacement: Data) -> URL? {
+            let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
+            var mode: mode_t = 0o644
+            var information: stat = stat()
+            let found: Int32 = target.url.withUnsafeFileSystemRepresentation { path in
+                guard let path else {
+                    return -1
+                }
+                return stat(path, &information)
+            }
+            if found == 0 {
+                mode = information.st_mode & 0o7777
+            }
+            do {
+                makeTheFolder(for: target.url)
+                try FileManager.default.createDirectory(
+                    at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try? FileManager.default.removeItem(at: stagedURL)
+                if UndoKillPoints.stagingWriteFailsAt?(targetIndex) == true {
+                    // As a full disk does: the exclusive create makes the
+                    // file, then writing into it fails.
+                    try UndoFiles.writeDurably(Data(), to: stagedURL, mode: mode)
+                    throw UndoJournalError.couldNotStoreContent(ENOSPC)
+                }
+                try UndoFiles.writeDurably(replacement, to: stagedURL, mode: mode)
+                return stagedURL
+            } catch {
+                // The exclusive create may have made the file before the
+                // write failed (the Fable sweep of U1, F1): it is this
+                // swap's own, so it goes with every other staged file.
+                // Staging writes a NEW file, which no other program can be
+                // holding, so this is never `fileIsInUse`: the disk is full
+                // or the folder will not take a new file.
+                _ = UndoSwap.removeStaged(stagedURL)
+                return nil
+            }
+        }
+
+        /// What this swap has made or kept inside the place `folder`
+        /// (staged files and kept originals), relative to it, as absent:
+        /// a move's pair is judged without them (U4b).
+        func ownFilesInside(_ folder: URL) -> [String: UndoItem] {
+            var found: [String: UndoItem] = [:]
+            let prefix: String = folder.path + "/"
+            for url in staged + originals {
+                if let url, url.path.hasPrefix(prefix) {
+                    found[String(url.path.dropFirst(prefix.count))] = .absent
+                }
+            }
+            return found
+        }
+
+        /// After a folder moved from `old` to `new`: every staged file and
+        /// kept original of this swap inside it is named at its new place.
+        func followTheMove(from old: URL, to new: URL) {
+            let prefix: String = old.path + "/"
+            var position: Int = 0
+            while position < staged.count {
+                if let url = staged[position], url.path.hasPrefix(prefix) {
+                    staged[position] = URL(fileURLWithPath: new.path + "/" + String(url.path.dropFirst(prefix.count)))
+                }
+                position += 1
+            }
+            position = 0
+            while position < originals.count {
+                if let url = originals[position], url.path.hasPrefix(prefix) {
+                    originals[position] = URL(fileURLWithPath: new.path + "/" + String(url.path.dropFirst(prefix.count)))
+                }
+                position += 1
+            }
+        }
+
         /// True when a test stopped it while a folder taken out was being
         /// removed, as a process that died there would stop.
         @discardableResult
@@ -828,6 +963,8 @@ nonisolated enum UndoSwap {
                 case .moveHere(let from, _, _):
                     if failsHere || !UndoSwap.renameExclusively(target.url, onto: from) {
                         everyOnePutBack = false
+                    } else {
+                        followTheMove(from: target.url, to: from)
                     }
                 case .makeTree:
                     // Back under its staged name, removed with the rest.
@@ -899,49 +1036,17 @@ nonisolated enum UndoSwap {
                 staged.append(stagedURL)
                 continue
             }
-            guard case .file = target.change, let replacement = target.replacement else {
+            guard case .file = target.change, let replacement = target.replacement, !target.stagesAtItsTurn else {
                 staged.append(nil)
                 continue
             }
-            let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
-            var mode: mode_t = 0o644
-            var information: stat = stat()
-            let found: Int32 = target.url.withUnsafeFileSystemRepresentation { path in
-                guard let path else {
-                    return -1
-                }
-                return stat(path, &information)
-            }
-            if found == 0 {
-                mode = information.st_mode & 0o7777
-            }
-            do {
-                makeTheFolder(for: target.url)
-                try FileManager.default.createDirectory(
-                    at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
-                )
-                try? FileManager.default.removeItem(at: stagedURL)
-                if UndoKillPoints.stagingWriteFailsAt?(targetIndex) == true {
-                    // As a full disk does: the exclusive create makes the
-                    // file, then writing into it fails.
-                    try UndoFiles.writeDurably(Data(), to: stagedURL, mode: mode)
-                    throw UndoJournalError.couldNotStoreContent(ENOSPC)
-                }
-                try UndoFiles.writeDurably(replacement, to: stagedURL, mode: mode)
-                staged.append(stagedURL)
-            } catch {
-                // The exclusive create may have made the file before the
-                // write failed (the Fable sweep of U1, F1): it is this
-                // swap's own, so it goes with every other staged file.
-                // Staging writes a NEW file, which no other program can be
-                // holding, so this is never `fileIsInUse`: the disk is full
-                // or the folder will not take a new file.
-                _ = UndoSwap.removeStaged(stagedURL)
+            guard let stagedURL = stageAFile(target, at: targetIndex, replacement: replacement) else {
                 staged.append(nil)
                 tidy()
                 removeTheFoldersMade()
                 return .refused(.couldNotWrite(path: target.relativePath))
             }
+            staged.append(stagedURL)
         }
 
         // 2. Swap them in, checking each target first.
@@ -966,6 +1071,12 @@ nonisolated enum UndoSwap {
             case _ where refusal != nil:
                 break
             case .file:
+                if target.stagesAtItsTurn, let replacement = target.replacement {
+                    guard let stagedURL = stageAFile(target, at: index, replacement: replacement) else {
+                        return refusedAfterSwapping(.couldNotWrite(path: target.relativePath))
+                    }
+                    staged[index] = stagedURL
+                }
                 var putBack: Bool = true
                 refusal = UndoSwap.swapAFile(
                     target, index: index, label: label, staged: &staged, originals: &originals, putBack: &putBack
@@ -979,7 +1090,7 @@ nonisolated enum UndoSwap {
             case .moveHere(let from, _, let op):
                 // The pair once more, just before the rename: the content at
                 // the place it leaves, nothing where it goes.
-                let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: from)
+                let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: from, overriding: ownFilesInside(from))
                 let atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url)
                 if atFrom == .cannotRead || atTarget == .cannotRead {
                     refusal = .cannotTellNow(path: target.relativePath)
@@ -989,6 +1100,8 @@ nonisolated enum UndoSwap {
                     makeTheFolder(for: target.url)
                     if !UndoSwap.renameExclusively(from, onto: target.url) {
                         refusal = .fileIsInUse(path: target.relativePath)
+                    } else {
+                        followTheMove(from: from, to: target.url)
                     }
                 }
             case .makeTree:
