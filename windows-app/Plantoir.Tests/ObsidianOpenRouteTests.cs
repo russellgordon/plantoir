@@ -730,6 +730,7 @@ public sealed class ObsidianOpenRouteTests : IDisposable
     {
         var runner = new Plantoir.Core.Assist.AssistToolRunner(new NoServer(), "MPM2D", 1, Plantoir.Core.Assist.AssistSurface.LocalWindow)
         {
+            CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             OpenInObsidianInApp = throws
                 ? () => throw new IOException("no")
                 : () => Task.FromResult<OpenInObsidianPress>(new OpenInObsidianPress.DidNotOpen()),

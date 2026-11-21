@@ -68,7 +68,7 @@ public class AssistLapCapTests : IDisposable
 
     /// <summary>An agent with no cards in the way: the sentence goes to the model.</summary>
     private static AssistAgent Agent(ScriptModel model, CannedTools tools) =>
-        new(model, tools, new JsonArray(), "VVH2O", 1) { ConfirmationMode = () => false };
+        new(model, tools, new JsonArray(), "VVH2O", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class, ConfirmationMode = () => false };
 
     private static ScriptModel Reading(int times, ScriptModel? model = null)
     {

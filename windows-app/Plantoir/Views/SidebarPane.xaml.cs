@@ -1202,8 +1202,10 @@ public sealed partial class SidebarPane : UserControl
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.HidePages))));
         menu.Items.Add(MenuItem("Publish Class for a Date…", "",
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishClassForADate))));
-        menu.Items.Add(MenuItem("Add Next Class", "",
-            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddNextClass))));
+        // #927: Add Class… in the place Add Next Class had (ruled 2026-11-13
+        // on #897), opening the menu bar's dialog; its ways are not items here.
+        menu.Items.Add(MenuItem(SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.AddClass)!, "",
+            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddClass))));
         menu.Items.Add(new MenuFlyoutSeparator());
 
         // The vault is the COURSE folder even for a section — the section is
