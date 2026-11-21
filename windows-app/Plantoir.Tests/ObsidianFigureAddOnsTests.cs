@@ -134,17 +134,25 @@ public sealed class ObsidianFigureAddOnsTests : IDisposable
         try
         {
             string course = NewCourse("MPM2D");
-            var watch = Stopwatch.StartNew();
             var first = ObsidianFigureAddOns.Install(ObsidianFigureAddOns.Pinned, course, VendorCarried, Defaults);
-            watch.Stop();
             Assert.All(first, r => Assert.Equal(ObsidianFigureAddOns.OutcomeKind.Added, r.Outcome.Kind));
+            // What the first pass is for, byte for byte: every pinned file in
+            // place, whole. This replaced a 5 s wall-clock bound on the first
+            // pass (#770 item 3), which measured the machine rather than the
+            // pass (74 ms measured, documentation 12; 9,258 ms on a loaded PC).
+            foreach (var addOn in ObsidianFigureAddOns.Pinned)
+            foreach (var file in addOn.Files)
+            {
+                byte[] written = File.ReadAllBytes(Path.Combine(course, ".obsidian", "plugins", addOn.Id, file.Name));
+                Assert.Equal(file.Bytes, written.LongLength);
+                Assert.Equal(file.Sha256, ObsidianFigureAddOns.Sha256(written));
+            }
             var before = Snapshot(course);
             var second = ObsidianFigureAddOns.Install(ObsidianFigureAddOns.Pinned, course, VendorCarried, Defaults);
             Assert.All(second, r => Assert.Equal(ObsidianFigureAddOns.OutcomeKind.AlreadyThere, r.Outcome.Kind));
             Assert.Equal(before, Snapshot(course));
             ObsidianFigureAddOnsThisRun.NotePass("MPM2D", ObsidianFigureAddOnsTrail.Trigger.AfterAPreview, second);
             Assert.False(File.Exists(trail) && File.ReadAllText(trail).Contains("Obsidian add-ons"));
-            Assert.True(watch.ElapsedMilliseconds < 5000, $"a first pass took {watch.ElapsedMilliseconds} ms");
         }
         finally { RestoreTrail(); }
     }
