@@ -26,10 +26,26 @@ Branch `issue/928-win-preview-starts`. #1022 item 1 is done here; #1022 item 2
   re-took `_previewWork`).
 - A parked start runs its launcher only if it still holds its own lease (by
   reference), is the window's latest start (`_latestPreviewStart`), the page
-  is not torn down and `App.QuitHasGoneAhead` is false. The quit flag is set in
-  `MainWindow.AskBeforeQuittingThroughWork` once past the question
-  (`App.LetThePreviewStartsGo`, which also abandons every repair press), and
-  taken back where that close turns out not to quit.
+  is not torn down and the quit has not gone ahead
+  (`Plantoir.Core.Models.QuitGoingAhead`). Since review 1 (M1) the closing
+  handler runs one `QuitGoingAhead.Pass` per run: the quit goes ahead in one
+  place (`pass.GoAhead()`, which also abandons every repair press) and is
+  taken back in one place, the pass's end, unless the pass said the close
+  went through, was handed to the next pass, or was no quit. Keep Working
+  when asked again after the wait for a tools copy used to leave it set, and
+  Preview then started nothing until relaunch.
+- A press while the window's own stop finishes (`StopPreviewAsync`, counted
+  by `_stopsUnderWay`) does nothing and writes a true line to the diagnostic
+  log ("…while this window's preview was still stopping: nothing was
+  started"), not `preview already starting` (review 1, L1). No trail event
+  names it and adding one needs a contract key, so it is the diagnostic log.
+- An exception escaping either start after it took its lease hands back what
+  that start still holds (`HandBackAfterAFailure`: stopped the way Stop
+  stops it, only if `PreviewStarts.TheStartStillHoldsItsOwn`) (L2). The
+  repair's refusal after the stop is shown through its own catch (L5).
+- `AssistWorkspace`'s refusal for a folder that is not set up, which Section ▸
+  Rebuild Preview shows a teacher, no longer names `preview.ps1` or the full
+  path (`AssistWorkspace.NotAWorkingFolderYet`, the folder by its name) (L6).
 - A run that never started (`HowTheRunStands` → `CouldNotStart`: not running,
   `LaunchProblem` set, asked before the exit code) ends the wait at once
   (`AbandonWait`: wait, record, lease), writes `preview could not start` with
@@ -56,20 +72,33 @@ Branch `issue/928-win-preview-starts`. #1022 item 1 is done here; #1022 item 2
 - Ledger: the `Owed(ActivityTrailEvents, 928, …)` entry and `Reason928` are
   removed; the three events are in `ActivityTrail.Event`.
 - Tests: `PreviewStartRecordTests` (every `pressCases` and `previewAgainCases`
-  case from the JSON, two starts then the quit question, the per-section
-  count, `HowTheRunStands`, `TheStartStillBelongs`, a replaced press, and
-  source readings that both starts ask the model in order),
-  `LaunchProblemWordingTests` (refuses ".sh", ".ps1", ".py", "launcher",
-  "script" in every launch problem; a missing launcher met for real).
+  case from the JSON, with windows A and B as two lease owners, the
+  per-section count, `HowTheRunStands`, `TheStartStillBelongs`, a replaced
+  press, two owners on one section, release by reference, a press during a
+  stop, and source readings that both starts ask the model in order, release
+  only their window's rows and hand back on a failure),
+  `QuitGoingAheadTests` (every way out of the quit question, and a reading
+  that the handler uses one pass), `LaunchProblemWordingTests` (refuses
+  ".sh", ".ps1", ".py", "launcher", "script" in every launch problem and in
+  the folder-not-set-up refusal; a missing launcher met for real). Review 1's
+  L3: the two vacuous tests (`TwoStartsThenTheEnd…`, `TheViewRecordsABuild…`)
+  are removed; the pressCase "a second press while the first waits for its
+  stop" and the source-order theory cover item 4.
 - Not met for real: the ConPTY launch failure (`CouldNotGetStarted`); the
   runner always launches `powershell.exe`, so the test reads the constant.
   The mac's test points its shell at a missing program.
 
-- Known and left: Section ▸ Rebuild Preview in a folder with no
-  `preview.ps1` is refused earlier, by `AssistWorkspace`'s constructor, whose
-  sentence names the folder and `preview.ps1` ("isn't a Plantoir working
-  folder"). That sentence is the assistant's and the menu's, not a launch
-  problem, so it is not changed here.
+- Must-fail (review 1), all reverts at once in scratch commit bd4b1bb5c (local only), each test failing on its own revert: VM B, 2026-11-21 00:31, 11 of 28 failed, the other 17 passed:
+  - `QuitGoingAheadTests.KeepWorkingWhenAskedAgainAfterTheWait` line 56 and `AWindowOpenedDuringTheWait` line 71: the pass's default ending reverted from TakenBack (M1).
+  - `QuitGoingAheadTests.TheClosingHandlerUsesOnePass` line 148: `LetHeldCopiesGo()` put back on the handler's Keep Working path.
+  - `PreviewStartRecordTests.AnotherWindowsStartNeverEndsThisWindowsLease` line 258: `ReleaseLeftBehind` made to ignore the owner (M2).
+  - `PreviewStartRecordTests.TheViewReleasesOnlyItsOwnWindowsLeases` line 381: `ReleaseLease`'s sweep put back to `PreviewLeases.Release(wp, …)` (M2).
+  - `PreviewStartRecordTests.AReleaseRemovesOnlyTheLeaseItsStartTook` line 281: `Release(lease)` put back to `_active.Remove(lease)` (value equality).
+  - `PreviewStartRecordTests.AStartHoldsItsOwnLeaseByReference` line 292: `TheStartStillHoldsItsOwn` made to compare with `Equals`.
+  - `PreviewStartRecordTests.APressDuringAStopIsNotAStartUnderWay` line 301: the stop branch of `WhatAPressMeets` removed (L1).
+  - `PreviewStartRecordTests.ThePressAsksWhetherTheWindowsStopIsUnderWay` line 392: `_stopsUnderWay++` removed from `StopPreviewAsync` (L1).
+  - `PreviewStartRecordTests.AFailedStartHandsBackWhatItHolds` line 404: `HandBackAfterAFailure` removed from `StartAutomatedPreview`'s catch (L2).
+  - `LaunchProblemWordingTests.TheFolderNotSetUpRefusalNamesNoFileOrPath` line 84 (via line 21): the old sentence naming `preview.ps1` put back (L6).
 
 ### #1022 item 1
 
@@ -91,7 +120,7 @@ and terminates only while that run is still current and running; it returns
 the fallback's completion. Control-C's two seconds stay (behaviour,
 `ControlCGrace`). `StopFallbackOwnsItsRunTests`: a second run started inside
 the grace is still running after the first's fallback has completed; a run
-that ignores Control-C is still terminated by its own fallback.
+that ignores Control-C is still terminated by its own fallback. (Review 1, L4: the first test's `IsRunning` assertion was dropped, since staged runs have no process and it held under the old code too; `FallbackTerminations` is what fails on revert.)
 
 The mac's `ScriptRunner.swift` has the same shape (`DispatchQueue.main.asyncAfter`
 near line 583, no run check); not touched here (Windows only tonight). #1015
