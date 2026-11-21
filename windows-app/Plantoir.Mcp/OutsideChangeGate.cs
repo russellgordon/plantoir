@@ -69,8 +69,10 @@ public static class OutsideChangeGate
                       given.ValueKind == JsonValueKind.Number && given.TryGetInt32(out int number) ? number : 0;
         string line = $"an outside assistant's {tool} held back, before anything was backed up or written — " +
                       $"another program on this computer is building {course}";
-        if (section > 0) ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere, line, course, section);
-        else ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere, line);
+        // A call that names no section reads as 0, and ActivityTrail.Place
+        // writes "{course} · " for it (#946, the mac's outsideChangeHeldBack):
+        // the course is still named, never "{course}/0".
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere, line, course, section);
         return AssistWording.CourseIsBeingBuilt(course.ToUpperInvariant());
     }
 }

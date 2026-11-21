@@ -1043,25 +1043,159 @@ public static class ActivityTrail
     public static void Note(Event @event, string what, DateTime? moment = null)
     {
         DateTime when = moment ?? DateTime.Now;
-        string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{DateText.Stamp(when)} · {safeWhat}";
-        Append(entry);
+        Append(SafeTrailLine($"{DateText.Stamp(when)} · {what}", keepingLineBreaks: false));
     }
 
+    /// <summary>A line about one course: <see cref="Place"/> puts the course,
+    /// and the section when one was named, in front of <paramref name="what"/>.</summary>
     public static void Note(Event @event, string what, string course, int section, DateTime? moment = null)
     {
         DateTime when = moment ?? DateTime.Now;
-        string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{DateText.Stamp(when)} · {course}/{section} · {safeWhat}";
-        Append(entry);
+        Append(SafeTrailLine($"{DateText.Stamp(when)} · {Place(course, section)}{what}", keepingLineBreaks: false));
     }
 
+    /// <summary>
+    /// The assistant's question: a stamped line naming the course, then the
+    /// teacher's sentence on ONE line behind <see cref="PromptPrefix"/>
+    /// (<c>courseNameCharacters.trailLines.promptCases</c>, #821). The
+    /// sentence is put on one line before it goes behind the prefix, so a
+    /// sentence on two lines can no longer put its second line on the trail
+    /// with no prefix, where a report sent with the prompts left out still
+    /// carried it. The record's own line break between its two lines stays.
+    /// </summary>
     public static void NotePrompt(string prompt, string course, int section, DateTime? moment = null)
     {
-        DateTime when = moment ?? DateTime.Now;
-        string safePrompt = LogRedactor.Redacting(prompt.Trim());
-        string entry = $"{DateText.Stamp(when)} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
-        Append(entry);
+        Append(PromptRecord(prompt, course, section, moment ?? DateTime.Now));
+    }
+
+    /// <summary>
+    /// The record <see cref="NotePrompt"/> writes, without writing it. Each of
+    /// its two lines goes through <see cref="SafeTrailLine"/> on its RAW text
+    /// (<c>trailLines.order</c>: redact, clean, redact again), never cleaned
+    /// first: cleaning the sentence before redacting it turned a NUL inside a
+    /// token into a space and wrote the token's tail (lane E review 1, M1).
+    /// The joined record is then put through once more, keeping its one line
+    /// break; redacting again changes nothing (<c>redactedAgainCases</c>).
+    /// </summary>
+    public static string PromptRecord(string prompt, string course, int section, DateTime moment)
+    {
+        string head = SafeTrailLine($"{DateText.Stamp(moment)} · {Place(course, section)}asked a question", keepingLineBreaks: false);
+        string asked = PromptPrefix + SafeTrailLine(prompt, keepingLineBreaks: false).Trim();
+        return SafeTrailLine(head + "\n" + asked, keepingLineBreaks: true);
+    }
+
+    /// <summary>
+    /// What goes in front of a line about one course: <c>ICS3U/2 · </c> for a
+    /// section, <c>ICS3U · </c> when no section was named, and nothing when
+    /// there is no course either (<c>shared-rules.json</c> →
+    /// <c>activityTrail.lineShape.placeCases</c>, #946, the mac's #879 and its
+    /// <c>ActivityTrail.place</c>). A section is numbered from 1, so 0 or less
+    /// is "none was named": a line that names no section used to be written
+    /// <c>ICS3U/0</c>, a section that does not exist. Every trail line about
+    /// a course gets its place here, from the window, the headless door and
+    /// the built-in assistant alike; no caller builds its own.
+    /// </summary>
+    public static string Place(string course, int section)
+    {
+        string trimmedCourse = course.Trim();
+        if (trimmedCourse.Length == 0) return "";
+        if (section <= 0) return $"{trimmedCourse} · ";
+        return $"{trimmedCourse}/{section} · ";
+    }
+
+    /// <summary>
+    /// <paramref name="line"/> as the trail may hold it: one line (unless
+    /// <paramref name="keepingLineBreaks"/>) and redacted
+    /// (<c>courseNameCharacters.trailLines.order</c>, #821, the mac's
+    /// <c>ProblemReportStore.safeTrailLine</c>). Every line this file writes
+    /// goes through here and nowhere else.
+    ///
+    /// <para>A line with nothing to clean is redacted once, as it always was.
+    /// A line that holds a control is redacted, cleaned, and redacted again.
+    /// The first pass takes a secret with a control INSIDE it whole (the
+    /// redactor's <c>\S+</c> reads a NUL, an ESC or a DEL as part of the
+    /// value; cleaning first turned it into a space and the tail was written:
+    /// <c>Bearer abc123</c> NUL <c>SECRETTAIL</c>). The second pass takes a
+    /// secret a control was HIDING (a NUL after <c>Bearer</c>, an isolate
+    /// inside <c>CLOUDFLARE_API_TOKEN</c>, an override before an email's
+    /// <c>@</c>). Each order alone leaks one shape; both together leak
+    /// neither, and redacting twice changes nothing
+    /// (<c>problemReportRedaction.redactedAgainCases</c>).</para>
+    ///
+    /// <para><b>Not caught by any order</b> (<c>trailLines.knownLimits</c>,
+    /// written down so nobody believes the trail catches them, and not
+    /// tested as passing): a rule that matches a run of particular
+    /// characters (an email, a Netlify token, an account ID, the
+    /// 40-character run) cut short by a control in the middle of the value,
+    /// and <c>labelledSecret</c> / <c>bearerHeader</c> when that control is
+    /// white space to the redactor (tab, LF, CR, VT, FF, U+0085, U+2028,
+    /// U+2029).</para>
+    /// </summary>
+    public static string SafeTrailLine(string line, bool keepingLineBreaks)
+    {
+        string cleanedLine = OneLineText.Cleaned(line, keepingLineBreaks);
+        if (cleanedLine == line) return LogRedactor.Redacting(line);
+        string redactedOnce = LogRedactor.Redacting(line);
+        string cleanedAfterRedacting = OneLineText.Cleaned(redactedOnce, keepingLineBreaks);
+        return LogRedactor.Redacting(cleanedAfterRedacting);
+    }
+
+    // ---- The headless path's task lines (#774) ------------------------------
+
+    /// <summary>
+    /// <c>task started</c>'s words, as the window's <c>ScriptRunner</c> writes
+    /// them: "started preview.ps1 COMP 1 --build-only". The arguments are
+    /// written as they are and redacted with the whole line on the way in
+    /// (<see cref="SafeTrailLine"/>), so <c>--account</c> and any token never
+    /// reach the file. Shared with <c>plantoir-mcp.exe</c>'s
+    /// <c>LauncherRunner</c>, which has no <c>ScriptRunner</c> (ConPTY and a
+    /// window's synchronisation context), so the headless door and the window
+    /// say the same sentence.
+    /// </summary>
+    public static string TaskStartedWords(string launcherFile, IReadOnlyList<string> arguments) =>
+        arguments.Count > 0 ? $"started {launcherFile} {string.Join(" ", arguments)}" : $"started {launcherFile}";
+
+    /// <summary><c>task finished</c>'s words: "finished deploy.ps1 — succeeded after 12s".</summary>
+    public static string TaskFinishedWords(string launcherFile, string outcome, TimeSpan? elapsed) =>
+        $"finished {launcherFile} — {outcome}{(elapsed is { } took ? DurationWords(took) : "")}";
+
+    /// <summary>How long a task took, in the window's words: " after 12s", " after 3m 4s".</summary>
+    public static string DurationWords(TimeSpan elapsed) =>
+        elapsed.TotalSeconds < 60
+            ? $" after {Math.Max(1, (int)elapsed.TotalSeconds)}s"
+            : $" after {(int)elapsed.TotalMinutes}m {elapsed.Seconds}s";
+
+    /// <summary>
+    /// Exit 3: a launcher run with <c>--non-interactive</c> reached a question
+    /// and refused rather than wait for an answer nobody could give
+    /// (<c>activityTrail.mustRecord</c> → "task finished" → <c>why</c>, #378).
+    /// The headless path always runs its launchers that way.
+    /// </summary>
+    public const string StoppedAtAQuestionNobodyCouldAnswer = "stopped at a question nobody was there to answer (exit 3)";
+
+    /// <summary>A headless run whose caller stopped waiting for it (the assistant's call was cancelled): the launcher was ended part way.</summary>
+    public const string StoppedBeforeItFinished = "stopped before it finished";
+
+    /// <summary>The outcome of a headless run that exited: exit 3 in its own words, any other exit in the window's.</summary>
+    public static string HeadlessOutcome(int exitCode) =>
+        exitCode == 3
+            ? StoppedAtAQuestionNobodyCouldAnswer
+            : ScriptRunner.FinishedOutcome(exitCode, wasStoppedByUser: false, wasCancelled: false, wasClosedForADeploy: false);
+
+    /// <summary>
+    /// The course and section a launcher's arguments name: every launcher
+    /// takes the course code first and the section number second
+    /// (<c>PreviewCommand.BuildOnlyArguments</c>, <c>DeployCommand.Arguments</c>).
+    /// No course when the first argument is a flag; section 0 (none, for
+    /// <see cref="Place"/>) when the second is not a number.
+    /// </summary>
+    public static (string Course, int Section) PlaceOfLauncherArguments(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count == 0 || arguments[0].StartsWith('-')) return ("", 0);
+        int section = 0;
+        if (arguments.Count > 1)
+            int.TryParse(arguments[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out section);
+        return (arguments[0], section);
     }
 
     /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
@@ -1140,7 +1274,7 @@ public static class ActivityTrail
 
     /// <summary>A line written with its own wait for the writers' lock; true when it was written.</summary>
     private static bool Note(Event @event, string what, TimeSpan lockWait, bool capsThisProcess) =>
-        Append($"{DateText.Stamp(DateTime.Now)} · {LogRedactor.Redacting(what)}", lockWait, capsThisProcess);
+        Append(SafeTrailLine($"{DateText.Stamp(DateTime.Now)} · {what}", keepingLineBreaks: false), lockWait, capsThisProcess);
 
     /// <summary>The close line's words; the contract's <c>line</c> is this with reason "quit by the teacher".</summary>
     public static string ClosedLine(QuitConfirmation.ClosingReason reason, int processId) =>
