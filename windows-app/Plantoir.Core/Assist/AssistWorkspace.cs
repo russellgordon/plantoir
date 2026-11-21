@@ -3306,12 +3306,6 @@ public sealed partial class AssistWorkspace
         try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
-            // Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece
-            // B, the director's ruling on its implementation review's I2): no
-            // copy, no rollover, said with the start of the year's own words
-            // for the same fact. Nothing has been written yet.
-            if (SpeaksFromTheMenu && isARollover)
-                throw new AssistRefusal(AssistWording.StartOfYearNeedsABackup(course.Code));
             throw new AssistRefusal(
                 $"{course.Code} couldn’t be backed up, so no dates were changed: {error.Message}");
         }
