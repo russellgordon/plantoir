@@ -139,11 +139,11 @@ public sealed class RollOverFromTheMenuTests : IDisposable
     {
         Marker(".netlify_sites", "ics3u-s1-2025-gordon");
 
-        string menu = Body(await Plan(Menu(), "same"));
+        string menu = Summary(await Plan(Menu(), "same"));
         Assert.Contains(AssistWording.MenuRollOverPlanKeepsTheWebsite, menu);
         Assert.EndsWith(AssistWording.MenuRollOverPlanSetsTheRecordAside, menu);
 
-        string window = Body(await Plan(Window(), "same"));
+        string window = Summary(await Plan(Window(), "same"));
         Assert.DoesNotContain(AssistWording.MenuRollOverPlanKeepsTheWebsite, window);
         Assert.DoesNotContain(AssistWording.MenuRollOverPlanSetsTheRecordAside, window);
     }
@@ -154,7 +154,7 @@ public sealed class RollOverFromTheMenuTests : IDisposable
     {
         Configure("local_folder");
 
-        string plan = Body(await Plan(Menu(), "same"));
+        string plan = Summary(await Plan(Menu(), "same"));
         Assert.Contains(AssistWording.MenuRollOverDeploysToAFolder, plan);
         Assert.DoesNotContain(AssistWording.MenuRollOverPlanKeepsTheWebsite, plan);
 

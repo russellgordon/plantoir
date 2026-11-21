@@ -194,6 +194,59 @@ public class SectionVerbsUiTests
         Assert.Contains($"{Code}/1 · Classes ▸ Add Class… — carried out, as a copy of a class", MenuBar.Trail(app));
     }
 
+    /// <summary>
+    /// #954 (the mac's #897 piece B), end to end: Classes ▸ Roll Over to a New
+    /// Year… on a deployed section shows the dates on file, says they have
+    /// passed, and asks the website question with NOTHING chosen and Continue
+    /// dimmed; Keep, Continue, the plan's own website and record lines, Roll
+    /// Over. The dates are already right, so this is the menu's own path: a
+    /// copy saved first, the marker kept, the trail's counts saying which way
+    /// the website went. MUST FAIL with an answer chosen when the dialog
+    /// opens, or Continue live before one is.
+    /// </summary>
+    [UiFact]
+    public void RollOverAsksAboutTheWebsiteWithNothingChosen_ThenKeepsIt()
+    {
+        using var app = ACourseWithTwoClasses();
+        string marker = Path.Combine(app.WorkspacePath, "courses", Code, ".netlify_sites", "section1.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(marker)!);
+        File.WriteAllText(marker, """{"name": "uiverb-s1-2025-gordon"}""");
+
+        EndToEnd.PressMenuBarItem(app, "Classes", "classesRollOverToANewYear");
+        var startNew = WaitFor(app, "sectionVerbRollOverWebsite-new", "the new-website answer");
+        var keep = WaitFor(app, "sectionVerbRollOverWebsite-same", "the keep-the-website answer");
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuRollOverNewWebsite, startNew.Name);
+        Assert.False(startNew.AsRadioButton().IsChecked, "an answer was chosen when the dialog opened");
+        Assert.False(keep.AsRadioButton().IsChecked, "an answer was chosen when the dialog opened");
+        WaitFor(app, "sectionVerbRollOverDatesAreOld", "the line saying the dates have passed");
+        var dialog = MenuBar.Dialog(app, "Roll Over to a New Year…");
+        var primary = dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"));
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuContinueButton, primary?.Name);
+        Assert.False(primary!.IsEnabled, "Continue was live before the website question had an answer");
+        CaptureIfAsked("windows-roll-over-dialog.png");
+
+        keep.AsRadioButton().IsChecked = true;
+        Press(app, "PrimaryButton", "Roll Over to a New Year… (Continue)");
+        var plan = WaitFor(app, "sectionVerbPlan", "the rollover's plan");
+        Assert.Contains(Plantoir.Core.Assist.AssistWording.MenuRollOverPlanKeepsTheWebsite, plan.Name);
+        Assert.Contains(Plantoir.Core.Assist.AssistWording.MenuRollOverPlanSetsTheRecordAside, plan.Name);
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.MenuRollOverButton,
+                     MenuBar.Dialog(app, "Roll Over (plan)").FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))?.Name);
+        CaptureIfAsked("windows-roll-over-plan.png");
+        Press(app, "PrimaryButton", "Roll Over to a New Year… (Roll Over)");
+        var result = WaitFor(app, "sectionVerbResult", "what the rollover did");
+        _output.WriteLine("result: " + result.Name);
+        Assert.Contains(Plantoir.Core.Assist.AssistWording.RolloverKeptTheSameWebsite, result.Name);
+        MenuBar.CloseDialog(app);
+
+        Assert.True(File.Exists(marker), "keeping the website moved its marker");
+        string backups = Path.Combine(app.WorkspacePath, "courses", "_backups", Code);
+        Assert.Single(Directory.GetFiles(backups, $"{Code}_backup_*_classes-section1.zip"));
+        string trail = MenuBar.Trail(app);
+        Assert.Contains($"{Code}/1 · Classes ▸ Roll Over to a New Year… — ", trail);
+        Assert.Contains("website: kept", trail);
+    }
+
     [UiFact]
     public void RebuildPreviewRebuildsAServingPreview()
     {
