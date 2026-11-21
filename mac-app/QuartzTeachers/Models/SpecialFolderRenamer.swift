@@ -49,7 +49,7 @@ struct FolderRenameOutcome {
 
 /// What a rename will do (#899 U4b), read from the disk before anything is
 /// written: `SpecialFolderRenamer.plan`, planned into one step by `apply`.
-struct FolderRenamePlan: Sendable {
+nonisolated struct FolderRenamePlan: Sendable {
 
     // MARK: - Stored properties
 
