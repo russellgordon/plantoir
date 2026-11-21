@@ -280,6 +280,27 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertTrue(listed(course.directoryURL).contains("concepts"))
     }
 
+    /// After an Undo the folder is back at its old place, so a kept copy of
+    /// a page inside it is under the move's `from`: the step's kept
+    /// original is looked for where the page is now, or a Redo resting on
+    /// it would come to content missing (the part-two review's M1, second
+    /// layer). MUST FAIL with `keptOriginal` looking beside the op's path.
+    func testAKeptOriginalOfAPageInsideAMovedFolderIsFoundWhereThePageIsNow() async throws {
+        let course: Course = try course()
+        _ = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in self.root }), .undone(seq: 1))
+        let kept: Data = Data("See [[Assessments/Quiz 2]].\n".utf8)
+        let keptURL: URL = course.directoryURL.appendingPathComponent("section1/Tasks/.Quiz 1.md\(UndoSwap.stagedMarker)1-undo-orig")
+        try kept.write(to: keptURL)
+        let step: UndoStep = try XCTUnwrap(try journal().read().records[1]).step
+
+        let found: Data? = UndoRecovery.keptOriginal(of: step, root: root)(
+            "courses/ICS3U/section1/Assessments/Quiz 1.md", UndoHash.sha256(of: kept)
+        )
+
+        XCTAssertEqual(found, kept)
+    }
+
     // MARK: - Save, then rename (U4a review 1, LOW 1)
 
     /// Save Course Settings, then rename a folder, then Undo and Undo: both
