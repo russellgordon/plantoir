@@ -563,23 +563,48 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// Sends an interrupt signal (Control-C) through the pseudo-terminal
     /// so foreground process groups and traps terminate cleanly, falling back
     /// to direct termination after two seconds.
+    ///
+    /// <para>The fallback belongs to the run it was set for (#1026): it
+    /// remembers that run's number and process and terminates only while
+    /// that run is still the current one. A preview started on this runner
+    /// inside the two seconds (Stop, then Preview again) is a different run;
+    /// the old fallback asked only <see cref="IsRunning"/> and killed it,
+    /// with the stop flags already reset, so it ended "Something went
+    /// wrong". The two seconds are Control-C's grace, the behaviour, not a
+    /// wait for anything. The returned task completes when the fallback has
+    /// decided, which a test awaits instead of a clock.</para>
     /// </summary>
-    public void CancelByUser(Action? onCleanup = null)
+    public Task CancelByUser(Action? onCleanup = null)
     {
         WasCancelled = true;
         WasStoppedByUser = true;
         Notify(nameof(WasCancelled));
         Notify(nameof(WasStoppedByUser));
         onCleanup?.Invoke();
+        int cancelledRun = CurrentRunNumber;
+        ConPtyProcess? cancelledProcess = _process;
         SendRaw("\x03");
-        Task.Delay(2000).ContinueWith(_ =>
+        return Task.Delay(ControlCGrace).ContinueWith(_ =>
         {
-            if (IsRunning)
+            if (TheFallbackStillOwnsTheRun(cancelledRun))
             {
-                Terminate();
+                Interlocked.Increment(ref _fallbackTerminations);
+                cancelledProcess?.Kill();
             }
-        });
+        }, TaskScheduler.Default);
     }
+
+    /// <summary>Control-C's grace before the stop's fallback terminates the run (behaviour, #1026).</summary>
+    internal static readonly TimeSpan ControlCGrace = TimeSpan.FromSeconds(2);
+
+    private int _fallbackTerminations;
+
+    /// <summary>How many times a stop's fallback has terminated a run (#1026's test reads it).</summary>
+    internal int FallbackTerminations => Volatile.Read(ref _fallbackTerminations);
+
+    /// <summary>The fallback set for run <paramref name="cancelledRun"/> may act only while that run is still the current one and still running.</summary>
+    private bool TheFallbackStillOwnsTheRun(int cancelledRun) =>
+        IsRunning && CurrentRunNumber == cancelledRun;
 
     /// <summary>An ending the teacher asked for is not a fault.</summary>
     public void StopByUser()
