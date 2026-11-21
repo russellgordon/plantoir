@@ -59,10 +59,12 @@ public class PlaceholderFieldNamesSourceTests
     public void ClassDatesBoxesAreNamedAsTheMacs()
     {
         string source = View("SectionScheduleDialog.cs");
-        Assert.Contains("public const string ClassDatesName = \"Class dates\";", source);
         Assert.Contains("public const string GoogleSheetAddressName = \"Google Sheet address\";", source);
         Assert.Contains("public const string WhereTheseCameFromName = \"Where these came from\";", source);
-        Assert.Contains("AutomationProperties.SetName(_typedBox, ClassDatesName);", source);
+        // The dates box in the course's noun, the mac's classDates(noun:) (#1027 review 3, M2).
+        Assert.Contains("AutomationProperties.SetName(_typedBox, ClassDatesDialogWords.DatesBoxName(_course.Configuration.ClassNoun));", source);
+        Assert.Equal("Class dates", Plantoir.Core.Assist.ClassDatesDialogWords.DatesBoxName(Plantoir.Core.Models.ClassNoun.Class));
+        Assert.Equal("Meeting dates", Plantoir.Core.Assist.ClassDatesDialogWords.DatesBoxName(Plantoir.Core.Models.ClassNoun.Meeting));
         Assert.Contains("AutomationProperties.SetName(_sheetUrlBox, GoogleSheetAddressName);", source);
         Assert.Contains("AutomationProperties.SetName(_sourceBox, WhereTheseCameFromName);", source);
     }

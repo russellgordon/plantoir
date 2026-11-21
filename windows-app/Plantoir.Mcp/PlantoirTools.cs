@@ -195,7 +195,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("TEACHERS SAY: \"deploy the site\", \"put it online\", \"push it live\", \"send it to the website\", " +
                  "\"make it live for students\", \"upload the site\". Put a section's website where students can " +
                  "actually reach it.")]
-    public async Task<string> DeploySection(
+    public async Task<CallToolResult> DeploySection(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         IProgress<ProgressNotificationValue> progress,
@@ -204,10 +204,14 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         try
         {
             var result = await workspace.Deploy(course, section, Relay(progress), cancellation);
-            return result.Message;
+            return Answering(result.Message);
         }
-        catch (AssistRefusal refusal) { return refusal.Message; }
-        catch (OperationCanceledException) { return "The deploy was stopped before it finished."; }
+        // The teacher's copy in the course's noun when it differs: a club's
+        // "dated later" refusal says meeting (#1027 review 3, low 5); the
+        // model's is the message, as before.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
+        catch (AssistRefusal refusal) { return Answering(refusal.Message); }
+        catch (OperationCanceledException) { return Answering("The deploy was stopped before it finished."); }
     }
 
     [McpServerTool(Name = "explain_publishing", Title = "Explain what publishing means here",
@@ -743,13 +747,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             var result = workspace.ApplyInsertClasses(plan);
-            if (!result.Succeeded || workspace.NounForCourse(course) != ClassNoun.Meeting)
+            // A club's teacher reads the mac's "meeting" line (#274, #1027
+            // review 3, M1); the model's copy is untouched.
+            if (!result.Succeeded || result.ForTheTeacher is not { } forTheTeacher)
                 return Answering(result.Message);
-            // A club's teacher reads "meeting" (#274); the model's copy is untouched.
-            return Answering(result.Message.Replace(
-                                 AssistWording.MadeRoom(plan.Added.Count, plan.PositionTitle),
-                                 AssistWording.MadeRoomForAMeeting(plan.Added.Count, plan.PositionTitle)),
-                             result.Message);
+            return Answering(forTheTeacher, result.Message);
         });
 
     [McpServerTool(Name = "plan_add_classes", Title = "Plan adding class pages",
@@ -1486,6 +1488,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             string detail = summary +
                             $"\n\n{AssistWorkspace.BackedUpNote}" +
                             "\n\nNothing was published or hidden, so students see no change until you deploy.";
+            // A club's teacher reads the counts in "meeting" (#1027 review 3, M1).
+            if (result.ForTheTeacher is { } forTheTeacher) summary = forTheTeacher;
 
             // The website goes in the SUMMARY as well as the detail: the
             // summary is the one line the teacher reads in the chat window, and
@@ -1983,7 +1987,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // class on tomorrow", which is not a date anybody can check
             // against their timetable a week later.
             return result.Succeeded
-                ? Answering(AssistWording.PublishedTheClassOn(DateText.Iso(day)),
+                // In the course's noun, the mac's publishedTheClassOn(noun:) (#1027 review 3, M1).
+                ? Answering(workspace.NounForCourse(course) == ClassNoun.Meeting
+                                ? AssistWording.PublishedTheClassOnForAMeeting(DateText.Iso(day))
+                                : AssistWording.PublishedTheClassOn(DateText.Iso(day)),
                             text.ToString())
                 : Answering(text.ToString());
         }

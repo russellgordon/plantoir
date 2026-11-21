@@ -77,6 +77,13 @@ public static partial class AssistWording
         : pages > 0 ? ReDatedOnlyPagesTheyUse(pages)
         : EveryPageIsAlreadyOnItsDay(course, section);
 
+    /// <summary>The same in the course's noun: what a club's teacher reads (#1027 review 3, M1).</summary>
+    internal static string ReDatedSummary(string course, string section, int classes, int pages, ClassNoun noun) =>
+        noun != ClassNoun.Meeting ? ReDatedSummary(course, section, classes, pages)
+        : classes > 0 ? ReDatedForAMeeting(classes, pages)
+        : pages > 0 ? ReDatedOnlyPagesTheyUseForAMeeting(pages)
+        : EveryPageIsAlreadyOnItsDay(course, section);
+
     public static string Deployed(string course, string section) =>
         $"{course} Section {section} is deployed. Students can reach it now.";
 

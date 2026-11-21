@@ -66,6 +66,8 @@ public class RemovalQuestionsContractTests
                          SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.CancelScheduledDeploy, noun));
         Assert.Null(SubjectMenuLayout.TitleSayingTheNoun(SubjectMenuRules.Item.CancelScheduledDeploy, ClassNoun.Meeting));
         Assert.Contains("LayoutTitle(Item item, ClassNoun noun) => SubjectMenuLayout.TitleHere(item, noun)", Source("MainWindow.Menus.cs"));
+        // ...and the Section menu's items, this one among them, are added through it (#1027 review 3, low 11).
+        Assert.Contains("Add(into, LayoutTitle(item, ClassNoun.Class), id, item);", Source("MainWindow.Menus.cs"));
     }
 
     [Fact]

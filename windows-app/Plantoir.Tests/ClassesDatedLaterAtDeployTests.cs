@@ -211,6 +211,29 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
                         File.ReadAllText(_trail));
     }
 
+    /// <summary>
+    /// deploy_section hands a club's teacher the refusal's own club form, and
+    /// the model the class form (#1027 review 3, low 5). MUST FAIL with the
+    /// tool's catch returning the message alone.
+    /// </summary>
+    [Fact]
+    public async Task TheServersDeployRefusal_SaysMeetingToAClubsTeacher()
+    {
+        string config = Path.Combine(CourseDirectory, "course_config.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace("\"section_numbers\": [1]", "\"section_numbers\": [1], \"class_noun\": \"meeting\""));
+        Class("Unit 2, Day 5", Today.AddDays(3), published: true);
+        var workspace = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow, Today = () => Today };
+        var tools = new Plantoir.Mcp.PlantoirTools(workspace);
+
+        var answer = await tools.DeploySection("ICS3U", 1, new Progress<ModelContextProtocol.Protocol.ProgressNotificationValue>(_ => { }), default);
+
+        var titles = new[] { "Unit 2, Day 5" };
+        Assert.Equal(AssistWording.DeployHasClassesDatedLaterAndNoWindow("ICS3U", "1", titles, ClassNoun.Meeting),
+                     answer.Meta?[AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>());
+        Assert.Equal(AssistWording.DeployHasClassesDatedLaterAndNoWindow("ICS3U", "1", titles), answer.Detail());
+        Assert.Empty(_launcher.Runs);
+    }
+
     // ---- What is remembered as kept -------------------------------------------
 
     /// <summary>

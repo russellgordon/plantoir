@@ -39,9 +39,6 @@ public sealed class SectionScheduleDialog : ContentDialog
     private readonly StackPanel _filePanel = new() { Spacing = 6 };
     private readonly StackPanel _sheetPanel = new() { Spacing = 6 };
 
-    /// <summary>The dates box's name: the mac's <c>AccessibilityNames.classDates</c>.</summary>
-    public const string ClassDatesName = "Class dates";
-
     /// <summary>The sheet link's name: the mac's <c>AccessibilityNames.googleSheetAddress</c>.</summary>
     public const string GoogleSheetAddressName = "Google Sheet address";
 
@@ -249,7 +246,7 @@ public sealed class SectionScheduleDialog : ContentDialog
     {
         // Each box has a name of its own, the mac's words (#993 D41, #1012,
         // #1020): a placeholder is a hint that goes as the teacher types.
-        AutomationProperties.SetName(_typedBox, ClassDatesName);
+        AutomationProperties.SetName(_typedBox, ClassDatesDialogWords.DatesBoxName(_course.Configuration.ClassNoun));
         AutomationProperties.SetAutomationId(_typedBox, "sectionScheduleTypedField");
         AutomationProperties.SetName(_sheetUrlBox, GoogleSheetAddressName);
         AutomationProperties.SetAutomationId(_sheetUrlBox, "sectionScheduleGoogleSheetField");

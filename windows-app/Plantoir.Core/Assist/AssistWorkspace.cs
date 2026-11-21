@@ -3159,15 +3159,25 @@ public sealed partial class AssistWorkspace
         // from a total: "Re-dated 14 classes and -4 pages they use" came from
         // (pages whose date changes) - (every class in the section).
         string summary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials);
-        if (undated.Count > 0) summary += " " + NewDatesCouldNotBeSet(undated);
-        if (notHidden.Count > 0) summary += " " + SettingsCannotBeAddedTo(notHidden);
+        // A club's teacher reads the counts in "meeting", the mac's
+        // reDated(noun:) (#1027 review 3, M1); the model keeps the class form.
+        var noun = NounForCourse(course.Code);
+        string teacherSummary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials, noun);
+        string leftAsTheyWere = "";
+        if (undated.Count > 0) leftAsTheyWere += " " + NewDatesCouldNotBeSet(undated);
+        if (notHidden.Count > 0) leftAsTheyWere += " " + SettingsCannotBeAddedTo(notHidden);
+        summary += leftAsTheyWere;
+        teacherSummary += leftAsTheyWere;
         NoteSettingsLeftAsTheyWere("re-dating classes", undated.Union(notHidden, StringComparer.OrdinalIgnoreCase).Count(),
             course.Code, section);
         string detail = summary +
                         $"\n\n{BackedUpNote}" +
                         "\n\nNothing was published or hidden, so students see no change until you deploy.";
 
-        return new AssistResult(true, detail, backup);
+        return new AssistResult(true, detail, backup)
+        {
+            ForTheTeacher = noun == ClassNoun.Meeting ? teacherSummary : null,
+        };
     }
 
     public const string BackedUpNote =
@@ -4186,15 +4196,19 @@ public sealed partial class AssistWorkspace
                 $"{notAdded} new not added",
                 course.Code, section);
 
+        // What could not be dated or finished, said to whoever asked.
+        string leftUndone = "";
+        if (undated.Count > 0) leftUndone += " " + NewDatesCouldNotBeSet(undated);
+        if (notFinished.Count > 0)
+            leftUndone += " " + ChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+
         string said =
             (created.Count > 0 ? AssistWording.MadeRoom(created.Count, plan.PositionTitle) + " " : "") +
             $"Renamed {renamed.Count}, moved {moved} onto " +
             $"later class days, and updated {linksUpdated} link" +
             $"{(linksUpdated == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
             AssistWording.LookTheSectionOverBeforePublishing;
-        if (undated.Count > 0) said += " " + NewDatesCouldNotBeSet(undated);
-        if (notFinished.Count > 0)
-            said += " " + ChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+        said += leftUndone;
 
         // Said because it is now TRUE and was not said before: this records no
         // undo entry, so "undo that" afterwards reaches back past it to
@@ -4207,7 +4221,15 @@ public sealed partial class AssistWorkspace
         // No undo entry says so, so the menu's trail line is told here (#489, M1).
         if (created.Count > 0 || renamed.Count > 0 || moved > 0 || linksUpdated > 0) NoteAChangeWithNoUndoEntry();
 
-        return new AssistResult(true, said, backup);
+        // A club's teacher reads the mac's line: how many meetings room was
+        // made for, and what was left undone (AssistToolRunner's
+        // makeRoomForClasses → madeRoom(noun:)). The counts sentence and
+        // OtherClassesMoved say "class", so they are the model's alone there
+        // (#1027 review 3, M1); the plan said the undo sentence before Go.
+        string? forAClubsTeacher = NounForCourse(course.Code) == ClassNoun.Meeting
+            ? AssistWording.MadeRoomForAMeeting(created.Count, plan.PositionTitle) + leftUndone
+            : null;
+        return new AssistResult(true, said, backup) { ForTheTeacher = forAClubsTeacher };
     }
 
     // ---- Duplicating a lesson as the next class ----------------------------
@@ -4950,7 +4972,15 @@ public sealed class AssistRefusal(string message, string? forTheTeacher = null) 
 }
 
 /// <summary>How an operation ended, and where the backup went.</summary>
-public sealed record AssistResult(bool Succeeded, string Message, string? BackupPath);
+public sealed record AssistResult(bool Succeeded, string Message, string? BackupPath)
+{
+    /// <summary>
+    /// What the teacher reads when it differs from <see cref="Message"/>, the
+    /// model's copy: a club's result line in "meeting" (#1027 review 3, M1).
+    /// Null when the teacher reads the message itself.
+    /// </summary>
+    public string? ForTheTeacher { get; init; }
+}
 
 /// <summary>
 /// Runs one of the working folder's launchers. Abstracted so the plan logic can

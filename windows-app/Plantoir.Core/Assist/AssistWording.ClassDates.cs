@@ -111,6 +111,13 @@ public static partial class AssistWording
 /// </summary>
 public static class ClassDatesDialogWords
 {
+    /// <summary>
+    /// The dates box's name, what Narrator reads: the mac's
+    /// <c>AccessibilityNames.classDates(noun:)</c>, in the course's noun
+    /// (#1027 review 3, M2).
+    /// </summary>
+    public static string DatesBoxName(ClassNoun noun) => noun == ClassNoun.Meeting ? "Meeting dates" : "Class dates";
+
     /// <summary>The line under the title.</summary>
     public static string Purpose(Course course) => AssistWording.ClassDatesPurpose(course.Configuration.ClassNoun);
 

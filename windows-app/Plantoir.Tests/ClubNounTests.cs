@@ -519,4 +519,137 @@ public sealed class ClubNounTests : IDisposable
         Assert.True(twinsRead > 50, $"only {twinsRead} twins read");
         Assert.True(twinsSayingClass.Count == 0, "a club twin says class: " + string.Join(", ", twinsSayingClass));
     }
+    // ---- The result line each Meetings item shows (#1027 review 3, M1) -------
+
+    /// <summary>
+    /// The scratch club with its meeting dates one day later than its pages, so
+    /// a re-date moves all three.
+    /// </summary>
+    private PlantoirTools ClubWhoseDatesMoved()
+    {
+        var tools = Club("meeting");
+        var later = Enumerable.Range(0, 10).Select(week => new DateOnly(2025, 9, 19).AddDays(7 * week)).ToList();
+        TimetableMemory.Write(_folder, "ICS3U", 1, later, "contract test", new DateOnly(2026, 9, 1));
+        return tools;
+    }
+
+    private Course TheClub => Workspace.DiscoverCourses(_folder).Single(found => found.Code == "ICS3U");
+
+    /// <summary>
+    /// What a club's teacher reads right after using each item, item by item:
+    /// the tool's teacher copy for the items the menu's server runs, the
+    /// dialog's own lines for Meeting Dates… and Get Ready for the Start of
+    /// the Year….
+    /// </summary>
+    private Dictionary<SubjectMenuRules.Item, Func<Task<IReadOnlyList<string>>>> ResultLinesInAClub() => new()
+    {
+        [SubjectMenuRules.Item.AddClass] = async () =>
+        {
+            var tools = Club("meeting");
+            var added = tools.AddNextClass("ICS3U", 1);
+            var inANewUnit = tools.AddNextClass("ICS3U", 1, unit: "next");
+            var copied = tools.AddNextClass("ICS3U", 1, duplicate: "Week 1");
+            await Task.CompletedTask;
+            return new[] { TeacherCopy(added), TeacherCopy(inANewUnit), TeacherCopy(copied) };
+        },
+        [SubjectMenuRules.Item.ClassDates] = () =>
+        {
+            Club("meeting");
+            var club = TheClub;
+            var dates = new[] { new DateOnly(2025, 9, 18), new DateOnly(2025, 9, 25) };
+            IReadOnlyList<string> lines = new[]
+            {
+                ClassDatesDialogWords.DatesBoxName(club.Configuration.ClassNoun),
+                ClassDatesDialogWords.Purpose(club),
+                ClassDatesDialogWords.Found(dates, club, 1),
+                ClassDatesDialogWords.Remembered(dates.Length, club, 1),
+                ClassDatesDialogWords.NotGivenYet(club),
+                ClassDatesDialogWords.NoneRecorded(club),
+                ClassDatesDialogWords.CouldNotOpen(club),
+            };
+            return Task.FromResult(lines);
+        },
+        [SubjectMenuRules.Item.ReDateClasses] = async () =>
+            new[] { TeacherCopy(await ClubWhoseDatesMoved().ReDateClasses("ICS3U", 1)) },
+        [SubjectMenuRules.Item.MakeRoomForClasses] = () =>
+        {
+            var made = Club("meeting").MakeRoomForClasses("ICS3U", 1, 1, 2, 1);
+            return Task.FromResult<IReadOnlyList<string>>(new[] { TeacherCopy(made) });
+        },
+        [SubjectMenuRules.Item.GetReadyForTheStartOfTheYear] = () =>
+        {
+            Club("meeting");
+            var plan = _workspace!.PlanStartOfYear("ICS3U", 1);
+            var outcome = _workspace.PrepareForStartOfYear("ICS3U", 1, plan.Code, StartOfYearAskedFrom.TheApp);
+            return Task.FromResult<IReadOnlyList<string>>(new[] { plan.TeacherText, outcome.Message });
+        },
+        [SubjectMenuRules.Item.PublishClassForADate] = async () =>
+        {
+            var tools = Linked(Club("meeting"), visible: false);
+            var published = await tools.PublishClassOn("ICS3U", 1, "2025-09-18",
+                                                       new Progress<ProgressNotificationValue>(_ => { }), default, preview: false);
+            return new[] { TeacherCopy(published) };
+        },
+    };
+
+    /// <summary>
+    /// Every item of the Meetings menu, and every Section item a club retitles,
+    /// walked from the layout: none of the lines its teacher reads right after
+    /// using it says class. MUST FAIL with any of the three result lines review
+    /// 3 found (Publish Meeting for a Date…, Re-date Meetings…, Make Room for
+    /// Meetings…) said in the class form, and with an item added to the menu
+    /// and not walked here.
+    /// </summary>
+    [Fact]
+    public async Task EveryMeetingsItemsResultLineNeverSaysClassToAClubsTeacher()
+    {
+        var items = new List<SubjectMenuRules.Item>();
+        foreach (var group in SubjectMenuLayout.Groups(SubjectMenuLayout.Menu.Classes))
+            foreach (var entry in group)
+                if (entry is SubjectMenuLayout.Entry.OfItem item) items.Add(item.Item);
+        foreach (var group in SubjectMenuLayout.Groups(SubjectMenuLayout.Menu.Section))
+            foreach (var entry in group)
+                if (entry is SubjectMenuLayout.Entry.OfItem item
+                    && SubjectMenuLayout.TitleSayingTheNoun(item.Item, ClassNoun.Meeting) is not null)
+                    items.Add(item.Item);
+        Assert.Contains(SubjectMenuRules.Item.PublishClassForADate, items);
+
+        var walks = ResultLinesInAClub();
+        var sayingClass = new List<string>();
+        foreach (var item in items)
+        {
+            Assert.True(walks.ContainsKey(item), $"{item} is on the club's menus and its result line is not walked");
+            foreach (string line in await walks[item]())
+            {
+                Assert.False(string.IsNullOrWhiteSpace(line), $"{item} said nothing");
+                if (SaysClass.IsMatch(line)) sayingClass.Add($"{item}: {line}");
+            }
+        }
+        Assert.True(sayingClass.Count == 0, "a club's teacher reads class:\n" + string.Join("\n", sayingClass));
+    }
+
+    /// <summary>
+    /// The three lines review 3 found, word for word the mac's in a club, and
+    /// the model's copy still the class form (#267). MUST FAIL with any of the
+    /// three said in the class form to the teacher, or the noun reaching the
+    /// model.
+    /// </summary>
+    [Fact]
+    public async Task TheThreeResultLinesAreTheMacsInAClub()
+    {
+        var published = await Linked(Club("meeting"), visible: false).PublishClassOn(
+            "ICS3U", 1, "2025-09-18", new Progress<ProgressNotificationValue>(_ => { }), default, preview: false);
+        Assert.Equal(AssistWording.PublishedTheClassOnForAMeeting("2025-09-18"), TeacherCopy(published));
+        Assert.DoesNotContain("meeting", ModelCopy(published), StringComparison.OrdinalIgnoreCase);
+
+        var reDated = await ClubWhoseDatesMoved().ReDateClasses("ICS3U", 1);
+        Assert.StartsWith("Re-dated 3 meetings and ", TeacherCopy(reDated));
+        Assert.StartsWith("Re-dated 3 classes and ", ModelCopy(reDated));
+        Assert.DoesNotContain("meeting", ModelCopy(reDated), StringComparison.OrdinalIgnoreCase);
+
+        var made = Club("meeting").MakeRoomForClasses("ICS3U", 1, 1, 2, 1);
+        Assert.Equal(AssistWording.MadeRoomForAMeeting(1, "Week 2"), TeacherCopy(made));
+        Assert.Contains("Because other classes moved", ModelCopy(made));
+        Assert.StartsWith(AssistWording.MadeRoom(1, "Week 2"), ModelCopy(made));
+    }
 }
