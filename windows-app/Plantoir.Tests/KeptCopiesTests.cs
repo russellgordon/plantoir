@@ -118,6 +118,9 @@ public sealed class KeptCopiesTests : IDisposable
         MakeBuildWithACopy("ICS3U");
         string archive = CourseArchiver.ArchiveAndRemoveCourse(course, CoursesDir);
         Assert.False(Directory.Exists(BuildOutputLocation.ForCourse(BuildsRoot, "ICS3U")));
+        // A build standing outside again (another copy of the app, a launcher
+        // run): restoring from Archived still takes all of it, kept copies too.
+        MakeBuildWithACopy("ICS3U");
 
         CourseRestorer.Restore(ArchivedItem.From(archive, "ICS3U")!, CoursesDir, Array.Empty<Course>());
 
