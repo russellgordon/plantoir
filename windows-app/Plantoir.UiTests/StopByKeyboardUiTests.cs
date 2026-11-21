@@ -421,15 +421,9 @@ public class StopByKeyboardUiTests
         foreach (int delay in new[] { 250, 400, 500, 650 })
         {
             CopyAPageEscapeUiTests.Front(app);
-            Keyboard.Press(VirtualKeyShort.ESCAPE);
-            Thread.Sleep(delay);
-            bool openBeforeTheRepeats = OpenStopQuestion(app) is not null;
-            for (int repeat = 0; repeat < 45; repeat++)
-            {
-                Keyboard.Press(VirtualKeyShort.ESCAPE);
-                Thread.Sleep(33);
-            }
-            Keyboard.Release(VirtualKeyShort.ESCAPE);
+            bool openBeforeTheRepeats = false;
+            HeldKeys.HoldWithRepeats(VirtualKeyShort.ESCAPE, firstDelayMs: delay, repeats: 45, repeatMs: 33,
+                whileHeld: () => openBeforeTheRepeats = OpenStopQuestion(app) is not null);
             Thread.Sleep(700);
             bool open = OpenStopQuestion(app) is not null;
             Measured($"a held Escape (repeats after {delay} ms, 45 of them): question {(openBeforeTheRepeats ? "open" : "not yet open")} before the repeats, {(open ? "still open" : "gone")} after, phase \"{Phase(app)}\"");

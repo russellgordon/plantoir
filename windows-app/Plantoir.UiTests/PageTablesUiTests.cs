@@ -116,15 +116,8 @@ public class PageTablesUiTests
     private static void HeldSpace(DrivenApp app)
     {
         CopyAPageEscapeUiTests.Front(app);
-        try
-        {
-            for (int down = 0; down < 6; down++)
-            {
-                Keyboard.Press(VirtualKeyShort.SPACE);
-                Thread.Sleep(down == 0 ? 500 : 33);
-            }
-        }
-        finally { Keyboard.Release(VirtualKeyShort.SPACE); }
+        // Six downs: the first, then five repeats 33 ms apart after 500 ms.
+        HeldKeys.HoldWithRepeats(VirtualKeyShort.SPACE, firstDelayMs: 500, repeats: 5, repeatMs: 33);
         Thread.Sleep(400);
     }
 

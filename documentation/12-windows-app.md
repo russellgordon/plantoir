@@ -3104,9 +3104,11 @@ a teacher can see it rather than merely held in a constant.
 carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
 `dotnet test` builds them and runs none of those — only
 `AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
-and need no desktop (bundle 11), and `HarnessSourceRuleTests`, five more that
-keep a bare key-down, a discarded `Keyboard.Pressing` and an unwatched key out
-of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
+and need no desktop (bundle 11) (the key rules that keep a bare key-down, a
+discarded `Keyboard.Pressing` and an unwatched key out of these sources,
+`HarnessSourceRuleTests` (#638), live in `Plantoir.Tests` since #1035, so the
+merge gate runs them: in this project they failed on `dev` for days with
+nobody seeing it). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -3257,11 +3259,16 @@ the 2026-10-23 full run and passed alone).
   `using (Keyboard.Pressing(key)) { … }`, which sends the up on dispose, a
   failing assert included. `PlanTable`'s Shift+Tab had called `Pressing` and
   thrown the disposable away; it is a `using` now.
-- **`HarnessSourceRuleTests`** (plain facts, no desktop) fails on any
-  `Keyboard.Press(` in the UI test sources. The exception is one method,
-  allowed by name: `PageTablesUiTests.HeldSpace`, which imitates
-  auto-repeat (several downs, then one up in a `finally`) and must keep
-  its release.
+- **`HarnessSourceRuleTests`** (in `Plantoir.Tests`, plain facts reading
+  `windows-app/Plantoir.UiTests/*.cs`) fails on any `Keyboard.Press(` in the UI
+  test sources. The one exception, allowed by name, is
+  `HeldKeys.HoldWithRepeats`, which imitates auto-repeat (one down, more downs
+  after the repeat delay, one up in a `finally`) and must keep its release;
+  every held-key imitation calls it (`PageTablesUiTests.HeldSpace`,
+  `StopByKeyboardUiTests`' held Escape). It also fails on a key a test names
+  that `HeldKeys.Watched` does not list, comparing by name because the unit
+  project cannot load FlaUI: spell a key as `Watched` does (`RETURN`, not
+  `ENTER`).
 - **`HeldKeys` sweeps for a key held any other way.** It reads
   `GetAsyncKeyState` for every modifier (generic and left/right, Windows
   keys included) and every key the suite sends. `DrivenApp`'s constructor
@@ -16746,6 +16753,17 @@ and passes over SSH on the PC (run `899u2b-win-11`): a deny ACE on READING
 a file stops the administrator's token there, unlike a deny on LISTING a
 folder, which it passes (`DenyBitesFact`). Its `DenyReadBitesFact` probe
 still skips it, saying why, on any account whose token reads past it.
+
+There are now three deny-rule probes, one each for listing a folder, reading a
+file and replacing a file (`DenyReplaceBitesFact`, #953). Each probe tests the
+exact operation its tests need, because they do not all fail in the same
+places. Over SSH on the PC, the account is an elevated administrator with the
+backup and restore privileges enabled. A rename passes deny rules on both the
+file and its folder there, but a read-only attribute still stops it. A test
+that needs a deny rule to bite must therefore use the probe that matches its
+operation, not borrow another one. Any part of the test that does not depend
+on a deny rule should be split out as a plain fact, so that it still runs
+everywhere.
 
 **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
 .NET 9, the system NTFS volume, other agents of the run sharing the CPU, so
