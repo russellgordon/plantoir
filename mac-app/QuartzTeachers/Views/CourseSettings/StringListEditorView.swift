@@ -282,7 +282,7 @@ struct StringListEditorView: View {
             presenting: pendingRemoval
         ) { removal in
             Button("Remove", role: .destructive) {
-                removeItem(named: removal.item)
+                takeOutOfTheList(named: removal.item)
             }
             Button("Cancel", role: .cancel) {
                 pendingRemoval = nil
@@ -606,7 +606,7 @@ struct StringListEditorView: View {
             pendingRemoval = removal
             return removal
         case .ordinary:
-            removeItem(named: item)
+            takeOutOfTheList(named: item)
             return nil
         }
     }
@@ -638,7 +638,10 @@ struct StringListEditorView: View {
         )
     }
 
-    func removeItem(named name: String) {
+    /// Takes the name out of the list in memory; nothing is written until
+    /// Save (named so after #899 U4a, when the writer scan counted its old
+    /// name, `removeItem(named:)`, as a file removal).
+    func takeOutOfTheList(named name: String) {
         var result: [String] = []
         for item in items {
             if item != name {

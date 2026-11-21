@@ -72,4 +72,20 @@ nonisolated enum FrontPageWording {
     /// action has everywhere else in the app (the HIG's Alerts page, read
     /// that night). OK stays the default, on the trailing side.
     static let showKept: String = "Show in Finder"
+
+    /// What Show in Finder says instead when a kept file it was to show is
+    /// no longer there (U3c review 3, LOW 2, fixed in U4a: Finder was
+    /// brought forward on an unrelated window and nothing was said). One
+    /// sentence per name; an informational alert with OK.
+    static func keptGone(_ keptNames: [String]) -> String {
+        var sentences: [String] = []
+        for name in keptNames {
+            sentences.append(keptGoneSentence(kept: name))
+        }
+        return sentences.joined(separator: " ")
+    }
+
+    static func keptGoneSentence(kept name: String) -> String {
+        return "“\(name)” is no longer there, so there is nothing to show."
+    }
 }

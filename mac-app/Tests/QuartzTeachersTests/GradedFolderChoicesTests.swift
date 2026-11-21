@@ -50,7 +50,7 @@ final class GradedFolderChoicesTests: XCTestCase {
     }
 
     /// Removes a folder the way the teacher does, through the list editor
-    /// Course Settings builds for that list: `removeItem(named:)` takes the
+    /// Course Settings builds for that list: `takeOutOfTheList(named:)` takes the
     /// name out of the list, then calls `onRemove`, which is
     /// `folderWasRemoved` — the exclusion, then the pool, then the trail line.
     ///
@@ -65,7 +65,7 @@ final class GradedFolderChoicesTests: XCTestCase {
     ) {
         let list: GestureList = scope == .shared ? .sharedFolders : .perSectionFolders
         let editor: StringListEditorView = CourseSettingsGestureScript.editor(for: list, of: view)
-        editor.removeItem(named: name)
+        editor.takeOutOfTheList(named: name)
     }
 
     /// A course folder holding the given directories, and a configuration to
@@ -197,7 +197,7 @@ final class GradedFolderChoicesTests: XCTestCase {
     /// tells the build to skip — a pool matching nothing the site publishes,
     /// while the settings claim something counts.
     ///
-    /// The removal runs through the list editor's own `removeItem(named:)`, so
+    /// The removal runs through the list editor's own `takeOutOfTheList(named:)`, so
     /// it happens in the order Course Settings really does it (issue #183):
     /// `exclude` first, then `dropFromMarksPool`. That order matters for a
     /// course that has NEVER been asked — by the time the pool is touched the
