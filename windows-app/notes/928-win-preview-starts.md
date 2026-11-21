@@ -99,6 +99,7 @@ Branch `issue/928-win-preview-starts`. #1022 item 1 is done here; #1022 item 2
   - `PreviewStartRecordTests.ThePressAsksWhetherTheWindowsStopIsUnderWay` line 392: `_stopsUnderWay++` removed from `StopPreviewAsync` (L1).
   - `PreviewStartRecordTests.AFailedStartHandsBackWhatItHolds` line 404: `HandBackAfterAFailure` removed from `StartAutomatedPreview`'s catch (L2).
   - `LaunchProblemWordingTests.TheFolderNotSetUpRefusalNamesNoFileOrPath` line 84 (via line 21): the old sentence naming `preview.ps1` put back (L6).
+- Proven on VM B, head 90598c6b9 (dev 10d04bfbd merged): the piece's classes and every class that reads a changed file as source text, 44 classes in batches, all green except `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel` (deploy.sh line 1472 inside `run_token_mode()`; `deploy.sh` is untouched by this branch, so it is dev's, unrelated). `DialogTitleScanTests` needed the census at 17 for the "Cannot Preview Yet" alert. `PreviewThatCannotStartUiTests` passed twice.
 
 ### #1022 item 1
 
