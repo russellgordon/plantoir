@@ -35,15 +35,15 @@ internal sealed record UndoRecoveryRun(IReadOnlyList<UndoRecoveryResult> Settled
 internal sealed record UndoTrailLine(ActivityTrail.Event Event, string? Course, long? Section, string Words,
                                      IReadOnlyList<string>? Kept = null, IReadOnlyList<string>? NoLongerInTheList = null);
 
+/// <summary>What became of a change the list could not record (the mac's <c>UndoUnrecordedChange</c>).</summary>
+internal enum UndoUnrecordedChange { WentAhead, NothingWasChanged, StoppedPartWay, MadeButNotClosed }
+
 /// <summary>
 /// The trail lines Undo writes (<c>activityTrail.mustRecord</c>), in the
 /// mac's words (<c>UndoTrail</c> in <c>UndoAppSeams.swift</c>). The door is
 /// given a sink for them; the app's start-up (W4) passes
 /// <see cref="ToTheActivityTrail"/>, a test passes a list.
 /// </summary>
-/// <summary>What became of a change the list could not record (the mac's <c>UndoUnrecordedChange</c>).</summary>
-internal enum UndoUnrecordedChange { WentAhead, NothingWasChanged, StoppedPartWay, MadeButNotClosed }
-
 internal static class UndoTrail
 {
     /// <summary>

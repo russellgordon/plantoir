@@ -190,6 +190,109 @@ public sealed class UndoActionStepTests : IDisposable
         Assert.Equal(Class(2, draft: true), File.ReadAllText(Full(Day2)));
     }
 
+    /// <summary>A door over <paramref name="list"/>'s journal with seams, or with maintainers of a test's own.</summary>
+    private static UndoDoor DoorOver(UndoForThisProcess list, UndoSeams? seams = null, IUndoMaintainers? maintainers = null) =>
+        new(list.Journal, list.Mode, maintainers ?? list.Maintainers, seams: seams, trail: list.Trail);
+
+    /// <summary>Day 1 goes in, Day 2 is read-only and refuses, and Day 1 cannot be put back: the step is left part way.</summary>
+    private static UndoSeams PutBackOfTheFirstPageFails() => new() { PutBackFailsAt = index => index == 0 };
+
+    private void StepLeftPartWay(UndoForThisProcess list)
+    {
+        Write(Day1, Class(1, draft: true));
+        File.SetAttributes(Full(Day2), FileAttributes.ReadOnly);
+        var step = new UndoActionStep(new UndoStepMaker("menu", "publishPages"), Folder, "ICS3U", 1, undo: list,
+                                      door: DoorOver(list, PutBackOfTheFirstPageFails()));
+        step.Write(Full(Day1), Class(1, draft: false));
+        step.Write(Full(Day2), Class(2, draft: false));
+
+        var partWay = Assert.Throws<UndoStepLeftPartWayException>(step.Make);
+
+        File.SetAttributes(Full(Day2), FileAttributes.Normal);
+        // The disk holds the new Day 1, and its earlier content is kept beside it, named.
+        Assert.Equal(Class(1, draft: false), File.ReadAllText(Full(Day1)));
+        Assert.Equal(Class(2, draft: true), File.ReadAllText(Full(Day2)));
+        string kept = Assert.Single(partWay.KeptOriginals);
+        Assert.Equal(Class(1, draft: true), File.ReadAllText(kept));
+        Assert.Contains(UndoActionStep.KeptSentence("“Unit 1, Day 1.md”", Path.GetFileName(kept)), partWay.Message, StringComparison.Ordinal);
+        // "hidden" is true on Windows only by the attribute (review 1, MEDIUM 1): the kept file has it, the page does not.
+        Assert.True(File.GetAttributes(kept).HasFlag(FileAttributes.Hidden), "the kept file is not Hidden");
+        Assert.False(File.GetAttributes(Full(Day1)).HasFlag(FileAttributes.Hidden), "the page was hidden");
+        Assert.DoesNotContain("Nothing was", partWay.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>Review 1, MEDIUM 2: a recorded step left part way is said as part way (the door's <c>LeftPartWay</c> on its recorded path), never "Nothing was changed".</summary>
+    [Fact]
+    public void ARecordedStepLeftPartWayIsSaidAsPartWayAndNamesTheKeptFile()
+    {
+        ACourse();
+        StepLeftPartWay(List());
+        Assert.Single(Begins());
+    }
+
+    /// <summary>Review 1, MEDIUM 2: the same when the list cannot take the step (the door's shadow swap without a record), with the trail line saying it stopped part way.</summary>
+    [Fact]
+    public void AnUnrecordedStepLeftPartWayIsSaidAsPartWayWithItsTrailLine()
+    {
+        ACourse();
+        Directory.CreateDirectory(Path.GetDirectoryName(ListFolder)!);
+        File.WriteAllText(ListFolder, "not a folder");
+        StepLeftPartWay(List());
+        UndoTrailLine line = Assert.Single(_trail);
+        Assert.Equal(UndoTrail.CouldNotRecordWords("publishPages", "the list could not be written", UndoUnrecordedChange.StoppedPartWay), line.Words);
+    }
+
+    private sealed class ThrowingMaintainers : IUndoMaintainers
+    {
+        public bool CanRun(string maintainer) => true;
+        public void Rederive(UndoOp op, string root) => throw new InvalidOperationException("a front page that could not be worked out");
+    }
+
+    /// <summary>
+    /// Review 1, MEDIUM 4: something unforeseen thrown while the front page is
+    /// re-derived, after the swap, is never said as "Nothing was changed":
+    /// the pages are in, the step stands, and no line says nothing changed.
+    /// </summary>
+    [Fact]
+    public void AFrontPageThatThrowsAfterTheSwapIsNeverSaidAsNothingChanged()
+    {
+        ACourse();
+        UndoForThisProcess list = List();
+        var step = new UndoActionStep(new UndoStepMaker("menu", "publishPages"), Folder, "ICS3U", 1, undo: list,
+                                      door: DoorOver(list, maintainers: new ThrowingMaintainers()));
+        step.Write(Full(Day2), Class(2, draft: false));
+        step.KeepsTheFrontPageTrue(1, Full(Index));
+
+        step.Make();
+
+        Assert.Equal(Class(2, draft: false), File.ReadAllText(Full(Day2)));
+        Assert.Single(Begins());
+        Assert.Empty(_trail);
+    }
+
+    /// <summary>
+    /// Review 1, MEDIUM 3: today's in-memory undo keeps a page's earlier
+    /// content as it was on the disk, so a UTF-16 page comes back byte for
+    /// byte at Undo Last Change (it used to keep the text read as UTF-8).
+    /// </summary>
+    [Fact]
+    public void AUtf16PageComesBackByteForByteAtTodaysUndo()
+    {
+        ACourse();
+        File.WriteAllText(Full(Day2), Class(2, draft: true), new UnicodeEncoding(bigEndian: false, byteOrderMark: true));
+        byte[] before = File.ReadAllBytes(Full(Day2));
+        var history = new UndoHistory();
+        var workspace = new AssistWorkspace(Folder, new NoLaunchers(), undo: history) { Surface = AssistSurface.Menu, UndoList = List() };
+        PublishPlan plan = workspace.PlanPublish("ICS3U", 1, ["Unit 1, Day 2"], draft: false, publishes: true);
+
+        workspace.Apply(plan, preview: false).GetAwaiter().GetResult();
+        Assert.Contains("draft: false", File.ReadAllText(Full(Day2)), StringComparison.Ordinal);
+        Assert.Equal(Class(2, draft: true), Assert.Single(history.Entries).Files[Full(Day2)].Before);
+        history.Undo();
+
+        Assert.Equal(before, File.ReadAllBytes(Full(Day2)));
+    }
+
     private sealed class NoLaunchers : ILauncherRunner
     {
         public Task<LaunchOutcome> Run(string launcher, IReadOnlyList<string> arguments, string workingFolder,

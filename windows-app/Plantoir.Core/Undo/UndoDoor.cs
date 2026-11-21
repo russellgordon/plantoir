@@ -394,11 +394,6 @@ internal sealed class UndoDoor
     }
 
     /// <summary>
-    /// A failure of the list's own files: a disk or permission error, or any
-    /// failure at all in shadow, where nothing the list does may stop or change
-    /// the teacher's action (<c>rule.shadow</c>; W4).
-    /// </summary>
-    /// <summary>
     /// A word for why the list could not take a step, never the error's own
     /// description, which can carry a path (the mac's <c>UndoTrailHook.word</c>).
     /// </summary>
@@ -414,6 +409,11 @@ internal sealed class UndoDoor
         _trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoCouldNotRecordAStep, draft.Course, draft.Section,
                                          UndoTrail.CouldNotRecordWords(draft.ActionKey, why, change)));
 
+    /// <summary>
+    /// A failure of the list's own files: a disk or permission error, or any
+    /// failure at all in shadow, where nothing the list does may stop or change
+    /// the teacher's action (<c>rule.shadow</c>; W4).
+    /// </summary>
     private bool IsAFailureOfTheList(Exception error) =>
         error is UndoJournalException or IOException or UnauthorizedAccessException || !Live;
 
@@ -871,11 +871,20 @@ internal sealed class UndoDoor
 
     private bool CanRederive(UndoOp op) => op.Maintainer is { } maintainer && _maintainers?.CanRun(maintainer) == true;
 
+    /// <remarks>
+    /// Runs AFTER the swap, so whatever it throws must never reach a caller
+    /// as a failure before the swap: the step's pages are in, and a caller
+    /// that read it as "nothing was changed" would say so of a disk where
+    /// every page was written (W7a review 1, MEDIUM 4). A re-derivation that
+    /// throws leaves its file as it was, as one that returns false does.
+    /// </remarks>
     private void Rederive(IEnumerable<UndoOp> ops, string root)
     {
         foreach (UndoOp op in ops)
         {
-            if (op.Kind == UndoOp.Recompute && _maintainers is not null) _maintainers.Rederive(op, root);
+            if (op.Kind != UndoOp.Recompute || _maintainers is null) continue;
+            try { _maintainers.Rederive(op, root); }
+            catch (Exception) { }
         }
     }
 

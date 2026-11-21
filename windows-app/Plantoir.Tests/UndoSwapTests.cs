@@ -390,6 +390,30 @@ public sealed class UndoSwapTests : IDisposable
         Assert.True(File.GetAttributes(page).HasFlag(pinning));
     }
 
+    /// <summary>
+    /// W7a review 1, MEDIUM 1: a kept original is marked Hidden once the page's
+    /// rename is in, and shown again before it is put back, so a page whose
+    /// swap is reversed is never left Hidden (nor one the teacher hid shown).
+    /// </summary>
+    [Fact]
+    public void AReversedPageIsNeverLeftHiddenAndAHiddenPageStaysHidden()
+    {
+        string first = Page("courses/A/a.md", Old);
+        string hiddenByTheTeacher = Page("courses/A/c.md", Old);
+        File.SetAttributes(hiddenByTheTeacher, FileAttributes.Hidden | FileAttributes.Archive);
+        string second = Page("courses/A/b.md", Old);
+        File.SetAttributes(second, FileAttributes.ReadOnly);
+
+        UndoSwapResult result = UndoSwap.Swap([Target("courses/A/a.md", Old, New), Target("courses/A/c.md", Old, New), Target("courses/A/b.md", Old, New)], "1-undo", _root);
+
+        File.SetAttributes(second, FileAttributes.Normal);
+        Assert.IsType<UndoSwapResult.Refused>(result);
+        Assert.Equal(Old, File.ReadAllBytes(first));
+        Assert.False(File.GetAttributes(first).HasFlag(FileAttributes.Hidden), "a page put back was left Hidden");
+        Assert.True(File.GetAttributes(hiddenByTheTeacher).HasFlag(FileAttributes.Hidden), "a page the teacher hid was shown");
+        Assert.Empty(StagedLeft());
+    }
+
     private UndoSwapTarget FolderTakenOut(string relative)
     {
         string full = Path.Combine(_root, relative.Replace('/', Path.DirectorySeparatorChar));

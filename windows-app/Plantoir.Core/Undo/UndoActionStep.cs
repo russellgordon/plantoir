@@ -139,15 +139,15 @@ internal sealed class UndoActionStep
     }
 
     /// <summary>Each planned file that changes, with the text it held and holds (for today's in-memory undo, <c>UndoHistory</c>).</summary>
-    internal IReadOnlyList<(string FullPath, string? Before, string? After)> ChangedFiles
+    internal IReadOnlyList<(string FullPath, string? Before, string? After, byte[]? BeforeBytes)> ChangedFiles
     {
         get
         {
-            var changed = new List<(string, string?, string?)>();
+            var changed = new List<(string, string?, string?, byte[]?)>();
             foreach (string path in _order)
             {
                 if (Same(_before[path], _after[path])) continue;
-                changed.Add((_shownAs[path], TextOf(_before[path]), TextOf(_after[path])));
+                changed.Add((_shownAs[path], TextOf(_before[path]), TextOf(_after[path]), _before[path]));
             }
             return changed;
         }
@@ -168,7 +168,13 @@ internal sealed class UndoActionStep
     }
 
     /// <summary>The section's front page is kept true by its rule after the step (<c>recompute</c>, <c>sectionFrontPage</c>).</summary>
-    internal void KeepsTheFrontPageTrue(long section, string fullPath) => _frontPages.Add((Path.GetFullPath(fullPath), section));
+    internal void KeepsTheFrontPageTrue(long section, string fullPath)
+    {
+        // Once per page, as the mac's: an action that plans one class after
+        // another names the same front page each time (review 1, LOW).
+        var page = (Path.GetFullPath(fullPath), section);
+        if (!_frontPages.Contains(page)) _frontPages.Add(page);
+    }
 
     private void Plan(string fullPath, byte[]? after)
     {
@@ -237,9 +243,10 @@ internal sealed class UndoActionStep
         catch (Exception error) when (_mode == UndoMode.Shadow && error is not (IOException or UnauthorizedAccessException))
         {
             // Shadow: nothing the list does may stop the action (rule.shadow).
-            // The door handles every failure it knows; an unforeseen one,
-            // thrown before its swap, changed nothing, so the step is made
-            // plainly with its line.
+            // The door handles every failure it knows, and nothing after its
+            // swap throws (its re-derivations are caught there: review 1,
+            // MEDIUM 4); an unforeseen one is thrown before its swap and
+            // changed nothing, so the step is made plainly with its line.
             CouldNotRecord("the list could not be written", UndoUnrecordedChange.WentAhead, after: WritePlainlyQuietly);
             return;
         }
@@ -254,6 +261,11 @@ internal sealed class UndoActionStep
                 throw LeftPartWay(outcome.Refusal!, keptBefore);
             case UndoOutcomeKind.Refused:
                 throw new UndoStepRefusedException(outcome.Refusal!, Reason(outcome.Refusal!));
+            case UndoOutcomeKind.StoppedByATest:
+                // A kill point of a test or the harness, which may fall after
+                // the swap: never said in the "Nothing was changed" family
+                // (review 1, LOW).
+                throw new InvalidOperationException("The step was stopped by a test.");
             case UndoOutcomeKind.AnotherChangeIsUnderWay:
                 throw new UndoStepRefusedException(new UndoRefusal(UndoRefusalKind.FileIsInUse), "another change to this folder is under way");
             default:
@@ -302,7 +314,9 @@ internal sealed class UndoActionStep
             // swap goes in at the file it leads to.
             string place = UndoLinks.Look(path) == UndoLinks.What.Link && File.ResolveLinkTarget(path, returnFinalTarget: true) is { } final
                 ? final.FullName : path;
-            targets.Add(new UndoSwapTarget(place, Path.GetFileName(path), _before[path], _after[path]));
+            // Named by its full path: no working folder is there to name it
+            // inside, and the refusal's sentence checks the page it names.
+            targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
         }
         HashSet<string> keptBefore = KeptOriginalsNow();
         switch (UndoSwap.Swap(targets, "shadow", null, _plainSeams))
@@ -348,7 +362,9 @@ internal sealed class UndoActionStep
             {
                 ["kind"] = UndoOp.Recompute, ["maintainer"] = UndoOp.SectionFrontPage, ["path"] = relative, ["section"] = section,
             });
-            _maintainers.Rederive(op, _root);
+            // After the files are in: never a failure of the action (review 1, MEDIUM 4).
+            try { _maintainers.Rederive(op, _root); }
+            catch (Exception) { }
         }
     }
 
@@ -358,16 +374,21 @@ internal sealed class UndoActionStep
         string file = refusal.Path is { } path ? "“" + Path.GetFileName(path.Replace('/', Path.DirectorySeparatorChar)) + "”" : "a page";
         // A page marked read-only refuses its rename: said as a permission,
         // which is what it is, never as a full disk.
-        if (refusal.Kind == UndoRefusalKind.CouldNotWrite && refusal.Path is { } refused && _root is not null
-            && File.Exists(UndoDoor.FullPath(_root, refused))
-            && File.GetAttributes(UndoDoor.FullPath(_root, refused)).HasFlag(FileAttributes.ReadOnly))
+        string? refusedPage = refusal.Path is not { } named ? null
+            : Path.IsPathRooted(named) ? named
+            : _root is not null ? UndoDoor.FullPath(_root, named) : null;
+        if (refusal.Kind == UndoRefusalKind.CouldNotWrite && refusedPage is not null
+            && File.Exists(refusedPage) && File.GetAttributes(refusedPage).HasFlag(FileAttributes.ReadOnly))
             return "Plantoir doesn’t have permission to change one of them.";
         return refusal.Kind switch
         {
             UndoRefusalKind.ChangedSince => $"{file} was changed by another program while it was being saved.",
             UndoRefusalKind.FileIsInUse => $"{file} is in use by another program.",
             UndoRefusalKind.CannotTellNow => $"{file} could not be read just now.",
-            UndoRefusalKind.CouldNotWrite => $"nothing could be written beside {file} (the disk may be full).",
+            // Room and permission are one refusal (couldNotWrite): the
+            // sentence names both, so a folder denied by its permissions is
+            // never told only that the disk may be full (review 1, LOW).
+            UndoRefusalKind.CouldNotWrite => $"nothing could be written beside {file} (the disk may be full, or Plantoir may not have permission to write there).",
             _ => $"{file} could not be saved.",
         };
     }
@@ -425,5 +446,15 @@ internal sealed class UndoActionStep
     private static bool Same(byte[]? left, byte[]? right) =>
         left is null ? right is null : right is not null && left.AsSpan().SequenceEqual(right);
 
-    private static string? TextOf(byte[]? bytes) => bytes is null ? null : new UTF8Encoding(false).GetString(bytes);
+    /// <summary>
+    /// The text as <c>File.ReadAllText</c> reads it, a byte-order mark
+    /// (UTF-8, UTF-16, UTF-32) detected and dropped, as <c>Save</c> read the
+    /// before it gave today's undo (review 1, MEDIUM 3).
+    /// </summary>
+    private static string? TextOf(byte[]? bytes)
+    {
+        if (bytes is null) return null;
+        using var reader = new StreamReader(new MemoryStream(bytes), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
+    }
 }

@@ -4899,9 +4899,9 @@ public sealed partial class AssistWorkspace
             frontBefore.Add((page, text));
         }
         step.Make();
-        foreach (var (path, before, after) in changes)
+        foreach (var (path, before, after, beforeBytes) in changes)
         {
-            _undo?.Touch(path, before);
+            _undo?.Touch(path, before, beforeBytes);
             _undo?.Wrote(path, after);
         }
         foreach (var (path, before) in frontBefore)

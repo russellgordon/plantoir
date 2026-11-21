@@ -257,7 +257,17 @@ internal static class UndoSwap
                     original.LetGo();
                     originals[index] = null;
                     if (seams?.PutBackFailsAt?.Invoke(index) == true) whole = false;
-                    else if (RenameWithRetries(original.Path, target.FullPath, replace: true, seams) != 0) whole = false;
+                    else
+                    {
+                        // Shown again before it is the page again; hidden
+                        // again if it stays under its kept name.
+                        ShowTheKeptFile(original);
+                        if (RenameWithRetries(original.Path, target.FullPath, replace: true, seams) != 0)
+                        {
+                            whole = false;
+                            HideTheKeptFile(original);
+                        }
+                    }
                 }
                 else if (!TryDelete(target.FullPath))
                 {
@@ -502,6 +512,31 @@ internal static class UndoSwap
     internal static bool IsAFolderSetAside(string path) =>
         Path.GetFileName(path).EndsWith("-orig", StringComparison.Ordinal) && UndoLinks.Look(path) == UndoLinks.What.Folder;
 
+    /// <summary>Marks a kept original Hidden, unless it already is (a page the teacher hid keeps its own attribute). Best effort: an attribute that will not take leaves the file as it is.</summary>
+    internal static void HideTheKeptFile(UndoStagedFile kept)
+    {
+        try
+        {
+            FileAttributes now = File.GetAttributes(kept.Path);
+            if (now.HasFlag(FileAttributes.Hidden)) return;
+            File.SetAttributes(kept.Path, now | FileAttributes.Hidden);
+            kept.HiddenByTheSwap = true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>Clears the Hidden attribute the swap set, before a kept original is renamed back to be the page.</summary>
+    private static void ShowTheKeptFile(UndoStagedFile kept)
+    {
+        if (!kept.HiddenByTheSwap) return;
+        try
+        {
+            File.SetAttributes(kept.Path, File.GetAttributes(kept.Path) & ~FileAttributes.Hidden);
+            kept.HiddenByTheSwap = false;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
+
     /// <summary>The place a staged name stands beside: the name between its leading dot and its LAST <c>.plantoir-undo-</c>, or null.</summary>
     internal static string? PlaceOfStagedName(string name)
     {
@@ -648,6 +683,15 @@ internal static class UndoSwap
             }
         }
         wentIn = true;
+        // The page's rename has gone in, so the kept name alone holds its
+        // earlier content (a hard link no longer shares the page's
+        // attributes): it is marked Hidden now. On Windows a leading dot
+        // hides nothing: measured on the PC (LENOVO, Windows 11 Pro 26200,
+        // "Show hidden files" off), a dot file is listed and selected by
+        // File Explorer, outside and inside OneDrive, and one marked Hidden
+        // is not; so "kept beside it as the hidden file" is true only with
+        // the attribute (W7a review 1, MEDIUM 1; the director's call).
+        if (originals[index] is { } keptNow) HideTheKeptFile(keptNow);
 
         // L4: the original is the page as it was AT the rename (a hard link),
         // so an edit made in place between the re-read and the rename shows
@@ -1004,6 +1048,9 @@ internal sealed class UndoStagedFile
 {
     private SafeFileHandle? _handle;
     private readonly (uint Volume, ulong Index)? _identity;
+
+    /// <summary>Whether the swap set the Hidden attribute on this kept original (so it clears it again before putting it back, and never clears one the page had of its own).</summary>
+    internal bool HiddenByTheSwap { get; set; }
 
     private UndoStagedFile(string path, bool isALink, SafeFileHandle? handle, (uint Volume, ulong Index)? identity)
     {
