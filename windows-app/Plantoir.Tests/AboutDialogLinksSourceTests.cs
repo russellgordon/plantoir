@@ -33,19 +33,22 @@ public class AboutDialogLinksSourceTests
     public void EveryLinkIsAHyperlinkButtonOfItsOwnWithItsOwnWords()
     {
         string source = AboutDialog();
-        var expected = new (string Words, string Id)[]
+        // Each link's address too, the mac's (AboutWindowLinksTests, #1012):
+        // the 993b review found the first pattern took any address at all, so
+        // a link pointed elsewhere passed (#1020).
+        var expected = new (string Address, string Words, string Id)[]
         {
-            ("\"https://plantoir.app\"", "aboutWebsiteLink"),
-            ("\"support@plantoir.app\"", "aboutEmailLink"),
-            ("QuartzName", "aboutQuartzLink"),
-            ("\"Sponsor Jacky Zhao on GitHub\"", "aboutSponsorLink"),
-            ("\"Phosphor Icons\"", "aboutIconCreditLink"),
-            ("\"Russell Gordon\"", "aboutDesignCreditLink"),
+            ("https://plantoir.app", "\"https://plantoir.app\"", "aboutWebsiteLink"),
+            ("mailto:support@plantoir.app", "\"support@plantoir.app\"", "aboutEmailLink"),
+            ("https://quartz.jzhao.xyz", "QuartzName", "aboutQuartzLink"),
+            ("https://github.com/sponsors/jackyzha0", "\"Sponsor Jacky Zhao on GitHub\"", "aboutSponsorLink"),
+            ("https://phosphoricons.com", "\"Phosphor Icons\"", "aboutIconCreditLink"),
+            ("https://www.russellgordon.ca", "\"Russell Gordon\"", "aboutDesignCreditLink"),
         };
-        foreach (var (words, id) in expected)
+        foreach (var (address, words, id) in expected)
         {
-            string call = @"Link\(""[^""]+"", " + Regex.Escape(words) + @", """ + id + @"""";
-            Assert.True(Regex.IsMatch(source, call), $"no link of its own reads {words} ({id})");
+            string call = @"Link\(""" + Regex.Escape(address) + @""", " + Regex.Escape(words) + @", """ + id + @"""";
+            Assert.True(Regex.IsMatch(source, call), $"no link of its own reads {words} ({id}) and goes to {address}");
         }
         // Six links and no seventh: every Link( call names one of the six.
         Assert.Equal(6, Regex.Matches(source, ", \"about[A-Za-z]+Link\"").Count);

@@ -29,13 +29,34 @@
                                       AutomationProperties.AutomationId="{x:Bind AutomationId}"
                                       AutomationProperties.Name="{x:Bind SpokenName}"
                                       AutomationProperties.HelpText="{x:Bind WarningTooltip, Mode=OneWay}">
-                            <StackPanel Orientation="Horizontal" Spacing="8" ToolTipService.ToolTip="{x:Bind Tooltip, Mode=OneWay}">
+                            <!-- A Grid, not a horizontal StackPanel (#1024): a StackPanel
+                                 gives its text all the width it asks for, so a long code
+                                 ran past the column's edge, clipped with no ellipsis and
+                                 its badges out of sight. Here the text takes what is left
+                                 after the icon and badges and trims with an ellipsis; left
+                                 aligned, so the badges still sit just after a short title.
+                                 Margins, not ColumnSpacing: spacing stays between columns
+                                 whose badge is collapsed and would take room from the text.
+                                 A course's code cut short carries the whole code as its own
+                                 tooltip (TitleTooltip, the mac's #997 D44). -->
+                            <Grid HorizontalAlignment="Left" ToolTipService.ToolTip="{x:Bind Tooltip, Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
                                 <FontIcon Glyph="{x:Bind Glyph}" FontSize="14" />
-                                <TextBlock Text="{x:Bind Title}" />
+                                <TextBlock Grid.Column="1" Margin="8,0,0,0" Text="{x:Bind Title}" TextTrimming="CharacterEllipsis"
+                                           IsTextTrimmedChanged="RowTitle_IsTextTrimmedChanged"
+                                           DataContextChanged="RowTitle_DataContextChanged"
+                                           ToolTipService.ToolTip="{x:Bind TitleTooltip, Mode=OneWay}"
+                                           AutomationProperties.HelpText="{x:Bind TitleHelpText, Mode=OneWay}"
+                                           AutomationProperties.AutomationId="{x:Bind TitleId}" />
                                 <!-- A clock, only on a section with a deploy waiting to fire.
                                      Its own tooltip says when: the row's tooltip is about the
                                      section, and "at 6:30 tomorrow" belongs to the clock. -->
-                                <FontIcon Glyph="{x:Bind BadgeGlyph}" FontSize="12" Opacity="0.75"
+                                <FontIcon Grid.Column="2" Margin="8,0,0,0" Glyph="{x:Bind BadgeGlyph}" FontSize="12" Opacity="0.75"
                                           Visibility="{x:Bind BadgeVisibility, Mode=OneWay}"
                                           ToolTipService.ToolTip="{x:Bind BadgeTooltip, Mode=OneWay}" />
                                 <!-- A warning, on a section whose scheduled deploy did not
@@ -53,12 +74,12 @@
                                      help text too: Narrator reads the row, not a tooltip on
                                      a child icon. Its id names the course and the section,
                                      so it is unique across the window (review change 3). -->
-                                <FontIcon Glyph="{x:Bind WarningGlyph}" FontSize="12"
+                                <FontIcon Grid.Column="3" Margin="8,0,0,0" Glyph="{x:Bind WarningGlyph}" FontSize="12"
                                           Visibility="{x:Bind WarningVisibility, Mode=OneWay}"
                                           ToolTipService.ToolTip="{x:Bind WarningTooltip, Mode=OneWay}"
                                           AutomationProperties.Name="{x:Bind WarningTooltip, Mode=OneWay}"
                                           AutomationProperties.AutomationId="{x:Bind WarningId, Mode=OneWay}" />
-                            </StackPanel>
+                            </Grid>
                         </TreeViewItem>
                     </DataTemplate>
                 </TreeView.ItemTemplate>
@@ -99,7 +120,8 @@
             </Button>
             <TextBox x:Name="FilterBox" Grid.Column="2" PlaceholderText="Filter" Margin="6,0,0,0"
                      VerticalAlignment="Center" TextChanged="Filter_TextChanged"
-                     AutomationProperties.AutomationId="courseFilterField" />
+                     AutomationProperties.AutomationId="courseFilterField"
+                     AutomationProperties.Name="Filter" />
         </Grid>
     </Grid>
 </UserControl>
