@@ -32,3 +32,13 @@ The bullets above, plus: the door is the product's through `UndoForThisProcess.C
 - The prune-time tidy's "undo found a folder set aside": not built (the change is one `onAside` argument and a trail sink on `UndoJournal`, but its test needs a pruned unsettled tree step with a folder aside, which was not written; a change without a test that fails was not left in).
 - Killed-step proof of a publish (injected and by the harness): not run.
 - The File Explorer measurement of the kept file: not done; the alert's keys stay held.
+- W4c review 1 lows: LOW 4 done (`contracts/shared-rules.json` `editJSONCasesHow`: "only for a row that platform holds by name as not yet measured"). LOWs 1, 2, 3, 5 and 6 not done (budget).
+
+## Changed tests (the failure is now all or none)
+
+`PublishStoppedPartWayTests.APageThatCannotBeWrittenIsAnsweredAndTheCopyIsNamedOnlyInTheWindow` (the page-list rows), `SectionVerbsTests.APublishThatStoppedPartWay_IsCarriedOut` and `UndoAcrossToolsTests.AnOperationThatThrewPartWayLeavesNothingOpenToSwallowTheNext` asserted the old file-by-file part-way outcome. A publish of pages is now one step, so a page that cannot be written leaves every page as it was, and the sentence is "Nothing was changed: …". The whole-unit rows still go part way: `ApplyWholeUnit` is not converted yet.
+
+## Runs (PC, LENOVO i5-8365U, Windows 11 Pro 26200)
+
+- `899w7a-c2` at 338ba328e: both builds 0; classes (Undo, ledger, trail, `Publish*`, `UndoHistory`) 1069 passed, 1 failed, 1 skipped. The failure is `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`, which also fails without this piece (W4c review 1, `int-n4-2`).
+- Must-fail (`vm-tools/guest/899-w7a-mustfail.json`, 5 sabotages): all RED. A publish written file by file: 4 of 6 failed. A before read at make time: 1 of 6. The front page planned inside the step: 1 of 6. The trail line not written: 1 of 6. Today's in-memory undo not told: 1 of 6. After the restore, the same single unrelated failure; HEAD SAME.
