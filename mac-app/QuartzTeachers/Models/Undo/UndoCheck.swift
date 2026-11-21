@@ -127,7 +127,7 @@ nonisolated enum UndoCheck {
             return UndoJSONMember.state(of: op, in: item)
         case .recompute:
             return .after
-        case .move, .createTree, .removeTree, .external, .none:
+        case .move, .moveApart, .setAside, .createTree, .removeTree, .external, .none:
             return .neither
         }
     }
@@ -191,6 +191,19 @@ nonisolated enum UndoCheck {
     /// for an undo), so several lines on one page make one staged file. A
     /// move, a tree or an external op is judged on its own against what is
     /// there now (`wholeState`), and becomes one change of its own.
+    ///
+    /// `leavesApart` is true for an Undo or a Redo (never for making a step,
+    /// nor for recovery): an op that stands apart (`UndoOp.standsApart`)
+    /// and is found changed since, or an external op that cannot be set
+    /// back now, is then LEFT where it is and named in `leftApart` instead
+    /// of refusing the step, and the rest goes ahead (Russell's ruling of
+    /// 2026-11-19 on Q3; #959; #897 piece B, seams 2 and 4).
+    ///
+    /// The step's `moveApart` ops (a section's website records) move as a
+    /// GROUP (the director's decision of 2026-11-20, on #899): when any one
+    /// of them is changed since (one host's deploy filled its place and
+    /// another's did not), every one is left apart, so a section is never
+    /// split across two websites (`groupStaysApart`).
     static func plan(
         _ ops: [UndoOp],
         direction: UndoDirection,
@@ -198,7 +211,8 @@ nonisolated enum UndoCheck {
         journal: UndoJournal,
         places: UndoExternalPlaces = UndoAppPreferences(),
         keptOriginal: ((_ path: String, _ sha: String) -> Data?)? = nil,
-        keptOriginalUsed: ((UndoKeptOriginalUse) -> Void)? = nil
+        keptOriginalUsed: ((UndoKeptOriginalUse) -> Void)? = nil,
+        leavesApart: Bool = false
     ) -> UndoPlan {
         var ordered: [UndoOp] = ops
         if direction == .backward {
@@ -222,6 +236,10 @@ nonisolated enum UndoCheck {
         var recomputes: [UndoOp] = []
         var wholeTargets: [UndoSwapTarget] = []
         var cannotTellPath: String? = nil
+        var leftApart: [String] = []
+        let groupStaysApart: Bool = leavesApart && UndoCheck.aWebsiteRecordIsChangedSince(
+            ordered, direction: direction, root: root, places: places
+        )
 
         for op in ordered {
             guard let kind = op.knownKind else {
@@ -261,7 +279,20 @@ nonisolated enum UndoCheck {
                     }
                     continue
                 }
-                if verdict == .changedSince {
+                if groupStaysApart && kind == .moveApart {
+                    leftApart.append(op.placeName)
+                    continue
+                }
+                var cannotGoBack: Bool = verdict == .changedSince
+                if !cannotGoBack, op.knownKind == .external, let target = op.target {
+                    let wanted: UndoJSON? = direction == .backward ? op.valueBefore : op.valueAfter
+                    cannotGoBack = !places.canSet(target, wanted)
+                }
+                if cannotGoBack {
+                    if leavesApart && op.standsApart {
+                        leftApart.append(op.placeName)
+                        continue
+                    }
                     if !inTheWay.contains(op.placeName) {
                         inTheWay.append(op.placeName)
                     }
@@ -380,7 +411,29 @@ nonisolated enum UndoCheck {
         for target in wholeTargets {
             targets.append(target)
         }
-        return .ready(targets: targets, recomputes: recomputes)
+        return .ready(targets: targets, recomputes: recomputes, leftApart: leftApart)
+    }
+
+    /// Whether any `moveApart` op of a step (a website record) is changed
+    /// since, judged as `plan` judges it: the one test that leaves the whole
+    /// group apart.
+    static func aWebsiteRecordIsChangedSince(
+        _ ops: [UndoOp], direction: UndoDirection, root: URL, places: UndoExternalPlaces
+    ) -> Bool {
+        for op in ops where op.knownKind == .moveApart {
+            var leavesTheFolder: Bool = false
+            for place in op.pathsNamed where !UndoPlaces.staysInside(root, place) {
+                leavesTheFolder = true
+            }
+            if leavesTheFolder {
+                continue
+            }
+            let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: places)
+            if UndoCheck.verdict(for: state, direction: direction) == .changedSince {
+                return true
+            }
+        }
+        return false
     }
 
     /// The content after moving one op one way, or nil when a blob it needs
@@ -411,7 +464,7 @@ nonisolated enum UndoCheck {
             return UndoHunk.moved(op, from: item, direction: direction)
         case .editJSON:
             return UndoJSONMember.moved(op, from: item, direction: direction)
-        case .recompute, .move, .createTree, .removeTree, .external, .none:
+        case .recompute, .move, .moveApart, .setAside, .createTree, .removeTree, .external, .none:
             return item
         }
     }
@@ -421,7 +474,7 @@ nonisolated enum UndoCheck {
     /// when content it needs is there and cannot be read.
     static func wholeTarget(_ op: UndoOp, direction: UndoDirection, root: URL, journal: UndoJournal) throws -> UndoSwapTarget? {
         switch op.knownKind {
-        case .move:
+        case .move, .moveApart, .setAside:
             guard let from = op.from, let to = op.to else {
                 return nil
             }
@@ -518,7 +571,9 @@ nonisolated struct UndoWhatTheListCouldNotTake: Equatable, Sendable {
 
 /// What a check found.
 nonisolated enum UndoPlan: Equatable, Sendable {
-    case ready(targets: [UndoSwapTarget], recomputes: [UndoOp])
+    /// `leftApart`: the places of ops that stand apart and are left where
+    /// they are (`UndoCheck.plan`'s `leavesApart`), in the order judged.
+    case ready(targets: [UndoSwapTarget], recomputes: [UndoOp], leftApart: [String])
     case refused(UndoRefusal)
     /// Content the step needs is there and cannot be read (a failing disk):
     /// refused for this attempt, the list left as it is.
@@ -625,16 +680,68 @@ nonisolated enum UndoSwap {
 
     // MARK: - Functions
 
+    ///
+    /// `leaveApart` is given by an Undo or a Redo only (never by making a
+    /// step, nor by recovery): an external target that stands apart (a
+    /// deploy set for later) and that cannot be set at the swap, because
+    /// launchd refused it, the write was off the main thread, or it no
+    /// longer holds what the check saw, is then LEFT as it is and handed to
+    /// `leaveApart`, and the rest of the swap goes on, exactly as a marker
+    /// is left apart (the review of U3b, LOW 3): one label that stays
+    /// loaded must never block its step, and every step under it, for good.
     static func swap(
         _ targets: [UndoSwapTarget],
         label: String,
         places: UndoExternalPlaces = UndoAppPreferences(),
         root: URL? = nil,
-        keepingTheOriginalsOf keptPaths: Set<String> = []
+        keepingTheOriginalsOf keptPaths: Set<String> = [],
+        leaveApart: ((String) -> Void)? = nil,
+        startsAtTheNextLogin: ((String) -> Void)? = nil
     ) -> UndoSwapResult {
         var staged: [URL?] = []
         var originals: [URL?] = []
         var swapsMade: Int = 0
+        // The externals left apart at the swap: nothing of theirs to reverse.
+        var leftApartAt: Set<Int> = []
+        // Each folder this swap made for a place that had none (a moved
+        // record's kept folder, a new page's folder), deepest last: removed
+        // again, when empty, by a swap that is refused (the review of U3b,
+        // LOW 4: a refused step left an empty kept folder behind).
+        var foldersMade: [URL] = []
+
+        /// Makes the folder a place goes in, noting each level it made.
+        func makeTheFolder(for url: URL) {
+            var missing: [URL] = []
+            var folder: URL = url.deletingLastPathComponent()
+            while folder.path != "/" && !FileManager.default.fileExists(atPath: folder.path) {
+                missing.append(folder)
+                folder = folder.deletingLastPathComponent()
+            }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var index: Int = missing.count - 1
+            while index >= 0 {
+                if FileManager.default.fileExists(atPath: missing[index].path) {
+                    foldersMade.append(missing[index])
+                }
+                index -= 1
+            }
+        }
+
+        /// Removes every folder `makeTheFolder` made that is still empty,
+        /// deepest first. `rmdir` never removes a folder with anything in it.
+        func removeTheFoldersMade() {
+            var index: Int = foldersMade.count - 1
+            while index >= 0 {
+                _ = foldersMade[index].withUnsafeFileSystemRepresentation { path in
+                    guard let path else {
+                        return Int32(-1)
+                    }
+                    return rmdir(path)
+                }
+                index -= 1
+            }
+            foldersMade = []
+        }
 
         /// True when a test stopped it while a folder taken out was being
         /// removed, as a process that died there would stop.
@@ -699,6 +806,10 @@ nonisolated enum UndoSwap {
             while index >= 0 {
                 let target: UndoSwapTarget = targets[index]
                 let failsHere: Bool = UndoKillPoints.putBackFailsAt?(index) == true
+                if leftApartAt.contains(index) {
+                    index -= 1
+                    continue
+                }
                 switch target.change {
                 case .file:
                     if let original = originals[index] {
@@ -755,6 +866,7 @@ nonisolated enum UndoSwap {
                 return .notPutBack(refusal, keptOriginals: originalsLeft())
             }
             tidy()
+            removeTheFoldersMade()
             return .refused(refusal)
         }
 
@@ -769,19 +881,19 @@ nonisolated enum UndoSwap {
             if let root, !UndoSwap.staysInside(target, root: root) {
                 staged.append(nil)
                 tidy()
+                removeTheFoldersMade()
                 return .refused(.changedSince(firstPath: target.relativePath, others: 0))
             }
             if case .makeTree(let listing, let contents) = target.change {
                 let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
-                try? FileManager.default.createDirectory(
-                    at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
-                )
+                makeTheFolder(for: target.url)
                 _ = UndoSwap.removeStaged(stagedURL)
                 let failsHere: Bool = UndoKillPoints.stagingWriteFailsAt?(targetIndex) == true
                 if failsHere || !UndoTreeReading.make(listing, contents: contents, at: stagedURL) {
                     _ = UndoSwap.removeStaged(stagedURL)
                     staged.append(nil)
                     tidy()
+                    removeTheFoldersMade()
                     return .refused(.couldNotWrite(path: target.relativePath))
                 }
                 staged.append(stagedURL)
@@ -804,6 +916,7 @@ nonisolated enum UndoSwap {
                 mode = information.st_mode & 0o7777
             }
             do {
+                makeTheFolder(for: target.url)
                 try FileManager.default.createDirectory(
                     at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
                 )
@@ -826,6 +939,7 @@ nonisolated enum UndoSwap {
                 _ = UndoSwap.removeStaged(stagedURL)
                 staged.append(nil)
                 tidy()
+                removeTheFoldersMade()
                 return .refused(.couldNotWrite(path: target.relativePath))
             }
         }
@@ -872,9 +986,7 @@ nonisolated enum UndoSwap {
                 } else if atFrom != .holdsTheContent || atTarget != .free {
                     refusal = .changedSince(firstPath: target.relativePath, others: 0)
                 } else {
-                    try? FileManager.default.createDirectory(
-                        at: target.url.deletingLastPathComponent(), withIntermediateDirectories: true
-                    )
+                    makeTheFolder(for: target.url)
                     if !UndoSwap.renameExclusively(from, onto: target.url) {
                         refusal = .fileIsInUse(path: target.relativePath)
                     }
@@ -925,8 +1037,25 @@ nonisolated enum UndoSwap {
             case .setExternal(let externalTarget, let expected, let value):
                 if !UndoCheck.externalMatches(places.read(externalTarget), expected) {
                     refusal = .changedSince(firstPath: target.relativePath, others: 0)
-                } else if !places.write(externalTarget, value) {
-                    refusal = .couldNotWrite(path: target.relativePath)
+                } else {
+                    switch places.writeSaying(externalTarget, value) {
+                    case .written:
+                        break
+                    case .notWritten:
+                        refusal = .couldNotWrite(path: target.relativePath)
+                    case .startsAtTheNextLogin:
+                        // Set back, and launchd would not load it now: it
+                        // starts at the next login. Named on its own, never
+                        // as left apart (the re-review of U3b's fixes, LOW 2).
+                        startsAtTheNextLogin?(target.relativePath)
+                    }
+                }
+                if refusal != nil, let leaveApart, externalTarget.hasPrefix(UndoOp.scheduledDeployFamily + ":") {
+                    // Left as it is and named, the rest goes on: an Undo or
+                    // a Redo only (see `leaveApart`).
+                    leaveApart(target.relativePath)
+                    leftApartAt.insert(index)
+                    refusal = nil
                 }
             }
             if let refusal {
@@ -1498,8 +1627,19 @@ nonisolated struct UndoAsideFolder: Equatable, Sendable {
 
 /// How an undo or a redo went.
 nonisolated enum UndoOutcome: Equatable, Sendable {
-    case undone(seq: Int)
-    case redone(seq: Int)
+    /// `leftApart`: what stands apart from the step and was left where it
+    /// is (a rollover's marker after a deploy filled its place, a deploy set
+    /// for later whose moment has gone by), by place, for U7 to say once
+    /// (Russell's ruling of 2026-11-19 on Q3). Empty for every other step.
+    ///
+    /// `startsAtTheNextLogin`: the deploys set for later this put back
+    /// whose plist is in LaunchAgents and which launchd would not load now,
+    /// by target: each starts the next time the teacher logs in, and will
+    /// not run at its moment unless they log out and in before it
+    /// (`AssistWording.undoScheduleStartsAtTheNextLogin`; the re-review of U3b's
+    /// fixes, LOW 2). Empty for every other step.
+    case undone(seq: Int, leftApart: [String] = [], startsAtTheNextLogin: [String] = [])
+    case redone(seq: Int, leftApart: [String] = [], startsAtTheNextLogin: [String] = [])
     case nothingToUndo
     case nothingToRedo
     /// A newer step is still being made, undone or redone
@@ -1581,7 +1721,7 @@ nonisolated extension UndoJournal {
     ) async -> UndoOutcome {
         await UndoRecovery.recoverAndRederive(self, resolveRoot: resolveRoot, places: places)
         let outcome: UndoOutcome = undoNewest(resolveRoot: resolveRoot, places: places)
-        if case .undone(let seq) = outcome {
+        if case .undone(let seq, _, _) = outcome {
             await UndoMaintainers.rederive(stepNumbered: seq, in: self, resolveRoot: resolveRoot)
         }
         return outcome
@@ -1595,7 +1735,7 @@ nonisolated extension UndoJournal {
     ) async -> UndoOutcome {
         await UndoRecovery.recoverAndRederive(self, resolveRoot: resolveRoot, places: places)
         let outcome: UndoOutcome = redoNewest(resolveRoot: resolveRoot, places: places)
-        if case .redone(let seq) = outcome {
+        if case .redone(let seq, _, _) = outcome {
             await UndoMaintainers.rederive(stepNumbered: seq, in: self, resolveRoot: resolveRoot)
         }
         return outcome
@@ -1704,12 +1844,13 @@ nonisolated extension UndoJournal {
         let plan: UndoPlan = UndoCheck.plan(
             record.step.ops, direction: direction, root: root, journal: self, places: places,
             keptOriginal: keptOriginal,
-            keptOriginalUsed: { use in uses.append(use) }
+            keptOriginalUsed: { use in uses.append(use) },
+            leavesApart: true
         )
         if UndoKillPoints.stopsHere(.afterTheCheck) {
             return .stoppedByATest
         }
-        guard case .ready(let targets, let recomputes) = plan else {
+        guard case .ready(let targets, let recomputes, let leftApart) = plan else {
             if case .refused(let refusal) = plan {
                 if refusal == .notReadable {
                     return .notAvailable
@@ -1752,7 +1893,21 @@ nonisolated extension UndoJournal {
 
         // 4. Swap, then re-derive the files kept true by a rule.
         let label: String = "\(seq)-" + (direction == .backward ? "undo" : "redo")
-        switch UndoSwap.swap(targets, label: label, places: places, root: root, keepingTheOriginalsOf: Set(notTaken.outgoingOf)) {
+        // What the check left apart, then what the swap could not set and
+        // left apart (a deploy set for later launchd refused).
+        var everyPlaceLeftApart: [String] = leftApart
+        var everyScheduleStartingAtTheNextLogin: [String] = []
+        let swapped: UndoSwapResult = UndoSwap.swap(
+            targets, label: label, places: places, root: root,
+            keepingTheOriginalsOf: Set(notTaken.outgoingOf),
+            leaveApart: { place in
+                everyPlaceLeftApart.append(place)
+            },
+            startsAtTheNextLogin: { place in
+                everyScheduleStartingAtTheNextLogin.append(place)
+            }
+        )
+        switch swapped {
         case .refused(let refusal):
             JournaledWrite.finish(seq: seq, with: .failed, phase: phase, reason: "refused", in: self, mode: .live)
             // Caught at the swap rather than the check: the same hand edit,
@@ -1822,7 +1977,15 @@ nonisolated extension UndoJournal {
                 record.step.course ?? "", record.step.section, direction == .backward, keptOfWhatItHeld, keptOfWhatItHoldsNow
             )
         }
-        return direction == .backward ? .undone(seq: seq) : .redone(seq: seq)
+        // Only now, the whole swap in and the step closed, the trail says a
+        // schedule put back starts at the next login (round four, LOW 4).
+        for place in everyScheduleStartingAtTheNextLogin {
+            places.noteItStartsAtTheNextLogin(place)
+        }
+        if direction == .backward {
+            return .undone(seq: seq, leftApart: everyPlaceLeftApart, startsAtTheNextLogin: everyScheduleStartingAtTheNextLogin)
+        }
+        return .redone(seq: seq, leftApart: everyPlaceLeftApart, startsAtTheNextLogin: everyScheduleStartingAtTheNextLogin)
     }
 
     /// What a refusal that can never succeed does to the list. The page was

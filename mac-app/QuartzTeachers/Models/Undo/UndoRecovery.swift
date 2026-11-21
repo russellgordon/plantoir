@@ -276,7 +276,7 @@ nonisolated enum UndoRecovery {
             }
             for direction in [UndoDirection.backward, UndoDirection.forward] {
                 let plan: UndoPlan = UndoCheck.plan(opsOnThePlace, direction: direction, root: root, journal: journal)
-                guard case .ready(let targets, _) = plan else {
+                guard case .ready(let targets, _, _) = plan else {
                     continue
                 }
                 for target in targets where target.url.standardizedFileURL.path == wanted && target.replacement == kept {
@@ -809,7 +809,7 @@ nonisolated enum UndoRecovery {
                     swapRefused = true
                     return nil
                 }
-                guard case .ready(let targets, _) = plan else {
+                guard case .ready(let targets, _, _) = plan else {
                     // It can never be put back (no kept original matches
                     // what the list no longer holds): closed, never left in
                     // flight.

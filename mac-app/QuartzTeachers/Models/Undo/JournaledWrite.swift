@@ -420,7 +420,7 @@ nonisolated enum JournaledWrite {
         }
         let root: URL = draft.workingFolderURL ?? URL(fileURLWithPath: "/", isDirectory: true)
         let plan: UndoPlan = UndoCheck.plan(draft.ops, direction: .forward, root: root, journal: journal, places: places)
-        guard case .ready(let targets, let recomputes) = plan else {
+        guard case .ready(let targets, let recomputes, _) = plan else {
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             if case .refused(let refusal) = plan {
                 return .refused(refusal)
@@ -1318,10 +1318,14 @@ nonisolated enum UndoShadowStaging {
     /// one that could not be put back (`notPutBack`, the second review of
     /// U3a, MEDIUM c), so its leftovers are found once this process is gone,
     /// and the kept originals among them are kept (`tidyLeftovers`).
-    static func swap(_ targets: [UndoSwapTarget], noting journal: UndoJournal) -> UndoSwapResult {
+    /// `places` are where an external op of the swap is set (U3b's
+    /// rollover, a step with moves and a deploy set for later).
+    static func swap(
+        _ targets: [UndoSwapTarget], noting journal: UndoJournal, places: UndoExternalPlaces = UndoAppPreferences()
+    ) -> UndoSwapResult {
         let label: String = newLabel(for: journal)
         let noteURL: URL? = writeNote(for: targets, label: label, in: journal)
-        let result: UndoSwapResult = UndoSwap.swap(targets, label: label)
+        let result: UndoSwapResult = UndoSwap.swap(targets, label: label, places: places)
         switch result {
         case .stoppedByATest, .notPutBack:
             return result

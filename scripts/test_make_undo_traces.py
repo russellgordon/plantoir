@@ -100,10 +100,12 @@ class ActionTraceTests(unittest.TestCase):
 
     def test_every_recorded_step_is_reproduced_by_its_ops_both_ways(self):
         for step in traces.read_action_steps():
-            model = traces.Model(pages={entry["path"]: entry["before"] for entry in step["files"]
-                                        if entry["before"] is not None})
+            pages = {entry["path"]: entry["before"] for entry in step["files"] if entry["before"] is not None}
+            for moved in step.get("moves", []):
+                pages[moved["from"]] = moved["content"]
+            model = traces.Model(pages=pages)
             outcome = model.files_step([(entry["path"], entry["before"], entry["after"]) for entry in step["files"]],
-                                       step.get("recomputes", []))
+                                       step.get("recomputes", []), step.get("moves", []))
             self.assertEqual(outcome[0], "applied", step["name"])
             self.assertEqual([op["kind"] for op in outcome[2]], step["ops"], step["name"] + ": the op kinds")
             undone = traces.plan(outcome[2], True, dict(model.pages))
@@ -111,6 +113,20 @@ class ActionTraceTests(unittest.TestCase):
             for entry in step["files"]:
                 self.assertEqual(undone[1].get(entry["path"], model.pages.get(entry["path"])), entry["before"],
                                  step["name"] + ": " + entry["path"] + " undone")
+
+    def test_a_rollover_after_a_deploy_is_undone_leaving_its_marker_apart(self):
+        # U3b, Russell's ruling of 2026-11-19 on Q3: some rollover trace has
+        # a deploy fill the marker's place and a later undo of the step
+        # that names the marker as left apart, not a refusal.
+        found = False
+        for trace in committed()["actionTraces"]:
+            deployed = False
+            for call in trace["calls"]:
+                if call["call"] == "deploy":
+                    deployed = True
+                if deployed and call["call"] == "undo" and call.get("leftApart"):
+                    found = True
+        self.assertTrue(found, "no action trace undoes a rollover after a deploy")
 
     def test_there_are_about_120_action_traces_and_each_starts_with_its_step(self):
         steps = traces.read_action_steps()
@@ -245,7 +261,7 @@ class LineModelTests(unittest.TestCase):
                 if ops[0]["kind"] == "writeFile":
                     continue
                 result = traces.plan(ops, True, {path: after})
-                self.assertEqual(result, ("ready", {path: text}), page_id)
+                self.assertEqual(result, ("ready", {path: text}, []), page_id)
 
     def test_a_body_edit_leaves_the_line_op_undoable(self):
         _, path, text, _ = traces.FIXTURE[0]
@@ -254,7 +270,7 @@ class LineModelTests(unittest.TestCase):
         self.assertEqual(ops[0]["kind"], "editLine")
         edited = after + "Written since.\n"
         result = traces.plan(ops, True, {path: edited})
-        self.assertEqual(result, ("ready", {path: text + "Written since.\n"}))
+        self.assertEqual(result, ("ready", {path: text + "Written since.\n"}, []))
 
 
 def safe_path(path):
@@ -287,7 +303,7 @@ def readable_op(op):
     for key in ("beforeSha", "afterSha", "sha", "listingSha"):
         if key in op and op[key] is not None and not is_blob_name(op[key]):
             return False
-    if kind == "move":
+    if kind in ("move", "moveApart", "setAside"):
         if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
             return False
         if overlap(op["from"], op["to"]):
@@ -335,9 +351,9 @@ def readable_op(op):
     return True
 
 
-KINDS_KNOWN = ("writeFile", "editLine", "recompute", "replaceText", "editJSON", "move",
+KINDS_KNOWN = ("writeFile", "editLine", "recompute", "replaceText", "editJSON", "move", "moveApart", "setAside",
                "createTree", "removeTree", "external")
-EXTERNAL_TARGETS_KNOWN = ("preference",)
+EXTERNAL_TARGETS_KNOWN = ("preference", "scheduledDeploy")
 MAINTAINERS_KNOWN = ("sectionFrontPage",)
 HOLDS_KNOWN = ("section", "course")
 
@@ -352,7 +368,7 @@ def readable_step(step):
         if not readable_op(op):
             return False
     # opKinds.wholeOps: no other op shares a whole op's places.
-    whole = ("move", "createTree", "removeTree", "external")
+    whole = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
     for index, op in enumerate(step["ops"]):
         if op["kind"] not in whole:
             continue
@@ -447,7 +463,7 @@ class ContractCaseTests(unittest.TestCase):
                 if kind == "recompute":
                     # No check (opKinds.recompute): re-derived, never compared.
                     state = "after"
-                elif kind == "move":
+                elif kind in ("move", "moveApart", "setAside"):
                     state = traces.move_state(op, current["atFrom"], current["atTo"])
                 elif kind in ("createTree", "removeTree"):
                     state = traces.tree_state(op, current)
@@ -498,7 +514,8 @@ class ContractCaseTests(unittest.TestCase):
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
                   "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why"}
+                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
+                  "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
     MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
@@ -509,6 +526,14 @@ class ContractCaseTests(unittest.TestCase):
     SETTINGS = "courses/TST1O/settings.json"
     NOTES = "courses/TST1O/notes.md"
     PREFERENCE = "preference:undoCasesPreference"
+    CLOUDFLARE_FROM = "courses/TST1O/.cloudflare_sites/section1.json"
+    CLOUDFLARE_TO = "courses/TST1O/.cloudflare_sites/section1.previous.json"
+    CLOUDFLARE_MARKER = "{\"project\": \"tst1o-s1-2025\"}\n"
+    LEFTOVER_FROM = "courses/TST1O/.netlify_sites/section1.from-built-output.json"
+    LEFTOVER_TO = "courses/TST1O/.netlify_sites/section1.from-built-output.previous.json"
+    LEFTOVER = "{\"site_id\": \"ccc-333\"}\n"
+    SCHEDULE = "scheduledDeploy:org.plantoir.deploy.undo-cases"
+    SCHEDULE_VALUE = {"plist": "cGxpc3Q=", "script": "c2NyaXB0"}
 
     def kind_call(self, call, model):
         """U2's calls (stackCasesHow), on the model's pages. Answers what
@@ -519,6 +544,59 @@ class ContractCaseTests(unittest.TestCase):
                 pages[self.MARKER_FROM] = self.OLD_MARKER
             content = pages.get(self.MARKER_FROM) or ""
             return model.ops_step([{"kind": "move", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(content)}])
+        if call == "rollOverOntoANewWebsite":
+            # U3b: one step of the year's setting and the marker moved aside
+            # as a `moveApart` (stackCasesHow).
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            content = pages.get(self.MARKER_FROM) or ""
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            marker = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(content)}
+            return model.ops_step([year, marker])
+        if call == "rollOverOntoNewWebsitesOnTwoHosts":
+            # U3b, records as a group: the year and both hosts' markers.
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.CLOUDFLARE_FROM) is None and pages.get(self.CLOUDFLARE_TO) is None:
+                pages[self.CLOUDFLARE_FROM] = self.CLOUDFLARE_MARKER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            netlify = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(self.OLD_MARKER)}
+            cloudflare = {"kind": "moveApart", "from": self.CLOUDFLARE_FROM, "to": self.CLOUDFLARE_TO,
+                          "sha": traces.sha(self.CLOUDFLARE_MARKER)}
+            return model.ops_step([year, netlify, cloudflare])
+        if call == "rollOverTurningOffASchedule":
+            # U3b: the year and the deploy set for later turned off.
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            pages[self.SCHEDULE] = self.SCHEDULE_VALUE
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            return model.ops_step([year, {"kind": "external", "target": self.SCHEDULE, "before": self.SCHEDULE_VALUE}])
+        if call == "rollOverSettingALeftoverAside":
+            # U3b, the review of U3b's fixes, LOW 3: the year, the record as
+            # a `moveApart`, and a leftover no deploy reads as a `setAside`.
+            if pages.get(self.MARKER_FROM) is None and pages.get(self.MARKER_TO) is None:
+                pages[self.MARKER_FROM] = self.OLD_MARKER
+            if pages.get(self.LEFTOVER_FROM) is None and pages.get(self.LEFTOVER_TO) is None:
+                pages[self.LEFTOVER_FROM] = self.LEFTOVER
+            if pages.get(self.SETTINGS) is None:
+                pages[self.SETTINGS] = "{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n"
+            year = {"kind": "editJSON", "path": self.SETTINGS, "keyPath": ["school_year"], "before": "2025-2026", "after": "2026-2027"}
+            marker = {"kind": "moveApart", "from": self.MARKER_FROM, "to": self.MARKER_TO, "sha": traces.sha(self.OLD_MARKER)}
+            leftover = {"kind": "setAside", "from": self.LEFTOVER_FROM, "to": self.LEFTOVER_TO, "sha": traces.sha(self.LEFTOVER)}
+            return model.ops_step([year, marker, leftover])
+        if call == "removeTheKeptLeftover":
+            pages.pop(self.LEFTOVER_TO, None)
+            return None
+        if call == "theScheduleStartsOnlyAtTheNextLogin":
+            model.schedules_start_at_the_next_login = True
+            return None
+        if call == "theScheduleCannotBeSetNow":
+            model.refuses_schedules = True
+            return None
         if call == "deployANewMarker":
             pages[self.MARKER_FROM] = self.NEW_MARKER
             return None
@@ -584,9 +662,29 @@ class ContractCaseTests(unittest.TestCase):
             return "bothKept"
         return (source, destination)
 
-    KIND_CALLS = ("moveTheMarker", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
+    KIND_CALLS = ("moveTheMarker", "rollOverOntoANewWebsite", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
                   "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
-                  "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside")
+                  "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
+                  "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
+                  "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin")
+
+    def leftover_markers(self, model):
+        source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
+        if source is None and destination == self.LEFTOVER:
+            return "moved"
+        if source == self.LEFTOVER and destination is None:
+            return "movedBack"
+        if source is None and destination is None:
+            return "gone"
+        return (source, destination)
+
+    def cloudflare_markers(self, model):
+        source, destination = model.pages.get(self.CLOUDFLARE_FROM), model.pages.get(self.CLOUDFLARE_TO)
+        if source is None and destination == self.CLOUDFLARE_MARKER:
+            return "moved"
+        if source == self.CLOUDFLARE_MARKER and destination is None:
+            return "movedBack"
+        return (source, destination)
 
     def test_stack_cases(self):
         folder_b = "@B/"
@@ -790,6 +888,12 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual([step["seq"] for step in model.steps if step["phase"] == "interrupted"], case["interrupted"])
                 if "markers" in case:
                     self.assertEqual(self.markers(model), case["markers"])
+                if "cloudflareMarkers" in case:
+                    self.assertEqual(self.cloudflare_markers(model), case["cloudflareMarkers"])
+                if "leftoverMarkers" in case:
+                    self.assertEqual(self.leftover_markers(model), case["leftoverMarkers"])
+                if "startsAtTheNextLogin" in case:
+                    self.assertEqual(model.starts_at_the_next_login, case["startsAtTheNextLogin"])
                 if "folderKept" in case:
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:
@@ -799,6 +903,10 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(bool(model.kept) or foreign, case["keptOriginalLeft"])
                 if "keptWhatItReplacedLines" in case:
                     self.assertEqual(model.kept_what_it_replaced_lines, case["keptWhatItReplacedLines"])
+                if "leftApart" in case:
+                    self.assertEqual(list(last[2]) if len(last) > 2 else [], case["leftApart"])
+                if "schoolYear" in case:
+                    self.assertEqual(json.loads(model.pages[self.SETTINGS])["school_year"], case["schoolYear"])
 
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;

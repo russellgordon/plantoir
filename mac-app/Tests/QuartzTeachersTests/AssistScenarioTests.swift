@@ -500,7 +500,9 @@ final class AssistScenarioTests: XCTestCase {
             try FileManager.default.createDirectory(
                 at: markerFolder, withIntermediateDirectories: true
             )
-            try "{\"site\":\"last-year\"}".write(
+            // A record that names its site, as deploy.py writes one: a
+            // record naming none is not a website (#899 U3b, round four).
+            try "{\"id\":\"last-year\"}".write(
                 to: markerFolder.appendingPathComponent("section1.json"),
                 atomically: true, encoding: .utf8
             )

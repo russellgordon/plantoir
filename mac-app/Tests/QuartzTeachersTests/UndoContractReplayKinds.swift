@@ -20,12 +20,22 @@ nonisolated enum UndoContractKinds {
     static let settings: String = "courses/TST1O/settings.json"
     static let notes: String = "courses/TST1O/notes.md"
     static let preference: String = "preference:undoCasesPreference"
+    static let cloudflareFrom: String = "courses/TST1O/.cloudflare_sites/section1.json"
+    static let cloudflareTo: String = "courses/TST1O/.cloudflare_sites/section1.previous.json"
+    static let cloudflareMarker: String = "{\"project\": \"tst1o-s1-2025\"}\n"
+    static let schedule: String = "scheduledDeploy:org.plantoir.deploy.undo-cases"
+    static let scheduleValue: UndoJSON = .object(["plist": .string("cGxpc3Q="), "script": .string("c2NyaXB0")])
+    static let leftoverFrom: String = "courses/TST1O/.netlify_sites/section1.from-built-output.json"
+    static let leftoverTo: String = "courses/TST1O/.netlify_sites/section1.from-built-output.previous.json"
+    static let leftover: String = "{\"site_id\": \"ccc-333\"}\n"
 
     /// Every call this file answers.
     static let calls: Set<String> = [
-        "moveTheMarker", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
+        "moveTheMarker", "rollOverOntoANewWebsite", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
         "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
         "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
+        "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
+        "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
     ]
 
     static let asidePage: String = "courses/TST1O/old/a.md"
@@ -60,6 +70,15 @@ nonisolated enum UndoContractKinds {
         return "\(outcome)"
     }
 
+    /// The settings file's school year, or nil.
+    static func schoolYear(in root: URL) -> String? {
+        let reading: UndoJSONMember.Reading = UndoJSONMember.reading(["school_year"], in: Data((text(at: settings, in: root) ?? "").utf8))
+        if case .value(.string(let year)) = reading {
+            return year
+        }
+        return nil
+    }
+
     static func text(at path: String, in root: URL) -> String? {
         guard let data = UndoItem.read(at: root.appendingPathComponent(path)).data else {
             return nil
@@ -77,6 +96,75 @@ nonisolated enum UndoContractKinds {
             let content: String = text(at: markerFrom, in: root) ?? ""
             let op: UndoOp = UndoOp.moveFile(from: markerFrom, to: markerTo, sha: UndoHash.sha256(of: Data(content.utf8)))
             return word(JournaledWrite.perform(ops: draft(ops: [op], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+        case "rollOverOntoANewWebsite":
+            // U3b: one step of the year's setting and the marker moved aside
+            // as a `moveApart`, which stands apart from the rest of its step.
+            if text(at: markerFrom, in: root) == nil && text(at: markerTo, in: root) == nil {
+                try UndoContractReplay.write(oldMarker, to: markerFrom, in: root)
+            }
+            if text(at: settings, in: root) == nil {
+                try UndoContractReplay.write("{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n", to: settings, in: root)
+            }
+            let content: String = text(at: markerFrom, in: root) ?? ""
+            let year: UndoOp = UndoOp.editJSON(path: settings, keyPath: ["school_year"], before: .string("2025-2026"), after: .string("2026-2027"))
+            let marker: UndoOp = UndoOp.moveFileApart(from: markerFrom, to: markerTo, sha: UndoHash.sha256(of: Data(content.utf8)))
+            return word(JournaledWrite.perform(ops: draft(ops: [year, marker], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+        case "rollOverOntoNewWebsitesOnTwoHosts":
+            // U3b, records as a group: the year's setting and BOTH hosts'
+            // markers moved aside, each a `moveApart`, in one step.
+            if text(at: markerFrom, in: root) == nil && text(at: markerTo, in: root) == nil {
+                try UndoContractReplay.write(oldMarker, to: markerFrom, in: root)
+            }
+            if text(at: cloudflareFrom, in: root) == nil && text(at: cloudflareTo, in: root) == nil {
+                try UndoContractReplay.write(cloudflareMarker, to: cloudflareFrom, in: root)
+            }
+            if text(at: settings, in: root) == nil {
+                try UndoContractReplay.write("{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n", to: settings, in: root)
+            }
+            let year: UndoOp = UndoOp.editJSON(path: settings, keyPath: ["school_year"], before: .string("2025-2026"), after: .string("2026-2027"))
+            let netlify: UndoOp = UndoOp.moveFileApart(from: markerFrom, to: markerTo, sha: UndoHash.sha256(of: Data(oldMarker.utf8)))
+            let cloudflare: UndoOp = UndoOp.moveFileApart(from: cloudflareFrom, to: cloudflareTo, sha: UndoHash.sha256(of: Data(cloudflareMarker.utf8)))
+            return word(JournaledWrite.perform(ops: draft(ops: [year, netlify, cloudflare], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+        case "rollOverTurningOffASchedule":
+            // U3b: the year's setting and the section's deploy set for later
+            // turned off (`external` on `scheduledDeploy:`), in one step.
+            if text(at: settings, in: root) == nil {
+                try UndoContractReplay.write("{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n", to: settings, in: root)
+            }
+            _ = places.write(schedule, scheduleValue)
+            let year: UndoOp = UndoOp.editJSON(path: settings, keyPath: ["school_year"], before: .string("2025-2026"), after: .string("2026-2027"))
+            let off: UndoOp = UndoOp.external(target: schedule, before: scheduleValue, after: nil)
+            return word(JournaledWrite.perform(ops: draft(ops: [year, off], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+        case "rollOverSettingALeftoverAside":
+            // U3b, the review of U3b's fixes, LOW 3: the year, the record as
+            // a `moveApart`, and a leftover no deploy reads as a `setAside`.
+            if text(at: markerFrom, in: root) == nil && text(at: markerTo, in: root) == nil {
+                try UndoContractReplay.write(oldMarker, to: markerFrom, in: root)
+            }
+            if text(at: leftoverFrom, in: root) == nil && text(at: leftoverTo, in: root) == nil {
+                try UndoContractReplay.write(leftover, to: leftoverFrom, in: root)
+            }
+            if text(at: settings, in: root) == nil {
+                try UndoContractReplay.write("{\n  \"course_name\" : \"Test\",\n  \"school_year\" : \"2025-2026\"\n}\n", to: settings, in: root)
+            }
+            let year: UndoOp = UndoOp.editJSON(path: settings, keyPath: ["school_year"], before: .string("2025-2026"), after: .string("2026-2027"))
+            let marker: UndoOp = UndoOp.moveFileApart(from: markerFrom, to: markerTo, sha: UndoHash.sha256(of: Data(oldMarker.utf8)))
+            let aside: UndoOp = UndoOp.setFileAside(from: leftoverFrom, to: leftoverTo, sha: UndoHash.sha256(of: Data(leftover.utf8)))
+            return word(JournaledWrite.perform(ops: draft(ops: [year, marker, aside], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+        case "removeTheKeptLeftover":
+            try? FileManager.default.removeItem(at: root.appendingPathComponent(leftoverTo))
+            return nil
+        case "theScheduleStartsOnlyAtTheNextLogin":
+            // launchd would not start the job now and its plist cannot be
+            // taken away again: every later write that sets a deploy for
+            // later answers that it starts at the next login.
+            places.schedulesStartAtTheNextLogin = true
+            return nil
+        case "theScheduleCannotBeSetNow":
+            // launchd refuses the job, or the write is off the main thread:
+            // every write to a deploy set for later answers false from now.
+            places.refusesSchedules = true
+            return nil
         case "deployANewMarker":
             // What a deploy after a rollover onto a new website does: a new
             // marker in the place the rollover emptied, nothing in the list.
@@ -194,6 +282,37 @@ nonisolated enum UndoContractKinds {
         return "from \(String(describing: from)), to \(String(describing: to))"
     }
 
+    /// What `cloudflareMarkers` says of the two places the second host's
+    /// marker move names.
+    static func cloudflareMarkers(in root: URL) -> String {
+        let from: String? = text(at: cloudflareFrom, in: root)
+        let to: String? = text(at: cloudflareTo, in: root)
+        if from == nil && to == cloudflareMarker {
+            return "moved"
+        }
+        if from == cloudflareMarker && to == nil {
+            return "movedBack"
+        }
+        return "from \(String(describing: from)), to \(String(describing: to))"
+    }
+
+    /// What `leftoverMarkers` says of the two places the leftover's
+    /// `setAside` names.
+    static func leftoverMarkers(in root: URL) -> String {
+        let from: String? = text(at: leftoverFrom, in: root)
+        let to: String? = text(at: leftoverTo, in: root)
+        if from == nil && to == leftover {
+            return "moved"
+        }
+        if from == leftover && to == nil {
+            return "movedBack"
+        }
+        if from == nil && to == nil {
+            return "gone"
+        }
+        return "from \(String(describing: from)), to \(String(describing: to))"
+    }
+
     /// Every staged file or folder (`.plantoir-undo-` in its name) anywhere
     /// in the working folder: none may be left once a call has answered.
     static func stagedLeftovers(in root: URL) -> [String] {
@@ -228,6 +347,14 @@ nonisolated final class UndoMemoryPlaces: UndoExternalPlaces, @unchecked Sendabl
 
     private let guardLock: NSLock = NSLock()
 
+    /// Whether every write to a deploy set for later fails, as a launchd
+    /// refusal does (`theScheduleCannotBeSetNow`).
+    var refusesSchedules: Bool = false
+
+    /// Whether every write that SETS a deploy for later answers that it
+    /// starts at the next login (`theScheduleStartsOnlyAtTheNextLogin`).
+    var schedulesStartAtTheNextLogin: Bool = false
+
     // MARK: - Functions
 
     func read(_ target: String) -> UndoExternalReading {
@@ -243,8 +370,22 @@ nonisolated final class UndoMemoryPlaces: UndoExternalPlaces, @unchecked Sendabl
 
     func write(_ target: String, _ value: UndoJSON?) -> Bool {
         guardLock.lock()
+        if refusesSchedules && target.hasPrefix(UndoOp.scheduledDeployFamily + ":") {
+            guardLock.unlock()
+            return false
+        }
         values[target] = value
         guardLock.unlock()
         return true
+    }
+
+    func writeSaying(_ target: String, _ value: UndoJSON?) -> UndoExternalWrite {
+        if !write(target, value) {
+            return .notWritten
+        }
+        if schedulesStartAtTheNextLogin && value != nil && target.hasPrefix(UndoOp.scheduledDeployFamily + ":") {
+            return .startsAtTheNextLogin
+        }
+        return .written
     }
 }

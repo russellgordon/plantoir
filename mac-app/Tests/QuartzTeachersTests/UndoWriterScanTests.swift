@@ -153,11 +153,11 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/CoursePageCopier.swift": (3, "waitsFor: U4"),
         "Models/CourseRenamer.swift": (3, "waitsFor: U4"),
         "Models/CourseRestorer.swift": (29, "waitsFor: U5"),
-        "Models/DeployCommand.swift": (3, "waitsFor: U3b (releaseSite: the rollover's markers moved aside, one move op each in the rollover's ONE step, U3's by the decision in documentation 09; the deploy.sh it names is not counted, rulings 17 and 18)"),
+        "Models/DeployCommand.swift": (3, "waitsFor: U4 (releaseSite's plain moves serve only Keep a Copy for Reference, on the copy it makes, U4's step; the rollover PLANS its markers into its one step, planSiteRelease, U3b; the deploy.sh it names is not counted, rulings 17 and 18)"),
         "Models/DeployTokens/DeployTokenPanel.swift": (1, "notAStep: runs deploy.sh --token through /bin/bash in its mode with no course and no section (#696): the teacher's deploy tokens, which are credentials and not on the list (ruling 8), in the launcher's token store outside every course"),
         "Models/FolderContainers.swift": (2, "notAStep: the website builder's containers, through a shell, outside every course"),
         "Models/FolderScaffold.swift": (1, "waitsFor: U4 (a new working folder's scaffold, made with New Course)"),
-        "Models/LinksChecklist/PublishedPagesRecord.swift": (4, "waitsFor: U3b (release: the rollover's record fragments moved aside and its two answered records removed, in the rollover's ONE step, U3's by the decision in documentation 09; the record itself is written by a deploy's deploy.py, not a step, rulings 17 and 18, and read by undo.rule.deployed)"),
+        "Models/LegacyNetlifyRecord.swift": (14, "notAStep: moveTheLegacyMarkerIn brings the legacy Netlify record out of the built output (outside the working folder, where no step can name a place) into .netlify_sites before the rollover's step, as deploy.py's own migration does (load_netlify_marker), moving a current record no deploy can read out of its way first, or brings it in as a leftover no deploy reads, which the step then sets aside; LegacyMarkerBroughtIn.putBack moves it back for a step then refused, and removes the .netlify_sites folder it made when it is empty again (rmdir, counted: Russell's rulings of 2026-11-20; the review of U3b's fixes, round three). Never a step, by ruling"),
         "Models/ObsidianFigureAddOns.swift": (11, "waitsFor: U4"),
         "Models/OneSectionRestore.swift": (1, "notAStep: `unzip -p` reads a backup's course_config.json to its output and writes nothing; the restore itself is CourseRestorer's (U5)"),
         "Models/PlanSharing.swift": (7, "notAStep: sharing unit plans and stopping (ruling 18); its releasePlanMarkers runs inside a reference copy, which is U4's"),
@@ -197,6 +197,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/Undo/UndoJournal.swift": (19, "door: the list itself, outside every working folder"),
         "Models/Undo/UndoLock.swift": (1, "door: the list's own lock file"),
         "Models/Undo/UndoOpKinds.swift": (4, "door: a folder a redo of createTree (or an undo of removeTree) makes under its staged name, from the list's content"),
+        "Models/Undo/UndoScheduledDeploys.swift": (11, "door: a deploy set for later as an external op (U3b), its LaunchAgent plist and script, outside every working folder"),
         "Models/Undo/UndoRecovery.swift": (2, "door: pruning the list's own content and segments"),
         "Models/Undo/UndoUITestSeam.swift": (1, "notAStep: a debug build's test seam, only with --state-dir, which edits a page in place as another program racing a swap would (#899 U3c, the real-window test of Russell's ruling of 2026-11-20, night)"),
         "Models/UnitWordRenamer.swift": (6, "waitsFor: U4"),
@@ -312,6 +313,19 @@ final class UndoWriterScanTests: XCTestCase {
             total += count
         }
         XCTAssertEqual(total, 9)
+    }
+
+    /// The `rmdir` that removes a folder a bring-in made once it is empty
+    /// (`DeployCommand.removeIfEmpty`, inside a closure that returns it) is
+    /// counted, as every bare C call that writes is (`bareWritingCalls`;
+    /// the review of U3b's fixes, LOW 8, checked).
+    func testTheScanCountsTheRmdirThatRemovesAnEmptyFolder() {
+        let source: String = "        _ = folder.withUnsafeFileSystemRepresentation { path in\n            return rmdir(path)\n        }"
+        var count: Int = 0
+        for code in UndoWriterScanTests.codeLines(of: source) {
+            count += UndoWriterScanTests.writingCallCount(inCode: code)
+        }
+        XCTAssertEqual(count, 1)
     }
 
     func testEveryReasonIsOneOfTheThreeKinds() {

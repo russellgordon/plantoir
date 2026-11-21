@@ -153,6 +153,25 @@ nonisolated final class JournaledStep {
     /// (`undoJournal.opKinds.recompute`).
     private(set) var recomputeURLs: [(url: URL, maintainer: String, section: Int?)] = []
 
+    /// Each file planned to be MOVED (U3b: the rollover's record fragments
+    /// and markers), in the order planned: where it is, where it goes, the
+    /// SHA-256 of its bytes when planned, and the kind of op it is: `move`,
+    /// `moveApart` (a website record a deploy reads, which stands apart from
+    /// the rest of the step with the other records, as a group: Russell's
+    /// ruling of 2026-11-19 on Q3, the director's decision of 2026-11-20),
+    /// or `setAside` (a leftover no deploy reads, which stands apart ALONE).
+    private(set) var plannedMoves: [(from: URL, to: URL, sha: String, kind: UndoOpKind)] = []
+
+    /// Each `external` op planned (U3b: the deploy set for later a rollover
+    /// removes), in order.
+    private(set) var plannedExternals: [UndoOp] = []
+
+    /// Where the step's `external` ops read and write: the app's
+    /// preferences and, given the action's launchd runner, its deploys set
+    /// for later (`UndoAppPlaces`).
+    var places: UndoExternalPlaces = UndoAppPreferences()
+
+
     // MARK: - Computed properties
 
     /// The mode the step is made in.
@@ -165,7 +184,13 @@ nonisolated final class JournaledStep {
 
     /// Whether nothing has been planned.
     var isEmpty: Bool {
-        return plannedOrder.isEmpty
+        return plannedOrder.isEmpty && plannedMoves.isEmpty && plannedExternals.isEmpty
+    }
+
+    /// Whether the step holds a move or an external op, and so is made as
+    /// ops (`JournaledWrite.perform(ops:)`) rather than as files.
+    var isMixed: Bool {
+        return !plannedMoves.isEmpty || !plannedExternals.isEmpty
     }
 
     /// The working folder: the folder holding the course's `courses` folder,
@@ -268,6 +293,52 @@ nonisolated final class JournaledStep {
     /// Plans the file at `url` to be removed.
     func remove(_ url: URL) {
         plan(nil, at: url)
+    }
+
+    /// Plans the file at `from` to be MOVED to `to` (one rename that never
+    /// replaces, made with the rest of the step), judged as a pair by its
+    /// bytes now. False, planning nothing, when it cannot be read now. A
+    /// move that `standsApart` is left as it is by an Undo or a Redo that
+    /// finds the pair changed since, and the rest of the step goes ahead.
+    @discardableResult
+    func move(_ from: URL, to: URL, standsApart: Bool = false) -> Bool {
+        return planAMove(from, to: to, kind: standsApart ? .moveApart : .move)
+    }
+
+    /// Plans a LEFTOVER no deploy reads to be set aside (`setAside`, #899
+    /// U3b): moved as `move` is, standing apart on its own, never one of the
+    /// group of website records (`moveApart`), so a leftover that is changed
+    /// or missing since is left as it is and named by an Undo or a Redo,
+    /// and never decides where the section's records go (the review of U3b's
+    /// fixes, LOW 3). False, planning nothing, when it cannot be read now.
+    @discardableResult
+    func setAside(_ from: URL, to: URL) -> Bool {
+        return planAMove(from, to: to, kind: .setAside)
+    }
+
+    /// Plans one move of the given kind, judged by its bytes now.
+    private func planAMove(_ from: URL, to: URL, kind: UndoOpKind) -> Bool {
+        guard case .file(let data) = UndoItem.read(at: from) else {
+            return false
+        }
+        plannedMoves.append((from: from, to: to, sha: UndoHash.sha256(of: data), kind: kind))
+        return true
+    }
+
+    /// Plans one `external` op: the target set from `before` to `after`
+    /// (nil: not set), made after the step's files and moves.
+    func setExternal(_ target: String, from before: UndoJSON?, to after: UndoJSON?) {
+        plannedExternals.append(UndoOp.external(target: target, before: before, after: after))
+    }
+
+    /// Takes an external op back out of the plan (a rollover whose schedule
+    /// could not be removed makes the rest of its step without it).
+    func forgetExternal(_ target: String) {
+        var kept: [UndoOp] = []
+        for op in plannedExternals where op.target != target {
+            kept.append(op)
+        }
+        plannedExternals = kept
     }
 
     /// Records that a file kept true by a rule (`sectionFrontPage`) follows
@@ -384,6 +455,10 @@ nonisolated final class JournaledStep {
     /// the list can take it), then every planned file staged and swapped in
     /// together. Throws, having written nothing, when the door refuses.
     func make() throws {
+        if isMixed {
+            try makeAsOps()
+            return
+        }
         if plannedOrder.isEmpty {
             return
         }
@@ -435,6 +510,191 @@ nonisolated final class JournaledStep {
             throw JournaledStepError.couldNotRecordTheStep
         case .anotherChangeIsUnderWay:
             throw JournaledStepError.anotherChangeIsUnderWay
+        case .stoppedByATest:
+            throw JournaledStepError.stoppedByATest
+        }
+    }
+
+    /// The action, its `pageCount` counting every file the step changes
+    /// or moves. (A rollover's legacy marker is brought into the working
+    /// folder before its step, `DeployCommand.moveTheLegacyMarkerIn`, so no
+    /// argument says a marker was moved outside the step.)
+    private func action(changedFiles: Int) -> UndoAction {
+        return UndoAction(key: maker.actionKey, arguments: ["pageCount": String(changedFiles)])
+    }
+
+    /// A step holding moves or external ops (U3b), made through the door
+    /// that takes every kind (`JournaledWrite.perform(ops:)`): its files as
+    /// `editLine` or `writeFile` ops by the door's own rule, then its moves,
+    /// then its external ops, then its `recompute` ops, under ONE begin, and
+    /// all of it or none (the door plans the ops forward and swaps them in
+    /// together, setting back what went in when a later change cannot).
+    ///
+    /// In shadow, a list that cannot take the step leaves one trail line and
+    /// the change is still made all or none, unrecorded
+    /// (`makeWithoutARecord`); a step that cannot be named (no working
+    /// folder, a place through a link out of it) is the same. Live, either
+    /// refuses before anything changes.
+    private func makeAsOps() throws {
+        let currentMode: UndoMode = mode
+        guard let root = workingFolderURL,
+              let changes = recordableChanges(under: root),
+              let moveOps = recordableMoves(under: root) else {
+            if currentMode == .live {
+                throw JournaledStepError.couldNotRecordTheStep
+            }
+            UndoTrailHook.couldNotRecordLine?(
+                maker.actionKey, courseCode, section, .shadow, "a file it writes cannot be named in a step"
+            )
+            try makeWithoutARecord()
+            return
+        }
+        var ops: [UndoOp] = []
+        var blobs: [Data] = []
+        var changedFiles: Int = 0
+        for change in changes where change.before != change.after {
+            changedFiles += 1
+            for op in JournaledWrite.ops(for: change) {
+                ops.append(op)
+                if op.knownKind != .writeFile {
+                    continue
+                }
+                if let before = change.before {
+                    blobs.append(before)
+                }
+                if let after = change.after {
+                    blobs.append(after)
+                }
+            }
+        }
+        for op in moveOps {
+            ops.append(op)
+            changedFiles += 1
+        }
+        for op in plannedExternals {
+            ops.append(op)
+        }
+        for kept in recomputeURLs {
+            if let path = UndoFolderPlaces.relativePath(of: kept.url, under: root) {
+                ops.append(UndoOp.recompute(path: path, maintainer: kept.maintainer, section: kept.section))
+            }
+        }
+        let draft: UndoOpsDraft = UndoOpsDraft(
+            action: action(changedFiles: changedFiles),
+            madeBy: maker.madeBy,
+            workingFolderURL: root,
+            workingFolderPath: FolderIdentity.canonicalPath(root.path),
+            course: courseCode,
+            section: section,
+            actionClass: "A",
+            holds: holds,
+            ops: ops,
+            blobs: blobs
+        )
+        let journal: UndoJournal = UndoJournalLocation.standardJournal()
+        let outcome: JournaledWriteOutcome = JournaledWrite.perform(ops: draft, in: journal, mode: currentMode, places: places)
+        switch outcome {
+        case .applied, .appliedWithoutARecord, .changedNothing:
+            return
+        case .refused(let refusal):
+            throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+        case .leftPartWay(let refusal, let keptOriginals):
+            throw JournaledStepError.leftPartWay(
+                refusal, fileName: JournaledStep.fileName(in: refusal), keptOriginals: keptOriginals
+            )
+        case .couldNotRecordTheStep:
+            if currentMode == .live {
+                throw JournaledStepError.couldNotRecordTheStep
+            }
+            UndoTrailHook.couldNotRecordLine?(
+                maker.actionKey, courseCode, section, .shadow, "the list could not take the step"
+            )
+            try makeWithoutARecord()
+        case .anotherChangeIsUnderWay:
+            throw JournaledStepError.anotherChangeIsUnderWay
+        case .stoppedByATest:
+            throw JournaledStepError.stoppedByATest
+        }
+    }
+
+    /// The moves as ops inside the working folder, each place's path
+    /// relative to it; nil when any cannot be named in a step.
+    func recordableMoves(under root: URL) -> [UndoOp]? {
+        var result: [UndoOp] = []
+        for planned in plannedMoves {
+            guard let from = UndoFolderPlaces.relativePath(of: planned.from, under: root),
+                  let to = UndoFolderPlaces.relativePath(of: planned.to, under: root) else {
+                return nil
+            }
+            switch planned.kind {
+            case .moveApart:
+                result.append(UndoOp.moveFileApart(from: from, to: to, sha: planned.sha))
+            case .setAside:
+                result.append(UndoOp.setFileAside(from: from, to: to, sha: planned.sha))
+            default:
+                result.append(UndoOp.moveFile(from: from, to: to, sha: planned.sha))
+            }
+        }
+        return result
+    }
+
+    /// A step with moves or external ops made in shadow with no record:
+    /// every change staged and swapped in together by `UndoSwap`, all or
+    /// none, exactly as the door would have made it, so a sentence saying
+    /// nothing was changed is true when this throws. Whether every place is
+    /// inside the working folder was settled before this is reached (or
+    /// cannot be, for a step that cannot be named), so the swap is given no
+    /// root to check against.
+    func makeWithoutARecord() throws {
+        var targets: [UndoSwapTarget] = []
+        for key in plannedOrder {
+            guard let url = plannedURL[key], let after = plannedAfter[key] else {
+                continue
+            }
+            // The bytes the plan read, so a file another program changed
+            // after the plan read it is refused, never written over.
+            var before: Data? = nil
+            if !mustBeNew.contains(key) {
+                switch plannedBefore[key] ?? UndoItem.read(at: url) {
+                case .absent:
+                    before = nil
+                case .file(let data):
+                    before = data
+                case .notAFile, .unreadable:
+                    let refusal: UndoRefusal = .cannotTellNow(path: url.path)
+                    throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+                }
+            }
+            if before == after {
+                continue
+            }
+            targets.append(UndoSwapTarget(url: url, relativePath: url.lastPathComponent, expected: before, replacement: after))
+        }
+        for planned in plannedMoves {
+            let op: UndoOp = UndoOp.moveFile(from: planned.from.path, to: planned.to.path, sha: planned.sha)
+            targets.append(UndoSwapTarget(
+                url: planned.to, relativePath: planned.to.lastPathComponent,
+                change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op)
+            ))
+        }
+        for op in plannedExternals {
+            guard let target = op.target else {
+                continue
+            }
+            targets.append(UndoSwapTarget(
+                url: URL(fileURLWithPath: "/"), relativePath: target,
+                change: .setExternal(target: target, expected: op.valueBefore, value: op.valueAfter)
+            ))
+        }
+        switch UndoShadowStaging.swap(targets, noting: UndoJournalLocation.standardJournal(), places: places) {
+        case .swapped:
+            return
+        case .refused(let refusal):
+            throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+        case .notPutBack(let refusal, let keptOriginals):
+            throw JournaledStepError.leftPartWay(
+                refusal, fileName: JournaledStep.fileName(in: refusal), keptOriginals: keptOriginals
+            )
         case .stoppedByATest:
             throw JournaledStepError.stoppedByATest
         }
