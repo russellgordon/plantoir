@@ -177,7 +177,8 @@ struct SidebarView: View {
                             CourseRowLabel(
                                 course: course,
                                 isBeingRenamed: renamingCourseCode == course.code,
-                                isBeingCopied: workspace.isBeingCopied(course.code)
+                                isBeingCopied: workspace.isBeingCopied(course.code),
+                                isRenamingAFolder: workspace.isRenamingAFolder(course.code)
                             )
                                 .tag(SidebarSelection.course(course.code))
                                 .accessibilityIdentifier("sidebar-\(course.code)")
@@ -1452,7 +1453,10 @@ struct SidebarView: View {
                     }
             }
         } label: {
-            CourseRowLabel(course: course, isBeingRenamed: false, isBeingCopied: workspace.isBeingCopied(course.code))
+            CourseRowLabel(
+                course: course, isBeingRenamed: false, isBeingCopied: workspace.isBeingCopied(course.code),
+                isRenamingAFolder: workspace.isRenamingAFolder(course.code)
+            )
                 .tag(SidebarSelection.course(course.code))
                 .accessibilityIdentifier("sidebar-\(course.code)")
                 .contextMenu {
@@ -2534,7 +2538,18 @@ struct CourseRowLabel: View {
     /// Whether a copy of the course is being zipped right now (#351).
     var isBeingCopied: Bool = false
 
+    /// Whether a Rename folder of the course is under way, in any window
+    /// (#899 U4b): its Preview, Deploy and section actions are greyed
+    /// meanwhile, and this row says why, as it does for a copy.
+    var isRenamingAFolder: Bool = false
+
     // MARK: - Computed properties
+
+    /// What the row's small spinner says the course is busy with, or nil
+    /// when it shows none: a copy being zipped first, then a rename.
+    var workUnderWay: String? {
+        return CourseRowLabel.workUnderWay(isBeingCopied: isBeingCopied, isRenamingAFolder: isRenamingAFolder)
+    }
 
     var body: some View {
         if isBeingRenamed {
@@ -2549,14 +2564,35 @@ struct CourseRowLabel: View {
                 // A copy of the course is being zipped (#351) — a backup, or
                 // the archive before a restore or removal. The row says so
                 // rather than the window going quiet for the minute it takes.
-                if isBeingCopied {
+                //
+                // A Rename folder under way is marked the same way (U4b part
+                // seven's review, L2), so a window whose section's Preview
+                // and Deploy are greyed by a rename in another window shows
+                // why.
+                if let workUnderWay {
                     ProgressView()
                         .controlSize(.small)
-                        .accessibilityLabel("Saving a copy")
-                        .accessibilityIdentifier("courseBeingCopied-\(course.code)")
+                        .accessibilityLabel(workUnderWay)
+                        .help(workUnderWay)
+                        .accessibilityIdentifier(
+                            isBeingCopied ? "courseBeingCopied-\(course.code)" : "courseRenamingAFolder-\(course.code)"
+                        )
                 }
             }
         }
+    }
+
+    // MARK: - Functions
+
+    /// The spinner's words for what the course is busy with, or nil.
+    static func workUnderWay(isBeingCopied: Bool, isRenamingAFolder: Bool) -> String? {
+        if isBeingCopied {
+            return "Saving a copy"
+        }
+        if isRenamingAFolder {
+            return "Renaming a folder"
+        }
+        return nil
     }
 }
 

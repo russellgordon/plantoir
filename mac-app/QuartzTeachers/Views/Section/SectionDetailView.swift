@@ -512,6 +512,28 @@ struct SectionDetailView: View {
         return SectionDetailView.deployOrdinaryHelp
     }
 
+    /// Why Preview and Deploy are greyed for the whole folder or course, in
+    /// their help tags, or nil: the folder's tools getting ready (#476), else
+    /// a Rename folder of the course under way in any window (#899 U4b part
+    /// seven's review, L2), in the menu-reason wording.
+    var greyedReason: String? {
+        return SectionDetailView.greyedReason(
+            folderReadinessReason: workspace.folderReadinessReason,
+            renamingAFolder: workspace.isRenamingAFolder(course.code)
+        )
+    }
+
+    /// The rule of `greyedReason`, as a test can run it.
+    static func greyedReason(folderReadinessReason: String?, renamingAFolder: Bool) -> String? {
+        if let folderReadinessReason {
+            return folderReadinessReason
+        }
+        if renamingAFolder {
+            return CourseActivity.availableOnceTheFolderIsRenamed
+        }
+        return nil
+    }
+
     /// The Deploy button's help when nothing is in its way.
     static let deployOrdinaryHelp: String = "Deploy this section's website"
 
@@ -842,7 +864,7 @@ struct SectionDetailView: View {
                     // Nor while the folder's tools are still being copied, or
                     // that copy failed (#476): the help says why, no dialog.
                     .disabled(!previewButtonIsEnabled)
-                    .help(previewRunner.isRunning ? "Stop previewing this section" : (workspace.folderReadinessReason ?? "Preview this section's website"))
+                    .help(previewRunner.isRunning ? "Stop previewing this section" : (greyedReason ?? "Preview this section's website"))
                     .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
 
                     // "Deploy", NOT "Publish" — a page is published (the
@@ -871,7 +893,7 @@ struct SectionDetailView: View {
                     // removal waiting on that zip deletes what this would publish.
                     .disabled(!deployButtonIsEnabled)
                     .help(SectionDetailView.deployHelp(
-                        folderReadinessReason: workspace.folderReadinessReason,
+                        folderReadinessReason: greyedReason,
                         heldElsewhere: courseIsHeldElsewhere,
                         courseCode: course.code,
                         heldSection: sectionHeldElsewhere
@@ -879,7 +901,7 @@ struct SectionDetailView: View {
                     // The same sentence for VoiceOver while another program
                     // holds the course or this section (#729, #835);
                     // nothing extra otherwise.
-                    .accessibilityHint(courseIsHeldElsewhere && workspace.folderReadinessReason == nil
+                    .accessibilityHint(courseIsHeldElsewhere && greyedReason == nil
                         ? SectionDetailView.deployHelp(
                             folderReadinessReason: nil, heldElsewhere: true,
                             courseCode: course.code, heldSection: sectionHeldElsewhere

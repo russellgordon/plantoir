@@ -147,6 +147,16 @@ enum SpecialFolderRenamer {
         ".toolchain", "node_modules", ".git",
     ]
 
+    /// Tests only: called as the plan is about to read each page, off the
+    /// main actor, so a test can hold the plan open on an event (U4b part
+    /// seven's review, M1). Nil in the app.
+    nonisolated(unsafe) static var planReadsAPage: (@Sendable (URL) -> Void)?
+
+    /// Tests only: called once the plan's detached walk has ended, however
+    /// it ended, so a test can tell a cancelled plan has stopped. Nil in the
+    /// app.
+    nonisolated(unsafe) static var planHasEnded: (@Sendable () -> Void)?
+
     // MARK: - Functions
 
     /// Why this new name cannot be used, or nil when it can.
@@ -471,6 +481,10 @@ enum SpecialFolderRenamer {
 
         var moves: [FolderRenamePlan.Move] = []
         for location in locations {
+            // A Cancel stops the walk between folders and between pages
+            // (part seven's review, M1): the plan writes nothing, so it can
+            // stop anywhere.
+            try Task.checkCancellation()
             var isDirectory: ObjCBool = false
             if !fileManager.fileExists(atPath: location.path, isDirectory: &isDirectory) {
                 continue
@@ -505,6 +519,9 @@ enum SpecialFolderRenamer {
 
         var pages: [FolderRenamePlan.Page] = []
         for pageURL in markdownPages(in: courseDirectory, fileManager: fileManager) {
+            try Task.checkCancellation()
+            planReadsAPage?(pageURL)
+            try Task.checkCancellation()
             guard let read = try? Data(contentsOf: pageURL), let text = String(data: read, encoding: .utf8) else {
                 continue
             }
@@ -520,6 +537,54 @@ enum SpecialFolderRenamer {
             ))
         }
         return FolderRenamePlan(moves: moves, pages: pages)
+    }
+
+    /// Plans a rename OFF the main actor, and gives up waiting the moment the
+    /// caller is cancelled (U4b part seven's review, M1): Cancel gives the
+    /// course back at once.
+    ///
+    /// The walk runs in a detached task, because it must not hold the main
+    /// actor, and a detached task does not inherit cancellation; so the
+    /// caller's cancellation is forwarded to it (`withTaskCancellationHandler`)
+    /// and `plan` stops at its next page (`Task.checkCancellation`). A read
+    /// that blocks inside the system (an evicted iCloud page, a network
+    /// volume gone away) cannot be interrupted, so the caller does not wait
+    /// for the walk to stop: the result comes through a stream, whose
+    /// `next()` returns nil as soon as the waiting task is cancelled. The
+    /// walk then ends on its own, writes nothing, and whatever it finds is
+    /// never read by anyone: the stream it would be delivered through has
+    /// already been given up.
+    nonisolated static func planHaltingAtCancel(
+        _ oldName: String,
+        to newName: String,
+        scope: FolderScope,
+        courseDirectory: URL,
+        sectionNumbers: [Int]
+    ) async throws -> FolderRenamePlan {
+        let (results, delivery) = AsyncThrowingStream<FolderRenamePlan, Error>.makeStream()
+        let walk: Task<Void, Never> = Task.detached(priority: .userInitiated) {
+            do {
+                let planned: FolderRenamePlan = try plan(
+                    oldName, to: newName, scope: scope,
+                    courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+                )
+                delivery.yield(planned)
+                delivery.finish()
+            } catch {
+                delivery.finish(throwing: error)
+            }
+            planHasEnded?()
+        }
+        return try await withTaskCancellationHandler {
+            var waiting: AsyncThrowingStream<FolderRenamePlan, Error>.Iterator = results.makeAsyncIterator()
+            if let planned = try await waiting.next() {
+                return planned
+            }
+            // Nil only when the wait was given up at Cancel.
+            throw CancellationError()
+        } onCancel: {
+            walk.cancel()
+        }
     }
 
     /// Plans a rename into `step`: each folder's move first, then each page

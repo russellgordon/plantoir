@@ -1111,6 +1111,12 @@ struct CourseSettingsView: View {
         if course.isRenamingAFolder {
             return CourseActivity.folderRenameIsUnderWay(course: course.displayCode)
         }
+        // A copy of the course being zipped (#351), a backup or the archive
+        // before a removal or restore: the same, naming the copy (part
+        // seven's review, L1).
+        if CourseActivity.courseIsBeingCopied(folderPath: course.workingFolderPath, courseCode: course.code) {
+            return AssistWording.courseIsBeingCopiedFromTheMenu(course: course.displayCode)
+        }
         // `finishing` is settled once when the sheet opens, not here: it
         // touches the filesystem, and this runs on every keystroke.
         return SpecialFolderRenamer.problem(
@@ -1137,19 +1143,17 @@ struct CourseSettingsView: View {
         guard let claim = CourseActivity.beginFolderRename(
             folderPath: course.workingFolderPath, courseCode: course.code
         ) else {
-            return .failed(SpecialFolderRenamer.nothingWasChanged(
-                renaming: oldName, said: JournaledStepError.anotherChangeIsUnderWay.localizedDescription
-            ))
+            return .failed(CourseActivity.folderRenameIsUnderWay(course: course.displayCode))
         }
         defer {
             CourseActivity.endFolderRename(claim)
         }
         // Nor while a copy of the course is being zipped (#351): a removal
         // or restore waiting on that zip would take a course half renamed.
+        // Said as the other busy refusals are, naming the copy (part seven's
+        // review, L1); the sheet's Rename is disabled with it beforehand.
         if CourseActivity.courseIsBeingCopied(folderPath: course.workingFolderPath, courseCode: course.code) {
-            return .failed(SpecialFolderRenamer.nothingWasChanged(
-                renaming: oldName, said: JournaledStepError.anotherChangeIsUnderWay.localizedDescription
-            ))
+            return .failed(AssistWording.courseIsBeingCopiedFromTheMenu(course: course.displayCode))
         }
         let courseDirectory: URL = course.directoryURL
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
@@ -1170,15 +1174,22 @@ struct CourseSettingsView: View {
             // The walk OFF the main thread: reading every page in the course
             // to find the links is not quick on an iCloud-backed vault, where
             // an evicted file downloads on read. Nothing is written by it.
+            // Cancel gives the course back at once (part seven's review, M1):
+            // the walk is told to stop, and this does not wait for it, so the
+            // claim below ends now even if a read is stuck inside the system.
             let planned: FolderRenamePlan
             do {
-                planned = try await Task.detached(priority: .userInitiated) {
-                    return try SpecialFolderRenamer.plan(
-                        oldName, to: newName, scope: scope,
-                        courseDirectory: courseDirectory,
-                        sectionNumbers: sectionNumbers
-                    )
-                }.value
+                planned = try await SpecialFolderRenamer.planHaltingAtCancel(
+                    oldName, to: newName, scope: scope,
+                    courseDirectory: courseDirectory,
+                    sectionNumbers: sectionNumbers
+                )
+            } catch is CancellationError {
+                // Halted at Cancel while planning: nothing was written and no
+                // record was made. The sheet has gone; this is said to no one.
+                return .failed(SpecialFolderRenamer.nothingWasChanged(
+                    renaming: oldName, said: CancellationError().localizedDescription
+                ))
             } catch let refused as JournaledStepError {
                 return .failed(SpecialFolderRenamer.nothingWasChanged(
                     renaming: oldName, said: refused.localizedDescription
@@ -1201,13 +1212,14 @@ struct CourseSettingsView: View {
             // Halted at Cancel while it was only planning (the plan writes
             // nothing): nothing is made. Asked here, on the main actor, in the
             // same turn as the swap is marked begun, so a Cancel lands either
-            // before this (and halts it) or after (and is disabled).
-            if Task.isCancelled {
+            // before this (and halts it) or after (and is disabled). The swap
+            // also refuses a claim no longer held: an ended claim is never
+            // taken up again.
+            if Task.isCancelled || !CourseActivity.folderRenameSwapBegins(claim) {
                 return .failed(SpecialFolderRenamer.nothingWasChanged(
                     renaming: oldName, said: CancellationError().localizedDescription
                 ))
             }
-            CourseActivity.folderRenameSwapBegins(claim)
             // Recorded BEFORE the step is made, so that a rename killed part
             // way can be recognised and finished: with the switch off, recovery
             // records and repairs nothing (`interruptedRenameTarget`).

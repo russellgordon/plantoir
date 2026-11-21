@@ -196,8 +196,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 renamingAFolder: CourseActivity.anyFolderRenameIsUnderWay
             ) {
                 Task { @MainActor in
-                    await ToolchainReadiness.shared.waitForAllCopies()
-                    await CourseActivity.waitForAllFolderRenames()
+                    await AppDelegate.waitForWorkUnderWay()
                     if AppDelegate.finishTerminating() == .terminateNow {
                         NSApp.reply(toApplicationShouldTerminate: true)
                     }
@@ -213,6 +212,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// or a Rename folder (#899 U4b). Neither asks a question; both finish.
     static func quitWaitsForWorkUnderWay(toolchainCopying: Bool, renamingAFolder: Bool) -> Bool {
         return toolchainCopying || renamingAFolder
+    }
+
+    /// What a quit that answered `.terminateLater` waits for before it
+    /// finishes: every tools copy (#476) and every Rename folder (#899 U4b)
+    /// to end, each an event, never a time. One function, so the quit's own
+    /// wait is what the test runs (U4b part seven's review, L6).
+    static func waitForWorkUnderWay() async {
+        await ToolchainReadiness.shared.waitForAllCopies()
+        await CourseActivity.waitForAllFolderRenames()
     }
 
     /// The trail's last word from this process (#560), written as late as

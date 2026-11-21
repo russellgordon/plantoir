@@ -51,6 +51,8 @@ final class UndoRenameFolderStepTests: XCTestCase {
         UndoKillPoints.fileInUseAtSwap = nil
         UndoKillPoints.putBackFailsAt = nil
         UndoKillPoints.beforeTheRename = nil
+        SpecialFolderRenamer.planReadsAPage = nil
+        SpecialFolderRenamer.planHasEnded = nil
         ActivityTrail.store = previousTrail
         try? FileManager.default.removeItem(at: listFolder)
         try? FileManager.default.removeItem(at: root)
@@ -703,7 +705,8 @@ final class UndoRenameFolderStepTests: XCTestCase {
     /// ⌘Q during a rename waits for it (U4b part six's review, M1), as it
     /// waits for a tools copy (#476): the quit's wait resumes only once the
     /// step is made and the rename's claim has ended. MUST FAIL with the
-    /// rename left out of the quit's wait.
+    /// rename left out of the quit's wait (`AppDelegate.waitForWorkUnderWay`,
+    /// which `applicationShouldTerminate` awaits; part seven's review, L6).
     func testAQuitDuringARenameWaitsForItToFinish() async throws {
         let course: Course = try course()
         let reached: XCTestExpectation = XCTestExpectation(description: "the swap reached its first page")
@@ -720,7 +723,9 @@ final class UndoRenameFolderStepTests: XCTestCase {
             toolchainCopying: false, renamingAFolder: CourseActivity.anyFolderRenameIsUnderWay
         ), "the quit does not wait for the rename")
         let quit: Task<(Bool, Int), Never> = Task { @MainActor in
-            await CourseActivity.waitForAllFolderRenames()
+            // The quit's own wait, as `applicationShouldTerminate` runs it
+            // (part seven's review, L6).
+            await AppDelegate.waitForWorkUnderWay()
             let steps: Int = (try? self.journal().read().records.count) ?? -1
             return (CourseActivity.anyFolderRenameIsUnderWay, steps)
         }
@@ -759,6 +764,134 @@ final class UndoRenameFolderStepTests: XCTestCase {
         let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
         XCTAssertFalse(course.isRenamingAFolder)
+    }
+
+    // MARK: - Part seven: Cancel gives the course back
+
+    /// Cancel while the plan is still walking the course (U4b part seven's
+    /// review, M1): the plan is held open at its first page on an event,
+    /// then the rename is cancelled. The rename returns at once, without
+    /// waiting for the held read; the claim is gone, so Save is enabled and
+    /// the course is free; nothing is on disk, no step, no record. Letting
+    /// the held plan go on afterwards changes nothing: it stops at its next
+    /// page and reads no other. MUST FAIL with the plan awaited as a
+    /// detached task's `value` (the rename waits for the held read), and
+    /// with the plan not checking for cancellation (it reads every page).
+    func testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing() async throws {
+        let course: Course = try course()
+        course.configuration.courseName = "Computer Science"
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        let pagesRead: PlanPageCount = PlanPageCount()
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            pagesRead.add()
+            gate.arrive()
+        }
+        let ended: XCTestExpectation = XCTestExpectation(description: "the cancelled plan stopped")
+        SpecialFolderRenamer.planHasEnded = { @Sendable in
+            ended.fulfill()
+        }
+        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
+        let halted: Task<RenameResult, Never> = Task { @MainActor in
+            let result: RenameResult = await view.renameFolder("Tasks", to: "Assessments", scope: .perSection)
+            returned.fulfill()
+            return result
+        }
+        await fulfillment(of: [reached])
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+        XCTAssertFalse(view.saveIsEnabled)
+
+        halted.cancel()
+        // The event is the rename returning; the bound only turns a rename
+        // that waits for the held read into a failure rather than a hang.
+        await fulfillment(of: [returned], timeout: 30)
+        let result: RenameResult = await halted.value
+
+        XCTAssertNotNil(failed(result), "\(result)")
+        XCTAssertFalse(course.isRenamingAFolder, "the course is still held after Cancel")
+        XCTAssertFalse(CourseActivity.anyFolderRenameIsUnderWay, "a quit would wait for a cancelled plan")
+        XCTAssertTrue(view.saveIsEnabled, "Save is not enabled after Cancel")
+        XCTAssertNil(view.folderRenameProblem("Concepts", to: "Ideas", scope: .shared))
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+
+        gate.open()
+        await fulfillment(of: [ended])
+
+        XCTAssertEqual(pagesRead.count, 1, "the cancelled plan went on reading pages")
+        XCTAssertEqual(pages(of: course), before, "the held plan changed a page once it went on")
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0, "the held plan reached the swap")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+        XCTAssertFalse(course.isRenamingAFolder)
+    }
+
+    /// An ended claim is never taken up again (part seven's review, M1):
+    /// the swap refuses a rename whose claim has been given back, so a plan
+    /// whose rename was cancelled can never reach it. MUST FAIL with
+    /// `folderRenameSwapBegins` marking the swap whether or not the claim is
+    /// held.
+    func testTheSwapRefusesARenameWhoseClaimHasEnded() throws {
+        let claim: CourseActivity.FolderRenameRecord = try XCTUnwrap(
+            CourseActivity.beginFolderRename(folderPath: root.path, courseCode: "ICS3U")
+        )
+        CourseActivity.endFolderRename(claim)
+
+        XCTAssertFalse(CourseActivity.folderRenameSwapBegins(claim), "an ended claim began its swap")
+        XCTAssertFalse(CourseActivity.anyFolderRenameIsUnderWay)
+        XCTAssertFalse(CourseActivity.folderRenameIsSwapping(folderPath: root.path, courseCode: "ICS3U"))
+    }
+
+    /// A rename while a copy of the course is being saved (a backup, or the
+    /// archive before a removal or restore) is refused before it plans, with
+    /// the sentence naming the copy, in the sheet and at the click (part
+    /// seven's review, L1). MUST FAIL with the old "The file couldn’t be
+    /// saved." sentence, or with the sheet's Rename left enabled.
+    func testARenameWhileACopyIsBeingSavedIsRefusedNamingTheCopy() async throws {
+        let course: Course = try course()
+        let before: [String: Data] = pages(of: course)
+        CourseActivity.beginCopy(folderPath: root.path, courseCode: "ICS3U")
+        defer {
+            CourseActivity.endCopy(folderPath: root.path, courseCode: "ICS3U")
+        }
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let sentence: String = AssistWording.courseIsBeingCopiedFromTheMenu(course: "ICS3U")
+
+        XCTAssertEqual(view.folderRenameProblem("Tasks", to: "Assessments", scope: .perSection), sentence)
+        let result: RenameResult = await view.renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        XCTAssertEqual(failed(result), sentence)
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        XCTAssertFalse(course.isRenamingAFolder)
+    }
+
+    /// While a rename of the course runs, a section's greyed Preview and
+    /// Deploy say why in their help tags, and the course's sidebar row
+    /// shows it busy, as for a copy being zipped (part seven's review, L2).
+    /// The folder's tools getting ready still wins. MUST FAIL with the
+    /// rename left out of either rule.
+    func testWhileARenameRunsPreviewDeployAndTheSidebarRowSayWhy() {
+        let reason: String? = SectionDetailView.greyedReason(folderReadinessReason: nil, renamingAFolder: true)
+        XCTAssertEqual(reason, CourseActivity.availableOnceTheFolderIsRenamed)
+        XCTAssertEqual(
+            SectionDetailView.deployHelp(folderReadinessReason: reason, heldElsewhere: false, courseCode: "ICS3U"),
+            CourseActivity.availableOnceTheFolderIsRenamed
+        )
+        XCTAssertNil(SectionDetailView.greyedReason(folderReadinessReason: nil, renamingAFolder: false))
+        XCTAssertEqual(SectionDetailView.greyedReason(folderReadinessReason: "Getting ready", renamingAFolder: true), "Getting ready")
+        XCTAssertEqual(CourseRowLabel.workUnderWay(isBeingCopied: false, isRenamingAFolder: true), "Renaming a folder")
+        XCTAssertEqual(CourseRowLabel.workUnderWay(isBeingCopied: true, isRenamingAFolder: false), "Saving a copy")
+        XCTAssertNil(CourseRowLabel.workUnderWay(isBeingCopied: false, isRenamingAFolder: false))
     }
 
     /// A move back that fails because something appeared at the old name
@@ -838,5 +971,32 @@ final class RenameHold: @unchecked Sendable {
         isOpen = true
         condition.broadcast()
         condition.unlock()
+    }
+}
+
+/// Counts the pages a plan has begun to read, from any thread.
+final class PlanPageCount: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    let lock: NSLock = NSLock()
+
+    var pages: Int = 0
+
+    // MARK: - Computed properties
+
+    var count: Int {
+        lock.lock()
+        let counted: Int = pages
+        lock.unlock()
+        return counted
+    }
+
+    // MARK: - Functions
+
+    func add() {
+        lock.lock()
+        pages += 1
+        lock.unlock()
     }
 }

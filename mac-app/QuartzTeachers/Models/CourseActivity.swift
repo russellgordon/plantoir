@@ -204,17 +204,26 @@ enum CourseActivity {
     }
 
     /// Records that a rename's check and swap have begun: from here it can
-    /// no longer be halted, so its sheet's Cancel is disabled.
-    static func folderRenameSwapBegins(_ claim: FolderRenameRecord) {
+    /// no longer be halted, so its sheet's Cancel is disabled. Returns false,
+    /// and marks nothing, when the claim is no longer held: an ended claim is
+    /// never taken up again, so a rename whose claim was given back (at
+    /// Cancel, U4b part seven's review, M1) can never reach its swap.
+    static func folderRenameSwapBegins(_ claim: FolderRenameRecord) -> Bool {
         var updated: [FolderRenameRecord] = []
+        var found: Bool = false
         for existing in store.activeFolderRenames {
             var record: FolderRenameRecord = existing
             if existing.owner == claim.owner {
                 record.isSwapping = true
+                found = true
             }
             updated.append(record)
         }
+        if !found {
+            return false
+        }
         store.activeFolderRenames = updated
+        return true
     }
 
     /// Records that a rename has ended, however it ended, and lets the quit
@@ -691,6 +700,11 @@ enum CourseActivity {
         store.activeCopies = []
         store.activePlanWork = []
         store.activeFolderRenames = []
+        let waiters: [CheckedContinuation<Void, Never>] = store.folderRenameWaiters
+        store.folderRenameWaiters = []
+        for waiter in waiters {
+            waiter.resume()
+        }
         WorkLeaseRegistry.reconcile()
     }
 }

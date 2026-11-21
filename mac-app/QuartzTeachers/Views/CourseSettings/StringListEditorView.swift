@@ -302,6 +302,12 @@ struct StringListEditorView: View {
         }
         .sheet(item: $pendingRename) { rename in
             renameSheet(for: rename.item, interruptedTarget: rename.interruptedRenameTarget)
+                // However the sheet goes, a rename still only planning goes
+                // with it (U4b part seven's review, M1); one whose swap has
+                // begun is never halted.
+                .onDisappear {
+                    haltARenameStillPlanning()
+                }
         }
     }
 
@@ -695,9 +701,19 @@ struct StringListEditorView: View {
         if isRenaming && (renameCanNoLongerBeHalted?() ?? true) {
             return
         }
+        haltARenameStillPlanning()
+        pendingRename = nil
+    }
+
+    /// Cancels the rename if it is still only planning: its plan stops, and
+    /// the course is given back at once (U4b part seven's review, M1). Never
+    /// once its check and swap have begun.
+    func haltARenameStillPlanning() {
+        if isRenaming && (renameCanNoLongerBeHalted?() ?? true) {
+            return
+        }
         renameTask?.cancel()
         renameTask = nil
-        pendingRename = nil
     }
 
     /// Hands the rename to the caller and reports what came back.
