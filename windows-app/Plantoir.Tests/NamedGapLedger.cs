@@ -635,6 +635,10 @@ internal static class NamedGapLedger
              "U3b, a leftover: with nothing changed between, Undo puts the record and the leftover back with the rest and leaves nothing apart",
              "U3b: a deploy set for later put back at Undo whose job the computer will not start now, and which cannot be taken away again, starts at the next login: named as such, never as left apart and never as simply back (the re-review of U3b's fixes, LOW 2); the rest is taken back"),
         Owed(AssistWordingKeys, 899, V200, Reason899W7U3b, "undoScheduleStartsAtTheNextLogin"),
+        // The rollover (moves) and U4a (members, trees) traces below fail by the
+        // replay's own guard, which names the part of the step it does not make
+        // yet, before any door is asked (part three, review 1, LOW 2): they can
+        // pass only once that guard is taken out for their kind.
         Owed(UndoActionTraces, 899, V200, Reason899W7U3b,
              "action-121", "action-122", "action-123", "action-124", "action-125", "action-126",
              "action-127", "action-128", "action-129", "action-130", "action-131", "action-132"),
