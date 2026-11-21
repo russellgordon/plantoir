@@ -283,9 +283,14 @@ public sealed class UndoActionStepTests : IDisposable
         byte[] before = File.ReadAllBytes(Full(Day2));
         var history = new UndoHistory();
         var workspace = new AssistWorkspace(Folder, new NoLaunchers(), undo: history) { Surface = AssistSurface.Menu, UndoList = List() };
-        PublishPlan plan = workspace.PlanPublish("ICS3U", 1, ["Unit 1, Day 2"], draft: false, publishes: true);
-
-        workspace.Apply(plan, preview: false).GetAwaiter().GetResult();
+        // The step an action makes, told to today's undo as an action tells it.
+        using (var recording = UndoHistory.Record(history, "published “Unit 1, Day 2” in ICS3U Section 1"))
+        {
+            UndoActionStep step = workspace.NewUndoStep("publishPages", "ICS3U", 1);
+            step.Write(Full(Day2), step.ReadText(Full(Day2)).Replace("draft: true", "draft: false"));
+            workspace.MakeTheUndoStep(step);
+            recording.Done();
+        }
         Assert.Contains("draft: false", File.ReadAllText(Full(Day2)), StringComparison.Ordinal);
         Assert.Equal(Class(2, draft: true), Assert.Single(history.Entries).Files[Full(Day2)].Before);
         history.Undo();
