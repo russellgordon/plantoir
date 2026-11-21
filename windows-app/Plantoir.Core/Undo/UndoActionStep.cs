@@ -176,6 +176,14 @@ internal sealed class UndoActionStep
         return File.Exists(fullPath) ? File.ReadAllText(fullPath) : null;
     }
 
+    /// <summary>Whether the file is there as the step will leave it: planned with content, else on the disk (the mac's <c>fileExists</c>).</summary>
+    internal bool Exists(string fullPath)
+    {
+        string key = Path.GetFullPath(fullPath);
+        if (_after.TryGetValue(key, out byte[]? planned)) return planned is not null;
+        return File.Exists(fullPath);
+    }
+
     /// <summary>The file's text as the step will leave it: what is planned, else the disk's.</summary>
     internal string ReadText(string fullPath)
     {

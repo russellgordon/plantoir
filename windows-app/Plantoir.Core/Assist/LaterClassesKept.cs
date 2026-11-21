@@ -25,8 +25,11 @@ namespace Plantoir.Core.Assist;
 /// published there for a preview check must still be asked about at Deploy
 /// (<c>file-formats.json</c> → <c>laterClassesKept.writtenBy</c>). Removed on rollover, with the
 /// checklist's answer (<see cref="LinksChecklist.ReleasePublishedPages"/>).
-/// A record that cannot be read or written costs the question once more,
-/// nothing else.</para>
+/// A record that cannot be read costs the question once more, nothing else.
+/// Publish Class for a Date plans the record inside its ONE step (#899 W7a):
+/// a record planned and then unwritable at the swap refuses the whole
+/// publish, all or none ("Nothing was changed: …"), the class left as it
+/// was (<c>UndoWholeUnitAndByDateStepTests.APublishClassForADateWhoseRecordCannotBeWrittenAtTheSwapChangesNothing</c>).</para>
 /// </remarks>
 public static class LaterClassesKept
 {

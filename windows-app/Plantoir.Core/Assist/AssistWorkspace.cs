@@ -4635,7 +4635,8 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>Create the pages the plan describes. Backed up first, and undoable.</summary>
-    public AssistResult ApplyAddClasses(NewClassesPlan plan, IProgress<string>? progress = null)
+    /// <param name="actionKey">The step's key (<c>undo-action-steps.json</c>): <c>addClasses</c> for add_classes, <c>addNextClass</c> or <c>addNextClassInANewUnit</c> for add_next_class, as the mac's <c>AssistToolRunner.addNextClass</c> names them.</param>
+    public AssistResult ApplyAddClasses(NewClassesPlan plan, IProgress<string>? progress = null, string actionKey = "addClasses")
     {
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
@@ -4668,13 +4669,29 @@ public sealed partial class AssistWorkspace
         // use, so a new page sorts beside them rather than at midnight.
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         string folder = ClassFolder(course, section);
-        Directory.CreateDirectory(folder);
 
-        foreach (var created in plan.Classes)
+        // ONE step through the door (#899 W7b1; the mac's
+        // PlaceholderClassPlanner.apply): every new page together, all or
+        // none, each a writeFile with no before; the class folder is made by
+        // the swap with them, never beforehand, so a refused step leaves no
+        // empty folder behind.
+        var step = NewUndoStep(actionKey, course.Code, section);
+        try
         {
-            string path = Path.Combine(folder, created.Title + ".md");
-            if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
-            Save(path, ClassSkeleton(created, plan.Naming.IsNumbered ? null : plan.Unit, plan.Classes.Count, tail));
+            foreach (var created in plan.Classes)
+            {
+                string path = Path.Combine(folder, created.Title + ".md");
+                if (step.Exists(path)) continue;       // checked again: the plan may be minutes old
+                step.Write(path, ClassSkeleton(created, plan.Naming.IsNumbered ? null : plan.Unit, plan.Classes.Count, tail));
+            }
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // All or none: "Nothing was changed" unless the door left a page
+            // holding the new content (its earlier content kept beside it).
+            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
+            throw;
         }
         recording.Done();
 
@@ -4899,9 +4916,13 @@ public sealed partial class AssistWorkspace
     internal UndoActionStep NewUndoStep(string actionKey, string courseCode, int section)
     {
         UndoForThisProcess list = UndoList ?? UndoForThisProcess.Current;
-        UndoDoor? door = UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail);
+        UndoDoor? door = UndoDoorOfATest
+            ?? (UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail));
         return new(new UndoStepMaker(UndoMadeBy, actionKey), _folder, courseCode, section, undo: list, door: door);
     }
+
+    /// <summary>A test's own door for every step of this workspace (the contract replay's list, with its clock); none in the app.</summary>
+    internal UndoDoor? UndoDoorOfATest { get; init; }
 
     /// <summary>A test's seams for the door every step of this workspace goes through (a put-back that fails, a kill point); none in the app.</summary>
     internal UndoSeams? UndoSeams { get; init; }

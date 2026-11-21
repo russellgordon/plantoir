@@ -873,7 +873,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                                  "there. A page with that name is never written over: it may be a lesson " +
                                  "written months ago.");
 
-            var result = workspace.ApplyAddClasses(plan);
+            // The step's key, as the mac's add_next_class names it (#899 W7b1):
+            // a new unit when the unit asked for is "next", else the next class.
+            string stepKey = string.Equals(unit?.Trim(), "next", StringComparison.OrdinalIgnoreCase)
+                ? "addNextClassInANewUnit" : "addNextClass";
+            var result = workspace.ApplyAddClasses(plan, actionKey: stepKey);
             if (!result.Succeeded) return Answering(result.Message);
 
             // The teacher asked for a page. Its name and its date are the
