@@ -59,7 +59,61 @@ internal static class WindowsActionsOnTheMacFixture
                 "the line under the block's start marker is Windows' own (“Today's work points here:”, since the block was first written on Windows), where the mac writes “## Curriculum connection”; with the switch off a teacher meets nothing different from before, so it is kept and measured"),
         };
 
+    /// <summary>
+    /// The converted steps whose new class pages are Windows'
+    /// <c>AssistWorkspace.ClassSkeleton</c>, a C# raw string literal: its line
+    /// endings are the SOURCE file's as checked out, so a checkout with
+    /// <c>core.autocrlf</c> (the PC's, measured 2026-11-21: <c>i/lf w/crlf</c>)
+    /// writes every line of the page CRLF but the two the unit tag adds
+    /// (<c>"tags:\n  - unit-N\n"</c>, written with <c>\n</c>). Measured, never
+    /// retyped: the fixture holds Windows' page to exactly that transform of
+    /// the mac's, so a change to it fails here and the entry is revisited.
+    /// </summary>
+    internal static readonly IReadOnlyList<string> NewClassPageSteps = ["addNextClass", "addNextClassInANewUnit", "addClasses"];
+
+    /// <summary>A raw string literal of this test assembly, compiled from the same checkout as the product's.</summary>
+    private const string RawLiteralProbe = """
+        a
+        b
+        """;
+
+    /// <summary>Whether this build's raw string literals carry CRLF (the checkout's line endings).</summary>
+    internal static bool RawLiteralsCarryCrLf => RawLiteralProbe.Contains('\r');
+
     // ---- Functions -----------------------------------------------------------------
+
+    /// <summary>
+    /// The mac's new class page as this build of Windows writes it (see
+    /// <see cref="NewClassPageSteps"/>): the same bytes on an LF checkout;
+    /// on a CRLF one, every line CRLF but the unit tag's two.
+    /// </summary>
+    internal static byte[] AsThisBuildWritesANewClassPage(byte[] mac)
+    {
+        if (!RawLiteralsCarryCrLf) return mac;
+        string text = Encoding.UTF8.GetString(mac).Replace("\n", "\r\n");
+        text = System.Text.RegularExpressions.Regex.Replace(text, "tags:\r\n(  - unit-[0-9]+)\r\n", "tags:\n$1\n");
+        return new UTF8Encoding(false).GetBytes(text);
+    }
+
+    /// <summary>The begin lines in a list folder whose step was applied (a refused step's begin is closed "failed").</summary>
+    internal static List<JsonObject> AppliedBegins(string journalFolder)
+    {
+        var begins = new Dictionary<long, JsonObject>();
+        var applied = new List<JsonObject>();
+        if (!Directory.Exists(journalFolder)) return applied;
+        foreach (string segment in Directory.EnumerateFiles(journalFolder, "journal-*.jsonl").Order(StringComparer.Ordinal))
+        {
+            foreach (string line in File.ReadAllLines(segment))
+            {
+                if (JsonNode.Parse(line) is not JsonObject read || read["seq"] is null) continue;
+                long seq = (long)read["seq"]!;
+                string? kind = (string?)read["event"];
+                if (kind == "begin") begins[seq] = read;
+                else if (kind == "applied" && begins.TryGetValue(seq, out JsonObject? begun)) applied.Add(begun);
+            }
+        }
+        return applied;
+    }
 
     internal static JsonElement Recorded(string stepName) =>
         StepsDocument.Value.RootElement.GetProperty("steps").EnumerateArray()
@@ -141,12 +195,15 @@ internal static class WindowsActionsOnTheMacFixture
     internal static string Run(string stepName, AssistWorkspace workspace)
     {
         var tools = new PlantoirTools(workspace);
+        // The MCP server always hands a tool a progress (the SDK's own when the
+        // client asked for none), so the replay does too: null is no caller's.
+        var progress = new Progress<ProgressNotificationValue>(_ => { });
         CallToolResult answered = stepName switch
         {
-            "publishPages" => tools.PublishPages(Course, 1, pages: ["Unit 1, Day 2"], preview: false).GetAwaiter().GetResult(),
-            "hidePages" => tools.UnpublishPages(Course, 1, pages: ["Unit 1, Day 1"], preview: false).GetAwaiter().GetResult(),
-            "publishPagesAWholeUnit" => tools.PublishPages(Course, 1, pages: ["Unit 1"], preview: false).GetAwaiter().GetResult(),
-            "publishClassForADate" => tools.PublishClassOn(Course, 1, "2026-09-10", null!, CancellationToken.None, preview: false).GetAwaiter().GetResult(),
+            "publishPages" => tools.PublishPages(Course, 1, progress, pages: ["Unit 1, Day 2"], preview: false).GetAwaiter().GetResult(),
+            "hidePages" => tools.UnpublishPages(Course, 1, progress, pages: ["Unit 1, Day 1"], preview: false).GetAwaiter().GetResult(),
+            "publishPagesAWholeUnit" => tools.PublishPages(Course, 1, progress, pages: ["Unit 1"], preview: false).GetAwaiter().GetResult(),
+            "publishClassForADate" => tools.PublishClassOn(Course, 1, "2026-09-10", progress, CancellationToken.None, preview: false).GetAwaiter().GetResult(),
             "addNextClass" => tools.AddNextClass(Course, 1),
             "addNextClassInANewUnit" => tools.AddNextClass(Course, 1, unit: "next"),
             "addClasses" => tools.AddClasses(Course, 1, unit: 2, howMany: 2),
@@ -321,7 +378,8 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
 
             Assert.StartsWith("Nothing was changed: ", answered);
             Assert.Equal(before, File.ReadAllBytes(page));
-            Assert.Equal(0, WindowsActionsOnTheMacFixture.Begins(ListFolder));
+            // The door's refused step is begun and closed "failed": never applied, never offered.
+            Assert.Empty(WindowsActionsOnTheMacFixture.AppliedBegins(ListFolder));
         }
         finally { File.SetAttributes(page, FileAttributes.Normal); }
     }
@@ -430,6 +488,9 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             string full = UndoDoor.FullPath(Folder, path);
             byte[]? want = WindowsActionsOnTheMacFixture.Bytes(file.GetProperty("after"));
             byte[]? have = File.Exists(full) ? File.ReadAllBytes(full) : null;
+            if (want is not null && file.GetProperty("before").ValueKind == JsonValueKind.Null
+                && WindowsActionsOnTheMacFixture.NewClassPageSteps.Contains(name))
+                want = WindowsActionsOnTheMacFixture.AsThisBuildWritesANewClassPage(want);
             if (WindowsActionsOnTheMacFixture.WindowsOwnJson.TryGetValue(name, out var json))
             {
                 Assert.NotNull(want);

@@ -89,6 +89,22 @@ public sealed class UndoActionTraceContractTests
                                   && !WindowsActionsOnTheMacFixture.WindowsOwnLine.ContainsKey(stepName)
                                   && !WindowsActionsOnTheMacFixture.WindowsOwnJson.ContainsKey(stepName);
         if (byTheWindowsAction) WindowsActionsOnTheMacFixture.Lay(scribe.FullPath("A", ""), recorded);
+        // A new class page of this build carries the checkout's line endings
+        // (WindowsActionsOnTheMacFixture.NewClassPageSteps, measured there to
+        // the byte against the mac's after): the trace's hashes are the mac's
+        // bytes, so on a CRLF build such a page is hashed with its CRLFs read
+        // as the mac's LFs. Every other page, and every page of an LF build,
+        // is hashed as it is.
+        var checkoutLineEndings = new HashSet<string>(StringComparer.Ordinal);
+        if (byTheWindowsAction && WindowsActionsOnTheMacFixture.RawLiteralsCarryCrLf
+            && WindowsActionsOnTheMacFixture.NewClassPageSteps.Contains(stepName))
+        {
+            foreach (JsonElement file in files)
+            {
+                if (file.GetProperty("before").ValueKind == JsonValueKind.Null)
+                    checkoutLineEndings.Add(file.GetProperty("path").GetString()!);
+            }
+        }
 
         var calls = trace.GetProperty("calls").EnumerateArray().ToList();
         int closingRedos = 0;
@@ -185,13 +201,13 @@ public sealed class UndoActionTraceContractTests
             Assert.True(NullableSeq(call, "head") == offered.Head?.Seq, $"{where}: head {offered.Head?.Seq}");
             Assert.True(NullableSeq(call, "redo") == offered.Redo.Seq, $"{where}: redo {offered.Redo.Seq}");
 
-            if (index == lastUndoOfTheClosingRun) afterUndoingAll = Hashes(scribe, paths);
+            if (index == lastUndoOfTheClosingRun) afterUndoingAll = Hashes(scribe, paths, checkoutLineEndings);
         }
 
         Assert.Empty(scribe.StagedLeftovers("A"));
         Assert.NotNull(afterUndoingAll);
         AssertHashes(trace.GetProperty("afterUndoingAll"), afterUndoingAll!, name + " afterUndoingAll");
-        AssertHashes(trace.GetProperty("final"), Hashes(scribe, paths), name + " final");
+        AssertHashes(trace.GetProperty("final"), Hashes(scribe, paths, checkoutLineEndings), name + " final");
     }
 
     /// <summary>The recorded step as an action hands it to the door: each file's before and after, then its recompute ops.</summary>
@@ -286,10 +302,16 @@ public sealed class UndoActionTraceContractTests
         return paths;
     }
 
-    private static Dictionary<string, string?> Hashes(UndoScribe scribe, IReadOnlyList<string> paths)
+    private static Dictionary<string, string?> Hashes(UndoScribe scribe, IReadOnlyList<string> paths, IReadOnlySet<string> checkoutLineEndings)
     {
         var hashes = new Dictionary<string, string?>(StringComparer.Ordinal);
-        foreach (string path in paths) hashes[path] = scribe.Page("A", path) is { } bytes ? UndoCheck.Sha(bytes) : null;
+        foreach (string path in paths)
+        {
+            byte[]? bytes = scribe.Page("A", path);
+            if (bytes is not null && checkoutLineEndings.Contains(path))
+                bytes = new UTF8Encoding(false).GetBytes(Encoding.UTF8.GetString(bytes).Replace("\r\n", "\n"));
+            hashes[path] = bytes is null ? null : UndoCheck.Sha(bytes);
+        }
         return hashes;
     }
 
@@ -299,7 +321,7 @@ public sealed class UndoActionTraceContractTests
         {
             string? want = page.Value.ValueKind == JsonValueKind.Null ? null : page.Value.GetString();
             Assert.True(actual.ContainsKey(page.Name), $"{where}: {page.Name} is not a file of the step");
-            Assert.True(want == actual[page.Name], $"{where}: {page.Name}");
+            Assert.True(want == actual[page.Name], $"{where}: {page.Name} is {actual[page.Name] ?? "absent"}, the trace's {want ?? "absent"}");
         }
     }
 

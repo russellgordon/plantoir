@@ -625,16 +625,9 @@ public class ReDateTests : IDisposable
 
         workspace.ApplySyncDates(plan);
 
-        var begins = new List<System.Text.Json.Nodes.JsonObject>();
-        foreach (string segment in Directory.EnumerateFiles(list, "journal-*.jsonl"))
-        {
-            foreach (string line in File.ReadAllLines(segment))
-            {
-                if (System.Text.Json.Nodes.JsonNode.Parse(line) is System.Text.Json.Nodes.JsonObject read && (string?)read["event"] == "begin")
-                    begins.Add(read);
-            }
-        }
-        var step = Assert.Single(begins)["step"]!;
+        // The refused try above is begun and closed "failed" by the door; the
+        // one APPLIED step is this sync's.
+        var step = Assert.Single(WindowsActionsOnTheMacFixture.AppliedBegins(list))["step"]!;
         Assert.Equal("syncPageDates", (string?)step["action"]!["key"]);
         var kinds = new List<string>();
         foreach (var op in step["ops"]!.AsArray()) kinds.Add((string)op!["kind"]!);
