@@ -70,6 +70,9 @@ public static partial class AssistWording
     public static string NothingToUndoFromTheMenu(Plantoir.Core.Models.ClassNoun noun) =>
         $"Nothing has been changed from the {Plantoir.Core.Models.SubjectMenuLayout.EitherMenu(noun)} menu in this window yet, so there is nothing to undo. Anything older is in Plantoir's Backups list.";
 
+    /// <summary>The same, in a club: "the Section or Meetings menu" (the contract's <c>nothingToUndoFromTheMeetingsMenu</c>, #1027).</summary>
+    public static string NothingToUndoFromTheMeetingsMenu => NothingToUndoFromTheMenu(Plantoir.Core.Models.ClassNoun.Meeting);
+
     /// <summary>The section changed while its copy was being saved, so the plan no longer fits.</summary>
     public static string ChangedWhileSavingACopyFromTheMenu(string course, string section) =>
         $"Nothing was changed: {course} Section {section} changed while a copy of it was being saved, so the plan no longer fits. Choose the menu item again to see it as things are now.";

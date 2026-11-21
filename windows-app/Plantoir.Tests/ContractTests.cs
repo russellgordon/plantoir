@@ -313,7 +313,7 @@ public class ContractTests
         Assert.Equal(wording["sectionIsChangingFromTheMeetingsMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMeetingsMenu("{course}", "{section}"));
         // #1027: named from the selected section's course, the Meetings menu in a club.
         Assert.Equal(wording["nothingToUndoFromTheMenu"]!.ToString(), AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class));
-        Assert.Equal(wording["nothingToUndoFromTheMeetingsMenu"]!.ToString(), AssistWording.NothingToUndoFromTheMenu(ClassNoun.Meeting));
+        Assert.Equal(wording["nothingToUndoFromTheMeetingsMenu"]!.ToString(), AssistWording.NothingToUndoFromTheMeetingsMenu);
         Assert.Equal(wording["menuPublishPagesTitle"]!.ToString(), AssistWording.MenuPublishPagesTitle("{course}", "{section}"));
         Assert.Equal(wording["menuHidePagesTitle"]!.ToString(), AssistWording.MenuHidePagesTitle("{course}", "{section}"));
         Pair("menuPublishClassTitle", AssistWording.MenuPublishClassTitle("{course}", "{section}"),
