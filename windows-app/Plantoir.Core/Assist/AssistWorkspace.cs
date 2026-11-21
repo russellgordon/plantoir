@@ -3748,8 +3748,11 @@ public sealed partial class AssistWorkspace
         if (count < 1) throw new AssistRefusal(AssistWording.AskForAtLeastOneClass(), AssistWording.AskForAtLeastOneClass(course.Configuration.ClassNoun));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
+            // The model's words are unchanged (#267: what the model is told
+            // stays); the teacher reads the mac's sentence in the course's noun.
             ?? throw new AssistRefusal(
-                AssistWording.CannotMoveClassesWithoutDates(course.Code, section),
+                $"I don't know when {course.Code} Section {section} meets, so I can't move classes onto real " +
+                "days. Ask the teacher for their class dates, then record them with remember_timetable.",
                 AssistWording.CannotMoveClassesWithoutDates(course.Code, section, course.Configuration.ClassNoun));
 
         var classes = NumberedClasses(course, section, out int unnumbered);
@@ -4500,14 +4503,10 @@ public sealed partial class AssistWorkspace
             throw new AssistRefusal(NextClassPlanner.NoUnitsInANumberedCourse(course.Code, naming.Word));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
-            ?? throw new AssistRefusal(
-                AssistWording.CannotDateNewClassesWithoutDates(course.Code, section),
-                AssistWording.CannotDateNewClassesWithoutDates(course.Code, section, course.Configuration.ClassNoun));
+            ?? throw NoDatesToAddClassesTo(course, section);
 
         if (remembered.Dates.Count == 0)
-            throw new AssistRefusal(
-                AssistWording.CannotDateNewClassesWithoutDates(course.Code, section),
-                AssistWording.CannotDateNewClassesWithoutDates(course.Code, section, course.Configuration.ClassNoun));
+            throw NoDatesToAddClassesTo(course, section);
 
         string folder = ClassFolder(course, section);
         var existing = ClassPages(course, section);
@@ -4842,6 +4841,19 @@ public sealed partial class AssistWorkspace
             return full[root.Length..];
         return Path.GetFileName(full);
     }
+
+    /// <summary>
+    /// add_classes with no dates: the model's words are unchanged (#267), and
+    /// they end with the question the window offers the dates sheet for. A
+    /// club's teacher reads the same in the club's noun, the contract's
+    /// <c>cannotDateANewClassWithoutDatesForAMeeting</c>, whose question the
+    /// window offers the sheet for too (#1027 round 4).
+    /// </summary>
+    private static AssistRefusal NoDatesToAddClassesTo(Course course, int section) =>
+        new($"I don’t know when {course.Code} Section {section} meets, so I can’t date new classes. {AssistWording.MayIAskForYourDates}",
+            course.Configuration.ClassNoun == ClassNoun.Meeting
+                ? AssistWording.CannotDateANewClassWithoutDatesForAMeeting(course.Code, section)
+                : null);
 
     private static string ClassFolder(Course course, int sectionNumber)
     {

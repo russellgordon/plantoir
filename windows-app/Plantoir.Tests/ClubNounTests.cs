@@ -494,7 +494,8 @@ public sealed class ClubNounTests : IDisposable
         File.Delete(Path.Combine(_folder, "courses", "ICS3U", ".internal", "timetable", "section1.json"));
         var noDates = tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2, 1);
         Assert.Equal(AssistWording.CannotMoveClassesWithoutDatesForAMeeting("ICS3U", 1), TeacherCopy(noDates));
-        Assert.Equal(AssistWording.CannotMoveClassesWithoutDates("ICS3U", 1), ModelCopy(noDates));
+        Assert.True(SaysClass.IsMatch(ModelCopy(noDates)), ModelCopy(noDates));
+        Assert.DoesNotContain("meeting", ModelCopy(noDates));
     }
 
     /// <summary>

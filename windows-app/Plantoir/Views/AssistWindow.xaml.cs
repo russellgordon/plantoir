@@ -808,7 +808,10 @@ public sealed partial class AssistWindow : Window
             {
                 Say(Speaker(line.Speaker), line.Text);
                 if (line.NeedsApproval) ShowApproval(line.Text);
-                if (line.Text.Contains(AssistWording.MayIAskForYourDates)) ShowDatesOffer();
+                // Either noun's question offers the sheet: a club's teacher copy
+                // asks for meeting dates (#1027 round 4).
+                if (line.Text.Contains(AssistWording.MayIAskForYourDates)
+                    || line.Text.Contains(AssistWording.MayIAskForYourDatesForAMeeting)) ShowDatesOffer();
             }
         }
         catch (OperationCanceledException) { /* the window is closing */ }
