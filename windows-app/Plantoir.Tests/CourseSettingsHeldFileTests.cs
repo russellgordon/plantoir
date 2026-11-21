@@ -113,24 +113,28 @@ public sealed class CourseSettingsHeldFileTests : IDisposable
     }
 
     /// <summary>
-    /// The decisive shape for the merge read: a second process refuses
-    /// READING but lets the file be replaced (it shares delete), so a Save
-    /// that took the refused read as "unreadable" would write its whole copy
-    /// over the file. It must refuse instead.
+    /// The race #874 names: the merge read is refused, then the holder (a
+    /// second process) lets go before the write. It lets go on the first
+    /// pause after the read's four, which only a write that followed the
+    /// refused read reaches; such a write would put the window's whole copy
+    /// over what the build wrote. The Save must refuse instead.
     /// </summary>
     [Fact]
-    public void AReadRefusedByAHolderThatAllowsReplacingStillRefusesTheSave()
+    public void ASaveWhoseMergeReadWasRefusedNeverWritesTheWholeCopy()
     {
         var window = CourseConfiguration.Load(ConfigPath);
         window.Values["show_reading_time"] = true;
         File.WriteAllText(ConfigPath, """{"hidden":["Media"],"show_reading_time":false,"footer_html":"from a build"}""");
         byte[] before = File.ReadAllBytes(ConfigPath);
-        using (HeldFiles.PausingWith(_ => { }))
-        using (new SecondProcessHold(ConfigPath, FileShare.Write | FileShare.Delete))
+        int pauses = 0;
+        var holder = new SecondProcessHold(ConfigPath, FileShare.None);
+        using (HeldFiles.PausingWith(_ => { if (++pauses == HeldFiles.Pauses.Count + 1) holder.Release(); }))
         {
             var refused = Assert.Throws<FileInUseException>(() => window.Write(ConfigPath));
             Assert.Equal(HeldFiles.InUseSentence("course_config.json"), refused.Message);
         }
+        holder.Dispose();
+        Assert.Equal(HeldFiles.Pauses.Count, pauses);
         Assert.Equal(before, File.ReadAllBytes(ConfigPath));
         Assert.Empty(Temporaries());
     }
