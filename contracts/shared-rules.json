@@ -52068,26 +52068,6 @@
         "nothingMovedOutside": true
       },
       {
-        "name": "U4a, LOW 4 (a): the step's after content gone from the list: the Undo stores what it took off before its swap, the Redo is made from the list, and nothing is kept beside the page",
-        "calls": [
-          "step",
-          "wholeFileStep",
-          "afterContentGone",
-          "undo",
-          "redo"
-        ],
-        "expectLast": "redone",
-        "head": 2,
-        "redo": null,
-        "onTheList": [
-          1,
-          2
-        ],
-        "keptOriginalLeft": false,
-        "keptBesideThePage": 0,
-        "why": "U4a review 1, LOW 4, with U3c review 3's probe shape: under the lock and before the swap, the outgoing bytes the other direction needs go into the list when it lacks them (UndoRecovery.storeWhatTheOtherDirectionNeeds), so the Redo is made from the list and nothing is kept beside the page. A door that does not store them loses the only copy at the swap's tidy, and the Redo comes to contentMissing."
-      },
-      {
         "name": "U4a, LOW 4 (a): the same with the list taking no new file: what the Undo took off is kept beside the page, and the Redo is made from it",
         "calls": [
           "step",

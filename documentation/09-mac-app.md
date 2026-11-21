@@ -22190,8 +22190,10 @@ the switch stays off. Rename folder through the door is NOT in this part
   read-again; the refusal is deliberate, since writing over a member that
   just changed is what #265 forbids.
 - **Two contract rows for U3c review 3's kept-copy rules** (LOW 4):
-  `stackCases` 'U4a, LOW 4 (a)' (twice: the outgoing bytes stored before the
-  swap, and kept beside the page when the list takes no new file) and
+  `stackCases` 'U4a, LOW 4 (a)' (the outgoing bytes kept beside the page
+  when the list takes no new file, and the Redo made from them; a row for
+  the bytes stored in the list was dropped, because on the Mac it passed
+  with the store taken out) and
   'U4a, LOW 4 (b)' (seven moves, two kept files), with the call
   `afterContentGone` and the key `keptBesideThePage` (`stackCasesHow`). The
   Python model (`make_undo_traces.py`) now stores the outgoing bytes as the
@@ -22213,6 +22215,8 @@ the switch stays off. Rename folder through the door is NOT in this part
   component's links followed, at most `MAXSYMLINKS`), and the link stays a
   link, for a target inside the course and one outside the working folder
   (`…testASettingsFileThatIsALinkIsSavedThroughTheLinkWithTheSwitchOff`).
+  Measured with the fix taken out: only the link leading OUTSIDE the working
+  folder was refused ("Could not save"); one leading inside it was saved.
   Measured: before U4a, `write(to:)`'s atomic write REPLACED the link with a
   plain file and left the teacher's real file as it was; rejected, for the
   reason `rule.shadow` gives for a daily page.
