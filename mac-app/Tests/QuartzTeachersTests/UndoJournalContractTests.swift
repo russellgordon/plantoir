@@ -77,6 +77,26 @@ final class UndoJournalContractTests: XCTestCase {
         XCTAssertEqual(result.failures, [])
     }
 
+    /// Every contract file is one JSON object to this Mac's reader,
+    /// JSONSerialization, the one every contract runner here uses; and the
+    /// editJSON cases are in their own file, never in shared-rules.json, which
+    /// Windows PowerShell 5.1 must also read (#899 W6).
+    func testEveryContractFileIsOneObjectToJSONSerialization() throws {
+        let folder: URL = UndoContractReplay.repositoryURL().appendingPathComponent("contracts")
+        let names: [String] = try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+        var read: [String] = []
+        for name in names {
+            if name.hasSuffix(".json") {
+                XCTAssertNoThrow(try UndoContractReplay.contract(name), name)
+                read.append(name)
+            }
+        }
+        XCTAssertTrue(read.contains("shared-rules.json"))
+        XCTAssertTrue(read.contains("undo-json-cases.json"))
+        let undo: [String: Any] = try UndoContractReplay.undoBlock()
+        XCTAssertNil(undo["editJSONCases"], "editJSONCases is in undo-json-cases.json, not shared-rules.json")
+    }
+
     /// U2: a folder's listing is the same text on both platforms.
     func testListingCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runListingCases()

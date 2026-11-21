@@ -38,6 +38,48 @@ def shared_undo():
         return json.load(handle)["undo"]
 
 
+def json_cases():
+    # undo-json-cases.json: the editJSON byte cases, kept out of
+    # shared-rules.json because Windows PowerShell 5.1 cannot read them (#899 W6).
+    with open(REPO / "contracts" / "undo-json-cases.json", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+# The one contract file no PowerShell reads, because some of its rows must hold
+# keys that differ only by case (ContractFilesWindowsPowerShellReadsTests).
+NOT_FOR_WINDOWS_POWERSHELL = ["undo-json-cases.json"]
+
+
+def windows_powershell_problems(text):
+    """What would stop Windows PowerShell 5.1's ConvertFrom-Json reading this
+    JSON text: an object with two keys equal ignoring case (it builds each
+    object as a case-insensitive dictionary, comparing character by character
+    as .NET's OrdinalIgnoreCase does), or an empty key. A model of the rule
+    for this Mac; Windows runs the real ConvertFrom-Json on every file."""
+    problems = []
+
+    def fold(key):
+        folded = ""
+        for character in key:
+            upper = character.upper()
+            folded += upper if len(upper) == 1 else character
+        return folded
+
+    def look(pairs):
+        seen = {}
+        for key, _ in pairs:
+            if key == "":
+                problems.append("an empty key")
+            folded = fold(key)
+            if folded in seen and seen[folded] != key:
+                problems.append("keys %r and %r differ only by case" % (seen[folded], key))
+            seen[folded] = key
+        return dict(pairs)
+
+    json.loads(text, object_pairs_hook=look)
+    return problems
+
+
 def committed():
     with open(REPO / "contracts" / "undo-traces.json", encoding="utf-8") as handle:
         return json.load(handle)
@@ -92,6 +134,33 @@ def deployed_answer(case):
     if cannot_tell or case.get("changesMoreThanVisibility"):
         return "cannotTell"
     return "noOffer"
+
+
+# Cases the mac's Foundation acts on and this model, like Windows, is not
+# measured to copy (#899 W6 review 2): keys beyond ASCII (sorted by Unicode
+# collation there, canonically equivalent keys taken for one), a byte-order
+# mark at the start of a key or text, a number with an exponent and more than
+# 17 digits or more than 38 without. Held by name, as Windows'
+# NamedGapLedger holds them: the model must REFUSE each (no bytes; cannot
+# tell both ways), never give bytes or a verdict of its own, and the
+# contract's answer must still differ.
+REFUSED_HERE_EDIT_JSON = (
+    "a new object's keys beyond ASCII: the mac sorts them by Unicode collation (an emoji first, \u00e9 between E and f, a full-width \uff21 beside A, \u00df after ss, a tab passed over)",
+    "a new object holding \u00e9 written two ways (one character, and e with a combining accent): the mac takes them for one key",
+    "a key path part beyond ASCII finds the member the file spells another way (\u00e9 as one character in the op, e with a combining accent in the file)",
+    "a key path part beyond ASCII, spelled as the file spells it",
+    "the Kelvin sign in a file's key is the letter K to the mac: the member is found and its value moved",
+    "a file's key that starts with a byte-order mark (written \\ufeff) is the key without it to the mac: the member is found and its value moved",
+)
+REFUSED_HERE_CHECK = (
+    "editJSON: a file's number spelled with an exponent and more than 17 digits is read by the mac as a decimal number, whose double is not the nearest one: the step's value is that double",
+    "editJSON: a file's number spelled with an exponent and more than 17 digits, the step's value its nearest double, which the mac does not read from it",
+    "editJSON: a member holding an object whose key is \u00e9 written as e with a combining accent, the step's value \u00e9 as one character",
+    "editJSON: a key path part \u00e9 as one character, the file's key e with a combining accent, the step having added the member",
+    "editJSON: a member holding text that starts with a byte-order mark (written \\ufeff), which the mac reads without it",
+    "editJSON: a file's key that is the Kelvin sign, the key path the letter K, the step having added the member",
+    "editJSON: another member's number written with 168 digits after the point, which the mac cannot read: the file is not JSON there",
+)
 
 
 def undone_as_read(step, path, text):
@@ -531,17 +600,60 @@ class ContractCaseTests(unittest.TestCase):
                         state = traces.op_state(op, text)
                 undo = {"after": "canUndo", "before": "alreadyBack", "neither": "changedSince", "cannotTell": "cannotTell"}[state]
                 redo = {"before": "canRedo", "after": "alreadyRedone", "neither": "changedSince", "cannotTell": "cannotTell"}[state]
+                if case["name"] in REFUSED_HERE_CHECK:
+                    self.assertEqual((undo, redo), ("cannotTell", "cannotTell"), "held: refused as cannot tell, never judged")
+                    self.assertNotEqual((undo, redo), (case["undo"], case["redo"]), "held, and it now agrees: take it off the list")
+                    continue
                 self.assertEqual(undo, case["undo"])
                 self.assertEqual(redo, case["redo"])
 
     def test_edit_json_cases(self):
         # The bytes of an editJSON move (the hard review of U2b, LOW a).
-        cases = shared_undo()["editJSONCases"]
+        cases = json_cases()["editJSONCases"]
         self.assertGreaterEqual(len(cases), 6)
         for case in cases:
             with self.subTest(case=case["name"]):
                 out = traces.json_bytes_moved(case["op"], case["direction"] == "undo", case["file"].encode("utf-8"))
+                if case["name"] in REFUSED_HERE_EDIT_JSON:
+                    self.assertIsNone(out, "held: refused, never bytes of its own")
+                    self.assertIsNotNone(case["result"], "held, and the contract now refuses it too: take it off the list")
+                    continue
                 self.assertEqual(None if out is None else out.decode("utf-8"), case["result"])
+
+    def test_every_held_case_is_still_in_the_contract(self):
+        names = set()
+        for case in shared_undo()["checkCases"] + json_cases()["editJSONCases"]:
+            names.add(case["name"])
+        for name in REFUSED_HERE_EDIT_JSON + REFUSED_HERE_CHECK:
+            self.assertIn(name, names)
+
+    def test_the_number_limits_are_the_contracts_rule(self):
+        # undo.numberSpellingRule, the one rule Windows' UndoJson checks too.
+        rule = shared_undo()["numberSpellingRule"]
+        self.assertEqual(rule["exponentCharactersAtMost"], traces.MAC_EXPONENT_CHARACTERS_AT_MOST)
+        self.assertEqual(rule["digitsWithAnExponentAtMost"], traces.MEASURED_DIGITS_WITH_AN_EXPONENT)
+        self.assertEqual(rule["digitsWithoutAnExponentAtMost"], traces.MEASURED_DIGITS_WITHOUT_AN_EXPONENT)
+        self.assertGreaterEqual(len(shared_undo()["numberSpellingCases"]), 30)
+
+    def test_number_spelling_cases(self):
+        # Each spelling as the member a of {"a": <spelling>, "b": 1}: not JSON,
+        # cannot tell (read, never as measured), minus infinity, or the double.
+        for case in shared_undo()["numberSpellingCases"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(set(case), {"name", "spelling", "reads"})
+                data = ('{"a": ' + case["spelling"] + ', "b": 1}\n').encode("utf-8")
+                read = traces._mac_read(data)
+                reads = case["reads"]
+                if reads == "notJSON":
+                    self.assertIsNone(read)
+                    continue
+                self.assertIsNotNone(read)
+                if reads == "cannotTell":
+                    self.assertIsInstance(read["a"], traces._Unmeasured)
+                    continue
+                self.assertNotIsInstance(read["a"], traces._Unmeasured)
+                wanted = float("-inf") if reads == "minusInfinity" else reads
+                self.assertEqual(read["a"], wanted)
 
     def test_listing_cases(self):
         cases = shared_undo()["listingCases"]
@@ -1098,6 +1210,34 @@ class ContractCaseTests(unittest.TestCase):
         events = set(journal["events"])
         self.assertEqual(events, {"begin", "applied", "rolledBack", "interrupted", "undoing", "undone",
                                   "redoing", "redone", "failed", "dropped", "pruned", "cleared", "note"})
+
+
+class ContractFileReadabilityTests(unittest.TestCase):
+    """Every contract file that Windows PowerShell reads, or may, stays
+    readable by its ConvertFrom-Json (#899 W6: shared-rules.json once held
+    keys X1 and x1, and windows-app/test_launcher_rules.ps1 could not start)."""
+
+    def test_the_rule_sees_what_windows_powershell_refuses(self):
+        self.assertEqual(len(windows_powershell_problems('{"a": {"X1": 1, "x1": 2}}')), 1)
+        self.assertEqual(len(windows_powershell_problems('{"a": [{"": 1}]}')), 1)
+        self.assertEqual(windows_powershell_problems('{"a": {"X1": 1, "x2": 2, "\u212a": 3, "k": 4}}'), [])
+
+    def test_every_other_contract_file_is_readable_by_windows_powershell(self):
+        names = []
+        for path in sorted((REPO / "contracts").glob("*.json")):
+            names.append(path.name)
+            if path.name in NOT_FOR_WINDOWS_POWERSHELL:
+                continue
+            with self.subTest(path.name):
+                self.assertEqual(windows_powershell_problems(path.read_text(encoding="utf-8")), [])
+        self.assertIn("shared-rules.json", names)
+        for name in NOT_FOR_WINDOWS_POWERSHELL:
+            self.assertIn(name, names)
+
+    def test_the_edit_json_cases_live_only_in_their_own_file(self):
+        self.assertNotIn("editJSONCases", shared_undo())
+        self.assertNotIn("editJSONCasesHow", shared_undo())
+        self.assertGreaterEqual(len(json_cases()["editJSONCases"]), 16)
 
 
 if __name__ == "__main__":
