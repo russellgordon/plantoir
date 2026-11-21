@@ -2942,15 +2942,19 @@ public sealed partial class AssistWorkspace
         using var recording = UndoHistory.Record(_undo,
             $"cut section {sectionNumber} loose from its website");
 
-        foreach (string folder in new[] { ".netlify_sites", ".cloudflare_sites" })
+        // The markers, in the order they are walked, from ONE list
+        // (MarkersTheReleaseWalks), which Roll Over to a New Year…'s dialog
+        // reads too (#954: sectionIsPinned is "any marker the release walks").
+        foreach (string marker in MarkersTheReleaseWalks(_folder, course, sectionNumber))
         {
-            string marker = Path.Combine(course.DirectoryPath, folder, $"section{sectionNumber}.json");
-            string keptPath = Path.Combine(course.DirectoryPath, folder,
-                ReleasedMarkerName(sectionNumber, stamp));
+            string home = Path.GetDirectoryName(marker)!;
+            string keptPath = Path.GetFileName(marker) == LegacyMarkerFileName
+                ? Path.Combine(home, $".netlify_site.previous-{stamp}.json")
+                : Path.Combine(home, ReleasedMarkerName(sectionNumber, stamp));
             Release(marker, keptPath, kept, stillPinned);
         }
 
-        // The LEGACY marker, which `deploy.py` still reads and migrates back
+        // The LEGACY marker, walked last in the list above, which `deploy.py` still reads and migrates back
         // into the stable path (`load_netlify_marker`). Leaving it would make
         // a rollover report "never published" and then publish over last
         // year's site on the next deploy — in exactly the folders old enough
@@ -2972,13 +2976,6 @@ public sealed partial class AssistWorkspace
         // path `deploy.py` reads HERE; the `.merged_output` one is what a
         // folder carried here from a mac would have, and releasing a file that
         // is not there costs nothing.
-        foreach (string sectionOutput in LegacyMarkerHomes(course, sectionNumber))
-        {
-            string marker = Path.Combine(sectionOutput, ".netlify_site.json");
-            string keptPath = Path.Combine(sectionOutput, $".netlify_site.previous-{stamp}.json");
-            Release(marker, keptPath, kept, stillPinned);
-        }
-
         recording.Done();
         return new SiteRelease(kept, stillPinned);
     }
@@ -3030,18 +3027,39 @@ public sealed partial class AssistWorkspace
     /// harmless here because it can only cause a release to be skipped, never
     /// a wrong file to be moved.
     /// </remarks>
-    private IEnumerable<string> LegacyMarkerHomes(Course course, int sectionNumber)
+    private static IEnumerable<string> LegacyMarkerHomes(string workingFolder, Course course, int sectionNumber)
     {
         string fromBuildRoot;
         try
         {
             fromBuildRoot = BuildOutputLocation.ForSection(
-                BuildOutputLocation.BuildsRootFor(_folder), course.Code, sectionNumber);
+                BuildOutputLocation.BuildsRootFor(workingFolder), course.Code, sectionNumber);
         }
         catch { fromBuildRoot = ""; }
         if (fromBuildRoot.Length > 0) yield return fromBuildRoot;
 
         yield return Path.Combine(course.DirectoryPath, ".merged_output", $"section{sectionNumber}");
+    }
+
+    /// <summary>The legacy marker's file name, in each of <see cref="LegacyMarkerHomes"/>.</summary>
+    private const string LegacyMarkerFileName = ".netlify_site.json";
+
+    /// <summary>
+    /// Every marker <see cref="ReleaseSite"/> walks for a section, in its
+    /// order: <c>.netlify_sites</c> and <c>.cloudflare_sites</c>
+    /// <c>section&lt;N&gt;.json</c>, then the legacy <c>.netlify_site.json</c>
+    /// in each of its homes. ONE list, so Roll Over to a New Year…'s
+    /// <c>sectionIsPinned</c> (#954, <c>subjectMenus.rollOverSheet</c>) asks
+    /// about exactly the files a rollover onto a new website would move.
+    /// </summary>
+    public static IReadOnlyList<string> MarkersTheReleaseWalks(string workingFolder, Course course, int sectionNumber)
+    {
+        var markers = new List<string>();
+        foreach (string folder in new[] { ".netlify_sites", ".cloudflare_sites" })
+            markers.Add(Path.Combine(course.DirectoryPath, folder, $"section{sectionNumber}.json"));
+        foreach (string sectionOutput in LegacyMarkerHomes(workingFolder, course, sectionNumber))
+            markers.Add(Path.Combine(sectionOutput, LegacyMarkerFileName));
+        return markers;
     }
 
     /// <summary>
@@ -3099,6 +3117,12 @@ public sealed partial class AssistWorkspace
         try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
+            // Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece
+            // B, the director's ruling on its implementation review's I2): no
+            // copy, no rollover, said with the start of the year's own words
+            // for the same fact. Nothing has been written yet.
+            if (SpeaksFromTheMenu && isARollover)
+                throw new AssistRefusal(AssistWording.StartOfYearNeedsABackup(course.Code));
             throw new AssistRefusal(
                 $"{course.Code} couldn’t be backed up, so no dates were changed: {error.Message}");
         }
@@ -3222,6 +3246,25 @@ public sealed partial class AssistWorkspace
         {
             ForTheTeacher = noun == ClassNoun.Meeting ? teacherSummary : null,
         };
+    }
+
+    /// <summary>
+    /// Classes ▸ Roll Over to a New Year… on a section whose dates are already
+    /// right (#954, the mac's <c>menuRolloverWithTheDatesAlreadyRight</c>): a
+    /// fresh copy of the course is saved first, which the window's path does
+    /// not do here (a teacher who ran Re-date Classes… first lands exactly
+    /// here), and when it cannot be made the rollover is refused before
+    /// anything is written, with <c>wording.startOfYearNeedsABackup</c>.
+    /// </summary>
+    public void BackUpBeforeARolloverFromTheMenu(string courseCode, int sectionNumber)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+        try { BackUpOnceForThisConversation(course, section); }
+        catch (Exception error) when (error is not AssistRefusal)
+        {
+            throw new AssistRefusal(AssistWording.StartOfYearNeedsABackup(course.Code));
+        }
     }
 
     public const string BackedUpNote =

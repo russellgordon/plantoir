@@ -64,7 +64,7 @@ public static class SubjectMenuLayout
     {
         new[] { I(Item.AddClass) },
         new[] { I(Item.ClassDates), I(Item.ReDateClasses), I(Item.MakeRoomForClasses) },
-        new[] { I(Item.GetReadyForTheStartOfTheYear) },
+        new[] { I(Item.RollOverToANewYear), I(Item.GetReadyForTheStartOfTheYear) },
     };
 
     /// <summary>The menu's groups.</summary>
@@ -164,6 +164,7 @@ public static class SubjectMenuLayout
         Item.SectionNewTerminalAtFolder => "Open in Terminal",
         Item.RemoveSection => "Remove Section",
         Item.GetReadyForTheStartOfTheYear => StartOfYearWording.MenuItem,
+        Item.RollOverToANewYear => "Roll Over to a New Year…",
         _ => null,   // not an item of Section or Classes: SubjectMenuLayoutContractTests fails on a layout item with none (#990 review, LOW c)
     };
 
@@ -223,6 +224,7 @@ public static class SubjectMenuLayout
             Item.ReDateClasses => "ReDateClasses",
             Item.MakeRoomForClasses => "MakeRoomForClasses",
             Item.GetReadyForTheStartOfTheYear => "GetReady",
+            Item.RollOverToANewYear => "RollOverToANewYear",
             _ => item.ToString(),
         };
         return ContractName(layout) + own;
