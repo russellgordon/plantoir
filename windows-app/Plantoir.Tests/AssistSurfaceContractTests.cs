@@ -1318,6 +1318,29 @@ public class AssistSurfaceContractTests
             "that no test here answers: " + string.Join("; ", unanswered) + ".");
     }
 
+    /// <summary>
+    /// #769 item 2: the assistant window's busy answer is asked app-wide, of
+    /// <c>SectionRuns.DeployIsUnderWay</c> (whose answers are
+    /// <c>SectionRunsTests</c>), never of a window showing the section. The
+    /// window is in the interface project this suite cannot reference, so its
+    /// one assignment line is read from the source.
+    /// </summary>
+    [Fact]
+    public void TheAssistantAsksTheSectionsDeployStateAppWide()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            RepoRoot, "windows-app", "Plantoir", "Views", "AssistWindow.xaml.cs"));
+        var assignments = new List<string>();
+        foreach (string line in source.Replace("\r\n", "\n").Split('\n'))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("SectionIsBusy =", StringComparison.Ordinal)) assignments.Add(trimmed);
+        }
+        string assignment = Assert.Single(assignments);
+        Assert.Contains("SectionRuns.DeployIsUnderWay(_folder, _course.Code, _section)", assignment);
+        Assert.DoesNotContain("MainWindowShowingThisSection", assignment);
+    }
+
     private static string RepoRoot
     {
         get
