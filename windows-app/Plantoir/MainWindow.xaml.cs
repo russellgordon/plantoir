@@ -308,9 +308,11 @@ public sealed partial class MainWindow : Window
         DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForMenus());
 
         // Restore…'s question greys every Restore… from the press until the
-        // answer (#911): the menu bar, and the backup pane's button, which is
-        // drawn again with the button greyed or not.
-        Sidebar.AskingWhichRestoreChanged += (_, _) =>
+        // answer (#911), and a one-section restore's zip greys them again
+        // while it runs: the menu bar, and the backup pane's button, which is
+        // drawn again with the button greyed or not (keyboard focus carried
+        // across, ShowBackupPane).
+        Sidebar.RestoreAvailabilityChanged += (_, _) =>
         {
             if (IsClosed) return;
             if (Workspace.Selection is SidebarSelection.BackupEntry) ShowDetailForSelection();
@@ -1373,6 +1375,7 @@ public sealed partial class MainWindow : Window
 
     public void ShowDetailForSelection()
     {
+        if (Workspace.Selection is not SidebarSelection.BackupEntry) ForgetRestoreFocus();
         switch (Workspace.Selection)
         {
             case SidebarSelection.SectionItem(var code, var number)
@@ -1417,12 +1420,7 @@ public sealed partial class MainWindow : Window
                 break;
             case SidebarSelection.BackupEntry(var backupId)
                 when Workspace.BackupItems.FirstOrDefault(b => b.Id == backupId) is { } backup:
-                DetailHost.Content = EmptyState(backup.Title,
-                    $"{backup.SubtitleFor(Workspace.ClassNounOf(backup.CourseCode))}. Restoring puts {backup.CourseCode} back to exactly this " +
-                    "moment — the current version is archived first, and the backup is kept.",
-                    "Restore…", () => Sidebar.ConfirmRestoreBackup(backup),
-                    "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup),
-                    actionEnabled: !Sidebar.IsAskingWhichRestore);
+                ShowBackupPane(backup);
                 break;
             case null when Workspace.Courses.Count == 0:
                 DetailHost.Content = EmptyState("No Courses Yet",
@@ -1449,9 +1447,67 @@ public sealed partial class MainWindow : Window
     /// to do (the mac's own archived and
     /// backup panes, `Restore…` prominent and `Delete …` plain).
     /// </summary>
+    /// <summary>The backup pane's Restore… button as last drawn, and the keyboard focus it held when it was greyed (#911, review 3's LOW).</summary>
+    private Button? _backupRestoreButton;
+    private string? _restoreFocusBackupId;
+    private FocusState _restoreFocus = FocusState.Unfocused;
+
+    private void ForgetRestoreFocus()
+    {
+        _restoreFocusBackupId = null;
+        _restoreFocus = FocusState.Unfocused;
+    }
+
+    /// <summary>
+    /// Draws a backup's pane. It is drawn again whenever every Restore…
+    /// greys or ungreys (a question asked or answered, a restore's zip
+    /// started or finished), and a replaced or greyed button takes the
+    /// keyboard focus with it, so a teacher who pressed Restore… from the
+    /// keyboard would come back to nothing focused. So the focus the old
+    /// button held is kept for this backup while the button is greyed and
+    /// given to the new button, in the same FocusState, once it is enabled
+    /// and in the tree (its Loaded event). Choosing any other row forgets it.
+    /// </summary>
+    private void ShowBackupPane(BackupItem backup)
+    {
+        if (_restoreFocusBackupId != backup.Id) ForgetRestoreFocus();
+        if (_backupRestoreButton is { } old && old.FocusState != FocusState.Unfocused
+            && DetailHost.Content is DependencyObject shown && IsUnder(old, shown))
+        {
+            _restoreFocusBackupId = backup.Id;
+            _restoreFocus = old.FocusState;
+        }
+        bool enabled = !Sidebar.RestoreWaits(backup.CourseCode);
+        DetailHost.Content = EmptyState(backup.Title,
+            $"{backup.SubtitleFor(Workspace.ClassNounOf(backup.CourseCode))}. Restoring puts {backup.CourseCode} back to exactly this " +
+            "moment — the current version is archived first, and the backup is kept.",
+            "Restore…", () => Sidebar.ConfirmRestoreBackup(backup),
+            "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup),
+            actionEnabled: enabled,
+            actionMade: made => _backupRestoreButton = made);
+        if (enabled && _restoreFocus != FocusState.Unfocused && _backupRestoreButton is { } restore)
+        {
+            FocusState give = _restoreFocus;
+            ForgetRestoreFocus();
+            void GiveFocus(object sender, RoutedEventArgs args)
+            {
+                restore.Loaded -= GiveFocus;
+                restore.Focus(give);
+            }
+            restore.Loaded += GiveFocus;
+        }
+    }
+
+    private static bool IsUnder(DependencyObject element, DependencyObject root)
+    {
+        for (DependencyObject? at = element; at is not null; at = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(at))
+            if (ReferenceEquals(at, root)) return true;
+        return false;
+    }
+
     private static UIElement EmptyState(string title, string description, string? actionLabel, Action? action,
                                         string? secondLabel = null, Action? secondAction = null,
-                                        bool actionEnabled = true)
+                                        bool actionEnabled = true, Action<Button>? actionMade = null)
     {
         var panel = new StackPanel
         {
@@ -1485,6 +1541,7 @@ public sealed partial class MainWindow : Window
                 IsEnabled = actionEnabled,
             };
             button.Click += (_, _) => action();
+            actionMade?.Invoke(button);
             if (secondLabel is not null && secondAction is not null)
             {
                 var row = new StackPanel

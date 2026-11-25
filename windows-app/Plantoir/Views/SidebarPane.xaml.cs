@@ -1160,8 +1160,8 @@ public sealed partial class SidebarPane : UserControl
         var menu = new MenuFlyout();
         var restoreItem = MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestoreBackup(item)));
         menu.Items.Add(restoreItem);
-        // Read as the menu opens (row 104's lesson): greyed while a Restore… question is being asked.
-        menu.Opening += (_, _) => restoreItem.IsEnabled = !IsAskingWhichRestore;
+        // Read as the menu opens (row 104's lesson): greyed while a Restore… question is being asked or the course is being zipped.
+        menu.Opening += (_, _) => restoreItem.IsEnabled = !RestoreWaits(item.CourseCode);
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(item.FilePath))));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Delete Backup…", Glyphs.Remove, Selecting(row, () => ConfirmDeleteBackup(item))));
@@ -1766,13 +1766,32 @@ public sealed partial class SidebarPane : UserControl
     /// </summary>
     internal bool IsAskingWhichRestore { get; private set; }
 
-    /// <summary>Raised when <see cref="IsAskingWhichRestore"/> changes, so the window greys or ungreys what reads it.</summary>
-    internal event EventHandler? AskingWhichRestoreChanged;
+    /// <summary>
+    /// Raised when <see cref="RestoreWaits"/> may have changed: a question
+    /// asked or answered, or a restore's zip started or finished, so the
+    /// window greys or ungreys what reads it.
+    /// </summary>
+    internal event EventHandler? RestoreAvailabilityChanged;
 
     private void SetAskingWhichRestore(bool asking)
     {
         IsAskingWhichRestore = asking;
-        AskingWhichRestoreChanged?.Invoke(this, EventArgs.Empty);
+        RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Whether Restore… waits for this course: a Restore… question is being
+    /// asked, or a copy of the course is being zipped (a Back Up Now or a
+    /// one-section restore's archive here, or another program's copy), the
+    /// rule the menu bar's Restore from Backup follows
+    /// (<c>subjectMenus.situationKeys.copying</c>). Every Restore… a teacher
+    /// can press reads this.
+    /// </summary>
+    internal bool RestoreWaits(string courseCode)
+    {
+        if (IsAskingWhichRestore) return true;
+        if (Workspace.WorkspacePath is not { } folder) return false;
+        return WorkLease.IsHeld(folder, courseCode, WorkLease.Copying) || IsZipping(folder, courseCode);
     }
 
     /// <summary>What the teacher chose in Restore…'s question. Only an explicit button chooses; anything else is <see cref="Nothing"/>.</summary>
@@ -1780,8 +1799,9 @@ public sealed partial class SidebarPane : UserControl
 
     public async void ConfirmRestoreBackup(BackupItem item)
     {
-        // Greyed while a question is being asked (above); this only backs that up.
-        if (IsAskingWhichRestore) return;
+        // Greyed while a question is being asked or the course is zipped
+        // (above); this only backs that up, as the mac's isBeingCopied does.
+        if (RestoreWaits(item.CourseCode)) return;
         SetAskingWhichRestore(true);
         RestoreChoice choice;
         int section = 0;
@@ -1916,14 +1936,34 @@ public sealed partial class SidebarPane : UserControl
         }
         // The course as loaded; RefusalAtTheClick asks the folder and the saved settings themselves.
         Course? course = Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode);
-        var result = await Task.Run(() => MenuSectionRestore.Run(section, item, course, facts, coursesDirectory, BusyRefusal));
+        // The whole course is zipped first (the archive), so the course is
+        // marked from here to the end of the swap exactly as Back Up Now
+        // marks it: Back Up Now, Remove Course and every Restore… grey, and
+        // the assistant is refused (CourseIsBeingCopied). The mac refuses at
+        // the top of restoreOneSection on isBeingCopied for the same reason.
+        if (folder is null || RestoreWaits(item.CourseCode)) return;
+        string zipKey = ZipKey(folder, item.CourseCode);
+        lock (_zipping) _zipping.Add(zipKey);
+        _window.ApplyMenuEnablement();
+        RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        MenuSectionRestore.Result result;
+        try { result = await Task.Run(() => MenuSectionRestore.Run(section, item, course, facts, coursesDirectory, BusyRefusal)); }
+        finally
+        {
+            lock (_zipping) _zipping.Remove(zipKey);
+            _window.ApplyMenuEnablement();
+            RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        }
         if (result.ArchivePath is not null || result.Finished)
         {
             Workspace.Reload();
             if (result.Finished) Workspace.Selection = new SidebarSelection.SectionItem(item.CourseCode, section);
             _window.ApplyState();
         }
-        await ShowError(result.Title, result.Message);
+        // The finished, refused or stopped-part-way sentence: the last is the
+        // only place the teacher is told where the set-aside files are, so it
+        // waits for a dialog opened meanwhile rather than being dropped.
+        await ShowError(result.Title, result.Message, waitForTheSlot: true);
     }
 
     private async Task RestoreWholeCourse(BackupItem item)
@@ -2208,7 +2248,42 @@ public sealed partial class SidebarPane : UserControl
         }
     }
 
-    private async Task ShowError(string title, string message)
+    /// <summary>
+    /// Shows <paramref name="dialog"/> once no other dialog holds the window's
+    /// one slot: the popup a ContentDialog is up in is waited out on that
+    /// popup's own <c>Closed</c> event (raised as it stops being open, which
+    /// is what the slot reads), never on a clock, and then the slot is tried
+    /// again. For a sentence that must reach the teacher, where
+    /// <see cref="ShowDialogSafelyAsync"/> would return null and drop it.
+    /// </summary>
+    private async Task<ContentDialogResult?> ShowWhenTheSlotIsFree(ContentDialog dialog)
+    {
+        while (EffectiveXamlRoot is { } root && PopupHoldingADialog(root) is { } holder)
+        {
+            var closed = new TaskCompletionSource();
+            void Closed(object? sender, object args) => closed.TrySetResult();
+            holder.Closed += Closed;
+            // Closed between the read and the subscription: nothing to wait for.
+            if (holder.IsOpen) await closed.Task;
+            holder.Closed -= Closed;
+        }
+        // folder-check: not needed — a result sentence acts on nothing.
+        return await ShowDialogSafelyAsync(dialog);
+    }
+
+    private static Microsoft.UI.Xaml.Controls.Primitives.Popup? PopupHoldingADialog(XamlRoot root)
+    {
+        try
+        {
+            foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(root))
+                if (popup.Child is ContentDialog) return popup;
+        }
+        catch (Exception) { }
+        return null;
+    }
+
+    /// <summary>A sentence with OK. <paramref name="waitForTheSlot"/>: shown once no other dialog holds the slot (<see cref="ShowWhenTheSlotIsFree"/>), never dropped.</summary>
+    private async Task ShowError(string title, string message, bool waitForTheSlot = false)
     {
         var dialog = new ContentDialog
         {
@@ -2217,7 +2292,8 @@ public sealed partial class SidebarPane : UserControl
             CloseButtonText = "OK",
         };
         // folder-check: not needed — an error report acts on nothing.
-        await ShowDialogSafelyAsync(dialog);
+        if (waitForTheSlot) await ShowWhenTheSlotIsFree(dialog);
+        else await ShowDialogSafelyAsync(dialog);
     }
 
     /// <summary>

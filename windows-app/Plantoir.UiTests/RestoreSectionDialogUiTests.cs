@@ -94,4 +94,69 @@ public class RestoreSectionDialogUiTests
         app.OpenDialog()!.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))!.AsButton().Invoke();
         Assert.True(Retry.WhileFalse(() => app.OpenDialog() is null, Patience).Result, "the finished dialog did not close on OK");
     }
+
+    /// <summary>
+    /// The backup pane's Restore… is drawn again, greyed, while its question
+    /// is asked and drawn again when it is answered (review 3's LOW): a
+    /// teacher who pressed it from the keyboard and cancelled comes back to
+    /// the new Restore… focused, not to nothing. Waits on the focused element.
+    /// </summary>
+    [UiFact]
+    public void KeyboardFocusComesBackToRestoreWhenTheQuestionIsCancelled()
+    {
+        string backupName = "";
+        using var app = new DrivenApp(courses =>
+        {
+            EndToEnd.WriteCourse(courses, Code, "Restore Section Course", new[] { "Concepts" });
+            var course = Workspace.DiscoverCourses(Path.GetDirectoryName(courses)!).First(found => found.Code == Code);
+            backupName = Path.GetFileName(CourseArchiver.BackUpCourse(course, courses, new BackupMaker.Menu(1, SubjectMenuLayout.Menu.Section)));
+        });
+
+        var group = app.Find("backupsGroup", "the Backups group");
+        if (group.Patterns.ExpandCollapse.IsSupported
+            && group.Patterns.ExpandCollapse.Pattern.ExpandCollapseState.Value != ExpandCollapseState.Expanded)
+            group.Patterns.ExpandCollapse.Pattern.Expand();
+        var row = app.FindOrNull("backup-" + backupName, Patience);
+        Assert.True(row is not null, "the sidebar does not list the backup");
+        app.ClickMiddleOf(row!);
+        AutomationElement? PaneRestore() =>
+            app.Window.FindFirstDescendant(cf => cf.ByName("Restore…").And(cf.ByControlType(ControlType.Button)));
+        var restore = Retry.WhileNull(PaneRestore, Patience).Result;
+        Assert.True(restore is not null, "the backup's pane shows no Restore… button");
+
+        CopyAPageEscapeUiTests.Front(app);
+        restore!.Focus();
+        bool RestoreHasFocus()
+        {
+            try
+            {
+                var focused = app.Window.Automation.FocusedElement();
+                return focused is not null && focused.Name == "Restore…"
+                       && focused.Properties.ControlType.ValueOrDefault == ControlType.Button;
+            }
+            catch { return false; }
+        }
+        Assert.True(Retry.WhileFalse(RestoreHasFocus, Patience).Result, "Restore… could not be given the keyboard focus");
+
+        FlaUI.Core.Input.Keyboard.Type(VirtualKeyShort.SPACE);
+        var question = Retry.WhileNull(() =>
+        {
+            var dialog = app.OpenDialog();
+            var primary = dialog?.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"));
+            return primary?.Name == OneSectionRestoreWording.RestoreSectionButton(1) ? dialog : null;
+        }, Patience).Result;
+        Assert.True(question is not null, "Space on Restore… did not ask the one-section question");
+        FlaUI.Core.Input.Keyboard.Type(VirtualKeyShort.ESCAPE);
+        Assert.True(Retry.WhileFalse(() => app.OpenDialog() is null, Patience).Result, "Escape left the question up");
+
+        string where = "";
+        bool back = Retry.WhileFalse(() =>
+        {
+            if (RestoreHasFocus()) return true;
+            try { var focused = app.Window.Automation.FocusedElement(); where = $"{focused?.Name} ({focused?.Properties.ControlType.ValueOrDefault})"; } catch { }
+            return false;
+        }, Patience).Result;
+        Assert.True(back, "after the question was cancelled the keyboard focus is on " + where + ", not on Restore…");
+        Assert.Equal(0, ArchivedCount(app));
+    }
 }

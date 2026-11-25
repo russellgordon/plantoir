@@ -221,7 +221,8 @@ mac's reason: a rename should not cost a teacher their website.
   (a `finally` clears it) and every Restore… is greyed: the menu bar reads it
   as a dialog up (`SheetIsUp`), the backup row's context menu reads it as it
   opens, and the backup pane's Restore… button is drawn again greyed through
-  `AskingWhichRestoreChanged`. That covers the gap while the zip is read on
+  `RestoreAvailabilityChanged` (named `AskingWhichRestoreChanged` until the
+  sweep of 2026-11-25; all three now read `RestoreWaits`, below). That covers the gap while the zip is read on
   a worker thread before the question opens. The early return on the flag
   only backs the greying up. The Backups group dialog's Restore… needs
   nothing: that dialog is itself up until it hands over.
@@ -247,6 +248,56 @@ mac's reason: a rename should not cost a teacher their website.
   `StopByKeyboardUiTests.cs`, another lane's file on `dev`, not on anything
   here; `RestoreSectionDialogUiTests` sends only `Keyboard.Type` of ESCAPE and
   RETURN, both watched.
+
+### Sweep of 2026-11-25 (MEDIUM and LOW) and review 3's LOW
+
+- **The course is busy while Restore Section N zips it.** `RestoreOneSection`
+  adds the course to `_zipping` before `MenuSectionRestore.Run` (which makes
+  the whole-course archive first) and removes it in a `finally`, calling
+  `ApplyMenuEnablement` both times, exactly as `BackUpCourse` does: Back Up
+  Now, Remove Course and Restore from Backup grey in the menu bar
+  (`subjectMenus.situationKeys.copying`) and the assistant is refused
+  (`CourseIsBeingCopied`). It returns at the top when a copy is already being
+  made, as the mac's `restoreOneSection` returns on `isBeingCopied`.
+- **Every Restore… reads one rule, `SidebarPane.RestoreWaits(code)`**: a
+  question being asked, or the course being copied (this app's zip or
+  another program's `Copying` lease). The menu bar's rule already greyed
+  Restore from Backup under copying; the backup row's context menu and the
+  backup pane's button now follow it too, and `ConfirmRestoreBackup`'s early
+  return backs it up.
+- **The result sentence is never dropped.** `ShowError(…, waitForTheSlot:
+  true)` goes through `ShowWhenTheSlotIsFree`: while a ContentDialog's popup
+  is open in the window, it waits on that popup's own `Closed` event, then
+  reads the slot again; no clock. The finished, refused and stopped-part-way
+  sentences all go this way (the last is the only place the teacher is told
+  where the set-aside files are). Other callers of `ShowError` are unchanged.
+- **Keyboard focus comes back to Restore….** The backup pane is drawn again
+  whenever `RestoreWaits` changes, which took the focus away with the old
+  button. `MainWindow.ShowBackupPane` keeps the `FocusState` the old button
+  held, for that backup, while the button is greyed, and gives it to the new
+  button on its `Loaded` event once it is enabled; choosing any other row
+  forgets it. Microsoft's focus-navigation pages (read 2026-11-25:
+  focus-navigation, focus-navigation-programmatic, dialogs) say nothing about
+  returning focus after a dialog or a replaced control, so this follows the
+  HIG's expectation that focus stays where the person left it; the
+  `FocusState` is the old button's own, so a mouse press does not gain a
+  keyboard focus ring. Proved by
+  `RestoreSectionDialogUiTests.KeyboardFocusComesBackToRestoreWhenTheQuestionIsCancelled`.
+
+**For documentation 12, the sentence to amend** (`documentation/12-windows-app.md`,
+the "Held, 4 entries" paragraph near line 2748, untrue once this merges, because
+the branch removes #911's `NamedGapLedger` entry and writes the event): replace
+
+> **Held, 4 entries, all v2.0.0, all `ActivityTrailEvents`.** #911 (1):
+> `section restore stopped part way`. Windows' section restore is not staged
+> yet, so it has no "stopped part way" outcome to record. #912 (3):
+
+with
+
+> **Held, 3 entries, all v2.0.0, all `ActivityTrailEvents`.** (#911's
+> `section restore stopped part way` was held here until Windows' section
+> restore was staged; since #911 merged, Windows writes it and the entry is
+> gone.) #912 (3):
 
 ## Tests added tonight for steps 3 and 4 (first VM: 186 of 186 over the brief's run rule, both builds and the UI test green at b9540f26b, `dev` 8117678f8 merged, 02:33)
 

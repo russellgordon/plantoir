@@ -205,7 +205,7 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
         Assert.Equal(1, Regex.Matches(body, @"RestoreWholeCourse\(").Count);
         // The question is asked with every Restore… greyed, and ungreyed
         // whatever happens (a finally), before anything is restored.
-        Assert.Matches(@"if \(IsAskingWhichRestore\) return;\s*SetAskingWhichRestore\(true\);", body);
+        Assert.Matches(@"if \(RestoreWaits\(item\.CourseCode\)\) return;\s*SetAskingWhichRestore\(true\);", body);
         Assert.Matches(@"try\s*\{\s*\(choice, section, facts\) = await AskWhichRestore\(item\);\s*\}\s*finally\s*\{\s*SetAskingWhichRestore\(false\);\s*\}\s*//[^\n]*\n(\s*//[^\n]*\n)*\s*switch \(choice\)", body);
     }
 
@@ -223,9 +223,48 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
         string menus = File.ReadAllText(Path.Combine(root, "MainWindow.Menus.cs"));
         string window = File.ReadAllText(Path.Combine(root, "MainWindow.xaml.cs"));
         Assert.Contains("SheetIsUp = DialogGate.IsOpen(Content?.XamlRoot) || Sidebar.IsAskingWhichRestore,", menus);
-        Assert.Matches(@"var restoreItem = MenuItem\(""Restore…"", RestoreGlyph, Selecting\(row, \(\) => ConfirmRestoreBackup\(item\)\)\);\s*menu\.Items\.Add\(restoreItem\);\s*//[^\n]*\n\s*menu\.Opening \+= \(_, _\) => restoreItem\.IsEnabled = !IsAskingWhichRestore;", sidebar);
-        Assert.Matches(@"""Restore…"", \(\) => Sidebar\.ConfirmRestoreBackup\(backup\),\s*""Delete Backup…"", \(\) => Sidebar\.ConfirmDeleteBackup\(backup\),\s*actionEnabled: !Sidebar\.IsAskingWhichRestore\);", window);
+        Assert.Matches(@"var restoreItem = MenuItem\(""Restore…"", RestoreGlyph, Selecting\(row, \(\) => ConfirmRestoreBackup\(item\)\)\);\s*menu\.Items\.Add\(restoreItem\);\s*//[^\n]*\n\s*menu\.Opening \+= \(_, _\) => restoreItem\.IsEnabled = !RestoreWaits\(item\.CourseCode\);", sidebar);
+        Assert.Contains("bool enabled = !Sidebar.RestoreWaits(backup.CourseCode);", window);
+        Assert.Matches(@"""Restore…"", \(\) => Sidebar\.ConfirmRestoreBackup\(backup\),\s*""Delete Backup…"", \(\) => Sidebar\.ConfirmDeleteBackup\(backup\),\s*actionEnabled: enabled,", window);
+        // RestoreWaits is the question OR the course being zipped (the menu bar's copying rule).
+        Assert.Matches(@"internal bool RestoreWaits\(string courseCode\)\s*\{\s*if \(IsAskingWhichRestore\) return true;[^}]*WorkLease\.IsHeld\(folder, courseCode, WorkLease\.Copying\) \|\| IsZipping\(folder, courseCode\);", sidebar);
         Assert.Contains("IsEnabled = actionEnabled,", window);
-        Assert.Matches(@"Sidebar\.AskingWhichRestoreChanged \+= \(_, _\) =>\s*\{\s*if \(IsClosed\) return;\s*if \(Workspace\.Selection is SidebarSelection\.BackupEntry\) ShowDetailForSelection\(\);\s*ApplyMenuEnablement\(\);", window);
+        Assert.Matches(@"Sidebar\.RestoreAvailabilityChanged \+= \(_, _\) =>\s*\{\s*if \(IsClosed\) return;\s*if \(Workspace\.Selection is SidebarSelection\.BackupEntry\) ShowDetailForSelection\(\);\s*ApplyMenuEnablement\(\);", window);
+    }
+
+    /// <summary>
+    /// Restore Section N zips the whole course first, so from before that zip
+    /// to after the swap the course is marked as Back Up Now marks it
+    /// (sweep of 2026-11-25, MEDIUM): added to <c>_zipping</c> with the menu
+    /// bar told, released in a <c>finally</c>, refused at the top while a copy
+    /// is already being made (the mac's isBeingCopied); and the result
+    /// sentence, the stopped-part-way one included, waits for the slot
+    /// rather than being dropped when another dialog holds it.
+    /// </summary>
+    [Fact]
+    public void TheCourseIsBusyWhileTheSectionRestoreZipsAndTheResultWaitsForTheSlot()
+    {
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SidebarPane.xaml.cs"));
+        var method = Regex.Match(source, @"private async Task RestoreOneSection\(int section, BackupItem item, OneSectionRestore\.BackupFacts facts\)\s*\{(?<body>.*?)\r?\n    \}\r?\n", RegexOptions.Singleline);
+        Assert.True(method.Success, "RestoreOneSection is not where the scan looks");
+        string body = method.Groups["body"].Value;
+        Assert.Matches(@"if \(folder is null \|\| RestoreWaits\(item\.CourseCode\)\) return;\s*string zipKey = ZipKey\(folder, item\.CourseCode\);\s*lock \(_zipping\) _zipping\.Add\(zipKey\);\s*_window\.ApplyMenuEnablement\(\);\s*RestoreAvailabilityChanged\?\.Invoke\(this, EventArgs\.Empty\);", body);
+        Assert.Matches(@"try \{ result = await Task\.Run\(\(\) => MenuSectionRestore\.Run\([^;]*\); \}\s*finally\s*\{\s*lock \(_zipping\) _zipping\.Remove\(zipKey\);\s*_window\.ApplyMenuEnablement\(\);\s*RestoreAvailabilityChanged\?\.Invoke\(this, EventArgs\.Empty\);\s*\}", body);
+        Assert.Equal(1, Regex.Matches(body, @"MenuSectionRestore\.Run\(").Count);
+        Assert.Contains("await ShowError(result.Title, result.Message, waitForTheSlot: true);", body);
+        Assert.Equal(1, Regex.Matches(body, @"ShowError\(").Count);
+        Assert.DoesNotContain("ShowDialogSafelyAsync(", body);
+        Assert.Contains("if (waitForTheSlot) await ShowWhenTheSlotIsFree(dialog);", source);
+
+        // The wait is on the holding popup's own Closed event, then the slot is read again.
+        var wait = Regex.Match(source, @"private async Task<ContentDialogResult\?> ShowWhenTheSlotIsFree\(ContentDialog dialog\)\s*\{(?<body>.*?)\r?\n    \}\r?\n", RegexOptions.Singleline);
+        Assert.True(wait.Success, "ShowWhenTheSlotIsFree is not where the scan looks");
+        string waiting = wait.Groups["body"].Value;
+        Assert.Matches(@"while \(EffectiveXamlRoot is \{ \} root && PopupHoldingADialog\(root\) is \{ \} holder\)", waiting);
+        Assert.Contains("holder.Closed += Closed;", waiting);
+        Assert.Contains("if (holder.IsOpen) await closed.Task;", waiting);
+        Assert.Contains("holder.Closed -= Closed;", waiting);
+        Assert.DoesNotContain("Task.Delay", waiting);
+        Assert.Contains("return await ShowDialogSafelyAsync(dialog);", waiting);
     }
 }
