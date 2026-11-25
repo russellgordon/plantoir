@@ -1,8 +1,9 @@
 # #806 and #816 on Windows: the GeoGebra browser check in headless Edge
 
 One run of `browser-checks/geogebra_applet.mjs` covers both issues; each has
-its own subsection so it can be closed on its own. #913 is not in this file
-(another writer measures it later). Nothing in product code, `scripts/`,
+its own subsection so it can be closed on its own. #913's baseline
+measurement and its candidate settings are at the end of this file ("#913:
+what the preview's WebView2 contacts"); its settings are another writer's. Nothing in product code, `scripts/`,
 `browser-checks/`, `support/` or `contracts/` changed.
 
 ## The run (method, so it can be repeated)
@@ -103,3 +104,187 @@ the 2026-10-28 run by hand:
 ```text wrap
 **Measured again, 2026-11-25** (#806 items 11 and 12, #816 item 13). The first Windows VM (Windows 11 Pro ARM64 in Parallels, the app win-x64 under emulation), Edge 158.0.4370.33 headless, `dev` 45be52fbf's x64 Debug build and its runtime (Node 22.23.4, Python 3.14.10). A temp working folder with EXC2O from `setup.ps1 --install-example`, verify.sh's GeoGebra Fixture, GeoGebra Second (with the 150-point lines sketch) and Quiz GeoGebra plants, and the saved copy of `plantoirvrfy578` seeded in the course's `.geogebra-cache` under its fence's key, so nothing was asked of geogebra.org; built with `preview.ps1 EXC2O 1 --build-only` (62 s). `browser-checks/geogebra_applet.mjs`, unchanged, on a clone with the publish's own `_headers`, served on `[::1]`, with the check's own throwaway Edge profile: OK in 33 s, in both phases. The reset icon pressed for real on the commands sketch and the file sketch brought each back as it opened (5 objects and a = 3; A,B,f,m) and took a drag again; 393 presses of Shift+Tab and Space (388 isolated) while the 150-line sketch ran left all 150 points, and its reset brought back all 150. While the first sketch opened, with the engine's first request held, its card said the contract's two lines at contrast 12.13 and 7.24 in light and 16.27 and 13.28 in dark, the 640 x 360 card lay on the 640 x 360 box, and the figure stayed 433.58 px tall throughout; it drew in 1,080 ms (964 isolated). A sketch whose file was refused went back to its button. 0 refusals by the policy, 0 requests off the site. The helper is `vm-tools/guest/806-geogebra.ps1`; the touch-laptop press is not possible in a VM.
 ```
+
+# #913: what the preview's WebView2 contacts
+
+Part 2a: the BASELINE only, on this branch at 22ae99c4c (`dev` 45be52fbf plus
+the #806 and #816 notes; no product code differs from `dev`). Nothing in
+product code changed. The settings, their after-measurement and their
+must-fail are the next writer's (the brief's step 4). **#913 waits** on that
+step and, for what cannot be turned off for free, on Russell (see "Candidate
+settings").
+
+## The measurement
+
+### Method (so it can be repeated)
+
+- **Machine:** the FIRST Windows VM (`Windows 11`, Windows 11 Pro ARM64 in
+  Parallels, Plantoir `win-x64` under emulation), behind
+  `vm-tools/runs/VM.lock`, parked on its dev snapshot 02 after each turn.
+- **Build:** `winvm.sh sync issue/806-win-webview` (22ae99c4c), then
+  `refetch-runtime.ps1` and `build-app.ps1` (Debug, 0 errors).
+- **Runtime:** the `msedgewebview2.exe` that ran for the preview reported
+  ProductVersion **158.0.4370.33** on every run (read from the running
+  process's file, the same number `GetAvailableBrowserVersionString` gives
+  for the Evergreen runtime; that API itself was not called).
+- **Driver:** `vm-tools/guest/913-measure.ps1` (vm-tools e7acdd5), run by
+  `vm-tools/913-turn.sh <log> <ref> <steps>`; system half
+  `vm-tools/guest/913-dns.ps1` (2ac5ae7, run as SYSTEM). Logs:
+  `vm-tools/runs/913/turn2.log` (runs 1 and 2), `turn3.log` (run 3).
+- **Profile:** a throwaway root under `%TEMP%` (`913c`, then `913d`) holding
+  `--state-dir <root>\state` (so `WEBVIEW2_USER_DATA_FOLDER` is
+  `<root>\state\WebView2`, new and empty on a first start, checked and
+  printed) and a working folder `<root>\work` with EXC2O from the built app's
+  own `setup.ps1 --install-example`. Nothing of a real course, no class list,
+  no name.
+- **Run:** `Plantoir.exe --state-dir <root>\state --auto-preview EXC2O 1`
+  (the Preview button's code path).
+- **Capture:** Chromium's net-log, turned on for the measurement only by
+  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--log-net-log=<root>\netlog-<label>.json --net-log-capture-mode=Default`
+  in the launching shell (removed from the shell right after the start; no
+  product code). Both flags are on Microsoft's flags page
+  (https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/webview-features-flags);
+  the format is Chromium's
+  (https://www.chromium.org/developers/design-documents/network-stack/netlog/).
+- **System half:** the Windows DNS Client operational log
+  (`Microsoft-Windows-DNS-Client/Operational`, event 3006, a query asked)
+  turned on and emptied before each run, then counted for the run's
+  `msedgewebview2.exe` process ids only, then emptied and turned off.
+- **Window (fixed before the first run, the same on every run):** from the
+  app's start to **300 s after the preview pane reported its page loaded**
+  (under `--state-dir` the app writes `loaded <status> <address>` to the
+  Open in Browser button's ItemStatus on NavigationCompleted; the driver
+  waits for `loaded 200` through UI Automation and never prints the
+  address); then the app's window is closed as a teacher closes it and the
+  browser processes are waited out, so the net-log covers the browser's whole
+  life.
+- **Reduction, in the VM:** the runtime's own Python reads the net-log and
+  prints only: hosts, lookups asked and made, URL requests by scheme and
+  method, uploads with their body size, whether a `Referer` beyond a bare
+  origin or a local address in a query string rode on a request off the
+  computer (yes or no), the request PATH for hosts off the computer
+  (Microsoft's and the site's CDN paths, never the local site's, never a
+  query), and TCP connection attempts by host and port. The raw net-log is
+  deleted in the VM by explicit path (`raw net-log deleted: True` on each
+  run), and the root and the preview's build folder are removed after the
+  turn (`cleaned: True`, `build folder removed: True`).
+
+### Runs on 22ae99c4c (runtime 158.0.4370.33, window 300 s from the page)
+
+**Run 1, first start (empty profile)**, root `913c`: app 17:03:34, page shown
+17:04:59 (85 s), window ended 17:09:59, net-log 4,056 events.
+
+| host | where | lookups asked / made | URL requests | uploads | page address on it | path (off the computer) | what it is |
+|---|---|---|---|---|---|---|---|
+| 127.0.0.1 | this computer | 2 / 0 | http GET 8 | 0 | n/a | n/a | the preview's own server (the site) |
+| localhost | this computer | 0 / 0 | ws GET 1 | 0 | n/a | n/a | the preview's live-reload socket |
+| cdnjs.cloudflare.com | off | 3 / 1 | none | 0 | no | none | the site's (a lookup only, no request in the window) |
+| fonts.googleapis.com | off | 6 / 1 | https GET 1 | 0 | no (Referer: bare local origin) | `/css2` | the site's (Google Fonts) |
+| fonts.gstatic.com | off | 6 / 1 | https GET 2 | 0 | no (bare origin) | `/s/ibmplexmono/v23/….woff2` | the site's (Google Fonts) |
+| config.edge.skype.com | off | 3 / 1 | https GET 2 | 0 | no (no Referer, no local address in a query) | `/config/v1/Edge/158.0.4370.33` | Edge's experiment and configuration fetch (named from its path; the WebView2 policy page describes the Experimentation and Configuration Service but does not name its host) |
+| edge.microsoft.com | off | 9 / 3 | https POST 8 | 8 (13,807 bytes) | no | `/componentupdater/api/v1/update` | the browser's component updater (named from its path; no Microsoft WebView2 page describes it) |
+| wpad | off (local network name) | 6 / 6 | none | 0 | no | none | proxy auto-detection (WPAD; Chromium's, not described on Microsoft's WebView2 pages) |
+
+TCP connection attempts: this computer:8081 6, this computer:9081 2, an
+address off the computer:443 5 (the reducer did not map those to names).
+
+**Run 2, second start on the same throwaway profile**, root `913c`: app
+17:10:30, page shown 17:12:58 (148 s), window ended 17:17:58, net-log 2,379
+events.
+
+| host | where | lookups asked / made | URL requests | uploads | page address on it | path (off the computer) |
+|---|---|---|---|---|---|---|
+| 127.0.0.1 | this computer | 2 / 0 | http GET 7 | 0 | n/a | n/a |
+| localhost | this computer | 0 / 0 | ws GET 1 | 0 | n/a | n/a |
+| cdnjs.cloudflare.com | off | 3 / 1 | none | 0 | no | none |
+| fonts.googleapis.com | off | 4 / 1 | https GET 1 | 0 | no | `/css2` |
+| fonts.gstatic.com | off | 6 / 1 | https GET 1 | 0 | no | `/s/ibmplexmono/v23/….woff2` |
+| edge.microsoft.com | off | 2 / 1 | https POST 1 | 1 (5,239 bytes) | no | `/componentupdater/api/v1/update` |
+| wpad | off (local network name) | 5 / 5 | none | 0 | no | none |
+
+TCP connection attempts: this computer:8081 4, this computer:9081 2, an
+address off the computer:443 1. **`config.edge.skype.com` was not contacted on
+the second start** within the window.
+
+DNS Client log, run 2 (17:10:30 to 17:18:11, 6 WebView2 process ids): names
+asked by a WebView2 process: `wpad` 5. Queries by other processes in the
+window (not named): 19. (Run 1's DNS half was lost: the reduction read the
+process ids wrongly and printed 0 ids; fixed in 2ac5ae7 and run again as run
+3.)
+
+Run 3 (a second first start, root `913d`, `vm-tools/runs/913/turn3.log`) was made only for the DNS half of a first start; it is not tabled here (stopped on budget), and its log is the record.
+
+### What the measurement says, and what it does not
+
+- **No request off the computer carried a page address of the teacher's
+  site** in any run: no `Referer` beyond a bare origin and no local address in
+  a query string. The bare local origin (`http://127.0.0.1:<port>`) did ride
+  as `Referer` on the site's own Google Fonts stylesheet request in run 1.
+- **Microsoft's contacts on a first start:** the configuration service (2
+  GETs) and the component updater (8 POSTs, 13,807 bytes of request bodies);
+  **on a second start:** the component updater only (1 POST, 5,239 bytes).
+  The bodies' contents were not captured (Default capture mode records no
+  body), so what they carry beyond their size is not measured.
+- **The DNS Client log saw only `wpad`** from the WebView2 processes, while
+  the net-log made lookups for every host above: the browser's other lookups
+  did not reach the Windows DNS Client's log as a WebView2 process's query,
+  so that log is not a complete second witness. A packet capture (`pktmon`
+  filtered to the WebView2 processes) was not run.
+- **Not measured:** SmartScreen (no SmartScreen host appeared in either log;
+  the pages shown were on 127.0.0.1, and absence in a 5-minute window is not
+  proof it never sends); the crash reporter (no crash happened, so nothing
+  was sent; its sending is outside the net-log); Windows diagnostic data for
+  WebView2 (sent by Windows' own services, outside both logs); the WebView2
+  Runtime's own updater (Microsoft Edge Update, a separate service); anything
+  after the window; a teacher clicking a link to a site off the computer.
+- **An earlier run, not counted here:** on 2026-11-21 (2f50d1fa3, turn1.log)
+  the same driver ran with two faults (the page-shown status was looked for
+  under the wrong automation id, so the window ran 12 minutes from start, and
+  the process ids were not found). It printed the same hosts, and one run with
+  the `ExperimentationAndConfigurationServiceControl` policy set to 0 in HKLM
+  printed no `config.edge.skype.com` row. That is an indication for the next
+  writer, not a proof: it must be measured again by this method (invariant
+  3).
+
+## Candidate settings
+
+Each read on Microsoft's page on 2026-11-25. "Reachable" says where it can be
+given: per view (a `CoreWebView2Settings` value, in
+`SectionDetailView.xaml.cs`), per environment (a
+`CoreWebView2EnvironmentOptions` value passed to `EnsureCoreWebView2Async(env)`,
+also in `SectionDetailView.xaml.cs`), process-wide (an environment variable set
+in `Program.cs`), or per machine or user (a registry policy).
+
+| contact | documented setting | page | reachable | what else it turns off |
+|---|---|---|---|---|
+| `config.edge.skype.com` (first start; 2 GETs) | WebView2 policy `ExperimentationAndConfigurationServiceControl` = 0 (RestrictedMode), DWORD under `SOFTWARE\Policies\Microsoft\Edge\WebView2` | https://learn.microsoft.com/en-us/deployedge/microsoft-edge-webview-policies | **per machine or user only** (a registry policy with no per-app value name; an IT administrator's setting, and `HKCU\Software\Policies` is normally not writable by a standard user: not tried). No documented browser argument or environment option exists for it. | every WebView2 app for that machine or user; Microsoft's configuration payload too, which "may also contain a list of actions to take on certain domains for compatibility reasons" (for example a User Agent override); "Microsoft doesn't recommend this setting". |
+| `edge.microsoft.com/componentupdater` (8 POSTs first start, 1 second start) | **none found on Microsoft's WebView2 pages.** The Edge update policies (`UpdatesSuppressed`, the enterprise page) govern the runtime's updater, not this in-browser component updater. | https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/enterprise ; the flags page lists no component-update flag | n/a | n/a: the only route would be a Chromium switch Microsoft does not list (option A in the brief: may stop working silently in any runtime update). |
+| `wpad` (5 to 6 lookups each start) | `no-proxy-server` or `proxy-server` on the flags page, which says "Apps in production shouldn't use WebView2 browser flags" | https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/webview-features-flags | process-wide (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`) or per environment (`AdditionalBrowserArguments`) | a school network that hands out its proxy by WPAD: the site's fonts and cdnjs would stop loading. It asks the local network for a proxy; it sends nothing to Microsoft. |
+| SmartScreen (not seen; not measured) | `CoreWebView2Settings.IsReputationCheckingRequired` = false | https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2settings.isreputationcheckingrequired and https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy | **per view**, but applied to all WebViews on the same user data folder (on if any view leaves it true) | Microsoft Defender SmartScreen's check of pages and downloads shown in the preview. The data-privacy page: "If you don't disable SmartScreen, you must provide notice to all users that your software includes Microsoft Defender SmartScreen, and collects and sends the user's information to Microsoft". |
+| crash reports (not seen; not measured) | `CoreWebView2EnvironmentOptions.IsCustomCrashReportingEnabled` = true ("Windows won't send crash data to the Microsoft endpoint"; dumps stay in `FailureReportFolderPath`) | https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy and https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2environmentoptions | **per environment** (needs the preview to create its own environment; environments that differ cannot share a browser process: "WebView creation fails with `HRESULT_FROM_WIN32(ERROR_INVALID_STATE)` if the specified options does not match", from the `CreateCoreWebView2EnvironmentWithOptions` page) | nothing a teacher sees; Microsoft no longer gets the preview's crash dumps. |
+| Windows diagnostic data for WebView2 (not measured) | none for the app: "governed by the ... Diagnostic data setting on Windows ... as a centralized switch"; required data is collected regardless | https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy | the teacher's own Windows setting only | n/a: can only be documented. |
+
+**Where a process-wide variable meets the Planning tab (790b).** From the
+`CreateCoreWebView2EnvironmentWithOptions` page
+(https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/webview2-idl):
+"If `additionalBrowserArguments` is specified in environment variable or in
+the registry, it is appended to the corresponding values in
+`CreateCoreWebView2EnvironmentWithOptions` parameters", while the user data
+folder variable REPLACES the option. So an arguments variable set in
+`Program.cs` would JOIN the Planning tab's own `AdditionalBrowserArguments`
+(its dead proxy), never replace it; a proxy argument in that variable would
+however be appended after the Planning tab's, which is a reason not to put
+any proxy flag there. Since no contact above has a documented browser
+argument, nothing process-wide is proposed.
+
+**Recommendation.** Build `IsCustomCrashReportingEnabled = true` on the
+preview's own environment (documented, costs the teacher nothing; now
+reachable, since lane D's `SectionDetailView.xaml.cs` is merged), and prove it
+by the measurement as far as a measurement can (it changes no contact in a
+run without a crash, so its proof is the option read back from the
+environment plus the documented behaviour; say so). `IsReputationCheckingRequired`
+is documented and reachable per view but costs a security check, so it is
+Russell's (turn off, or tell teachers as Microsoft requires).
+`config.edge.skype.com` (first start only), the component updater (every
+start), `wpad` and Windows diagnostic data can only be documented: no setting
+on Microsoft's WebView2 pages turns them off for one app.
