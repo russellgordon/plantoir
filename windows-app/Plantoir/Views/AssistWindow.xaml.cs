@@ -581,7 +581,7 @@ public sealed partial class AssistWindow : Window
             // Same process as the previews, so the in-memory leases are the
             // truth about whether one is on screen.
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>
-                lease.FolderPath == _folder &&
+                WorkingFolder.IsTheSame(lease.FolderPath, _folder) &&
                 string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase) &&
                 lease.SectionNumber == _section),
             ConfirmationMode = () => App.Settings.AssistantAsksBeforeChanging,
