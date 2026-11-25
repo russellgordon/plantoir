@@ -227,7 +227,7 @@ public sealed class MenuSectionRestoreClickTests : IDisposable
         Assert.Contains("bool enabled = !Sidebar.RestoreWaits(backup.CourseCode);", window);
         Assert.Matches(@"""Restore…"", \(\) => Sidebar\.ConfirmRestoreBackup\(backup\),\s*""Delete Backup…"", \(\) => Sidebar\.ConfirmDeleteBackup\(backup\),\s*actionEnabled: enabled,", window);
         // RestoreWaits is the question OR the course being zipped (the menu bar's copying rule).
-        Assert.Matches(@"internal bool RestoreWaits\(string courseCode\)\s*\{\s*if \(IsAskingWhichRestore\) return true;[^}]*WorkLease\.IsHeld\(folder, courseCode, WorkLease\.Copying\) \|\| IsZipping\(folder, courseCode\);", sidebar);
+        Assert.Matches(@"internal bool RestoreWaits\(string courseCode\)\s*\{\s*if \(IsAskingWhichRestore\) return true;\s*if \(Workspace\.WorkspacePath is not \{ \} folder\) return false;\s*return WorkLease\.IsHeld\(folder, courseCode, WorkLease\.Copying\) \|\| IsZipping\(folder, courseCode\);", sidebar);
         Assert.Contains("IsEnabled = actionEnabled,", window);
         Assert.Matches(@"Sidebar\.RestoreAvailabilityChanged \+= \(_, _\) =>\s*\{\s*if \(IsClosed\) return;\s*if \(Workspace\.Selection is SidebarSelection\.BackupEntry\) ShowDetailForSelection\(\);\s*ApplyMenuEnablement\(\);", window);
     }
