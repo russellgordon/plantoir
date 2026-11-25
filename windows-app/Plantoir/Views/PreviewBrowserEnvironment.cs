@@ -12,8 +12,7 @@ namespace Plantoir.Views;
 /// </summary>
 /// <remarks>
 /// <para><b>Crash reports.</b> <c>IsCustomCrashReportingEnabled = true</c>:
-/// "Windows won't send crash data to the Microsoft endpoint"; dumps stay in
-/// the user data folder's failure-report folder
+/// "Windows won't send crash data to the Microsoft endpoint"
 /// (https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy
 /// and https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2environmentoptions).
 /// A run without a crash sends nothing either way, so no measurement can show
