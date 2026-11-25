@@ -653,17 +653,22 @@ public class ReDateTests : IDisposable
             UndoSeams = new Plantoir.Core.Undo.UndoSeams { PutBackFailsAt = index => index == 0 },
         };
         var plan = workspace.PlanSyncDates("ICS3U", 1, new[] { "Unit 1, Day 1" });
-        string loops = Path.Combine(_folder, "courses", "ICS3U", "Concepts", "Loops.md");
-        File.SetAttributes(loops, FileAttributes.ReadOnly);
+        // The step keeps the plan's order: the first page goes in, the second refuses.
+        var changing = plan.Changing.ToList();
+        Assert.Equal(2, changing.Count);
+        string first = PagePaths.ResolveInside(_folder, changing[0].RelativePath);
+        string second = PagePaths.ResolveInside(_folder, changing[1].RelativePath);
+        File.SetAttributes(second, FileAttributes.ReadOnly);
         try
         {
             var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplySyncDates(plan));
             Assert.StartsWith(AssistWording.PublishStoppedPartWay("the pages’ dates", ""), refused.Message);
-            Assert.Contains("createdSection1: 2026-10-13", Read("Concepts/Variables.md"));
-            string kept = Assert.Single(Directory.GetFiles(Path.Combine(_folder, "courses", "ICS3U", "Concepts"), ".Variables.md.plantoir-undo-*-orig"));
+            Assert.Contains("createdSection1: 2026-10-13", File.ReadAllText(first));
+            Assert.Contains("createdSection1: 2026-02-01", File.ReadAllText(second));
+            string kept = Assert.Single(Directory.GetFiles(Path.GetDirectoryName(first)!, "." + Path.GetFileName(first) + ".plantoir-undo-*-orig"));
             Assert.Contains(Path.GetFileName(kept), refused.Message);
         }
-        finally { File.SetAttributes(loops, FileAttributes.Normal); }
+        finally { File.SetAttributes(second, FileAttributes.Normal); }
     }
 
     [Fact]
