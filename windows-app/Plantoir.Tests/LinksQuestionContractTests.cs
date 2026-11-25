@@ -217,7 +217,7 @@ public class LinksQuestionContractTests : IDisposable
         var workspace = Section("Next: [[Unit 1, Day 2]]");
         var model = new ScriptModel().Says("Hello.");
         var agent = new AssistAgent(model, new ToolsOver(new PlantoirTools(workspace)), new JsonArray(),
-                                    WindowCourse, WindowSection);
+                                    WindowCourse, WindowSection) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class };
 
         var lines = agent.Say("What does Unit 1, Day 1 link to?", CancellationToken.None).GetAwaiter().GetResult();
         Assert.Empty(model.Asked);
@@ -245,7 +245,7 @@ public class LinksQuestionContractTests : IDisposable
         var model = new ScriptModel().Says("I can look that up.");
         var agent = new AssistAgent(model, new ToolsOver(new PlantoirTools(workspace)), new JsonArray(),
                                     WindowCourse, WindowSection)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             IsACourseCode = code => Codes.Value.Contains(code),
         };
 
@@ -262,7 +262,7 @@ public class LinksQuestionContractTests : IDisposable
         Section();
         var tools = new CannedTools();
         var agent = new AssistAgent(new ScriptModel(), tools, new JsonArray(), WindowCourse, WindowSection)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             IsACourseCode = code => Codes.Value.Contains(code),
             CoursesInTheFolder = () => new[] { WindowCourse, "SPH3U" },
         };

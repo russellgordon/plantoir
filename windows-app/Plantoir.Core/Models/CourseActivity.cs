@@ -70,7 +70,8 @@ public static class CourseActivity
             // Each section once however many starts hold a claim on it
             // (previewBuildRecord.rule, #928): a window's start beside the
             // assistant's rebuild is one preview being built.
-            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Distinct().Count(), 0);
+            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Distinct().Count(), 0,
+                                                 DeployedFolderShows.Shared.Count);
     }
 
     public static bool IsPreviewing(string folderPath, string courseCode) =>

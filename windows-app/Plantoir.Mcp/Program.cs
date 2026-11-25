@@ -157,10 +157,24 @@ builder.Services.AddMcpServer(options =>
         // so the copy saved before it names Section or Classes. One call at a
         // time on the menu's server, and back to Section after it.
         workspace.MenuOfTheChange = AssistWorkspace.MenuNamed(
-            context.Params?.Meta?[AssistWorkspace.MenuMetaKey]?.GetValue<string>());
+            AssistWorkspace.MetaText(context.Params?.Meta, AssistWorkspace.MenuMetaKey));
+        // #1027: the selected section's course, for a sentence with no course of its own.
+        workspace.MenuCourseOfTheCall = AssistWorkspace.MetaText(context.Params?.Meta, AssistWorkspace.CourseMetaKey);
         CallToolResult result;
-        try { result = await next(context, cancellation); }
-        finally { workspace.MenuOfTheChange = Plantoir.Core.Models.SubjectMenuLayout.Menu.Section; }
+        try
+        {
+            // #927: Classes ▸ Add Class…, as a copy, names its source in an
+            // argument no schema declares, read here before the binder drops it.
+            result = context.Params is { Name: { } tool }
+                     && new PlantoirTools(workspace).FromTheMenuIfACopy(tool, arguments) is { } copy
+                ? copy
+                : await next(context, cancellation);
+        }
+        finally
+        {
+            workspace.MenuOfTheChange = Plantoir.Core.Models.SubjectMenuLayout.Menu.Section;
+            workspace.MenuCourseOfTheCall = null;
+        }
         return PlantoirTools.AfterCall(workspace, topBefore, Text(arguments, "course"), Number(arguments, "section"), result);
     }));
 

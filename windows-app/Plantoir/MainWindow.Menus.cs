@@ -155,10 +155,10 @@ public sealed partial class MainWindow
         // Enablement ahead of the flyout: measured to fire before it draws.
         foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ClassesMenu, ViewMenu, HelpMenu })
         {
-            title.PointerEntered += (_, _) => ApplyMenuEnablement();
-            title.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => ApplyMenuEnablement()), true);
+            title.PointerEntered += (_, _) => MenuIsOpening();
+            title.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => MenuIsOpening()), true);
         }
-        AppMenuBar.GotFocus += (_, _) => ApplyMenuEnablement();   // opened from the keyboard
+        AppMenuBar.GotFocus += (_, _) => MenuIsOpening();   // opened from the keyboard
         // And when a flyout DRAWS, whatever opened it (the keyboard, UI
         // Automation): its items are Loaded as it opens — measured 3 ms after
         // Tapped — which is still before anything in it can be pressed. The
@@ -167,7 +167,7 @@ public sealed partial class MainWindow
         foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ClassesMenu, ViewMenu })
             if (title.Items.FirstOrDefault() is FrameworkElement first)
             {
-                first.Loaded += (_, _) => ApplyMenuEnablement();
+                first.Loaded += (_, _) => MenuIsOpening();
                 // #514: a menu closing, however (Escape, a click outside, an
                 // item chosen) — measured, the first item's Unloaded fires on
                 // every close: Alt released inside it was never seen, so the
@@ -237,7 +237,7 @@ public sealed partial class MainWindow
     }
 
     /// <summary>An item's words in Section ▸ or Classes ▸; a layout item with none draws its name, and the contract test fails on it.</summary>
-    private static string LayoutTitle(Item item) => SubjectMenuLayout.TitleHere(item) ?? item.ToString();
+    private static string LayoutTitle(Item item, ClassNoun noun) => SubjectMenuLayout.TitleHere(item, noun) ?? item.ToString();
 
     /// <summary>One item of Section ▸ or Classes ▸, with its key where it has one.</summary>
     private void AddLayoutItem(IList<MenuFlyoutItemBase> into, SubjectMenuLayout.Menu layout, Item item)
@@ -258,13 +258,13 @@ public sealed partial class MainWindow
                 return;
             case Item.RebuildPreview:
                 // Ctrl+Shift+B, the mac's Shift+Cmd+B until #990: kept free for it by #488's key census.
-                Add(into, LayoutTitle(item), id, item, Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item, Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
                 return;
             case Item.Deploy:
-                Add(into, LayoutTitle(item), id, item, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
                 return;
             case Item.SectionOpenInObsidian:
-                Add(into, LayoutTitle(item), id, item);
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item);
                 // Its key is moved onto it by ApplyMenuEnablement while a section is selected.
                 _sectionObsidianKey = Key(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+O")!.Value.Make(this, Item.SectionOpenInObsidian);
                 return;
@@ -273,7 +273,7 @@ public sealed partial class MainWindow
                 // belongs to text editing, and a key that took back a page
                 // change from inside a text field would be a surprise nobody
                 // could undo (the mac's reason for no Cmd+Z).
-                Add(into, LayoutTitle(item), id, item);
+                Add(into, LayoutTitle(item, ClassNoun.Class), id, item);
                 return;
         }
     }
@@ -415,16 +415,40 @@ public sealed partial class MainWindow
             case Item.Preview: detail?.PressPreview(opposite: false); return;
             case Item.Deploy: detail?.PressDeploy(); return;
             case Item.OpenInBrowser: detail?.PressOpenInBrowser(); return;
+            case Item.StopShowingDeployedFolder:
+                // #889: every show of the selected section, and a start still under way.
+                if (Workspace.Selection is SidebarSelection.SectionItem(var stopCode, var stopNumber)
+                    && Workspace.WorkspacePath is { } stopFolder
+                    && Workspace.Courses.FirstOrDefault(c => c.Code == stopCode) is { } stopCourse)
+                    DeployedFolderOpening.Stop(stopCourse, stopNumber, stopFolder);
+                ApplyMenuEnablement();
+                return;
             case Item.Back: detail?.PreviewGoBack(); return;
             case Item.Forward: detail?.PreviewGoForward(); return;
             case Item.ReloadPage: detail?.PreviewReload(); return;
             case Item.PublishPages or Item.HidePages or Item.PublishClassForADate or Item.RebuildPreview
-                or Item.UndoLastChange or Item.AddNextClass or Item.ReDateClasses or Item.MakeRoomForClasses
-                or Item.ClassDates:
+                or Item.UndoLastChange or Item.AddClass or Item.ReDateClasses or Item.MakeRoomForClasses
+                or Item.ClassDates or Item.RollOverToANewYear:
                 _ = RunSectionVerb(item);
                 return;
         }
         if (!Sidebar.Perform(item)) App.LogDiagnostic($"menu item {item} has no route yet");
+    }
+
+    /// <summary>
+    /// The section row's Open in Browser (#889), its row already selected: the
+    /// one Open in Browser, so the preview while one shows there, the deployed
+    /// folder otherwise, said on the trail as from the sidebar.
+    /// </summary>
+    internal void OpenInBrowserFromARow(Course course, int section)
+    {
+        if (SelectedSectionDetail() is { HasPreview: true } detail)
+        {
+            detail.PressOpenInBrowser();
+            return;
+        }
+        if (Workspace.WorkspacePath is { } folder)
+            _ = DeployedFolderOpening.OpenAsync(course, section, folder, DeployedFolderFrom.Sidebar, Content?.XamlRoot);
     }
 
     /// <summary>The section window on screen, only when it is the selected section's.</summary>
@@ -508,9 +532,32 @@ public sealed partial class MainWindow
             LastChangeIsHere = course is not null && sectionNumber is int changedIn && LastMenuChangeIsIn(course.Code, changedIn),
             VerbIsRunning = folder is not null && course is not null && sectionNumber is int runningIn
                             && AVerbIsRunningOn(folder, course.Code, runningIn),
+            // #889: read now, from the saved settings and the disk (offeredWhen:
+            // a menu opening is one of its events), and this app's shows.
+            // The selected section's view holds the offer as last read off the
+            // window's thread (lane B review, low 3); a menu's opening asks it
+            // to read again. No view, no offer: dimmed.
+            DeployedFolderReady = detail?.DeployedFolderReadyAsLastRead == true,
+            DeployedFolderShown = folder is not null && course is not null && sectionNumber is int shownIn
+                                  && DeployedFolderOpening.IsShown(course, shownIn, folder),
             CanGoBack = detail?.CanGoBack == true,
             CanGoForward = detail?.CanGoForward == true,
         };
+    }
+
+    /// <summary>
+    /// #889 <c>offeredWhen</c>, "when a menu opens", by every route a menu
+    /// opens: the pointer reaching or pressing a title, the keyboard (the bar
+    /// takes the focus), and a flyout drawing however it was opened (UI
+    /// Automation, the keyboard). The selected section's view reads the offer
+    /// off this thread and redraws the menus when it has it (lane B review,
+    /// low 3; #1027's review, low 2: the keyboard route drew the cached
+    /// answer). A read under way coalesces the calls into one more.
+    /// </summary>
+    private void MenuIsOpening()
+    {
+        SelectedSectionDetail()?.ReadTheOfferAgain();
+        ApplyMenuEnablement();
     }
 
     /// <summary>Grey or ungrey every ruled item, and move the keys and titles that follow the selection.</summary>
@@ -550,6 +597,11 @@ public sealed partial class MainWindow
         var noun = SelectedCourseNoun();
         SectionMenu.Title = SubjectMenuLayout.Title(SubjectMenuLayout.Menu.Section, noun);
         ClassesMenu.Title = SubjectMenuLayout.Title(SubjectMenuLayout.Menu.Classes, noun);
+        // And its items say meeting in a club (#1027): only the words change.
+        foreach (var item in Enum.GetValues<Item>())
+            if (SubjectMenuLayout.TitleSayingTheNoun(item, noun) is { } words
+                && _ruled.TryGetValue(item, out var drawn) && drawn is MenuFlyoutItem titled)
+                titled.Text = words;
 
         // Ctrl+Shift+O sits on the ONE Open in Obsidian item that can be live.
         bool onSection = situation.Row == Row.Section;

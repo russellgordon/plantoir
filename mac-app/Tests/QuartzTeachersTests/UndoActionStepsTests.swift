@@ -996,7 +996,7 @@ final class UndoActionStepsTests: XCTestCase {
             UndoKillPoints.beforeTheRename = nil
             UndoKillPoints.putBackFailsAt = nil
         }
-        guard case .rememberedKeeping(let remembered) = SectionScheduleSheet.save(plan) else {
+        guard case .rememberedKeeping(let remembered) = SectionScheduleSheet.save(plan, noun: .class) else {
             XCTFail("the part-way save was not carried on as remembered")
             return
         }

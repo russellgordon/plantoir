@@ -112,7 +112,7 @@ public class ReferenceRefusalTests : IDisposable
         var acts = new List<string>();
         var tools = new NoTools();
         var agent = new AssistAgent(new NoModel(), tools, new JsonArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             StopPreviewInApp = () => acts.Add("stop preview"),
             StartDeployInApp = () => acts.Add("deploy"),
             StartDeployInAppAsync = () => { acts.Add("deploy"); return Task.FromResult<string?>("Deployed."); },
@@ -140,7 +140,7 @@ public class ReferenceRefusalTests : IDisposable
         bool kept = false;
         var acts = new List<string>();
         var agent = new AssistAgent(new NoModel(), new NoTools(), new JsonArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             StopPreviewInApp = () => acts.Add("stop preview"),
             StartDeployInAppAsync = () => { acts.Add("deploy"); return Task.FromResult<string?>("Deployed."); },
             PreviewIsShowing = () => true,

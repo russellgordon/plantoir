@@ -885,6 +885,18 @@ public static class ActivityTrail
         /// "why was this morning's deploy slow?" days later.
         /// </summary>
         SiteBuiltAgainBeforeDeploying,
+        /// <summary>
+        /// #889 (the mac's #850): a section's deployed folder was opened in
+        /// the web browser, from where (the result, the Section menu, the
+        /// toolbar, the sidebar), whether it was already shown and whether its
+        /// address moved. Counts only, never a path or an address
+        /// (<see cref="Plantoir.Core.Models.DeployedFolderTrail"/>).
+        /// </summary>
+        DeployedFolderOpenedInTheWebBrowser,
+        /// <summary>#889: a deployed folder is no longer shown, and why (Stop, quitting, the folder gone, it stopped on its own), with counts.</summary>
+        DeployedFolderNoLongerShown,
+        /// <summary>#889: a deployed folder could not be opened, and why, in a few words.</summary>
+        DeployedFolderCouldNotBeOpened,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -1038,6 +1050,9 @@ public static class ActivityTrail
         Event.ProblemsChanged => "problems changed",
         Event.AskedAnAssistantToFixProblems => "asked an assistant to fix problems",
         Event.SiteBuiltAgainBeforeDeploying => "site built again before deploying",
+        Event.DeployedFolderOpenedInTheWebBrowser => "deployed folder opened in the web browser",
+        Event.DeployedFolderNoLongerShown => "deployed folder no longer shown",
+        Event.DeployedFolderCouldNotBeOpened => "deployed folder could not be opened",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

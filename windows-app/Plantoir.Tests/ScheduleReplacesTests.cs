@@ -131,7 +131,7 @@ public class ScheduleReplacesTests : IDisposable
         var was = new DateTime(2026, 9, 25, 6, 30, 0);
         var agent = new AssistAgent(new WindowBindingContractTests.ScriptedModel(),
                                     new WindowBindingContractTests.RecordingTools(), new JsonArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             Today = () => new DateOnly(2026, 9, 19),
             Now = () => new DateTime(2026, 9, 19, 9, 0, 0),
             TimeZone = TimeZoneInfo.Utc,

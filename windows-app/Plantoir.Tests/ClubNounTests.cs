@@ -19,6 +19,9 @@ public sealed class ClubNounTests : IDisposable
 {
     private readonly string _folder = Directory.CreateTempSubdirectory("club-noun").FullName;
 
+    /// <summary>The workspace the last <see cref="Club"/> made.</summary>
+    private AssistWorkspace? _workspace;
+
     public void Dispose()
     {
         try { Directory.Delete(_folder, recursive: true); } catch { }
@@ -43,6 +46,7 @@ public sealed class ClubNounTests : IDisposable
             ? text.Replace("\"class_noun\": \"meeting\"", "\"class_noun_unused\": \"x\"")
             : text.Replace("\"class_noun\": \"meeting\"", $"\"class_noun\": \"{noun}\"");
         File.WriteAllText(config, text);
+        _workspace = workspace;
         return new PlantoirTools(workspace);
     }
 
@@ -209,5 +213,472 @@ public sealed class ClubNounTests : IDisposable
         var refused = Club("meeting").PlanAddNextClass("ICS3U", 1, "next");
         Assert.Equal(NextClassPlanner.NoUnitsInANumberedCourse("ICS3U", "Week"), ModelCopy(refused));
         Assert.Null(refused.Meta?[AssistToolAnswer.TeacherSummaryKey]);
+    }
+
+    // ---- The menus' items in a club (#1027) --------------------------------------------
+
+    private static JsonNode ItemTitles => SubjectMenusContractTests.Rule["layout"]!["itemTitles"]!;
+
+    private static readonly System.Text.RegularExpressions.Regex SaysClass = new(@"\b[Cc]lass(es)?\b");
+
+    /// <summary>
+    /// Russell's ruling on #1027: in a club the Meetings menu's items say
+    /// meeting. Every item of Section ▸ and Classes ▸ the contract lists has its
+    /// <c>title</c> in a course and its <c>titleForAMeeting</c> in a club (the
+    /// menu bar and a section row's menu both read <see cref="SubjectMenuLayout.TitleHere"/>);
+    /// every other item says neither and has one title, so the list is
+    /// complete. The mac's <c>testEveryItemTitleSaysMeetingInAClub</c>.
+    /// MUST FAIL with a club title put back to its class words.
+    /// </summary>
+    [Fact]
+    public void EveryItemTitleSaysMeetingInAClub()
+    {
+        var listed = ItemTitles["items"]!.AsObject();
+        Assert.Equal(5, listed.Count);
+        foreach (var menu in Enum.GetValues<SubjectMenuLayout.Menu>())
+            foreach (var group in SubjectMenuLayout.Groups(menu))
+                foreach (var entry in group)
+                {
+                    if (entry is not SubjectMenuLayout.Entry.OfItem(var item)) continue;
+                    string? asAClass = SubjectMenuLayout.TitleHere(item, ClassNoun.Class);
+                    string? asAMeeting = SubjectMenuLayout.TitleHere(item, ClassNoun.Meeting);
+                    if (listed[SubjectMenuRules.ContractName(item)] is { } titles)
+                    {
+                        Assert.Equal(titles["title"]!.ToString(), asAClass);
+                        Assert.Equal(titles["titleForAMeeting"]!.ToString(), asAMeeting);
+                    }
+                    else
+                    {
+                        Assert.Equal(asAClass, asAMeeting);
+                        Assert.Null(SubjectMenuLayout.TitleSayingTheNoun(item, ClassNoun.Meeting));
+                    }
+                    Assert.DoesNotMatch(SaysClass, asAMeeting ?? "");
+                }
+        foreach (var (name, _) in listed)
+            Assert.Contains(Enum.GetValues<SubjectMenuRules.Item>(), item => SubjectMenuRules.ContractName(item) == name
+                                                                    && SubjectMenuLayout.MenuContaining(item) is not null);
+    }
+
+    /// <summary>The trail's "ran from a menu" path names the item as the club's menu bar draws it (<c>ranFromAMenuCases</c>). MUST FAIL with the path read in the ordinary noun.</summary>
+    [Fact]
+    public void TheRanFromAMenuPathSaysMeetingInAClub()
+    {
+        var cases = ItemTitles["ranFromAMenuCases"]!.AsArray();
+        Assert.True(cases.Count >= 4);
+        foreach (var c in cases)
+        {
+            var item = Enum.GetValues<SubjectMenuRules.Item>().Single(i => SubjectMenuRules.ContractName(i) == c!["item"]!.ToString());
+            var noun = ClassPageSchemes.NounReading(c!["noun"]!.ToString());
+            Assert.Equal(c["path"]!.ToString(), Plantoir.Core.Models.SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleHere(item, noun)!, noun));
+        }
+    }
+
+    /// <summary>
+    /// Every club sentence that names one of the items names it as the club's
+    /// menu bar does: where the ordinary twin says "Classes ▸ Class Dates…", the
+    /// club's says "Meetings ▸ Meeting Dates…". Walks every <c>…ForAMeeting</c>
+    /// and <c>…FromTheMeetingsMenu</c> key of the contract's wording.
+    /// </summary>
+    [Fact]
+    public void EveryClubSentenceNamesTheItemAsTheClubsMenuBarDoes()
+    {
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        int namesAnItem = 0;
+        foreach (var (key, value) in wording)
+        {
+            string? ordinaryKey = key.EndsWith("ForAMeeting", StringComparison.Ordinal) ? key[..^"ForAMeeting".Length]
+                : key.EndsWith("FromTheMeetingsMenu", StringComparison.Ordinal) ? key[..^"FromTheMeetingsMenu".Length] + "FromTheMenu"
+                : null;
+            if (ordinaryKey is null) continue;
+            string club = value!.ToString();
+            string ordinary = wording[ordinaryKey]!.ToString();
+            foreach (var (name, _) in ItemTitles["items"]!.AsObject())
+            {
+                var item = Enum.GetValues<SubjectMenuRules.Item>().Single(i => SubjectMenuRules.ContractName(i) == name);
+                string ordinaryPath = SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleHere(item, ClassNoun.Class)!, ClassNoun.Class);
+                if (!ordinary.Contains(ordinaryPath)) continue;
+                namesAnItem++;
+                Assert.Contains(SubjectMenuLayout.Path(item, SubjectMenuLayout.TitleHere(item, ClassNoun.Meeting)!, ClassNoun.Meeting), club);
+            }
+        }
+        Assert.True(namesAnItem >= 2, $"{namesAnItem} club sentences name an item");
+        Assert.Equal(wording["menuNeedsClassDatesFirstForAMeeting"]!.ToString(), AddClassWords.NeedsClassDatesFirst(ClassNoun.Meeting));
+    }
+
+    /// <summary>
+    /// Undo Last Change's nothing-to-undo from the menu on a club's section
+    /// names the Section or Meetings menu: the window sends the section's
+    /// course in the call's <c>_meta</c> (#1027). MUST FAIL with the sentence
+    /// read in the ordinary noun.
+    /// </summary>
+    /// <summary>
+    /// #1027's review, low 5: the window's <c>_meta</c> keys are read as text
+    /// or not at all. A number or an object under either key reads as absent
+    /// (the Section menu, the class form) rather than throwing before the call
+    /// begins. MUST FAIL with <c>GetValue&lt;string&gt;</c> put back.
+    /// </summary>
+    [Fact]
+    public void AMetaValueThatIsNotTextReadsAsAbsent()
+    {
+        var meta = new JsonObject
+        {
+            [AssistWorkspace.CourseMetaKey] = 42,
+            [AssistWorkspace.MenuMetaKey] = new JsonObject { ["menu"] = "Classes" },
+        };
+        Assert.Null(AssistWorkspace.MetaText(meta, AssistWorkspace.CourseMetaKey));
+        Assert.Null(AssistWorkspace.MetaText(meta, AssistWorkspace.MenuMetaKey));
+        Assert.Null(AssistWorkspace.MetaText(null, AssistWorkspace.CourseMetaKey));
+        Assert.Null(AssistWorkspace.MetaText(new JsonObject(), AssistWorkspace.CourseMetaKey));
+        Assert.Equal("ICS3U", AssistWorkspace.MetaText(new JsonObject { [AssistWorkspace.CourseMetaKey] = "ICS3U" }, AssistWorkspace.CourseMetaKey));
+    }
+
+    [Fact]
+    public void NothingToUndoOnAClubsSectionNamesTheMeetingsMenu()
+    {
+        Club("meeting");
+        var workspace = _workspace!;
+        workspace.MenuCourseOfTheCall = "ICS3U";
+        Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Meeting), workspace.NothingToUndoFromTheMenu());
+        Assert.Contains("the Section or Meetings menu", workspace.NothingToUndoFromTheMenu());
+        workspace.MenuCourseOfTheCall = null;
+        Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class), workspace.NothingToUndoFromTheMenu());
+    }
+
+    /// <summary>
+    /// #1027's review, MEDIUM 1: Meetings ▸ Meeting Dates… opens the Class
+    /// Dates dialog, and in a club what it says itself is the contract's
+    /// <c>…ForAMeeting</c> twin: the purpose line, the status once the dates
+    /// are read, the refusal of a date too far from today and the refusal of
+    /// a half-read column. What the model reads stays the class form. MUST
+    /// FAIL with any of them said in the ordinary noun.
+    /// </summary>
+    [Fact]
+    public void TheClassDatesDialogSaysMeetingInAClub()
+    {
+        Club("meeting");
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        string Said(string key) => wording[key]!.ToString().Replace("{course}", "ICS3U").Replace("{section}", "1");
+        string folder = Path.Combine(_folder, "courses", "ICS3U");
+        var club = new Course("ICS3U", folder, CourseConfiguration.Load(Path.Combine(folder, "course_config.json")));
+        Assert.Equal(ClassNoun.Meeting, club.Configuration.ClassNoun);
+
+        Assert.Equal(Said("classDatesPurposeForAMeeting"), ClassDatesDialogWords.Purpose(club));
+        Assert.Equal(Said("classDatesTooFarFromTodayForAMeeting"),
+                     ClassDatesDialogWords.CannotBeADate(new[] { new DateOnly(2569, 9, 8) }, club, 1));
+
+        var tuesdays = Enumerable.Range(0, 12).Select(week => new DateOnly(2026, 9, 8).AddDays(7 * week)).ToList();
+        Assert.Equal(Said("classDatesToRememberForAMeeting").Replace("2026-12-15 (Tuesday)", "2026-11-24 (Tuesday)"),
+                     ClassDatesDialogWords.Found(tuesdays, club, 1));
+
+        const string Typed = "2026-09-08\nbanana\n2026-09-10";
+        var asTheDialogReads = Assert.Throws<AssistRefusal>(() => SectionScheduleSource.ReadTypedText(Typed, null, club.Configuration.ClassNoun));
+        Assert.Equal(Said("classDatesHalfReadForAMeeting").Replace("2026-13-01", "“banana”").Replace("the pasted dates", "what you pasted"),
+                     asTheDialogReads.Message);
+        var asTheModelReads = Assert.Throws<AssistRefusal>(() => SectionScheduleSource.ReadTypedText(Typed));
+        Assert.Equal(Said("classDatesHalfRead").Replace("2026-13-01", "“banana”").Replace("the pasted dates", "what you pasted"),
+                     asTheModelReads.Message);
+    }
+
+    // ---- #1027 round 3 (review 2).
+
+    /// <summary>
+    /// Every key of the contract whose words say class has a club twin
+    /// (<c>…ForAMeeting</c>, or <c>…FromTheMeetingsMenu</c> for a
+    /// <c>…FromTheMenu</c> key) or is on <c>staysClass</c> with its reason, and
+    /// nothing stale is on that list. MUST FAIL with any twin taken out.
+    /// </summary>
+    [Fact]
+    public void EveryClassSentenceInTheContractHasAClubFormOrAReason()
+    {
+        var file = ContractLoader.LoadJson("assist-wording.json");
+        var wording = file["wording"]!.AsObject();
+        var staysClass = file["staysClass"]!.AsObject();
+        var withoutAClubForm = new List<string>();
+        int saidInClass = 0;
+        foreach (var (key, value) in wording)
+        {
+            if (key.EndsWith("ForAMeeting") || key.EndsWith("FromTheMeetingsMenu")) continue;
+            if (value is not JsonValue || !SaysClass.IsMatch(value.ToString())) continue;
+            saidInClass++;
+            bool hasATwin = wording.ContainsKey(key + "ForAMeeting")
+                || (key.EndsWith("FromTheMenu") && wording.ContainsKey(key[..^"FromTheMenu".Length] + "FromTheMeetingsMenu"));
+            if (!hasATwin && !staysClass.ContainsKey(key)) withoutAClubForm.Add(key);
+        }
+        Assert.True(saidInClass > 50, $"only {saidInClass} class sentences read");
+        Assert.True(withoutAClubForm.Count == 0, "say class with no club form and no reason: " + string.Join(", ", withoutAClubForm));
+        foreach (var (key, reason) in staysClass)
+        {
+            Assert.True(wording.ContainsKey(key), $"staysClass names no key {key}");
+            Assert.True(SaysClass.IsMatch(wording[key]!.ToString()), $"{key} no longer says class");
+            Assert.False(wording.ContainsKey(key + "ForAMeeting"), $"{key} has a twin, so it is not an exception");
+            Assert.False(string.IsNullOrWhiteSpace(reason!.ToString()), key);
+        }
+    }
+
+    /// <summary>Review 2, MEDIUM 1: Add Meeting…'s trail counts say meeting (<c>itemTitles.countsCases</c>), and so do Deploy's hide counts.</summary>
+    [Fact]
+    public void TheRanFromAMenuCountsSayMeetingInAClub()
+    {
+        var cases = ContractLoader.LoadJson("shared-rules.json")["subjectMenus"]!["layout"]!["itemTitles"]!["countsCases"]!.AsArray();
+        Assert.Equal(5, cases.Count);
+        foreach (var testCase in cases)
+        {
+            var way = Enum.Parse<SubjectMenuRules.AddClassWay>(testCase!["way"]!.ToString(), ignoreCase: true);
+            var noun = testCase["noun"]!.ToString() == "meeting" ? ClassNoun.Meeting : ClassNoun.Class;
+            Assert.Equal(testCase["counts"]!.ToString(), SectionVerbs.AddClassCounts(way, noun));
+        }
+        Assert.Equal("1 meeting dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(1, ClassNoun.Meeting));
+        Assert.Equal("3 classes dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(3));
+    }
+
+    /// <summary>
+    /// Review 2, MEDIUM 2: a make-room plan that runs out of dates says meeting
+    /// days on a club's card and in the refusal the teacher reads; the model
+    /// reads the class form. MUST FAIL with the problem typed in the class noun only.
+    /// </summary>
+    [Fact]
+    public void APlanShortOfDatesSaysMeetingToAClubsTeacher()
+    {
+        var tools = Club("meeting");
+        var plan = tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2, 40);
+        string card = TeacherCopy(plan);
+        Assert.Contains("meeting day", card);
+        Assert.DoesNotContain("class day", card);
+        Assert.DoesNotContain("class date", card);
+        Assert.Contains("class day", ModelCopy(plan));
+
+        var write = tools.MakeRoomForClasses("ICS3U", 1, 1, 2, 40);
+        Assert.Contains("meeting date", TeacherCopy(write));
+        Assert.False(SaysClass.IsMatch(TeacherCopy(write)), TeacherCopy(write));
+        Assert.Contains("class date", ModelCopy(write));
+    }
+
+    /// <summary>Review 2, lows 3 and 5: the assistant's dates card lines say meeting in a club; the too-far refusal names every such date.</summary>
+    [Fact]
+    public void TheDatesCardLinesSayMeetingAndTheRefusalNamesEveryDate()
+    {
+        Club("meeting");
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        string folder = Path.Combine(_folder, "courses", "ICS3U");
+        var club = new Course("ICS3U", folder, CourseConfiguration.Load(Path.Combine(folder, "course_config.json")));
+        Assert.Equal("Could not open the meeting dates dialog.", ClassDatesDialogWords.CouldNotOpen(club));
+        Assert.Equal("No meeting dates were recorded.", ClassDatesDialogWords.NoneRecorded(club));
+        Assert.Equal(wording["datesNotGivenYetForAMeeting"]!.ToString(), ClassDatesDialogWords.NotGivenYet(club));
+        Assert.Equal(wording["rememberedTheClassDatesForAMeeting"]!.ToString().Replace("{course}", "ICS3U").Replace("{section}", "1"),
+                     ClassDatesDialogWords.Remembered(12, club, 1));
+
+        var today = new DateOnly(2026, 11, 20);
+        var typed = new[] { new DateOnly(2026, 9, 8), new DateOnly(2569, 9, 8), new DateOnly(2570, 1, 5), new DateOnly(2569, 9, 8) };
+        var refused = TimetableMemory.EveryUnbelievable(typed, today);
+        Assert.Equal(new[] { new DateOnly(2569, 9, 8), new DateOnly(2570, 1, 5) }, refused);
+        string said = ClassDatesDialogWords.CannotBeADate(refused, club, 1);
+        Assert.StartsWith("2569-09-08 and 2570-01-05 are too far from today to be meeting dates", said);
+        Assert.Contains("those dates corrected", said);
+    }
+
+    /// <summary>
+    /// #1027 round 4: the planners' refusals were typed in code with the class
+    /// word. Each is now a contract key with its twin: the teacher reads the
+    /// club's, the model the class form (#267). MUST FAIL with any of them
+    /// thrown without the course's noun.
+    /// </summary>
+    [Fact]
+    public void ThePlannersRefusalsSayMeetingToAClubsTeacher()
+    {
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        var tools = Club("meeting");
+        var none = tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2, 0);
+        Assert.Equal(wording["askForAtLeastOneClassForAMeeting"]!.ToString(), TeacherCopy(none));
+        Assert.Equal(wording["askForAtLeastOneClass"]!.ToString(), ModelCopy(none));
+
+        File.Delete(Path.Combine(_folder, "courses", "ICS3U", ".internal", "timetable", "section1.json"));
+        var noDates = tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2, 1);
+        Assert.Equal(AssistWording.CannotMoveClassesWithoutDatesForAMeeting("ICS3U", 1), TeacherCopy(noDates));
+        Assert.True(SaysClass.IsMatch(ModelCopy(noDates)), ModelCopy(noDates));
+        Assert.DoesNotContain("meeting", ModelCopy(noDates));
+    }
+
+    /// <summary>
+    /// The guard's other half: every club twin says meeting and never class, so
+    /// a twin typed by copying the class form fails here. MUST FAIL with a
+    /// <c>…ForAMeeting</c> key that still says class.
+    /// </summary>
+    [Fact]
+    public void EveryClubTwinSaysMeetingAndNeverClass()
+    {
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!.AsObject();
+        var twinsSayingClass = new List<string>();
+        int twinsRead = 0;
+        foreach (var (key, value) in wording)
+        {
+            if (!key.EndsWith("ForAMeeting") && !key.EndsWith("FromTheMeetingsMenu")) continue;
+            if (value is not JsonValue) continue;
+            twinsRead++;
+            if (SaysClass.IsMatch(value.ToString())) twinsSayingClass.Add(key);
+        }
+        Assert.True(twinsRead > 50, $"only {twinsRead} twins read");
+        Assert.True(twinsSayingClass.Count == 0, "a club twin says class: " + string.Join(", ", twinsSayingClass));
+    }
+    // ---- The result line each Meetings item shows (#1027 review 3, M1) -------
+
+    /// <summary>
+    /// The scratch club with its meeting dates one day later than its pages, so
+    /// a re-date moves all three.
+    /// </summary>
+    private PlantoirTools ClubWhoseDatesMoved()
+    {
+        var tools = Club("meeting");
+        var later = Enumerable.Range(0, 10).Select(week => new DateOnly(2025, 9, 19).AddDays(7 * week)).ToList();
+        TimetableMemory.Write(_folder, "ICS3U", 1, later, "contract test", new DateOnly(2026, 9, 1));
+        return tools;
+    }
+
+    private Course TheClub => Workspace.DiscoverCourses(_folder).Single(found => found.Code == "ICS3U");
+
+    /// <summary>
+    /// What a club's teacher reads right after using each item, item by item:
+    /// the tool's teacher copy for the items the menu's server runs, the
+    /// dialog's own lines for Meeting Dates… and Get Ready for the Start of
+    /// the Year….
+    /// </summary>
+    private Dictionary<SubjectMenuRules.Item, Func<Task<IReadOnlyList<string>>>> ResultLinesInAClub() => new()
+    {
+        [SubjectMenuRules.Item.AddClass] = async () =>
+        {
+            var tools = Club("meeting");
+            var added = tools.AddNextClass("ICS3U", 1);
+            var inANewUnit = tools.AddNextClass("ICS3U", 1, unit: "next");
+            var copied = tools.AddNextClass("ICS3U", 1, duplicate: "Week 1");
+            await Task.CompletedTask;
+            return new[] { TeacherCopy(added), TeacherCopy(inANewUnit), TeacherCopy(copied) };
+        },
+        [SubjectMenuRules.Item.ClassDates] = () =>
+        {
+            Club("meeting");
+            var club = TheClub;
+            var dates = new[] { new DateOnly(2025, 9, 18), new DateOnly(2025, 9, 25) };
+            IReadOnlyList<string> lines = new[]
+            {
+                ClassDatesDialogWords.DatesBoxName(club.Configuration.ClassNoun),
+                ClassDatesDialogWords.Purpose(club),
+                ClassDatesDialogWords.Found(dates, club, 1),
+                ClassDatesDialogWords.Remembered(dates.Length, club, 1),
+                ClassDatesDialogWords.NotGivenYet(club),
+                ClassDatesDialogWords.NoneRecorded(club),
+                ClassDatesDialogWords.CouldNotOpen(club),
+            };
+            return Task.FromResult(lines);
+        },
+        [SubjectMenuRules.Item.ReDateClasses] = async () =>
+            new[] { TeacherCopy(await ClubWhoseDatesMoved().ReDateClasses("ICS3U", 1)) },
+        [SubjectMenuRules.Item.MakeRoomForClasses] = () =>
+        {
+            var made = Club("meeting").MakeRoomForClasses("ICS3U", 1, 1, 2, 1);
+            return Task.FromResult<IReadOnlyList<string>>(new[] { TeacherCopy(made) });
+        },
+        [SubjectMenuRules.Item.GetReadyForTheStartOfTheYear] = () =>
+        {
+            Club("meeting");
+            var plan = _workspace!.PlanStartOfYear("ICS3U", 1);
+            var outcome = _workspace.PrepareForStartOfYear("ICS3U", 1, plan.Code, StartOfYearAskedFrom.TheApp);
+            return Task.FromResult<IReadOnlyList<string>>(new[] { plan.TeacherText, outcome.Message });
+        },
+        [SubjectMenuRules.Item.PublishClassForADate] = async () =>
+        {
+            var tools = Linked(Club("meeting"), visible: false);
+            var published = await tools.PublishClassOn("ICS3U", 1, "2025-09-18",
+                                                       new Progress<ModelContextProtocol.ProgressNotificationValue>(_ => { }), default, preview: false);
+            return new[] { TeacherCopy(published) };
+        },
+        // Meetings ▸ Roll Over to a New Year… (#954, met #1027 on the
+        // integration tree): the dialog's own lines in the club's noun, then
+        // the teacher's copy of the menu's rollover for each answer, a new
+        // website (from a Netlify record) and last year's.
+        [SubjectMenuRules.Item.RollOverToANewYear] = async () =>
+        {
+            Club("meeting");
+            var club = TheClub;
+            var lines = new List<string>
+            {
+                RollOverWords.Intro(club.Configuration.ClassNoun),
+                RollOverWords.Dates(RollOverFromTheMenu.DayAsWritten(new DateOnly(2025, 9, 18)),
+                                    RollOverFromTheMenu.DayAsWritten(new DateOnly(2025, 11, 20)), club.Configuration.ClassNoun),
+                RollOverWords.DatesAreOld(club.Configuration.ClassNoun),
+            };
+            foreach (string website in new[] { "new", "same" })
+            {
+                ClubWhoseDatesMoved();
+                string records = Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites");
+                Directory.CreateDirectory(records);
+                File.WriteAllText(Path.Combine(records, "section1.json"), """{"name": "ics3u-s1-2025-club"}""");
+                var fromTheMenu = new AssistWorkspace(_folder, new FakeLauncher(), undo: new UndoHistory()) { Surface = AssistSurface.Menu };
+                var rolledOver = await new PlantoirTools(fromTheMenu).ReDateClasses(
+                    "ICS3U", 1, timetable: "", block: "", cancellation: default, pages: null, meetings: null,
+                    firstDay: "", startYear: 0, website: website, rollover: "yes");
+                lines.Add(TeacherCopy(rolledOver));
+            }
+            return lines;
+        },
+    };
+
+    /// <summary>
+    /// Every item of the Meetings menu, and every Section item a club retitles,
+    /// walked from the layout: none of the lines its teacher reads right after
+    /// using it says class. MUST FAIL with any of the three result lines review
+    /// 3 found (Publish Meeting for a Date…, Re-date Meetings…, Make Room for
+    /// Meetings…) said in the class form, and with an item added to the menu
+    /// and not walked here.
+    /// </summary>
+    [Fact]
+    public async Task EveryMeetingsItemsResultLineNeverSaysClassToAClubsTeacher()
+    {
+        var items = new List<SubjectMenuRules.Item>();
+        foreach (var group in SubjectMenuLayout.Groups(SubjectMenuLayout.Menu.Classes))
+            foreach (var entry in group)
+                if (entry is SubjectMenuLayout.Entry.OfItem item) items.Add(item.Item);
+        foreach (var group in SubjectMenuLayout.Groups(SubjectMenuLayout.Menu.Section))
+            foreach (var entry in group)
+                if (entry is SubjectMenuLayout.Entry.OfItem item
+                    && SubjectMenuLayout.TitleSayingTheNoun(item.Item, ClassNoun.Meeting) is not null)
+                    items.Add(item.Item);
+        Assert.Contains(SubjectMenuRules.Item.PublishClassForADate, items);
+
+        var walks = ResultLinesInAClub();
+        var sayingClass = new List<string>();
+        foreach (var item in items)
+        {
+            Assert.True(walks.ContainsKey(item), $"{item} is on the club's menus and its result line is not walked");
+            foreach (string line in await walks[item]())
+            {
+                Assert.False(string.IsNullOrWhiteSpace(line), $"{item} said nothing");
+                if (SaysClass.IsMatch(line)) sayingClass.Add($"{item}: {line}");
+            }
+        }
+        Assert.True(sayingClass.Count == 0, "a club's teacher reads class:\n" + string.Join("\n", sayingClass));
+    }
+
+    /// <summary>
+    /// The three lines review 3 found, word for word the mac's in a club, and
+    /// the model's copy still the class form (#267). MUST FAIL with any of the
+    /// three said in the class form to the teacher, or the noun reaching the
+    /// model.
+    /// </summary>
+    [Fact]
+    public async Task TheThreeResultLinesAreTheMacsInAClub()
+    {
+        var published = await Linked(Club("meeting"), visible: false).PublishClassOn(
+            "ICS3U", 1, "2025-09-18", new Progress<ModelContextProtocol.ProgressNotificationValue>(_ => { }), default, preview: false);
+        Assert.Equal(AssistWording.PublishedTheClassOnForAMeeting("2025-09-18"), TeacherCopy(published));
+        Assert.DoesNotContain("meeting", ModelCopy(published), StringComparison.OrdinalIgnoreCase);
+
+        var reDated = await ClubWhoseDatesMoved().ReDateClasses("ICS3U", 1);
+        Assert.StartsWith("Re-dated 3 meetings and ", TeacherCopy(reDated));
+        Assert.StartsWith("Re-dated 3 classes and ", ModelCopy(reDated));
+        Assert.DoesNotContain("meeting", ModelCopy(reDated), StringComparison.OrdinalIgnoreCase);
+
+        var made = Club("meeting").MakeRoomForClasses("ICS3U", 1, 1, 2, 1);
+        Assert.Equal(AssistWording.MadeRoomForAMeeting(1, "Week 2"), TeacherCopy(made));
+        Assert.Contains("Because other classes moved", ModelCopy(made));
+        Assert.StartsWith(AssistWording.MadeRoom(1, "Week 2"), ModelCopy(made));
     }
 }

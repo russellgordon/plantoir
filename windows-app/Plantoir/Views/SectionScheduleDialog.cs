@@ -39,9 +39,6 @@ public sealed class SectionScheduleDialog : ContentDialog
     private readonly StackPanel _filePanel = new() { Spacing = 6 };
     private readonly StackPanel _sheetPanel = new() { Spacing = 6 };
 
-    /// <summary>The dates box's name: the mac's <c>AccessibilityNames.classDates</c>.</summary>
-    public const string ClassDatesName = "Class dates";
-
     /// <summary>The sheet link's name: the mac's <c>AccessibilityNames.googleSheetAddress</c>.</summary>
     public const string GoogleSheetAddressName = "Google Sheet address";
 
@@ -249,7 +246,7 @@ public sealed class SectionScheduleDialog : ContentDialog
     {
         // Each box has a name of its own, the mac's words (#993 D41, #1012,
         // #1020): a placeholder is a hint that goes as the teacher types.
-        AutomationProperties.SetName(_typedBox, ClassDatesName);
+        AutomationProperties.SetName(_typedBox, ClassDatesDialogWords.DatesBoxName(_course.Configuration.ClassNoun));
         AutomationProperties.SetAutomationId(_typedBox, "sectionScheduleTypedField");
         AutomationProperties.SetName(_sheetUrlBox, GoogleSheetAddressName);
         AutomationProperties.SetAutomationId(_sheetUrlBox, "sectionScheduleGoogleSheetField");
@@ -258,9 +255,8 @@ public sealed class SectionScheduleDialog : ContentDialog
 
         var main = new StackPanel { Spacing = 14, MinWidth = 460, MaxWidth = 560 };
 
-        main.Children.Add(FormBuilders.DialogExplanation(
-            "Give Plantoir the class dates once, so it can date new class pages for you. " +
-            "They are kept inside the course folder, so they travel with it through backup, archive and restore."));
+        // #1027: in the course's noun, "meeting" in a club.
+        main.Children.Add(FormBuilders.DialogExplanation(ClassDatesDialogWords.Purpose(_course)));
 
         if (!string.IsNullOrWhiteSpace(reason))
         {
@@ -448,9 +444,9 @@ public sealed class SectionScheduleDialog : ContentDialog
 
             // What TimetableMemory.Read would not believe, Write refuses; say
             // which date rather than "could not save" (#144).
-            if (TimetableMemory.Unbelievable(_parsedDates, today) is { } impossible)
+            if (TimetableMemory.EveryUnbelievable(_parsedDates, today) is { Count: > 0 } impossible)
             {
-                _statusBlock.Text = $"{DateText.Iso(impossible)} can't be a class date. Check the year and read the dates again.";
+                _statusBlock.Text = ClassDatesDialogWords.CannotBeADate(impossible, _course, _sectionNumber);
                 _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
                 args.Cancel = true;
                 return;
@@ -496,7 +492,7 @@ public sealed class SectionScheduleDialog : ContentDialog
                     _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
                     return false;
                 }
-                outcome = SectionScheduleSource.ReadTypedText(text, _chosenOrdering);
+                outcome = SectionScheduleSource.ReadTypedText(text, _chosenOrdering, _course.Configuration.ClassNoun);
             }
             else if (route == 1)
             {
@@ -506,7 +502,7 @@ public sealed class SectionScheduleDialog : ContentDialog
                     _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
                     return false;
                 }
-                outcome = SectionScheduleSource.ReadFromFile(_pickedFilePath, _chosenOrdering);
+                outcome = SectionScheduleSource.ReadFromFile(_pickedFilePath, _chosenOrdering, _course.Configuration.ClassNoun);
             }
             else
             {
@@ -522,7 +518,7 @@ public sealed class SectionScheduleDialog : ContentDialog
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
                 string csv = await http.GetStringAsync(csvUri);
                 var lines = csv.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-                outcome = SectionScheduleSource.Read(lines, "Google Sheet", "Google Sheet", _chosenOrdering);
+                outcome = SectionScheduleSource.Read(lines, "Google Sheet", "Google Sheet", _chosenOrdering, _course.Configuration.ClassNoun);
             }
 
             if (outcome is ScheduleOutcome.Question q)
@@ -545,7 +541,7 @@ public sealed class SectionScheduleDialog : ContentDialog
                     return false;
                 }
 
-                _statusBlock.Text = $"Found {_parsedDates.Count} class {(_parsedDates.Count == 1 ? "date" : "dates")} ({DateText.Iso(_parsedDates[0])} to {DateText.Iso(_parsedDates[^1])}).";
+                _statusBlock.Text = ClassDatesDialogWords.Found(_parsedDates, _course, _sectionNumber);
                 _statusBlock.Foreground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
                 return true;
             }

@@ -90,18 +90,22 @@ enum SectionReDatePlanner {
         }
     }
 
-    enum Problem: LocalizedError {
+    enum Problem: LocalizedError, SaidInACoursesNoun {
         case noTimetable(String, Int)
         case noClasses(String, Int)
 
         var errorDescription: String? {
+            return sentence(noun: .class)
+        }
+
+        /// The refusal in a course's own noun (#1027): "meeting" in a club.
+        /// The model is given `errorDescription`, the class form (#267).
+        func sentence(noun: ClassNoun) -> String {
             switch self {
             case .noTimetable(let code, let number):
-                return "I don’t know when \(code) Section \(number) meets, so I can’t re-date it. "
-                     + AssistWording.mayIAskForYourDates
+                return AssistWording.cannotReDateWithoutDates(code: code, number: number, noun: noun)
             case .noClasses(let code, let number):
-                return "\(code) Section \(number) has no numbered class pages, so there is nothing "
-                     + "to re-date."
+                return AssistWording.noNumberedClassPagesToReDate(code: code, number: number, noun: noun)
             }
         }
     }

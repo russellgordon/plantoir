@@ -1,3 +1,5 @@
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -536,9 +538,9 @@ public sealed partial class AgentGuidanceTests : IDisposable
         finally { ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
     }
 
-    /// <summary>#953: a read-only file and a deny rule are permissions, refused at once and never said as "in use".</summary>
+    /// <summary>#953: a read-only file is a permission, refused at once and never said as "in use".</summary>
     [Fact]
-    public void APermissionIsRefusedAtOnceAndNotSaidAsInUse()
+    public void AReadOnlyFileIsRefusedAtOnceAndNotSaidAsInUse()
     {
         string file = Path.Combine(_folder, "AGENTS.md");
         File.WriteAllText(file, "Mine.\n", new UTF8Encoding(false));
@@ -556,16 +558,22 @@ public sealed partial class AgentGuidanceTests : IDisposable
         File.SetAttributes(file, FileAttributes.Normal);
         Assert.Empty(pauses);
         Assert.Equal(before, File.ReadAllBytes(file));
+        Assert.Empty(Temporaries(_folder));
+    }
+
+    /// <summary>#953: a deny rule is a permission, refused at once in the system's words for it, never as "in use".</summary>
+    [DenyReplaceBitesFact]
+    public void ADenyRuleIsRefusedAtOnceAndSaidAsAccessDenied()
+    {
+        string file = Path.Combine(_folder, "AGENTS.md");
+        File.WriteAllText(file, "Mine.\n", new UTF8Encoding(false));
+        byte[] before = File.ReadAllBytes(file);
+        var pending = new AgentGuidance.PendingAppend("AGENTS.md", file, "NEW");
+        var pauses = new List<int>();
 
         // A deny rule: the file may not be deleted (so not replaced), and the folder may not delete it either.
-        var me = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
-        var fileDeny = new System.Security.AccessControl.FileSystemAccessRule(me,
-            System.Security.AccessControl.FileSystemRights.Delete | System.Security.AccessControl.FileSystemRights.WriteData,
-            System.Security.AccessControl.AccessControlType.Deny);
-        var folderDeny = new System.Security.AccessControl.FileSystemAccessRule(me,
-            System.Security.AccessControl.FileSystemRights.DeleteSubdirectoriesAndFiles,
-            System.Security.AccessControl.InheritanceFlags.None, System.Security.AccessControl.PropagationFlags.None,
-            System.Security.AccessControl.AccessControlType.Deny);
+        var fileDeny = DenyReplaceBitesFactAttribute.FileDeny();
+        var folderDeny = DenyReplaceBitesFactAttribute.FolderDeny();
         var fileInfo = new FileInfo(file);
         var folderInfo = new DirectoryInfo(_folder);
         var fileSecurity = fileInfo.GetAccessControl();
@@ -723,6 +731,74 @@ public sealed partial class AgentGuidanceTests : IDisposable
             string target = Path.Combine(to, Path.GetRelativePath(from, file));
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file, target, overwrite: true);
+        }
+    }
+}
+
+/// <summary>
+/// A fact that needs deny ACEs to stop this account REPLACING a file (the
+/// rename over it that <see cref="AgentGuidance.AppendAfterYes"/> makes):
+/// SKIPPED, saying why, when they do not (over SSH the account's token is an
+/// administrator's, with the backup and restore privileges enabled, and the
+/// rename passes over both rules: measured on the PC, 2026-11-21), the
+/// convention of <see cref="DenyBitesFactAttribute"/>. The probe makes a
+/// temporary folder and file, puts on them the very rules the test uses,
+/// tries the same rename, and removes everything.
+/// </summary>
+public sealed class DenyReplaceBitesFactAttribute : FactAttribute
+{
+    private static readonly Lazy<bool> DenyBites = new(Probe);
+
+    public DenyReplaceBitesFactAttribute()
+    {
+        if (!DenyBites.Value)
+            Skip = "A deny ACE does not stop this account replacing a file (an administrator's token, as over SSH), so "
+                 + "'a deny rule is refused at once and said as Access is denied' cannot be tried on the disk here; "
+                 + "AReadOnlyFileIsRefusedAtOnceAndNotSaidAsInUse covers the refusal at once, and "
+                 + "TheFailureLineIsTheContractsAndTheNoticeHasNoPath the system's sentence for an access-denied error.";
+    }
+
+    /// <summary>On the file: it may not be deleted (so not replaced) nor written.</summary>
+    public static FileSystemAccessRule FileDeny() => new(WindowsIdentity.GetCurrent().User!,
+        FileSystemRights.Delete | FileSystemRights.WriteData, AccessControlType.Deny);
+
+    /// <summary>On the folder: it may not delete the file either.</summary>
+    public static FileSystemAccessRule FolderDeny() => new(WindowsIdentity.GetCurrent().User!,
+        FileSystemRights.DeleteSubdirectoriesAndFiles, InheritanceFlags.None, PropagationFlags.None, AccessControlType.Deny);
+
+    private static bool Probe()
+    {
+        string folder = Directory.CreateTempSubdirectory("deny-replace-probe-").FullName;
+        string path = Path.Combine(folder, "probe.md");
+        string temporary = Path.Combine(folder, "probe.tmp");
+        File.WriteAllText(path, "probe");
+        File.WriteAllText(temporary, "new");
+        var file = new FileInfo(path);
+        var directory = new DirectoryInfo(folder);
+        var fileDeny = FileDeny();
+        var folderDeny = FolderDeny();
+        try
+        {
+            var fileRights = file.GetAccessControl();
+            fileRights.AddAccessRule(fileDeny);
+            file.SetAccessControl(fileRights);
+            var folderRights = directory.GetAccessControl();
+            folderRights.AddAccessRule(folderDeny);
+            directory.SetAccessControl(folderRights);
+            try
+            {
+                File.Move(temporary, path, overwrite: true);
+                return false;
+            }
+            catch (UnauthorizedAccessException) { return true; }
+            catch (IOException) { return true; }
+        }
+        catch { return false; }
+        finally
+        {
+            try { var r = directory.GetAccessControl(); r.RemoveAccessRuleSpecific(folderDeny); directory.SetAccessControl(r); } catch { }
+            try { var r = new FileInfo(path).GetAccessControl(); r.RemoveAccessRuleSpecific(fileDeny); new FileInfo(path).SetAccessControl(r); } catch { }
+            try { Directory.Delete(folder, recursive: true); } catch { }
         }
     }
 }
