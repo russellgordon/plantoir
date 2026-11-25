@@ -15,7 +15,15 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public static class AssistSectionRestore
 {
-    public sealed class Problem(string message) : Exception(message);
+    public class Problem(string message) : Exception(message);
+
+    /// <summary>
+    /// The restore stopped part way and could not put everything back (#911,
+    /// by <c>course-management.json</c> → <c>backups.restoreOneSection</c>):
+    /// the message is the whole sentence, said without "Nothing was put back:",
+    /// because something WAS changed.
+    /// </summary>
+    public sealed class StoppedPartWay(string message) : Problem(message);
 
     public const string NothingToRestore =
         "This conversation hasn't changed anything yet, so there is nothing to put back.";
@@ -75,14 +83,16 @@ public static class AssistSectionRestore
     /// the sentence it had just shown.
     /// </summary>
     /// <returns>How many shared pages kept their current setting; see <see cref="DoneMessage"/>.</returns>
-    public static int Restore(string? backupPath, string courseCode, int sectionNumber, string? coursesDirectory)
+    public static int Restore(string? backupPath, string courseCode, int sectionNumber, string? coursesDirectory,
+                              CourseRestorer.SectionSwapHooks? hooks = null)
     {
         if (backupPath is null) throw new Problem(NothingToRestore);
         if (coursesDirectory is null) throw new Problem(NoWorkingFolder);
         if (!File.Exists(backupPath) || BackupItem.From(backupPath, courseCode) is not { } item)
             throw new Problem(UnreadableBackup(Path.GetFileName(backupPath)));
         int notPutBack;
-        try { notPutBack = CourseRestorer.RestoreSection(sectionNumber, item, coursesDirectory); }
+        try { notPutBack = CourseRestorer.RestoreSection(sectionNumber, item, coursesDirectory, hooks); }
+        catch (CourseRestorer.SectionRestoreStoppedPartWay stopped) { throw new StoppedPartWay(stopped.Message); }
         catch (CourseRestorer.RestoreException error) { throw new Problem(error.Message); }
         catch (IOException error) { throw new Problem(error.Message); }
         catch (UnauthorizedAccessException error) { throw new Problem(error.Message); }

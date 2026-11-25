@@ -12,6 +12,195 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 76364b50b — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
+## 2026-11-25 — #955, #769 items 1 and 2, #806 and #816, #913 (branches `issue/955-win-custom-domain-reading`, `issue/769a-win-one-folder-however-spelled`, `issue/769b-win-assist-busy-off-screen`, `issue/806-win-webview`)
+
+#### #955: a section's custom domain is read by `customDomainReading`
+
+- #955: `CourseConfiguration.CustomDomain(section, destinationType)` now runs every case of `contracts/file-formats.json` → `customDomainReading` (17 cases, read from the JSON at run time by `CourseConfigurationTests.ACustomDomainIsReadTheContractsWay`, the mirror of the Mac's `FileFormatsContractTests.testACustomDomainIsReadTheContractsWay`). New `CourseConfiguration.DestinationTypesWithAnAddress` (`netlify`, `cloudflare_pages`, the Mac's and the Python's list, same order); the reader returns `""` first for any other type, so `local_folder` never has a domain. Before the change cases 8 ("the older bare string, a folder primary: the folder has no address (#904)") and 10 ("a folder never has a domain, even one written under its name") failed, both reading `ics3u.school.ca`; the other 15, case 6 (empty `deploy_target`) included, already passed, case 6 through `DeployTarget`'s getter.
+- Not built, on purpose: `SetCustomDomain` can still carry an old bare string into a `local_folder` map entry when the primary is a folder (the Mac does the same); the reader now ignores that entry, so nothing a teacher sees follows from it.
+- Not changed: `CourseSettingsView.xaml.cs` (about line 1053) filters `d.Type != "local_folder"` for the domain fields; it could ask `CourseConfiguration.DestinationTypesWithAnAddress` instead, so GitHub Pages (#669) is picked up when it joins the list. An interface file, outside #955.
+- What a folder leg shows now: `MultiDestinationDeployRunner` asks `CustomDomain(section, "local_folder")`, gets `""`, and sets the folder runner's `CustomDomainForLinks` to null, so its link is the folder path (`ScriptRunner.PublishedFolder`), never a domain; before, a folder-primary course with an old bare string or a `local_folder` map entry had that domain on the folder runner (it reached a link only if the folder's transcript held a site URL, which a folder publish does not print).
+
+#### #769 item 1: one folder however it is spelled
+
+- #769 item 1: `CourseActivity` (`IsPreviewing`, `IsPublishing`, `IsPublishingSection`) and `PreviewLeases` (`Take`'s same-section refusal, `Take`'s same-folder ports, `ReleaseLeftBehind`, `Release` by folder) compare working folders through `WorkingFolder.IsTheSame`, never `==`; `UnderWay()` counts preview builds once per `SectionKey`, so two claims on one section under two spellings count once. The two view lease questions (`SectionDetailView.xaml.cs` repair's "open in another window", `AssistWindow.xaml.cs` `PreviewIsShowing`) ask it as `MainWindow.Verbs.cs` already did. The stored spelling is unchanged. The issue's own case: a section deploying under `C:\x` now refuses a preview asked as `C:\X\`, with the existing sentence. Tests: `CourseActivityTests` (five new facts, `Respelled` = upper case plus a trailing separator) and `PreviewWhileDeployingTests.ADeployUnderOneSpellingRefusesAPreviewAskedUnderAnother`.
+- The two view lines have no unit test of their own; they ask the same comparison as `MainWindow.Verbs.cs` line 86.
+- Not folded, by design: a mapped drive (`Z:\` for `\\server\share`) is not folded by `WorkingFolder.Resolved`, so it is still two folders here, as everywhere else in the app; `Resolved` was not extended.
+- Not changed: course code case. `IsPreviewing`, `IsPublishing` and `IsPublishingSection` compare the code with `==`; `SectionKey`, `ReleaseLeftBehind` and `Release` by folder compare it case-insensitively. Each line kept what it had.
+- Grep after the change of `windows-app/Plantoir.Core` and `windows-app/Plantoir` for `FolderPath ==`, `== folderPath`, `== _folder`, `== workspacePath`: no hits remain, so there are no other comparisons to name.
+
+#### #769 item 2: the assistant's busy answer does not depend on what is on screen
+
+- #769 item 2 (Windows): the assistant window asked "is this section busy?" of a main window showing the section's folder (`MainWindowShowingThisSection()?.IsSectionBusy(...) == true`), so with no window on that folder a deploy of the section running in this app read as idle, and the assistant went on to the deploy path instead of saying `AssistWording.SectionIsBusy`. Core now has `SectionRuns.DeployIsUnderWay(folder, course, section)` (= `SectionDeployRun.UnderWay(Find(...), ...)`, the section's run if a view made one and the in-process publish record either way), the mac's `SectionDetailView.deployIsUnderWay`; `AssistWindow`'s `SectionIsBusy` calls it. `MainWindow.IsSectionBusy` had no other caller and is removed (its comment moved to the Core method), so there is one path.
+- Busy keeps its meaning: a deploy on its way, never a preview. The issue's proposal to also ask the preview leases is not built: `IsSectionBusy`'s comment (now on `DeployIsUnderWay`) and the deploy-during-preview port settle it (the deploy stops a preview itself).
+- Not changed: the menu surface (`MainWindow.Verbs.cs` `MenuRunner`) sets no `StartDeployInApp`, so its `deploy_section` never asks `SectionIsBusy`. `MainWindowShowingThisSection` and `MainWindowForBuilds` stay for what needs a window (stopping a preview, the classes-dated-later question, starting the deploy).
+- Tests: four facts in `SectionRunsTests` (no run made and a publish record: under way, also under a second spelling; nothing: not; another section: not; record disposed: not). `AssistSurfaceContractTests.TheAssistantAsksTheSectionsDeployStateAppWide` reads the single `SectionIsBusy =` line of `AssistWindow.xaml.cs`. It is its own fact rather than an assertion inside `TheArrowsAreLetThroughInBothCasesTheContractNames` (the one test that already read the file), because that test walks the arrow-key contract and must name only its cases. `SectionDeployRunSourceTests.IsSectionBusyAsksTheRunsByTheCallersFolder` became `NoWindowKeepsItsOwnBusyAnswer` (`MainWindow.xaml.cs` has no `IsSectionBusy(`).
+
+#### #806, #816: the GeoGebra browser check in headless Edge
+
+- #806, #816: browser-checks/geogebra_applet.mjs run once in headless Edge 158.0.4370.33 on the first Windows VM (dev 45be52fbf, Node v22.23.4), on verify.sh's GeoGebra fixture planted into EXC2O and built by preview.ps1 --build-only, a clone with the publish's own _headers served on [::1]: OK in both phases. Item 11 (reset icon, both sketches back as they opened: 5 objects and a = 3; A,B,f,m, dragged again), item 12 (393 and 388 Shift+Tab/Space presses while a 150-line sketch ran: all 150 points, and after reset), item 13 (opening words inside the card while the engine was held, contrast 12.13/7.24 light and 16.27/13.28 dark, figure 433.58 px throughout, a refused file back to its button). The touch-laptop press is not possible in a VM. Notes: windows-app/notes/806-win-webview.md.
+
+#### #913: what the preview's WebView2 contacts
+
+- #913: the section preview's WebView2 now runs on its own environment with IsCustomCrashReportingEnabled = true (crash reports are not sent to Microsoft) and IsReputationCheckingRequired = false on its view (no SmartScreen check of the pages shown), per Russell's rulings of 2026-11-25 (PreviewBrowserEnvironment.cs, SectionDetailView.EnsurePreviewBrowserAsync; PreviewBrowserPrivacySourceTests). Measured before and after in the first Windows VM (runtime 158.0.4370.33, net-log plus the DNS Client log, 300 s from the page): the same contacts both times, with no page address in any request's address, query string or Referer (the request bodies were not captured, only their sizes): Edge's configuration fetch from config.edge.skype.com (2 GETs, first start only), the component updater at edge.microsoft.com (8 POSTs first start, 1 on the next), and WPAD lookups on the local network; the site's own fonts and cdnjs still reached. Those three are left on purpose and documented. Notes: windows-app/notes/806-win-webview.md.
+
+## 2026-11-21 — Lane H, 2026-11-21 night: #805 and #911 (branch `issue/873-win-restore`)
+
+#### #805: a restore keeps the kept copies; a rename carries the builds folder
+
+- `BuildOutputLocation.DiscardBuiltSitesFor(buildsRoot, code)` (the mac's
+  `discardBuiltSites`): every entry of `builds\<id>\<CODE>` goes except a
+  REAL `.geogebra-cache` folder; one that is a file, a junction or a link to
+  itself goes with the rest, as a link (never what it points at); a course
+  builds folder that is itself a link is removed as a link and never
+  enumerated; the workspace `builds\<id>\work\<CODE>` still goes.
+- Both `CourseRestorer.RestoreBackup` paths call it (through
+  `CourseArchiver.DiscardBuiltSites`) in place of `DiscardBuilds`; nothing
+  else in `RestoreBackup` moved. Archiving and `Restore(ArchivedItem)` still
+  discard everything.
+- `CourseRenamer.Rename` carries `builds\<id>\<OLD>` to `builds\<id>\<NEW>`
+  (`BuildOutputLocation.MoveBuild`, the mac's `moveBuild`): built sites and
+  kept copies together; a folder already under the new code is replaced, as
+  the mac's `removeItem` then `moveItem`; an old folder that is missing moves
+  nothing; the old code's build workspace is discarded (it is made again).
+  Silent on failure, as the mac's (`try?`, nothing said).
+- The one-section restore's discard (`DiscardBuildsFor(root, code, N)`) never
+  reaches `.geogebra-cache`, which lives at course level:
+  `SectionSwapTests.ARestoreThatFinishesPutsTheSectionBackAndLeavesNoStaging`
+  asserts the kept copy byte for byte after a section restore.
+- Ported by hand from the unreviewed `issue/873-restoring-from-a-backup`:
+  `DiscardBuiltSitesFor`, `MoveBuild`, `DiscardEntry`, `KeptCopiesFolderName`,
+  `CourseArchiver.DiscardBuiltSites`/`BuildsRootOf`, `KeptCopiesTests` (the
+  gone-course test now also asserts the copy's bytes and the workspace gone).
+- **#805's owed items: all done** (the clear in both paths with the workspace
+  discarded, the folder name pinned against
+  `buildOutputLocation.keptCopiesSurviveTheClear.folder`, the real-folder rule
+  over a file, a junction outside and a junction to itself, and the rename
+  carry with its test). #805 can close on its own.
+
+#### #911: one section from a backup made for it, staged and swapped
+
+Built tonight, each a commit:
+
+1. **Step 1, the assistant window's route, staged** (`CourseRestorer.RestoreSection`):
+   unpacked into `courses\.internal\restoring\<GUID>\backup\` (never
+   `%TEMP%`), checked, live children of `section<N>\` moved to
+   `…\<GUID>\as-it-was\section<N>\`, the backup's moved in, every move undone
+   last first on a failure (`wording.leftAsItWas`, which the window shows after
+   its usual "Nothing was put back:", true then). A way back that did not
+   finish: the aside folder moves to
+   `courses\_backups\<CODE>\Section N before a restore <yyyy-MM-dd_HHmmss>`,
+   `section restore stopped part way` is written (the #911 ledger entry and
+   `Reason911` are gone), and the window says `wording.stoppedPartWay` (or
+   `stoppedPartWayNothingToOpen`) WITHOUT "Nothing was put back:"
+   (`AssistSectionRestore.StoppedPartWay`). If even that move fails, the files
+   stay in `courses\.internal\restoring\<GUID>\as-it-was` and that path is
+   said. `restoring` and `.internal` are removed non-recursively when empty.
+   The `%TEMP%` unpack, the delete-first `ReplaceContents` and its copy
+   fallback are gone. Success says nothing new.
+2. **Step 2, the offer and naming rules**, pure functions in
+   `OneSectionRestore` (`OfferedSection`, `Naming.DifferenceFromBackup`,
+   `RenameIsUnfinished`, `ReadFacts`), run from `offerCases` (8) and
+   `namingCases` (12). `ReadFacts` reads the zip's listing and its
+   `course_config.json` entry from the entry stream (`CourseConfiguration.FromBytes`);
+   an unreadable zip holds nothing. Nothing calls `ReadFacts` yet: the dialog
+   (step 4) is where it is asked, once per backup, when the dialog is about to
+   open.
+
+3. **Step 3, the menu's one-section restore** (`CourseRestorer.RestoreSectionFromTheMenu`,
+   the mac's `restoreSectionFromTheMenu`): the same staging and swap, now
+   over the section folder AND the nine `filesOutsideTheSection` (each
+   `fromTheBackup`, `discarded` or `leftAsItIs`; a `fromTheBackup` file the
+   backup lacks is removed, kept aside until the swap is good); the
+   per-section keys on shared pages as before; a shared page the backup
+   lacks hidden from this section unless the build already reads it hidden
+   (`HidingAPageMadeSinceTheBackup`, the ordinary `PageFrontmatter.SetDraft`
+   with `publishForSection<N>: false`; pages under `private\`, `templates\`,
+   `.obsidian\` or any dot folder never touched, `OneSectionRestore.IsPublishable`,
+   pinned to `geogebraFences.files.notPublished.folders`); the section-number,
+   reference and naming refusals asked again of the live settings and the
+   UNPACKED backup (`namingChanged`, `foldersChanged`, `sectionNotInCourse`,
+   the mac's `sectionMissingFromBackup` and `archiveUnreadable` sentences);
+   the legacy `.netlify_site.json` in the section's build root kept across the
+   discarded build; the `Outcome` (`PagesNotPutBack`, `PagesNotSaved`,
+   `PagesMadeSinceHidden`, `WebsiteRecordDiffers`, the markers compared as
+   parsed JSON); and the Undo seam `keepingWhatWasReplaced`, handed the aside
+   folder before it goes (no caller passes it; a test does).
+4. **Step 4, the dialog and the order around it.** `ConfirmRestoreBackup`
+   reads the zip once per backup (`_backupFacts`, off the interface thread)
+   when the dialog is about to open, asks `OneSectionRestore.OfferFor`, and
+   for an offered section shows ONE `ContentDialog`: title `wording.title`,
+   content `wording.message` (`BackupMaker.DescriptionFor` and
+   `WhenDescription`), Restore Section N (primary, `DefaultButton`), Restore
+   Whole Course (secondary: today's whole-course restore, unchanged, moved
+   into `RestoreWholeCourse`), Cancel (close, Escape). Otherwise today's
+   two-button dialog. The click is `MenuSectionRestore.Run`, the mac's
+   `restoreOneSection` in its order: the busy refusal (preview or deploy, in
+   the mac's words; an assistant's hold; the Section menu or the assistant
+   changing THIS section, `wording.busy`) and every offer condition asked
+   again (`RefusalAtTheClick`) BEFORE the archive; the whole course archived
+   (`ArchiveCourseWithoutRemoving`); the busy refusal asked again; the
+   restore; `section restored` (`RestoredOneSectionFromTheMenuLine`, the
+   mac's words) and, when pages could not take a key, `page settings left as
+   they were`; then `doneTitle` and `done` with its pieces in the one result
+   dialog (`ShowError`'s OK dialog, the backup alert's slot). A failure is
+   said under `BackupProblemTitle.Restoring` with the restorer's own sentence.
+   The busy refusals before the dialog keep their existing Windows titles.
+
+**HIG (Alerts, read 2026-11-21):** the page puts the default button on the
+trailing side and Cancel on the leading side, and says never to make Cancel
+the default; it gives no three-button macOS rule. Windows' ContentDialog
+lays out primary, secondary, close left to right, and every other
+three-button question in this app uses that order, so the brief's "the
+Windows order the app already uses" decides: Restore Section N (default,
+leftmost), Restore Whole Course, Cancel (rightmost, Escape). No control the
+Mac lacks; nothing invisible.
+
+**#911's five "Windows owes" bullets: all DONE** (the third button and the
+offer rule; the widened one-section restore; the staged swap with a way back
+for BOTH routes; the archive first, the `section restored` line and the
+`page settings left as they were` count; the finished line in its notice
+slot). #911 can close on its own once reviewed.
+
+**The review of steps 1 and 2 (`vm-tools/briefs/2026-11-21-lane-h-review-1.md`), lows fixed here:**
+- LOW 3: only WORK a backup leaves out keeps a replaced section aside:
+  `CourseRestorer.LeftOutWork` = `.git`, `node_modules`, `dist`, `build`,
+  `out` (a project's history, its packages, what its own tools made). The
+  rest of `ExcludedFromArchives` is litter made again on its own and never
+  keeps anything: `.DS_Store`, `__pycache__`, `.cache`, `.quartz-cache`,
+  `.merged_output`. Tests: `ADeeperFolderOfWorkABackupLeavesOutKeepsTheAsideCopy`,
+  `SystemLitterDeeperInTheSectionNeverKeepsTheAsideCopy`,
+  `TheLeftOutListSplitsIntoWorkAndLitter` (a name added to the list must be
+  decided).
+- LOW 1: `RestoreKillTests(staged)` (and the unpack kills) assert `section2\`
+  byte for byte and no `as-it-was` folder.
+- LOW 2: kills part way through the unpack (`unpack:2`, through a new
+  `SectionSwapHooks.UnpackedAnEntry`; the staging unpack now extracts entry by
+  entry with ExtractToDirectory's outside-the-folder guard), during the moves
+  in (assistant `move:5`, `move:6`; menu `move:7`, `move:10`), and during a way
+  back started by a REAL refusal (the harness holds `zz notes\n.md` without
+  delete sharing; `back:1`, `back:2`), on both routes: 18 kill cases.
+- LOW 4: every sweep case asserts what the teacher is told
+  (`SectionSwapFixture.AssertToldTruly`): `leftAsItWas` when the way back
+  finished, else `stoppedPartWay` naming the kept folder or
+  `stoppedPartWayNothingToOpen`, with the archive sentence on the menu's
+  route, and the trail line naming that folder.
+- LOW 5: the stacked summary tags in `ActivityTrail.cs`.
+- LOW 6 (a section on another volume) and LOW 7 (a kill leaves the unpacked
+  backup) are the brief's design, unchanged; said here only.
+
+## 2026-11-21 — #794, #795, #796, #798: Windows reads the guidance-skill pins from the contract
+Branch `issue/794-win-skill-pins`. Test code only: `windows-app/Plantoir.Tests/AgentGuidanceSkillPinsTests.cs` (new, `public partial class AgentGuidanceTests`, sharing its `_folder`, `Contract` and `Pass()`), and one word in `AgentGuidanceTests.cs` (`sealed partial`). No product code, nothing under `support/`, `contracts/`, `scripts/` or `mac-app/`. No source-text test reads either file (grepped `Plantoir.Tests` and `Plantoir.UiTests`; the only hit, `NamedGapLedger.cs`, names another test in a comment).
+
+- **#794 done.** `EverySkillSaysWhatTheContractSaysItMust` walks `printablePages.agentGuidance.mustSay` after one real `AgentGuidance.Write`: `rule` skipped; a skill in `held.skills` must have no `SKILL.md` in either home and its phrases are not read; every other key must name a skill written in both homes whose `SKILL.md` holds each phrase by either folded form; at least one skill pinned. Every problem is collected and printed one per line, so a run names all of them. `APhraseIsMatchedAsMustSaysRuleSays` (a `[Theory]`, four rows) proves the matching rule on literal text: a phrase wrapped across CRLF matches by the first form; one wrapped inside `> ` or `>> ` lines only by the second; a changed word by neither.
+- **#795 done.** `TheHandoutStartersDefineEveryMacroTheSkillNames`: for each `handoutsSkill.starterMacros` entry, in both homes, the written starter defines each macro (`\newcommand{m}` or `\newlength{m}`) and the skill has a backtick then the macro. A separate test beside `TheHandoutsSkillIsWrittenWithItsStartersAndEveryRouteToItNamesIt`, not inside it, because `issue/953-win-deny-test` changes that file tonight; the assertions are the Mac handouts test's, so the done-state is the same.
+- **#796 done.** `TheHintsWrapperIsWrittenAndTheOfferedTemplateIsNamedOnce`: `hintsStarter` written in both homes, defines `\showhints`, named in the skill in backticks, not in `starters`; each `offeredTemplate.namedIn` skill names `offeredTemplate.name` exactly once, white space folded (a count, as the Mac counts it). `\hint` for `starters/Handout.tex` is covered by #795's walk and the new `mustSay` phrases by #794's: nothing added for them.
+- **#798 item 1 done.** `TheTestAuthoringSkillIsWrittenWithItsTemplatesAndBothRootFilesNameIt`: in both homes the `testAuthoringSkill.skill` is written with every `templates` file (spaces included); its `SKILL.md` names `usesStyleOf` in backticks and contains `kitChecker`; each `mentionedBy` skill names it in backticks; it is not in `pageAuthoringSkill.routesTo`; both root files name it and no longer contain "a quiz or test for marks". That phrase is the one literal: it is the wording the contract's rule says was removed, so the contract holds no value for it, and the Mac's twin types the same literal. The Mac's other literal checks in that test (`name:`, "This working folder holds courses for Plantoir", `handouts.json`, `read_how_i_teach`) are not copied: the brief allows no literal but the one, and the pinned rules of that skill are `mustSay`'s, which #794 walks.
+- **#798 item 2:** see "#798 measured".
+- Where Windows differs from the Mac, by design: every assertion in a walk is collected and the test fails once with the list (xUnit stops at the first failed `Assert`, XCTest does not); a key naming a skill that is not written is a problem line, never a crash or a pass on nothing. .NET's `\s` and ICU's differ only in `\v` and U+0085, which no skill contains.
+- **Review LOW 1 (held names):** `EachHeldSkillIsKeptInHeldPlaceAndWrittenInNeitherHome`, the held half of the Mac's `testHeldSkillsAreNotWrittenAndNothingWrittenNamesThem`: every `held.skills` key must have a `SKILL.md` under `held.place` (both read from the contract) and no folder of its name in either home after one `Write`. Run on VM B, `8c1da92da` (dev `45be52fbf` merged): both builds 0 errors, `AgentGuidanceTests` 32 of 32. Must-fail: scratch `b0b22debd` (never pushed) added `plantoir-held-nothing` to `held.skills`; 1 failed of 32, `held.skills names plantoir-held-nothing, and no such skill is kept in held/agent_guidance/skills`. Log `vm-tools/runs/794-vm-turn3.log`.
+- Run on the second VM, `e2bb8ff5d` (dev `2f50d1fa3` merged): `Plantoir.csproj` and `Plantoir.UiTests.csproj` built (0 errors); `AgentGuidanceTests` 30 of 30 passed.
+
 ## 2026-11-21 — #927 Classes ▸ Add Class… on Windows, with #990's review-3 and sweep lows
 
 - **Classes ▸ Add Class…** replaces Add Next Class (#927, the mac's #897 piece A), in the menu bar's Classes menu (Meetings in a club, #990) and on the section row's right-click menu in Add Next Class's place (ruled 2026-11-13 on #897). Its dialog (`SectionVerbDialog.ChooseHowToAddAClass`) asks how: the next class in the unit under way, the first class of a new unit, or a copy of one of this section's class pages; a way that cannot be used is drawn greyed, with the reason lines under the ways (`subjectMenus.addClassSheet`, 8 of 8 cases in `AddClassContractTests`). The first two add at once (Add); a copy is picked from a searchable Page/Date list (7 rows before it scrolls, the mac's), then its plan, then Duplicate. The item's title is "Add Class…" in every course, a club included, as the mac's `SubjectMenus.title` draws it.

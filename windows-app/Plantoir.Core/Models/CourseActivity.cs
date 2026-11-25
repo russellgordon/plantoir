@@ -8,7 +8,9 @@ namespace Plantoir.Core.Models;
 /// mid-copy of those very files; the Add Section entry points decline while
 /// their course is busy anywhere. Mirrors the mac app's CourseActivity
 /// (row 104). The same code in a different working folder is a different
-/// course, so every question carries the folder path.
+/// course, so every question carries the folder path — and one folder however
+/// it is spelled is one folder: every comparison goes through
+/// <see cref="WorkingFolder.IsTheSame"/>, never <c>==</c> (#769, mac #189).
 /// </summary>
 public static class CourseActivity
 {
@@ -69,17 +71,18 @@ public static class CourseActivity
         lock (_gate)
             // Each section once however many starts hold a claim on it
             // (previewBuildRecord.rule, #928): a window's start beside the
-            // assistant's rebuild is one preview being built.
-            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Distinct().Count(), 0,
+            // assistant's rebuild is one preview being built — and one folder
+            // however it is spelled, through SectionKey (#769).
+            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Select(b => SectionKey.For(b.FolderPath, b.CourseCode, b.SectionNumber)).Distinct().Count(), 0,
                                                  DeployedFolderShows.Shared.Count);
     }
 
     public static bool IsPreviewing(string folderPath, string courseCode) =>
-        PreviewLeases.Active.Any(l => l.FolderPath == folderPath && l.CourseCode == courseCode);
+        PreviewLeases.Active.Any(l => WorkingFolder.IsTheSame(l.FolderPath, folderPath) && l.CourseCode == courseCode);
 
     public static bool IsPublishing(string folderPath, string courseCode)
     {
-        lock (_gate) return _publishes.Any(p => p.FolderPath == folderPath && p.CourseCode == courseCode);
+        lock (_gate) return _publishes.Any(p => WorkingFolder.IsTheSame(p.FolderPath, folderPath) && p.CourseCode == courseCode);
     }
 
     /// <summary>
@@ -93,7 +96,7 @@ public static class CourseActivity
     public static bool IsPublishingSection(string folderPath, string courseCode, int sectionNumber)
     {
         lock (_gate)
-            return _publishes.Any(p => p.FolderPath == folderPath && p.CourseCode == courseCode &&
+            return _publishes.Any(p => WorkingFolder.IsTheSame(p.FolderPath, folderPath) && p.CourseCode == courseCode &&
                                        p.SectionNumber == sectionNumber);
     }
 

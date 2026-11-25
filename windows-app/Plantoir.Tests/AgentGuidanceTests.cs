@@ -18,7 +18,7 @@ namespace Plantoir.Tests;
 /// process-wide state.
 /// </summary>
 [Collection(SharedActivityState.Name)]
-public sealed class AgentGuidanceTests : IDisposable
+public sealed partial class AgentGuidanceTests : IDisposable
 {
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "plantoir-guidance-" + Guid.NewGuid().ToString("N")[..8]);
 
