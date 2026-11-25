@@ -28,3 +28,26 @@ SpecialFolderRenamerTests: 31 run, 0 failures
 UndoFilesContractTests: 3 run, 0 failures
 UndoJournalContractTests: 19 run, 0 failures
 UndoRenameFolderStepTests: 26 run, 0 failures
+
+#899 U4b, final sweep M1 and L4, must-fail, 2026-11-25, branch at 0ff56c51c plus this commit, dev 45be52fbf merged. Each run under xlock.sh with a 900 s kill limit.
+Sabotage A: both part-way ActivityTrail.note calls dropped (M1), and both refusal clears made unconditional (L4).
+== Run A, sabotaged: 4 of 4 fail ==
+	 Executed 4 tests, with 4 failures (0 unexpected) in 1.333 (1.336) seconds
+	 Executed 4 tests, with 4 failures (0 unexpected) in 1.333 (1.337) seconds
+	 Executed 4 tests, with 4 failures (0 unexpected) in 1.333 (1.338) seconds
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:1014: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARefusedFinishOfAnInterruptedRenameKeepsItsRecord] : XCTAssertEqual failed: ("nil") is not equal to ("Optional("Ideas")") - the r
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:1041: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAFinishRefusedAsChangedSinceOnEveryTryKeepsItsRecord] : XCTAssertEqual failed: ("nil") is not equal to ("Optional("Ideas")") - a 
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:958: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARenameLeftRenamedOnlyInPartWritesATrailLine] : XCTAssertTrue failed
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:978: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARenameStoppedPartWayWithItsFoldersPutBackWritesATrailLine] : XCTAssertTrue failed
+Sabotage B: only the changed-since retry's clear made unconditional (L4).
+== Run B, sabotaged: the retry test fails, the plain refusal test passes ==
+	 Executed 2 tests, with 1 failure (0 unexpected) in 0.420 (0.421) seconds
+	 Executed 2 tests, with 1 failure (0 unexpected) in 0.420 (0.422) seconds
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:1041: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAFinishRefusedAsChangedSinceOnEveryTryKeepsItsRecord] : XCTAssertEqual failed: ("nil") is not equal to ("Optional("Ideas")") - a 
+== Run C, fixes restored, the six classes ==
+UndoRenameFolderStepTests: 30 run, 0 failures
+SpecialFolderRenamerTests: 31 run, 0 failures
+CourseActivityTests: 9 run, 0 failures
+UndoFilesContractTests: 3 run, 0 failures
+UndoJournalContractTests: 19 run, 0 failures
+SharedRulesContractTests: 67 run, 0 failures

@@ -2276,11 +2276,17 @@ itself — so word it deliberately rather than discovering the gap:
 - **`ClassPageTerm.problem(with:)`** — the two wizard refusals for a unit word
   containing a digit or a comma. (The rename sheet reuses them; every OTHER
   sentence it shows is in `specialNames.renameUnitWord`.)
-- **Rename folder's two half-failure sentences are gone** (#899 U4b): the
-  rename is one step through the door, every folder, page and setting or none
-  of them, so "renamed N of M copies" and "the folder moved but the settings
-  could not be written" can no longer happen. What a refused rename says is in
-  `undo.wording` (`renameFolderNothingWasChanged`, `renameFolderStoppedPartWay`).
+- **On the Mac, Rename folder's two old half-failure sentences are gone**
+  (#899 U4b): the rename is one step through the door, every folder, page and
+  setting or none of them, so "renamed N of M copies" and "the folder moved but
+  the settings could not be written" are no longer said there. Windows still
+  says both until its own piece (W8). What a refused rename says on the Mac is
+  in `undo.wording`, three keys: `renameFolderNothingWasChanged` (nothing was
+  changed), and two for a refused step that could not all be put back, which
+  is still possible: `renameFolderStoppedPartWay` (every folder back at its old
+  name, files kept beside their pages) and `renameFolderRenamedOnlyInPart`
+  (a folder left at its new name, named). Both write a `folder renamed` line
+  on the trail.
 - **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
 - **The assistant's unit sentences**, which an earlier draft wrongly said were
   "listed below with the others" until this line was added. Two of the five are

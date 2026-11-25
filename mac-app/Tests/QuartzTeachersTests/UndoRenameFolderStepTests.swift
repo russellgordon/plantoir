@@ -931,6 +931,115 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertTrue(said.hasPrefix("“Tasks” was renamed only in part"), said)
         XCTAssertTrue(said.contains("“section1/Assessments”"), said)
     }
+
+    // MARK: - The final sweep (M1, L4)
+
+    /// The activity trail as written so far.
+    func trail() -> String {
+        return ActivityTrail.store.activityText(includingPrompts: true)
+    }
+
+    /// A rename stopped part way with a folder left at its new name writes
+    /// one `folder renamed` line saying so, naming the folder at its new
+    /// name and how many files were kept beside their pages, never a page's
+    /// name (the final sweep, M1). MUST FAIL with no line on that return.
+    func testARenameLeftRenamedOnlyInPartWritesATrailLine() async throws {
+        let course: Course = try course()
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index == 1 }
+        UndoKillPoints.putBackFailsAt = { @Sendable (index: Int) in index == 0 }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        XCTAssertNotNil(failed(result), "\(result)")
+        let expected: String = SpecialFolderRenamer.renamedOnlyInPartLine(
+            renaming: "Tasks", to: "Assessments", course: "ICS3U", scope: .perSection,
+            places: ["section1/Assessments"], keptBeside: 0
+        )
+        XCTAssertTrue(trail().contains(expected), trail())
+        XCTAssertFalse(trail().contains("Quiz"), "a page's name is on the trail")
+    }
+
+    /// A rename stopped part way with every folder put back but a page's
+    /// original kept beside it writes one `folder renamed` line saying the
+    /// folder was not renamed and how many files were kept (the final
+    /// sweep, M1). MUST FAIL with no line on that return.
+    func testARenameStoppedPartWayWithItsFoldersPutBackWritesATrailLine() async throws {
+        let course: Course = try course()
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index == 2 }
+        UndoKillPoints.putBackFailsAt = { @Sendable (index: Int) in index == 1 }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Concepts", to: "Ideas", scope: .shared)
+
+        let said: String = try XCTUnwrap(failed(result), "\(result)")
+        XCTAssertTrue(said.hasPrefix(SpecialFolderRenamer.stoppedPartWay(renaming: "Concepts", said: "")), said)
+        let expected: String = SpecialFolderRenamer.stoppedPartWayLine(
+            renaming: "Concepts", to: "Ideas", course: "ICS3U", scope: .shared, keptBeside: 1
+        )
+        XCTAssertTrue(trail().contains(expected), trail())
+        XCTAssertFalse(trail().contains("Arrays"), "a page's name is on the trail")
+    }
+
+    /// A course left with its folder moved and its settings not, by a
+    /// rename killed with the switch off: what `testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord`
+    /// starts from.
+    func courseWithAnInterruptedRename() async throws -> Course {
+        JournaledStep.modeOverride = .shadow
+        let course: Course = try course()
+        UndoKillPoints.hook = { reached in reached == .beforeSwap(1) }
+        _ = await CourseSettingsView(course: course).renameFolder("Concepts", to: "Ideas", scope: .shared)
+        UndoKillPoints.hook = nil
+        try recoverInShadow()
+        let target: String? = SpecialFolderRenamer.interruptedRenameTarget(
+            from: "Concepts", scope: .shared, courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+        )
+        XCTAssertEqual(target, "Ideas", "the kill did not leave an interrupted rename")
+        return course
+    }
+
+    /// A refused attempt to FINISH an interrupted rename leaves the earlier
+    /// run's record, so the sheet still offers the name to finish with (the
+    /// final sweep, L4): this run moved no folder and wrote no record.
+    /// MUST FAIL with every refusal clearing the record.
+    func testARefusedFinishOfAnInterruptedRenameKeepsItsRecord() async throws {
+        let course: Course = try await courseWithAnInterruptedRename()
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index == 0 }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Concepts", to: "Ideas", scope: .shared)
+
+        let said: String = try XCTUnwrap(failed(result), "\(result)")
+        XCTAssertTrue(said.hasPrefix(SpecialFolderRenamer.nothingWasChanged(renaming: "Concepts", said: "")), said)
+        let target: String? = SpecialFolderRenamer.interruptedRenameTarget(
+            from: "Concepts", scope: .shared, courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+        )
+        XCTAssertEqual(target, "Ideas", "the refusal cleared the earlier run's record")
+    }
+
+    /// The same when the finish is refused as changed since on every try,
+    /// planned again each time and then given up (the final sweep, L4): the
+    /// retry's clearing reaches only a record this run wrote. MUST FAIL with
+    /// the retry clearing the record.
+    func testAFinishRefusedAsChangedSinceOnEveryTryKeepsItsRecord() async throws {
+        let course: Course = try await courseWithAnInterruptedRename()
+        let page: URL = course.directoryURL.appendingPathComponent("Ideas/Arrays.md")
+        UndoKillPoints.hook = { @Sendable (reached: UndoKillPoint) in
+            if reached == .afterBegin {
+                // Still naming the folder, so each re-plan relinks the page
+                // again and each make finds it changed again.
+                try? ("See [[Concepts/Loops]], changed " + UUID().uuidString + ".\n").write(
+                    to: page, atomically: true, encoding: .utf8
+                )
+            }
+            return false
+        }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Concepts", to: "Ideas", scope: .shared)
+
+        XCTAssertNotNil(failed(result), "\(result)")
+        let target: String? = SpecialFolderRenamer.interruptedRenameTarget(
+            from: "Concepts", scope: .shared, courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+        )
+        XCTAssertEqual(target, "Ideas", "a refused retry cleared the earlier run's record")
+    }
 }
 
 /// Holds a rename's swap at its first page until the main actor opens it,

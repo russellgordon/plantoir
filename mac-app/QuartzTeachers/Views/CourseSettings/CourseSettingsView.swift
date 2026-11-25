@@ -1129,10 +1129,11 @@ struct CourseSettingsView: View {
     /// rewrites the configuration keys that named it, as ONE step through
     /// the door (#899 U4b, key `renameFolder`): every folder's move, every
     /// page's relink and one `editJSON` per settings member it changes, all
-    /// of them or none. A rename that is refused writes nothing and says so;
-    /// there is no state in which the folder moved and the settings do not
-    /// know, which is what the old order (disk first, settings after) could
-    /// leave behind.
+    /// of them or none. A rename that is refused writes nothing and says so.
+    /// The old order (disk first, settings after) could leave the folder
+    /// moved and the settings not knowing as an ordinary outcome; now that is
+    /// left only when a refused step cannot all be put back, which is said
+    /// (`renamedOnlyInPart`, `stoppedPartWay`) and written on the trail.
     func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) async -> RenameResult {
         // One rename at a time per course FOLDER, from any window, and no
         // Save meanwhile (U4b part six's review, M2): the claim is recorded in
@@ -1169,6 +1170,12 @@ struct CourseSettingsView: View {
             )
         }
         var attempts: Int = 0
+        // Whether the rename record on disk is THIS run's (the final sweep,
+        // L4). A run finishing an interrupted rename moves no folder and
+        // writes no record: the record there is the earlier run's, and a
+        // refusal must leave it, or the sheet stops offering the name to
+        // finish with.
+        var thisRunWroteTheRecord: Bool = false
         var outcome: FolderRenameOutcome = FolderRenameOutcome(foldersMoved: 0, pagesRelinked: 0)
         while true {
             // The walk OFF the main thread: reading every page in the course
@@ -1227,6 +1234,7 @@ struct CourseSettingsView: View {
                 SpecialFolderRenamer.recordRenameStarting(
                     from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory
                 )
+                thisRunWroteTheRecord = true
             }
             do {
                 // The check and the swap read and hash every file in each
@@ -1246,22 +1254,37 @@ struct CourseSettingsView: View {
                 // Nothing was changed (a refusal comes only once everything
                 // is put back), so the record goes before the re-plan, which
                 // may itself be refused (part four's review, L2); the next
-                // make writes it again.
-                SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+                // make writes it again. Only a record this run wrote.
+                if thisRunWroteTheRecord {
+                    SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+                    thisRunWroteTheRecord = false
+                }
                 attempts += 1
                 continue
             } catch let partWay as JournaledStepError {
-                if case .leftPartWay = partWay {
+                if case .leftPartWay(_, _, let keptOriginals) = partWay {
                     // Said as the disk is: a folder whose move back failed is
-                    // named at its new name (part four's review, L1).
+                    // named at its new name (part four's review, L1). Each
+                    // part-way ending leaves its line on the trail BEFORE it
+                    // returns (the final sweep, M1): these are the states
+                    // somebody will be asked to explain next week. The
+                    // record stays, as a stopped rename's does.
                     let leftRenamed: [String] = SpecialFolderRenamer.foldersLeftAtTheirNewName(
                         planned.moves, courseDirectory: courseDirectory
                     )
                     if !leftRenamed.isEmpty {
+                        ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.renamedOnlyInPartLine(
+                            renaming: oldName, to: newName, course: course.code, scope: scope,
+                            places: leftRenamed, keptBeside: keptOriginals.count
+                        ))
                         return .failed(SpecialFolderRenamer.renamedOnlyInPart(
                             renaming: oldName, to: newName, places: leftRenamed, said: partWay.localizedDescription
                         ))
                     }
+                    ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.stoppedPartWayLine(
+                        renaming: oldName, to: newName, course: course.code, scope: scope,
+                        keptBeside: keptOriginals.count
+                    ))
                     return .failed(SpecialFolderRenamer.stoppedPartWay(
                         renaming: oldName, said: partWay.localizedDescription
                     ))
@@ -1272,12 +1295,16 @@ struct CourseSettingsView: View {
                         renaming: oldName, said: partWay.localizedDescription
                     ))
                 }
-                SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+                if thisRunWroteTheRecord {
+                    SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+                }
                 return .failed(SpecialFolderRenamer.nothingWasChanged(
                     renaming: oldName, said: partWay.localizedDescription
                 ))
             } catch {
-                SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+                if thisRunWroteTheRecord {
+                    SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+                }
                 return .failed(SpecialFolderRenamer.nothingWasChanged(
                     renaming: oldName, said: error.localizedDescription
                 ))

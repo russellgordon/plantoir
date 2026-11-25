@@ -651,6 +651,46 @@ enum SpecialFolderRenamer {
             + "Still called “\(newName)”: \(joined). \(said)"
     }
 
+    /// How many files were kept beside their pages, as a trail line says it.
+    nonisolated static func keptBesideWords(_ count: Int) -> String {
+        if count == 1 {
+            return "1 file kept beside its page"
+        }
+        return String(count) + " files kept beside their pages"
+    }
+
+    /// The trail line (`folder renamed`) for a rename stopped part way with
+    /// folders left at their new name (the final sweep, M1). It names the
+    /// folders, which are the course's own special folders, and counts the
+    /// kept files, never naming a page.
+    nonisolated static func renamedOnlyInPartLine(
+        renaming oldName: String, to newName: String, course: String, scope: FolderScope,
+        places: [String], keptBeside: Int
+    ) -> String {
+        var joined: String = ""
+        for place in places {
+            if !joined.isEmpty {
+                joined += ", "
+            }
+            joined += place
+        }
+        return "renamed the folder " + oldName + " to " + newName + " in " + course
+            + " only in part, and could not put everything back (" + scope.configurationKey
+            + ", still called " + newName + ": " + joined + "; " + keptBesideWords(keptBeside)
+            + ")"
+    }
+
+    /// The trail line (`folder renamed`) for a rename stopped part way with
+    /// every folder back at its old name but files kept beside their pages
+    /// (the final sweep, M1).
+    nonisolated static func stoppedPartWayLine(
+        renaming oldName: String, to newName: String, course: String, scope: FolderScope, keptBeside: Int
+    ) -> String {
+        return "did not rename the folder " + oldName + " to " + newName + " in " + course
+            + ", and could not put everything back (" + scope.configurationKey + ", "
+            + keptBesideWords(keptBeside) + ")"
+    }
+
     /// Each planned folder that is at its new name now, by its path inside
     /// the course: what a rename stopped part way left renamed. Whatever is
     /// at the OLD name does not count (U4b part six's review, L1): the
