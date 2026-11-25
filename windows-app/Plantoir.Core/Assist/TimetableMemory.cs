@@ -239,25 +239,13 @@ public sealed class TimetableMemory
                                                     IEnumerable<DateOnly> dates, string source, DateOnly today,
                                                     UndoActionStep step)
     {
-        var ordered = dates.Distinct().OrderBy(date => date).ToList();
-        if (ordered.Count == 0) return TimetableWriteOutcome.NotSaved;
-        // What Read would not believe is not written: see Unbelievable.
-        if (Unbelievable(ordered, today) is not null) return TimetableWriteOutcome.NotSaved;
-
         try
         {
-            string path = FileFor(workspacePath, courseCode, sectionNumber);
             // ONE step through the door (#899 W7b1; the mac's
             // applyRememberTimetable): the section's timetable file, its
-            // folder made by the swap, all or none; never told to today's
-            // undo (it never was). The bytes are Windows' own, as before.
-            step.Write(path, JsonSerializer.Serialize(new Stored
-            {
-                Section = sectionNumber,
-                Dates = ordered.Select(date => DateText.Iso(date)).ToList(),
-                Source = source,
-                Recorded = DateText.Iso(today),
-            }, new JsonSerializerOptions { WriteIndented = true }));
+            // folder made by the swap, all or none.
+            if (!PlanInto(step, workspacePath, courseCode, sectionNumber, dates, source, today))
+                return TimetableWriteOutcome.NotSaved;
             step.Make();
             return TimetableWriteOutcome.Saved;
         }
@@ -268,6 +256,34 @@ public sealed class TimetableMemory
         // saidWhenTheStepStopped). Never a plain "remembered".
         catch (UndoStepLeftPartWayException partWay) { return TimetableWriteOutcome.LeftPartWay(partWay); }
         catch { return TimetableWriteOutcome.NotSaved; }
+    }
+
+    /// <summary>
+    /// Plans these dates as the section's timetable file in
+    /// <paramref name="step"/>, without making it: the Class Dates step's
+    /// one file, and a file of the re-date's and the rollover's own step
+    /// (#899 W7b1 review 2, M1: one teacher action is one step), so a refused
+    /// re-date leaves the timetable as it was. Never told to today's undo
+    /// (it never was). The bytes are Windows' own, as before. False, and
+    /// nothing planned, for no dates or a date Read would not believe (see
+    /// <see cref="Unbelievable"/>).
+    /// </summary>
+    internal static bool PlanInto(UndoActionStep step, string workspacePath, string courseCode, int sectionNumber,
+                                  IEnumerable<DateOnly> dates, string source, DateOnly today)
+    {
+        var ordered = dates.Distinct().OrderBy(date => date).ToList();
+        if (ordered.Count == 0) return false;
+        if (Unbelievable(ordered, today) is not null) return false;
+        var datesWritten = new List<string>();
+        foreach (DateOnly date in ordered) datesWritten.Add(DateText.Iso(date));
+        step.Write(FileFor(workspacePath, courseCode, sectionNumber), JsonSerializer.Serialize(new Stored
+        {
+            Section = sectionNumber,
+            Dates = datesWritten,
+            Source = source,
+            Recorded = DateText.Iso(today),
+        }, new JsonSerializerOptions { WriteIndented = true }), todaysUndoKeepsIt: false);
+        return true;
     }
 
     /// <summary>

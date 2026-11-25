@@ -3127,20 +3127,6 @@ public sealed partial class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so no dates were changed: {error.Message}");
         }
 
-        // Write the timetable down now the teacher has committed to it. They
-        // have just done the tedious part; asking again next week — or in the
-        // next conversation — is the tedium this is here to end.
-        // A timetable that cannot be saved costs only the record, as before;
-        // one left part way is named in the answer, since its hidden file is
-        // there to find (review 1, MEDIUM 1). Through the workspace's own
-        // step, with its door and seams (LOW 5).
-        string? timetableKept = null;
-        if (plan.AllMeetings.Count > 0)
-            timetableKept = TimetableMemory.WriteDown(_folder, course.Code, section, plan.AllMeetings,
-                $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now),
-                NewUndoStep("rememberTimetable", course.Code, section)).WhatWasKept;
-        string AndTheTimetableKept(string said) => timetableKept is null ? said : said + " " + timetableKept;
-
         using var recording = UndoHistory.Record(_undo,
             $"re-dated {course.Code} Section {section} onto block {plan.Block}");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
@@ -3158,9 +3144,14 @@ public sealed partial class AssistWorkspace
         // kept true by its rule after the step (recompute, sectionFrontPage),
         // never written as a file of it. A rollover makes the same step under
         // its own key; the record it releases (below) stays outside it until
-        // the rollover is one step (W7c). The timetable written above is its
-        // own rememberTimetable step, as before W7b1 it was its own write (the
-        // mac's re-date writes none: see the notes).
+        // the rollover is one step (W7c).
+        // The timetable the teacher committed to is written down IN this
+        // step, after the pages (#899 W7b1 review 2, M1: one teacher action
+        // is one step, as the re-date is on the mac): they have just done the
+        // tedious part, and asking again next week is the tedium this ends.
+        // All or none with the pages, so a refusal leaves it as it was and
+        // "Nothing was changed" is true of it too (review 2, M2). Dates Read
+        // would not believe are not planned, which costs only the record.
         var step = NewUndoStep(isARollover ? "rollOver" : "reDateClasses", course.Code, section);
         try
         {
@@ -3189,6 +3180,9 @@ public sealed partial class AssistWorkspace
                     step.Write(full, updated);
                     if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
                 }
+                if (plan.AllMeetings.Count > 0)
+                    TimetableMemory.PlanInto(step, _folder, course.Code, section, plan.AllMeetings,
+                                             $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
                 step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
             finally { PlanningThrough = null; }
@@ -3202,9 +3196,9 @@ public sealed partial class AssistWorkspace
             // (#550's list of pages written one by one is gone with the
             // writing one by one). An AssistRefusal, so re_date_classes and
             // roll_over_section both ANSWER it, each through its own catch.
-            if (error is not UndoStepLeftPartWayException) throw new AssistRefusal(AndTheTimetableKept(NothingWasChanged(error)));
+            if (error is not UndoStepLeftPartWayException) throw new AssistRefusal(NothingWasChanged(error));
             NoteAChangeWithNoUndoEntry();
-            throw new AssistRefusal(AndTheTimetableKept(StoppedPartWay("the section's class dates", error, section)));
+            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section));
         }
 
         // A ROLLOVER releases the published-pages record and the checklist's
@@ -3230,7 +3224,6 @@ public sealed partial class AssistWorkspace
         string leftAsTheyWere = "";
         if (undated.Count > 0) leftAsTheyWere += " " + NewDatesCouldNotBeSet(undated);
         if (notHidden.Count > 0) leftAsTheyWere += " " + SettingsCannotBeAddedTo(notHidden);
-        leftAsTheyWere = AndTheTimetableKept(leftAsTheyWere);
         summary += leftAsTheyWere;
         teacherSummary += leftAsTheyWere;
         NoteSettingsLeftAsTheyWere("re-dating classes", undated.Union(notHidden, StringComparer.OrdinalIgnoreCase).Count(),

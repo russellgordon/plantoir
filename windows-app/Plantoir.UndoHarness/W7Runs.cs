@@ -212,6 +212,116 @@ internal static class W7Runs
         return 0;
     }
 
+    // ---- W7b1 review 2: Re-date Classes, the pages and the timetable in ONE step ---------
+
+    private const string TimetablePath = "courses/ICS3U/.internal/timetable/section1.json";
+
+    private static readonly DateOnly[] NewMeetings = [new(2026, 10, 11), new(2026, 10, 12), new(2026, 10, 13)];
+
+    private static string ReDatedPage(int day) => Page(day, published: false).Replace($"2026-09-0{day}T", $"2026-10-1{day}T");
+
+    /// <summary>"before", "after" or "NEITHER": the timetable's dates as laid, or as the re-date writes them down.</summary>
+    private static string TimetableState(string run)
+    {
+        string full = Full(run, TimetablePath);
+        if (!File.Exists(full)) return "NEITHER";
+        try
+        {
+            var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(full))!;
+            string dates = node["dates"]!.ToJsonString();
+            if (dates == "[\"2026-09-01\",\"2026-09-02\",\"2026-09-03\"]") return "before";
+            if (dates == "[\"2026-10-11\",\"2026-10-12\",\"2026-10-13\"]") return "after";
+        }
+        catch (System.Text.Json.JsonException) { }
+        return "NEITHER";
+    }
+
+    /// <summary>
+    /// Re-date Classes' step (#899 W7b1 review 2, M1): the three pages
+    /// re-dated AND the section's timetable written down, one step, killed at
+    /// every point of the door, shadow then live, recovered by a second
+    /// process. Each file whole; live, the pages and the timetable all one way.
+    /// </summary>
+    internal static int ReDateKill(string folder)
+    {
+        var points = new List<string> { "afterBegin" };
+        for (int index = 0; index <= Pages.Length; index++) points.Add("beforeSwap@" + index.ToString(CultureInfo.InvariantCulture));
+        points.Add("beforeApplied");
+        int failures = 0;
+        int total = 0;
+        foreach (UndoMode mode in new[] { UndoMode.Shadow, UndoMode.Live })
+        {
+            foreach (string point in points)
+            {
+                total++;
+                string run = Path.Combine(folder, "redate-" + mode + "-" + point.Replace('@', '-'));
+                MakeTheFolder(run);
+                string timetable = Full(run, TimetablePath);
+                Directory.CreateDirectory(Path.GetDirectoryName(timetable)!);
+                File.WriteAllText(timetable, "{\"section\":1,\"dates\":[\"2026-09-01\",\"2026-09-02\",\"2026-09-03\"],\"source\":\"typed in by hand\",\"recorded\":\"2026-09-01\"}");
+                string said = Child(["child-w7-redate", run, mode.ToString(), point], kill: true);
+                string recovered = Child(["child-w7-recover", run, mode.ToString()], kill: false);
+                var states = new List<string>();
+                for (int index = 0; index < Pages.Length; index++)
+                {
+                    string text = File.Exists(Full(run, Pages[index])) ? File.ReadAllText(Full(run, Pages[index])) : "";
+                    states.Add(text == Page(index + 1, false) ? "before" : text == ReDatedPage(index + 1) ? "after" : "NEITHER");
+                }
+                states.Add(TimetableState(run));
+                UndoFoldedStep? step = List(run, mode).Journal.Read().Folded.Steps.Values.LastOrDefault();
+                int stagedNew = 0;
+                foreach (string entry in Directory.EnumerateFileSystemEntries(Root(run), "*", SearchOption.AllDirectories))
+                {
+                    string name = Path.GetFileName(entry);
+                    if (name.Contains(UndoSwap.StagedMarker, StringComparison.Ordinal) && name.EndsWith("-new", StringComparison.Ordinal)) stagedNew++;
+                }
+                bool eachWhole = !states.Contains("NEITHER");
+                bool reachedItsPoint = said.StartsWith("AT ", StringComparison.Ordinal);
+                bool consistent;
+                if (mode == UndoMode.Live)
+                {
+                    string expected = step?.State == UndoStepState.Done ? "after" : "before";
+                    consistent = reachedItsPoint && eachWhole && states.All(state => state == expected) && step is not null && !step.IsInFlight && stagedNew == 0;
+                }
+                else
+                {
+                    consistent = reachedItsPoint && eachWhole && (step is null || !step.IsInFlight) && stagedNew == 0;
+                }
+                Console.WriteLine($"RESULT w7-redate-kill mode={mode} point={point} child=[{said}] recovered=[{recovered}] " +
+                                  $"step={step?.State.ToString() ?? "none"} files={string.Join(",", states)} stagedNew={stagedNew} {(consistent ? "WHOLE" : "NOT-WHOLE")}");
+                if (!consistent) failures++;
+            }
+        }
+        Console.WriteLine($"RESULT w7-redate-kill total={total} failures={failures}");
+        return failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>The re-dating child: the three pages re-dated, then the timetable planned by TimetableMemory.PlanInto, in ONE step, as ApplyReDate plans them (it does not run ApplyReDate), made through the door.</summary>
+    internal static int ChildReDate(string run, string mode, string point)
+    {
+        Console.WriteLine("STARTED");
+        Console.Out.Flush();
+        UndoForThisProcess list = List(run, Enum.Parse<UndoMode>(mode));
+        var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: StopAt(point), trail: list.Trail);
+        var step = new UndoActionStep(new UndoStepMaker("menu", "reDateClasses"), Root(run), "ICS3U", 1, undo: list, door: door);
+        for (int index = 0; index < Pages.Length; index++) step.Write(Full(run, Pages[index]), ReDatedPage(index + 1));
+        if (!Plantoir.Core.Assist.TimetableMemory.PlanInto(step, Root(run), "ICS3U", 1, NewMeetings, "block F", new DateOnly(2026, 9, 8)))
+        {
+            Console.WriteLine("DONE the timetable was not planned");
+            return 0;
+        }
+        try
+        {
+            step.Make();
+            Console.WriteLine("DONE made");
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine("DONE " + error.GetType().Name + ": " + error.Message.Replace('\n', ' '));
+        }
+        return 0;
+    }
+
     /// <summary>
     /// The W7a final review's LOW 3: a plain write (no working folder, so no
     /// list) of three pages killed before each swap and before its end; then a

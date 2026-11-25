@@ -37,20 +37,18 @@ internal static class WindowsActionsOnTheMacFixture
     ];
 
     /// <summary>
-    /// A converted step whose Windows action makes one step of its own
-    /// BEFORE the recorded one, measured: by step name, that step's key and
-    /// why. Re-date Classes remembers the timetable it re-dated onto as its
-    /// own <c>rememberTimetable</c> step, as it wrote it on its own before
-    /// W7b1 (a timetable read from a school calendar's block is remembered
-    /// nowhere else); the mac's <c>SectionReDatePlanner.apply</c> writes none.
-    /// Its traces make the recorded step's draft, since their sequence
-    /// numbers are of one step.
+    /// A converted step whose Windows step holds one file more than the
+    /// mac's, measured: by step name, that file's path, its op, and why. It
+    /// comes after the recorded files and before the recomputes, in the SAME
+    /// step (#899 W7b1 review 2, M1, the director's ruling: one teacher
+    /// action is one step, as on the mac). Its traces make the recorded
+    /// step's draft, since their hashes are of the mac's files alone.
     /// </summary>
-    internal static readonly IReadOnlyDictionary<string, (string Key, string Why)> WindowsOwnStepBefore =
-        new Dictionary<string, (string, string)>(StringComparer.Ordinal)
+    internal static readonly IReadOnlyDictionary<string, (string Path, string Op, string Why)> WindowsOwnFileInTheStep =
+        new Dictionary<string, (string, string, string)>(StringComparer.Ordinal)
         {
-            ["reDateClasses"] = ("rememberTimetable",
-                "Windows' re-date has always written the timetable it re-dated onto (TimetableMemory.Write, source \"block <block>\"), so a block read from a school calendar is remembered for the next re-date; with the switch off a teacher meets nothing different from before, so it stays, as its own step made just before the re-date's"),
+            ["reDateClasses"] = ("courses/ICS3U/.internal/timetable/section1.json", UndoOp.WriteFile,
+                "Windows' re-date has always written down the timetable it re-dated onto (source \"block <block>\"), so a block read from a school calendar is remembered for the next re-date; the mac's SectionReDatePlanner.apply writes none. It is a file of the re-date's own step, so one Undo puts the pages and the timetable back together"),
         };
 
     /// <summary>
@@ -537,13 +535,12 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
         };
         int beginsBefore = WindowsActionsOnTheMacFixture.BeginKeys(ListFolder).Count;
         string answered = WindowsActionsOnTheMacFixture.Run(name, workspace);
-        // ONE new step, the recorded one; or, measured, Windows' own step
-        // just before it (WindowsOwnStepBefore) and then the recorded one.
-        var wantKeys = new List<string>();
-        if (WindowsActionsOnTheMacFixture.WindowsOwnStepBefore.TryGetValue(name, out var before)) wantKeys.Add(before.Key);
-        wantKeys.Add(recorded.GetProperty("action").GetString()!);
+        // ONE new step, the recorded one: never a step of Windows' own
+        // beside it (review 2, M1).
+        var wantKeys = new List<string> { recorded.GetProperty("action").GetString()! };
         List<string> newKeys = WindowsActionsOnTheMacFixture.BeginKeys(ListFolder).Skip(beginsBefore).ToList();
         Assert.True(wantKeys.SequenceEqual(newKeys), $"{name}: new steps {string.Join(", ", newKeys)}: {answered}");
+        bool holdsOneMore = WindowsActionsOnTheMacFixture.WindowsOwnFileInTheStep.TryGetValue(name, out var ownFile);
         JsonObject step = WindowsActionsOnTheMacFixture.NewestBegin(ListFolder)!["step"]!.AsObject();
 
         Assert.Equal(recorded.GetProperty("action").GetString(), (string?)step["action"]!["key"]);
@@ -567,8 +564,14 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
         }
         var recordedPaths = new List<string>();
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray()) recordedPaths.Add(file.GetProperty("path").GetString()!);
+        if (holdsOneMore) recordedPaths.Add(ownFile.Path);
         Assert.True(recordedPaths.SequenceEqual(paths), $"{name}: files {string.Join(" | ", paths)}");
         var recordedKinds = recorded.GetProperty("ops").EnumerateArray().Select(op => op.GetString()!).ToList();
+        if (holdsOneMore)
+        {
+            int firstRecompute = recordedKinds.IndexOf(UndoOp.Recompute);
+            recordedKinds.Insert(firstRecompute < 0 ? recordedKinds.Count : firstRecompute, ownFile.Op);
+        }
         Assert.True(recordedKinds.SequenceEqual(kinds), $"{name}: ops {string.Join(",", kinds)}");
         var recordedRecomputes = new List<string>();
         foreach (JsonElement recompute in recorded.GetProperty("recomputes").EnumerateArray())
@@ -616,6 +619,14 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             }
             Assert.True(want is null ? have is null : have is not null && want.AsSpan().SequenceEqual(have),
                         $"{name}: {path} after is not the recorded after:\n{(have is null ? "(absent)" : Encoding.UTF8.GetString(have))}");
+        }
+        if (holdsOneMore)
+        {
+            // The one file more holds what the action wrote down: the
+            // section's dates the re-date used, under Windows' own source.
+            JsonNode written = JsonNode.Parse(File.ReadAllBytes(UndoDoor.FullPath(Folder, ownFile.Path)))!;
+            Assert.Equal(1, (int)written["section"]!);
+            Assert.StartsWith("block ", (string?)written["source"]);
         }
     }
 }

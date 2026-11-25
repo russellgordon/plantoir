@@ -621,6 +621,10 @@ public class RolloverWebsiteTests : IDisposable
         string dayOne = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 1.md");
         string dayTwo = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 2.md");
         string dayOneBefore = File.ReadAllText(dayOne);
+        // The timetable it rolls onto is written down in the rollover's ONE
+        // step (review 2, M1 and M2), so a refusal leaves it as it was too.
+        string timetable = Path.Combine(_folder, "courses", "ICS3U", ".internal", "timetable", "section1.json");
+        byte[]? timetableBefore = File.Exists(timetable) ? File.ReadAllBytes(timetable) : null;
 
         string said;
         using (new FileStream(dayTwo, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -631,6 +635,7 @@ public class RolloverWebsiteTests : IDisposable
         Assert.StartsWith("Nothing was changed: ", said);
         Assert.DoesNotContain("The pages already re-dated", said);
         Assert.Equal(dayOneBefore, File.ReadAllText(dayOne));
+        Assert.Equal(timetableBefore, File.Exists(timetable) ? File.ReadAllBytes(timetable) : null);
     }
 
     /// <summary>

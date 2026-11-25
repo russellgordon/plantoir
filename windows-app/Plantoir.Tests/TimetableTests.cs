@@ -671,6 +671,76 @@ public class ReDateTests : IDisposable
         finally { File.SetAttributes(second, FileAttributes.Normal); }
     }
 
+    /// <summary>
+    /// #899 W7b1 review 2, M1 and M2: the timetable a re-date writes down is
+    /// a file of the re-date's ONE step, so when its pages are refused the
+    /// timetable is as it was and "Nothing was changed" is true of it too
+    /// (it was rewritten by a step of its own before, then said unchanged).
+    /// </summary>
+    [Fact]
+    public void AReDateWhosePagesAreRefusedLeavesTheTimetableAsItWas()
+    {
+        var (workspace, plan, second, timetable, timetableBefore) = AReDateOntoANewTimetable(seams: null);
+        File.SetAttributes(second, FileAttributes.ReadOnly);
+        try
+        {
+            var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
+            Assert.StartsWith("Nothing was changed: ", refused.Message);
+            Assert.Equal(timetableBefore, File.ReadAllBytes(timetable));
+        }
+        finally { File.SetAttributes(second, FileAttributes.Normal); }
+        Assert.Empty(WindowsActionsOnTheMacFixture.AppliedBegins(Path.Combine(_folder, "state-undo")));
+    }
+
+    /// <summary>
+    /// And one stopped part way (the first page in and not put back, the
+    /// second refused) is said as part way naming the page's kept file: the
+    /// timetable, after the pages in the step, is as it was, and the answer
+    /// carries no sentence about a timetable's kept file.
+    /// </summary>
+    [Fact]
+    public void AReDateStoppedPartWayLeavesTheTimetableAsItWas()
+    {
+        var (workspace, plan, second, timetable, timetableBefore) =
+            AReDateOntoANewTimetable(new Plantoir.Core.Undo.UndoSeams { PutBackFailsAt = index => index == 0 });
+        File.SetAttributes(second, FileAttributes.ReadOnly);
+        try
+        {
+            var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
+            Assert.StartsWith(AssistWording.PublishStoppedPartWay("the section's class dates", ""), refused.Message);
+            Assert.Equal(timetableBefore, File.ReadAllBytes(timetable));
+            Assert.DoesNotContain(TimetableMemory.KeptLead, refused.Message);
+            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(timetable)!, "." + Path.GetFileName(timetable) + ".plantoir-undo-*"));
+        }
+        finally { File.SetAttributes(second, FileAttributes.Normal); }
+    }
+
+    /// <summary>
+    /// Two classes and a remembered timetable "typed in by hand" in
+    /// September, and a re-date onto block F's October meetings, so both
+    /// pages and the timetable change; the plan's second page, the timetable
+    /// file and its bytes before.
+    /// </summary>
+    private (AssistWorkspace Workspace, ReDatePlan Plan, string Second, string Timetable, byte[] TimetableBefore)
+        AReDateOntoANewTimetable(Plantoir.Core.Undo.UndoSeams? seams)
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        Class("Unit 1, Day 2", "2026-09-09");
+        var list = new Plantoir.Core.Undo.UndoForThisProcess(Path.Combine(_folder, "state-undo"), Plantoir.Core.Undo.UndoMode.Shadow, null);
+        Assert.True(TimetableMemory.Write(_folder, "ICS3U", 1, new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 9) },
+                                          "typed in by hand", new DateOnly(2026, 9, 8),
+                                          new Plantoir.Core.Undo.UndoStepMaker("sheet", "rememberTimetable"),
+                                          new Plantoir.Core.Undo.UndoForThisProcess(Path.Combine(_folder, "state-undo-sheet"), Plantoir.Core.Undo.UndoMode.Shadow, null)));
+        string timetable = Path.Combine(_folder, "courses", "ICS3U", ".internal", "timetable", "section1.json");
+        byte[] timetableBefore = File.ReadAllBytes(timetable);
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher()) { UndoList = list, UndoSeams = seams };
+        var plan = workspace.PlanReDate("ICS3U", 1, Block(), Array.Empty<string>(), Array.Empty<int>());
+        Assert.NotEmpty(plan.AllMeetings);
+        var changing = plan.Changing.ToList();
+        Assert.Equal(2, changing.Count);
+        return (workspace, plan, PagePaths.ResolveInside(_folder, changing[1].RelativePath), timetable, timetableBefore);
+    }
+
     [Fact]
     public void SyncingWritesTheDateAndLeavesTheRestOfTheFileAlone()
     {
