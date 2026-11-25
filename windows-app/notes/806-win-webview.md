@@ -3,8 +3,9 @@
 One run of `browser-checks/geogebra_applet.mjs` covers both issues; each has
 its own subsection so it can be closed on its own. #913's baseline
 measurement and its candidate settings are at the end of this file ("#913:
-what the preview's WebView2 contacts"); its settings are another writer's. Nothing in product code, `scripts/`,
-`browser-checks/`, `support/` or `contracts/` changed.
+what the preview's WebView2 contacts"), and part 2b, the two settings Russell
+ruled on, after them ("#913 part 2b"). For #806 and #816 nothing in product
+code, `scripts/`, `browser-checks/`, `support/` or `contracts/` changed.
 
 ## The run (method, so it can be repeated)
 
@@ -109,10 +110,8 @@ the 2026-10-28 run by hand:
 
 Part 2a: the BASELINE only, on this branch at 22ae99c4c (`dev` 45be52fbf plus
 the #806 and #816 notes; no product code differs from `dev`). Nothing in
-product code changed. The settings, their after-measurement and their
-must-fail are the next writer's (the brief's step 4). **#913 waits** on that
-step and, for what cannot be turned off for free, on Russell (see "Candidate
-settings").
+product code changed in part 2a. The settings, their after-measurement and
+their must-fail are part 2b, below ("#913 part 2b").
 
 ## The measurement
 
@@ -288,3 +287,181 @@ Russell's (turn off, or tell teachers as Microsoft requires).
 `config.edge.skype.com` (first start only), the component updater (every
 start), `wpad` and Windows diagnostic data can only be documented: no setting
 on Microsoft's WebView2 pages turns them off for one app.
+
+# #913 part 2b: the two settings, and what stays
+
+Russell's rulings on #913 (2026-11-25): SmartScreen OFF on the preview's view,
+crash reporting to Microsoft OFF on the preview's own environment; the
+experiment configuration, the component updater and proxy auto-detection NOT
+touched (no policy, no flag) and documented plainly. **#913 is done** with
+this part, apart from the privacy wording, which is shared and is the
+director's (below).
+
+## What was built
+
+- `windows-app/Plantoir/Views/PreviewBrowserEnvironment.cs` (new): one
+  environment per process, made with `CoreWebView2EnvironmentOptions {
+  IsCustomCrashReportingEnabled = true }` through
+  `CoreWebView2Environment.CreateWithOptionsAsync(null, null, options)` (the
+  user data folder still comes from `WEBVIEW2_USER_DATA_FOLDER`, set in
+  `Program.Main`, which overrides the folder argument); a failure is not kept,
+  so the next load asks again. `ApplyViewSettings` sets
+  `core.Settings.IsReputationCheckingRequired = false`. The code comment cites
+  both Microsoft pages.
+- `SectionDetailView.xaml.cs`: `EnsurePreviewBrowserAsync()` is now the only
+  place the pane's browser is made; `NavigateAsAppAsync` and `ReloadAsAppAsync`
+  call it, so the settings are given before the first page is asked for.
+- **Failure path:** if the environment cannot be made, the exception reaches
+  the same `catch` as a failed `EnsureCoreWebView2Async()` did before, the
+  diagnostic log gets `NavigateAsAppAsync: <message>` (or `ReloadAsAppAsync:`),
+  and the pane shows no page, exactly as before; the teacher is told nothing
+  new. No wording changed.
+- **Other WebView2 views:** on `dev` (66c9853a8) the preview is the only
+  WebView2 in the app (`SectionProblemsView.cs` draws over it and makes
+  none). The Planning tab (`origin/issue/790b-planning-tab`, not on `dev`,
+  not changed) makes its own environment on its own user data folder
+  (`LocalPagesEnvironment.cs`); neither setting reaches it from here, since
+  `IsReputationCheckingRequired` is shared only by views on the SAME folder and
+  `IsCustomCrashReportingEnabled` is an option of each environment. Both would
+  apply there the same way (its `CoreWebView2EnvironmentOptions` and each of
+  its views) if Russell wants them; that is the Planning tab writer's.
+
+## Tests
+
+`windows-app/Plantoir.Tests/PreviewBrowserPrivacySourceTests.cs` (3 facts,
+source text with comments stripped): the environment's options carry
+`IsCustomCrashReportingEnabled = true` and are passed to
+`CreateWithOptionsAsync`; `ApplyViewSettings` sets
+`IsReputationCheckingRequired = false`; `EnsurePreviewBrowserAsync` passes
+`PreviewBrowserEnvironment.GetAsync()` and applies the view settings, and it
+is the only `EnsureCoreWebView2Async(` in the file. Run in the first VM by
+`vm-tools/guest/913-tests.ps1` with the 19 other classes that read
+`SectionDetailView.xaml.cs` as source text, each whole: **295 of 295 passed**
+on 4792bb1a7 (`vm-tools/runs/913/turn4.log`). No contract file is involved.
+
+## The measurement, after (same method and window as the baseline)
+
+`vm-tools/runs/913/turn4.log`, branch at 4792bb1a7 (`dev` 66c9853a8 merged in),
+runtime `msedgewebview2.exe` 158.0.4370.33, net-log in Default mode through
+`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` in the launching shell, the DNS Client
+log for the run's WebView2 process ids, window 300 s from the page shown,
+throwaway root `913e` (removed: `cleaned: True`, `build folder removed:
+True`, `raw net-log deleted: True` on both runs).
+
+**After, first start (empty profile):** page shown 105 s after start, 4,094
+events.
+
+| host | where | lookups asked / made | URL requests | uploads | page address on it | path (off the computer) |
+|---|---|---|---|---|---|---|
+| 127.0.0.1 | this computer | 2 / 0 | http GET 8 | 0 | n/a | n/a |
+| localhost | this computer | 0 / 0 | ws GET 1 | 0 | n/a | n/a |
+| cdnjs.cloudflare.com | off | 3 / 1 | none | 0 | no | none |
+| fonts.googleapis.com | off | 6 / 1 | https GET 1 | 0 | no (Referer: bare local origin) | `/css2` |
+| fonts.gstatic.com | off | 6 / 1 | https GET 2 | 0 | no (bare origin) | `/s/ibmplexmono/v23/….woff2` |
+| config.edge.skype.com | off | 3 / 1 | https GET 2 | 0 | no (no Referer) | `/config/v1/Edge/158.0.4370.33` |
+| edge.microsoft.com | off | 9 / 3 | https POST 8 | 8 (13,812 bytes) | no (no Referer) | `/componentupdater/api/v1/update` |
+| wpad | off (local network name) | 6 / 6 | none | 0 | no | none |
+
+DNS Client log, 6 WebView2 process ids: `wpad` 6 and nothing else.
+
+**After, second start (same profile):** page shown 33 s after start, 2,566
+events.
+
+| host | where | lookups asked / made | URL requests | uploads | page address on it | path (off the computer) |
+|---|---|---|---|---|---|---|
+| 127.0.0.1 | this computer | 2 / 0 | http GET 7 | 0 | n/a | n/a |
+| localhost | this computer | 0 / 0 | ws GET 1 | 0 | n/a | n/a |
+| cdnjs.cloudflare.com | off | 3 / 1 | none | 0 | no | none |
+| fonts.googleapis.com | off | 4 / 1 | https GET 1 | 0 | no | `/css2` |
+| fonts.gstatic.com | off | 6 / 1 | https GET 1 | 0 | no | `/s/ibmplexmono/v23/….woff2` |
+| edge.microsoft.com | off | 2 / 1 | https POST 1 | 1 (5,238 bytes) | no (no Referer) | `/componentupdater/api/v1/update` |
+| wpad | off (local network name) | 5 / 5 | none | 0 | no | none |
+
+`config.edge.skype.com` not contacted within the window. DNS Client log, 6
+WebView2 process ids: `wpad` 5 and nothing else.
+
+**Against the baseline (runs 1 and 2):** the same hosts, the same request
+kinds and counts; the component updater's bodies 13,812 against 13,807 bytes
+(first) and 5,238 against 5,239 (second). The site's own hosts (Google Fonts,
+cdnjs) were still reached; the page loaded (`loaded 200`) on the new
+environment both times.
+
+## What a run could not show
+
+Neither setting changes anything a run of this kind can see, and no
+measurement of either is claimed:
+
+- **SmartScreen:** no SmartScreen host appeared in any baseline or after run
+  (the pages shown are on 127.0.0.1), so there was no row to make disappear.
+  It rests on the source test and on Microsoft's page
+  (https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2settings.isreputationcheckingrequired).
+- **Crash reports:** no crash happened in any run, and the crash reporter's
+  sending is outside the net-log, so nothing was sent either way. It rests on
+  the source test and on Microsoft's page ("Windows won't send crash data to
+  the Microsoft endpoint",
+  https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy).
+- **The must-fail is therefore the test's, not a measurement's** (below). A
+  scratch build with the settings removed would print the same table as the
+  baseline and prove nothing, so it was not run.
+- Still not measured, as in the baseline: the request bodies' contents (only
+  their sizes), Windows diagnostic data, the WebView2 Runtime's own updater
+  (Microsoft Edge Update), anything after the 300 s window, a teacher
+  following a link off the computer.
+
+## Must-fail lines
+
+Scratch branch `scratch/913-mustfail` (864d4e74e, local only, never pushed):
+`IsCustomCrashReportingEnabled = true` taken out of the options, the
+`IsReputationCheckingRequired` line removed, and `EnsurePreviewBrowserAsync`
+back to a bare `Preview.EnsureCoreWebView2Async()`. Same 20 classes in the
+VM: 292 passed, 3 failed, each on its own line, as printed:
+
+```text wrap
+Failed Plantoir.Tests.PreviewBrowserPrivacySourceTests.ThePreviewsEnvironmentKeepsCrashReportsOnTheComputer: Assert.Matches() Failure: Pattern not found in value / Regex: "new\\s+CoreWebView2EnvironmentOptions\\s*\\{[^}]*\" / Value: "{\r\n        if (_creating is { IsFaulted: false, "
+Failed Plantoir.Tests.PreviewBrowserPrivacySourceTests.ThePreviewsViewHasSmartScreenTurnedOff: Assert.Matches() Failure: Pattern not found in value / Regex: "\\.Settings\\.IsReputationCheckingRequired\\s*=\\s" / Value: "{\r\n    }"
+Failed Plantoir.Tests.PreviewBrowserPrivacySourceTests.EveryPlaceThePanesBrowserIsMadeUsesBoth: Assert.Matches() Failure: Pattern not found in value / Regex: "Preview\\.EnsureCoreWebView2Async\\(\\s*await\\s+P" / Value: "{\r\n        await Preview.EnsureCoreWebView2Async"
+```
+
+## For PROGRESS (#913)
+
+```text wrap
+- #913: the section preview's WebView2 now runs on its own environment with IsCustomCrashReportingEnabled = true (crash dumps stay on the computer) and IsReputationCheckingRequired = false on its view (no SmartScreen check of the pages shown), per Russell's rulings of 2026-11-25 (PreviewBrowserEnvironment.cs, SectionDetailView.EnsurePreviewBrowserAsync; PreviewBrowserPrivacySourceTests). Measured before and after in the first Windows VM (runtime 158.0.4370.33, net-log plus the DNS Client log, 300 s from the page): the same contacts both times, none carrying a page address: Edge's configuration fetch from config.edge.skype.com (2 GETs, first start only), the component updater at edge.microsoft.com (8 POSTs first start, 1 on the next), and WPAD lookups on the local network; the site's own fonts and cdnjs still reached. Those three are left on purpose and documented. Notes: windows-app/notes/806-win-webview.md.
+```
+
+## For documentation 12 (#913)
+
+A new subsection, "What the preview's browser sends on its own (#913)", near
+the WebView2 user data folder's description. The paragraphs:
+
+```text wrap
+**What the preview's browser sends on its own (#913, measured 2026-11-25).** The section preview is Microsoft Edge WebView2. In the first Windows VM (Windows 11 Pro ARM64 in Parallels, the app win-x64 under emulation, runtime 158.0.4370.33), Plantoir was started with a throwaway `--state-dir` and `--auto-preview EXC2O 1` on the example course; Chromium's net-log (Default mode, through `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` in the launching shell only) and the Windows DNS Client log for the run's WebView2 processes covered the app's start to 300 seconds after the page loaded, on a first start (empty profile) and a second start, before and after the settings below. The method and the helpers are `windows-app/notes/806-win-webview.md` and `vm-tools/guest/913-measure.ps1`. The capture was reduced in the VM to hosts, request kinds and counts, and whether a page address of the site rode on a request; the raw log was deleted there.
+
+**Turned off, by documented settings.** The preview's view sets `CoreWebView2Settings.IsReputationCheckingRequired = false`, so Microsoft Defender SmartScreen does not check the pages it shows; and the preview's own environment sets `CoreWebView2EnvironmentOptions.IsCustomCrashReportingEnabled = true`, so a crash's dump stays in the user data folder rather than going to Microsoft (`windows-app/Plantoir/Views/PreviewBrowserEnvironment.cs`, which cites Microsoft's pages). Neither could be shown by a run: no SmartScreen host appeared in any run (the pages are on 127.0.0.1), and no crash happened. `PreviewBrowserPrivacySourceTests` holds both in place.
+
+**Edge's experiment configuration.** On a first start the preview's browser made 2 HTTPS GETs to `config.edge.skype.com` (path `/config/v1/Edge/<runtime version>`), with no Referer and no local address in a query: no page address went with them. On the second start it made none within the window. It is left on: the only documented way to stop it is the machine- or user-wide policy `ExperimentationAndConfigurationServiceControl` (https://learn.microsoft.com/en-us/deployedge/microsoft-edge-webview-policies), which reaches every WebView2 app on the computer, is an IT administrator's setting, and also stops Microsoft's compatibility fixes for sites; Microsoft does not recommend it. Russell's ruling, 2026-11-25: not touched.
+
+**The component updater.** Every start, the preview's browser POSTed to `edge.microsoft.com/componentupdater/api/v1/update`: 8 requests with 13,812 bytes of request bodies on a first start, 1 request with 5,238 bytes on the second, with no Referer and no local address in a query: no page address went with them. The bodies' contents were not captured, only their sizes. It is left on: no Microsoft WebView2 page documents a setting for it; the only route would be a Chromium switch Microsoft does not list, which may stop working in any runtime update without a sign. Russell's ruling, 2026-11-25: not touched.
+
+**Proxy auto-detection.** Every start, the preview's browser asked the local network for the name `wpad` (6 lookups on a first start, 5 on the second; the only name the DNS Client log saw from a WebView2 process). This is a question to the local network, not to Microsoft, and no request followed in the VM, which has no WPAD server. It is left on: the documented flags that stop it (`no-proxy-server`, `proxy-server`) are ones Microsoft says production apps should not use, and a school network that hands out its proxy this way would then stop the site's own fonts and cdnjs loading. Russell's ruling, 2026-11-25: not touched.
+
+**Not measured:** Windows' own diagnostic data for WebView2 (governed by the teacher's Windows Diagnostic data setting, https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy), the WebView2 Runtime's updater (Microsoft Edge Update, a separate service), anything after the 300-second window, and a teacher following a link to a site off the computer. The site's own hosts (Google Fonts, cdnjs) are the site's and were reached, as they must be.
+```
+
+## For the privacy text
+
+**Where it lives:** the Privacy section of `website/pages/support.html`
+(plantoir.app's Support page, about line 164). It is SHARED: one page for Mac
+and Windows. Not edited here. Its first paragraph says "The one thing it sends
+on its own is its daily check for a new version", which the measurement shows
+is not the whole story for the Windows preview. (Also read:
+`help/pages/publish-and-deploy.md` line 29, "Nothing leaves your
+{{machine}}", shared help wording about publishing; it stays true of the
+pages, since no page address went out in any run, so no change is proposed
+there.) Nothing on the Mac was measured, so the proposal names Windows only.
+
+Proposed paragraph, for the director, to go after the first paragraph of that
+section:
+
+```text wrap
+On Windows, Preview shows your pages in Microsoft Edge WebView2, Microsoft's browser engine, and that engine contacts Microsoft on its own: the first time Preview opens, it fetches Edge's settings from Microsoft, and each time Preview opens, it asks Microsoft whether its built-in parts need an update. Neither request carries the address of a page you are previewing. It also asks your school's network whether it uses a proxy server, as web browsers do; that question goes to your network, not to Microsoft. Plantoir turns off the two things it can for its own preview: Microsoft Defender SmartScreen's check of the pages shown, and sending crash reports to Microsoft. Your Windows diagnostic data setting still applies, as it does to every app.
+```
