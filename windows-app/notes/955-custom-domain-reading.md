@@ -22,7 +22,8 @@ Script `vm-tools/guest/955-mustfail.ps1 -Break address|emptytarget`: it edits `C
 ## Runs (VM B)
 
 - 8ab7253db: `CourseConfigurationTests`, `ContractTests` and `UndoWriterScanTests` (the filter `~ContractTests` also took in every `*ContractTests` class): 1453 passed, 1 failed of 1454, the failure `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`, on the known VM-only list (plantoir-machines skill), unrelated. App build (Debug x64) exit 0, 0 errors; UI test project build exit 0, 0 errors.
-- After merging `origin/dev` 66c9853a8: see the hand-back's head commit; the three classes re-run there.
+- 5164aa1d0 (after merging `origin/dev` 66c9853a8), the three classes by exact name: 75 passed of 75. App build exit 0, 0 errors; UI test project build exit 0, 0 errors.
+- Scripts: `vm-tools/guest/955-mustfail.ps1`, `955-failtext.ps1`, `955-busy.ps1`.
 
 ## Self-check
 
