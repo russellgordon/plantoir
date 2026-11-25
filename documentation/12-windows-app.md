@@ -2744,9 +2744,10 @@ entry, `course-management.json` → `backups.restoreOneSection` and
 unrun rather than red. No Windows test reads the `why` or the `carries` of
 `section restored`.
 
-**Held, 4 entries, all v2.0.0, all `ActivityTrailEvents`.** #911 (1):
-`section restore stopped part way`. Windows' section restore is not staged
-yet, so it has no "stopped part way" outcome to record. #912 (3):
+**Held, 3 entries, all v2.0.0, all `ActivityTrailEvents`.** (#911's
+`section restore stopped part way` was held here until Windows' section
+restore was staged; since #911 merged, Windows writes it and the entry is
+gone.) #912 (3):
 `backup kept its Media files once`, `shared backup Media swept` and
 `backup Media not found`. Windows writes no small backup and sweeps nothing.
 No new area was needed, so the existing area's own closed, withdrawn and
@@ -3842,6 +3843,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   skill teaches — the `> [!quiz]` callout and what the site does with it — is
   [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and
   what the build does is 05 → "Self-check quizzes: what the build does".
+
+The guidance-skill pins (`mustSay`, `held`, `starterMacros`, `hintsStarter`, `offeredTemplate`, `testAuthoringSkill`) are read from `shared-rules.json` by `Plantoir.Tests/AgentGuidanceSkillPinsTests.cs`, against what `AgentGuidance.Write` puts in a temporary working folder in both homes. Matching follows `mustSay.rule`; the two folding patterns are the Mac's (`\s+`, and `\s*\n[ \t]*(?:>[ \t]*)*` first), so CRLF never decides a result. A held skill (`held.skills`) is written in neither home and must be kept whole under `held.place`, so a held name that names nothing fails. The test-authoring skill's checks and its Marking Guide run on Windows with these commands (measured on Windows 11 ARM64 in Parallels, Python 3.14.10, 2026-11-21). From the working folder: `python -B .agents\skills\plantoir-test-authoring\scripts\check_kit.py "<test folder>\Marking Kit\answers.json"`. From a test folder: `python -B Checks\check_answers.py`. `py` in place of `python` works the same, and so does the fetched runtime's own `python\python.exe`; `python3` does not, because on stock Windows it is the Microsoft Store alias (exit 9009, "Python was not found"). The Marking Guide compiles with Tectonic 0.17.0's Windows zip (`tectonic-0.17.0-x86_64-pc-windows-msvc.zip`), from the test folder: `tectonic.exe -X compile "Marking Guide.tex"`; the first run fetches the bundle's files, `nicematrix` and `mhchem` among them (77.7 s with an empty cache), and a second run takes 6.0 s.
+
 - **The question** is a ContentDialog (`MainWindow.Guidance.cs`): title
   `askTitle`, `askFound` as the explanation under it, `askWhat`,
   `askYoursStays`, an Expander (`showWhatIsAdded`) over a read-only

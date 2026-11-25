@@ -239,6 +239,27 @@ public static class CourseArchiver
     }
 
     /// <summary>
+    /// Throw away a course's built sites and build workspace but KEEP its kept
+    /// copies of geogebra.org sketches (#805,
+    /// <see cref="BuildOutputLocation.DiscardBuiltSitesFor"/>): what a restore
+    /// from a backup does. Archiving uses <see cref="DiscardBuilds"/>, which
+    /// takes everything.
+    /// </summary>
+    internal static void DiscardBuiltSites(string coursesDirectory, string courseCode)
+    {
+        if (BuildsRootOf(coursesDirectory) is { } buildsRoot)
+            BuildOutputLocation.DiscardBuiltSitesFor(buildsRoot, courseCode);
+    }
+
+    /// <summary>The builds root of the working folder this courses directory belongs to (its parent).</summary>
+    internal static string? BuildsRootOf(string coursesDirectory)
+    {
+        string? workingFolder = Path.GetDirectoryName(coursesDirectory.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        return string.IsNullOrEmpty(workingFolder) ? null : BuildOutputLocation.BuildsRootFor(workingFolder!);
+    }
+
+    /// <summary>
     /// Archive one section, remove it, and take its number out of the
     /// course's settings (num_sections follows along).
     /// </summary>
