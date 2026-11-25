@@ -278,8 +278,8 @@ mac's reason: a rename should not cost a teacher their website.
   button on its `Loaded` event once it is enabled; choosing any other row
   forgets it. Microsoft's focus-navigation pages (read 2026-11-25:
   focus-navigation, focus-navigation-programmatic, dialogs) say nothing about
-  returning focus after a dialog or a replaced control, so this follows the
-  HIG's expectation that focus stays where the person left it; the
+  returning focus after a dialog or a replaced control, so the focus is put
+  back where the teacher left it, on the control that replaced it; the
   `FocusState` is the old button's own, so a mouse press does not gain a
   keyboard focus ring. Proved by
   `RestoreSectionDialogUiTests.KeyboardFocusComesBackToRestoreWhenTheQuestionIsCancelled`.
