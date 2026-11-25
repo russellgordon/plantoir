@@ -1183,10 +1183,16 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     $"dates from {DateText.Iso(TimetableMemory.EarliestBelievable)} to " +
                     $"{TimetableMemory.YearsAheadBelievable} years from today; check the year and try again.");
 
-            if (!workspace.RememberTimetable(found.Code, number, parsed, source, DateOnly.FromDateTime(DateTime.Now)))
+            var written = workspace.RememberTimetable(found.Code, number, parsed, source, DateOnly.FromDateTime(DateTime.Now));
+            if (!written.Remembered)
                 throw new AssistRefusal(
                     "Those dates couldn't be saved, so they aren't remembered. Tell the teacher they may be " +
                     "asked again — don't claim otherwise.");
+            // Left part way: the part-way sentence naming the kept file, never
+            // "Recorded" (the mac's saidWhenTheStepStopped, "the class dates";
+            // #899 W7b1 review 1, MEDIUM 1).
+            if (written.StoppedPartWay is { } partWay)
+                throw new AssistRefusal(workspace.StoppedPartWay("the class dates", partWay, number));
 
             var stored = TimetableMemory.Read(workspace.FolderPath, found.Code, number)!;
             return $"Recorded {stored.Dates.Count} class dates for {found.Code} Section {number}, " +

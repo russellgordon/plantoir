@@ -179,7 +179,15 @@ internal static class UndoSwap
         // kill point included, as a process that died there would let it go.
         var staged = new UndoStagedFile?[targets.Count];
         var originals = new UndoStagedFile?[targets.Count];
-        try { return SwapStaged(targets, label, root, seams, places, staged, originals, keepingTheOriginalsOf); }
+        var foldersMade = new List<string>();
+        try
+        {
+            UndoSwapResult result = SwapStaged(targets, label, root, seams, places, staged, originals, keepingTheOriginalsOf, foldersMade);
+            // A refused swap leaves no empty folder it made behind (the W7b1
+            // review's LOW 1; the digest's trap "empty folders left behind").
+            if (result is UndoSwapResult.Refused) RemoveTheEmptyFoldersMade(foldersMade);
+            return result;
+        }
         finally
         {
             foreach (UndoStagedFile? file in staged) file?.LetGo();
@@ -189,7 +197,7 @@ internal static class UndoSwap
 
     private static UndoSwapResult SwapStaged(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams,
                                              IUndoExternalPlaces? places, UndoStagedFile?[] staged, UndoStagedFile?[] originals,
-                                             IReadOnlySet<string>? keepingTheOriginalsOf)
+                                             IReadOnlySet<string>? keepingTheOriginalsOf, List<string> foldersMade)
     {
         int count = targets.Count;
         int swapsMade = 0;
@@ -306,7 +314,7 @@ internal static class UndoSwap
                 bool made;
                 try
                 {
-                    Directory.CreateDirectory(Path.GetDirectoryName(target.FullPath)!);
+                    MakeTheFolderOf(target.FullPath, foldersMade);
                     UndoLinks.RemoveFolder(stagedFolder);
                     made = UndoTreeReading.Make(tree.Listing, tree.Contents, stagedFolder, failTheWrite: seams?.StagingWriteFailsAt?.Invoke(index) == true);
                 }
@@ -325,7 +333,7 @@ internal static class UndoSwap
             string stagedPath = BesidePath(target.FullPath, label, "new");
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(target.FullPath)!);
+                MakeTheFolderOf(target.FullPath, foldersMade);
                 TryDelete(stagedPath);
                 if (seams?.StagingWriteFailsAt?.Invoke(index) == true)
                 {
@@ -1074,6 +1082,44 @@ internal static class UndoSwap
             if (UndoLinks.Look(kept) == UndoLinks.What.Nothing) return false;   // not taken in that instant: the rename itself failed
         }
         return false;
+    }
+
+    /// <summary>
+    /// Makes the folder a target goes in, noting each folder that was not
+    /// there before, outermost first, in <paramref name="foldersMade"/>.
+    /// </summary>
+    private static void MakeTheFolderOf(string fullPath, List<string> foldersMade)
+    {
+        var missing = new List<string>();
+        string? folder = Path.GetDirectoryName(fullPath);
+        while (folder is not null && !Directory.Exists(folder))
+        {
+            missing.Add(folder);
+            folder = Path.GetDirectoryName(folder);
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        for (int index = missing.Count - 1; index >= 0; index--)
+        {
+            if (!foldersMade.Contains(missing[index], StringComparer.OrdinalIgnoreCase)) foldersMade.Add(missing[index]);
+        }
+    }
+
+    /// <summary>
+    /// Removes each folder a refused swap made, innermost first, only while it
+    /// is empty: a folder that holds anything (a file another program put
+    /// there meanwhile, or a page a swap could not take back) is kept.
+    /// </summary>
+    private static void RemoveTheEmptyFoldersMade(List<string> foldersMade)
+    {
+        for (int index = foldersMade.Count - 1; index >= 0; index--)
+        {
+            try
+            {
+                if (Directory.Exists(foldersMade[index]) && !Directory.EnumerateFileSystemEntries(foldersMade[index]).Any())
+                    Directory.Delete(foldersMade[index], recursive: false);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     /// <summary>Writes a file that must not be there yet, whole, and flushes it to the disk.</summary>

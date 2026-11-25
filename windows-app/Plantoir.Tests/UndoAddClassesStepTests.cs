@@ -52,11 +52,12 @@ public sealed class UndoAddClassesStepTests : IDisposable
 
     private string PagePath(string title) => Path.Combine(ClassFolder, title + ".md");
 
-    private AssistWorkspace Open(UndoHistory history) =>
+    private AssistWorkspace Open(UndoHistory history, UndoSeams? seams = null) =>
         new(Folder, new FakeLauncher(), undo: history)
         {
             Surface = AssistSurface.Outside,
             UndoList = new UndoForThisProcess(ListFolder, UndoMode.Shadow, _trail.Add),
+            UndoSeams = seams,
         };
 
     private List<JsonObject> Begins()
@@ -110,7 +111,7 @@ public sealed class UndoAddClassesStepTests : IDisposable
 
     /// <summary>A page that cannot be written (its name is taken by a folder) stops the action before ANY page is written: all or none, said as "Nothing was changed".</summary>
     [Fact]
-    public void AClassThatCannotBeWrittenStopsEveryClassAndNoFolderIsLeft()
+    public void AClassThatCannotBeWrittenStopsEveryClass()
     {
         AssistWorkspace workspace = Open(new UndoHistory());
         NewClassesPlan plan = workspace.PlanAddClasses("ICS3U", 1, 1, 1, 3);
@@ -156,5 +157,60 @@ public sealed class UndoAddClassesStepTests : IDisposable
 
         JsonObject begin = Assert.Single(Begins());
         Assert.Equal(key, (string?)begin["step"]!["action"]!["key"]);
+    }
+
+    /// <summary>Review 1, LOW 1: a step refused at staging, in a section with no class folder yet, leaves no empty folder behind.</summary>
+    [Fact]
+    public void ARefusedStepLeavesNoEmptyClassFolder()
+    {
+        Assert.False(Directory.Exists(ClassFolder));
+        AssistWorkspace workspace = Open(new UndoHistory(), new UndoSeams { StagingWriteFailsAt = index => index == 2 });
+        NewClassesPlan plan = workspace.PlanAddClasses("ICS3U", 1, 1, 1, 3);
+
+        var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyAddClasses(plan));
+
+        Assert.StartsWith("Nothing was changed: ", refused.Message);
+        Assert.False(Directory.Exists(ClassFolder), "the refused step left the class folder behind");
+    }
+
+    /// <summary>
+    /// Review 1, MEDIUM 2: add_classes and add_next_class left part way (Day
+    /// 1 made, Day 2 appeared meanwhile, and Day 1 cannot be taken away
+    /// again) answer the part-way sentence, the mac's "the classes you asked
+    /// for", never "That couldn’t be read".
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClassesLeftPartWayAreSaidAsPartWay(bool throughAddNextClass)
+    {
+        Directory.CreateDirectory(ClassFolder);
+        FileStream? holdingDayOne = null;
+        var seams = new UndoSeams
+        {
+            BeforeEachSwap = (index, fullPath) =>
+            {
+                if (index != 1) return;
+                // Day 1 is held open without delete sharing, so it cannot be taken away again.
+                holdingDayOne = new FileStream(PagePath("Unit 1, Day 1"), FileMode.Open, FileAccess.Read, FileShare.Read);
+                File.WriteAllText(fullPath, "mine");
+            },
+        };
+        var tools = new Plantoir.Mcp.PlantoirTools(Open(new UndoHistory(), seams));
+        string said;
+        try
+        {
+            said = throughAddNextClass
+                ? tools.AddNextClass("ICS3U", 1, unit: "1", days: 2).Summary()
+                : tools.AddClasses("ICS3U", 1, unit: 1, howMany: 2).Summary();
+        }
+        finally { holdingDayOne?.Dispose(); }
+
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the classes you asked for", ""), said);
+        Assert.DoesNotContain("couldn’t be read", said, StringComparison.Ordinal);
+        Assert.DoesNotContain("Nothing was", said, StringComparison.Ordinal);
+        // True to the disk: Day 1 was made, Day 2 is the other program's.
+        Assert.True(File.Exists(PagePath("Unit 1, Day 1")));
+        Assert.Equal("mine", File.ReadAllText(PagePath("Unit 1, Day 2")));
     }
 }

@@ -191,7 +191,7 @@ internal static class W7Runs
         return failures == 0 ? 0 : 1;
     }
 
-    /// <summary>The adding child: three new pages planned into ONE step, as ApplyAddClasses plans them, and made through the door.</summary>
+    /// <summary>The adding child: three new pages, each a writeFile with no before, planned into ONE step as ApplyAddClasses's step holds them (the child plans them itself; it does not run ApplyAddClasses), and made through the door.</summary>
     internal static int ChildAddClasses(string run, string mode, string point)
     {
         Console.WriteLine("STARTED");

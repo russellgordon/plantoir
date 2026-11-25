@@ -3130,9 +3130,16 @@ public sealed partial class AssistWorkspace
         // Write the timetable down now the teacher has committed to it. They
         // have just done the tedious part; asking again next week — or in the
         // next conversation — is the tedium this is here to end.
+        // A timetable that cannot be saved costs only the record, as before;
+        // one left part way is named in the answer, since its hidden file is
+        // there to find (review 1, MEDIUM 1). Through the workspace's own
+        // step, with its door and seams (LOW 5).
+        string? timetableKept = null;
         if (plan.AllMeetings.Count > 0)
-            TimetableMemory.Write(_folder, course.Code, section, plan.AllMeetings,
-                $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now), new UndoStepMaker(UndoMadeBy, "rememberTimetable"), UndoList);
+            timetableKept = TimetableMemory.WriteDown(_folder, course.Code, section, plan.AllMeetings,
+                $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now),
+                NewUndoStep("rememberTimetable", course.Code, section)).WhatWasKept;
+        string AndTheTimetableKept(string said) => timetableKept is null ? said : said + " " + timetableKept;
 
         using var recording = UndoHistory.Record(_undo,
             $"re-dated {course.Code} Section {section} onto block {plan.Block}");
@@ -3195,9 +3202,9 @@ public sealed partial class AssistWorkspace
             // (#550's list of pages written one by one is gone with the
             // writing one by one). An AssistRefusal, so re_date_classes and
             // roll_over_section both ANSWER it, each through its own catch.
-            if (error is not UndoStepLeftPartWayException) throw new AssistRefusal(NothingWasChanged(error));
+            if (error is not UndoStepLeftPartWayException) throw new AssistRefusal(AndTheTimetableKept(NothingWasChanged(error)));
             NoteAChangeWithNoUndoEntry();
-            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section));
+            throw new AssistRefusal(AndTheTimetableKept(StoppedPartWay("the section's class dates", error, section)));
         }
 
         // A ROLLOVER releases the published-pages record and the checklist's
@@ -3223,6 +3230,7 @@ public sealed partial class AssistWorkspace
         string leftAsTheyWere = "";
         if (undated.Count > 0) leftAsTheyWere += " " + NewDatesCouldNotBeSet(undated);
         if (notHidden.Count > 0) leftAsTheyWere += " " + SettingsCannotBeAddedTo(notHidden);
+        leftAsTheyWere = AndTheTimetableKept(leftAsTheyWere);
         summary += leftAsTheyWere;
         teacherSummary += leftAsTheyWere;
         NoteSettingsLeftAsTheyWere("re-dating classes", undated.Union(notHidden, StringComparer.OrdinalIgnoreCase).Count(),
@@ -3384,8 +3392,7 @@ public sealed partial class AssistWorkspace
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
-            throw;
+            throw RefusalForAStepThatStopped(error, "the pages’ dates", section);
         }
         recording.Done();
 
@@ -3779,8 +3786,7 @@ public sealed partial class AssistWorkspace
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
-            throw;
+            throw RefusalForAStepThatStopped(error, "the curriculum mentions", section);
         }
         recording.Done();
 
@@ -4804,8 +4810,8 @@ public sealed partial class AssistWorkspace
         // ONE step through the door (#899 W7b1; the mac's
         // PlaceholderClassPlanner.apply): every new page together, all or
         // none, each a writeFile with no before; the class folder is made by
-        // the swap with them, never beforehand, so a refused step leaves no
-        // empty folder behind.
+        // the swap with them, never beforehand, and a refused swap removes
+        // the empty folders it made, so none is left behind.
         var step = NewUndoStep(actionKey, course.Code, section);
         try
         {
@@ -4820,9 +4826,9 @@ public sealed partial class AssistWorkspace
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             // All or none: "Nothing was changed" unless the door left a page
-            // holding the new content (its earlier content kept beside it).
-            StoppedWhileWriting(error is UndoStepLeftPartWayException, error);
-            throw;
+            // holding the new content, said as part way (the mac's
+            // saidWhenTheStepStopped, "the classes you asked for").
+            throw RefusalForAStepThatStopped(error, "the classes you asked for", section);
         }
         recording.Done();
 
@@ -5070,10 +5076,10 @@ public sealed partial class AssistWorkspace
     /// W7b1): <see cref="TimetableMemory.Write(string, string, int, IEnumerable{DateOnly}, string, DateOnly, string?)"/>
     /// as ONE step made by this workspace's surface, on its list.
     /// </summary>
-    /// <returns>False when the dates could not be saved, as before.</returns>
-    public bool RememberTimetable(string courseCode, int section, IEnumerable<DateOnly> dates, string source, DateOnly today) =>
-        TimetableMemory.Write(_folder, courseCode, section, dates, source, today,
-                              new UndoStepMaker(UndoMadeBy, "rememberTimetable"), UndoList);
+    /// <returns>Not remembered when the dates could not be saved, as before; left part way, with the kept file to name (review 1, MEDIUM 1).</returns>
+    public TimetableWriteOutcome RememberTimetable(string courseCode, int section, IEnumerable<DateOnly> dates, string source, DateOnly today) =>
+        TimetableMemory.WriteDown(_folder, courseCode, section, dates, source, today,
+                                  NewUndoStep("rememberTimetable", courseCode, section));
 
     /// <summary>A test's own door for every step of this workspace (the contract replay's list, with its clock); none in the app.</summary>
     internal UndoDoor? UndoDoorOfATest { get; init; }

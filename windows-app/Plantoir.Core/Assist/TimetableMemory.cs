@@ -200,24 +200,49 @@ public sealed class TimetableMemory
     /// saved, which the caller reports honestly rather than claiming otherwise:
     /// a teacher told their timetable was remembered, who is then asked for it
     /// again tomorrow, has learnt not to trust what the assistant tells them.
+    /// True when the dates are on disk, a step left part way included: a
+    /// caller that speaks to the teacher uses <see cref="WriteDown(string, string, int, IEnumerable{DateOnly}, string, DateOnly, string?)"/>,
+    /// which says what was kept.
     /// </summary>
     /// <param name="madeBy">Who makes the step (#899 W7b1; the mac's <c>applyRememberTimetable(_:by:)</c>): the
     /// Class Dates dialog's <c>sheet</c> by default, the tool's caller's surface (<c>AssistWorkspace.UndoMadeBy</c>) otherwise.</param>
     public static bool Write(string workspacePath, string courseCode, int sectionNumber,
                              IEnumerable<DateOnly> dates, string source, DateOnly today,
                              string? madeBy = null)
-        => Write(workspacePath, courseCode, sectionNumber, dates, source, today,
-                 new UndoStepMaker(madeBy ?? "sheet", "rememberTimetable"), undo: null);
+        => WriteDown(workspacePath, courseCode, sectionNumber, dates, source, today, madeBy).Remembered;
+
+    /// <summary>
+    /// <see cref="Write(string, string, int, IEnumerable{DateOnly}, string, DateOnly, string?)"/>, saying
+    /// what came of it: whether the dates are remembered, and, when the step
+    /// was left part way, which hidden file holds what the timetable held
+    /// (#899 W7b1, review 1, MEDIUM 1).
+    /// </summary>
+    public static TimetableWriteOutcome WriteDown(string workspacePath, string courseCode, int sectionNumber,
+                                                  IEnumerable<DateOnly> dates, string source, DateOnly today,
+                                                  string? madeBy = null)
+        => WriteDown(workspacePath, courseCode, sectionNumber, dates, source, today,
+                     new UndoActionStep(new UndoStepMaker(madeBy ?? "sheet", "rememberTimetable"), workspacePath, courseCode, sectionNumber));
 
     /// <summary>The same, with the step's maker and a test's own list (this process's when null).</summary>
     internal static bool Write(string workspacePath, string courseCode, int sectionNumber,
                                IEnumerable<DateOnly> dates, string source, DateOnly today,
                                UndoStepMaker by, UndoForThisProcess? undo)
+        => WriteDown(workspacePath, courseCode, sectionNumber, dates, source, today,
+                     new UndoActionStep(by, workspacePath, courseCode, sectionNumber, undo: undo)).Remembered;
+
+    /// <summary>
+    /// The same, through a step the caller made (the workspace's, with its
+    /// list, door and seams: the W7b1 review's LOW 5). The step must be new
+    /// and is made here.
+    /// </summary>
+    internal static TimetableWriteOutcome WriteDown(string workspacePath, string courseCode, int sectionNumber,
+                                                    IEnumerable<DateOnly> dates, string source, DateOnly today,
+                                                    UndoActionStep step)
     {
         var ordered = dates.Distinct().OrderBy(date => date).ToList();
-        if (ordered.Count == 0) return false;
+        if (ordered.Count == 0) return TimetableWriteOutcome.NotSaved;
         // What Read would not believe is not written: see Unbelievable.
-        if (Unbelievable(ordered, today) is not null) return false;
+        if (Unbelievable(ordered, today) is not null) return TimetableWriteOutcome.NotSaved;
 
         try
         {
@@ -226,7 +251,6 @@ public sealed class TimetableMemory
             // applyRememberTimetable): the section's timetable file, its
             // folder made by the swap, all or none; never told to today's
             // undo (it never was). The bytes are Windows' own, as before.
-            var step = new UndoActionStep(by, workspacePath, courseCode, sectionNumber, undo: undo);
             step.Write(path, JsonSerializer.Serialize(new Stored
             {
                 Section = sectionNumber,
@@ -235,14 +259,49 @@ public sealed class TimetableMemory
                 Recorded = DateText.Iso(today),
             }, new JsonSerializerOptions { WriteIndented = true }));
             step.Make();
-            return true;
+            return TimetableWriteOutcome.Saved;
         }
-        // The dates went in and what the file held is kept beside it: they
-        // ARE remembered, so it is said as remembered (the mac's sheet,
-        // savedWithWhatItHeldKept), never as not saved.
-        catch (UndoStepLeftPartWayException) { return true; }
-        catch { return false; }
+        // The dates went in and what the file held could not be put back
+        // over them: they ARE remembered, and the hidden file that holds what
+        // it held is named (the mac's applyRememberTimetable rethrows
+        // leftPartWay: its sheet says savedWithWhatItHeldKept, its assistant
+        // saidWhenTheStepStopped). Never a plain "remembered".
+        catch (UndoStepLeftPartWayException partWay) { return TimetableWriteOutcome.LeftPartWay(partWay); }
+        catch { return TimetableWriteOutcome.NotSaved; }
     }
+
+    /// <summary>
+    /// <c>shared-rules.json</c> → <c>undo.wording.classDatesKeptLead</c>, then
+    /// one <c>classDatesKeptBesideIt</c> per kept file (the mac's
+    /// <c>Problem.keptMessage</c>).
+    /// </summary>
+    internal static string KeptMessage(IReadOnlyList<string> keptOriginals)
+    {
+        var said = new System.Text.StringBuilder(KeptLead);
+        foreach (string kept in keptOriginals)
+        {
+            string name = Path.GetFileName(kept);
+            said.Append(' ').Append(KeptBesideIt("“" + (UndoSwap.PlaceOfStagedName(name) ?? name) + "”", name));
+        }
+        return said.ToString();
+    }
+
+    /// <summary>
+    /// What the Class Dates sheet says when the dates went in part way: the
+    /// mac's <c>Problem.savedWithWhatItHeldKept</c>,
+    /// <c>wording.classDatesAreRemembered</c> in the course's noun and then
+    /// <paramref name="whatWasKept"/> (<see cref="TimetableWriteOutcome.WhatWasKept"/>).
+    /// </summary>
+    public static string RememberedWithWhatItHeldKept(Course course, int sectionNumber, string whatWasKept) =>
+        AssistWording.ClassDatesAreRemembered(course.Code, sectionNumber.ToString(CultureInfo.InvariantCulture),
+                                              course.Configuration.ClassNoun) + " " + whatWasKept;
+
+    /// <summary><c>undo.wording.classDatesKeptLead</c>.</summary>
+    internal const string KeptLead = "Another program may have changed their file as they were saved.";
+
+    /// <summary><c>undo.wording.classDatesKeptBesideIt</c>; <paramref name="place"/> is already quoted.</summary>
+    internal static string KeptBesideIt(string place, string kept) =>
+        $"What {place} held just before is kept beside it as the hidden file “{kept}”.";
 
     /// <summary>The shape on disk, kept separate so the in-memory type stays clean.</summary>
     private sealed class Stored
@@ -252,4 +311,45 @@ public sealed class TimetableMemory
         [JsonPropertyName("source")] public string? Source { get; set; }
         [JsonPropertyName("recorded")] public string? Recorded { get; set; }
     }
+}
+
+/// <summary>
+/// What came of writing a section's class dates down (#899 W7b1, review 1,
+/// MEDIUM 1): saved, not saved, or saved with what the file held kept beside
+/// it as a hidden file, which is then named.
+/// </summary>
+public sealed class TimetableWriteOutcome
+{
+    // ---- Stored properties ---------------------------------------------------------
+
+    internal static readonly TimetableWriteOutcome Saved = new(true, null);
+    internal static readonly TimetableWriteOutcome NotSaved = new(false, null);
+
+    /// <summary>Whether the dates are on disk.</summary>
+    public bool Remembered { get; }
+
+    private readonly UndoStepLeftPartWayException? _stoppedPartWay;
+
+    // ---- Computed properties -------------------------------------------------------
+
+    /// <summary>The step left part way, when it was: the dates went in, and what the file held is kept beside it (its message names the kept file).</summary>
+    public Exception? StoppedPartWay => _stoppedPartWay;
+
+    /// <summary>
+    /// Null unless the step was left part way; then the mac's
+    /// <c>keptMessage</c>: <c>classDatesKeptLead</c> and the hidden file named.
+    /// </summary>
+    public string? WhatWasKept => _stoppedPartWay is { } partWay ? TimetableMemory.KeptMessage(partWay.KeptOriginals) : null;
+
+    // ---- Initializer ---------------------------------------------------------------
+
+    private TimetableWriteOutcome(bool remembered, UndoStepLeftPartWayException? stoppedPartWay)
+    {
+        Remembered = remembered;
+        _stoppedPartWay = stoppedPartWay;
+    }
+
+    // ---- Functions -------------------------------------------------------------------
+
+    internal static TimetableWriteOutcome LeftPartWay(UndoStepLeftPartWayException partWay) => new(true, partWay);
 }

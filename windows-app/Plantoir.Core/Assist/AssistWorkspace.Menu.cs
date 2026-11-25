@@ -227,6 +227,22 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
+    /// What a converted action says when its ONE step fails (#899 W7b1,
+    /// review 1, MEDIUM 2; the mac's <c>saidWhenTheStepStopped</c>): "Nothing
+    /// was changed" when the door wrote nothing; when it left a file holding
+    /// the new content with its earlier content kept beside it, the part-way
+    /// sentence (<see cref="StoppedPartWay"/>), which names each kept file.
+    /// Always an <see cref="AssistRefusal"/>, so every caller answers it and
+    /// none says "That couldn’t be read".
+    /// </summary>
+    internal AssistRefusal RefusalForAStepThatStopped(Exception error, string what, int section)
+    {
+        if (error is not UndoStepLeftPartWayException) return new AssistRefusal(NothingWasChanged(error));
+        NoteAChangeWithNoUndoEntry();
+        return new AssistRefusal(StoppedPartWay(what, error, section));
+    }
+
+    /// <summary>
     /// <c>wording.publishStoppedPartWay</c> with its way back, said by every
     /// change that stopped part way (#165, #436; the re-date since #550):
     /// the menu, which has no Restore banner, points at the course's Backups

@@ -636,6 +636,36 @@ public class ReDateTests : IDisposable
         Assert.Contains("createdSection1: 2026-10-13", Read("Concepts/Loops.md"));
     }
 
+    /// <summary>
+    /// #899 W7b1 review 1, MEDIUM 2: Bring Pages into Date left part way (one
+    /// page moved, the next read-only, and the first cannot be put back) is
+    /// said as part way, naming the kept file, never "That couldn’t be read".
+    /// </summary>
+    [Fact]
+    public void SyncingLeftPartWayIsSaidAsPartWay()
+    {
+        Class("Unit 1, Day 1", "2026-10-13", "Concept: [[Variables]] and [[Loops]]");
+        Material("Concepts/Variables.md", "2026-02-01");
+        Material("Concepts/Loops.md", "2026-02-01");
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher())
+        {
+            UndoList = new Plantoir.Core.Undo.UndoForThisProcess(Path.Combine(_folder, "state-undo"), Plantoir.Core.Undo.UndoMode.Shadow, null),
+            UndoSeams = new Plantoir.Core.Undo.UndoSeams { PutBackFailsAt = index => index == 0 },
+        };
+        var plan = workspace.PlanSyncDates("ICS3U", 1, new[] { "Unit 1, Day 1" });
+        string loops = Path.Combine(_folder, "courses", "ICS3U", "Concepts", "Loops.md");
+        File.SetAttributes(loops, FileAttributes.ReadOnly);
+        try
+        {
+            var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplySyncDates(plan));
+            Assert.StartsWith(AssistWording.PublishStoppedPartWay("the pages’ dates", ""), refused.Message);
+            Assert.Contains("createdSection1: 2026-10-13", Read("Concepts/Variables.md"));
+            string kept = Assert.Single(Directory.GetFiles(Path.Combine(_folder, "courses", "ICS3U", "Concepts"), ".Variables.md.plantoir-undo-*-orig"));
+            Assert.Contains(Path.GetFileName(kept), refused.Message);
+        }
+        finally { File.SetAttributes(loops, FileAttributes.Normal); }
+    }
+
     [Fact]
     public void SyncingWritesTheDateAndLeavesTheRestOfTheFileAlone()
     {

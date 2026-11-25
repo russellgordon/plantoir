@@ -115,4 +115,83 @@ public sealed class UndoClassDatesStepTests : IDisposable
         Assert.StartsWith("builtInAssistant:", (string?)step["madeBy"]);
         Assert.Equal("rememberTimetable", (string?)step["action"]!["key"]);
     }
+
+    /// <summary>
+    /// Another program writes into the timetable in place as it is saved, and
+    /// putting it back fails: the dates are in and what the file held is kept
+    /// beside it as a hidden file (the door's part way).
+    /// </summary>
+    private static UndoSeams TheTimetableIsLeftPartWay() => new()
+    {
+        BetweenKeepingAndRenaming = (_, fullPath) =>
+        {
+            using var inPlace = new FileStream(fullPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+            byte[] edit = System.Text.Encoding.UTF8.GetBytes("{ \"section\": 1, \"dates\": [] }");
+            inPlace.Write(edit);
+            inPlace.SetLength(edit.Length);
+        },
+        PutBackFailsAt = index => index == 0,
+    };
+
+    private string KeptTimetable() =>
+        Assert.Single(Directory.GetFiles(Path.GetDirectoryName(TimetablePath)!, ".section1.json.plantoir-undo-*-orig"));
+
+    /// <summary>
+    /// Review 1, MEDIUM 1: a Class Dates step left part way is never a plain
+    /// "remembered". The outcome says the dates are on disk AND names the
+    /// hidden file that holds what the timetable held, in the contract's
+    /// words (the mac's applyRememberTimetable rethrows leftPartWay).
+    /// </summary>
+    [Fact]
+    public void ATimetableLeftPartWayNamesTheKeptFile()
+    {
+        Assert.True(Remember(Dates));
+        var list = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null);
+        var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: TheTimetableIsLeftPartWay(), trail: list.Trail);
+        var step = new UndoActionStep(new UndoStepMaker("sheet", "rememberTimetable"), Folder, "ICS3U", 1, undo: list, door: door);
+
+        TimetableWriteOutcome written = TimetableMemory.WriteDown(Folder, "ICS3U", 1, [new DateOnly(2026, 9, 21)], "block H", Today, step);
+
+        Assert.True(written.Remembered);
+        Assert.NotNull(written.StoppedPartWay);
+        string kept = KeptTimetable();
+        Assert.Equal(TimetableMemory.KeptMessage([kept]), written.WhatWasKept);
+        Assert.Contains(Path.GetFileName(kept), written.WhatWasKept, StringComparison.Ordinal);
+        // True to the disk: the new date is what the timetable holds.
+        Assert.Equal([new DateOnly(2026, 9, 21)], TimetableMemory.Read(Folder, "ICS3U", 1)!.Dates);
+    }
+
+    /// <summary>Review 1, MEDIUM 1: remember_timetable left part way answers the part-way sentence naming the kept file, never "Recorded".</summary>
+    [Fact]
+    public void TheToolSaysATimetableLeftPartWayAsPartWay()
+    {
+        Assert.True(Remember(Dates));
+        File.WriteAllText(Path.Combine(Folder, Plantoir.Core.Models.Workspace.MarkerLauncher), "");
+        File.WriteAllText(Path.Combine(Folder, "courses", "ICS3U", "course_config.json"),
+            "{\"course_code\":\"ICS3U\",\"course_name\":\"A course\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
+        var workspace = new AssistWorkspace(Folder, new FakeLauncher())
+        {
+            Surface = AssistSurface.Outside,
+            UndoList = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null),
+            UndoSeams = TheTimetableIsLeftPartWay(),
+        };
+
+        string said = new Plantoir.Mcp.PlantoirTools(workspace).RememberTimetable("ICS3U", 1, "2026-09-21").Summary();
+
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the class dates", ""), said);
+        Assert.Contains(Path.GetFileName(KeptTimetable()), said, StringComparison.Ordinal);
+        Assert.DoesNotContain("Recorded", said, StringComparison.Ordinal);
+    }
+
+    /// <summary>The sheet's words for a timetable left part way are the contract's: classDatesAreRemembered, classDatesKeptLead and one classDatesKeptBesideIt per kept file.</summary>
+    [Fact]
+    public void TheSheetsWordsForAKeptTimetableAreTheContracts()
+    {
+        JsonObject rules = JsonNode.Parse(File.ReadAllText(ContractLoader.GetContractPath("shared-rules.json")))!.AsObject();
+        JsonNode wording = rules["undo"]!["wording"]!;
+        string kept = Path.Combine(Folder, ".section1.json.plantoir-undo-4-apply-orig");
+        string expected = (string)wording["classDatesKeptLead"]! + " " + ((string)wording["classDatesKeptBesideIt"]!)
+            .Replace("{place}", "“section1.json”").Replace("{kept}", ".section1.json.plantoir-undo-4-apply-orig");
+        Assert.Equal(expected, TimetableMemory.KeptMessage([kept]));
+    }
 }

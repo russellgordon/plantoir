@@ -426,12 +426,49 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
             };
             string answered = WindowsActionsOnTheMacFixture.Run("addCurriculumMentions", workspace);
 
-            Assert.StartsWith("Nothing was changed: ", answered);
+            // Measured (review 1, LOW 4): a read-only page is said as a permission.
+            Assert.Equal("Nothing was changed: Plantoir doesn’t have permission to change one of them.", answered);
             Assert.Equal(before, File.ReadAllBytes(page));
             // The door's refused step is begun and closed "failed": never applied, never offered.
             Assert.Empty(WindowsActionsOnTheMacFixture.AppliedBegins(ListFolder));
         }
         finally { File.SetAttributes(page, FileAttributes.Normal); }
+    }
+
+    /// <summary>
+    /// Review 1, MEDIUM 2: curriculum mentions left part way (another program
+    /// writes into the page as it is saved, and putting it back fails) answer
+    /// the part-way sentence naming the kept file, never "That couldn’t be read".
+    /// </summary>
+    [Fact]
+    public void CurriculumMentionsLeftPartWayAreSaidAsPartWay()
+    {
+        JsonElement recorded = WindowsActionsOnTheMacFixture.Recorded("addCurriculumMentions");
+        WindowsActionsOnTheMacFixture.Lay(Folder, recorded);
+        string page = UndoDoor.FullPath(Folder, recorded.GetProperty("files")[0].GetProperty("path").GetString()!);
+        var workspace = new AssistWorkspace(Folder, new FakeLauncher())
+        {
+            Surface = AssistSurface.Outside,
+            UndoList = new UndoForThisProcess(ListFolder, UndoMode.Shadow, null),
+            UndoSeams = new UndoSeams
+            {
+                BetweenKeepingAndRenaming = (_, fullPath) =>
+                {
+                    using var inPlace = new FileStream(fullPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                    byte[] edit = Encoding.UTF8.GetBytes("written by hand\n");
+                    inPlace.Write(edit);
+                    inPlace.SetLength(edit.Length);
+                },
+                PutBackFailsAt = index => index == 0,
+            },
+        };
+
+        string answered = WindowsActionsOnTheMacFixture.Run("addCurriculumMentions", workspace);
+
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the curriculum mentions", ""), answered);
+        string kept = Assert.Single(Directory.GetFiles(Path.GetDirectoryName(page)!, "." + Path.GetFileName(page) + ".plantoir-undo-*-orig"));
+        Assert.Contains(Path.GetFileName(kept), answered, StringComparison.Ordinal);
+        Assert.DoesNotContain("couldn’t be read", answered, StringComparison.Ordinal);
     }
 
     [Theory]
