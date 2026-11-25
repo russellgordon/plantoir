@@ -1,0 +1,30 @@
+#899 U4b, must-fail of 5e86f6e65's Cancel fix, 2026-11-25, branch after merging dev 45be52fbf (a79d13c10).
+Sabotage: CourseSettingsView.renameFolder awaits Task.detached { SpecialFolderRenamer.plan(...) }.value instead of planHaltingAtCancel. Each run under xlock.sh with a 900 s kill limit.
+
+== Run 1, sabotaged, test at c1dc75aa1: fails at its 30 s wait, then HANGS at the wait for 'ended' (stopped by hand after about 3 minutes) ==
+/Users/russellgordon/plantoir/wt-899-u4b/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:819: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing] : failed - the rename waited for the held plan after Cancel
+Test Case '-[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing]' started.
+XLOCK_HELD 15:41:17
+
+== Run 2, sabotaged, test returning after its failure (this commit): fails, no hang ==
+	 Executed 1 test, with 1 failure (0 unexpected) in 30.615 (30.616) seconds
+	 Executed 1 test, with 1 failure (0 unexpected) in 30.615 (30.617) seconds
+/Users/russellgordon/plantoir/wt-899-u4b/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:823: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing] : failed - the rename waited for the held plan after Cancel
+Test Case '-[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing]' failed (30.615 seconds).
+Test Case '-[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing]' started.
+TIMED_EXIT 65
+XLOCK_DONE exit=65 15:45:35
+XLOCK_HELD 15:44:57
+
+== Run 3, fix restored, the seven classes ==
+XLOCK_HELD 15:46:00
+Test Case '-[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing]' passed (0.232 seconds).
+** TEST EXECUTE SUCCEEDED **
+XLOCK_DONE exit=0 15:47:19
+CourseActivityTests: 9 run, 0 failures
+QuitConfirmationTests: 13 run, 0 failures
+SaveEnablesTests: 9 run, 0 failures
+SpecialFolderRenamerTests: 31 run, 0 failures
+UndoFilesContractTests: 3 run, 0 failures
+UndoJournalContractTests: 19 run, 0 failures
+UndoRenameFolderStepTests: 26 run, 0 failures

@@ -812,11 +812,17 @@ final class UndoRenameFolderStepTests: XCTestCase {
         // that waits for the held read into a failure rather than a hang.
         // A rename that waited would never return while the plan is held,
         // so the hold is opened before awaiting it: the test then fails
-        // rather than hanging the run.
+        // rather than hanging the run. It ends there: a rename that waited
+        // planned outside `planHaltingAtCancel`, so `planHasEnded` is never
+        // called and the wait for `ended` below would never return (measured
+        // 2026-11-25: with the plan awaited as a detached task's `value`, the
+        // run failed here and then hung at that wait).
         let waited: XCTWaiter.Result = await XCTWaiter().fulfillment(of: [returned], timeout: 30)
         if waited != .completed {
             gate.open()
             XCTFail("the rename waited for the held plan after Cancel")
+            _ = await halted.value
+            return
         }
         let result: RenameResult = await halted.value
 
