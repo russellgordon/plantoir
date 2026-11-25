@@ -212,7 +212,7 @@ window (not named): 19. (Run 1's DNS half was lost: the reduction read the
 process ids wrongly and printed 0 ids; fixed in 2ac5ae7 and run again as run
 3.)
 
-Run 3 (a second first start, root `913d`, `vm-tools/runs/913/turn3.log`) was made only for the DNS half of a first start; it is not tabled here (stopped on budget), and its log is the record.
+Run 3 (a second first start, root `913d`, `vm-tools/runs/913/turn3.log`) was made only for the DNS half of a first start; in brief, as printed: page shown 89 s after start; the same hosts as run 1, with `config.edge.skype.com` https GET 2 and `edge.microsoft.com` https POST 5 (9,831 bytes), no page address on any; DNS Client log (8 WebView2 process ids): `wpad` 6 and nothing else.
 
 ### What the measurement says, and what it does not
 
