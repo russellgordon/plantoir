@@ -70,3 +70,43 @@ Not converted in W7b1 (each still writes file by file; each held by name in `Und
 ## Must-fail (`vm-tools/guest/899-w7b-mustfail.json`)
 
 `899w7b-mf1` at 79d71c4fd: **18 of 18 RED** (rows 1 to 16 the writer's; 17, a held row's run is real: Make Room asked of a unit that does not exist changes nothing and the held row fails; 18, the unit tag written CRLF breaks the fixture's byte-for-byte line-ending transform), each with build 0; restored tree **Passed! 1214, Failed 0, Skipped 1, Total 1215**; HEAD the same, status clean.
+
+## Review 1 round (2026-11-25): the two mediums, the lows, Re-date proven
+
+Merged `origin/dev` 66c9853a8 first (818f5753b; `NamedGapLedger.cs` kept both sides). The dead writer's half-written Make Room and Duplicate conversion is in `git stash` as "w7b1 half-written Make Room and Duplicate, 2026-11-21", untouched, for W7b2.
+
+### For PROGRESS
+
+- **M1, Class Dates left part way.** `TimetableMemory.WriteDown` returns a `TimetableWriteOutcome` (remembered, not saved, or remembered with what the file held kept, `StoppedPartWay` and `WhatWasKept`); `Write` keeps its bool (true when the dates are on disk) for setup callers. The Class Dates sheet says the mac's `savedWithWhatItHeldKept` words (`classDatesAreRemembered`, `undo.wording.classDatesKeptLead`, one `classDatesKeptBesideIt` per kept file) in its status line and stays open; Save again closes it, the same dates changing nothing. (The mac shows an alert; the kept-file alert is held for no W7b piece, so the sheet's own status line carries it.) `remember_timetable` answers `publishStoppedPartWay` ("the class dates", the mac's words) naming the kept file, never "Recorded". Re-date's timetable write names its kept file in the re-date's answer, refusal included.
+- **M2.** Add Classes, Add Next Class, curriculum mentions and Bring Pages into Date failing at the step go through `AssistWorkspace.RefusalForAStepThatStopped`: "Nothing was changed: …" when the door wrote nothing, the part-way sentence naming each kept file when it left one (the mac's `saidWhenTheStepStopped`: "the classes you asked for", "the curriculum mentions"; Windows' own "the pages’ dates"), always an `AssistRefusal`, never "That couldn’t be read".
+- **LOW 1.** A refused swap removes the empty folders it made (`UndoSwap.MakeTheFolderOf`, `RemoveTheEmptyFoldersMade`: innermost first, only while empty). Test `UndoAddClassesStepTests.ARefusedStepLeavesNoEmptyClassFolder`; the old test's name no longer claims it.
+- **LOW 4 measured.** A read-only curriculum page says "Nothing was changed: Plantoir doesn’t have permission to change one of them." (`UndoActionStep.Reason`'s read-only case); the earlier notes were right, and the test now asserts the whole sentence.
+- **LOW 5.** The re-date's and the tool's timetable steps are the workspace's (`NewUndoStep`), with its door and seams.
+- **LOW 6.** `Reason899W7b2` and `Reason899NoDuplicateAsNextClass` say what is true (Windows has the menu's Duplicate as Next Class since #927, still without a step); the writer-scan line's indentation; the harness child's comment says it plans the pages itself.
+- **LOW 7:** "For the director (both platforms)".
+- **Not done in this round:** LOW 2 (the `addCurriculumMentions` and `rememberTimetable` traces still replay the JSON draft) and the rest of LOW 3 (sabotages of a before read at make time, and change-nothing steps for sync and curriculum mentions): left for the next piece on this code.
+
+### For documentation 12
+
+- A Windows step left part way is never said as "couldn’t be read" or as plainly done: every converted action says "Nothing was changed" or the part-way sentence naming each kept file; Class Dates says the dates are remembered and names the hidden file (the mac's sheet words).
+- A refused swap leaves no empty folder it made.
+
+### Runs (PC)
+
+- `899w7b1-c3` at 2cff6e384: both builds 0; **Passed 1344, Failed 0, Skipped 1, Total 1345** (the Undo classes, the ledger, every class covering a converted action, `PublishStoppedPartWayTests`, `DateTextTests`). Kill harness, outside and inside OneDrive: `w7-publish-kill` 10/10, `w7-add-classes-kill` 10/10, `w7-plain-kill` 3/3 WHOLE, scratch removed. Re-date (5a3eae568) is proven by this run: its fixture row, `SectionVerbsTests`, `RolloverWebsiteTests` and must-fail rows 1 to 3.
+
+### Must-fail (`vm-tools/guest/899-w7b1-mustfail-2.json`)
+
+`899w7b1-c3` (rows 1 to 7, 9, 10), `899w7b1-mf2` (11) and `899w7b1-mf3` (8, after its filter was corrected from `TimetableTests` to the class `ReDateTests`, and the file written with ASCII escapes so PowerShell reads the curly apostrophes) at 2cff6e384: **11 of 11 RED**, each with build 0; restored tree Passed 1344, Failed 0, Skipped 1 each time; HEAD the same, status clean.
+
+1. Re-date written file by file (`Save`): `TheWindowsActionLeavesTheRecordedStep` (reDateClasses).
+2. Re-date names no recompute: the same row.
+3. Re-date refused, the old rethrow: `ReDateWhoseSecondPageCannotBeWritten_ChangesNothing`, `RollOverWhoseSecondPageCannotBeWritten_ChangesNothing`.
+4. M1, a timetable left part way answers a plain remembered: `ATimetableLeftPartWayNamesTheKeptFile`, `TheToolSaysATimetableLeftPartWayAsPartWay`.
+5. M1, `remember_timetable` says Recorded: `TheToolSaysATimetableLeftPartWayAsPartWay`.
+6. M2, Add Classes rethrown: `ClassesLeftPartWayAreSaidAsPartWay` (both tools).
+7. M2, curriculum mentions rethrown: `CurriculumMentionsLeftPartWayAreSaidAsPartWay`.
+8. M2, Bring Pages into Date rethrown: `ReDateTests.SyncingLeftPartWayIsSaidAsPartWay`.
+9. LOW 1, the empty folders left: `ARefusedStepLeavesNoEmptyClassFolder`.
+10. M1, the sheet's lead not the contract's: `TheSheetsWordsForAKeptTimetableAreTheContracts`.
+11. LOW 4, a read-only page said as a full disk: `CurriculumMentionsOnAPageThatCannotBeWrittenChangeNothing`.
