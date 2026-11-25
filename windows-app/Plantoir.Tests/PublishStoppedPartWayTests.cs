@@ -99,6 +99,22 @@ public class PublishStoppedPartWayTests : IDisposable
     }
 
     /// <summary>
+    /// #1027's review, low 3: a copy from the menu whose page could not be
+    /// made says the mac's "Nothing was created: …" with the reason in a
+    /// teacher's words: a permission said plainly, never the .NET message.
+    /// MUST FAIL with the exception's own message put back.
+    /// </summary>
+    [Fact]
+    public void ACopyThatCouldNotBeMadeSaysWhyInPlainWords()
+    {
+        var denied = new UnauthorizedAccessException("Access to the path 'C:\\x\\Week 5.md' is denied.");
+        Assert.Equal("Nothing was created: " + AssistWorkspace.ReasonItStopped(denied), AssistWorkspace.NothingWasCreated(denied));
+        Assert.DoesNotContain("Access to the path", AssistWorkspace.NothingWasCreated(denied));
+        var other = new IOException("The network path was not found.");
+        Assert.Equal("Nothing was created: The network path was not found.", AssistWorkspace.NothingWasCreated(other));
+    }
+
+    /// <summary>
     /// A publish whose FIRST write fails changed nothing, and says the mac's
     /// "Nothing was changed: …" — never "Only part of … was changed", and no
     /// pointer at a copy, since there is nothing to put back (#550). On every

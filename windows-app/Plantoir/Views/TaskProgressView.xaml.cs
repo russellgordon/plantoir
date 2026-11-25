@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -51,6 +53,10 @@ public sealed partial class TaskProgressView : UserControl
     public TaskProgressView()
     {
         InitializeComponent();
+        // #889: the note under a finished folder deploy (renderNote), and the
+        // button beside the folder button, in the contract's words.
+        FolderResultRenderNote.Text = DeployedFolderWording.RenderNote;
+        FolderResultBrowserButton.Content = DeployedFolderWording.ResultButton;
         // Re-renders once a second while a task runs, so the "still working…"
         // timer keeps moving even when the script itself is momentarily quiet.
         _tick = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -496,7 +502,14 @@ public sealed partial class TaskProgressView : UserControl
             {
                 var button = new Button { Content = "Show in File Explorer" };
                 button.Click += (_, _) => FolderActions.ShowInFileExplorer(folder);
-                block.Children.Add(button);
+                var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                buttons.Children.Add(button);
+                if (DestinationBrowserButton() is { } browser) buttons.Children.Add(browser);
+                block.Children.Add(buttons);
+                block.Children.Add(new TextBlock
+                {
+                    Text = DeployedFolderWording.RenderNote, FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap,
+                });
             }
             else if (leg.Runner.PublishedSiteUrl is { } url)
             {
@@ -923,5 +936,36 @@ public sealed partial class TaskProgressView : UserControl
     private void FolderResult_Click(object sender, RoutedEventArgs e)
     {
         if (_publishedFolder is { } folder) FolderActions.ShowInFileExplorer(folder);
+    }
+
+    /// <summary>
+    /// Opens the section's deployed folder in the browser (#889), set by the
+    /// section's window, which knows the course; null, and no button, where
+    /// no section owns this view.
+    /// </summary>
+    internal Func<Task>? OpenDeployedFolder
+    {
+        get => _openDeployedFolder;
+        set
+        {
+            _openDeployedFolder = value;
+            FolderResultBrowserButton.Visibility = value is null ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+    private Func<Task>? _openDeployedFolder;
+
+    private void FolderResultBrowser_Click(object sender, RoutedEventArgs e)
+    {
+        if (_openDeployedFolder is { } open) _ = open();
+    }
+
+    /// <summary>The Open in Browser button under a folder leg of a multi-destination deploy (#889).</summary>
+    private Button? DestinationBrowserButton()
+    {
+        if (_openDeployedFolder is not { } open) return null;
+        var button = new Button { Content = DeployedFolderWording.ResultButton };
+        AutomationProperties.SetAutomationId(button, "destinationFolderBrowserButton");
+        button.Click += (_, _) => _ = open();
+        return button;
     }
 }

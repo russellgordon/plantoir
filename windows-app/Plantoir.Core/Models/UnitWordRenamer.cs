@@ -273,7 +273,14 @@ public static class UnitWordRenamer
     /// ignores case, and "Units 1, Day 1" begins with "Unit"). Otherwise it is
     /// stale and cleared rather than believed.
     /// </summary>
-    public static string? InterruptedRenameTarget(UnitWordRenameCourseFacts facts)
+    /// <param name="clearingAStaleRecord">
+    /// False for Add Class…'s dialog and the menu's server (#927, the mac's
+    /// <c>interruptedRenameTarget(clearingAStaleRecord: false)</c>): a stale
+    /// record is still read as stale, but LEFT where it is, because a rename
+    /// running in another window has, for one write, a record and no moved
+    /// page, and only the rename that owns a record may clear it.
+    /// </param>
+    public static string? InterruptedRenameTarget(UnitWordRenameCourseFacts facts, bool clearingAStaleRecord = true)
     {
         string marker = RenameMarkerPath(facts.DirectoryPath);
         Dictionary<string, string>? note;
@@ -282,14 +289,14 @@ public static class UnitWordRenamer
         if (note is null || !note.TryGetValue("from", out var from) || !note.TryGetValue("to", out var to)) return null;
         if (from != facts.CurrentWord || to.Length == 0 || to == from)
         {
-            ClearRenameRecord(facts.DirectoryPath);
+            if (clearingAStaleRecord) ClearRenameRecord(facts.DirectoryPath);
             return null;
         }
         bool somethingMoved = ClassFolderPages(facts)
             .Any(page => UnitDay.Parse(page.Title, to) is not null && page.Title.StartsWith(to, StringComparison.Ordinal));
         if (!somethingMoved)
         {
-            ClearRenameRecord(facts.DirectoryPath);
+            if (clearingAStaleRecord) ClearRenameRecord(facts.DirectoryPath);
             return null;
         }
         return to;

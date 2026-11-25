@@ -34,6 +34,7 @@ public class DialogTitleScanTests
         ["MainWindow.Guidance.cs"] = 1,
         ["MainWindow.Menus.cs"] = 2,
         ["MainWindow.xaml.cs"] = 6,
+        ["Services/DeployedFolderOpening.cs"] = 1,   // #889: couldNotOpen, its title the contract's couldNotOpenTitle
         ["Services/UpdatePrompts.cs"] = 1,
         ["Views/AboutDialog.cs"] = 1,
         ["Views/AddSectionDialog.cs"] = 1,

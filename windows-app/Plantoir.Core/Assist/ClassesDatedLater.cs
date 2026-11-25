@@ -111,8 +111,8 @@ public static class ClassesDatedLater
     /// The counts the "ran from a menu" line of the hide at Deploy carries —
     /// the mac's words (<c>SectionDetailVerbs.swift</c>), not the contract's.
     /// </summary>
-    public static string UntickedAtDeployCounts(int count) =>
-        count == 1 ? "1 class dated later, unticked at Deploy" : $"{count} classes dated later, unticked at Deploy";
+    public static string UntickedAtDeployCounts(int count, ClassNoun noun = ClassNoun.Class) =>
+        AssistWording.UntickedAtDeployCounts(count, noun);
 
     /// <summary>
     /// The section's class pages, read from disk: the folders the shared

@@ -167,7 +167,7 @@ public class CopyAPageEndToEndUiTests
         Keyboard.Type(typed);
         Thread.Sleep(600);
         Keyboard.Type(VirtualKeyShort.DOWN);
-        Keyboard.Type(VirtualKeyShort.ENTER);
+        Keyboard.Type(VirtualKeyShort.RETURN);
     }
 
     private static string DialogText(DrivenApp app) =>

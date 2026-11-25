@@ -524,7 +524,10 @@
    "mac": {
     "wording": "AssistWording.menuRollOverButton"
    },
-   "windows": null
+   "windows": {
+    "label": "Roll Over",
+    "say": "assist-wording#wording.menuRollOverButton"
+   }
   },
   "makeRoomButton": {
    "label": "Make Room",

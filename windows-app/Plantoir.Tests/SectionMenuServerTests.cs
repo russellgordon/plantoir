@@ -153,7 +153,7 @@ public class SectionMenuServerTests : IDisposable
         var workspace = Menu();
         var tools = new PlantoirTools(workspace);
 
-        Assert.Equal(AssistWording.NothingToUndoFromTheMenu, tools.UndoLastChange().Summary());
+        Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class), tools.UndoLastChange().Summary());
 
         var before = workspace.TopOfTheUndoList;
         await tools.PublishPages("ICS3U", 1, NoProgress, default, new[] { "section1/All Classes/Unit 1, Day 2" }, preview: false);

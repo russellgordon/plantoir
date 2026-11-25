@@ -115,8 +115,13 @@ public sealed class AssistToolRunner
     /// </summary>
     public Func<bool>? SectionIsChangingFromTheMenu { get; init; }
 
-    /// <summary>What the course calls its class pages: the refusal above names "the Section or Meetings menu" in a club (#990).</summary>
-    public ClassNoun CourseNoun { get; init; } = ClassNoun.Class;
+    /// <summary>
+    /// What the course calls its class pages: the refusal above names "the
+    /// Section or Meetings menu" in a club (#990). REQUIRED, with no default
+    /// (#990 review 3, low 3): a site that forgot it would give a club "the
+    /// Section or Classes menu" and still compile.
+    /// </summary>
+    public required ClassNoun CourseNoun { get; init; }
 
     /// <summary>
     /// Whether a copy of the course is being saved right now (the work lease's

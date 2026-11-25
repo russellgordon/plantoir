@@ -50,6 +50,8 @@ final class SubjectMenuLayoutTests: XCTestCase {
     /// What the real menu should read, line by line, from the layout: each
     /// item's title, "Revise With" for the submenu, and "----" between
     /// groups. Preview reads back in its resting form, as the golden does.
+    /// The menu bar under test has no club selected, so its items are titled
+    /// as a course titles them.
     static func expectedLines(of menu: SubjectMenuLayout.Menu) throws -> [String] {
         var lines: [String] = []
         var isFirstGroup: Bool = true
@@ -61,7 +63,7 @@ final class SubjectMenuLayoutTests: XCTestCase {
             for entry in group {
                 switch entry {
                 case .item(let item):
-                    lines.append(try XCTUnwrap(SectionMenu.title(for: item), "\(item) is in the layout with no title"))
+                    lines.append(try XCTUnwrap(SectionMenu.title(for: item, noun: .class), "\(item) is in the layout with no title"))
                 case .submenu(let submenu):
                     lines.append(SubjectMenuLayout.title(of: submenu))
                 }
@@ -301,7 +303,7 @@ final class SubjectMenuLayoutTests: XCTestCase {
         XCTAssertEqual(SectionVerbs.menuPath(of: .undoLastChange, noun: .class), "Section ▸ Undo Last Change")
         XCTAssertEqual(SectionVerbs.menuPath(of: .rebuildPreview, noun: .class), "Section ▸ Rebuild Preview")
         // A club's trail names its menus as its menu bar does (#990, 2026-11-20 evening).
-        XCTAssertEqual(SectionVerbs.menuPath(of: .makeRoomForClasses, noun: .meeting), "Meetings ▸ Make Room for Classes…")
+        XCTAssertEqual(SectionVerbs.menuPath(of: .makeRoomForClasses, noun: .meeting), "Meetings ▸ Make Room for Meetings…")
         XCTAssertEqual(SectionVerbs.menuPath(of: .publishPages, noun: .meeting), "Section ▸ Publish Pages…")
     }
 
@@ -336,7 +338,8 @@ final class SubjectMenuLayoutTests: XCTestCase {
         }
         XCTAssertEqual(SubjectMenuLayout.eitherMenu(noun: .class), "Section or Classes")
         XCTAssertEqual(SubjectMenuLayout.eitherMenu(noun: .meeting), "Section or Meetings")
-        XCTAssertTrue(AssistWording.nothingToUndoFromTheMenu.contains("the Section or Classes menu"))
+        XCTAssertTrue(AssistWording.nothingToUndoFromTheMenu(noun: .class).contains("the Section or Classes menu"))
+        XCTAssertTrue(AssistWording.nothingToUndoFromTheMenu(noun: .meeting).contains("the Section or Meetings menu"))
     }
 
     /// The Backups list's column names the menu that made the copy.
@@ -354,13 +357,13 @@ final class SubjectMenuLayoutTests: XCTestCase {
     /// #990's ellipsis ruling: a command that only asks for a confirmation
     /// takes none. MUST FAIL with either ellipsis back.
     func testTheConfirmOnlyCommandsCarryNoEllipsis() throws {
-        XCTAssertEqual(SectionMenu.title(for: .removeSection), "Remove Section")
-        XCTAssertEqual(SectionMenu.title(for: .cancelScheduledDeploy), "Remove Scheduled Deploy")
+        XCTAssertEqual(SectionMenu.title(for: .removeSection, noun: .class), "Remove Section")
+        XCTAssertEqual(SectionMenu.title(for: .cancelScheduledDeploy, noun: .class), "Remove Scheduled Deploy")
         let words: [String: Any] = try XCTUnwrap(
             (try SharedRulesContractTests.section("scheduledDeployCancellation")["removingOne"] as? [String: Any])?["words"]
                 as? [String: Any]
         )
         XCTAssertEqual(words["menuItem"] as? String, ScheduledDeployRemovalWording.menuItem)
-        XCTAssertEqual(SectionMenu.title(for: .deploy), "Deploy…", "Deploy…'s ellipsis is #996's, not this piece's")
+        XCTAssertEqual(SectionMenu.title(for: .deploy, noun: .class), "Deploy…", "Deploy…'s ellipsis is #996's, not this piece's")
     }
 }

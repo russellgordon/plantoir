@@ -515,16 +515,7 @@ extension SectionDetailView {
             return RollOverFromTheMenu.counts(model.rollOver.website, sent: model.rollOver.websiteSent ?? "")
         case .addClass:
             // How it was added, never the class's title (#897).
-            switch model.way {
-            case .nextInThisUnit:
-                return "the next class in this unit"
-            case .inANewUnit:
-                return "in a new unit"
-            case .asACopyOfAClass:
-                return "as a copy of a class"
-            case nil:
-                return ""
-            }
+            return SectionVerbs.addClassCounts(model.way, noun: course.configuration.classNoun)
         default:
             return ""
         }
@@ -703,9 +694,7 @@ extension SectionDetailView {
             let outcome: AssistToolOutcome = await verbs.perform(
                 SectionVerbs.hidePages(course: course.code, section: sectionNumber, names: names, planning: false),
                 item: .hidePages, courseCode: course.code, sectionNumber: sectionNumber,
-                counts: hidden.count == 1
-                    ? "1 class dated later, unticked at Deploy"
-                    : "\(hidden.count) classes dated later, unticked at Deploy"
+                counts: AssistWording.untickedAtDeployCounts(count: hidden.count, noun: course.configuration.classNoun)
             )
             verbs.toolRunner.previewFollowsAChange = true
             refreshEditedMarker()

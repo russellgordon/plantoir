@@ -119,7 +119,7 @@ final class AccessibilityTreeTests: XCTestCase {
             try? FileManager.default.removeItem(at: made.root)
         }
         let read: AccessibilityTree = try tree(of: SectionScheduleSheet(course: made.course, sectionNumber: 1))
-        XCTAssertEqual(read.element(identifiedAs: "sectionScheduleTypedField")?.names, [AccessibilityNames.classDates])
+        XCTAssertEqual(read.element(identifiedAs: "sectionScheduleTypedField")?.names, [AccessibilityNames.classDates()])
         XCTAssertEqual(read.element(identifiedAs: "sectionScheduleSourceField")?.names, ["Where these came from"])
         assertEveryControlIsNamedOnce(in: read)
     }

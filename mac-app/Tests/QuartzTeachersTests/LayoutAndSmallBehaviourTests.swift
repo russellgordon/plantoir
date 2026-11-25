@@ -140,7 +140,7 @@ final class LayoutAndSmallBehaviourTests: XCTestCase {
         var typed: String = ""
         let binding: Binding<String> = Binding(get: { return typed }, set: { (text: String) in typed = text })
         let host: TableHost = TableHost(
-            ClassDatesTextBox(text: binding, accessibilityName: AccessibilityNames.classDates, identifier: "datesBox"),
+            ClassDatesTextBox(text: binding, accessibilityName: AccessibilityNames.classDates(), identifier: "datesBox"),
             size: NSSize(width: 400, height: 200)
         )
         defer {
@@ -159,7 +159,7 @@ final class LayoutAndSmallBehaviourTests: XCTestCase {
     /// A box on its own, bound to `typed`, with its text view.
     static func hostedBox(_ binding: Binding<String>) throws -> (host: TableHost, box: NSTextView) {
         let host: TableHost = TableHost(
-            ClassDatesTextBox(text: binding, accessibilityName: AccessibilityNames.classDates, identifier: "datesBox"),
+            ClassDatesTextBox(text: binding, accessibilityName: AccessibilityNames.classDates(), identifier: "datesBox"),
             size: NSSize(width: 400, height: 200)
         )
         host.pump(0.2)

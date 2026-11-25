@@ -197,6 +197,9 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, Plantoir.Core.
     /// </summary>
     public string? MenuOfTheNextCalls { get; set; }
 
+    /// <summary>The course of the section the next calls are for (#1027), sent in each call's <c>_meta</c> while set.</summary>
+    public string? CourseOfTheNextCalls { get; set; }
+
     public async Task<Plantoir.Core.Assist.AssistToolAnswer> CallTool(
         string name, JsonObject arguments,
         Action<string>? progress = null,
@@ -242,6 +245,8 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, Plantoir.Core.
         {
             var meta = parameters["_meta"] as JsonObject ?? new JsonObject();
             meta[Plantoir.Core.Assist.AssistWorkspace.MenuMetaKey] = menu;
+            if (CourseOfTheNextCalls is { } course)
+                meta[Plantoir.Core.Assist.AssistWorkspace.CourseMetaKey] = course;
             parameters["_meta"] = meta;
         }
 

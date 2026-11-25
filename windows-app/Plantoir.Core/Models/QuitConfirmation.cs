@@ -77,7 +77,8 @@ public static class QuitConfirmation
             : sessionEnding ? ClosingReason.AskedByWindows : ClosingReason.ByTheTeacher;
 
     /// <summary>What this app has under way at the moment of the quit.</summary>
-    public sealed record UnderWay(int Publishes, int PreviewsOpen, int PreviewsBeingBuilt, int CopiesBeingSaved);
+    /// <param name="DeployedFoldersShown">Deployed folders this app shows in the browser (#889): counted, and never a reason to ask, since nothing is built or written.</param>
+    public sealed record UnderWay(int Publishes, int PreviewsOpen, int PreviewsBeingBuilt, int CopiesBeingSaved, int DeployedFoldersShown = 0);
 
     /// <summary>The whole rule; the contract's cases run straight through it.</summary>
     public static bool ShouldAsk(UnderWay underWay, Reason reason) =>
