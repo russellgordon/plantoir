@@ -1382,7 +1382,7 @@ public sealed partial class SectionDetailView : UserControl
         }
 
         if (_lease is null && PreviewLeases.Active.Any(
-                lease => lease.FolderPath == workspacePath
+                lease => WorkingFolder.IsTheSame(lease.FolderPath, workspacePath)
                          && lease.CourseCode == _course.Code
                          && lease.SectionNumber == _sectionNumber))
         {
@@ -2286,11 +2286,24 @@ public sealed partial class SectionDetailView : UserControl
     // WebView2 155, setting the same address again DOES navigate, so this is
     // not about a trap: documentation/12 → "Preview at Last Viewed on Windows".)
 
+    /// <summary>
+    /// The pane's browser, on the preview's own environment (crash reports
+    /// kept on the computer) and with SmartScreen's check of the pages shown
+    /// turned off, before the first page is asked for (#913, Russell's
+    /// rulings; PreviewBrowserEnvironment says what each costs and cites
+    /// Microsoft's pages). The only place the pane's browser is made.
+    /// </summary>
+    private async Task EnsurePreviewBrowserAsync()
+    {
+        await Preview.EnsureCoreWebView2Async(await PreviewBrowserEnvironment.GetAsync());
+        PreviewBrowserEnvironment.ApplyViewSettings(Preview.CoreWebView2);
+    }
+
     private async Task NavigateAsAppAsync(Uri url)
     {
         try
         {
-            await Preview.EnsureCoreWebView2Async();
+            await EnsurePreviewBrowserAsync();
             WatchTheTeachersNavigations();
             _ledger.AppLoadRequested(DateTime.UtcNow);
             Preview.CoreWebView2.Navigate(url.AbsoluteUri);
@@ -2302,7 +2315,7 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
-            await Preview.EnsureCoreWebView2Async();
+            await EnsurePreviewBrowserAsync();
             WatchTheTeachersNavigations();
             _ledger.AppLoadRequested(DateTime.UtcNow);
             Preview.CoreWebView2.Reload();

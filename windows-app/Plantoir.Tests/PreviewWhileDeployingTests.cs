@@ -51,6 +51,20 @@ public class PreviewWhileDeployingTests : IDisposable
         Assert.True(ran >= 2, "the contract lost its window cases");
     }
 
+    /// <summary>
+    /// #769 item 1: a section deploying under one spelling of its folder
+    /// refuses a preview asked under another (upper case, a trailing
+    /// separator) — one folder however it is spelled, as the Mac (#189).
+    /// </summary>
+    [Fact]
+    public void ADeployUnderOneSpellingRefusesAPreviewAskedUnderAnother()
+    {
+        using var publish = CourseActivity.BeginPublish(Folder, "ICS4U", 2);
+        string respelled = Folder.ToUpperInvariant() + System.IO.Path.DirectorySeparatorChar;
+        Assert.True(CourseActivity.IsPublishingSection(respelled, "ICS4U", 2));
+        Assert.False(CourseActivity.IsPublishingSection(respelled, "ICS4U", 3));
+    }
+
     private sealed class NoModel : IChatModel
     {
         public System.Threading.Tasks.Task<ModelReply?> Ask(JsonArray messages, JsonArray tools,

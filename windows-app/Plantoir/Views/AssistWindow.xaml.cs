@@ -571,17 +571,18 @@ public sealed partial class AssistWindow : Window
             {
                 if (_main is not null) await _main.StopPreviewForAsync(_folder, _course.Code, _section);
             },
-            // Asked of a window showing this section's folder — the busy
-            // answer is read off a detail pane, and another folder's pane
-            // answers about another folder's section.
-            SectionIsBusy = () => MainWindowShowingThisSection()?.IsSectionBusy(_folder, _course.Code, _section) == true,
+            // Asked app-wide, of the section's run and the in-process publish
+            // record by THIS section's folder, never of a window: with no
+            // window showing the section, its deploy running in this app is
+            // still busy (#769 item 2; the mac's deployIsUnderWay, #706).
+            SectionIsBusy = () => SectionRuns.DeployIsUnderWay(_folder, _course.Code, _section),
             // Same process as every window's Deploy, so the in-memory publish
             // record is the truth about this section being deployed (#386).
             SectionIsBeingDeployed = () => CourseActivity.IsPublishingSection(_folder, _course.Code, _section),
             // Same process as the previews, so the in-memory leases are the
             // truth about whether one is on screen.
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>
-                lease.FolderPath == _folder &&
+                WorkingFolder.IsTheSame(lease.FolderPath, _folder) &&
                 string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase) &&
                 lease.SectionNumber == _section),
             ConfirmationMode = () => App.Settings.AssistantAsksBeforeChanging,

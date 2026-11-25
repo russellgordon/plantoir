@@ -184,6 +184,49 @@ public sealed class SectionRunsTests : IDisposable
         Assert.True(run.IsShown(null), "a running deploy is always shown");
     }
 
+    // ---- The assistant's busy answer (#769 item 2) -----------------------
+
+    /// <summary>
+    /// A deploy of the section running in this app with no window or view on
+    /// the section at all (no run was ever made) is under way for the
+    /// assistant, however the folder is spelled.
+    /// </summary>
+    [Fact]
+    public void WithNoViewEverOpened_APublishRecordIsUnderWay()
+    {
+        using (CourseActivity.BeginPublish(_folder, "EXC2O", 1))
+        {
+            Assert.Null(SectionRuns.Find(_folder, "EXC2O", 1));
+            Assert.True(SectionRuns.DeployIsUnderWay(_folder, "EXC2O", 1), "the publish record, with no run");
+            Assert.True(SectionRuns.DeployIsUnderWay(Respelled(_folder), "EXC2O", 1), "the same folder by another name");
+        }
+    }
+
+    [Fact]
+    public void WithNothingRunning_TheDeployIsNotUnderWay()
+    {
+        Assert.False(SectionRuns.DeployIsUnderWay(_folder, "EXC2O", 1));
+        Assert.False(SectionRuns.DeployIsUnderWay(null, "EXC2O", 1));
+    }
+
+    [Fact]
+    public void AnotherSectionOfTheFolder_IsNotUnderWay()
+    {
+        using (CourseActivity.BeginPublish(_folder, "EXC2O", 1))
+        {
+            Assert.False(SectionRuns.DeployIsUnderWay(_folder, "EXC2O", 2));
+        }
+    }
+
+    [Fact]
+    public void OnceThePublishRecordIsDisposed_TheDeployIsNotUnderWay()
+    {
+        IDisposable record = CourseActivity.BeginPublish(_folder, "EXC2O", 1);
+        Assert.True(SectionRuns.DeployIsUnderWay(_folder, "EXC2O", 1));
+        record.Dispose();
+        Assert.False(SectionRuns.DeployIsUnderWay(_folder, "EXC2O", 1));
+    }
+
     // ---- The contract ----------------------------------------------------
 
     public static IEnumerable<object[]> Cases() =>

@@ -136,14 +136,15 @@ public sealed class SectionDeployRunSourceTests
         Assert.Contains("TakeWhatTheDeployLeft();", handler);
     }
 
-    /// <summary>The window's busy answer finds the section's run by the CALLER's folder, on screen or not (plan review, 5).</summary>
+    /// <summary>
+    /// The busy answer has one path, app-wide (#769 item 2): no window keeps a
+    /// second one. What it answers is <see cref="SectionRunsTests"/>; the
+    /// assistant's wiring is <c>AssistSurfaceContractTests</c>.
+    /// </summary>
     [Fact]
-    public void IsSectionBusyAsksTheRunsByTheCallersFolder()
+    public void NoWindowKeepsItsOwnBusyAnswer()
     {
-        string body = Body(Source("MainWindow.xaml.cs"), "    public bool IsSectionBusy(");
-        Assert.Contains("SectionRuns.Find(folder, courseCode, section)", body);
-        Assert.Contains("SectionDeployRun.UnderWay(", body);
-        Assert.DoesNotContain("DetailHost.Content", body);
+        Assert.DoesNotContain("IsSectionBusy(", Source("MainWindow.xaml.cs"));
     }
 
     /// <summary>The progress panel lets go of shared runners, and one window asks a question, not two.</summary>
