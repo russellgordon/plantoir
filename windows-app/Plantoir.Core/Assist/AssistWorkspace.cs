@@ -3690,6 +3690,15 @@ public sealed partial class AssistWorkspace
     private const string CurriculumStart = "%%curriculum-start%%";
     private const string CurriculumEnd = "%%curriculum-end%%";
 
+    /// <summary>
+    /// The heading a new block opens with, the Mac's own
+    /// (<c>AssistCurriculumMentions.heading</c>; the Mac's output is the
+    /// <c>addCurriculumMentions</c> step in <c>contracts/undo-action-steps.json</c>).
+    /// Until #1039 Windows wrote "Today's work points here:" instead; pages that
+    /// carry that line keep it, and a block is found by its markers either way.
+    /// </summary>
+    private const string CurriculumHeading = "## Curriculum connection";
+
     /// <summary>Everything after the frontmatter fence, or the whole text if there is none.</summary>
     private static string BodyAfterFrontmatter(string pageText)
     {
@@ -3756,7 +3765,7 @@ public sealed partial class AssistWorkspace
             // A new block, before the "things to do" list if there is one —
             // that list closes a class page, and the curriculum note belongs
             // with the lesson rather than after the homework.
-            string block = CurriculumStart + lineEnd + "Today's work points here:" + lineEnd + lineEnd +
+            string block = CurriculumStart + lineEnd + CurriculumHeading + lineEnd + lineEnd +
                            transclusions + lineEnd + CurriculumEnd + lineEnd;
             int before = text.IndexOf("## Things to do", StringComparison.OrdinalIgnoreCase);
             text = before > 0
@@ -4981,7 +4990,20 @@ public sealed partial class AssistWorkspace
     /// has written yet has no business appearing in the site, and the teacher
     /// asked for exactly that.
     /// </summary>
-    private static string ClassSkeleton(NewClass created, int? unit, int howMany, string tail)
+    internal static string ClassSkeleton(NewClass created, int? unit, int howMany, string tail) =>
+        PageTextFromLiteral(ClassSkeletonLiteral(created, unit, howMany, tail));
+
+    /// <summary>
+    /// A raw string literal made into the text of a teacher's page: LF line
+    /// ends, as the Mac writes (#1040). A raw literal takes its line ends from
+    /// the checkout that compiled it, so built from a <c>core.autocrlf true</c>
+    /// checkout every line of the skeleton was CRLF except the two the unit
+    /// tag adds.
+    /// </summary>
+    internal static string PageTextFromLiteral(string literal) => literal.ReplaceLineEndings("\n");
+
+    /// <summary>The skeleton as the raw literal compiles, line ends and all; <see cref="ClassSkeleton"/> is what is written.</summary>
+    internal static string ClassSkeletonLiteral(NewClass created, int? unit, int howMany, string tail)
     {
         string plural = howMany == 1 ? "This page was" : $"{howMany} of these were";
         // A numbered course has no units, so its page carries no unit tag —
