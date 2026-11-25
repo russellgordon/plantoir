@@ -740,8 +740,9 @@ build claim — a preview's, or the assistant's rebuild — not the deploy's.
 - `SectionDeployRun.UnderWay(run, folder, course, section)` is preparing ∨ running ∨
   asking ∨ the in-process publish record. The Deploy button (and so Section ▸
   Deploy… and its key, which read the button), `DeployAsync`'s first check,
-  `DeployWillBeRefused`, `MainWindow.IsSectionBusy` (now given the caller's folder,
-  so a section not on screen still answers) and the Preview button, the links
+  `DeployWillBeRefused`, the assistant window's busy question
+  (`SectionRuns.DeployIsUnderWay`, by its own folder, so a section not on screen
+  still answers; `MainWindow.IsSectionBusy` is gone since #769) and the Preview button, the links
   checklist offered on appearing, today's-class re-check and the folder-repair
   check all read it.
 
@@ -836,16 +837,19 @@ deploy.ps1" and the launcher's refusal no longer happen.
 **Rejected on this side.** Leaving the deploy's claim in `_buildWork` and skipping
 its release on `Unloaded`: a view would still own a claim that outlives it.
 Removing finished runs, or making the store observable: a reader would watch an
-object nothing writes (the mac's reason). Making a run from `IsSectionBusy`: a
-caller off the interface thread would bind the runner to the wrong context — `Find`
+object nothing writes (the mac's reason). Making a run from the busy question (`SectionRuns.DeployIsUnderWay`, which was
+`MainWindow.IsSectionBusy` until #769): a caller off the interface thread would bind the runner to the wrong context — `Find`
 never creates.
 
 **Tests.** `SectionRunsTests` (the key, the store, `UnderWay`, `IsAsking`, the
 ending's order, take-and-clear, shown once, a later preview, and the eleven contract
 cases), `SectionDeployRunSourceTests` (the view binds to the run, appearing never
 deploys, the deploy takes its run once and holds its claims, Cancel and Unloaded,
-the later preview, every reader, `IsSectionBusy`, the progress panel), and the UI
+the later preview, every reader, no window keeping its own busy answer
+(`NoWindowKeepsItsOwnBusyAnswer`, since #769), the progress panel), and the UI
 test `ReturningToASectionMidDeployUiTests`.
+
+**The assistant asks the app, not a window (#769 item 2).** The built-in assistant asks whether its section is already being deployed of the app, not of a window: before it starts a deploy it asks the section's deploy run and the in-process publish record by its own folder, course and section (`SectionRuns.DeployIsUnderWay`), as the Mac's assistant asks `deployIsUnderWay`. A deploy of the section running in this app therefore reads as busy even when no window is showing that section or its folder, and the assistant says the section is busy and hands to the window's Deploy, which shows the running deploy. A preview, built or showing, is not busy: the deploy stops a preview itself.
 
 ---
 
@@ -1613,6 +1617,8 @@ comment in its leg loop, and `test_launcher_rules.ps1` section 10).
 `Plantoir.Mcp` uses `ProcessStartInfo.ArgumentList` and was never affected;
 `PtyDriver`'s own joiner has the same naive rule but is fed only the
 harness's `cmd.exe /c "<runner>.cmd"`.
+
+**A section's custom domain (#955).** The Windows reader of a section's custom domain, `CourseConfiguration.CustomDomain(section, destinationType)`, now runs `contracts/file-formats.json` → `customDomainReading`'s cases (`CourseConfigurationTests.ACustomDomainIsReadTheContractsWay`), as the Mac's `customDomain(forSection:destinationType:)` and the shared Python's `custom_domains.for_destination` do: a map gives the destination type's own string; the older bare string is the primary's only (`DeployTarget`, Netlify when `deploy_target` is absent or empty); a type outside `CourseConfiguration.DestinationTypesWithAnAddress` (today `local_folder`) never has a domain, whatever is stored; any other shape is no domain, never an exception (#955, after the Mac's #904).
 
 ### A new course starts on Cloudflare Pages (#739)
 
@@ -2968,8 +2974,8 @@ In all, the hold is 83 entries. Stack 13's other new lists have no Windows
 reader yet: `workLeases.launcherLeases`,
 `previewWhileItsSectionDeploys.leaseCases`, the two new
 `returningToASectionMidDeploy.heldElsewhere` cases,
-`subjectMenus.rollOverSheet`, `file-formats.json` → `customDomainReading`,
-and the trail lines `deploy.sh` writes beside `task started` and
+`subjectMenus.rollOverSheet` (`file-formats.json` → `customDomainReading`
+has one since #955), and the trail lines `deploy.sh` writes beside `task started` and
 `task finished`.
 
 **Unrun rather than red**, read by key with no Windows reader yet:
@@ -6104,9 +6110,11 @@ So every hand-back now names `_folder`, the section's own:
   A build or a deploy therefore always happens in a window showing the
   section's folder, so no sentence had to be invented for a hand-back that
   could not find its window — it can.
-- `SectionIsBusy` asks a window showing that folder, because "busy" is read off
+- `SectionIsBusy` asked a window showing that folder, because "busy" was read off
   a detail pane and another folder's pane answers about another folder's
-  section.
+  section. Since #769 it asks `SectionRuns.DeployIsUnderWay` by the assistant's
+  own folder, course and section, with no window involved ("A section's deploy outlives
+  its view", above, says how).
 - `App.WindowFor` compares with `WorkingFolder.IsTheSame` like everything else,
   rather than its own `Path.GetFullPath` spelling.
 
@@ -6217,6 +6225,8 @@ Plantoir's folders are chosen from the ordinary Windows picker.
 **No new trail event is owed.** `working folder opened` already records the
 act, its line is still true, and a selection being let go is not something a
 teacher DID — it is the consequence of what they did, recorded one line up.
+
+**The publish registry and the preview leases (#769 item 1).** The publish registry (`CourseActivity`) and the preview leases (`PreviewLeases`) compare working folders as the rest of the app does since #162 and #728 (`SectionKey`, `SectionRuns`): every folder comparison goes through `WorkingFolder.IsTheSame`, which folds what `WorkingFolder.Resolved` folds (case, a trailing separator, a relative or `..` path), and the quit question's count of previews being built is distinct by `SectionKey`. The stored spelling stays as given, because it names the container and the port; only the comparisons fold it. This is the Mac's rule (`FolderIdentity.isSameFolder` in `CourseActivity.coursePublishIsRunning` and `sectionPublishIsRunning`, #189). Before #769, a section deploying under one spelling did not refuse a preview of it asked under another, and a second window could take a second lease on the same section. A mapped drive is not folded (`Resolved` does not resolve it), so it remains a different folder.
 
 ## Course creation and the smaller course pieces (parity bundle 6a)
 
@@ -9328,9 +9338,10 @@ record says so (`LaterClassesAtADeploy.WillBeRefused`) and the runner skips its
 stop: stopping the preview for a deploy that never starts would cost the
 teacher the page they were reading (2C's implementation review, L-1;
 `ClassesDatedLaterAtDeployTests.ADeployTheWindowWillRefuse_KeepsThePreview_AndLetsTheRefusalSpeak`).
-`IsSectionBusy` counts a deploy being prepared as well as one running — since
-#728 by asking the section's run, by the caller's folder
-(`SectionDeployRun.UnderWay`). One check comes BEFORE that reading: a window already asking
+The assistant's busy question (`SectionRuns.DeployIsUnderWay`, asked by the
+assistant window since #769; `MainWindow.IsSectionBusy` until then) counts a
+deploy being prepared as well as one running, by asking the section's run by the
+caller's folder (`SectionDeployRun.UnderWay`). One check comes BEFORE that reading: a window already asking
 this question, or with any dialog up, answers `CannotAsk`, refused with
 `deployWaitsForAnOpenQuestion` and nothing stopped
 (`classesDatedLater.whenTheWindowIsBusy`). `DeployWillBeRefused()` also counts
@@ -10714,6 +10725,20 @@ are Chromium input events, not the OS keyboard. WebView2 Runtime
   (`KaTeX_Main`, `KaTeX_Math`, `KaTeX_Size1`); the only addresses refused
   were Google Fonts' stylesheet and, from the YouTube page being left, one
   YouTube logging call.
+
+### What the preview's browser sends on its own (#913)
+
+**What the preview's browser sends on its own (#913, measured 2026-11-25).** The section preview is Microsoft Edge WebView2. In the first Windows VM (Windows 11 Pro ARM64 in Parallels, the app win-x64 under emulation, runtime 158.0.4370.33), Plantoir was started with a throwaway `--state-dir` and `--auto-preview EXC2O 1` on the example course; Chromium's net-log (Default mode, through `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` in the launching shell only) and the Windows DNS Client log for the run's WebView2 processes covered the app's start to 300 seconds after the page loaded, on a first start (empty profile) and a second start, before and after the settings below. The method and the helpers are `windows-app/notes/806-win-webview.md` and `vm-tools/guest/913-measure.ps1`. The capture was reduced in the VM to hosts, request kinds and counts, and whether a page address of the site rode on a request; the raw log was deleted there.
+
+**Turned off, by documented settings.** The preview's view sets `CoreWebView2Settings.IsReputationCheckingRequired = false`, so Microsoft Defender SmartScreen does not check the pages it shows; and the preview's own environment sets `CoreWebView2EnvironmentOptions.IsCustomCrashReportingEnabled = true`, so crash reports are not sent to Microsoft (`windows-app/Plantoir/Views/PreviewBrowserEnvironment.cs`, which cites Microsoft's pages). Neither could be shown by a run: no SmartScreen host appeared in any run (the pages are on 127.0.0.1), and no crash happened. `PreviewBrowserPrivacySourceTests` holds both in place.
+
+**Edge's experiment configuration.** On a first start the preview's browser made 2 HTTPS GETs to `config.edge.skype.com` (path `/config/v1/Edge/<runtime version>`; it is named Edge's experiment and configuration fetch from that path). The runs checked each request's address, its query string and its Referer, and found no page address there. On the second start it made none within the window. It is left on. Microsoft's WebView2 policy page documents the machine- or user-wide policy `ExperimentationAndConfigurationServiceControl` as the switch for the Experimentation and Configuration Service (https://learn.microsoft.com/en-us/deployedge/microsoft-edge-webview-policies); that page does not name this host, and no counted run had the policy set, so that it stops this fetch has not been shown. The policy reaches every WebView2 app for that machine or user, is an IT administrator's setting, and also stops Microsoft's configuration payload, which "may also contain a list of actions to take on certain domains for compatibility reasons"; the page says "Microsoft doesn't recommend this setting". Russell's ruling, 2026-11-25: not touched.
+
+**The component updater.** On every start measured (a first and a second start before the settings and after them, and one more first start), the preview's browser POSTed to `edge.microsoft.com/componentupdater/api/v1/update` (named from its path): after the settings, 8 requests with 13,812 bytes of request bodies on a first start, 1 request with 5,238 bytes on the second. The runs checked each request's address, its query string and its Referer, and found no page address there. The request bodies were not captured, only their sizes, so what they carry is not known. It is left on: no Microsoft WebView2 page documents a setting for it; the only route would be a Chromium switch Microsoft does not list, which may stop working in any runtime update without a sign. Russell's ruling, 2026-11-25: not touched.
+
+**Proxy auto-detection.** On every start measured, the preview's browser asked the local network for the name `wpad` (6 lookups on a first start, 5 on the second; the only name the DNS Client log saw from a WebView2 process). This is a question to the local network, not to Microsoft, and no request to it followed in any run. It is left on: the documented flags that stop it (`no-proxy-server`, `proxy-server`) are ones Microsoft says production apps should not use, and on a network that hands out its proxy this way we would expect the site's own fonts and cdnjs to stop loading (expected, not tested). Russell's ruling, 2026-11-25: not touched.
+
+**Not measured:** Windows' own diagnostic data for WebView2 (Microsoft's page says it is governed by the teacher's Windows Diagnostic data setting, and that required data is collected regardless of it, https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy), the WebView2 Runtime's updater (Microsoft Edge Update, a separate service), anything after the 300-second window, and a teacher following a link to a site off the computer. The site's own hosts (Google Fonts, cdnjs) are the site's and were reached, as they must be.
 
 ### verify-deploy.ps1
 
@@ -13117,6 +13142,8 @@ Still owed: a tap in Edge on a site published to Netlify, Narrator by ear,
 and the dialog's order behind a runnable-code finding. No new trail line:
 an engine that is missing already surfaces as the `geogebraSketchesNotReady`
 folder problem.
+
+**Measured again, 2026-11-25** (#806 items 11 and 12, #816 item 13). The first Windows VM (Windows 11 Pro ARM64 in Parallels, the app win-x64 under emulation), Edge 158.0.4370.33 headless, `dev` 45be52fbf's x64 Debug build and its runtime (Node 22.23.4, Python 3.14.10). A temp working folder with EXC2O from `setup.ps1 --install-example`, verify.sh's GeoGebra Fixture, GeoGebra Second (with the 150-point lines sketch) and Quiz GeoGebra plants, and the saved copy of `plantoirvrfy578` seeded in the course's `.geogebra-cache` under its fence's key, so nothing was asked of geogebra.org; built with `preview.ps1 EXC2O 1 --build-only` (62 s). `browser-checks/geogebra_applet.mjs`, unchanged, on a clone with the publish's own `_headers`, served on `[::1]`, with the check's own throwaway Edge profile: OK in 33 s, in both phases. The reset icon pressed for real on the commands sketch and the file sketch brought each back as it opened (5 objects and a = 3; A,B,f,m) and took a drag again; 393 presses of Shift+Tab and Space (388 isolated) while the 150-line sketch ran left all 150 points, and its reset brought back all 150. While the first sketch opened, with the engine's first request held, its card said the contract's two lines at contrast 12.13 and 7.24 in light and 16.27 and 13.28 in dark, the 640 x 360 card lay on the 640 x 360 box, and the figure stayed 433.58 px tall throughout; it drew in 1,080 ms (964 isolated). A sketch whose file was refused went back to its button. 0 refusals by the policy, 0 requests off the site. The helper is `vm-tools/guest/806-geogebra.ps1`; the touch-laptop press is not possible in a VM.
 
 **The npm audit: `windows-app\audit-runtime.ps1`** (#685). It is opt-in and
 named in RELEASING.md step 2 beside verify.sh's line. It is not a `dotnet

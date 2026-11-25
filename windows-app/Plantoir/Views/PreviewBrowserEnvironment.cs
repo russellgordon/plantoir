@@ -20,7 +20,8 @@ namespace Plantoir.Views;
 /// <para><b>SmartScreen.</b> <c>IsReputationCheckingRequired = false</c> on the
 /// view (https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2settings.isreputationcheckingrequired).
 /// It applies to every view on the same user data folder, and is on if any
-/// view leaves it true; the preview is the only view on that folder.</para>
+/// view leaves it true; every view on that folder is a preview, made this way
+/// (through <c>EnsurePreviewBrowserAsync</c>, before its first page).</para>
 /// <para><b>Left alone, on purpose</b> (documented in documentation 12, #913):
 /// the experiment configuration, the component updater and proxy
 /// auto-detection. No per-app setting exists for them on Microsoft's WebView2

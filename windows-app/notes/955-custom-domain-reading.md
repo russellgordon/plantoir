@@ -1,16 +1,5 @@
 # #955: Windows reads a section's custom domain by `customDomainReading`
 
-## For PROGRESS
-
-- #955: `CourseConfiguration.CustomDomain(section, destinationType)` now runs every case of `contracts/file-formats.json` → `customDomainReading` (17 cases, read from the JSON at run time by `CourseConfigurationTests.ACustomDomainIsReadTheContractsWay`, the mirror of the Mac's `FileFormatsContractTests.testACustomDomainIsReadTheContractsWay`). New `CourseConfiguration.DestinationTypesWithAnAddress` (`netlify`, `cloudflare_pages`, the Mac's and the Python's list, same order); the reader returns `""` first for any other type, so `local_folder` never has a domain. Before the change cases 8 ("the older bare string, a folder primary: the folder has no address (#904)") and 10 ("a folder never has a domain, even one written under its name") failed, both reading `ics3u.school.ca`; the other 15, case 6 (empty `deploy_target`) included, already passed, case 6 through `DeployTarget`'s getter.
-- Not built, on purpose: `SetCustomDomain` can still carry an old bare string into a `local_folder` map entry when the primary is a folder (the Mac does the same); the reader now ignores that entry, so nothing a teacher sees follows from it.
-- Not changed: `CourseSettingsView.xaml.cs` (about line 1053) filters `d.Type != "local_folder"` for the domain fields; it could ask `CourseConfiguration.DestinationTypesWithAnAddress` instead, so GitHub Pages (#669) is picked up when it joins the list. An interface file, outside #955.
-- What a folder leg shows now: `MultiDestinationDeployRunner` asks `CustomDomain(section, "local_folder")`, gets `""`, and sets the folder runner's `CustomDomainForLinks` to null, so its link is the folder path (`ScriptRunner.PublishedFolder`), never a domain; before, a folder-primary course with an old bare string or a `local_folder` map entry had that domain on the folder runner (it reached a link only if the folder's transcript held a site URL, which a folder publish does not print).
-
-## For documentation 12
-
-The Windows reader of a section's custom domain, `CourseConfiguration.CustomDomain(section, destinationType)`, now runs `contracts/file-formats.json` → `customDomainReading`'s cases (`CourseConfigurationTests.ACustomDomainIsReadTheContractsWay`), as the Mac's `customDomain(forSection:destinationType:)` and the shared Python's `custom_domains.for_destination` do: a map gives the destination type's own string; the older bare string is the primary's only (`DeployTarget`, Netlify when `deploy_target` is absent or empty); a type outside `CourseConfiguration.DestinationTypesWithAnAddress` (today `local_folder`) never has a domain, whatever is stored; any other shape is no domain, never an exception (#955, after the Mac's #904).
-
 ## Must-fail lines
 
 Script `vm-tools/guest/955-mustfail.ps1 -Break address|emptytarget`: it edits `CourseConfiguration.cs` in VM B's checkout (never committed), runs `CourseConfigurationTests.ACustomDomainIsReadTheContractsWay` alone, restores the file with `git checkout` (0 changed files after each), at 8ab7253db.
