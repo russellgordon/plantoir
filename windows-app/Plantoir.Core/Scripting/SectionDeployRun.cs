@@ -223,6 +223,34 @@ public static class SectionRuns
     public static SectionDeployRun? Find(string? folder, string course, int section) =>
         s_runs.Find(SectionKey.For(folder, course, section));
 
+    /// <summary>
+    /// Whether THIS app has a deploy of the section on its way, asked by
+    /// folder, course and section and of nothing on screen: the section's run
+    /// if a view ever made one, and the in-process publish record either way
+    /// (<see cref="SectionDeployRun.UnderWay"/>). The assistant window asks
+    /// this before it starts a deploy (#769 item 2), so a deploy of the
+    /// section running with no window showing it still reads as busy, as the
+    /// mac's <c>SectionDetailView.deployIsUnderWay</c> answers for its
+    /// assistant (#706).
+    ///
+    /// <para>Busy, to a caller asking before a DEPLOY, means "a deploy is
+    /// already on its way", not "a preview is up". The Deploy path stops a
+    /// running preview itself and waits for it (deploy-during-preview port,
+    /// mac commit "Allow Deploy button to stop active preview before
+    /// publishing"), so reporting a preview as busy here made the assistant
+    /// refuse, and say so, while the deploy went ahead. Preparing counts too
+    /// (2C's implementation review, L-1): a deploy between its press and its
+    /// runner starting is already on its way, and a second one would only be
+    /// refused by the window.</para>
+    ///
+    /// <para>Asked of the SECTION's run, by the caller's folder (#728), never
+    /// of a view: until #728 the window's answer read whatever section the
+    /// pane showed, and until #769 the assistant asked only a window showing
+    /// the section's folder, so with none open it read as idle.</para>
+    /// </summary>
+    public static bool DeployIsUnderWay(string? folder, string course, int section) =>
+        SectionDeployRun.UnderWay(Find(folder, course, section), folder, course, section);
+
     /// <summary>For tests only.</summary>
     internal static void Reset() => s_runs.Reset();
 }

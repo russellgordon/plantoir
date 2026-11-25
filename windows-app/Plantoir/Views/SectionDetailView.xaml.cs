@@ -1382,7 +1382,7 @@ public sealed partial class SectionDetailView : UserControl
         }
 
         if (_lease is null && PreviewLeases.Active.Any(
-                lease => lease.FolderPath == workspacePath
+                lease => WorkingFolder.IsTheSame(lease.FolderPath, workspacePath)
                          && lease.CourseCode == _course.Code
                          && lease.SectionNumber == _sectionNumber))
         {

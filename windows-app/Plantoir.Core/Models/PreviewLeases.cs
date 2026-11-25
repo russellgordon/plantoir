@@ -29,8 +29,10 @@ public static class PreviewLeases
         {
             // Two builds of one section would race over the same output
             // folder — but the same section in a DIFFERENT folder is the
-            // compare-two-years case, and is allowed.
-            if (_active.Any(l => l.FolderPath == folderPath &&
+            // compare-two-years case, and is allowed. One folder however it is
+            // spelled is one folder (#769): the lease keeps the spelling it was
+            // given, only the comparisons fold it.
+            if (_active.Any(l => WorkingFolder.IsTheSame(l.FolderPath, folderPath) &&
                                  l.CourseCode == courseCode &&
                                  l.SectionNumber == sectionNumber))
                 throw new LeaseRefusedException(
@@ -38,7 +40,7 @@ public static class PreviewLeases
 
             // Ports are per-container, one container per folder — only
             // same-folder previews contend.
-            var taken = _active.Where(l => l.FolderPath == folderPath).Select(l => l.Port).ToHashSet();
+            var taken = _active.Where(l => WorkingFolder.IsTheSame(l.FolderPath, folderPath)).Select(l => l.Port).ToHashSet();
             foreach (int port in AvailablePorts)
             {
                 if (taken.Contains(port)) continue;
@@ -76,7 +78,7 @@ public static class PreviewLeases
         lock (_gate)
         {
             _active.RemoveAll(l => ReferenceEquals(l.Owner, owner) &&
-                                  l.FolderPath == folderPath &&
+                                  WorkingFolder.IsTheSame(l.FolderPath, folderPath) &&
                                   string.Equals(l.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) &&
                                   l.SectionNumber == sectionNumber);
         }
@@ -97,7 +99,7 @@ public static class PreviewLeases
     {
         lock (_gate)
         {
-            _active.RemoveAll(l => l.FolderPath == folderPath &&
+            _active.RemoveAll(l => WorkingFolder.IsTheSame(l.FolderPath, folderPath) &&
                                   string.Equals(l.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) &&
                                   l.SectionNumber == sectionNumber);
         }

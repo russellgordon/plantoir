@@ -991,6 +991,83 @@ public class CourseActivityTests
         PreviewLeases.Release(lease);
         Assert.False(CourseActivity.IsPreviewing(folder, "MCV4U"));
     }
+
+    // ---- One folder however it is spelled (#769 item 1, mac #189) ---------
+
+    /// <summary>The same folder by another name: upper case and a trailing separator.</summary>
+    private static string Respelled(string folder) => folder.ToUpperInvariant() + System.IO.Path.DirectorySeparatorChar;
+
+    [Fact]
+    public void APublishIsFoundUnderASecondSpellingOfItsFolder()
+    {
+        string folder = Folder();
+        using var publish = CourseActivity.BeginPublish(folder, "ICS3U", 2);
+        Assert.True(CourseActivity.IsPublishing(Respelled(folder), "ICS3U"));
+        Assert.True(CourseActivity.IsPublishingSection(Respelled(folder), "ICS3U", 2));
+        Assert.False(CourseActivity.IsPublishingSection(Respelled(folder), "ICS3U", 3));   // still the section
+    }
+
+    [Fact]
+    public void ALeaseIsFoundUnderASecondSpellingOfItsFolder()
+    {
+        string folder = Folder();
+        var lease = PreviewLeases.Take(Respelled(folder), "MCV4U", 1);
+        Assert.True(CourseActivity.IsPreviewing(folder, "MCV4U"));
+        PreviewLeases.Release(lease);
+        Assert.False(CourseActivity.IsPreviewing(folder, "MCV4U"));
+    }
+
+    [Fact]
+    public void TwoClaimsOnOneSectionUnderTwoSpellingsCountOnce()
+    {
+        string folder = Folder();
+        int before = CourseActivity.UnderWay().PreviewsBeingBuilt;
+        using var window = CourseActivity.BeginPreviewBuild(folder, "ICS4U", 1);
+        using var assistant = CourseActivity.BeginPreviewBuild(Respelled(folder), "ICS4U", 1);
+        Assert.Equal(before + 1, CourseActivity.UnderWay().PreviewsBeingBuilt);
+    }
+
+    [Fact]
+    public void ASecondSpellingOfALeasedSectionIsRefusedAndReleasesIt()
+    {
+        string folder = Folder();
+        var lease = PreviewLeases.Take(folder, "ICS3U", 1);
+        var refused = Assert.Throws<PreviewLeases.LeaseRefusedException>(
+            () => PreviewLeases.Take(Respelled(folder), "ICS3U", 1));
+        Assert.Contains("already being previewed in another window", refused.Message);
+
+        // Another section of the same folder, however spelled, gets another port.
+        var second = PreviewLeases.Take(Respelled(folder), "ICS3U", 2);
+        Assert.NotEqual(lease.Port, second.Port);
+
+        // Release by section, asked under the other spelling, removes it.
+        PreviewLeases.Release(Respelled(folder), "ICS3U", 1);
+        Assert.DoesNotContain(PreviewLeases.Active, held => ReferenceEquals(held, lease));
+        Assert.Contains(PreviewLeases.Active, held => ReferenceEquals(held, second));   // the other section stays
+        PreviewLeases.Release(second);
+    }
+
+    [Fact]
+    public void ARowLeftBehindIsSweptUnderASecondSpelling()
+    {
+        string folder = Folder();
+        object owner = new();
+        var lease = PreviewLeases.Take(folder, "ICS3U", 1, owner);
+        PreviewLeases.ReleaseLeftBehind(owner, Respelled(folder), "ICS3U", 1);
+        Assert.DoesNotContain(PreviewLeases.Active, held => ReferenceEquals(held, lease));
+    }
+
+    [Fact]
+    public void TheSameSectionInAnotherFolderIsStillAllowed()
+    {
+        string folder = Folder(), other = Folder();
+        var first = PreviewLeases.Take(folder, "ICS3U", 1);
+        var second = PreviewLeases.Take(other, "ICS3U", 1);   // compare-two-years: no refusal
+        PreviewLeases.Release(other, "ICS3U", 1);
+        Assert.Contains(PreviewLeases.Active, held => ReferenceEquals(held, first));   // the other folder's stays
+        Assert.DoesNotContain(PreviewLeases.Active, held => ReferenceEquals(held, second));
+        PreviewLeases.Release(first);
+    }
 }
 
 public class BuildFreshnessTests
