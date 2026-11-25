@@ -1193,6 +1193,16 @@ public sealed class CourseConfiguration
         SetNestedValue("emojis", "sections", SectionKey(section), emoji);
 
     /// <summary>
+    /// The destination types that have a site address, so the only ones a
+    /// custom domain can belong to (<see cref="CustomDomain(int, string)"/>,
+    /// #904, #955). The Mac's
+    /// `CourseConfiguration.destinationTypesWithAnAddress` and the shared
+    /// Python's `custom_domains.DESTINATION_TYPES_WITH_AN_ADDRESS`, in the
+    /// same order.
+    /// </summary>
+    public static readonly IReadOnlyList<string> DestinationTypesWithAnAddress = new[] { "netlify", "cloudflare_pages" };
+
+    /// <summary>
     /// The teacher's own domain for ONE DESTINATION of a section's published
     /// site. Keyed by destination TYPE, not just by section, because a course
     /// publishing to more than one destination for redundancy may want a
@@ -1206,9 +1216,19 @@ public sealed class CourseConfiguration
     /// PRIMARY destination (<see cref="DeployTarget"/>) — the only
     /// destination that existed when it could have been set — and is
     /// invisible to every other destination type.
+    ///
+    /// A folder on this computer has no site address, so `local_folder`
+    /// (any type not in <see cref="DestinationTypesWithAnAddress"/>) never
+    /// has a domain, whatever the setting says (#904, #955; the rule and its
+    /// cases are `contracts/file-formats.json` → `customDomainReading`, which
+    /// the Mac's reader and the shared Python's
+    /// `custom_domains.for_destination` run too). Before #955 a
+    /// folder-primary course's bare string, or a value written under
+    /// `local_folder`, was handed to its folder leg.
     /// </summary>
     public string CustomDomain(int section, string destinationType)
     {
+        if (!DestinationTypesWithAnAddress.Contains(destinationType)) return "";
         if (_values["custom_domains"] is not JObject outer) return "";
         if (outer["sections"] is not JObject sections) return "";
         var entry = sections[SectionKey(section)];
