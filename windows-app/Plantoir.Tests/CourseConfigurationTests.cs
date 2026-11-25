@@ -308,6 +308,37 @@ public class CourseConfigurationTests
         Assert.Equal("", config.CustomDomain(1, "cloudflare_pages"));
     }
 
+    /// <summary>
+    /// Every case of <c>file-formats.json</c> → <c>customDomainReading</c>
+    /// through the reader the deploy's per-destination links use (#955),
+    /// the mirror of the Mac's
+    /// <c>FileFormatsContractTests.testACustomDomainIsReadTheContractsWay</c>.
+    /// The shared Python runs the same cases (scripts/test_custom_domains.py).
+    /// </summary>
+    [Fact]
+    public void ACustomDomainIsReadTheContractsWay()
+    {
+        var rule = ContractLoader.LoadJson("file-formats.json")["customDomainReading"]!;
+        var cases = rule["cases"]!.AsArray();
+        Assert.NotEmpty(cases);
+        // Every case is asked before failing, so one run names every case
+        // the reader gets wrong, not only the first.
+        var wrongCases = new List<string>();
+        foreach (var testCase in cases)
+        {
+            string name = testCase!["name"]!.ToString();
+            string configJson = testCase["config"]!.ToJsonString();
+            string destination = testCase["destination"]!.ToString();
+            string expected = testCase["expect"]!.ToString();
+            var configuration = FromJson(configJson);
+            string actual = configuration.CustomDomain(1, destination);
+            if (actual != expected)
+                wrongCases.Add($"{name}: expected \"{expected}\", read \"{actual}\"");
+        }
+        Assert.True(wrongCases.Count == 0,
+            $"{wrongCases.Count} of {cases.Count} customDomainReading cases read wrongly: " + string.Join(" | ", wrongCases));
+    }
+
     [Fact]
     public void GradeWarningFiresOnlyWhenNameCarriesTheLabel()
     {
