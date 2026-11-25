@@ -177,6 +177,40 @@ public partial class AgentGuidanceTests
     }
 
     /// <summary>
+    /// The held half of the mac's
+    /// <c>PrintablePagesTests.testHeldSkillsAreNotWrittenAndNothingWrittenNamesThem</c>
+    /// (#750): each skill in <c>held.skills</c> is kept whole in
+    /// <c>held.place</c> (its SKILL.md is there) and, after one pass, is
+    /// written in neither home. This is what makes a held key in
+    /// <see cref="EverySkillSaysWhatTheContractSaysItMust"/> name something:
+    /// a held name that names no kept skill fails here.
+    /// </summary>
+    [Fact]
+    public void EachHeldSkillIsKeptInHeldPlaceAndWrittenInNeitherHome()
+    {
+        JsonNode held = Contract["held"]!;
+        string place = held["place"]!.ToString();
+        JsonObject heldSkills = held["skills"]!.AsObject();
+        Assert.True(heldSkills.Count > 0, "held.skills holds no skill");
+        Assert.Empty(Pass().Failures);
+
+        var problems = new List<string>();
+        string placeFolder = Path.Combine(ContractLoader.RepositoryRoot, place.Replace('/', Path.DirectorySeparatorChar));
+        foreach (KeyValuePair<string, JsonNode?> entry in heldSkills)
+        {
+            string skillName = entry.Key;
+            if (!File.Exists(Path.Combine(placeFolder, skillName, "SKILL.md")))
+                problems.Add($"held.skills names {skillName}, and no such skill is kept in {place}");
+            foreach (string home in AgentGuidance.SkillHomes)
+            {
+                if (Directory.Exists(Path.Combine(_folder, home, "skills", skillName)))
+                    problems.Add($"{home}: {skillName} is held, and a folder of its name is written");
+            }
+        }
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+    }
+
+    /// <summary>
     /// #795 (the mac's handouts test, its #754 part): for each starter in
     /// <c>handoutsSkill.starterMacros</c>, in both homes, the written starter
     /// defines each macro (<c>\newcommand{macro}</c> or
