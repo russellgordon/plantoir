@@ -231,7 +231,7 @@ public class PlaceholderFieldNamesUiTests
             Retry.WhileFalse(() => Focused(app) != before, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(100));
         }
         Assert.Equal("classesClassDates", Focused(app));
-        Keyboard.Type(VirtualKeyShort.ENTER);
+        Keyboard.Type(VirtualKeyShort.RETURN);
     }
 
     /// <summary>

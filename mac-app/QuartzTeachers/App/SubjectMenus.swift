@@ -204,6 +204,13 @@ struct SectionMenu: Commands {
         )
     }
 
+    /// What the selected course calls its class pages, which titles the
+    /// menu and its items (Meetings and Add Meeting… in a club, #990 and
+    /// #1027); `.class` with no window in front.
+    var noun: ClassNoun {
+        return sidebar?.classNoun ?? .class
+    }
+
     /// Where Preview opens by default (#504): the section window's copy of
     /// the setting when one is in front, so the title moves with the
     /// window's own republish; otherwise the setting itself.
@@ -249,7 +256,7 @@ struct SectionMenu: Commands {
         // The title follows the selected course: Classes, or Meetings in a
         // club (#990, Russell, 2026-11-20 evening), as the items follow it;
         // Classes with no window in front.
-        CommandMenu(SubjectMenuLayout.title(of: layout, noun: sidebar?.classNoun ?? .class)) {
+        CommandMenu(SubjectMenuLayout.title(of: layout, noun: noun)) {
             let current: SubjectMenuRules.Situation = situation
             let enabled: Set<SubjectMenuRules.Item> = SubjectMenuRules.enabledItems(current)
 
@@ -272,7 +279,16 @@ struct SectionMenu: Commands {
     /// label when the action requires more information before it can
     /// complete", Menus). The menu draws Preview with `previewItem`, titled
     /// by the setting; this is its resting title, for a menu path.
-    static func title(for item: SubjectMenuRules.Item) -> String? {
+    ///
+    /// `noun` is what the selected course calls its class pages. In a club
+    /// (`.meeting`) an item whose title says class says meeting instead
+    /// (#1027, Russell, 2026-11-20 night, after #990's "no sentence a club's
+    /// teacher reads says 'class'"): Add Meeting…, Meeting Dates… and the
+    /// rest, from `SubjectMenuLayout.titleSayingTheNoun`, which is
+    /// `subjectMenus.layout.itemTitles` in the contract. Only the words
+    /// change; the item, its place and its greying do not. There is no
+    /// default: a caller says which course's menu it means.
+    static func title(for item: SubjectMenuRules.Item, noun: ClassNoun) -> String? {
         switch item {
         case .preview:
             return PreviewStartPageWording.preview
@@ -285,7 +301,7 @@ struct SectionMenu: Commands {
         case .stopShowingDeployedFolder:
             return DeployedFolderWording.stopMenuItem
         case .publishClassForADate:
-            return "Publish Class for a Date…"
+            return SubjectMenuLayout.titleSayingTheNoun(of: item, noun: noun)
         case .publishPages:
             return "Publish Pages…"
         case .hidePages:
@@ -315,13 +331,13 @@ struct SectionMenu: Commands {
         case .addClass:
             // #897: ONE item whose sheet asks how the class is added. An
             // ellipsis: a choice follows.
-            return "Add Class…"
+            return SubjectMenuLayout.titleSayingTheNoun(of: item, noun: noun)
         case .classDates:
-            return "Class Dates…"
+            return SubjectMenuLayout.titleSayingTheNoun(of: item, noun: noun)
         case .reDateClasses:
-            return "Re-date Classes…"
+            return SubjectMenuLayout.titleSayingTheNoun(of: item, noun: noun)
         case .makeRoomForClasses:
-            return "Make Room for Classes…"
+            return SubjectMenuLayout.titleSayingTheNoun(of: item, noun: noun)
         case .rollOverToANewYear:
             // #897 piece B: an ellipsis (a choice and a plan follow); no key;
             // not on the row's right-click menu, being once a year.
@@ -345,7 +361,6 @@ struct SectionMenu: Commands {
             return nil
         }
     }
-
     /// One line of the layout: an item, with its key where it has one, or
     /// a submenu.
     @ViewBuilder
@@ -420,7 +435,7 @@ struct SectionMenu: Commands {
             // nobody could undo.
             // A layout item with no title draws its raw name, and
             // `SubjectMenuLayoutTests` fails on it.
-            item(SectionMenu.title(for: plain) ?? plain.rawValue, plain, enabled)
+            item(SectionMenu.title(for: plain, noun: noun) ?? plain.rawValue, plain, enabled)
         }
     }
 

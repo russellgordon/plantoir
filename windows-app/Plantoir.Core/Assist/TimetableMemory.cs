@@ -85,6 +85,22 @@ public sealed class TimetableMemory
     /// accepts the other believes: a tool that saved and then read back
     /// would otherwise find nothing where it had just written.
     /// </summary>
+    /// <summary>
+    /// Every date <see cref="Unbelievable"/> would refuse, once each, in the
+    /// order given: the Class Dates dialog names them all, as the mac does
+    /// (#1027 review 2, low 5).
+    /// </summary>
+    public static IReadOnlyList<DateOnly> EveryUnbelievable(IEnumerable<DateOnly> dates, DateOnly today)
+    {
+        DateOnly ceiling = today.AddYears(YearsAheadBelievable);
+        var refused = new List<DateOnly>();
+        foreach (var date in dates)
+        {
+            if ((date < EarliestBelievable || date > ceiling) && !refused.Contains(date)) refused.Add(date);
+        }
+        return refused;
+    }
+
     public static DateOnly? Unbelievable(IEnumerable<DateOnly> dates, DateOnly today)
     {
         DateOnly ceiling = today.AddYears(YearsAheadBelievable);
@@ -120,6 +136,23 @@ public sealed class TimetableMemory
     /// Whether setting a file aside leaves a line on the trail. On by
     /// default; a test that only wants the answer turns it off.
     /// </param>
+    /// <summary>
+    /// The course's noun for the trail line a teacher reads (#1027; the mac's
+    /// reader passes its course's): class when the settings cannot be read.
+    /// </summary>
+    private static Plantoir.Core.Models.ClassNoun NounOf(string workspacePath, string courseCode)
+    {
+        try
+        {
+            string config = Path.Combine(Workspace.CoursesDirectory(workspacePath), courseCode.ToUpperInvariant(), "course_config.json");
+            return Plantoir.Core.Models.CourseConfiguration.Load(config).ClassNoun;
+        }
+        catch (Exception)
+        {
+            return Plantoir.Core.Models.ClassNoun.Class;
+        }
+    }
+
     public static TimetableMemory? Read(string workspacePath, string courseCode, int sectionNumber,
                                         DateOnly? today = null, bool recording = true)
     {
@@ -146,8 +179,7 @@ public sealed class TimetableMemory
             {
                 if (recording)
                     ActivityTrail.Note(ActivityTrail.Event.RememberedTimetableSetAside,
-                        $"remembered timetable set aside: it names {DateText.Iso(impossible)}, which cannot be a " +
-                        "class date; the assistant will ask for the timetable again",
+                        AssistWording.ClassDatesSetAside(DateText.Iso(impossible), NounOf(workspacePath, courseCode)),
                         courseCode.ToUpperInvariant(), sectionNumber);
                 return null;
             }

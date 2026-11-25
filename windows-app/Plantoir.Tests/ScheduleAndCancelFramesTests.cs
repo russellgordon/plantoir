@@ -28,7 +28,7 @@ public class ScheduleAndCancelFramesTests : IDisposable
     private static JsonObject Rows => ContractLoader.LoadJson("assist-cases.json")["scheduleAndCancel"]!.AsObject();
 
     private static AssistAgent Agent(WindowBindingContractTests.ScriptedModel model, WindowBindingContractTests.RecordingTools tools) =>
-        new(model, tools, ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+        new(model, tools, ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class };
 
     [Fact]
     public void EveryAcceptedRowReachesItsToolWithItsWhen()

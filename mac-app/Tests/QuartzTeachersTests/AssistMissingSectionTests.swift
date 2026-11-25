@@ -127,9 +127,9 @@ final class AssistMissingSectionTests: XCTestCase {
     func testAddClassesWithoutACountOrAUnitAsksAndWritesNothing() async throws {
         // Each shape with the question it must be asked.
         let shapes: [([String: Any], String)] = [
-            (["course": "ICS3U", "section": 1, "unit": 1], AssistWording.addClassesNeedsACount),
-            (["course": "ICS3U", "section": 1, "unit": 1, "howMany": 0], AssistWording.addClassesNeedsACount),
-            (["course": "ICS3U", "section": 1, "howMany": 2], AssistWording.addClassesNeedsAUnit),
+            (["course": "ICS3U", "section": 1, "unit": 1], AssistWording.addClassesNeedsACount()),
+            (["course": "ICS3U", "section": 1, "unit": 1, "howMany": 0], AssistWording.addClassesNeedsACount()),
+            (["course": "ICS3U", "section": 1, "howMany": 2], AssistWording.addClassesNeedsAUnit()),
         ]
         for (arguments, question) in shapes {
             for name in ["plan_add_classes", "add_classes"] {

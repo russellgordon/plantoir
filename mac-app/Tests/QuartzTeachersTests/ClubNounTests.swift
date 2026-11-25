@@ -204,6 +204,246 @@ final class ClubNounTests: XCTestCase {
         XCTAssertTrue(ordinary.contains("the Section or Classes menu"), ordinary)
     }
 
+    // MARK: - The menus' items in a club (#1027)
+
+    /// `subjectMenus.layout.itemTitles` → `items`: each item whose title
+    /// says class, as a course titles it and as a club does.
+    private func itemTitlesInTheContract() throws -> [String: [String: String]] {
+        let layout: [String: Any] = try SubjectMenuLayoutTests.layout()
+        let itemTitles: [String: Any] = try XCTUnwrap(layout["itemTitles"] as? [String: Any])
+        return try XCTUnwrap(itemTitles["items"] as? [String: [String: String]])
+    }
+
+    /// Every item of Section ▸ and Classes ▸, the submenu's included.
+    private func everyItemOfTheTwoMenus() -> [SubjectMenuRules.Item] {
+        var items: [SubjectMenuRules.Item] = []
+        for menu in SubjectMenuLayout.Menu.allCases {
+            for group in SubjectMenuLayout.groups(of: menu) {
+                for entry in group {
+                    switch entry {
+                    case .item(let item):
+                        items.append(item)
+                    case .submenu(let submenu):
+                        items.append(contentsOf: SubjectMenuLayout.items(of: submenu))
+                    }
+                }
+            }
+        }
+        return items
+    }
+
+    /// Russell's ruling on #1027 (2026-11-20, night): in a club the
+    /// Meetings menu's items say meeting. Each item the contract lists is
+    /// drawn with its `title` in a course and its `titleForAMeeting` in a
+    /// club, in the menu bar and in a section row's menu (both read
+    /// `SectionMenu.title`); every other item of the two menus says neither
+    /// class nor meeting and has one title in every course, so the list is
+    /// complete. MUST FAIL with any club title put back to its class words,
+    /// or a new item that says class left out of the list.
+    func testEveryItemTitleSaysMeetingInAClub() throws {
+        let listed: [String: [String: String]] = try itemTitlesInTheContract()
+        XCTAssertEqual(listed.count, 5)
+        for item in everyItemOfTheTwoMenus() {
+            let asAClass: String? = SectionMenu.title(for: item, noun: .class)
+            let asAMeeting: String? = SectionMenu.title(for: item, noun: .meeting)
+            if let titles = listed[item.rawValue] {
+                XCTAssertEqual(asAClass, titles["title"], item.rawValue)
+                XCTAssertEqual(asAMeeting, titles["titleForAMeeting"], item.rawValue)
+                XCTAssertEqual(SubjectMenuLayout.titleSayingTheNoun(of: item, noun: .meeting), titles["titleForAMeeting"])
+                XCTAssertEqual(SubjectMenuLayout.titleSayingTheNoun(of: item, noun: .class), titles["title"])
+                XCTAssertTrue(saysClass(asAClass ?? ""), item.rawValue)
+                XCTAssertTrue((asAMeeting ?? "").contains("Meeting"), item.rawValue)
+                XCTAssertTrue((asAMeeting ?? "").hasSuffix("…"), "\(item.rawValue) lost its ellipsis")
+            } else {
+                XCTAssertEqual(asAMeeting, asAClass, "\(item.rawValue) changes with the noun and is not in the contract")
+                XCTAssertNil(SubjectMenuLayout.titleSayingTheNoun(of: item, noun: .meeting), item.rawValue)
+            }
+            XCTAssertFalse(saysClass(asAMeeting ?? ""), "\(item.rawValue) says class in a club: \(asAMeeting ?? "")")
+        }
+        for name in listed.keys {
+            let item: SubjectMenuRules.Item? = SubjectMenuRules.Item(rawValue: name)
+            XCTAssertNotNil(item, "\(name) is no item")
+            if let item {
+                XCTAssertNotNil(SubjectMenuLayout.menu(containing: item), "\(name) is in neither menu")
+            }
+        }
+    }
+
+    /// The contract's sentence for a key, with the place filled in.
+    private func contractSentence(_ key: String, course: String, section: Int) throws -> String {
+        let wording: [String: Any] = try XCTUnwrap(AssistContract.wording()["wording"] as? [String: Any])
+        let template: String = try XCTUnwrap(wording[key] as? String, key)
+        return template
+            .replacingOccurrences(of: "{course}", with: course)
+            .replacingOccurrences(of: "{section}", with: String(section))
+    }
+
+    /// #1027's review, MEDIUM 1: Meetings ▸ Meeting Dates… opens the Class
+    /// Dates sheet, and in a club every sentence it says itself is the
+    /// contract's `…ForAMeeting` twin — the purpose line, each refusal, the
+    /// proposal, the part-way alert's title, the missing-course line, and
+    /// the trail line when remembered dates are set aside. MUST FAIL with
+    /// any of them said in the ordinary noun.
+    func testTheClassDatesSheetSaysMeetingInAClub() throws {
+        let club = try makeClub(noun: .meeting)
+        defer { try? FileManager.default.removeItem(at: club.root) }
+        let code: String = club.course.code
+        let sheet: SectionScheduleSheet = SectionScheduleSheet(course: club.course, sectionNumber: 1)
+
+        XCTAssertEqual(sheet.purposeLine, try contractSentence("classDatesPurposeForAMeeting", course: code, section: 1))
+
+        let refusals: [(Error, String)] = [
+            (SectionTimetableStore.Problem.noDatesGiven(code, 1), "classDatesNoneGivenForAMeeting"),
+            (SectionTimetableStore.Problem.unreadableDates(code, 1, ["2026-13-01"]), "classDatesNotWrittenAsDatesForAMeeting"),
+            (SectionTimetableStore.Problem.halfRemembered(code, 1, ["the file is not readable JSON"]),
+             "classDatesOnFileUnreadableForAMeeting"),
+            (SectionTimetableStore.Problem.cannotBeClassDates(code, 1, ["2569-09-08"]), "classDatesTooFarFromTodayForAMeeting"),
+            (SectionTimetableStore.Problem.couldNotWrite(code, 1, "{reason}"), "classDatesCouldNotBeSavedForAMeeting"),
+            (SectionScheduleSource.Problem.unreadableEntries("the pasted dates", ["2026-13-01"]), "classDatesHalfReadForAMeeting"),
+        ]
+        for (error, key) in refusals {
+            let said: String = SectionScheduleSheet.sentence(for: error, noun: sheet.noun)
+            XCTAssertEqual(said, try contractSentence(key, course: code, section: 1), key)
+            // What the model is told stays in the ordinary noun.
+            XCTAssertTrue(saysClass(error.localizedDescription), "\(key): \(error.localizedDescription)")
+        }
+
+        XCTAssertEqual(
+            SectionTimetableStore.Problem.rememberedTitle(code, 1, noun: sheet.noun),
+            try contractSentence("classDatesAreRememberedForAMeeting", course: code, section: 1)
+        )
+
+        // The proposal, as the sheet draws it: a fresh list, then the same one.
+        var tuesdays: [String] = []
+        for day in ["09-08", "09-15", "09-22", "09-29", "10-06", "10-13", "10-20", "10-27",
+                    "11-03", "11-10", "11-17", "11-24"] {
+            tuesdays.append("2026-" + day)
+        }
+        let fresh: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: tuesdays, source: "block H", forSection: 1, in: club.course
+        )
+        let freshLine: String = fresh.description(noun: sheet.noun).components(separatedBy: "\n")[0]
+        let expectedFresh: String = try contractSentence("classDatesToRememberForAMeeting", course: code, section: 1)
+            .replacingOccurrences(of: "2026-12-15 (Tuesday)", with: "2026-11-24 (Tuesday)")
+        XCTAssertEqual(freshLine, expectedFresh)
+        XCTAssertFalse(saysClass(fresh.description(noun: sheet.noun)), fresh.description(noun: sheet.noun))
+        XCTAssertTrue(saysClass(fresh.description), fresh.description)
+
+        try SectionTimetableStore.applyRememberTimetable(fresh)
+        let same: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: tuesdays, source: "block H", forSection: 1, in: club.course
+        )
+        XCTAssertTrue(same.changesNothing)
+        XCTAssertEqual(
+            same.description(noun: sheet.noun),
+            try contractSentence("classDatesAlreadyRecordedForAMeeting", course: code, section: 1)
+        )
+
+        // The trail line when a remembered list holds a date that cannot be one.
+        let fileURL: URL = SectionTimetableStore.fileURL(forSection: 1, in: club.course)
+        let stored: [String: Any] = ["section": 1, "dates": ["2569-09-08"], "source": "block H", "recorded": "2026-09-01"]
+        try JSONSerialization.data(withJSONObject: stored).write(to: fileURL)
+        let trailBefore: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertNil(try SectionTimetableStore.read(forSection: 1, in: club.course))
+        let trailAfter: String = ActivityTrail.store.activityText(includingPrompts: true)
+        let newTrail: String = String(trailAfter.dropFirst(trailBefore.count))
+        XCTAssertTrue(
+            newTrail.contains(try contractSentence("classDatesSetAsideForAMeeting", course: code, section: 1)),
+            newTrail
+        )
+
+        // A course that cannot be found is known as a club by its code.
+        XCTAssertEqual(
+            SectionScheduleCourseMissingView(courseCode: "ROBOTICS").message,
+            try contractSentence("classDatesCourseMissingForAMeeting", course: "ROBOTICS", section: 1)
+        )
+        XCTAssertEqual(
+            SectionScheduleCourseMissingView(courseCode: "ICS3U").message,
+            try contractSentence("classDatesCourseMissing", course: "ICS3U", section: 1)
+        )
+    }
+
+    /// The trail's "ran from a menu" line names the item as the club's menu
+    /// bar draws it (`itemTitles` → `ranFromAMenuCases`). MUST FAIL with the
+    /// path's item title read in the ordinary noun.
+    func testTheRanFromAMenuPathSaysMeetingInAClub() throws {
+        let layout: [String: Any] = try SubjectMenuLayoutTests.layout()
+        let itemTitles: [String: Any] = try XCTUnwrap(layout["itemTitles"] as? [String: Any])
+        let cases: [[String: String]] = try XCTUnwrap(itemTitles["ranFromAMenuCases"] as? [[String: String]])
+        XCTAssertGreaterThanOrEqual(cases.count, 4)
+        for testCase in cases {
+            let item: SubjectMenuRules.Item = try XCTUnwrap(SubjectMenuRules.Item(rawValue: testCase["item"] ?? ""))
+            let noun: ClassNoun = try XCTUnwrap(ClassNoun(rawValue: testCase["noun"] ?? ""))
+            XCTAssertEqual(SectionVerbs.menuPath(of: item, noun: noun), testCase["path"])
+            XCTAssertEqual(
+                SectionVerbs.ranLine(item, ending: "carried out", counts: "", noun: noun),
+                (testCase["path"] ?? "") + " — carried out"
+            )
+        }
+    }
+
+    /// Every club sentence that names one of the items names it as the
+    /// club's menu bar does: where the ordinary twin says "Classes ▸ Class
+    /// Dates…", the club's says "Meetings ▸ Meeting Dates…" (#1027). Walks
+    /// every club key of the contract's wording, the `…ForAMeeting` keys and
+    /// the two `…MeetingsMenu` ones. MUST FAIL with a club sentence that
+    /// points at "the Meetings menu" without the item's title, as before
+    /// #1027.
+    func testEveryClubSentenceNamesTheItemAsTheClubsMenuBarDoes() throws {
+        let wording: [String: Any] = try XCTUnwrap(AssistContract.wording()["wording"] as? [String: Any])
+        let listed: [String: [String: String]] = try itemTitlesInTheContract()
+        var pairs: [(club: String, ordinary: String)] = []
+        for key in wording.keys {
+            if key.hasSuffix("ForAMeeting") {
+                pairs.append((key, String(key.dropLast("ForAMeeting".count))))
+            } else if key.hasSuffix("FromTheMeetingsMenu") {
+                pairs.append((key, String(key.dropLast("FromTheMeetingsMenu".count)) + "FromTheMenu"))
+            }
+        }
+        XCTAssertTrue(pairs.contains { pair in pair.club == "nothingToUndoFromTheMeetingsMenu" })
+        var namesAnItem: Int = 0
+        for pair in pairs {
+            let club: String = try XCTUnwrap(wording[pair.club] as? String, pair.club)
+            let ordinary: String = try XCTUnwrap(wording[pair.ordinary] as? String, "\(pair.club) has no \(pair.ordinary)")
+            for (name, titles) in listed {
+                let item: SubjectMenuRules.Item = try XCTUnwrap(SubjectMenuRules.Item(rawValue: name))
+                let ordinaryPath: String = SectionVerbs.menuPath(of: item, noun: .class)
+                if ordinary.contains(ordinaryPath) {
+                    namesAnItem += 1
+                    let clubPath: String = SectionVerbs.menuPath(of: item, noun: .meeting)
+                    XCTAssertTrue(clubPath.hasSuffix(titles["titleForAMeeting"] ?? "?"), clubPath)
+                    XCTAssertTrue(club.contains(clubPath), "\(pair.club) does not say \(clubPath): \(club)")
+                }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(namesAnItem, 2)
+        XCTAssertEqual(
+            wording["nothingToUndoFromTheMeetingsMenu"] as? String, AssistWording.nothingToUndoFromTheMenu(noun: .meeting)
+        )
+    }
+
+    /// Undo Last Change's "nothing to undo", from the menu on a club's
+    /// section, names the menus as the club's menu bar titles them (#1027:
+    /// named from the selected section's course, like the rest). MUST FAIL
+    /// with the sentence read in the ordinary noun.
+    func testNothingToUndoOnAClubsSectionNamesTheMeetingsMenu() async throws {
+        let club = try makeClub(noun: .meeting)
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: club.root.appendingPathComponent("trail"))
+        defer {
+            ActivityTrail.store = previousTrail
+            SectionMenuActivity.reset()
+            try? FileManager.default.removeItem(at: club.root)
+        }
+        let verbs: SectionVerbs = SectionVerbs(folderPath: club.root.path, siteWork: StubSiteWork())
+        let nothing: AssistToolOutcome = await verbs.perform(
+            SectionVerbs.undoLastChange(), item: .undoLastChange, courseCode: club.course.code, sectionNumber: 1
+        )
+        XCTAssertEqual(nothing.summary, AssistWording.nothingToUndoFromTheMenu(noun: .meeting))
+        XCTAssertTrue(nothing.summary.contains("the Section or Meetings menu"), nothing.summary)
+        XCTAssertFalse(saysClass(nothing.summary), nothing.summary)
+    }
+
     // MARK: - What the window offers a club
 
     /// The sentence the declined-dates answer tells a club to say is one the
@@ -323,5 +563,191 @@ final class ClubNounTests: XCTestCase {
         let command: AssistCardCommand? = AssistCardCommand.matching("Duplicate Week 2 as my next meeting")
         XCTAssertEqual(command?.toolName, "add_next_class")
         XCTAssertEqual(command?.arguments, ["duplicate": "Week 2"])
+    }
+
+    // MARK: - #1027 round 3: every class sentence has its club form
+
+    /// The contract's wording, read from the file both apps read.
+    private func wordingFile() throws -> [String: Any] {
+        let url: URL = AssistantSetUpContractTests.contractsURL().appendingPathComponent("assist-wording.json")
+        return try XCTUnwrap(try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any])
+    }
+
+    /// Every key of the contract whose words say class has a club twin
+    /// (`…ForAMeeting`, or `…FromTheMeetingsMenu` for a `…FromTheMenu` key)
+    /// or is on `staysClass` with its reason; nothing stale is on that list.
+    /// MUST FAIL with any twin taken out of the table.
+    func testEveryClassSentenceInTheContractHasAClubFormOrAReason() throws {
+        let file: [String: Any] = try wordingFile()
+        let wording: [String: Any] = try XCTUnwrap(file["wording"] as? [String: Any])
+        let staysClass: [String: String] = try XCTUnwrap(file["staysClass"] as? [String: String])
+        var withoutAClubForm: [String] = []
+        var saidInClass: Int = 0
+        for (key, value) in wording {
+            if key.hasSuffix("ForAMeeting") || key.hasSuffix("FromTheMeetingsMenu") {
+                continue
+            }
+            guard let sentence = value as? String, saysClass(sentence) else {
+                continue
+            }
+            saidInClass += 1
+            var hasATwin: Bool = wording[key + "ForAMeeting"] != nil
+            if key.hasSuffix("FromTheMenu") {
+                hasATwin = hasATwin || wording[String(key.dropLast("FromTheMenu".count)) + "FromTheMeetingsMenu"] != nil
+            }
+            if !hasATwin && staysClass[key] == nil {
+                withoutAClubForm.append(key)
+            }
+        }
+        XCTAssertGreaterThan(saidInClass, 50)
+        XCTAssertEqual(withoutAClubForm.sorted(), [], "say class with no club form and no reason")
+        for (key, reason) in staysClass {
+            let sentence: String = try XCTUnwrap(wording[key] as? String, "staysClass names no key \(key)")
+            XCTAssertTrue(saysClass(sentence), "\(key) no longer says class")
+            XCTAssertNil(wording[key + "ForAMeeting"], "\(key) has a twin, so it is not an exception")
+            XCTAssertFalse(reason.isEmpty, key)
+        }
+    }
+
+    /// Review 2, MEDIUM 1: Add Meeting…'s trail counts say meeting
+    /// (`itemTitles.countsCases`), and so do the counts of Deploy's hide.
+    /// MUST FAIL with the counts said in the ordinary noun.
+    func testTheRanFromAMenuCountsSayMeetingInAClub() throws {
+        let layout: [String: Any] = try SubjectMenuLayoutTests.layout()
+        let itemTitles: [String: Any] = try XCTUnwrap(layout["itemTitles"] as? [String: Any])
+        let cases: [[String: String]] = try XCTUnwrap(itemTitles["countsCases"] as? [[String: String]])
+        XCTAssertEqual(cases.count, 5)
+        for testCase in cases {
+            let way: SubjectMenuRules.AddClassWay = try XCTUnwrap(SubjectMenuRules.AddClassWay(rawValue: testCase["way"] ?? ""))
+            let noun: ClassNoun = try XCTUnwrap(ClassNoun(rawValue: testCase["noun"] ?? ""))
+            XCTAssertEqual(SectionVerbs.addClassCounts(way, noun: noun), testCase["counts"])
+        }
+        XCTAssertEqual(
+            AssistWording.untickedAtDeployCounts(count: 3, noun: .meeting),
+            try contractSentence("untickedAtDeployCountsForAMeeting", course: "ROBOTICS", section: 1)
+        )
+        XCTAssertEqual(AssistWording.untickedAtDeployCounts(count: 1, noun: .meeting), "1 meeting dated later, unticked at Deploy")
+        let source: String = try String(
+            contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().appendingPathComponent("QuartzTeachers/Views/Section/SectionDetailVerbs.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("SectionVerbs.addClassCounts(model.way, noun: course.configuration.classNoun)"))
+        XCTAssertTrue(source.contains("AssistWording.untickedAtDeployCounts(count: hidden.count, noun: course.configuration.classNoun)"))
+    }
+
+    /// Review 2, MEDIUM 2: a make-room plan that runs out of dates tells a
+    /// club's teacher about meeting days and dates, on the card and in the
+    /// refusal, and the model the class form. MUST FAIL with the problem
+    /// typed in the class noun only.
+    func testAPlanShortOfDatesSaysMeetingToAClubsTeacher() async throws {
+        let club = try makeClub(noun: .meeting)
+        defer { try? FileManager.default.removeItem(at: club.root) }
+        let arguments: [String: Any] = ["course": "ICS3U", "section": 1, "unit": 2, "howMany": 60]
+
+        let plan: AssistToolOutcome = await run(club.runner, "plan_make_room_for_classes", arguments)
+        XCTAssertTrue(plan.forTheCard.contains("meeting days"), plan.forTheCard)
+        XCTAssertFalse(plan.forTheCard.contains("class day"), plan.forTheCard)
+        XCTAssertFalse(plan.forTheCard.contains("class date"), plan.forTheCard)
+        XCTAssertTrue(plan.detail.contains("class days"), plan.detail)
+
+        let write: AssistToolOutcome = await run(club.runner, "make_room_for_classes", arguments)
+        XCTAssertTrue(write.summary.contains("meeting date"), write.summary)
+        XCTAssertFalse(saysClass(write.summary), write.summary)
+        XCTAssertTrue(write.detail.contains("class date"), write.detail)
+
+    }
+
+    /// Review 2, low 4: the dates card and its summaries, and a refusal of
+    /// add_classes, say meeting to a club's teacher; the model reads class.
+    /// MUST FAIL with the card or a summary said in the ordinary noun.
+    func testTheDatesCardAndItsSummariesSayMeetingInAClub() async throws {
+        let club = try makeClub(noun: .meeting)
+        defer { try? FileManager.default.removeItem(at: club.root) }
+        let arguments: [String: Any] = [
+            "course": "ICS3U", "section": 1, "dates": ["2026-09-08", "2026-09-15", "2026-09-22"],
+        ]
+        let plan: AssistToolOutcome = await run(club.runner, "plan_remember_timetable", arguments)
+        XCTAssertEqual(plan.summary, try contractSentence("workedOutTheClassDatesForAMeeting", course: "ICS3U", section: 1))
+        XCTAssertTrue(plan.forTheCard.contains("meeting dates"), plan.forTheCard)
+        XCTAssertFalse(saysClass(plan.forTheCard), plan.forTheCard)
+        XCTAssertTrue(plan.detail.contains("class dates"), plan.detail)
+
+        let write: AssistToolOutcome = await run(club.runner, "remember_timetable", arguments)
+        XCTAssertEqual(write.summary, "Remembered 3 meeting dates for ICS3U Section 1.")
+        XCTAssertTrue(write.detail.contains("Remembered 3 class dates"), write.detail)
+
+        let none: AssistToolOutcome = await run(club.runner, "remember_timetable", ["course": "ICS3U", "section": 1, "dates": [String]()])
+        XCTAssertFalse(saysClass(none.summary), none.summary)
+        XCTAssertTrue(saysClass(none.detail), none.detail)
+
+        let noCount: AssistToolOutcome = await run(club.runner, "add_classes", ["course": "ICS3U", "section": 1, "unit": 2])
+        XCTAssertEqual(noCount.summary, try contractSentence("addClassesNeedsACountForAMeeting", course: "ICS3U", section: 1))
+        XCTAssertEqual(noCount.detail, try contractSentence("addClassesNeedsACount", course: "ICS3U", section: 1))
+    }
+
+    /// Review 2, low 3: what VoiceOver says on a club's sheets says meeting.
+    /// MUST FAIL with a name that keeps the class word in a club.
+    func testVoiceOverNamesSayMeetingInAClub() {
+        let names: [String] = [
+            AccessibilityNames.classDate(noun: .meeting), AccessibilityNames.classDates(noun: .meeting),
+            AccessibilityNames.makeRoomClass(noun: .meeting), AccessibilityNames.makeRoomHowMany(noun: .meeting),
+            AccessibilityNames.sourceTable(noun: .meeting), AccessibilityNames.laterClassesTable(noun: .meeting),
+        ]
+        XCTAssertEqual(names, ["Meeting date", "Meeting dates", "Meeting", "Number of meetings", "Meetings", "Later meetings"])
+        XCTAssertEqual(AccessibilityNames.classDates(), "Class dates")
+        XCTAssertEqual(AccessibilityNames.makeRoomHowMany(), "Number of classes")
+    }
+
+
+    // MARK: - #1027 round 4: the planners' refusals
+
+    /// Every club twin says meeting and never class: a twin that copied the
+    /// class form, or a key whose noun was typed in, fails here.
+    /// MUST FAIL with any `…ForAMeeting` sentence that still says class.
+    func testEveryClubTwinSaysMeetingAndNeverClass() throws {
+        let wording: [String: Any] = try XCTUnwrap(try wordingFile()["wording"] as? [String: Any])
+        var twinsSayingClass: [String] = []
+        var twinsRead: Int = 0
+        for (key, value) in wording where key.hasSuffix("ForAMeeting") || key.hasSuffix("FromTheMeetingsMenu") {
+            guard let sentence = value as? String else {
+                continue
+            }
+            twinsRead += 1
+            if saysClass(sentence) {
+                twinsSayingClass.append(key)
+            }
+        }
+        XCTAssertGreaterThan(twinsRead, 50)
+        XCTAssertEqual(twinsSayingClass.sorted(), [], "a club twin says class")
+    }
+
+    /// Each planner's refusal, which was typed in the planner until round 4,
+    /// is the contract's key in a course and its twin in a club; the model's
+    /// copy (`localizedDescription`) stays the class form (#267).
+    /// MUST FAIL with any planner refusal typed with the class word again.
+    func testThePlannersRefusalsSayMeetingInAClub() throws {
+        let wording: [String: Any] = try XCTUnwrap(try wordingFile()["wording"] as? [String: Any])
+        let refusals: [(key: String, problem: SaidInACoursesNoun & LocalizedError)] = [
+            ("askForAtLeastOneClass", ClassInsertionPlanner.Problem.countOutOfRange),
+            ("askForAtLeastOneClass", PlaceholderClassPlanner.Problem.countOutOfRange),
+            ("cannotMoveClassesWithoutDates", ClassInsertionPlanner.Problem.noTimetable("COMP", 2)),
+            ("cannotDateNewClassesWithoutDates", PlaceholderClassPlanner.Problem.noTimetable("COMP", 2)),
+            ("cannotDateANewClassWithoutDates", NextClassPlanner.Problem.noTimetable("COMP", 2)),
+            ("cannotReDateWithoutDates", SectionReDatePlanner.Problem.noTimetable("COMP", 2)),
+            ("noNumberedClassPagesToReDate", SectionReDatePlanner.Problem.noClasses("COMP", 2)),
+        ]
+        for refusal in refusals {
+            let classForm: String = try XCTUnwrap(wording[refusal.key] as? String, refusal.key)
+            let clubForm: String = try XCTUnwrap(wording[refusal.key + "ForAMeeting"] as? String, refusal.key)
+            XCTAssertEqual(refusal.problem.sentence(noun: .meeting), clubForm, refusal.key)
+            XCTAssertEqual(refusal.problem.sentence(noun: .class), classForm, refusal.key)
+            XCTAssertEqual(refusal.problem.errorDescription, classForm, "the model reads the class form: \(refusal.key)")
+        }
+        let noClassOn: String = try XCTUnwrap(wording["noClassOnThatDayForAMeeting"] as? String)
+        XCTAssertEqual(
+            AssistWording.noClassOnThatDay(weekday: "Tuesday", date: "2026-12-08", code: "COMP", number: 2, noun: .meeting),
+            noClassOn
+        )
     }
 }

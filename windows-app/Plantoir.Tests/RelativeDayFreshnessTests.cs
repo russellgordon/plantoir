@@ -112,7 +112,7 @@ public class RelativeDayFreshnessTests
         public Rig()
         {
             Agent = new AssistAgent(Model, Tools, LocalSchemas(), "ICS3U", 1)
-            {
+            { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
                 ConfirmationMode = () => Confirming,
                 Today = () => this.Today,
             };

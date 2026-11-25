@@ -67,7 +67,7 @@ public class WindowBindingContractTests : IDisposable
         model.Then(new JsonObject { ["content"] = "All done." });
         var tools = new RecordingTools();
         var agent = new AssistAgent(model, tools, LocalSchemas(), window, section)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             CoursesInTheFolder = () => folder,
             ConfirmationMode = () => true,
         };
@@ -118,7 +118,7 @@ public class WindowBindingContractTests : IDisposable
         model.Then(Calling("list_pages", """{"course":"MCV4U","section":1}"""));
         model.Then(new JsonObject { ["content"] = "Here they are." });
         var agent = new AssistAgent(model, new RecordingTools(), LocalSchemas(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             CoursesInTheFolder = () => new[] { "ICS3U", "MCV4U" },
         };
 

@@ -38,7 +38,8 @@ public class QuitConfirmationTests
                 given["publishesUnderWay"]!.GetValue<int>(),
                 given["previewsOpen"]!.GetValue<int>(),
                 given["previewsBeingBuilt"]!.GetValue<int>(),
-                given["copiesBeingSaved"]?.GetValue<int>() ?? 0);
+                given["copiesBeingSaved"]?.GetValue<int>() ?? 0,
+                given["deployedFoldersShown"]?.GetValue<int>() ?? 0);
             var reason = given["quitReason"]!.ToString() switch
             {
                 "theTeacherAskedToQuit" => QuitConfirmation.Reason.TheTeacherAskedToQuit,

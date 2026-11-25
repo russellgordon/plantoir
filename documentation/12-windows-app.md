@@ -2744,9 +2744,10 @@ entry, `course-management.json` → `backups.restoreOneSection` and
 unrun rather than red. No Windows test reads the `why` or the `carries` of
 `section restored`.
 
-**Held, 4 entries, all v2.0.0, all `ActivityTrailEvents`.** #911 (1):
-`section restore stopped part way`. Windows' section restore is not staged
-yet, so it has no "stopped part way" outcome to record. #912 (3):
+**Held, 3 entries, all v2.0.0, all `ActivityTrailEvents`.** (#911's
+`section restore stopped part way` was held here until Windows' section
+restore was staged; since #911 merged, Windows writes it and the entry is
+gone.) #912 (3):
 `backup kept its Media files once`, `shared backup Media swept` and
 `backup Media not found`. Windows writes no small backup and sweeps nothing.
 No new area was needed, so the existing area's own closed, withdrawn and
@@ -2842,7 +2843,8 @@ assistant is shown changes. `scripts/test_tool_surface_digest.py` and
 expectation did not move. The test passed in the baseline, so Windows'
 surface still matches it.
 Add Next Class is not renamed: the issue says renaming the item is the fix,
-and the item is a menu a teacher sees, so it waits for #927's dialog.
+and the item is a menu a teacher sees, so it waited for #927's dialog (built 2026-11-21:
+Classes ▸ Add Class… replaced Add Next Class).
 
 **Five new areas, each read where its red was** (a sixth came with stack 13, below).
 - `SubjectMenuItemsUnderAnOlderName` (`subjectMenus.items`, with an older
@@ -3104,9 +3106,11 @@ a teacher can see it rather than merely held in a constant.
 carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
 `dotnet test` builds them and runs none of those — only
 `AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
-and need no desktop (bundle 11), and `HarnessSourceRuleTests`, five more that
-keep a bare key-down, a discarded `Keyboard.Pressing` and an unwatched key out
-of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
+and need no desktop (bundle 11) (the key rules that keep a bare key-down, a
+discarded `Keyboard.Pressing` and an unwatched key out of these sources,
+`HarnessSourceRuleTests` (#638), live in `Plantoir.Tests` since #1035, so the
+merge gate runs them: in this project they failed on `dev` for days with
+nobody seeing it). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -3257,11 +3261,16 @@ the 2026-10-23 full run and passed alone).
   `using (Keyboard.Pressing(key)) { … }`, which sends the up on dispose, a
   failing assert included. `PlanTable`'s Shift+Tab had called `Pressing` and
   thrown the disposable away; it is a `using` now.
-- **`HarnessSourceRuleTests`** (plain facts, no desktop) fails on any
-  `Keyboard.Press(` in the UI test sources. The exception is one method,
-  allowed by name: `PageTablesUiTests.HeldSpace`, which imitates
-  auto-repeat (several downs, then one up in a `finally`) and must keep
-  its release.
+- **`HarnessSourceRuleTests`** (in `Plantoir.Tests`, plain facts reading
+  `windows-app/Plantoir.UiTests/*.cs`) fails on any `Keyboard.Press(` in the UI
+  test sources. The one exception, allowed by name, is
+  `HeldKeys.HoldWithRepeats`, which imitates auto-repeat (one down, more downs
+  after the repeat delay, one up in a `finally`) and must keep its release;
+  every held-key imitation calls it (`PageTablesUiTests.HeldSpace`,
+  `StopByKeyboardUiTests`' held Escape). It also fails on a key a test names
+  that `HeldKeys.Watched` does not list, comparing by name because the unit
+  project cannot load FlaUI: spell a key as `Watched` does (`RETURN`, not
+  `ENTER`).
 - **`HeldKeys` sweeps for a key held any other way.** It reads
   `GetAsyncKeyState` for every modifier (generic and left/right, Windows
   keys included) and every key the suite sends. `DrivenApp`'s constructor
@@ -3834,6 +3843,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   skill teaches — the `> [!quiz]` callout and what the site does with it — is
   [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and
   what the build does is 05 → "Self-check quizzes: what the build does".
+
+The guidance-skill pins (`mustSay`, `held`, `starterMacros`, `hintsStarter`, `offeredTemplate`, `testAuthoringSkill`) are read from `shared-rules.json` by `Plantoir.Tests/AgentGuidanceSkillPinsTests.cs`, against what `AgentGuidance.Write` puts in a temporary working folder in both homes. Matching follows `mustSay.rule`; the two folding patterns are the Mac's (`\s+`, and `\s*\n[ \t]*(?:>[ \t]*)*` first), so CRLF never decides a result. A held skill (`held.skills`) is written in neither home and must be kept whole under `held.place`, so a held name that names nothing fails. The test-authoring skill's checks and its Marking Guide run on Windows with these commands (measured on Windows 11 ARM64 in Parallels, Python 3.14.10, 2026-11-21). From the working folder: `python -B .agents\skills\plantoir-test-authoring\scripts\check_kit.py "<test folder>\Marking Kit\answers.json"`. From a test folder: `python -B Checks\check_answers.py`. `py` in place of `python` works the same, and so does the fetched runtime's own `python\python.exe`; `python3` does not, because on stock Windows it is the Microsoft Store alias (exit 9009, "Python was not found"). The Marking Guide compiles with Tectonic 0.17.0's Windows zip (`tectonic-0.17.0-x86_64-pc-windows-msvc.zip`), from the test folder: `tectonic.exe -X compile "Marking Guide.tex"`; the first run fetches the bundle's files, `nicematrix` and `mhchem` among them (77.7 s with an empty cache), and a second run takes 6.0 s.
+
 - **The question** is a ContentDialog (`MainWindow.Guidance.cs`): title
   `askTitle`, `askFound` as the explanation under it, `askWhat`,
   `askYoursStays`, an Expander (`showWhatIsAdded`) over a read-only
@@ -8193,7 +8205,7 @@ when they land.
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
 | Course | Add Section…, Copy a Page from This Course… (Ctrl+Shift+K since #990) · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
 | Section | Since #990 (grouping A, drawn from `subjectMenus.layout`; "Section and Classes, drawn from the contract (#990)" below): Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Rebuild Preview (Ctrl+Shift+B), Open in Browser · Publish Class for a Date…, Publish Pages…, Hide Pages…, Publish Pages That Links Lead To…, Undo Last Change, Undo Getting Ready for the Start of the Year… · Deploy… (Ctrl+Shift+D), Schedule Deploy…, Remove Scheduled Deploy (Cancel Scheduled Deploy… until #987; no ellipsis since #990) · Revise With ▸ · Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section (no ellipsis since #990) |
-| Classes | Since #990: Add Next Class (Add Class… with #927) · Class Dates…, Re-date Classes…, Make Room for Classes… · Get Ready for the Start of the Year… (Roll Over to a New Year… joins with #954) |
+| Classes | Since #990: Add Class… (#927) · Class Dates…, Re-date Classes…, Make Room for Classes… · Roll Over to a New Year… (#954), Get Ready for the Start of the Year… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
@@ -8396,7 +8408,8 @@ here where Windows has the same thing:
   them"): Revise With ▸ and every item in it carry the star glyph, and the
   four assistant functions, the one group without icons, sit between dividers.
   The mac's other D43 change, the deployed folder's items in a group of their
-  own, has no Windows counterpart until #889 builds those items.
+  own, had no Windows counterpart until #889 built those items (2026-11-21: Open in Browser and
+Stop Showing Deployed Folder, a group of their own in the section row's menu).
 - **No grey text rows in the Course or Section menu** (Q14): Course ▸
   Rename's reason line (`courseRenameReason`) is gone. The row's context
   menus keep their lines (the ruling named the two menus): the busy note under
@@ -8454,9 +8467,9 @@ path (`SectionVerbDialog.MenuPath`) takes its menu from the layout, so it
 reads "Classes ▸ Re-date Classes… — carried out" now.
 
 **What Windows does not have yet** is left out by its named gap, and its
-neighbours keep their order: Stop Showing Deployed Folder (#889), GitHub
-Copilot (#884), Roll Over to a New Year… (#954); Add Class… is drawn as Add
-Next Class until #927. `SubjectMenuLayoutContractTests` builds the expected
+neighbours keep their order: GitHub Copilot (#884). Stop Showing Deployed
+Folder (#889), Roll Over to a New Year… (#954) and Add Class… (#927, which
+replaced Add Next Class) were gaps here until each was built on 2026-11-21. `SubjectMenuLayoutContractTests` builds the expected
 menus from the contract less those gaps and compares them with
 `SubjectMenuLayout`; the day a gap closes, the item must be added to the
 Windows lists, in its place, or the test goes red. The two Undo items stay in
@@ -8500,7 +8513,23 @@ pinned without pixels by `SubjectMenuLayoutContractTests`. With
 `PLANTOIR_UI_CAPTURE_DIR` set it also saves a picture of each menu open on a
 section row.
 
-**In a club the Classes menu is titled Meetings** (Russell, 2026-11-20 evening, on #990), live with the selection: `SubjectMenuLayout.Title(menu, ClassNoun)` takes the selected course's noun, read in `ApplyMenuEnablement` (not part of `Situation`, which holds only what greys an item and is pinned against `situationKeys`). The noun decides it, not the club code, because the noun is what a club's sentences are chosen by. Backups name the menus by the noun of the backup's course when drawn (`WorkspaceViewModel.ClassNounOf`, `SubjectMenuLayout.NounOfCourse`: a course no longer in the folder is read by its code). The in-app assistant's refusal while the menu changes the section names "the Section or Meetings menu" through `AssistAgent.CourseNoun` and `AssistToolRunner.CourseNoun`, set by the window. `NothingToUndoFromTheMenu` keeps "Section or Classes": there is no course to read a noun from, and the item leaves with U7/W11b. The mac's account is documentation 09, "In a club the menu is titled Meetings".
+**In a club the Classes menu is titled Meetings** (Russell, 2026-11-20 evening, on #990), live with the selection: `SubjectMenuLayout.Title(menu, ClassNoun)` takes the selected course's noun, read in `ApplyMenuEnablement` (not part of `Situation`, which holds only what greys an item and is pinned against `situationKeys`). The noun decides it, not the club code, because the noun is what a club's sentences are chosen by. Backups name the menus by the noun of the backup's course when drawn (`WorkspaceViewModel.ClassNounOf`, `SubjectMenuLayout.NounOfCourse`: a course no longer in the folder is read by its code). The in-app assistant's refusal while the menu changes the section names "the Section or Meetings menu" through `AssistAgent.CourseNoun` and `AssistToolRunner.CourseNoun`, set by the window. `NothingToUndoFromTheMenu` keeps "Section or Classes" even in a club: the course is known when the item runs, but the item and the sentence leave with U7/W11b in this milestone and no interim state is built (#990 review 3, low 1). The mac's account is documentation 09, "In a club the menu is titled Meetings".
+
+**Classes ▸ Add Class… (#927, the mac's #897 piece A).** The item's enablement is Add Next Class's (`SubjectMenuRules.Item.AddClass`); which ways the dialog offers is decided when it opens, from three facts that are not menu situation keys (`SectionVerbs.AddClassFacts`: the course's naming, the rename's own judgement made without clearing a stale record, and whether the class folders hold a page that is not an `index.md`). `SubjectMenuRules.AddClassWays`, `WhyGreyed`, `Label` and `ReasonLines` are the contract's `greyedRule`, `labelRule` and `reasonLineRule`. The copy is reached through `duplicateFileFromTheMenu`, which no tool declares: the MCP binder drops an undeclared argument, so `plantoir-mcp`'s call filter reads it from the raw arguments before dispatch, on the menu's server only (an outside client sending it is answered as if it had not, `OnlyTheMenusServerReadsTheArgument`). REJECTED: declaring it on `add_next_class` (it would move the schema every outside assistant and the built-in model is shown, which #897 froze). The source is matched against `ClassPages` by folder (`WorkingFolder.IsTheSame`, full path, case-insensitive) and file name as written; the mac also resolves links in the folder, because macOS lists a linked course's class folders resolved, while here both sides are built from the same course directory and are spelled alike. Measured nothing; the dialog's size has not been measured against a 620-epx ceiling (the mac's), only that the list stops at 7 rows.
+
+Seams left: the copy records nothing on the old undo list (W7 copies the journal step U3a defines; `NamedGapLedger.MenuCopyUndoEntries`).
+
+**Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B).** One rule, `RollOverFromTheMenu.WebsiteFor`, over the contract's three facts (`subjectMenus.rollOverSheet`), read when the dialog opens and again by the menu's server at the plan and at the write, so a deploy in between (a "new" that now would reuse a Cloudflare address) is answered as the mac answers it: kept, with the reason. `sectionIsPinned` is "any marker the release walks", and the release's list is now ONE function, `AssistWorkspace.MarkersTheReleaseWalks`, which `ReleaseSite` iterates: on this platform the legacy marker lives in the BUILD ROOT (`%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>\section<N>\`), not `.merged_output`, and a second list would be the place the two drift. The website is settled inside the tool call, before it returns, so always before the window rebuilds the preview (`AssistToolRunner.AlwaysStartsPreview` runs after the call). The no-copy refusal is in `ApplyReDate` (the dates-change path, menu and rollover only) and in `BackUpBeforeARolloverFromTheMenu` (the dates-right path); the window's path keeps its own sentence. REJECTED: a combined undo entry on the old list (the settled night-3 ruling: the journal step is W7's, built once). Measured nothing; the dialog's width is 420 to 560 epx, not measured against the mac's sheet.
+
+Seams left for W7: the rollover from the menu records the window's entries (see the #954 entry in `windows-app/PROGRESS.md`); `SettleTheWebsiteFromTheMenu` in `PlantoirTools.cs` is the one place the menu's website half is carried out, and `ApplyReDate(isARollover: true)` the dates half.
+
+**Club item titles (#1027).** The menus' item titles in a club come from one function per platform, checked against `subjectMenus.layout.itemTitles`; nothing else retypes them. A sentence with no course of its own (Undo Last Change's nothing-to-undo) learns the selected section's course from the call's `_meta` key `plantoirCourse`, never a tool argument, so no schema changes. Still saying class in a club, outside #1027: the Class Dates dialog's body (`SectionScheduleDialog`'s purpose line). Roll Over to a New Year… (still a named gap here) needs no club title.
+
+**Class Dates dialog, review 1 (#1027).** The dialog's sentences are the mac sheet's, key for key; every caller but the dialog passes no noun and gets the class form, so nothing the model reads changes. `classDatesCourseMissing`, `…NoneGiven`, `…NotWrittenAsDates`, `…OnFileUnreadable`, `…CouldNotBeSaved`, `…AreRemembered` and `…AlreadyRecorded` are carried here for the contract walk; this dialog has no path that says them yet (its own refusals are "Please type or paste some dates first." and the like, which name no class). Still saying class in a club, outside the Meetings menu: the assistant window's dates-card lines ("No class dates were recorded.").
+
+**Club twins (#1027, round 3).** `assist-wording.json` carries `staysClass`, generated from `AssistContract.wordingThatStaysClass`: every wording key whose words say class and has no `…ForAMeeting` (or `…FromTheMeetingsMenu`) twin, with the reason. Both apps' `ClubNounTests` fail on a class key that is on neither list, and on a stale entry. A new sentence that says class is therefore given its club twin, or its reason, when it is made.
+
+**Planner refusals (#1027, round 4).** A planner refusal is one wording key per platform with a `…ForAMeeting` twin; the teacher's copy is chosen where the refusal is answered, never by the model's copy.
 
 ### What does NOT exist here: File with no window
 
@@ -16279,6 +16308,10 @@ Also owed by 889b, from the surface above and the fixes review:
   handed a show re-checks `ShowFor` afterwards, so it never opens the
   address of a show that was stopped meanwhile.
 
+**889b, built** (2026-11-20): every place opens through `Services/DeployedFolderOpening.OpenAsync`, which reads the offer again at the press and hands the address to `ExternalLinks.Open` (a `--state-dir` run records it in `links-opened.txt` and opens nothing: the UI tests' browser seam). The toolbar's button decides preview or folder by `_previewUrl` at the press. `DeployedFolderShows.Changed` is carried to the view's dispatcher and redraws the chrome and the menus. The trail is written in `App` from `Happened`, on whatever thread raised it (`ActivityTrail.Note` touches no control). L-c is in the Core: `_joinedStarts` counts presses that joined a start under way, and the starter's refusing browser stops the show only when none did.
+
+**The offer is read on events (#889, lane B review lows).** The offer is not read on a clock or on a redraw; an event asks for one read, a second event during a read asks for one more after it, so the last event is the one drawn. The section row's right-click menu still looks the offer up as it opens (an event), on the window's thread.
+
 ## Undo and Redo: the journal Windows owes (#899, piece U1)
 
 The mac's journal core is described in `documentation/09-mac-app.md` →
@@ -16746,6 +16779,17 @@ and passes over SSH on the PC (run `899u2b-win-11`): a deny ACE on READING
 a file stops the administrator's token there, unlike a deny on LISTING a
 folder, which it passes (`DenyBitesFact`). Its `DenyReadBitesFact` probe
 still skips it, saying why, on any account whose token reads past it.
+
+There are now three deny-rule probes, one each for listing a folder, reading a
+file and replacing a file (`DenyReplaceBitesFact`, #953). Each probe tests the
+exact operation its tests need, because they do not all fail in the same
+places. Over SSH on the PC, the account is an elevated administrator with the
+backup and restore privileges enabled. A rename passes deny rules on both the
+file and its folder there, but a read-only attribute still stops it. A test
+that needs a deny rule to bite must therefore use the probe that matches its
+operation, not borrow another one. Any part of the test that does not depend
+on a deny rule should be split out as a plain fact, so that it still runs
+everywhere.
 
 **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
 .NET 9, the system NTFS volume, other agents of the run sharing the CPU, so

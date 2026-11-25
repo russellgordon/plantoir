@@ -28,6 +28,30 @@ public sealed partial class SidebarPane
     /// Rename unselected (its field lost focus to the selection change) does
     /// not arise here.
     /// </summary>
+    /// <summary>
+    /// Open in Browser and Stop Showing Deployed Folder on a section row (#889,
+    /// the mac's #850), drawn only when they apply, as this menu's rule is:
+    /// Open in Browser while the deployed folder can be opened, Stop while it
+    /// is shown, read when the menu is drawn, which is when it opens. A group
+    /// of their own, after a separator (the mac's D43: they have no icon, and
+    /// Open in Obsidian has one). The row is selected first and its window
+    /// acts, so the one Open in Browser opens the preview there if one shows.
+    /// </summary>
+    private void AddDeployedFolderItems(MenuFlyout menu, Course course, int number, SidebarSelection row)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        bool offered = DeployedFolderOpening.Offer(course, number, folder).Decision.Kind == DeployedFolderOffer.Kind.Offered;
+        bool shown = DeployedFolderOpening.IsShown(course, number, folder);
+        if (!offered && !shown) return;
+        menu.Items.Add(new MenuFlyoutSeparator());
+        if (offered)
+            menu.Items.Add(MenuItem(DeployedFolderWording.MenuItem, "",
+                Selecting(row, () => _window.OpenInBrowserFromARow(course, number))));
+        if (shown)
+            menu.Items.Add(MenuItem(DeployedFolderWording.StopMenuItem, "",
+                Selecting(row, () => DeployedFolderOpening.Stop(course, number, folder))));
+    }
+
     private Action Selecting(SidebarSelection selection, Action action) => () =>
     {
         SelectRow(selection);

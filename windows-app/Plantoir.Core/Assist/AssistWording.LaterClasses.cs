@@ -52,18 +52,31 @@ public static partial class AssistWording
     /// shaped like <see cref="DeployNeedsAnAnswer"/>. Several: the
     /// <c>NamingSeveral</c> twin.
     /// </summary>
-    public static string DeployHasClassesDatedLater(string course, string section, IReadOnlyList<string> titles) =>
+    public static string DeployHasClassesDatedLater(string course, string section, IReadOnlyList<string> titles,
+                                                    ClassNoun noun = ClassNoun.Class) =>
         titles.Count == 1
-            ? $"{course} Section {section} was not deployed, so nothing was sent to students: “{titles[0]}” is published and dated after the next class, and the teacher is asked about that before the section goes out. Deploy it once from its window in Plantoir, where the question can be answered; after that it can be deployed from here."
-            : DeployHasClassesDatedLaterNamingSeveral(course, section, titles);
+            ? $"{course} Section {section} was not deployed, so nothing was sent to students: “{titles[0]}” is published and dated after the next {LaterNoun(noun)}, and the teacher is asked about that before the section goes out. Deploy it once from its window in Plantoir, where the question can be answered; after that it can be deployed from here."
+            : DeployHasClassesDatedLaterNamingSeveral(course, section, titles, noun);
+    public static string DeployHasClassesDatedLaterForAMeeting(string course, string section, IReadOnlyList<string> titles) =>
+        DeployHasClassesDatedLater(course, section, titles, ClassNoun.Meeting);
+
+    private static string LaterNoun(ClassNoun noun) => noun == ClassNoun.Meeting ? "meeting" : "class";
 
     /// <summary>The same, naming several (three, then how many more).</summary>
-    public static string DeployHasClassesDatedLaterNamingSeveral(string course, string section, IReadOnlyList<string> titles) =>
-        $"{course} Section {section} was not deployed, so nothing was sent to students: {NamedFew(titles)} are published and dated after the next class, and the teacher is asked about that before the section goes out. Deploy it once from its window in Plantoir, where the question can be answered; after that it can be deployed from here.";
+    public static string DeployHasClassesDatedLaterNamingSeveral(string course, string section, IReadOnlyList<string> titles,
+                                                                 ClassNoun noun = ClassNoun.Class) =>
+        $"{course} Section {section} was not deployed, so nothing was sent to students: {NamedFew(titles)} are published and dated after the next {LaterNoun(noun)}, and the teacher is asked about that before the section goes out. Deploy it once from its window in Plantoir, where the question can be answered; after that it can be deployed from here.";
 
     /// <summary>The in-app assistant asked to deploy, and no window can show the section to ask in.</summary>
-    public static string DeployHasClassesDatedLaterAndNoWindow(string course, string section, IReadOnlyList<string> titles) =>
-        $"{course} Section {section} was not deployed: {(titles.Count == 1 ? $"“{titles[0]}” is" : NamedFew(titles) + " are")} published and dated after the next class. Deploy it from its window in Plantoir, where you are asked about that first.";
+    public static string DeployHasClassesDatedLaterNamingSeveralForAMeeting(string course, string section, IReadOnlyList<string> titles) =>
+        DeployHasClassesDatedLaterNamingSeveral(course, section, titles, ClassNoun.Meeting);
+
+    public static string DeployHasClassesDatedLaterAndNoWindow(string course, string section, IReadOnlyList<string> titles,
+                                                               ClassNoun noun = ClassNoun.Class) =>
+        $"{course} Section {section} was not deployed: {(titles.Count == 1 ? $"“{titles[0]}” is" : NamedFew(titles) + " are")} published and dated after the next {LaterNoun(noun)}. Deploy it from its window in Plantoir, where you are asked about that first.";
+
+    public static string DeployHasClassesDatedLaterAndNoWindowForAMeeting(string course, string section, IReadOnlyList<string> titles) =>
+        DeployHasClassesDatedLaterAndNoWindow(course, section, titles, ClassNoun.Meeting);
 
     /// <summary>The in-app assistant asked to deploy while the section's window already has a question up — never waited on.</summary>
     public static string DeployWaitsForAnOpenQuestion(string course, string section) =>

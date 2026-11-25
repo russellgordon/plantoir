@@ -38,8 +38,33 @@ public sealed class TimetableSetAsideTrailTests : IDisposable
         Assert.Null(TimetableMemory.Read(_root, "ics3u", 1, today: new DateOnly(2026, 9, 9)));
 
         string trail = File.ReadAllText(Path.Combine(_root, "trail.txt"));
-        Assert.Contains("ICS3U/1 · remembered timetable set aside: it names 2569-09-08", trail);
-        Assert.Contains("the assistant will ask for the timetable again", trail);
+        // The mac's line since #1027, from the contract (classDatesSetAside).
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!;
+        Assert.Contains("ICS3U/1 · " + wording["classDatesSetAside"]!.ToString(), trail);
+    }
+
+    /// <summary>
+    /// #1027: in a club the line says meeting, from the course's own
+    /// settings (<c>classDatesSetAsideForAMeeting</c>). MUST FAIL with the
+    /// line written in the ordinary noun.
+    /// </summary>
+    [Fact]
+    public void InAClubTheLineSaysMeeting()
+    {
+        string course = Path.Combine(_root, "courses", "ICS3U");
+        string folder = Path.Combine(course, ".internal", "timetable");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            ClassPlanningContractTests.ConfigFor(new Plantoir.Core.Models.ClassPageNaming("Week", Plantoir.Core.Models.ClassPageScheme.Numbered)));
+        File.WriteAllText(Path.Combine(folder, "section1.json"),
+            """{"section":1,"dates":["2569-09-08","2569-09-10"],"source":"typed in by hand","recorded":"2569-09-09"}""");
+
+        Assert.Null(TimetableMemory.Read(_root, "ICS3U", 1, today: new DateOnly(2026, 9, 9)));
+
+        string trail = File.ReadAllText(Path.Combine(_root, "trail.txt"));
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!;
+        Assert.Contains("ICS3U/1 · " + wording["classDatesSetAsideForAMeeting"]!.ToString(), trail);
+        Assert.DoesNotMatch(@"\b[Cc]lass(es)?\b", trail);
     }
 
     [Fact]

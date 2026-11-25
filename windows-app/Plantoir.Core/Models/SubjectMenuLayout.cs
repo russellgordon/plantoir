@@ -12,9 +12,8 @@ namespace Plantoir.Core.Models;
 /// menus from these lists (<c>MainWindow.Menus.cs</c>), so the split is data:
 /// <c>contracts/shared-rules.json</c> → <c>subjectMenus.layout</c> holds the
 /// same lists, and <c>SubjectMenuLayoutContractTests</c> checks the two agree,
-/// with the items this app does not have yet (the named gaps: Stop Showing
-/// Deployed Folder, GitHub Copilot, Roll Over to a New Year…) left out and
-/// Add Class… said under its older name, Add Next Class (#927). Which items
+/// with the items this app does not have yet (the named gaps: GitHub
+/// Copilot, Roll Over to a New Year…) left out. Which items
 /// can be used is still <see cref="SubjectMenuRules"/>' job: every item here
 /// is drawn in every situation and dimmed when it cannot be used, never
 /// hidden.
@@ -48,7 +47,7 @@ public static class SubjectMenuLayout
     /// </summary>
     public static IReadOnlyList<IReadOnlyList<Entry>> SectionGroups { get; } = new List<IReadOnlyList<Entry>>
     {
-        new[] { I(Item.Preview), I(Item.RebuildPreview), I(Item.OpenInBrowser) },
+        new[] { I(Item.Preview), I(Item.RebuildPreview), I(Item.OpenInBrowser), I(Item.StopShowingDeployedFolder) },
         new[]
         {
             I(Item.PublishClassForADate), I(Item.PublishPages), I(Item.HidePages), I(Item.PublishPagesLinksLeadTo),
@@ -63,9 +62,9 @@ public static class SubjectMenuLayout
     /// <summary>Classes ▸, group by group.</summary>
     public static IReadOnlyList<IReadOnlyList<Entry>> ClassesGroups { get; } = new List<IReadOnlyList<Entry>>
     {
-        new[] { I(Item.AddNextClass) },
+        new[] { I(Item.AddClass) },
         new[] { I(Item.ClassDates), I(Item.ReDateClasses), I(Item.MakeRoomForClasses) },
-        new[] { I(Item.GetReadyForTheStartOfTheYear) },
+        new[] { I(Item.RollOverToANewYear), I(Item.GetReadyForTheStartOfTheYear) },
     };
 
     /// <summary>The menu's groups.</summary>
@@ -139,17 +138,19 @@ public static class SubjectMenuLayout
 
     /// <summary>
     /// The words of an item of Section ▸ or Classes ▸ on Windows: the mac's,
-    /// but for Show in File Explorer and Open in Terminal, and Add Next Class
-    /// until #927 brings Add Class…. Remove Section and Remove Scheduled
+    /// but for Show in File Explorer and Open in Terminal. Remove Section and Remove Scheduled
     /// Deploy carry no ellipsis since #990: a command that only asks for a
-    /// confirmation takes none.
+    /// confirmation takes none. <paramref name="noun"/> is what the selected
+    /// course calls its class pages: in a club an item whose title says class
+    /// says meeting (#1027, <see cref="TitleSayingTheNoun"/>). No default: a
+    /// caller says which course's menu it means.
     /// </summary>
-    public static string? TitleHere(Item item) => item switch
+    public static string? TitleHere(Item item, ClassNoun noun) => TitleSayingTheNoun(item, noun) ?? item switch
     {
         Item.Preview => "Preview",
         Item.RebuildPreview => "Rebuild Preview",
-        Item.OpenInBrowser => "Open in Browser",
-        Item.PublishClassForADate => "Publish Class for a Date…",
+        Item.OpenInBrowser => DeployedFolderWording.MenuItem,
+        Item.StopShowingDeployedFolder => DeployedFolderWording.StopMenuItem,
         Item.PublishPages => "Publish Pages…",
         Item.HidePages => "Hide Pages…",
         Item.PublishPagesLinksLeadTo => LinksChecklistWording.MenuItem,
@@ -162,13 +163,35 @@ public static class SubjectMenuLayout
         Item.SectionShowInFinder => "Show in File Explorer",
         Item.SectionNewTerminalAtFolder => "Open in Terminal",
         Item.RemoveSection => "Remove Section",
-        Item.AddNextClass => "Add Next Class",
-        Item.ClassDates => "Class Dates…",
-        Item.ReDateClasses => "Re-date Classes…",
-        Item.MakeRoomForClasses => "Make Room for Classes…",
         Item.GetReadyForTheStartOfTheYear => StartOfYearWording.MenuItem,
+        Item.RollOverToANewYear => "Roll Over to a New Year…",
         _ => null,   // not an item of Section or Classes: SubjectMenuLayoutContractTests fails on a layout item with none (#990 review, LOW c)
     };
+
+    /// <summary>
+    /// The title of an item whose title says class (#1027, Russell,
+    /// 2026-11-20 night, after #990's "no sentence a club's teacher reads says
+    /// 'class'"): a course's words, or meeting in their place in a course
+    /// whose class pages are meetings, a club. The same words in the menu bar,
+    /// a section row's menu, the "ran from a menu" trail line and every
+    /// sentence that names the item. Null for every other item, which has one
+    /// title in every course. The mac's <c>SubjectMenuLayout.titleSayingTheNoun</c>;
+    /// <c>subjectMenus.layout.itemTitles</c> in the contract, which
+    /// <c>ClubNounTests</c> walks.
+    /// </summary>
+    public static string? TitleSayingTheNoun(Item item, ClassNoun noun)
+    {
+        bool meeting = noun == ClassNoun.Meeting;
+        return item switch
+        {
+            Item.PublishClassForADate => meeting ? "Publish Meeting for a Date…" : "Publish Class for a Date…",
+            Item.AddClass => meeting ? "Add Meeting…" : "Add Class…",
+            Item.ClassDates => meeting ? "Meeting Dates…" : "Class Dates…",
+            Item.ReDateClasses => meeting ? "Re-date Meetings…" : "Re-date Classes…",
+            Item.MakeRoomForClasses => meeting ? "Make Room for Meetings…" : "Make Room for Classes…",
+            _ => null,
+        };
+    }
 
     /// <summary>
     /// An item's AutomationId: its menu's contract name, then its own name
@@ -182,6 +205,7 @@ public static class SubjectMenuLayout
             Item.Preview => "Preview",
             Item.RebuildPreview => "RebuildPreview",
             Item.OpenInBrowser => "OpenInBrowser",
+            Item.StopShowingDeployedFolder => "StopShowingDeployedFolder",
             Item.PublishClassForADate => "PublishClassForADate",
             Item.PublishPages => "PublishPages",
             Item.HidePages => "HidePages",
@@ -195,11 +219,12 @@ public static class SubjectMenuLayout
             Item.SectionShowInFinder => "ShowInFileExplorer",
             Item.SectionNewTerminalAtFolder => "OpenInTerminal",
             Item.RemoveSection => "RemoveSection",
-            Item.AddNextClass => "AddNextClass",
+            Item.AddClass => "AddClass",
             Item.ClassDates => "ClassDates",
             Item.ReDateClasses => "ReDateClasses",
             Item.MakeRoomForClasses => "MakeRoomForClasses",
             Item.GetReadyForTheStartOfTheYear => "GetReady",
+            Item.RollOverToANewYear => "RollOverToANewYear",
             _ => item.ToString(),
         };
         return ContractName(layout) + own;
@@ -219,7 +244,7 @@ public static class SubjectMenuLayout
 
     /// <summary>
     /// Where an item is, the way the trail says it: "Classes ▸ Class Dates…"
-    /// ("Meetings ▸ Class Dates…" in a club). The menu's title comes from the
+    /// ("Meetings ▸ Meeting Dates…" in a club, the title being the club's, #1027). The menu's title comes from the
     /// layout, so the path moves with the item.
     /// </summary>
     public static string Path(Item item, string title, ClassNoun noun) =>

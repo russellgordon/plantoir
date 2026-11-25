@@ -121,6 +121,15 @@ public static class CourseRenamer
             throw new InvalidOperationException($"The course's folder could not be renamed: {ex.Message}", ex);
         }
 
+        // The builds folder follows the course (#805, the mac's moveBuild):
+        // its built sites and its kept copies of geogebra.org sketches, which
+        // were otherwise orphaned under the old code while the new code began
+        // with none, so the first build offline made every sketch a folder
+        // problem. Best-effort and silent, after the rename has succeeded, as
+        // the mac's is (its moves are `try?` and nothing is said).
+        if (CourseArchiver.BuildsRootOf(coursesDirectory) is { } buildsRoot)
+            BuildOutputLocation.MoveBuild(buildsRoot, previousCode, newCode);
+
         var stopped = new List<int>();
         var unstopped = new List<int>();
         foreach (var task in scheduled)

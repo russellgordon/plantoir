@@ -1158,7 +1158,10 @@ public sealed partial class SidebarPane : UserControl
     {
         var row = new SidebarSelection.BackupEntry(item.Id);
         var menu = new MenuFlyout();
-        menu.Items.Add(MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestoreBackup(item))));
+        var restoreItem = MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestoreBackup(item)));
+        menu.Items.Add(restoreItem);
+        // Read as the menu opens (row 104's lesson): greyed while a Restore… question is being asked or the course is being zipped.
+        menu.Opening += (_, _) => restoreItem.IsEnabled = !RestoreWaits(item.CourseCode);
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(item.FilePath))));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Delete Backup…", Glyphs.Remove, Selecting(row, () => ConfirmDeleteBackup(item))));
@@ -1235,15 +1238,21 @@ public sealed partial class SidebarPane : UserControl
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishPages))));
         menu.Items.Add(MenuItem("Hide Pages…", "",
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.HidePages))));
-        menu.Items.Add(MenuItem("Publish Class for a Date…", "",
+        // Titled as the menu bar titles them: Publish Meeting for a Date… and
+        // Add Meeting… in a club (#1027).
+        var noun = course.Configuration.ClassNoun;
+        menu.Items.Add(MenuItem(SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.PublishClassForADate, noun)!, "",
             Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishClassForADate))));
-        menu.Items.Add(MenuItem("Add Next Class", "",
-            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddNextClass))));
+        // #927: Add Class… in the place Add Next Class had (ruled 2026-11-13
+        // on #897), opening the menu bar's dialog; its ways are not items here.
+        menu.Items.Add(MenuItem(SubjectMenuLayout.TitleHere(SubjectMenuRules.Item.AddClass, noun)!, "",
+            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddClass))));
         menu.Items.Add(new MenuFlyoutSeparator());
 
         // The vault is the COURSE folder even for a section — the section is
         // a subfolder within it, and Obsidian reveals the SECTION's folder.
         menu.Items.Add(ObsidianItem(course, number, row));
+        AddDeployedFolderItems(menu, course, number, row);
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
@@ -1747,8 +1756,83 @@ public sealed partial class SidebarPane : UserControl
         _ = when;
     }
 
+    /// <summary>
+    /// True from Restore…'s press until the teacher answers its question,
+    /// the zip's reading before the question opens included (#911, review 2's
+    /// MEDIUM). While it is true every Restore… is greyed: the menu bar's
+    /// (the window reads it as a dialog being up), the backup row's context
+    /// menu item and the backup pane's button, so a second press cannot
+    /// reach a question that has no slot to open in.
+    /// </summary>
+    internal bool IsAskingWhichRestore { get; private set; }
+
+    /// <summary>
+    /// Raised when <see cref="RestoreWaits"/> may have changed: a question
+    /// asked or answered, or a restore's zip started or finished, so the
+    /// window greys or ungreys what reads it.
+    /// </summary>
+    internal event EventHandler? RestoreAvailabilityChanged;
+
+    private void SetAskingWhichRestore(bool asking)
+    {
+        IsAskingWhichRestore = asking;
+        RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Whether Restore… waits for this course: a Restore… question is being
+    /// asked, or a copy of the course is being zipped (a Back Up Now or a
+    /// one-section restore's archive here, or another program's copy), the
+    /// rule the menu bar's Restore from Backup follows
+    /// (<c>subjectMenus.situationKeys.copying</c>). Every Restore… a teacher
+    /// can press reads this.
+    /// </summary>
+    internal bool RestoreWaits(string courseCode)
+    {
+        if (IsAskingWhichRestore) return true;
+        if (Workspace.WorkspacePath is not { } folder) return false;
+        return WorkLease.IsHeld(folder, courseCode, WorkLease.Copying) || IsZipping(folder, courseCode);
+    }
+
+    /// <summary>What the teacher chose in Restore…'s question. Only an explicit button chooses; anything else is <see cref="Nothing"/>.</summary>
+    private enum RestoreChoice { Nothing, OneSection, WholeCourse }
+
     public async void ConfirmRestoreBackup(BackupItem item)
     {
+        // Greyed while a question is being asked or the course is zipped
+        // (above); this only backs that up, as the mac's isBeingCopied does.
+        if (RestoreWaits(item.CourseCode)) return;
+        SetAskingWhichRestore(true);
+        RestoreChoice choice;
+        int section = 0;
+        OneSectionRestore.BackupFacts? facts = null;
+        try
+        {
+            (choice, section, facts) = await AskWhichRestore(item);
+        }
+        finally
+        {
+            SetAskingWhichRestore(false);
+        }
+        // Decided by the explicit answer only: a question that could not be
+        // shown (null), Cancel, Escape or a closed dialog restores nothing,
+        // and says nothing, as a cancelled question says nothing.
+        switch (choice)
+        {
+            case RestoreChoice.OneSection:
+                await RestoreOneSection(section, item, facts!);
+                break;
+            case RestoreChoice.WholeCourse:
+                await RestoreWholeCourse(item);
+                break;
+            case RestoreChoice.Nothing:
+                break;
+        }
+    }
+
+    private async Task<(RestoreChoice Choice, int Section, OneSectionRestore.BackupFacts? Facts)> AskWhichRestore(BackupItem item)
+    {
+        var nothing = (RestoreChoice.Nothing, 0, (OneSectionRestore.BackupFacts?)null);
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
         // Restoring rewrites the course's folders — never mid-copy (row 104's rule).
@@ -1758,7 +1842,7 @@ public sealed partial class SidebarPane : UserControl
             await ShowError($"{item.CourseCode} is busy right now",
                 "Restoring replaces the course's folders and files, and a preview or deploy " +
                 "of this course is still using them. Try again when it finishes.");
-            return;
+            return nothing;
         }
         // An assistant's hold, in its own words (#468): a Claude or Codex
         // session, or this app's own window — never "a preview or deploy".
@@ -1766,7 +1850,40 @@ public sealed partial class SidebarPane : UserControl
             && CourseActivity.AssistHoldRefusal(heldIn, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held)
         {
             await ShowError(AssistWording.CourseIsAlreadyBeingRevised(item.CourseCode), held);
-            return;
+            return nothing;
+        }
+
+        // A backup made for ONE section offers that section first (#911, the
+        // mac's #897 C; Russell's ruling: Restore Section N is the default),
+        // the whole course beside it. The zip is read once per backup, now,
+        // as the dialog is about to open, never while it draws.
+        Course? course = Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode);
+        OneSectionRestore.BackupFacts? facts = null;
+        int? offered = null;
+        if (OneSectionRestore.MadeFor(item.Maker) is not null && course is not null)
+        {
+            facts = await FactsOfBackup(item);
+            offered = OneSectionRestore.OfferFor(item, course, facts);
+        }
+        if (offered is int section)
+        {
+            var question = new ContentDialog
+            {
+                Title = OneSectionRestoreWording.Title(item.CourseCode),
+                Content = OneSectionRestoreWording.Message(section,
+                    item.Maker.DescriptionFor(Workspace.ClassNounOf(item.CourseCode)), item.WhenDescription),
+                PrimaryButtonText = OneSectionRestoreWording.RestoreSectionButton(section),
+                SecondaryButtonText = OneSectionRestoreWording.RestoreWholeCourseButton,
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            var answer = await ShowDialogSafelyAsync(question);
+            RestoreChoice chosen = RestoreChoice.Nothing;
+            if (answer == ContentDialogResult.Primary) chosen = RestoreChoice.OneSection;
+            if (answer == ContentDialogResult.Secondary) chosen = RestoreChoice.WholeCourse;
+            if (chosen == RestoreChoice.Nothing) return nothing;
+            if (TheFolderMovedUnderThisConfirmation(askedIn)) return nothing;
+            return (chosen, section, facts);
         }
 
         var dialog = new ContentDialog
@@ -1780,9 +1897,77 @@ public sealed partial class SidebarPane : UserControl
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
         };
-        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
-        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return nothing;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return nothing;
+        return (RestoreChoice.WholeCourse, 0, null);
+    }
 
+    /// <summary>What each backup zip holds that the one-section offer needs, read once per backup (a zip does not change; an unreadable one holds nothing).</summary>
+    private readonly Dictionary<string, OneSectionRestore.BackupFacts> _backupFacts = new(StringComparer.OrdinalIgnoreCase);
+
+    private async Task<OneSectionRestore.BackupFacts> FactsOfBackup(BackupItem item)
+    {
+        if (_backupFacts.TryGetValue(item.FilePath, out var kept)) return kept;
+        string path = item.FilePath;
+        var facts = await Task.Run(() => OneSectionRestore.ReadFacts(path));
+        _backupFacts[path] = facts;
+        return facts;
+    }
+
+    /// <summary>
+    /// Restore from Backup…'s "Restore Section N" (#911 step 4): the click's
+    /// order is <see cref="MenuSectionRestore.Run"/>'s; the finished or
+    /// refused sentence is shown in the one result dialog, the backup
+    /// dialog's slot, as the mac shows it in the backup alert's.
+    /// </summary>
+    private async Task RestoreOneSection(int section, BackupItem item, OneSectionRestore.BackupFacts facts)
+    {
+        string coursesDirectory = Workspace.CoursesDirectory();
+        string? folder = Workspace.WorkspacePath;
+        string? BusyRefusal()
+        {
+            if (folder is null) return null;
+            if (CourseActivity.IsPreviewingOrPublishing(folder, item.CourseCode))
+                return $"{item.CourseCode} is previewing or deploying right now. Stop that first, then restore.";
+            if (CourseActivity.AssistHoldRefusal(folder, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held) return held;
+            if (SectionMenuActivity.IsChanging(folder, item.CourseCode, section) || AssistActivity.IsWorking(folder, item.CourseCode, section))
+                return OneSectionRestoreWording.Busy(section, item.CourseCode);
+            return null;
+        }
+        // The course as loaded; RefusalAtTheClick asks the folder and the saved settings themselves.
+        Course? course = Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode);
+        // The whole course is zipped first (the archive), so the course is
+        // marked from here to the end of the swap exactly as Back Up Now
+        // marks it: Back Up Now, Remove Course and every Restore… grey, and
+        // the assistant is refused (CourseIsBeingCopied). The mac refuses at
+        // the top of restoreOneSection on isBeingCopied for the same reason.
+        if (folder is null || RestoreWaits(item.CourseCode)) return;
+        string zipKey = ZipKey(folder, item.CourseCode);
+        lock (_zipping) _zipping.Add(zipKey);
+        _window.ApplyMenuEnablement();
+        RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        MenuSectionRestore.Result result;
+        try { result = await Task.Run(() => MenuSectionRestore.Run(section, item, course, facts, coursesDirectory, BusyRefusal)); }
+        finally
+        {
+            lock (_zipping) _zipping.Remove(zipKey);
+            _window.ApplyMenuEnablement();
+            RestoreAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        }
+        if (result.ArchivePath is not null || result.Finished)
+        {
+            Workspace.Reload();
+            if (result.Finished) Workspace.Selection = new SidebarSelection.SectionItem(item.CourseCode, section);
+            _window.ApplyState();
+        }
+        // The finished, refused or stopped-part-way sentence: the last is the
+        // only place the teacher is told where the set-aside files are, so it
+        // waits for a dialog opened meanwhile rather than being dropped.
+        await ShowError(result.Title, result.Message, waitForTheSlot: true);
+    }
+
+    private async Task RestoreWholeCourse(BackupItem item)
+    {
         try
         {
             // Even a restore has an undo: the current version is archived
@@ -2063,7 +2248,42 @@ public sealed partial class SidebarPane : UserControl
         }
     }
 
-    private async Task ShowError(string title, string message)
+    /// <summary>
+    /// Shows <paramref name="dialog"/> once no other dialog holds the window's
+    /// one slot: the popup a ContentDialog is up in is waited out on that
+    /// popup's own <c>Closed</c> event (raised as it stops being open, which
+    /// is what the slot reads), never on a clock, and then the slot is tried
+    /// again. For a sentence that must reach the teacher, where
+    /// <see cref="ShowDialogSafelyAsync"/> would return null and drop it.
+    /// </summary>
+    private async Task<ContentDialogResult?> ShowWhenTheSlotIsFree(ContentDialog dialog)
+    {
+        while (EffectiveXamlRoot is { } root && PopupHoldingADialog(root) is { } holder)
+        {
+            var closed = new TaskCompletionSource();
+            void Closed(object? sender, object args) => closed.TrySetResult();
+            holder.Closed += Closed;
+            // Closed between the read and the subscription: nothing to wait for.
+            if (holder.IsOpen) await closed.Task;
+            holder.Closed -= Closed;
+        }
+        // folder-check: not needed — a result sentence acts on nothing.
+        return await ShowDialogSafelyAsync(dialog);
+    }
+
+    private static Microsoft.UI.Xaml.Controls.Primitives.Popup? PopupHoldingADialog(XamlRoot root)
+    {
+        try
+        {
+            foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(root))
+                if (popup.Child is ContentDialog) return popup;
+        }
+        catch (Exception) { }
+        return null;
+    }
+
+    /// <summary>A sentence with OK. <paramref name="waitForTheSlot"/>: shown once no other dialog holds the slot (<see cref="ShowWhenTheSlotIsFree"/>), never dropped.</summary>
+    private async Task ShowError(string title, string message, bool waitForTheSlot = false)
     {
         var dialog = new ContentDialog
         {
@@ -2072,7 +2292,8 @@ public sealed partial class SidebarPane : UserControl
             CloseButtonText = "OK",
         };
         // folder-check: not needed — an error report acts on nothing.
-        await ShowDialogSafelyAsync(dialog);
+        if (waitForTheSlot) await ShowWhenTheSlotIsFree(dialog);
+        else await ShowDialogSafelyAsync(dialog);
     }
 
     /// <summary>

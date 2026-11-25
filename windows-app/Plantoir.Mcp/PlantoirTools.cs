@@ -195,7 +195,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("TEACHERS SAY: \"deploy the site\", \"put it online\", \"push it live\", \"send it to the website\", " +
                  "\"make it live for students\", \"upload the site\". Put a section's website where students can " +
                  "actually reach it.")]
-    public async Task<string> DeploySection(
+    public async Task<CallToolResult> DeploySection(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         IProgress<ProgressNotificationValue> progress,
@@ -204,10 +204,14 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         try
         {
             var result = await workspace.Deploy(course, section, Relay(progress), cancellation);
-            return result.Message;
+            return Answering(result.Message);
         }
-        catch (AssistRefusal refusal) { return refusal.Message; }
-        catch (OperationCanceledException) { return "The deploy was stopped before it finished."; }
+        // The teacher's copy in the course's noun when it differs: a club's
+        // "dated later" refusal says meeting (#1027 review 3, low 5); the
+        // model's is the message, as before.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
+        catch (AssistRefusal refusal) { return Answering(refusal.Message); }
+        catch (OperationCanceledException) { return Answering("The deploy was stopped before it finished."); }
     }
 
     [McpServerTool(Name = "explain_publishing", Title = "Explain what publishing means here",
@@ -700,7 +704,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             var noun = workspace.NounForCourse(course);
-            if (plan.ChangesNothing) return Answering(plan.Describe());
+            // Nothing to add still tells a club's teacher why in its own noun (#1027 review 2, M2).
+            if (plan.ChangesNothing)
+                return noun == ClassNoun.Meeting ? Answering(plan.Describe(noun), plan.Describe()) : Answering(plan.Describe());
             string forTheModel = plan.Describe();
             string card = plan.Describe(noun);
             // Once other classes move, Undo Last Change will not take this
@@ -741,13 +747,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             var result = workspace.ApplyInsertClasses(plan);
-            if (!result.Succeeded || workspace.NounForCourse(course) != ClassNoun.Meeting)
+            // A club's teacher reads the mac's "meeting" line (#274, #1027
+            // review 3, M1); the model's copy is untouched.
+            if (!result.Succeeded || result.ForTheTeacher is not { } forTheTeacher)
                 return Answering(result.Message);
-            // A club's teacher reads "meeting" (#274); the model's copy is untouched.
-            return Answering(result.Message.Replace(
-                                 AssistWording.MadeRoom(plan.Added.Count, plan.PositionTitle),
-                                 AssistWording.MadeRoomForAMeeting(plan.Added.Count, plan.PositionTitle)),
-                             result.Message);
+            return Answering(forTheTeacher, result.Message);
         });
 
     [McpServerTool(Name = "plan_add_classes", Title = "Plan adding class pages",
@@ -817,6 +821,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // proposes an ordinary next class and the teacher approves
             // something other than what runs.
             var noun = workspace.NounForCourse(course);
+            if (MenuNewUnitWaitsForARename(course, unit) is { } waiting) return Answering(waiting);
             if (!string.IsNullOrWhiteSpace(duplicate))
             {
                 var copy = workspace.PlanDuplicateClass(course, section, duplicate);
@@ -865,6 +870,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 return Answering(ClassChangeWording.Duplicated(copying.SourceTitle, copying.NewTitle),
                                  duplicated.Message);
             }
+            if (MenuNewUnitWaitsForARename(course, unit) is { } waiting) return Answering(waiting);
 
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
             if (plan.ChangesNothing)
@@ -886,6 +892,70 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             return Answering($"Added {made.Title}, dated {DateText.Iso(made.Date)}.",
                              result.Message + "\n\n" + AssistWording.ACreatedPageCanBeTakenBack);
         });
+
+    // ---- Classes ▸ Add Class…, from the menu's server only (#927) ---------------
+
+    /// <summary>
+    /// The menu's copy of a class as the next class, or null when this call
+    /// is not one: not the menu's server, not one of the two add_next_class
+    /// halves, or no <see cref="AssistWorkspace.MenuDuplicateArgument"/>.
+    /// Read by <c>plantoir-mcp</c>'s filter from the call's raw arguments,
+    /// because no schema declares the argument (the binder would drop it): the
+    /// tool surface every client is shown does not move.
+    /// </summary>
+    public CallToolResult? FromTheMenuIfACopy(string tool, IReadOnlyDictionary<string, System.Text.Json.JsonElement>? arguments)
+    {
+        if (!workspace.SpeaksFromTheMenu || arguments is null) return null;
+        bool planning = tool == "plan_add_next_class";
+        if (!planning && tool != "add_next_class") return null;
+        if (!arguments.TryGetValue(AssistWorkspace.MenuDuplicateArgument, out var path)
+            || path.ValueKind != System.Text.Json.JsonValueKind.String || string.IsNullOrWhiteSpace(path.GetString())) return null;
+        string course = arguments.TryGetValue("course", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.String ? c.GetString()! : "";
+        int section = !arguments.TryGetValue("section", out var n) ? 0
+            : n.ValueKind == System.Text.Json.JsonValueKind.Number && n.TryGetInt32(out int number) ? number
+            : n.ValueKind == System.Text.Json.JsonValueKind.String && int.TryParse(n.GetString(), out int written) ? written
+            : 0;
+        return DuplicateAsTheNextClassFromTheMenu(course, section, path.GetString()!, planning);
+    }
+
+    /// <summary>
+    /// Plan or make the menu's copy (<c>class-planning.json</c> →
+    /// <c>duplicatingAsTheNextClass</c>). A copy that cannot be made
+    /// certainly hidden is refused, nothing written, and the trail says so at
+    /// the plan as well as at the write.
+    /// </summary>
+    public CallToolResult DuplicateAsTheNextClassFromTheMenu(string course, int section, string sourcePath, bool planning)
+        => Guarded(() =>
+        {
+            AssistWorkspace.MenuDuplicateRequest request;
+            try { request = workspace.PlanMenuDuplicate(course, section, sourcePath); }
+            catch (AssistWorkspace.CopyCannotBeHidden refused)
+            {
+                workspace.NoteTheMenusCopyWasNotMade(workspace.Course(course).Code, section);
+                return Answering(refused.Message);
+            }
+            if (planning)
+            {
+                string card = AssistWorkspace.DescribeMenuDuplicate(request);
+                return Proposing(card, card);
+            }
+            return Answering(workspace.ApplyMenuDuplicate(request));
+        });
+
+    /// <summary>
+    /// Add Class…, in a new unit, waits for an unfinished unit-word rename
+    /// (#927): on the menu's server only, and only for <c>unit: "next"</c>, so
+    /// the window's "Start a new unit" phrasing behaves as before.
+    /// </summary>
+    private string? MenuNewUnitWaitsForARename(string course, string unit)
+    {
+        if (!workspace.SpeaksFromTheMenu || !string.Equals(unit, "next", StringComparison.OrdinalIgnoreCase)) return null;
+        var found = workspace.Course(course);
+        return Plantoir.Core.Models.UnitWordRenamer.InterruptedRenameTarget(
+                   Plantoir.Core.Models.UnitWordRenamer.Facts(found), clearingAStaleRecord: false) is null
+            ? null
+            : AddClassWords.UnitWordRenameUnfinished(found.Configuration.ClassNoun);
+    }
 
     [McpServerTool(Name = "plan_remember_timetable", Title = "Plan remembering class dates",
                    ReadOnly = true, Destructive = false)]
@@ -1338,7 +1408,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 var remembered = TimetableMemory.Read(workspace.FolderPath, found.Code, number);
                 if (remembered is null || remembered.Dates.Count == 0)
                 {
-                    return Answering($"I don’t know when {found.Code} Section {number} meets, so I can’t re-date it. {AssistWording.MayIAskForYourDates}");
+                    return Answering(
+                        AssistWording.CannotReDateWithoutDates(found.Code, number, found.Configuration.ClassNoun),
+                        AssistWording.CannotReDateWithoutDates(found.Code, number));
                 }
                 parsed = Timetable.FromDates(remembered.Dates, remembered.Source);
             }
@@ -1385,14 +1457,38 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     if (!AnAnswerWasGiven(website))
                         return Answering(already + "\n\n" + AskingWhichWebsite(),
                                          already + "\n\n" + AskingWhichWebsite());
+                    // Classes ▸ Roll Over to a New Year… (#954): the card says
+                    // the dates need nothing, then the menu's website and
+                    // record lines; "new" as the other branch says it.
+                    if (workspace.SpeaksFromTheMenu)
+                        return Proposing(already + "\n\n" + MenuRolloverPlanLines(found, number, website));
                     return Proposing(already + "\n\n" + WhatSettlingTheWebsiteWouldDo(website));
                 }
+                // From the menu, a rollover's card says what happens to the
+                // website on EITHER answer, then what is set aside (#954, the
+                // mac's menuRolloverPlanLines).
+                if (isRollover && AnAnswerWasGiven(website) && workspace.SpeaksFromTheMenu)
+                    return Proposing(plan.Describe() + "\n\n" + MenuRolloverPlanLines(found, number, website));
                 // Dates DO change, so Go is a real decision and the question
                 // arrives with the result afterwards - which is what the mac
                 // does, and why nothing is added here for the bare phrasing.
                 return Proposing(isRollover && WouldStartANewWebsite(website)
                     ? plan.Describe() + "\n\nIt would also " + WhatStartingANewWebsiteDoes()
                     : plan.Describe());
+            }
+
+            if (plan.ChangesNothing && isRollover && workspace.SpeaksFromTheMenu)
+            {
+                // Classes ▸ Roll Over to a New Year… on a section whose dates
+                // are already right (#954, the mac's
+                // menuRolloverWithTheDatesAlreadyRight): a copy of the course
+                // first, refused before anything is written when it cannot be
+                // made; then the record and the website.
+                workspace.BackUpBeforeARolloverFromTheMenu(course, section);
+                string settledFromTheMenu = SettleTheWebsiteAfterARollover(
+                    found, number, website, rollover, releasedWithTheDates: false);
+                string saidFromTheMenu = settledFromTheMenu.Length == 0 ? already : already + "\n\n" + settledFromTheMenu;
+                return Answering(saidFromTheMenu, saidFromTheMenu);
             }
 
             if (plan.ChangesNothing)
@@ -1419,6 +1515,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             string detail = summary +
                             $"\n\n{AssistWorkspace.BackedUpNote}" +
                             "\n\nNothing was published or hidden, so students see no change until you deploy.";
+            // A club's teacher reads the counts in "meeting" (#1027 review 3, M1).
+            if (result.ForTheTeacher is { } forTheTeacher) summary = forTheTeacher;
 
             // The website goes in the SUMMARY as well as the detail: the
             // summary is the one line the teacher reads in the chat window, and
@@ -1434,6 +1532,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             return Answering(summary, detail);
         }
+        // The teacher's copy in the course's noun when it differs (#1027); the model's is the message.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
     }
@@ -1529,6 +1629,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // is no re-date write for it to join.
         if (!releasedWithTheDates) workspace.ReleasePublishedPagesForARollover(course, sectionNumber);
 
+        if (workspace.SpeaksFromTheMenu) return SettleTheWebsiteFromTheMenu(course, sectionNumber, website);
+
         if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase))
         {
             ActivityTrail.Note(
@@ -1584,6 +1686,96 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
         NoteTheWebsiteOnTheTrail(released, course.Code, sectionNumber);
         return said;
+    }
+
+    // ---- Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B) ----
+
+    /// <summary>
+    /// The menu's plan lines for a rollover: what happens to the website, then
+    /// what is set aside. For "new", the window's own new-website line; for
+    /// "same", the menu's; the folder's line on either answer for a course
+    /// that deploys only to a folder; and the website rule's own line where it
+    /// says there is no question (<c>rollOverSheet.sheet.planLines</c>).
+    /// </summary>
+    private string MenuRolloverPlanLines(Course course, int sectionNumber, string website)
+    {
+        string said = WouldStartANewWebsite(website)
+            ? "It would also " + WhatStartingANewWebsiteDoes()
+            : AssistWording.MenuRollOverPlanKeepsTheWebsite;
+        if (RollOverFromTheMenu.DeploysOnlyToAFolder(course)) said = AssistWording.MenuRollOverDeploysToAFolder;
+        switch (RollOverFromTheMenu.WebsiteFor(workspace.FolderPath, course, sectionNumber, DateTime.Now.Year))
+        {
+            case RollOverFromTheMenu.Website.NotDeployedYet: said = AssistWording.MenuRollOverNotDeployedYet; break;
+            case RollOverFromTheMenu.Website.DeploysToAFolder: said = AssistWording.MenuRollOverDeploysToAFolder; break;
+            case RollOverFromTheMenu.Website.ANewWebsiteWouldReuseItsAddress:
+                said = AssistWording.MenuRollOverANewWebsiteWouldReuseItsAddress; break;
+        }
+        return said + "\n\n" + AssistWording.MenuRollOverPlanSetsTheRecordAside;
+    }
+
+    /// <summary>
+    /// The website half of a rollover from the menu, in the menu's words
+    /// (<c>rollOverSheet.sheet.finishedInPlaceOf</c>): a folder is a folder, a
+    /// new website that would take this one's own address is not started (the
+    /// dialog never sends one, but a deploy between opening it and pressing
+    /// Roll Over can make it so), and the new-website line ends on a sentence
+    /// true on Cloudflare. Settled before the tool returns, so before the
+    /// window rebuilds the preview. The markers move through
+    /// <see cref="AssistWorkspace.ReleaseSite"/>, the window's own path, and
+    /// its own undo entry (the journal step that makes the rollover ONE step
+    /// is Windows Undo W7's, #899).
+    /// </summary>
+    private string SettleTheWebsiteFromTheMenu(Course course, int sectionNumber, string website)
+    {
+        var rule = RollOverFromTheMenu.WebsiteFor(workspace.FolderPath, course, sectionNumber, DateTime.Now.Year);
+        bool wouldReuseItsAddress = rule == RollOverFromTheMenu.Website.ANewWebsiteWouldReuseItsAddress;
+        if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase)
+            || (WouldStartANewWebsite(website) && wouldReuseItsAddress))
+        {
+            string said = AssistWording.RolloverKeptTheSameWebsite;
+            string line = "kept last year's website when rolling the section over";
+            if (wouldReuseItsAddress)
+            {
+                said = AssistWording.MenuRollOverANewWebsiteWouldReuseItsAddress;
+                line = "kept the section's website when rolling it over — a new one would have had the same address";
+            }
+            else if (RollOverFromTheMenu.DeploysOnlyToAFolder(course))
+            {
+                said = AssistWording.RolloverDeploysToAFolderFromTheMenu;
+                line = "kept deploying the section to its folder when rolling it over";
+            }
+            ActivityTrail.Note(ActivityTrail.Event.SectionKeptItsWebsite, line, course.Code, sectionNumber);
+            return said;
+        }
+        // The dialog never sends anything but "new" or "same"; a call that
+        // did is asked, as the window asks.
+        if (!WouldStartANewWebsite(website)) return AskingWhichWebsite();
+
+        var released = workspace.ReleaseSite(course, sectionNumber);
+        if (!released.ReleasedAnything)
+        {
+            if (released.SomethingIsStillPinned)
+                return AssistWording.RolloverCouldNotStartANewWebsiteFromTheMenu(string.Join(", ", released.StillPinned));
+            ActivityTrail.Note(ActivityTrail.Event.SectionStartedANewWebsite,
+                "rolled the section over onto a new website — it was not on a website at the moment",
+                course.Code, sectionNumber);
+            return AssistWording.MenuRollOverNotDeployedYet;
+        }
+
+        string started = RollOverWords.StartedANewWebsite(string.Join(", ", released.KeptFiles),
+                                                          RollOverFromTheMenu.DeploysOnlyToAFolder(course));
+        if (released.SomethingIsStillPinned)
+            started += "\n\n" + AssistWording.RolloverCouldNotStartANewWebsiteFromTheMenu(string.Join(", ", released.StillPinned));
+        switch (TurnOffAnyScheduledPublish(workspace.FolderPath, course.Code, sectionNumber))
+        {
+            case ScheduledPublishOutcome.NoneWasSet: break;
+            case ScheduledPublishOutcome.TurnedOff:
+                started += "\n\n" + AssistWording.RolloverTurnedOffTheScheduledPublish; break;
+            case ScheduledPublishOutcome.CouldNotTurnOff:
+                started += "\n\n" + AssistWording.RolloverCouldNotTurnOffTheScheduledPublish; break;
+        }
+        NoteTheWebsiteOnTheTrail(released, course.Code, sectionNumber);
+        return started;
     }
 
     /// <summary>
@@ -1804,7 +1996,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // The Section menu's undo speaks in its own voice (#489): nobody said
         // "undo that", and its way out is Section ▸ Undo Last Change.
         bool menu = workspace.SpeaksFromTheMenu;
-        string nothingToUndo = menu ? AssistWording.NothingToUndoFromTheMenu : AssistWording.NothingToUndo;
+        string nothingToUndo = menu ? workspace.NothingToUndoFromTheMenu() : AssistWording.NothingToUndo;
         string stillAvailable = menu ? AssistWording.UndoIsStillAvailableFromTheMenu : AssistWording.UndoIsStillAvailable;
         if (workspace.History is not { } history)
             return Answering(nothingToUndo);
@@ -1920,10 +2112,15 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // class on tomorrow", which is not a date anybody can check
             // against their timetable a week later.
             return result.Succeeded
-                ? Answering(AssistWording.PublishedTheClassOn(DateText.Iso(day)),
+                // In the course's noun, the mac's publishedTheClassOn(noun:) (#1027 review 3, M1).
+                ? Answering(workspace.NounForCourse(course) == ClassNoun.Meeting
+                                ? AssistWording.PublishedTheClassOnForAMeeting(DateText.Iso(day))
+                                : AssistWording.PublishedTheClassOn(DateText.Iso(day)),
                             text.ToString())
                 : Answering(text.ToString());
         }
+        // The teacher's copy in the course's noun when it differs (#1027); the model's is the message.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
         // A page Obsidian moved between the plan and the write, a file
@@ -2152,6 +2349,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 ? Answering($"{verb} {changing} {word}.", result.Message)
                 : Answering(result.Message);
         }
+        // The teacher's copy in the course's noun when it differs (#1027); the model's is the message.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
         // A page Obsidian moved between the plan and the write, a file
@@ -2308,6 +2507,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private CallToolResult Guarded(Func<CallToolResult> work)
     {
         try { return work(); }
+        // The teacher's copy in the course's noun when it differs (#1027); the model's is the message.
+        catch (AssistRefusal refusal) when (refusal.ForTheTeacher != refusal.Message) { return Answering(refusal.ForTheTeacher, refusal.Message); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
         catch (IOException error) { return Answering($"That couldn’t be read: {error.Message}"); }

@@ -230,7 +230,7 @@ public class AssistScenarioTests : IDisposable
         // hands its agent NarrowToLocal(served).
         var schemas = ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray();
         var agent = new AssistAgent(model, tools, schemas, Course, SectionNumber)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             PreviewIsShowing = () => previewRunning,
             SectionIsBusy = () => sectionBusy,
         };
@@ -1071,7 +1071,7 @@ public class AssistScenarioTests : IDisposable
     public async Task DeploySection_SucceedsWhenAsyncSeamReportsSuccess()
     {
         var agent = new AssistAgent(new ScriptedModel(), new NoTools(), new JsonArray(), Course, SectionNumber)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             SectionIsBusy = () => false,
             PreviewIsShowing = () => false,
             StartDeployInAppAsync = () => Task.FromResult<string?>(
@@ -1087,7 +1087,7 @@ public class AssistScenarioTests : IDisposable
     public async Task DeploySection_ReportsFailureWhenAsyncSeamReportsFailure()
     {
         var agent = new AssistAgent(new ScriptedModel(), new NoTools(), new JsonArray(), Course, SectionNumber)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             SectionIsBusy = () => false,
             PreviewIsShowing = () => false,
             // The deploy actually ran and failed — the outcome the old,
@@ -1109,7 +1109,7 @@ public class AssistScenarioTests : IDisposable
         // exception before it started) — the fallback must never be the success
         // wording, which is exactly the bug being closed.
         var agent = new AssistAgent(new ScriptedModel(), new NoTools(), new JsonArray(), Course, SectionNumber)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             SectionIsBusy = () => false,
             PreviewIsShowing = () => false,
             StartDeployInAppAsync = () => Task.FromResult<string?>(null),

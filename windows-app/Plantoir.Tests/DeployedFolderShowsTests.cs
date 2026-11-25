@@ -148,6 +148,28 @@ public sealed class DeployedFolderShowsTests : IDisposable
         Assert.True(Refused(outcomes[0].Address!.Port));
     }
 
+    /// <summary>
+    /// The fixes review's L-c (#889b): the press that started a show, whose
+    /// browser refused it, does not stop it when another press joined it and
+    /// its browser took it. MUST FAIL with the starter stopping it whatever
+    /// joined (the show would be gone under the second press's open tab).
+    /// </summary>
+    [Fact]
+    public async Task AJoinedShowIsNotStoppedByTheStartersRefusingBrowser()
+    {
+        string folder = Deployed();
+        var (entered, release, _) = HoldTheStart();
+        var first = _shows.OpenAsync(folder, "ICS3U", 1, _workingFolder, DeployedFolderFrom.Toolbar, _ => false);
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        var second = Open(folder, DeployedFolderFrom.Sidebar);
+        release.Set();
+        var outcomes = await Task.WhenAll(first, second);
+        Assert.Equal(DeployedFolderCouldNotOpen.BrowserDidNotOpen, outcomes[0].Why);
+        Assert.NotNull(outcomes[1].Address);
+        Assert.Equal(1, _shows.Count);
+        Assert.Equal("home", Fetch(outcomes[1].Address!));
+    }
+
     /// <summary><c>stopCases</c>: "Stop is pressed while the show is still starting".</summary>
     [Fact]
     public async Task StopWhileStartingEndsItOnceStartedAndLeavesNothingListening()

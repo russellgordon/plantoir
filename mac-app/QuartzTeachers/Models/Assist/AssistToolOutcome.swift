@@ -165,6 +165,13 @@ struct AssistToolOutcome: Sendable, Equatable {
         return AssistToolOutcome(summary: reason, detail: reason, shouldContinue: false)
     }
 
+    /// A refusal whose teacher's line is said in the course's noun (#1027):
+    /// the model reads `reason`, the class form, as it reads every detail
+    /// (#267); the window shows `teacherReason`.
+    static func refused(_ reason: String, showingTheTeacher teacherReason: String) -> AssistToolOutcome {
+        return AssistToolOutcome(summary: teacherReason, detail: reason, shouldContinue: false)
+    }
+
     /// A read that could not be answered. Reads hand back either way, so the
     /// model can say plainly what was missing rather than inventing it.
     ///
@@ -181,5 +188,10 @@ struct AssistToolOutcome: Sendable, Equatable {
     /// occur.
     static func couldNotRead(_ reason: String) -> AssistToolOutcome {
         return AssistToolOutcome(summary: reason, detail: reason, shouldContinue: true)
+    }
+
+    /// `couldNotRead` with the teacher's line in the course's noun (#1027).
+    static func couldNotRead(_ reason: String, showingTheTeacher teacherReason: String) -> AssistToolOutcome {
+        return AssistToolOutcome(summary: teacherReason, detail: reason, shouldContinue: true)
     }
 }
