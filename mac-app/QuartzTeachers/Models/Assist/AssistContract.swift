@@ -133,6 +133,7 @@ enum AssistContract {
         let course: String = coursePlaceholder
         let section: String = sectionPlaceholder
         let assistant: String = assistantPlaceholder
+        let place: String = "\(course) Section \(section)"
         let table: [String: String] = [
             "deployApproval": AssistWording.deployApproval,
             "deployQuestion": AssistWording.deployQuestion,
@@ -386,8 +387,10 @@ enum AssistContract {
             // unit or no count.
             "noSectionNamed": AssistWording.noSectionNamed(course: course, sections: sectionsPlaceholder),
             "noSectionNamedAndNoSections": AssistWording.noSectionNamedAndNoSections(course: course),
-            "addClassesNeedsAUnit": AssistWording.addClassesNeedsAUnit,
-            "addClassesNeedsACount": AssistWording.addClassesNeedsACount,
+            "addClassesNeedsAUnit": AssistWording.addClassesNeedsAUnit(),
+            "addClassesNeedsAUnitForAMeeting": AssistWording.addClassesNeedsAUnit(noun: .meeting),
+            "addClassesNeedsACount": AssistWording.addClassesNeedsACount(),
+            "addClassesNeedsACountForAMeeting": AssistWording.addClassesNeedsACount(noun: .meeting),
             "didNotFollowThat": AssistWording.didNotFollowThat,
             // A call naming a course that is not this window's. Two keys for
             // two different facts, not two phrasings of one: the first can
@@ -495,9 +498,28 @@ enum AssistContract {
             ),
             "otherClassesMoved": AssistWording.otherClassesMoved,
             "notANumberedClassPage": AssistWording.notANumberedClassPage(page: pagePlaceholder),
+            "notANumberedClassPageForAMeeting": AssistWording.notANumberedClassPage(page: pagePlaceholder, noun: .meeting),
             "thePlaceForTheCopyIsStillTaken": AssistWording.thePlaceForTheCopyIsStillTaken(
                 page: copyPlaceholder, backupNamed: nil
             ),
+            "thePlaceForTheCopyIsStillTakenForAMeeting": AssistWording.thePlaceForTheCopyIsStillTaken(
+                page: copyPlaceholder, backupNamed: nil, noun: .meeting
+            ),
+            "thePlaceForTheCopyIsStillTakenNamingTheBackupForAMeeting":
+                AssistWording.thePlaceForTheCopyIsStillTaken(
+                    page: copyPlaceholder,
+                    backupNamed: "{course}_backup_2026-09-08_190000.zip",
+                    noun: .meeting
+                ),
+            "theCopyCouldNotBeMadeHiddenForAMeeting": AssistWording.theCopyCouldNotBeMadeHidden(
+                page: pagePlaceholder, as: copyPlaceholder, backupNamed: nil, noun: .meeting
+            ),
+            "theCopyCouldNotBeMadeHiddenNamingTheBackupForAMeeting":
+                AssistWording.theCopyCouldNotBeMadeHidden(
+                    page: pagePlaceholder, as: copyPlaceholder,
+                    backupNamed: "{course}_backup_2026-09-08_190000.zip",
+                    noun: .meeting
+                ),
             "thePlaceForTheCopyIsStillTakenNamingTheBackup":
                 AssistWording.thePlaceForTheCopyIsStillTaken(
                     page: copyPlaceholder,
@@ -613,6 +635,95 @@ enum AssistContract {
             "datesToReplaceForAMeeting": AssistWording.datesToReplace(
                 for: "\(course) Section \(section)", noun: .meeting
             ),
+            // #1027: the Class Dates sheet's own sentences, each with its twin.
+            "classDatesPurpose": AssistWording.classDatesPurpose(),
+            "classDatesPurposeForAMeeting": AssistWording.classDatesPurpose(noun: .meeting),
+            "classDatesCourseMissing": AssistWording.classDatesCourseMissing(course: course),
+            "classDatesCourseMissingForAMeeting": AssistWording.classDatesCourseMissing(course: course, noun: .meeting),
+            "classDatesNoneGiven": AssistWording.classDatesNoneGiven(place: place),
+            "classDatesNoneGivenForAMeeting": AssistWording.classDatesNoneGiven(place: place, noun: .meeting),
+            "classDatesNotWrittenAsDates": AssistWording.classDatesNotWrittenAsDates(offenders: "2026-13-01", count: 1, place: place),
+            "classDatesNotWrittenAsDatesForAMeeting": AssistWording.classDatesNotWrittenAsDates(offenders: "2026-13-01", count: 1, place: place, noun: .meeting),
+            "classDatesOnFileUnreadable": AssistWording.classDatesOnFileUnreadable(offenders: "the file is not readable JSON", count: 1, place: place),
+            "classDatesOnFileUnreadableForAMeeting": AssistWording.classDatesOnFileUnreadable(offenders: "the file is not readable JSON", count: 1, place: place, noun: .meeting),
+            "classDatesTooFarFromToday": AssistWording.classDatesTooFarFromToday(offenders: "2569-09-08", count: 1, place: place),
+            "classDatesTooFarFromTodayForAMeeting": AssistWording.classDatesTooFarFromToday(offenders: "2569-09-08", count: 1, place: place, noun: .meeting),
+            "classDatesCouldNotBeSaved": AssistWording.classDatesCouldNotBeSaved(place: place, reason: "{reason}"),
+            "classDatesCouldNotBeSavedForAMeeting": AssistWording.classDatesCouldNotBeSaved(place: place, reason: "{reason}", noun: .meeting),
+            "classDatesAreRemembered": AssistWording.classDatesAreRemembered(place: place),
+            "classDatesAreRememberedForAMeeting": AssistWording.classDatesAreRemembered(place: place, noun: .meeting),
+            "classDatesSetAside": AssistWording.classDatesSetAside(naming: "2569-09-08"),
+            "classDatesSetAsideForAMeeting": AssistWording.classDatesSetAside(naming: "2569-09-08", noun: .meeting),
+            "classDatesAlreadyRecorded": AssistWording.classDatesAlreadyRecorded(count: 12, place: place),
+            "classDatesAlreadyRecordedForAMeeting": AssistWording.classDatesAlreadyRecorded(count: 12, place: place, noun: .meeting),
+            "classDatesToRemember": AssistWording.classDatesToRemember(count: 12, place: place, first: "2026-09-08 (Tuesday)", last: "2026-12-15 (Tuesday)"),
+            "classDatesToRememberForAMeeting": AssistWording.classDatesToRemember(count: 12, place: place, first: "2026-09-08 (Tuesday)", last: "2026-12-15 (Tuesday)", noun: .meeting),
+            "classDatesHalfRead": AssistWording.classDatesHalfRead(offenders: "2026-13-01", count: 1, from: "the pasted dates"),
+            // #1027 round 3: the trail counts of Add Class… and of Deploy's
+            // hide, the plan problems the menu sheets show, and the dates
+            // card's summaries, each with its club twin.
+            "addClassCountsNext": AssistWording.addClassCountsNext(),
+            "addClassCountsNextForAMeeting": AssistWording.addClassCountsNext(noun: .meeting),
+            "addClassCountsAsACopy": AssistWording.addClassCountsAsACopy(),
+            "addClassCountsAsACopyForAMeeting": AssistWording.addClassCountsAsACopy(noun: .meeting),
+            "untickedAtDeployCounts": AssistWording.untickedAtDeployCounts(count: 3),
+            "untickedAtDeployCountsForAMeeting": AssistWording.untickedAtDeployCounts(count: 3, noun: .meeting),
+            "timetableTooShortFrom": AssistWording.timetableTooShortFrom(needed: 4, from: "2026-12-08", has: 2),
+            "timetableTooShortFromForAMeeting": AssistWording.timetableTooShortFrom(
+                needed: 4, from: "2026-12-08", has: 2, noun: .meeting
+            ),
+            "timetableTooShortAfter": AssistWording.timetableTooShortAfter(count: 3, from: "2026-12-08", has: 2),
+            "timetableTooShortAfterForAMeeting": AssistWording.timetableTooShortAfter(
+                count: 3, from: "2026-12-08", has: 2, noun: .meeting
+            ),
+            "noDaysAfterTheLastPage": AssistWording.noDaysAfterTheLastPage(),
+            "noDaysAfterTheLastPageForAMeeting": AssistWording.noDaysAfterTheLastPage(noun: .meeting),
+            // #1027 round 4: the planners' refusals, each with its club twin.
+            "askForAtLeastOneClass": AssistWording.askForAtLeastOneClass(),
+            "askForAtLeastOneClassForAMeeting": AssistWording.askForAtLeastOneClass(noun: .meeting),
+            "cannotMoveClassesWithoutDates": AssistWording.cannotMoveClassesWithoutDates(code: "COMP", number: 2),
+            "cannotMoveClassesWithoutDatesForAMeeting": AssistWording.cannotMoveClassesWithoutDates(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "cannotDateNewClassesWithoutDates": AssistWording.cannotDateNewClassesWithoutDates(code: "COMP", number: 2),
+            "cannotDateNewClassesWithoutDatesForAMeeting": AssistWording.cannotDateNewClassesWithoutDates(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "cannotDateANewClassWithoutDates": AssistWording.cannotDateANewClassWithoutDates(code: "COMP", number: 2),
+            "cannotDateANewClassWithoutDatesForAMeeting": AssistWording.cannotDateANewClassWithoutDates(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "cannotReDateWithoutDates": AssistWording.cannotReDateWithoutDates(code: "COMP", number: 2),
+            "cannotReDateWithoutDatesForAMeeting": AssistWording.cannotReDateWithoutDates(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "noNumberedClassPagesToReDate": AssistWording.noNumberedClassPagesToReDate(code: "COMP", number: 2),
+            "noNumberedClassPagesToReDateForAMeeting": AssistWording.noNumberedClassPagesToReDate(
+                code: "COMP", number: 2, noun: .meeting
+            ),
+            "noClassOnThatDay": AssistWording.noClassOnThatDay(
+                weekday: "Tuesday", date: "2026-12-08", code: "COMP", number: 2
+            ),
+            "noClassOnThatDayForAMeeting": AssistWording.noClassOnThatDay(
+                weekday: "Tuesday", date: "2026-12-08", code: "COMP", number: 2, noun: .meeting
+            ),
+            "noClassDateLeftForTheCopy": AssistWording.noClassDateLeftForTheCopy(),
+            "noClassDateLeftForTheCopyForAMeeting": AssistWording.noClassDateLeftForTheCopy(noun: .meeting),
+            "whichDayShouldTheNewClassTake": AssistWording.whichDayShouldTheNewClassTake(),
+            "whichDayShouldTheNewClassTakeForAMeeting": AssistWording.whichDayShouldTheNewClassTake(noun: .meeting),
+            "unusedDatesRunShort": AssistWording.unusedDatesRunShort(free: 1, undated: 2),
+            "unusedDatesRunShortForAMeeting": AssistWording.unusedDatesRunShort(free: 1, undated: 2, noun: .meeting),
+            "pagesNotNamedTheCoursesWay": AssistWording.pagesNotNamedTheCoursesWay(count: 2, shape: "Unit N, Day N"),
+            "pagesNotNamedTheCoursesWayForAMeeting": AssistWording.pagesNotNamedTheCoursesWay(
+                count: 2, shape: "Week N", noun: .meeting
+            ),
+            "workedOutTheClassDates": AssistWording.workedOutTheClassDates(),
+            "workedOutTheClassDatesForAMeeting": AssistWording.workedOutTheClassDates(noun: .meeting),
+            "rememberedTheClassDates": AssistWording.rememberedTheClassDates(count: 12, place: place),
+            "rememberedTheClassDatesForAMeeting": AssistWording.rememberedTheClassDates(
+                count: 12, place: place, noun: .meeting
+            ),
+            "classDatesHalfReadForAMeeting": AssistWording.classDatesHalfRead(offenders: "2026-13-01", count: 1, from: "the pasted dates", noun: .meeting),
             "datesForTheNextPage": AssistWording.datesForTheNextPage(),
             "datesForTheNextPageForAMeeting": AssistWording.datesForTheNextPage(noun: .meeting),
             "datesToDuplicate": AssistWording.datesToDuplicate(),
@@ -671,7 +782,9 @@ enum AssistContract {
             "undidPartlyFromTheMenu": AssistWording.undidPartlyFromTheMenu(changePlaceholder, leftAlone: 2),
             "couldNotUndoFromTheMenu": AssistWording.couldNotUndoFromTheMenu(changePlaceholder, leftAlone: 2),
             "undoIsStillAvailableFromTheMenu": AssistWording.undoIsStillAvailableFromTheMenu,
-            "nothingToUndoFromTheMenu": AssistWording.nothingToUndoFromTheMenu,
+            "nothingToUndoFromTheMenu": AssistWording.nothingToUndoFromTheMenu(noun: .class),
+            // #1027: in a club, the menus as its menu bar titles them.
+            "nothingToUndoFromTheMeetingsMenu": AssistWording.nothingToUndoFromTheMenu(noun: .meeting),
             "changedWhileSavingACopyFromTheMenu": AssistWording.changedWhileSavingACopyFromTheMenu(
                 course: course, section: section
             ),
@@ -723,7 +836,8 @@ enum AssistContract {
             "menuMakeRoomTitleForAMeeting": AssistWording.menuMakeRoomTitle(
                 course: course, section: section, noun: .meeting
             ),
-            "menuPickPagesToPublish": AssistWording.menuPickPagesToPublish,
+            "menuPickPagesToPublish": AssistWording.menuPickPagesToPublish(),
+            "menuPickPagesToPublishForAMeeting": AssistWording.menuPickPagesToPublish(noun: .meeting),
             "menuPickPagesToHide": AssistWording.menuPickPagesToHide,
             "menuNoHiddenPages": AssistWording.menuNoHiddenPages(course: course, section: section),
             "menuNoVisiblePages": AssistWording.menuNoVisiblePages(course: course, section: section),
@@ -874,6 +988,18 @@ enum AssistContract {
             "deployHasClassesDatedLaterAndNoWindow": AssistWording.deployHasClassesDatedLaterAndNoWindow(
                 course: course, section: section, pages: AssistPublishPlan.listingAFew(["Unit 2, Day 5"]), count: 1
             ),
+            "deployHasClassesDatedLaterForAMeeting": AssistWording.deployHasClassesDatedLater(
+                course: course, section: section, pages: AssistPublishPlan.listingAFew(["Week 5"]), count: 1,
+                noun: .meeting
+            ),
+            "deployHasClassesDatedLaterNamingSeveralForAMeeting": AssistWording.deployHasClassesDatedLater(
+                course: course, section: section,
+                pages: AssistPublishPlan.listingAFew(["Week 5", "Week 6"]), count: 2, noun: .meeting
+            ),
+            "deployHasClassesDatedLaterAndNoWindowForAMeeting": AssistWording.deployHasClassesDatedLaterAndNoWindow(
+                course: course, section: section, pages: AssistPublishPlan.listingAFew(["Week 5"]), count: 1,
+                noun: .meeting
+            ),
             "deployWaitsForAnOpenQuestion": AssistWording.deployWaitsForAnOpenQuestion(
                 course: course, section: section
             ),
@@ -921,8 +1047,26 @@ enum AssistContract {
                            + "doorCourseHold.naming",
             ],
             "wording": table,
+            "staysClass": AssistContract.wordingThatStaysClass,
         ]
     }
+
+    /// Every key of `wording` whose words say class with no `…ForAMeeting`
+    /// twin (nor a `…FromTheMeetingsMenu` one), and why that is right
+    /// (#1027): a club's teacher never reads it in that form. Both apps'
+    /// tests fail on a class key that is on neither list.
+    static let wordingThatStaysClass: [String: String] = [
+        "howITeachDraftingBrief": "read only by the model: it is appended to a tool result's detail",
+        "otherClassesMoved": "read only by the model: it is appended to a tool result's detail",
+        "openEndedPublishRefused": "written to the model, naming publish_class_on and its onOrAfter and "
+            + "before arguments; the model asks again in a narrower way",
+        "menuAddClassGreyedRenameHoldsANewUnit": "about a new unit: a club numbers its pages without units",
+        "menuAddClassInANewUnitInAModuleCourse": "a course whose unit word is module only",
+        "menuAddClassNextInThisUnitInAModuleCourse": "a course whose unit word is module only",
+        "nextClassNeedsItsOwnPhrasing": "the form for a course with units; a club is numbered, and the "
+            + "numbered form takes the course's noun",
+        "nextClassNeedsItsOwnPhrasingInAModuleCourse": "a course whose unit word is module only",
+    ]
 
     /// The generated half of the cases file, by top-level key.
     static func generatedCases() -> [String: Any] {

@@ -71,6 +71,8 @@ public static class SubjectMenuRules
         Preview,
         Deploy,
         OpenInBrowser,
+        /// <summary>Section ▸ Stop Showing Deployed Folder (#889, the mac's #850): live while this app shows the section's deployed folder.</summary>
+        StopShowingDeployedFolder,
         ScheduleDeploy,
         CancelScheduledDeploy,
         GetReadyForTheStartOfTheYear,
@@ -89,10 +91,22 @@ public static class SubjectMenuRules
         PublishClassForADate,
         RebuildPreview,
         UndoLastChange,
-        AddNextClass,
+        /// <summary>
+        /// Classes ▸ Add Class… (#927, the mac's #897 piece A): ONE item whose
+        /// dialog asks how the class is added (<see cref="AddClassWay"/>). It
+        /// replaced Add Next Class and is live exactly where that was, since
+        /// its first way always can be chosen.
+        /// </summary>
+        AddClass,
         ReDateClasses,
         MakeRoomForClasses,
         ClassDates,
+        /// <summary>
+        /// Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B):
+        /// live exactly where Re-date Classes… is, with no situation key of
+        /// its own (<c>subjectMenus.rollOverSheet</c>).
+        /// </summary>
+        RollOverToANewYear,
         // View
         Back,
         Forward,
@@ -148,6 +162,10 @@ public static class SubjectMenuRules
         public bool LastChangeIsHere { get; init; }
         /// <summary>One of the assistant's functions is running on the selected section.</summary>
         public bool VerbIsRunning { get; init; }
+        /// <summary>The selected section's deployed folder can be opened in the browser (<c>deployedFolderInBrowser.offeredCases</c> says offered, #889).</summary>
+        public bool DeployedFolderReady { get; init; }
+        /// <summary>This app is showing the selected section's deployed folder in the browser (#889).</summary>
+        public bool DeployedFolderShown { get; init; }
         public bool CanGoBack { get; init; }
         public bool CanGoForward { get; init; }
     }
@@ -213,7 +231,11 @@ public static class SubjectMenuRules
         {
             if (situation.PreviewButtonEnabled) enabled.Add(Item.Preview);
             if (situation.DeployButtonEnabled && isLive) enabled.Add(Item.Deploy);
-            if (situation.PreviewIsShowing) enabled.Add(Item.OpenInBrowser);
+            // One Open in Browser for both (#889, the mac's #850, Russell
+            // 2026-11-13): the preview while one shows, the deployed folder
+            // otherwise. Stop writes nothing, so nothing holds it back.
+            if (situation.PreviewIsShowing || situation.DeployedFolderReady) enabled.Add(Item.OpenInBrowser);
+            if (situation.DeployedFolderShown) enabled.Add(Item.StopShowingDeployedFolder);
             // Neither on a course kept for reference: nothing deploys from one,
             // and the menu bar may not disagree with its row (the mac's ruling
             // on #457's implementation review).
@@ -241,8 +263,11 @@ public static class SubjectMenuRules
                 enabled.Add(Item.PublishPages);
                 enabled.Add(Item.HidePages);
                 enabled.Add(Item.PublishClassForADate);
-                enabled.Add(Item.AddNextClass);
+                // Add Class…: live where Add Next Class was; which of its
+                // ways can be chosen is the dialog's, decided when it opens.
+                enabled.Add(Item.AddClass);
                 enabled.Add(Item.ReDateClasses);
+                enabled.Add(Item.RollOverToANewYear);
                 enabled.Add(Item.MakeRoomForClasses);
                 enabled.Add(Item.ClassDates);
                 if (situation.LastChangeIsHere) enabled.Add(Item.UndoLastChange);
@@ -264,6 +289,97 @@ public static class SubjectMenuRules
             if (situation.CanGoForward) enabled.Add(Item.Forward);
         }
         return enabled;
+    }
+
+    // ---- Add Class…'s dialog (#927, the mac's #897 piece A) ----------------------
+
+    /// <summary>
+    /// How Add Class… adds the class, in the dialog's order
+    /// (<c>subjectMenus.addClassSheet.ways</c>).
+    /// </summary>
+    public enum AddClassWay { NextInThisUnit, InANewUnit, AsACopyOfAClass }
+
+    /// <summary>
+    /// What the dialog decides its ways from, read when it OPENS, never per
+    /// drawing of the menu (<c>addClassSheet.factDefaults</c>).
+    /// </summary>
+    public sealed record AddClassFacts
+    {
+        /// <summary>The course names its class pages with one number (a club's Week 3): it has no units.</summary>
+        public bool ClassPagesAreNumbered { get; init; }
+        /// <summary>A unit-word rename stopped part way, as the rename itself judges it, without clearing a stale record.</summary>
+        public bool UnitWordRenameUnfinished { get; init; }
+        /// <summary>The section has at least one page in its class folders.</summary>
+        public bool HasAClassPage { get; init; }
+    }
+
+    /// <summary>Why a way is greyed (<c>addClassSheet.greyedBecause</c>).</summary>
+    public enum AddClassGreyedBecause { TheCourseHasNoUnits, ThereIsNoClassToCopy, ARenameIsUnfinished }
+
+    /// <summary>Which line a way is drawn with (<c>addClassSheet.labels</c>).</summary>
+    public enum AddClassLabel { NextInTheUnitUnderWay, NextInANumberedCourse, InANewUnitInTheCoursesWord, InANewUnitPlainly, AsACopy }
+
+    /// <summary>One line under the ways (<c>addClassSheet.reasonLines</c>).</summary>
+    public enum AddClassReasonLine
+    {
+        TheCourseHasNoUnits,
+        ThereIsNoClassToCopy,
+        ARenameHoldsBackANewUnitAndACopy,
+        ARenameHoldsBackANewUnit,
+        ARenameHoldsBackACopy,
+    }
+
+    /// <summary>The ways that can be chosen, in the dialog's order.</summary>
+    public static IReadOnlyList<AddClassWay> AddClassWays(AddClassFacts facts) =>
+        Enum.GetValues<AddClassWay>().Where(way => WhyGreyed(way, facts) is null).ToList();
+
+    /// <summary>
+    /// Why <paramref name="way"/> cannot be chosen, or null when it can: one
+    /// reason per way, the first that applies (<c>addClassSheet.greyedRule</c>).
+    /// The next class in this unit keeps Add Next Class's rule and is never greyed.
+    /// </summary>
+    public static AddClassGreyedBecause? WhyGreyed(AddClassWay way, AddClassFacts facts) => way switch
+    {
+        AddClassWay.InANewUnit when facts.ClassPagesAreNumbered => AddClassGreyedBecause.TheCourseHasNoUnits,
+        AddClassWay.InANewUnit when facts.UnitWordRenameUnfinished => AddClassGreyedBecause.ARenameIsUnfinished,
+        AddClassWay.AsACopyOfAClass when !facts.HasAClassPage => AddClassGreyedBecause.ThereIsNoClassToCopy,
+        AddClassWay.AsACopyOfAClass when facts.UnitWordRenameUnfinished => AddClassGreyedBecause.ARenameIsUnfinished,
+        _ => null,
+    };
+
+    /// <summary>The line <paramref name="way"/> is drawn with (<c>addClassSheet.labelRule</c>).</summary>
+    public static AddClassLabel Label(AddClassWay way, AddClassFacts facts) => way switch
+    {
+        AddClassWay.NextInThisUnit => facts.ClassPagesAreNumbered ? AddClassLabel.NextInANumberedCourse : AddClassLabel.NextInTheUnitUnderWay,
+        AddClassWay.InANewUnit => facts.ClassPagesAreNumbered ? AddClassLabel.InANewUnitPlainly : AddClassLabel.InANewUnitInTheCoursesWord,
+        _ => AddClassLabel.AsACopy,
+    };
+
+    /// <summary>
+    /// The lines under the ways, in the ways' order: one per reason, then ONE
+    /// rename line naming exactly the ways the rename holds back
+    /// (<c>addClassSheet.reasonLineRule</c>), so finishing the rename is never
+    /// promised to bring back a way greyed for another reason.
+    /// </summary>
+    public static IReadOnlyList<AddClassReasonLine> ReasonLines(AddClassFacts facts)
+    {
+        var lines = new List<AddClassReasonLine>();
+        bool holdsANewUnit = false, holdsACopy = false;
+        foreach (var way in Enum.GetValues<AddClassWay>())
+        {
+            switch (WhyGreyed(way, facts))
+            {
+                case AddClassGreyedBecause.TheCourseHasNoUnits: lines.Add(AddClassReasonLine.TheCourseHasNoUnits); break;
+                case AddClassGreyedBecause.ThereIsNoClassToCopy: lines.Add(AddClassReasonLine.ThereIsNoClassToCopy); break;
+                case AddClassGreyedBecause.ARenameIsUnfinished:
+                    if (way == AddClassWay.InANewUnit) holdsANewUnit = true; else holdsACopy = true;
+                    break;
+            }
+        }
+        if (holdsANewUnit && holdsACopy) lines.Add(AddClassReasonLine.ARenameHoldsBackANewUnitAndACopy);
+        else if (holdsANewUnit) lines.Add(AddClassReasonLine.ARenameHoldsBackANewUnit);
+        else if (holdsACopy) lines.Add(AddClassReasonLine.ARenameHoldsBackACopy);
+        return lines;
     }
 
     /// <summary>

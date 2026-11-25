@@ -259,6 +259,67 @@ public sealed class UndoRecoveryTests
         public void Rederive(UndoOp op, string root) => throw new InvalidOperationException("no runner");
     }
 
+    // ---- Kept originals the list gives (W4c) ------------------------------------------
+
+    /// <summary>
+    /// A step that died with every page swapped and its swap's tidy cut short
+    /// is completed, and a kept original whose bytes are exactly what the list
+    /// gives for its page (the line op undone from what the page holds now)
+    /// is not the only copy of anything: the settled tidy removes it, and no
+    /// "undo kept what a page held" line names it (the mac's listHolds, U3c).
+    /// </summary>
+    // W7a part two, review 1, LOW 3: once with the kept original marked
+    // Hidden, as the swap leaves one; the tidy finds it all the same.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ACompletedStepsKeptOriginalThatTheListGivesIsTidied(bool hidden)
+    {
+        using UndoScribe scribe = Scribe();
+        scribe.WritePage("A", First, Old(First));
+        long seq = scribe.Fold().NextSeq;
+        scribe.Append(scribe.BeginLine(seq, scribe.OpsFor(First, Old(First), New(First)), "A", pid: UndoScribe.AProcessThatIsGone));
+        scribe.WritePage("A", First, New(First));
+        string kept = UndoSwap.BesidePath(scribe.FullPath("A", First), $"{seq}-apply", "orig");
+        File.WriteAllBytes(kept, Old(First));
+        if (hidden) File.SetAttributes(kept, FileAttributes.Hidden | FileAttributes.Archive);
+
+        scribe.Door().Recover();
+
+        Assert.Equal(UndoStepState.Done, scribe.Fold().Steps[seq].State);
+        Assert.False(File.Exists(kept), "a kept original the list gives was left beside its page");
+        lock (scribe.TrailLines)
+            Assert.DoesNotContain(scribe.TrailLines, line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatAPageHeld);
+    }
+
+    /// <summary>
+    /// W7a part two, review 1, LOW 2: a kept original that recovery leaves and
+    /// names as "the hidden file" is Hidden, though the process died before
+    /// its swap could hide it (laid here without the attribute): the word is
+    /// true on that path too, and the page itself is never hidden.
+    /// </summary>
+    [Fact]
+    public void AKeptOriginalRecoveryLeavesAndNamesIsHiddenAndThePageIsNot()
+    {
+        using UndoScribe scribe = Scribe();
+        scribe.WritePage("A", First, Old(First));
+        long seq = scribe.Fold().NextSeq;
+        scribe.Append(scribe.BeginLine(seq, scribe.OpsFor(First, Old(First), New(First)), "A", pid: UndoScribe.AProcessThatIsGone));
+        scribe.WritePage("A", First, New(First));
+        string kept = UndoSwap.BesidePath(scribe.FullPath("A", First), $"{seq}-apply", "orig");
+        File.WriteAllBytes(kept, Encoding.UTF8.GetBytes("What the teacher wrote, which the list never recorded.\n"));
+        Assert.False(File.GetAttributes(kept).HasFlag(FileAttributes.Hidden));
+
+        scribe.Door().Recover();
+
+        Assert.True(File.Exists(kept), "a kept original that is the only copy of what it holds was removed");
+        lock (scribe.TrailLines)
+            Assert.Contains(scribe.TrailLines, line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatAPageHeld
+                                                       && line.Words.Contains(Path.GetFileName(kept), StringComparison.Ordinal));
+        Assert.True(File.GetAttributes(kept).HasFlag(FileAttributes.Hidden), "a kept original named as the hidden file is not Hidden");
+        Assert.False(File.GetAttributes(scribe.FullPath("A", First)).HasFlag(FileAttributes.Hidden), "the page was hidden");
+    }
+
     // ---- The closed-step tidy -----------------------------------------------------------
 
     /// <summary>
@@ -283,7 +344,19 @@ public sealed class UndoRecoveryTests
         scribe.PutFolderBack("B");
         Assert.NotEmpty(UndoStepContractTests.StagedFilesUnder(scribe.FullPath("B", "")));
         scribe.Door().Recover();
-        Assert.Empty(UndoStepContractTests.StagedFilesUnder(scribe.FullPath("B", "")));
+        // Everything staged goes but a kept original that differs from its
+        // page: the only copy of what the page held (W4c, the mac's U3c).
+        List<string> left = UndoStepContractTests.StagedFilesUnder(scribe.FullPath("B", "")).ToList();
+        Assert.NotEmpty(left);
+        foreach (string staged in left)
+        {
+            Assert.EndsWith("-orig", staged);
+            // LOW 3 of W7a part two's review 1: what the closed-step tidy met
+            // and kept is a kept original the swap marked Hidden.
+            Assert.True(File.GetAttributes(staged).HasFlag(FileAttributes.Hidden), "the kept original the tidy met was not Hidden: " + staged);
+            string place = Path.Combine(Path.GetDirectoryName(staged)!, UndoSwap.PlaceOfStagedName(Path.GetFileName(staged))!);
+            Assert.False(UndoSwap.IsACopyOfItsPlace(staged, place), "a copy of its page was left: " + staged);
+        }
     }
 
     // ---- A recovery that is itself stopped ---------------------------------------------

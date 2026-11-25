@@ -48,6 +48,38 @@ final class SectionAndClassesMenusUITests: XCTestCase {
         return found
     }
 
+    /// `contracts/shared-rules.json` → `subjectMenus.layout.itemTitles.items`
+    /// (#1027), read rather than retyped.
+    static func itemTitles() throws -> [String: [String: String]] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let menus: [String: Any] = try XCTUnwrap(all["subjectMenus"] as? [String: Any])
+        let layout: [String: Any] = try XCTUnwrap(menus["layout"] as? [String: Any])
+        let itemTitles: [String: Any] = try XCTUnwrap(layout["itemTitles"] as? [String: Any])
+        return try XCTUnwrap(itemTitles["items"] as? [String: [String: String]])
+    }
+
+    /// With `PLANTOIR_UI_CAPTURE_DIR` set, a picture of the screen with the
+    /// menu open, kept in the test's results as an attachment named
+    /// `fileName` (the runner may not write outside its own folders), and the
+    /// menu closed again.
+    func captureIfAsked(menu: String, of application: XCUIApplication, named fileName: String) {
+        guard let folder = ProcessInfo.processInfo.environment["PLANTOIR_UI_CAPTURE_DIR"], !folder.isEmpty else {
+            return
+        }
+        application.menuBars.menuBarItems[menu].click()
+        let attachment: XCTAttachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = fileName
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        application.typeKey(.escape, modifierFlags: [])
+    }
+
     /// Whether the item is drawn and can be pressed, with the menu closed again.
     static func isLive(_ title: String, inMenu menu: String, of application: XCUIApplication) -> (drawn: Bool, live: Bool) {
         let found: XCUIElement = item(title, inMenu: menu, of: application)
@@ -146,10 +178,22 @@ final class SectionAndClassesMenusUITests: XCTestCase {
         clubRow.click()
         XCTAssertTrue(menuBar.menuBarItems["Meetings"].waitForExistence(timeout: 5), "a club's menu bar reads Meetings")
         XCTAssertTrue(menuBar.menuBarItems["Classes"].waitForNonExistence(timeout: 5), "no Classes menu while a club is selected")
-        let classDates: (drawn: Bool, live: Bool) = SectionAndClassesMenusUITests.isLive(
-            "Class Dates…", inMenu: "Meetings", of: application
-        )
-        XCTAssertTrue(classDates.drawn, "the Meetings menu holds the same items")
+        // #1027: its items say meeting (`subjectMenus.layout.itemTitles`),
+        // each where the course has its class twin, and none says class.
+        // MUST FAIL with an item's title read in an ordinary course's noun.
+        for (name, titles) in try SectionAndClassesMenusUITests.itemTitles() {
+            let menu: String = name == "publishClassForADate" ? "Section" : "Meetings"
+            let meetingTitle: String = try XCTUnwrap(titles["titleForAMeeting"])
+            XCTAssertTrue(
+                SectionAndClassesMenusUITests.isLive(meetingTitle, inMenu: menu, of: application).drawn,
+                "\(menu) does not hold \(meetingTitle) in a club"
+            )
+            XCTAssertFalse(
+                SectionAndClassesMenusUITests.isLive(try XCTUnwrap(titles["title"]), inMenu: menu, of: application).drawn,
+                "\(menu) still holds \(titles["title"] ?? "") in a club"
+            )
+        }
+        captureIfAsked(menu: "Meetings", of: application, named: "mac-meetings-menu.png")
 
         courseRow.click()
         XCTAssertTrue(menuBar.menuBarItems["Classes"].waitForExistence(timeout: 5), "back to Classes on a course")

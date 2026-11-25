@@ -34,6 +34,7 @@ public class DialogTitleScanTests
         ["MainWindow.Guidance.cs"] = 1,
         ["MainWindow.Menus.cs"] = 2,
         ["MainWindow.xaml.cs"] = 6,
+        ["Services/DeployedFolderOpening.cs"] = 1,   // #889: couldNotOpen, its title the contract's couldNotOpenTitle
         ["Services/UpdatePrompts.cs"] = 1,
         ["Views/AboutDialog.cs"] = 1,
         ["Views/AddSectionDialog.cs"] = 1,
@@ -46,7 +47,7 @@ public class DialogTitleScanTests
         ["Views/LinksChecklistDialog.cs"] = 1,
         ["Views/NewCourseDialog.cs"] = 1,
         ["Views/ObsidianWorld.cs"] = 4,   // the add-ons offer and the reopen question (#581); the closing question and its alert (#1003)
-        ["Views/SectionDetailView.xaml.cs"] = 16,   // +2 with #736: Fix with…'s refusal and its "didn’t open"
+        ["Views/SectionDetailView.xaml.cs"] = 15,   // +2 with #736: Fix with…'s refusal and its "didn’t open"; #928: "Cannot Preview Yet" for a start that cannot go ahead is one dialog, ShowPreviewRefusal, for the press's two refusals, the run that never started and the automated start (17 became 15)
         ["Views/SectionScheduleDialog.cs"] = 1,
         ["Views/SectionVerbDialog.cs"] = 1,
         ["Views/SidebarPane.Reference.cs"] = 6,

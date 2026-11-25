@@ -24,15 +24,25 @@ public static class ReferenceCourse
     /// The code a teacher reads when the course at <paramref name="courseDirectory"/>
     /// is kept for reference AS SAVED NOW, else null. What a deploy door asks
     /// at the press: the window's copy may be older than a marker written by
-    /// hand or by another window. A settings file that cannot be read reads as
-    /// ordinary here — the launcher's own "cannot tell" refusal is the backstop.
+    /// hand or by another window. A settings file that is not valid JSON reads
+    /// as ordinary here — the launcher's own "cannot tell" refusal is the
+    /// backstop. One that is there and could not be read JUST NOW (held, a
+    /// build's replace, a deny rule; #874) FAILS CLOSED: it answers as this
+    /// app last read it, and with no earlier read, as kept (the folder's name).
     /// </summary>
     public static string? KeptOnDisk(string courseDirectory)
     {
+        string configPath = Path.Combine(courseDirectory, "course_config.json");
         try
         {
-            var configuration = CourseConfiguration.Load(Path.Combine(courseDirectory, "course_config.json"));
+            var configuration = CourseConfiguration.Load(configPath);
             var course = new Course(Path.GetFileName(courseDirectory), courseDirectory, configuration);
+            return IsKeptForReference(course) ? ShownCode(course) : null;
+        }
+        catch (FileRefusedException)
+        {
+            if (Workspace.LastGoodRead(configPath) is not { } earlier) return Path.GetFileName(courseDirectory);
+            var course = new Course(Path.GetFileName(courseDirectory), courseDirectory, CourseConfiguration.FromBytes(earlier));
             return IsKeptForReference(course) ? ShownCode(course) : null;
         }
         catch { return null; }

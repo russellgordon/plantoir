@@ -27,7 +27,7 @@ public class TimeAskedInCodeTests : IDisposable
         ActivityTrail.SetCustomLogPathForTesting(_trail);
         _agent = new AssistAgent(_model, _tools,
             ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             Today = () => new DateOnly(2026, 9, 19),
             Now = () => new DateTime(2026, 9, 19, 9, 0, 0),
             TimeZone = TimeZoneInfo.Utc,

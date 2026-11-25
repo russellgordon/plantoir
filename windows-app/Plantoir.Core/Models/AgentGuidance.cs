@@ -239,7 +239,11 @@ public static class AgentGuidance
     /// The system's own sentence for an IO failure, WITHOUT the path .NET
     /// puts in its message: <c>Win32Exception</c>'s text for a FACILITY_WIN32
     /// code ("Access is denied.", "Cannot create a file when that file already
-    /// exists."), and <see cref="CouldNotBeWritten"/> for anything else.
+    /// exists."), and <see cref="CouldNotBeWritten"/> for anything else. A
+    /// rename refused because another program holds the file arrives as
+    /// <see cref="FileInUseException"/>, whose code is the sharing violation,
+    /// so the sentence is the system's own for that ("…being used by another
+    /// process."), not the "Access is denied." the rename itself raised (#953).
     /// </summary>
     public static string SystemReason(Exception error)
     {
@@ -255,13 +259,19 @@ public static class AgentGuidance
     private static string ReadStrict(string path) => StrictUtf8.GetString(File.ReadAllBytes(path));
 
     /// <summary>A temporary file beside the target, moved over it: a crash leaves the old file or the new, never half of one.</summary>
-    internal static void WriteAtomically(string path, string text)
+    /// <remarks>The rename is asked again while another program holds the file
+    /// (<see cref="HeldFiles.Replace"/>, #953); still held after the bound, it
+    /// throws <see cref="FileInUseException"/>, the file is as it was and the
+    /// temporary is gone. A permission refusal is thrown at once.</remarks>
+    internal static void WriteAtomically(string path, string text, Action<int>? pause = null)
     {
-        string temporary = path + ".plantoir-" + Guid.NewGuid().ToString("N")[..8] + ".tmp";
+        string temporary = HeldFiles.TemporaryBeside(path);
         try
         {
             File.WriteAllBytes(temporary, new UTF8Encoding(false).GetBytes(text));
-            File.Move(temporary, path, overwrite: true);
+            HeldFiles.Hide(temporary);
+            HeldFiles.Replace(temporary, path, () => File.Move(temporary, path, overwrite: true), pause);
+            HeldFiles.Unhide(path);
         }
         finally
         {
@@ -300,27 +310,34 @@ public static class AgentGuidanceDeclined
     /// <summary>A test's own file, so a test never writes the real one. Null in the app.</summary>
     internal static string? FilePathForTests { get; set; }
 
+    /// <summary>The stored signature for a file, or null: none stored, or the answers could not be read just now (the teacher is asked again).</summary>
     public static string? SignatureFor(string path)
     {
-        lock (Gate) return Load().TryGetValue(Normal(path), out var signature) ? signature : null;
+        lock (Gate) return Load() is { } stored && stored.TryGetValue(Normal(path), out var signature) ? signature : null;
     }
 
-    public static void Remember(AgentGuidance.PendingAppend pending)
+    /// <summary>
+    /// Remembers a Not Now. False when it was not written: the stored answers
+    /// could not be read just now (they are never replaced by this one alone,
+    /// #953), or the write was refused. Either way the next launch asks again.
+    /// </summary>
+    public static bool Remember(AgentGuidance.PendingAppend pending)
     {
         lock (Gate)
         {
-            var stored = Load();
+            if (Load() is not { } stored) return false;
             stored[Normal(pending.FilePath)] = AgentGuidance.Signature(pending.Body);
-            Save(stored);
+            return Save(stored);
         }
     }
 
-    public static void Forget(string path)
+    /// <summary>Forgets a file's Not Now. True only when an answer was there and the file was written without it.</summary>
+    public static bool Forget(string path)
     {
         lock (Gate)
         {
-            var stored = Load();
-            if (stored.Remove(Normal(path))) Save(stored);
+            if (Load() is not { } stored) return false;
+            return stored.Remove(Normal(path)) && Save(stored);
         }
     }
 
@@ -329,26 +346,37 @@ public static class AgentGuidanceDeclined
         try { return Path.GetFullPath(path); } catch { return path; }
     }
 
-    private static Dictionary<string, string> Load()
+    /// <summary>
+    /// The stored answers; EMPTY when there is no file, or when it is there
+    /// but not valid JSON (replaced on the next write, as before); NULL when it
+    /// could not be read just now, so nothing that follows writes (#953).
+    /// </summary>
+    private static Dictionary<string, string>? Load()
     {
+        HeldFiles.FileBytes read;
+        try { read = HeldFiles.ReadBytes(FilePath); }
+        catch { return null; }
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) return null;
+        var empty = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (read.Outcome == HeldFiles.ReadOutcome.NotThere) return empty;
         try
         {
-            if (File.Exists(FilePath)
-                && JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(FilePath)) is { } read)
-                return new Dictionary<string, string>(read, StringComparer.OrdinalIgnoreCase);
+            if (JsonConvert.DeserializeObject<Dictionary<string, string>>(Encoding.UTF8.GetString(read.Data!).TrimStart('\uFEFF')) is { } stored)
+                return new Dictionary<string, string>(stored, StringComparer.OrdinalIgnoreCase);
         }
         catch { }
-        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        return empty;
     }
 
-    private static void Save(Dictionary<string, string> stored)
+    private static bool Save(Dictionary<string, string> stored)
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             AgentGuidance.WriteAtomically(FilePath, JsonConvert.SerializeObject(stored, Formatting.Indented));
+            return true;
         }
-        catch { }
+        catch { return false; }
     }
 }
 

@@ -60,7 +60,7 @@ public class SectionVerbsTests : IDisposable
         workspace = server;
         var tools = new AssistScenarioTests.RealTools(server);
         return new SectionVerbs(_folder, _ => Task.FromResult<IToolServer?>(tools),
-            (course, section, toolServer) => new AssistToolRunner(toolServer, course, section, AssistSurface.Menu));
+            (course, section, toolServer) => new AssistToolRunner(toolServer, course, section, AssistSurface.Menu) { CourseNoun = Plantoir.Core.Models.ClassNoun.Class });
     }
 
     private static JsonObject Arguments(JsonObject call) =>
@@ -259,7 +259,7 @@ public class SectionVerbsTests : IDisposable
         Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — took the last change back", File.ReadAllText(_trail));
 
         var third = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1, SubjectMenuLayout.Menu.Section);
-        Assert.Equal(AssistWording.NothingToUndoFromTheMenu, third.Summary);
+        Assert.Equal(AssistWording.NothingToUndoFromTheMenu(ClassNoun.Class), third.Summary);
         Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — changed nothing", File.ReadAllText(_trail));
         Assert.NotEqual(third.Summary, second.Summary);
     }
@@ -299,12 +299,15 @@ public class SectionVerbsTests : IDisposable
             answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
                                          "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "2 pages ticked");
 
-        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the pages you named", ""), answer.Summary);
-        Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
-        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — carried out, 2 pages ticked", File.ReadAllText(_trail));
+        // Since #899 W7a the publish is ONE step, all of it or none: the page
+        // in use stops it with nothing written, so the true sentence is
+        // "Nothing was changed" and Day 1 is untouched.
+        Assert.StartsWith("Nothing was changed: “Unit 1, Day 2.md” is in use by another program.", answer.Summary);
+        Assert.DoesNotContain("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.DoesNotContain("Section ▸ Publish Pages… — carried out", File.ReadAllText(_trail));
     }
 
-    /// <summary>The same through a whole unit, which has its own write loop.</summary>
+    /// <summary>The same through a whole unit: one step since #899 W7a, so a page held against writing leaves the whole unit as it was, said as nothing changed.</summary>
     [Fact]
     public async Task AWholeUnitThatStoppedPartWay_IsCarriedOut()
     {
@@ -314,9 +317,9 @@ public class SectionVerbsTests : IDisposable
             answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1" }, plan: false),
                                          "Section ▸ Publish Pages…", "ICS3U", 1, SubjectMenuLayout.Menu.Section, "1 unit");
 
-        Assert.StartsWith(AssistWording.PublishStoppedPartWay("Unit 1", ""), answer.Summary);
-        Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
-        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — carried out, 1 unit", File.ReadAllText(_trail));
+        Assert.StartsWith("Nothing was changed: ", answer.Summary);
+        Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — changed nothing, 1 unit", File.ReadAllText(_trail));
     }
 
     /// <summary>
@@ -452,7 +455,7 @@ public class SectionVerbsTests : IDisposable
 
             var window = new AssistWorkspace(_folder, new FakeLauncher(), undo: new UndoHistory()) { Surface = AssistSurface.LocalWindow };
             var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(window), "ICS3U", 1, AssistSurface.LocalWindow)
-            {
+            { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
                 SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, "ICS3U", 1),
             };
             var (answer, handed) = await runner.Run(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1, Day 1" }, plan: false), default);
@@ -473,9 +476,9 @@ public class SectionVerbsTests : IDisposable
         int rebuilt = 0, shown = 0;
         var tools = new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.Menu });
         var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ShowPreviewInApp = () => shown++,
-            RebuildPreviewInApp = () => rebuilt++,
+            RebuildPreviewInApp = () => { rebuilt++; return Task.FromResult<string?>(null); },
             CourseIsBeingCopied = () => false,
         };
         var (answer, _) = await runner.Run(SectionVerbs.RebuildPreview("ICS3U", 1), default);
@@ -483,13 +486,53 @@ public class SectionVerbsTests : IDisposable
         Assert.Equal((1, 0), (rebuilt, shown));
 
         var copying = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
-        {
-            RebuildPreviewInApp = () => rebuilt++,
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
+            RebuildPreviewInApp = () => { rebuilt++; return Task.FromResult<string?>(null); },
             CourseIsBeingCopied = () => true,
         };
         var (refused, _) = await copying.Run(SectionVerbs.RebuildPreview("ICS3U", 1), default);
         Assert.Equal(AssistWording.CourseIsBeingCopiedFromTheMenu("ICS3U"), refused.Summary);
         Assert.Equal(1, rebuilt);
+    }
+
+    /// <summary>
+    /// #928 review 2, M3: a rebuild the window refuses (another window is
+    /// previewing the section) is answered with the window's sentence, marked
+    /// as shown there, and the trail ends "not rebuilt"; nothing says
+    /// "rebuilding".
+    /// </summary>
+    [Fact]
+    public async Task ARebuildTheWindowRefuses_IsAnsweredWithItsSentence_NeverRebuilding()
+    {
+        const string refusal = "Section 1 of ICS3U is already being previewed in another window. Stop that preview first, or work with it there.";
+        var tools = new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.Menu });
+        var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
+            ShowPreviewInApp = () => { },
+            RebuildPreviewInApp = () => Task.FromResult<string?>(refusal),
+            CourseIsBeingCopied = () => false,
+        };
+        var (answer, handed) = await runner.Run(SectionVerbs.RebuildPreview("ICS3U", 1), default);
+        Assert.True(handed);
+        Assert.Equal(refusal, answer.Summary);
+        Assert.True(answer.ShownInTheWindow);
+        Assert.Equal("not rebuilt", SectionVerbs.Ending("rebuild_preview", answer, null, null, "ICS3U", 1));
+    }
+
+    /// <summary>M3, the assistant's plain "rebuild the preview": the window's refusal is what it says, never "opening".</summary>
+    [Fact]
+    public async Task ThePlainRebuildTheWindowRefuses_SaysTheWindowsSentence()
+    {
+        const string refusal = "Section 1 of ICS3U is already being previewed in another window. Stop that preview first, or work with it there.";
+        var agent = new AssistAgent(new NoModel(), new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher())),
+                                    new JsonArray(), "ICS3U", 1)
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
+            ShowPreviewInApp = () => { },
+            RebuildPreviewInApp = () => Task.FromResult<string?>(refusal),
+        };
+        var plain = await agent.Say("rebuild the preview", CancellationToken.None);
+        Assert.Contains(plain, line => line.Text == refusal);
+        Assert.DoesNotContain(plain, line => line.Text.Contains("is opening", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -504,7 +547,7 @@ public class SectionVerbsTests : IDisposable
         var tools = new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher(), undo: history) { Surface = AssistSurface.Menu });
         int stopped = 0, shown = 0;
         var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             PreviewIsShowing = () => true,
             StopPreviewInApp = () => stopped++,
             ShowPreviewInApp = () => shown++,
@@ -542,9 +585,9 @@ public class SectionVerbsTests : IDisposable
         int rebuilt = 0, shown = 0;
         var agent = new AssistAgent(new NoModel(), new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher())),
                                     new JsonArray(), "ICS3U", 1)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ShowPreviewInApp = () => shown++,
-            RebuildPreviewInApp = () => rebuilt++,
+            RebuildPreviewInApp = () => { rebuilt++; return Task.FromResult<string?>(null); },
             SectionIsChangingFromTheMenu = () => true,
         };
 

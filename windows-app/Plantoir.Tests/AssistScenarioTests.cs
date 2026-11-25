@@ -230,7 +230,7 @@ public class AssistScenarioTests : IDisposable
         // hands its agent NarrowToLocal(served).
         var schemas = ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray();
         var agent = new AssistAgent(model, tools, schemas, Course, SectionNumber)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             PreviewIsShowing = () => previewRunning,
             SectionIsBusy = () => sectionBusy,
         };
@@ -288,7 +288,8 @@ public class AssistScenarioTests : IDisposable
         {
             agent.ShowPreviewInApp = () => _window.Note("startPreview");
             // Rebuild Preview (#489, #528). The runner hands rebuild_preview to
-            // this ONE seam and returns at once; the window does the rest. In
+            // this ONE seam and answers once the start is decided; the window
+            // does the rest. In
             // the app it is MainWindow.RebuildPreviewFor ->
             // SectionDetailView.RebuildPreviewAsync, which AWAITS
             // StopPreviewIfRunningAsync (only when a preview is up) and then
@@ -303,8 +304,12 @@ public class AssistScenarioTests : IDisposable
             // a stop, or the order.
             agent.RebuildPreviewInApp = () =>
             {
-                windowWork = RebuildInTheWindow();
-                async Task RebuildInTheWindow()
+                // Answered once the start is decided (#928 review 2, M3): this
+                // fake's start always goes ahead, so it answers null.
+                Task<string?> rebuilding = RebuildInTheWindow();
+                windowWork = rebuilding;
+                return rebuilding;
+                async Task<string?> RebuildInTheWindow()
                 {
                     if (previewRunning)
                     {
@@ -314,6 +319,7 @@ public class AssistScenarioTests : IDisposable
                         _window.Note("stopPreview.ends");
                     }
                     _window.Note("startPreview");
+                    return null;
                 }
             };
             agent.StopPreviewInAppAsync = async () =>
@@ -1065,7 +1071,7 @@ public class AssistScenarioTests : IDisposable
     public async Task DeploySection_SucceedsWhenAsyncSeamReportsSuccess()
     {
         var agent = new AssistAgent(new ScriptedModel(), new NoTools(), new JsonArray(), Course, SectionNumber)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             SectionIsBusy = () => false,
             PreviewIsShowing = () => false,
             StartDeployInAppAsync = () => Task.FromResult<string?>(
@@ -1081,7 +1087,7 @@ public class AssistScenarioTests : IDisposable
     public async Task DeploySection_ReportsFailureWhenAsyncSeamReportsFailure()
     {
         var agent = new AssistAgent(new ScriptedModel(), new NoTools(), new JsonArray(), Course, SectionNumber)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             SectionIsBusy = () => false,
             PreviewIsShowing = () => false,
             // The deploy actually ran and failed — the outcome the old,
@@ -1103,7 +1109,7 @@ public class AssistScenarioTests : IDisposable
         // exception before it started) — the fallback must never be the success
         // wording, which is exactly the bug being closed.
         var agent = new AssistAgent(new ScriptedModel(), new NoTools(), new JsonArray(), Course, SectionNumber)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             SectionIsBusy = () => false,
             PreviewIsShowing = () => false,
             StartDeployInAppAsync = () => Task.FromResult<string?>(null),

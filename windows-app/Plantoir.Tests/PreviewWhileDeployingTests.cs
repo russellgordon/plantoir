@@ -84,7 +84,7 @@ public class PreviewWhileDeployingTests : IDisposable
         int opened = 0;
         var tools = new NoTools();
         var agent = new AssistAgent(new NoModel(), tools, new JsonArray(), "ICS4U", 2)
-        {
+        { CourseNoun = Plantoir.Core.Models.ClassNoun.Class,
             ShowPreviewInApp = () => opened++,
             SectionIsBeingDeployed = () => true,
         };

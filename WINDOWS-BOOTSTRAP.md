@@ -70,11 +70,11 @@ pieces into `dev`; a cut still starts with him asking.
    page that explains it. Read the page an issue names rather than all of them.
    Write-ups for work that already shipped on this port are in
    `documentation/13-windows-port-archive.md` — history, not a specification.
-4. **`contracts/README.md`**, then the twelve JSON files. The coverage table
-   there says what is shared and what deliberately is not. Three of the twelve
+4. **`contracts/README.md`**, then the thirteen JSON files. The coverage table
+   there says what is shared and what deliberately is not. Three of the thirteen
    are GENERATED from the mac, one (`undo-action-steps.json`) by the mac's
    `UndoActionStepsTests`, and one (`undo-traces.json`) by
-   `scripts/make_undo_traces.py`, and none of those five is hand-edited; the other seven are
+   `scripts/make_undo_traces.py`, and none of those five is hand-edited; the other eight are
    authored and can be corrected from either side — `contracts/README.md` says
    which is which.
 5. **`GUI-IMPROVEMENTS.md`**, newest rows first, for what changed up to
@@ -144,7 +144,7 @@ reasons rather than tasks:
   arguments changing on the mac arrived here looking like it came from nowhere.
   Only `assist-cases.json` and `app-rules.json` carry that key, because they
   are the two MIXED files and it marks the boundary; `assist-wording.json` is
-  generated in full and says so in its `note`, and the seven authored files
+  generated in full and says so in its `note`, and the eight authored files
   have no generated half to mark.
 - **A red contract test is usually a HANDOVER arriving, and the issue naming it
   is often already open.** The mac opens a `windows` issue in the session it
@@ -259,6 +259,20 @@ cd windows-app
 dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
+
+**Two prerequisites a fresh machine lacks (#964).** Found setting up a new
+Windows 11 machine in 2026-11 (ARM64, Python 3.14.10 from python.org with no
+extra packages); without them the suite does not match the development PC:
+
+- **`python-frontmatter` for the `python` on PATH** (`python -m pip install
+  python-frontmatter`). `CopyAPageFuzzTests` asks the website builder's own
+  code about each page on PATH's Python, and without the package that test
+  fails in seconds, saying "No module named 'frontmatter'" and naming
+  `python-frontmatter` (until #964 it hung the suite for half an hour).
+- **The symbolic-link privilege: turn on Developer Mode** (Settings ▸ System ▸
+  For developers), or hold `SeCreateSymbolicLinkPrivilege` another way.
+  Without it `scripts/test_site_files.py`'s
+  `test_media_reached_through_a_link_is_read` fails with WinError 1314.
 
 **A runtime fetched before #1010 needs `fetch-runtime.ps1` once more.** The
 build refuses it ("does not carry the Visual C++ runtime 14.52.37029.0 ...

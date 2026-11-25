@@ -7941,8 +7941,8 @@ on the section row's right-click menu
 **Menu paths.** `help/menu-paths.json`, `help/outline.json`, the two menu
 sentences that named Section ▸ Class Dates… (`menuNeedsClassDatesFirst`,
 `menuRollOverDatesAreOld`) and the comments that named the five moved items
-say Classes now. A club's twins of those two sentences name "the Classes menu"
-(below). The
+say Classes now. A club's twins of those two sentences name "the Meetings
+menu" (below). The
 three Undo sentences that name Section ▸ Undo Last Change are U7's and stay.
 
 **Name the real menu** (Russell, 2026-11-20, on #990). A sentence that says
@@ -7977,21 +7977,61 @@ selected course's noun in `SidebarMenuCommands.classNoun` (beside the
 situation, not in it, since it greys nothing), and `SectionMenu`'s
 `CommandMenu` title reads it, Classes with no window in front. Every sentence
 that names the menu for a club follows: the two club sentences ("Add them
-from the Meetings menu"), `sectionIsChangingFromTheMeetingsMenu` ("the
+with Meetings ▸ Meeting Dates…" since #1027), `sectionIsChangingFromTheMeetingsMenu` ("the
 Section or Meetings menu"), the trail's backup lines and "ran from a menu"
-paths ("Meetings ▸ Make Room for Classes…"), and the Backups list's
+paths ("Meetings ▸ Make Room for Meetings…" since #1027), and the Backups list's
 sentences, which read the noun of the backup's course when drawn
 (`WorkspaceModel.classNoun(ofCourse:)`; a backup of a course no longer in
 the folder is read by its code, a club's code meaning meetings). The file
 name does not change. `ClubNounTests` checks every club sentence for "class"
-with no exception for menu titles. `nothingToUndoFromTheMenu` keeps "the
-Section or Classes menu": with nothing to undo there is no course to read a
-noun from, and the item leaves with #899 U7. The HIG has no sentence on a
+with no exception for menu titles. The HIG has no sentence on a
 menu title that follows the selection; the nearest, Menus, has an item's
 "changeable label that describes an item's current state", and The menu
 bar's "Always show the same set of menu items" is kept: only the title
 changes. `SectionAndClassesMenusUITests.testTheClassesMenuIsTitledMeetingsWhileAClubIsSelected`
 proves it live in the real menu bar.
+
+**And its items say meeting** (#1027, Russell, 2026-11-20 night). Every item
+of Section or Classes whose title says class has a club title in the contract,
+`subjectMenus.layout.itemTitles`: Publish Meeting for a Date…, Add Meeting…,
+Meeting Dates…, Re-date Meetings…, Make Room for Meetings…. They are drawn
+from `SubjectMenuLayout.titleSayingTheNoun(of:noun:)` (nonisolated, so the
+assistant's sentences can use it), which `SectionMenu.title(for:noun:)` calls,
+so the menu bar, a section row's right-click menu (by the row's course) and
+the "ran from a menu" path (`SectionVerbs.menuPath`, "Meetings ▸ Add
+Meeting…") say the same words, live with the selected course; the items, their
+order, ellipses and greying do not change (The menu bar: "Always show the same
+set of menu items"; Menus: the ellipsis for an action that "requires more
+information before it can complete", which each still does). The two club
+sentences that used to point at "the Meetings menu" without the item's title
+now name it ("Add them with Meetings ▸ Meeting Dates…, then try again"), and
+Undo Last Change's nothing-to-undo is named from the selected section's
+course: `SectionVerbs.perform` sets the runner's `menuSelectedCourseCode` for
+one call (contract key `nothingToUndoFromTheMeetingsMenu`). `ClubNounTests`
+walks every item of the two menus against the contract list (an item not
+listed may not change with the noun nor say class), the list's
+`ranFromAMenuCases`, and every `…ForAMeeting` / `…FromTheMeetingsMenu`
+sentence whose class twin names an item. Help's club page quotes the titles
+with `say` tokens.
+
+**The Class Dates sheet says meeting too** (#1027's first review, MEDIUM 1).
+Meeting Dates… opens `SectionScheduleSheet`, and every sentence it says
+itself has a `classDates…` key with its `…ForAMeeting` twin
+(`AssistWording.classDatesPurpose`, `…CourseMissing`, `…NoneGiven`,
+`…NotWrittenAsDates`, `…OnFileUnreadable`, `…TooFarFromToday`,
+`…CouldNotBeSaved`, `…AreRemembered`, `…SetAside`, `…AlreadyRecorded`,
+`…ToRemember`, `…HalfRead`). The sheet reads its course's noun
+(`SectionScheduleSheet.noun`) and says each refusal through
+`SectionScheduleSheet.sentence(for:noun:)`, which asks
+`SectionTimetableStore.Problem` or `SectionScheduleSource.Problem` for
+`sentence(noun:)`; their `errorDescription`, which every tool result the model
+reads is built from, stays the class form, as #267 requires. The proposal is
+`RememberTimetablePlan.description(noun:)` on the sheet and `.description`
+(class) in tool results. The trail line when remembered dates are set aside
+is said in the course's noun by the reader, which holds the course; the
+missing-course line knows a club by its code (`ClubCodeRule`), since the
+course's settings are gone. `ClubNounTests.testTheClassDatesSheetSaysMeetingInAClub`
+checks each against the contract.
 
 ### The shape: one focused value per OWNER of the state
 
@@ -20502,7 +20542,10 @@ off.
   or not one JSON object, or bytes that do not scan, refuse the move as a
   change since; the result must read back as exactly the file with that
   one member changed. `undo-json-cases.json` → `editJSONCases` pins the bytes for both
-  platforms, and the Python reference produces the same ones. The reserved
+  platforms; the Python reference produces the same ones, except the six
+  rows Windows and the Python both refuse until their key order is
+  measured to match Foundation's (W6's second review: they answer cannot
+  tell rather than guess). The reserved
   `element` (an array element) is left to the piece that needs it: an op
   carrying it cannot be read here, so an older reader can never undo it by
   the member rule.

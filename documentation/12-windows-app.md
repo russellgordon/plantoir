@@ -134,7 +134,7 @@ Quartz server". Since #1016:
 
 | What the wait needs | Where it comes from | How it waits |
 |---|---|---|
-| The run has ended, could not start, or was stopped | `ScriptRunner` (`IsRunning`, `LastExitCode`, `LaunchProblem`, `WasStoppedByUser`) | Woken by the change. A run refused because the folder's tools are not ready sets `LastExitCode` -1 and ends the wait. A run that sets only `LaunchProblem` (`preview.ps1` gone between the press's checks and the start, or a pseudo console that would not open; `LastExitCode` stays null) wakes the wait, which finds no ending and waits on with its sentence in the console, as the once-a-second loop did before #1016. Treating it as over was tried on the branch and withdrawn (second review): it took the console down with the sentence in it, so the teacher saw nothing; keeping the sentence up while letting the lease go is owed, with a window test. A `preview.ps1` missing BEFORE the press never gets this far: the press's own check refuses it (`AssistRefusal`, "isn't a Plantoir working folder"), and today that refusal is only logged, which is a separate gap |
+| The run has ended, could not start, or was stopped | `ScriptRunner` (`IsRunning`, `LastExitCode`, `LaunchProblem`, `WasStoppedByUser`) | Woken by the change. A run refused because the folder's tools are not ready sets `LastExitCode` -1 and ends the wait. A run that sets `LaunchProblem` (the folder has no `preview.ps1`, before the press or after its checks, or a pseudo console that would not open) is a run that never started (`PreviewStarts.HowTheRunStands`, asked before the exit code): the wait ends at once, the record and the lease go back, the trail gets `preview could not start` with the sentence and `LaunchProblemDetail`, and the sentence is shown under "Cannot Preview Yet" while the console keeps it (#928, #1022 item 1). The rule withdrawn in #1016 took the console down with the sentence in it; the console now stays up while `LaunchProblem` is set. |
 | The address | the launcher's line, collected as lines arrive (#278) | Woken by the change (`PreviewAddress` now raises `PropertyChanged` when it changes) |
 | "Launching Quartz preview" | `build_site.py`'s line, collected as lines arrive (`ScriptRunner.HasAnnouncedQuartzLaunch`) | Woken by the change |
 | "Started a Quartz server" | Quartz's line, collected as it arrives (`ScriptRunner.ServerStartedAt`, the time it ARRIVED, where the old loop stamped the look that first saw it, up to a second late), read in the unfinished line too: it is the last line before a quiet server, and ConPTY can hold a line's end back until the next drawing (#623, #661), so waiting for the end would leave the 45 s bound unstarted (#233). The address alone still waits for its line to end | Woken by the change |
@@ -148,6 +148,10 @@ reading and the wait is not lost (`AChangeBeforeTheAwaitIsNotLost`), and
 disposes it every turn. Unlike the mac's Observation registration (which
 cannot be withdrawn on macOS 15) a .NET event handler is removed, so nothing
 is left behind.
+
+One start at a time per window (#928, the mac's #812): a start while the window's own start waits for a stop or builds does nothing (`preview already starting`); every start takes through `PreviewStarts.Begin`, the lease then its own record; a parked start runs only while it still belongs (its own lease, the latest start, the page there, the quit not gone ahead, `App.QuitHasGoneAhead`). The repair's Preview Again carries its press (`PreviewAgainPresses`, #813).
+
+Sentences: launch problems name no file and carry no system text (`ScriptRunner.LaunchProblemDetail` holds both, trail only); `LaunchProblemWordingTests` holds Windows to it.
 
 `ScriptRunner.WaitUntilFinished` (a deploy leg, a build before a deploy, the
 tools' own runs) and `WaitUntilFinishedOrKill` looked at `IsRunning` every
@@ -2181,6 +2185,25 @@ five times; 23 s became under a second. The product's behaviour, one
 remembered page silently not saved when the file is held, is a separate
 matter and is not changed here.
 
+### A file another program holds for a moment (#953, #874)
+
+**#953**
+
+On Windows a rename onto a file another program has open without delete sharing is refused (access denied); with no sharing at all a read is refused too (a sharing violation). `HeldFiles` is the one place that asks again: a sharing or lock violation, or an access-denied rename whose target (or temporary) cannot be opened for delete access with full sharing because of a sharing violation, is a hold; anything else (a deny rule, a read-only file, a reference lock) is a permission and is said at once, never retried. The bound is the one already accepted (`ObsidianFigureAddOns.Retrying`), not tuned. The guidance notice keeps the contract's `couldNotWrite` with the system's own sentence for the hold, and the file is named on the trail line. A refused read is its own answer, never "empty", and nothing that follows it writes.
+
+**#874**
+
+`CourseConfiguration.ReadBytes` is the one reader of `course_config.json`; a source-text test (`CourseSettingsHeldFileTests.EveryReaderOfTheSettingsGoesThroughTheOneReader`) fails on any `File.ReadAll*` of a settings path elsewhere in product code (CourseRestorer.cs excepted by name). During a build's `os.replace` (on Windows `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`) an open of the old file is refused for a moment; measured on a real second process, every one of those refusals was a sharing violation (86 in 476 rounds), none access denied (the "access denied" reported on #874 was Python's `PermissionError`, which covers both). Access denied on a file that is there is still asked again as a precaution, because the delete-access probe cannot tell it from a deny rule; so every access denied on a file that is there is asked again for the bound and, if it lasts, refused in the system's words, never read as "not there". Discovery keeps the run's last good read of each settings file, so a course never leaves the sidebar while a build swaps its file, and the reference doors answer from it, failing closed with no earlier read. A Save whose merge read is refused by a hold is refused, rather than writing the window's whole copy over what a build may just have written; the sentence is `HeldFiles.InUseSentence`, the Undo line's "is in use by another program". Measured with a real second PowerShell process holding the file (`FileShare.None` and `FileShare.Read`).
+
+### What the VMs showed in the unit suite, and what changed (#971, #964, #916 items 3 and 4)
+
+Lane F, 2026-11-21, from the second Windows VM.
+
+- **The tools server is looked for from two roots (#971).** `ClaudeCodeLauncher.FindServer` and `LocalModel.FindServer` search the running program's folder and `AppContext.BaseDirectory`. Under `dotnet test` on Windows ARM the running program is `C:\Program Files\dotnet\dotnet.exe` (`--arch x64` gives `…\dotnet\x64\dotnet.exe`), so a lookup beside the process alone found nothing and the door refused at its first check; the x64 PC's runner starts a `testhost.exe` from the test output folder, which hid it. In the installed app both roots are the `Plantoir.exe` folder. Rejected: searching wider (PATH, Program Files) for the tools server, which could find another install's server.
+- **A test chooses the path lengths it exercises (#971).** `OutsideDoorTests`' deep shim folder is exactly 240 characters whatever `%TEMP%` is, under a run-owned root; the stub `node.exe` (a .NET Framework 4.8 program) starts from at most 252 characters and the test asserts it stays within that. Before, the account name decided it.
+- **The frontmatter oracle fails rather than hangs (#964).** A `multiprocessing.Pool` whose initializer raises replaces the dead worker for ever; the oracle imports in the parent first. Reading a child's stderr to its end waits on every process that inherited the handle, so `Ask` reads both streams in the background and waits on the parent's exit.
+- **The suite's settings folder and trail are the run's own (#916 items 3 and 4)**: `plantoir-tests-<pid>-<start ticks>` and `plantoir-tests-trail-<pid>-<start ticks>\activity.txt` under `%TEMP%`, removed at process exit; a crashed run's are left, and no run removes another's.
+
 ### And when the failure IS real: a red contract test is a handover
 
 Everything above is about telling a genuine failure from a crash or an empty
@@ -2819,7 +2842,8 @@ assistant is shown changes. `scripts/test_tool_surface_digest.py` and
 expectation did not move. The test passed in the baseline, so Windows'
 surface still matches it.
 Add Next Class is not renamed: the issue says renaming the item is the fix,
-and the item is a menu a teacher sees, so it waits for #927's dialog.
+and the item is a menu a teacher sees, so it waited for #927's dialog (built 2026-11-21:
+Classes ▸ Add Class… replaced Add Next Class).
 
 **Five new areas, each read where its red was** (a sixth came with stack 13, below).
 - `SubjectMenuItemsUnderAnOlderName` (`subjectMenus.items`, with an older
@@ -3081,9 +3105,11 @@ a teacher can see it rather than merely held in a constant.
 carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
 `dotnet test` builds them and runs none of those — only
 `AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
-and need no desktop (bundle 11), and `HarnessSourceRuleTests`, five more that
-keep a bare key-down, a discarded `Keyboard.Pressing` and an unwatched key out
-of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
+and need no desktop (bundle 11) (the key rules that keep a bare key-down, a
+discarded `Keyboard.Pressing` and an unwatched key out of these sources,
+`HarnessSourceRuleTests` (#638), live in `Plantoir.Tests` since #1035, so the
+merge gate runs them: in this project they failed on `dev` for days with
+nobody seeing it). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -3234,11 +3260,16 @@ the 2026-10-23 full run and passed alone).
   `using (Keyboard.Pressing(key)) { … }`, which sends the up on dispose, a
   failing assert included. `PlanTable`'s Shift+Tab had called `Pressing` and
   thrown the disposable away; it is a `using` now.
-- **`HarnessSourceRuleTests`** (plain facts, no desktop) fails on any
-  `Keyboard.Press(` in the UI test sources. The exception is one method,
-  allowed by name: `PageTablesUiTests.HeldSpace`, which imitates
-  auto-repeat (several downs, then one up in a `finally`) and must keep
-  its release.
+- **`HarnessSourceRuleTests`** (in `Plantoir.Tests`, plain facts reading
+  `windows-app/Plantoir.UiTests/*.cs`) fails on any `Keyboard.Press(` in the UI
+  test sources. The one exception, allowed by name, is
+  `HeldKeys.HoldWithRepeats`, which imitates auto-repeat (one down, more downs
+  after the repeat delay, one up in a `finally`) and must keep its release;
+  every held-key imitation calls it (`PageTablesUiTests.HeldSpace`,
+  `StopByKeyboardUiTests`' held Escape). It also fails on a key a test names
+  that `HeldKeys.Watched` does not list, comparing by name because the unit
+  project cannot load FlaUI: spell a key as `Watched` does (`RETURN`, not
+  `ENTER`).
 - **`HeldKeys` sweeps for a key held any other way.** It reads
   `GetAsyncKeyState` for every modifier (generic and left/right, Windows
   keys included) and every key the suite sends. `DrivenApp`'s constructor
@@ -6872,10 +6903,12 @@ Windows".
 ### The unit suite keeps its state in a scratch folder (#285, #179)
 
 `Plantoir.Tests/TestAppDataRedirect.cs` is a `[ModuleInitializer]`: before any
-test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>)`. Settings,
+test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>-<start ticks>)`. Settings,
 models, builds and scheduled-publish state a test touches land there, not in
-the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id, so two worktrees'
-suites do not share a settings file. `AppDataRedirectTests` pins it. The redirect has one documented limit: during
+the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id and start time, so
+two worktrees' suites do not share a settings file and a recycled process id
+does not inherit an earlier run's state; the folder is removed at process
+exit (a crashed run's is left, and no run removes another's). `AppDataRedirectTests` pins it. The redirect has one documented limit: during
 a redirected UI test the launchers (`preview.ps1:512`) still write their trail
 lines to the real `Logs` folder, because they resolve it themselves.
 
@@ -7004,12 +7037,12 @@ became `OutsideDoor.StartGrace` (same 400 ms, same behaviour), and
 for is still asserted. Alone, 10 times each: 10 of 10 passed before and 10 of
 10 after, because the failure needs a loaded PC.
 
-**Two shared temp paths are left as they are** and filed as findings, because
-neither is this sweep: `TestTrailRedirect.ScratchTrailPath` is one fixed
-`%TEMP%\plantoir-tests\activity.txt` that every run appends to, and
-`TestAppDataRedirect`'s `plantoir-tests-<pid>` is never deleted, so a recycled
-id inherits ANY earlier run's settings and state, not only a crashed run's (a
-review counted 1,603 such folders in `%TEMP%` on this PC, back to 2026-10-01).
+**The suite's two temp paths are the run's own (#916 items 3 and 4).**
+`TestAppDataRedirect`'s `plantoir-tests-<pid>-<start ticks>` and
+`TestTrailRedirect`'s `plantoir-tests-trail-<pid>-<start ticks>\activity.txt`
+sit under `%TEMP%` and are removed at process exit, so a run leaves no folder
+behind and a recycled process id inherits nothing. A crashed run's are left,
+and no run removes another's.
 
 ### Same-second backups wait for the next second (#187)
 
@@ -8168,7 +8201,7 @@ when they land.
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
 | Course | Add Section…, Copy a Page from This Course… (Ctrl+Shift+K since #990) · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2; its grey reason line under it went with #990), Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
 | Section | Since #990 (grouping A, drawn from `subjectMenus.layout`; "Section and Classes, drawn from the contract (#990)" below): Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Rebuild Preview (Ctrl+Shift+B), Open in Browser · Publish Class for a Date…, Publish Pages…, Hide Pages…, Publish Pages That Links Lead To…, Undo Last Change, Undo Getting Ready for the Start of the Year… · Deploy… (Ctrl+Shift+D), Schedule Deploy…, Remove Scheduled Deploy (Cancel Scheduled Deploy… until #987; no ellipsis since #990) · Revise With ▸ · Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section (no ellipsis since #990) |
-| Classes | Since #990: Add Next Class (Add Class… with #927) · Class Dates…, Re-date Classes…, Make Room for Classes… · Get Ready for the Start of the Year… (Roll Over to a New Year… joins with #954) |
+| Classes | Since #990: Add Class… (#927) · Class Dates…, Re-date Classes…, Make Room for Classes… · Roll Over to a New Year… (#954), Get Ready for the Start of the Year… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
@@ -8371,7 +8404,8 @@ here where Windows has the same thing:
   them"): Revise With ▸ and every item in it carry the star glyph, and the
   four assistant functions, the one group without icons, sit between dividers.
   The mac's other D43 change, the deployed folder's items in a group of their
-  own, has no Windows counterpart until #889 builds those items.
+  own, had no Windows counterpart until #889 built those items (2026-11-21: Open in Browser and
+Stop Showing Deployed Folder, a group of their own in the section row's menu).
 - **No grey text rows in the Course or Section menu** (Q14): Course ▸
   Rename's reason line (`courseRenameReason`) is gone. The row's context
   menus keep their lines (the ruling named the two menus): the busy note under
@@ -8429,9 +8463,9 @@ path (`SectionVerbDialog.MenuPath`) takes its menu from the layout, so it
 reads "Classes ▸ Re-date Classes… — carried out" now.
 
 **What Windows does not have yet** is left out by its named gap, and its
-neighbours keep their order: Stop Showing Deployed Folder (#889), GitHub
-Copilot (#884), Roll Over to a New Year… (#954); Add Class… is drawn as Add
-Next Class until #927. `SubjectMenuLayoutContractTests` builds the expected
+neighbours keep their order: GitHub Copilot (#884). Stop Showing Deployed
+Folder (#889), Roll Over to a New Year… (#954) and Add Class… (#927, which
+replaced Add Next Class) were gaps here until each was built on 2026-11-21. `SubjectMenuLayoutContractTests` builds the expected
 menus from the contract less those gaps and compares them with
 `SubjectMenuLayout`; the day a gap closes, the item must be added to the
 Windows lists, in its place, or the test goes red. The two Undo items stay in
@@ -8475,7 +8509,23 @@ pinned without pixels by `SubjectMenuLayoutContractTests`. With
 `PLANTOIR_UI_CAPTURE_DIR` set it also saves a picture of each menu open on a
 section row.
 
-**In a club the Classes menu is titled Meetings** (Russell, 2026-11-20 evening, on #990), live with the selection: `SubjectMenuLayout.Title(menu, ClassNoun)` takes the selected course's noun, read in `ApplyMenuEnablement` (not part of `Situation`, which holds only what greys an item and is pinned against `situationKeys`). The noun decides it, not the club code, because the noun is what a club's sentences are chosen by. Backups name the menus by the noun of the backup's course when drawn (`WorkspaceViewModel.ClassNounOf`, `SubjectMenuLayout.NounOfCourse`: a course no longer in the folder is read by its code). The in-app assistant's refusal while the menu changes the section names "the Section or Meetings menu" through `AssistAgent.CourseNoun` and `AssistToolRunner.CourseNoun`, set by the window. `NothingToUndoFromTheMenu` keeps "Section or Classes": there is no course to read a noun from, and the item leaves with U7/W11b. The mac's account is documentation 09, "In a club the menu is titled Meetings".
+**In a club the Classes menu is titled Meetings** (Russell, 2026-11-20 evening, on #990), live with the selection: `SubjectMenuLayout.Title(menu, ClassNoun)` takes the selected course's noun, read in `ApplyMenuEnablement` (not part of `Situation`, which holds only what greys an item and is pinned against `situationKeys`). The noun decides it, not the club code, because the noun is what a club's sentences are chosen by. Backups name the menus by the noun of the backup's course when drawn (`WorkspaceViewModel.ClassNounOf`, `SubjectMenuLayout.NounOfCourse`: a course no longer in the folder is read by its code). The in-app assistant's refusal while the menu changes the section names "the Section or Meetings menu" through `AssistAgent.CourseNoun` and `AssistToolRunner.CourseNoun`, set by the window. `NothingToUndoFromTheMenu` keeps "Section or Classes" even in a club: the course is known when the item runs, but the item and the sentence leave with U7/W11b in this milestone and no interim state is built (#990 review 3, low 1). The mac's account is documentation 09, "In a club the menu is titled Meetings".
+
+**Classes ▸ Add Class… (#927, the mac's #897 piece A).** The item's enablement is Add Next Class's (`SubjectMenuRules.Item.AddClass`); which ways the dialog offers is decided when it opens, from three facts that are not menu situation keys (`SectionVerbs.AddClassFacts`: the course's naming, the rename's own judgement made without clearing a stale record, and whether the class folders hold a page that is not an `index.md`). `SubjectMenuRules.AddClassWays`, `WhyGreyed`, `Label` and `ReasonLines` are the contract's `greyedRule`, `labelRule` and `reasonLineRule`. The copy is reached through `duplicateFileFromTheMenu`, which no tool declares: the MCP binder drops an undeclared argument, so `plantoir-mcp`'s call filter reads it from the raw arguments before dispatch, on the menu's server only (an outside client sending it is answered as if it had not, `OnlyTheMenusServerReadsTheArgument`). REJECTED: declaring it on `add_next_class` (it would move the schema every outside assistant and the built-in model is shown, which #897 froze). The source is matched against `ClassPages` by folder (`WorkingFolder.IsTheSame`, full path, case-insensitive) and file name as written; the mac also resolves links in the folder, because macOS lists a linked course's class folders resolved, while here both sides are built from the same course directory and are spelled alike. Measured nothing; the dialog's size has not been measured against a 620-epx ceiling (the mac's), only that the list stops at 7 rows.
+
+Seams left: the copy records nothing on the old undo list (W7 copies the journal step U3a defines; `NamedGapLedger.MenuCopyUndoEntries`).
+
+**Classes ▸ Roll Over to a New Year… (#954, the mac's #897 piece B).** One rule, `RollOverFromTheMenu.WebsiteFor`, over the contract's three facts (`subjectMenus.rollOverSheet`), read when the dialog opens and again by the menu's server at the plan and at the write, so a deploy in between (a "new" that now would reuse a Cloudflare address) is answered as the mac answers it: kept, with the reason. `sectionIsPinned` is "any marker the release walks", and the release's list is now ONE function, `AssistWorkspace.MarkersTheReleaseWalks`, which `ReleaseSite` iterates: on this platform the legacy marker lives in the BUILD ROOT (`%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>\section<N>\`), not `.merged_output`, and a second list would be the place the two drift. The website is settled inside the tool call, before it returns, so always before the window rebuilds the preview (`AssistToolRunner.AlwaysStartsPreview` runs after the call). The no-copy refusal is in `ApplyReDate` (the dates-change path, menu and rollover only) and in `BackUpBeforeARolloverFromTheMenu` (the dates-right path); the window's path keeps its own sentence. REJECTED: a combined undo entry on the old list (the settled night-3 ruling: the journal step is W7's, built once). Measured nothing; the dialog's width is 420 to 560 epx, not measured against the mac's sheet.
+
+Seams left for W7: the rollover from the menu records the window's entries (see the #954 entry in `windows-app/PROGRESS.md`); `SettleTheWebsiteFromTheMenu` in `PlantoirTools.cs` is the one place the menu's website half is carried out, and `ApplyReDate(isARollover: true)` the dates half.
+
+**Club item titles (#1027).** The menus' item titles in a club come from one function per platform, checked against `subjectMenus.layout.itemTitles`; nothing else retypes them. A sentence with no course of its own (Undo Last Change's nothing-to-undo) learns the selected section's course from the call's `_meta` key `plantoirCourse`, never a tool argument, so no schema changes. Still saying class in a club, outside #1027: the Class Dates dialog's body (`SectionScheduleDialog`'s purpose line). Roll Over to a New Year… (still a named gap here) needs no club title.
+
+**Class Dates dialog, review 1 (#1027).** The dialog's sentences are the mac sheet's, key for key; every caller but the dialog passes no noun and gets the class form, so nothing the model reads changes. `classDatesCourseMissing`, `…NoneGiven`, `…NotWrittenAsDates`, `…OnFileUnreadable`, `…CouldNotBeSaved`, `…AreRemembered` and `…AlreadyRecorded` are carried here for the contract walk; this dialog has no path that says them yet (its own refusals are "Please type or paste some dates first." and the like, which name no class). Still saying class in a club, outside the Meetings menu: the assistant window's dates-card lines ("No class dates were recorded.").
+
+**Club twins (#1027, round 3).** `assist-wording.json` carries `staysClass`, generated from `AssistContract.wordingThatStaysClass`: every wording key whose words say class and has no `…ForAMeeting` (or `…FromTheMeetingsMenu`) twin, with the reason. Both apps' `ClubNounTests` fail on a class key that is on neither list, and on a stale entry. A new sentence that says class is therefore given its club twin, or its reason, when it is made.
+
+**Planner refusals (#1027, round 4).** A planner refusal is one wording key per platform with a `…ForAMeeting` twin; the teacher's copy is chosen where the refusal is answered, never by the model's copy.
 
 ### What does NOT exist here: File with no window
 
@@ -14523,7 +14573,7 @@ then the default button), and Enter there presses Stop Deploy, the default,
 as Return does on the mac; Space there ticks the box. With the focus moved to
 Cancel, Enter and Space both press Cancel. A second preview started straight
 after a stopped one ended on its own with "Something went wrong" in this VM,
-so each UI test runs one preview; not looked into (it is not this piece's).
+so each UI test runs one preview. Explained by #1026: the earlier stop's two-second kill fallback (`ScriptRunner.CancelByUser`) asked only whether the runner was running and terminated the new run, whose stop flags were already reset, so it read as a failure. Since #1026 the fallback terminates only the run it was set for. The UI tests still run one preview each; that can now be relaxed.
 
 **Rejected.** A `KeyDown` or `PreviewKeyDown` on the window or the panel: a
 hidden key catcher. Initial focus moved to Cancel as #979's
@@ -16254,6 +16304,10 @@ Also owed by 889b, from the surface above and the fixes review:
   handed a show re-checks `ShowFor` afterwards, so it never opens the
   address of a show that was stopped meanwhile.
 
+**889b, built** (2026-11-20): every place opens through `Services/DeployedFolderOpening.OpenAsync`, which reads the offer again at the press and hands the address to `ExternalLinks.Open` (a `--state-dir` run records it in `links-opened.txt` and opens nothing: the UI tests' browser seam). The toolbar's button decides preview or folder by `_previewUrl` at the press. `DeployedFolderShows.Changed` is carried to the view's dispatcher and redraws the chrome and the menus. The trail is written in `App` from `Happened`, on whatever thread raised it (`ActivityTrail.Note` touches no control). L-c is in the Core: `_joinedStarts` counts presses that joined a start under way, and the starter's refusing browser stops the show only when none did.
+
+**The offer is read on events (#889, lane B review lows).** The offer is not read on a clock or on a redraw; an event asks for one read, a second event during a read asks for one more after it, so the last event is the one drawn. The section row's right-click menu still looks the offer up as it opens (an event), on the window's thread.
+
 ## Undo and Redo: the journal Windows owes (#899, piece U1)
 
 The mac's journal core is described in `documentation/09-mac-app.md` →
@@ -16329,8 +16383,9 @@ rename or write; a place that leads outside is `changedSince`;
 `rule.stagedThenSwapped`, `stackCases`); and **a folder set aside is the
 teacher's own** (renamed back whenever its place is free, whatever it holds,
 and in the way when it changed; left untouched and recorded when its place
-is taken; the trail event `undo found a folder set aside`, written since W6
-(it was held in `NamedGapLedger` under #899 until then); `recoveryCases`
+is taken; the trail event `undo found a folder set aside`, written by
+recovery since W6 (one line before each rename; it was held in
+`NamedGapLedger` under #899 until then); `recoveryCases`
 with `changeTheFolderSetAside` and `somethingInItsPlace`).
 
 Two more from the fourth review and Russell's ruling of 2026-11-19 bind
@@ -16720,6 +16775,17 @@ and passes over SSH on the PC (run `899u2b-win-11`): a deny ACE on READING
 a file stops the administrator's token there, unlike a deny on LISTING a
 folder, which it passes (`DenyBitesFact`). Its `DenyReadBitesFact` probe
 still skips it, saying why, on any account whose token reads past it.
+
+There are now three deny-rule probes, one each for listing a folder, reading a
+file and replacing a file (`DenyReplaceBitesFact`, #953). Each probe tests the
+exact operation its tests need, because they do not all fail in the same
+places. Over SSH on the PC, the account is an elevated administrator with the
+backup and restore privileges enabled. A rename passes deny rules on both the
+file and its folder there, but a read-only attribute still stops it. A test
+that needs a deny rule to bite must therefore use the probe that matches its
+operation, not borrow another one. Any part of the test that does not depend
+on a deny rule should be split out as a plain fact, so that it still runs
+everywhere.
 
 **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
 .NET 9, the system NTFS volume, other agents of the run sharing the CPU, so
@@ -17805,6 +17871,42 @@ The mac has no such hole: its `UndoRecovery.prune` has no arm that keeps a
 step, and closes such a step `interrupted` as the contract's limits say. No
 contract row covers a kept step (the stack cases have none), so the test pins it.
 
+### What Windows has built: W4c, kept originals (#899, #949)
+
+- W4c (the Mac's U3c on Windows) is built: recovery and the door's Undo and Redo put a page back from the step's own kept original (`-orig`, `-<n>-orig`) when its SHA-256 is exactly the journal's, write both of the page's contents back into the list inside the lock before the swap, keep beside the page what the list will not take, and answer "cannot tell now" (list kept) for a kept original that cannot be read just now. Every tidy (recovery's first, the settled one, a could-not-put-back closing, a closed step's, pruning's) keeps a kept original that is the only copy of what it holds. A swap never removes, overwrites or reuses a kept name: it takes the next free `-<n>-orig`, kept exclusively.
+- Four trail events: "undo could not put back a change that stopped", "undo kept what a page held", "undo kept what it replaced", "undo refused for a change left part way".
+- The ledger: the 4 `ActivityTrailEvents`, 12 `UndoStackCases` ("U3c: …") and 10 `UndoRecoveryCases` held under `Reason899W4c` now run from the JSON; the reason is gone. Still held: `Reason899W4cWithW7` (2 rows, W7's rollover calls) and `Reason899W4cKeptAlert` (`keptTitle`, `kept`, `showKept`).
+
+#### W4c: kept originals (the Mac's U3c)
+
+- `UndoCheck.Plan(keptOriginal:, keptOriginalUsed:)`: for a `writeFile` whose blob the list no longer holds, `UndoRecovery.KeptOriginal` looks through the step's own kept originals beside that page (any label: apply, undo, redo, `-recover`) and gives the bytes of the first whose SHA-256 is the one wanted. Never by name or file times. One that cannot be read now (`UndoCurrent.CannotReadNow`: a permission, another program holding it, a OneDrive placeholder) is reported; the door and recovery then answer `cannotTellNow`, the list kept.
+- `UndoRecovery.StoreWhatKeptOriginalsGive` (inside the lock, before the swap): the kept bytes as their blob, and what the page holds as the other direction's blob when it hashes to the recorded sha. It answers `UndoWhatTheListCouldNotTake`: `OutgoingOf` (the swap keeps those pages' originals: `UndoSwap.Swap(keepingTheOriginalsOf:)`), and `KeptOriginalsHolding` (no tidy removes a kept original with those bytes: `TidyLeftovers(keepingCopiesHolding:)`).
+- `UndoSwap.TidyLeftovers(keepingOnlyCopies:, unlessTheListHolds:, keepingCopiesHolding:)`: a kept original FILE goes only when its bytes are its page's (`IsACopyOfItsPlace`) or exactly what the list gives for its page undone or redone from what the page holds now (`UndoRecovery.ListHolds`).
+- Settle's order: the first tidy keeps every kept original that differs from its page; the plan; at a ready plan, the tidy with `ListHolds`, then the store, then the put-back's swap (keeping originals only for an undo or a redo, which stay on the list); after the step is written, the settled tidy and, for any kept original left, "undo kept what a page held" with "because it differs from what the list recorded" or "because the list no longer holds a copy of it". A could-not-put-back closing writes "undo could not put back a change that stopped", naming the kept originals read after its tidy.
+- The swap's keep: `-orig`, then `-2-orig` and on, the first name `UndoLinks.Look` finds empty; `UndoStagedFile.Keep` never copies over a name a hard link was refused for (80 or 183), and its copy is exclusive.
+- `UndoTrailLine` carries `Kept` and `NoLongerInTheList` so a test matches the line against the disk.
+- Test seams: `UndoSeams.PutBackFailsAt` (the Mac's `putBackFailsAt`). The replays' `contentCannotBeStored` and `beforeContentGoneAndCannotBeStored` put a real deny entry (create files and folders) on the list's content folder or one prefix folder; `makeTheKeptOriginalUnreadable` and `keptOriginalUnreadable` deny reading the kept file (`UndoDenials`, removed before the checks).
+
+#### Where W7 connects
+
+Today's class's "Show on Front Page" does not go through the door on Windows yet (W7). The part-way outcome W7 needs is the door's `Refused` with `LeftPartWay`, then recovery, whose "undo kept what a page held" line names the kept file. The alert keys `keptTitle`, `kept` and `showKept` stay held until W7 wires the action and the alert is built from the measurement below.
+
+### What Windows has built: W7a, the step for a daily action (#899, #949)
+
+- `UndoActionStep` (`Plantoir.Core/Undo/UndoActionStep.cs`, the mac's `JournaledStep`): an action plans each file (`Write`), reads through the plan (`ReadText`), names the front page as a `recompute` (`KeepsTheFrontPageTrue`), and `Make()` hands ONE draft to `UndoDoor.Perform(UndoStepDraft)`: key, `pageCount`, `madeBy`, `class: A`, course, section, `holds`. Each before is read when the file is FIRST planned. A step that cannot be named (no `courses\` above the folder, a path out through a link, a target that is a link) is staged and swapped in together without the list in shadow, with one trail line; live, refused before anything is written. A target that is a folder, or a file unreadable at plan time, stops the action before anything is written.
+- Refusals: `UndoStepRefusedException` (nothing written: the caller says "Nothing was changed: …") and `UndoStepLeftPartWayException` (a file could not be put back: the message names each kept original with `undo.wording.keptBesideIt`; the caller says `publishStoppedPartWay`). `UndoOutcome.LeftPartWay` is new on the door.
+- Publish Pages and Hide Pages (`AssistWorkspace.Apply(PublishPlan …)`): one step, keys `publishPages` / `hidePages`; the front page is re-derived once after the step by the door (never a file of the step), or by the step itself when the door made none. `UndoHistory` is told each file's before and after as `Save` told it, the re-derived front page included.
+- `madeBy` from `AssistWorkspace.Surface`: `menu`, `builtInAssistant:<id>`, `outsideAssistant::<id>`; the id is one GUID per workspace (the window's conversation, or the `plantoir-mcp.exe` session).
+- "undo could not record a step" (`ActivityTrail.Event.UndoCouldNotRecordAStep`, `UndoTrail.CouldNotRecordWords`, the mac's `couldNotRecordLine`): written by the door when the list cannot take a step given as files (went ahead, nothing was changed, stopped part way), and by the step for a step it cannot name. Its ledger row and `Reason899` are gone.
+
+The bullets above, plus: the door is the product's through `UndoForThisProcess.Current.Door()` (the list under `AppDataRoot.Current\undo`, following `--state-dir`); `AssistWorkspace.UndoList` is a test's seam only. With the switch off, every page Publish and Hide write is the same text as before (`File.WriteAllText`'s UTF-8 without a byte-order mark); the only change a teacher can see is that a failure is now all or none.
+
+#### For W7b
+
+- Entry points: `AssistWorkspace.NewUndoStep(key, course, section)`, then `step.ReadText` / `step.Write` / `step.KeepsTheFrontPageTrue`, then `MakeTheUndoStep(step)` inside the action's `UndoHistory.Record`, and in its `catch (IOException or UnauthorizedAccessException)` `StoppedWhileWriting(error is UndoStepLeftPartWayException, error)`.
+- Still to go through it: every action W7b lists (writer scan entries `waitsFor: W7`; `LaterClassesKept.Keep` stays for Deploy's and the links checklist's records).
+- The planners read through the step while `_planningThrough` is set: an action that plans several things in one step sets it for its planning, as `Apply` and `ApplyWholeUnit` do.
+
 ### The pieces still owed for #899 on Windows, and what each waits for
 
 The plan (`plans/899-plan.md` of the v2.0.0 Windows run) as amended by its
@@ -17818,9 +17920,11 @@ recording and the trail event `undo could not record a step` move to W7.
 | W2b | BUILT (2026-11-20, above): `UndoSwap` (staged, then the POSIX-semantics rename, `MoveFileEx` only on 87/50; re-read, read-only refused, attributes and creation time kept, the kept original read back; staged files removed on every failure path, F1), `UndoPlaces` (containment by a handle's final path), `UndoDoor` (step, undo, redo, refusals, clearing, dropping; blobs and begin in one hold), `JournaledSetting`; `stepCases`, the stack cases and traces through the real door; pruning's tidy of an unsettled step's staged files | W2a merged |
 | W3 | BUILT (2026-11-20, above): `UndoRecovery` (settle by content, put back, `rolledBack`, `interrupted` and cleared, shadow), the refused-swap schedule, recovery before every prune, the abandoned own step, the closed-step tidy, re-derivation on settle, `undo rolled back`; `recoveryCases` (20 run, 21 held for W6); the kill harness; W2b's review LOWs | W2b merged |
 | W4 | BUILT (2026-11-20, above): where the list lives (following `--state-dir`), the writer scan, the switch (off), and recovery at every launch of the app and of `plantoir-mcp.exe` (`UndoAtLaunch.Recover`); `madeBy` from `AssistWorkspace.Surface` (L1) moved to the W7 row | W2a merged; no longer after W3 |
+| W4c | BUILT (2026-11-21, above): the Mac's U3c: recovery and the door's Undo and Redo put a page back from the step's own kept original (SHA-256 exactly the journal's), both of a page's contents written back into the list inside the lock before the swap, nothing that is an only copy deleted by any tidy, a swap keeps a kept name exclusively and takes the next free `-<n>-orig`; four trail events; `Reason899W4c` left the ledger | W6 |
 | W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
 | W6 | BUILT (2026-11-20, above): the six op kinds U2b defines (`replaceText`, `editJSON`, `move`, `createTree`, `removeTree`, `external`); running `recompute` stays with W7 | the mac's U2 |
-| W7 | every daily page action through the door, `madeBy` from `AssistWorkspace.Surface` (L1; the plan puts it beside the shadow recording, a `--door menu|builtIn` argument from the helper's role), publish and hide recorded (M1), `undo could not record a step`; replay `undo-traces.json` → `actionTraces` (120, from `undo-action-steps.json`: an `action` call is a step given as each file's before and after, its ops worked out by the door's rule, and the trace pins the op kinds), and the one sentence U3 added to `rule.recovery` (shadow recovery removes the staged files of a closed step whose every op changes a file in place) ; from U3b, the rollover as ONE step (documentation 09, "U3b: the rollover as one step"): the new op kind `moveApart` (judged as `move`; an Undo or Redo that finds it changed since leaves it, names it in `leftApart`, and goes on: Russell's ruling of 2026-11-19 on Q3, #959), the `external` family `scheduledDeploy:<name>` with Windows' own value for its Task Scheduler job (removed by the rollover; set back only while its moment is ahead, otherwise left apart and named), a recorded step's `moves` in `undo-action-steps.json`, an action trace's `deploy` call and `leftApart`, and the 4 `moveApart` checkCases and 8 U3b stackCases (calls `rollOverOntoANewWebsite`, `rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`, `theScheduleCannotBeSetNow`; keys `leftApart`, `schoolYear`, `cloudflareMarkers`). From U3b's second round: a step's `moveApart` records move as a GROUP (any one changed since leaves every one apart, so a section is never split across two websites); a schedule the swap cannot set at an Undo or Redo (the scheduler refuses the task) is left apart and named, never a refusal; a job whose moment is not recorded is never set back; a refused swap removes the empty folders it made; the legacy Netlify record in the built output is brought into `.netlify_sites` BEFORE the step (never a refusal: Russell, 2026-11-20 evening); refused, nothing changed, only when a record cannot be read, written or removed; a step then refused moves it back, or says what moved. From U3b's fix round three: ONE question decides every record, which one a deploy reads now (`undo.netlifyRecordCases`, 20 rows run through deploy.py's own `load_netlify_marker` by `scripts/test_netlify_record_a_deploy_reads.py`, which Windows' Python already runs; W7 runs the rows through its own reader too): a current record that parses wins, else a legacy one that parses (migrated into the current place; a current record that does not parse is first moved to `section<N>.unreadable.json` and never moved again), else none; a record that names no site (`null`, `{}`, `[]`, a string, an empty `id`) is no website, so nothing is brought in or moved and the section is said to have had no website. Only what a deploy reads moves, plus a legacy record that parses and differs from the current one: that one is the LEFTOVER `section<N>.from-built-output.json` (`.2`, `.3`… when the name is taken, never a refusal) and is set aside by the step as the new op kind `setAside` (judged as `move`, standing apart ON ITS OWN, never one of the group: 3 checkCases, 4 stackCases, calls `rollOverSettingALeftoverAside` and `removeTheKeptLeftover`, key `leftoverMarkers`); a legacy record saying the same as the current one, compared parsed, is only removed; a record a deploy cannot parse is NOT moved (it stays in the built output), and `section<N>.unreadable.json` is no `setAside` leftover. Corrections in documentation 12, "The rollover, U3b fix round four". A schedule put back whose task will only start at the next login is named in `startsAtTheNextLogin` (an Undo outcome of its own, sentence `undoScheduleStartsAtTheNextLogin`, 1 stackCase, call `theScheduleStartsOnlyAtTheNextLogin`), never as left apart. Until W7 a reader that does not know `moveApart` reads the step as a barrier, which is safe; the rows (and the wording key) belong on the named-gap ledger against #899 for W7 | the mac's U3 (U3a landed the daily actions; U3b the rollover), and #900 and #927 where they rewrite a writer |
+| W7a | BUILT (2026-11-21, above): `UndoActionStep`, a daily action as ONE step through the door with its files planned whole; Publish Pages, Hide Pages, a whole unit and Publish Class for a Date through it (keys `publishPages`, `hidePages`, `publishClassForADate`); `madeBy` from `AssistWorkspace.Surface`; `UndoOutcome.LeftPartWay`; `undo could not record a step`; the replay of `actionTraces` (150 traces, 18 U4a ones and rollover and `moves` ones held by name); kept files marked Hidden (the Explorer measurement) | W4c |
+| W7b, W7c | OWED, with what W7a handed on (above, "For W7b": Show on Front Page and the other daily actions through the door, the kept-file alert built on the Explorer measurement, pruning's folder line is done). W7 as first planned: every daily page action through the door, `madeBy` from `AssistWorkspace.Surface` (L1; the plan puts it beside the shadow recording, a `--door menu|builtIn` argument from the helper's role), publish and hide recorded (M1), `undo could not record a step`; replay `undo-traces.json` → `actionTraces` (120, from `undo-action-steps.json`: an `action` call is a step given as each file's before and after, its ops worked out by the door's rule, and the trace pins the op kinds), and the one sentence U3 added to `rule.recovery` (shadow recovery removes the staged files of a closed step whose every op changes a file in place) ; from U3b, the rollover as ONE step (documentation 09, "U3b: the rollover as one step"): the new op kind `moveApart` (judged as `move`; an Undo or Redo that finds it changed since leaves it, names it in `leftApart`, and goes on: Russell's ruling of 2026-11-19 on Q3, #959), the `external` family `scheduledDeploy:<name>` with Windows' own value for its Task Scheduler job (removed by the rollover; set back only while its moment is ahead, otherwise left apart and named), a recorded step's `moves` in `undo-action-steps.json`, an action trace's `deploy` call and `leftApart`, and the 4 `moveApart` checkCases and 8 U3b stackCases (calls `rollOverOntoANewWebsite`, `rollOverOntoNewWebsitesOnTwoHosts`, `rollOverTurningOffASchedule`, `theScheduleCannotBeSetNow`; keys `leftApart`, `schoolYear`, `cloudflareMarkers`). From U3b's second round: a step's `moveApart` records move as a GROUP (any one changed since leaves every one apart, so a section is never split across two websites); a schedule the swap cannot set at an Undo or Redo (the scheduler refuses the task) is left apart and named, never a refusal; a job whose moment is not recorded is never set back; a refused swap removes the empty folders it made; the legacy Netlify record in the built output is brought into `.netlify_sites` BEFORE the step (never a refusal: Russell, 2026-11-20 evening); refused, nothing changed, only when a record cannot be read, written or removed; a step then refused moves it back, or says what moved. From U3b's fix round three: ONE question decides every record, which one a deploy reads now (`undo.netlifyRecordCases`, 20 rows run through deploy.py's own `load_netlify_marker` by `scripts/test_netlify_record_a_deploy_reads.py`, which Windows' Python already runs; W7 runs the rows through its own reader too): a current record that parses wins, else a legacy one that parses (migrated into the current place; a current record that does not parse is first moved to `section<N>.unreadable.json` and never moved again), else none; a record that names no site (`null`, `{}`, `[]`, a string, an empty `id`) is no website, so nothing is brought in or moved and the section is said to have had no website. Only what a deploy reads moves, plus a legacy record that parses and differs from the current one: that one is the LEFTOVER `section<N>.from-built-output.json` (`.2`, `.3`… when the name is taken, never a refusal) and is set aside by the step as the new op kind `setAside` (judged as `move`, standing apart ON ITS OWN, never one of the group: 3 checkCases, 4 stackCases, calls `rollOverSettingALeftoverAside` and `removeTheKeptLeftover`, key `leftoverMarkers`); a legacy record saying the same as the current one, compared parsed, is only removed; a record a deploy cannot parse is NOT moved (it stays in the built output), and `section<N>.unreadable.json` is no `setAside` leftover. Corrections in documentation 12, "The rollover, U3b fix round four". A schedule put back whose task will only start at the next login is named in `startsAtTheNextLogin` (an Undo outcome of its own, sentence `undoScheduleStartsAtTheNextLogin`, 1 stackCase, call `theScheduleStartsOnlyAtTheNextLogin`), never as left apart. Until W7 a reader that does not know `moveApart` reads the step as a barrier, which is safe; the rows (and the wording key) belong on the named-gap ledger against #899 for W7 | the mac's U3 (U3a landed the daily actions; U3b the rollover), and #900 and #927 where they rewrite a writer |
 | W8 | settings (`editJSON`, never `writeFile`, on `course_config.json`), renames, New Course, reference courses; rollover and restore | the mac's U4; #897 B; #909 and #873 |
 | W9 | Delete Backup and Delete Archive to the Recycle Bin | the mac's U5 and Windows' 785a (#912) |
 | W10 | the offer to deploy after an Undo or Redo | the mac's U6, and W5 |
@@ -17874,7 +17978,7 @@ new is held in `NamedGapLedger.cs`.
 ### The lows fixed with U4a that W4c and W7 copy
 
 1. **The `undo could not record a step` line (U3 sweep, finding 2).** Written only once the shadow write has answered, worded by what happened: went ahead ("The change went ahead (the list is not in use yet)."), nothing was changed ("Nothing was changed."), stopped part way ("The change stopped part way; what a file held before is kept beside it."), made with its closing line not yet written ("The change was made; its record is finished at the next chance."). Mac: `UndoUnrecordedChange`, `UndoTrailHook.couldNotRecord(action:course:section:why:after:)` around `writePlainly` and `makeWithoutARecord`, and the shadow swap in `JournaledWrite.perform`. Before, the line said "went ahead" before a write that could still refuse (always for a page that is a link).
-2. **Switch-off refusals (finding 3).** `undo.rule.shadow` now says: with the switch off, a daily action whose file is a link, a folder or unreadable is refused before anything changes, as is one whose file changed between plan and make; a refusal part way keeps what a file held beside it. Before U3 those wrote (a link was replaced by a regular file). Windows' door must refuse the same.
+2. **Switch-off refusals (finding 3).** `undo.rule.shadow` now says: with the switch off, a daily action whose file is a link, a folder or unreadable is refused before anything changes, as is one whose file changed between plan and make; a refusal part way keeps what a file held beside it. Before U3 those wrote (a link was replaced by a regular file). Windows refuses the same for a folder, a file it cannot read, and a file changed between plan and make, but NOT for a page that is a link: before Undo, Windows wrote a linked page through its link (`File.WriteAllText`) and the link stayed a link, so with the switch off such a step is written through the link, all or none, by the plain staged swap at the file the link leads to, the link left as it is, with one trail line (`undo could not record a step`); with the switch off nothing behaves differently from before Undo (the final sweep of W4c and W7a, item 1; `UndoActionStepTests.WithTheSwitchOffALinkedPageIsWrittenThroughItsLinkAndStaysALink`). `undo.rule.shadow`'s sentence on a link is the Mac's; live, Windows refuses such a step before anything is written.
 3. **Duplicate Class (finding 4).** When the copy is refused and the room alone then cannot be made, the reply is "Nothing was changed: …", never "a blank class page is waiting".
 4. **An Undo or Redo never deletes an only copy (U3c review 3, LOW 3).** Under the lock, before the swap: each page's outgoing bytes that the step's other direction needs (a writeFile op's after for an Undo, its before for a Redo) go into the list when it lacks them; when the list will not take them they are kept beside the page and the other direction is made from that kept file.
 5. **One kept copy per content (LOW 1).** After a move that kept outgoing bytes beside a page, the step's kept copies beside that page are thinned to one per distinct SHA-256 (the newest move's kept for its content).

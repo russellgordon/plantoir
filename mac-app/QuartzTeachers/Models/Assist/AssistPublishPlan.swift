@@ -1941,9 +1941,9 @@ enum AssistToolRefusal: LocalizedError, Equatable {
             // — in a sentence that goes straight to the teacher, since a
             // refusal ends the turn rather than going back to the model. The
             // way out is now said in the words the window already offers.
-            return "I can't find a class on \(day.weekdayName), \(day.text), in \(code) "
-                 + "Section \(number). Ask me what dates you are teaching to see the ones I know "
-                 + "about, or tell me the name of the class page you meant."
+            return AssistWording.noClassOnThatDay(
+                weekday: day.weekdayName, date: day.text, code: code, number: number
+            )
         case .unreadableDate(let raw, let which):
             return "“\(raw)” isn't a date \(which) can use. Give it as YYYY-MM-DD, for example 2026-09-15."
         case .unreadableTime(let raw):

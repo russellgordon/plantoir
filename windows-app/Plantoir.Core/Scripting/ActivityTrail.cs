@@ -310,6 +310,37 @@ public static class ActivityTrail
         /// </summary>
         UndoFoundAFolderSetAside,
         /// <summary>
+        /// Undo's recovery closed a step that stopped part way and could not
+        /// be put back (what it needs is no longer in the list, and no kept
+        /// original matches), and cleared the list: naming each kept original
+        /// left beside its page, read after the tidy (#899 W4c, the mac's U3c).
+        /// </summary>
+        UndoCouldNotPutBack,
+        /// <summary>
+        /// Undo's recovery settled a step and left a kept original beside a
+        /// page because it is the only copy of what it holds, each with its
+        /// page, its hidden name and why (#899 W4c). Never page text.
+        /// </summary>
+        UndoKeptWhatAPageHeld,
+        /// <summary>
+        /// An Undo or Redo put a page back from what was kept beside it, and
+        /// the list would not take all the step needs, so what it could not
+        /// keep stays beside the page, named (#899 W4c). Never page text.
+        /// </summary>
+        UndoKeptWhatItReplaced,
+        /// <summary>
+        /// An Undo or Redo refused because the newest step is one recovery
+        /// has just tried and left part way (a file in use, a page it cannot
+        /// read now), naming the file; the list kept (#899 W4c, W3's LOW 4).
+        /// </summary>
+        UndoRefusedForAChangeLeftPartWay,
+        /// <summary>
+        /// The list could not take a daily action's step, or a file it writes
+        /// cannot be named in one: the action's key, the course and section, a
+        /// word for why, and what became of the change (#899 W7a). Never page text.
+        /// </summary>
+        UndoCouldNotRecordAStep,
+        /// <summary>
         /// A whole course was put back, from one of its backups (Restore…) or
         /// from Archived: the code it shows, its folder, the zip's FILE NAME,
         /// what became of the course as it was first (the archive made of it,
@@ -525,6 +556,25 @@ public static class ActivityTrail
         /// it was quiet and which of the things was true.
         /// </summary>
         PreviewDidNotAppear,
+        /// <summary>
+        /// A preview start asked for while the same window's own start was
+        /// still waiting for a stop or still building did nothing (#928, the
+        /// mac's #812). Carries the course and the section.
+        /// </summary>
+        PreviewAlreadyStarting,
+        /// <summary>
+        /// A repair's Preview Again started nothing: its page went away or
+        /// Plantoir was quitting before the old preview had stopped, or a later
+        /// Preview Again took its place (#928, the mac's #813). Carries which.
+        /// </summary>
+        PreviewAgainAbandoned,
+        /// <summary>
+        /// A preview's run never started (#928, #1022 item 1, the mac's #812
+        /// review): the sentence the teacher was shown under "Cannot Preview
+        /// Yet", then what they were not shown (the launcher's file, or the
+        /// system's description of the error).
+        /// </summary>
+        PreviewCouldNotStart,
         /// <summary>
         /// deploy.py made a section's Cloudflare Pages project again because it
         /// was gone from the account (#395). Carries the project and the
@@ -835,6 +885,18 @@ public static class ActivityTrail
         /// "why was this morning's deploy slow?" days later.
         /// </summary>
         SiteBuiltAgainBeforeDeploying,
+        /// <summary>
+        /// #889 (the mac's #850): a section's deployed folder was opened in
+        /// the web browser, from where (the result, the Section menu, the
+        /// toolbar, the sidebar), whether it was already shown and whether its
+        /// address moved. Counts only, never a path or an address
+        /// (<see cref="Plantoir.Core.Models.DeployedFolderTrail"/>).
+        /// </summary>
+        DeployedFolderOpenedInTheWebBrowser,
+        /// <summary>#889: a deployed folder is no longer shown, and why (Stop, quitting, the folder gone, it stopped on its own), with counts.</summary>
+        DeployedFolderNoLongerShown,
+        /// <summary>#889: a deployed folder could not be opened, and why, in a few words.</summary>
+        DeployedFolderCouldNotBeOpened,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -903,6 +965,11 @@ public static class ActivityTrail
         Event.SectionRestored => "section restored",
         Event.UndoRolledBack => "undo rolled back",
         Event.UndoFoundAFolderSetAside => "undo found a folder set aside",
+        Event.UndoCouldNotPutBack => "undo could not put back a change that stopped",
+        Event.UndoKeptWhatAPageHeld => "undo kept what a page held",
+        Event.UndoKeptWhatItReplaced => "undo kept what it replaced",
+        Event.UndoRefusedForAChangeLeftPartWay => "undo refused for a change left part way",
+        Event.UndoCouldNotRecordAStep => "undo could not record a step",
         Event.CourseRestoredFromABackup => "course restored from a backup",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
@@ -932,6 +999,9 @@ public static class ActivityTrail
         Event.ClassCopyNotMade => "class copy not made",
         Event.WordForAUnitRenamed => "word for a unit renamed",
         Event.PreviewDidNotAppear => "preview did not appear",
+        Event.PreviewAlreadyStarting => "preview already starting",
+        Event.PreviewAgainAbandoned => "preview again abandoned",
+        Event.PreviewCouldNotStart => "preview could not start",
         Event.CloudflareProjectMadeAgain => "cloudflare project made again",
         Event.CourseKeptForReference => "course kept for reference",
         Event.CourseCouldNotBeKeptForReference => "course could not be kept for reference",
@@ -980,6 +1050,9 @@ public static class ActivityTrail
         Event.ProblemsChanged => "problems changed",
         Event.AskedAnAssistantToFixProblems => "asked an assistant to fix problems",
         Event.SiteBuiltAgainBeforeDeploying => "site built again before deploying",
+        Event.DeployedFolderOpenedInTheWebBrowser => "deployed folder opened in the web browser",
+        Event.DeployedFolderNoLongerShown => "deployed folder no longer shown",
+        Event.DeployedFolderCouldNotBeOpened => "deployed folder could not be opened",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

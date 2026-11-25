@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Undo;
 
@@ -63,6 +64,13 @@ internal enum UndoOutcomeKind
 /// <summary>How the door went: a step made, an undo, a redo.</summary>
 internal sealed record UndoOutcome(UndoOutcomeKind Kind, long? Seq = null, UndoRefusal? Refusal = null, bool ClearedTheList = false)
 {
+    /// <summary>
+    /// A refused step whose swap could not be reversed (W7a; the mac's
+    /// <c>leftPartWay</c>): a file holds the new content while what it held
+    /// before is kept beside it. Never said as "Nothing was changed".
+    /// </summary>
+    internal bool LeftPartWay { get; init; }
+
     /// <summary>The word the contract spells it with: a refusal's own word, otherwise the outcome's.</summary>
     internal string Word => Kind == UndoOutcomeKind.Refused
         ? Refusal!.Word
@@ -195,7 +203,10 @@ internal sealed class UndoDoor
         var ops = new JsonArray();
         var blobs = new List<byte[]>();
         var targets = new List<UndoSwapTarget>();
-        foreach (UndoFileChange change in draft.Changes.OrderBy(change => change.RelativePath, StringComparer.Ordinal))
+        // In the order the action planned them, as the mac's JournaledWrite
+        // takes draft.changes: an Undo checks the ops newest first, so this
+        // order decides which page a refusal names first (action-047).
+        foreach (UndoFileChange change in draft.Changes)
         {
             if (SameBytes(change.Before, change.After)) continue;
             foreach (JsonNode? op in UndoLineOps.ForAFile(change.RelativePath, change.Before, change.After))
@@ -233,18 +244,28 @@ internal sealed class UndoDoor
         }
         catch (Exception error) when (IsAFailureOfTheList(error))
         {
-            if (Live) return new UndoOutcome(UndoOutcomeKind.CouldNotRecordTheStep);
+            string why = WordFor(error);
+            if (Live)
+            {
+                CouldNotRecord(draft, why, UndoUnrecordedChange.NothingWasChanged);
+                return new UndoOutcome(UndoOutcomeKind.CouldNotRecordTheStep);
+            }
             // Shadow: the change goes ahead exactly as it would have
             // (rule.shadow), the files a rule keeps true re-derived as on the
             // recorded path: a list that failed never leaves the section's
             // front page stale (the mac's performAndRederive re-derives on
-            // appliedWithoutARecord; W4's review, MEDIUM).
+            // appliedWithoutARecord; W4's review, MEDIUM). One trail line says
+            // what became of it, once that is known (W7a; the mac's
+            // UndoTrailHook.couldNotRecord).
             switch (UndoSwap.Swap(targets, "shadow", draft.WorkingFolder, _seams))
             {
-                case UndoSwapResult.Refused refused: return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: refused.Refusal);
+                case UndoSwapResult.Refused refused:
+                    CouldNotRecord(draft, why, refused.LeftPartWay ? UndoUnrecordedChange.StoppedPartWay : UndoUnrecordedChange.NothingWasChanged);
+                    return new UndoOutcome(UndoOutcomeKind.Refused, Refusal: refused.Refusal) { LeftPartWay = refused.LeftPartWay };
                 case UndoSwapResult.StoppedByATest: return new UndoOutcome(UndoOutcomeKind.StoppedByATest);
             }
             Rederive(OpsOf(ops), draft.WorkingFolder);
+            CouldNotRecord(draft, why, UndoUnrecordedChange.WentAhead);
             return new UndoOutcome(UndoOutcomeKind.AppliedWithoutARecord);
         }
         return MakeTheStep(seq, targets, draft.WorkingFolder, ops);
@@ -376,6 +397,22 @@ internal sealed class UndoDoor
     }
 
     /// <summary>
+    /// A word for why the list could not take a step, never the error's own
+    /// description, which can carry a path (the mac's <c>UndoTrailHook.word</c>).
+    /// </summary>
+    internal static string WordFor(Exception error) => error switch
+    {
+        UndoJournalException { Failure: UndoJournalFailure.LockBusy } => "the list was busy",
+        UndoJournalException { Failure: UndoJournalFailure.ListNotReadable } or UndoListUnreadableException => "the list could not be read",
+        _ => "the list could not be written",
+    };
+
+    /// <summary>The "undo could not record a step" line for a step given as files (W7a).</summary>
+    private void CouldNotRecord(UndoStepDraft draft, string why, UndoUnrecordedChange change) =>
+        _trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoCouldNotRecordAStep, draft.Course, draft.Section,
+                                         UndoTrail.CouldNotRecordWords(draft.ActionKey, why, change)));
+
+    /// <summary>
     /// A failure of the list's own files: a disk or permission error, or any
     /// failure at all in shadow, where nothing the list does may stop or change
     /// the teacher's action (<c>rule.shadow</c>; W4).
@@ -401,6 +438,7 @@ internal sealed class UndoDoor
         UndoRecoveryRun recovered;
         UndoRefusal? leftNewest = null;
         long? newestSeq = null;
+        UndoStep? newestStep = null;
         try
         {
             (found, waitsForARederivingRecovery, recovered) = _journal.WithLock(writer =>
@@ -420,6 +458,7 @@ internal sealed class UndoDoor
                 {
                     leftNewest = why;
                     newestSeq = newest.Seq;
+                    newestStep = newest.Step;
                 }
                 return (answer, waits, run);
             }, inShadow: !Live);
@@ -438,7 +477,12 @@ internal sealed class UndoDoor
         // W3's review, LOW 4), never "another change is under way" until the
         // step ages out.
         if (found.Kind == UndoAnswerKind.AnotherChangeIsUnderWay && leftNewest is { } why)
+        {
+            // One trail line, "undo refused for a change left part way" (the mac's U3c, leftNewestLine).
+            _trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoRefusedForAChangeLeftPartWay, newestStep?.Course, newestStep?.Section,
+                                             UndoTrail.LeftNewestWords(backward, why)));
             return new UndoOutcome(UndoOutcomeKind.Refused, newestSeq, why);
+        }
         switch (found.Kind)
         {
             case UndoAnswerKind.Nothing: return new UndoOutcome(backward ? UndoOutcomeKind.NothingToUndo : UndoOutcomeKind.NothingToRedo);
@@ -454,18 +498,28 @@ internal sealed class UndoDoor
             if (op.Kind == UndoOp.Recompute && !CanRederive(op)) return new UndoOutcome(UndoOutcomeKind.NotAvailable);
         }
 
-        // 2. Check every op, writing nothing.
+        // 2. Check every op, writing nothing. Content the list no longer holds
+        // is taken from a kept original of the step's own whose hash matches,
+        // as recovery does (the mac's U3c, rule.recovery). One that cannot be
+        // read just now may be the one: then the answer is cannot tell now,
+        // the list kept, never content missing, which clears it (LOW 5).
         UndoCheck.PlanResult plan;
+        string? keptOriginalNotRead = null;
+        var uses = new List<UndoKeptOriginalUse>();
         try
         {
             plan = UndoCheck.Plan(record.Step.Ops, backward, relative => UndoCurrent.Read(FullPath(root, relative)),
-                                  _journal.Blob, () => _journal.CanReach(record.Step), new UndoWholeReads(root, _places));
+                                  _journal.Blob, () => _journal.CanReach(record.Step), new UndoWholeReads(root, _places),
+                                  keptOriginal: UndoRecovery.KeptOriginal(record.Step, root, path => keptOriginalNotRead ??= path),
+                                  keptOriginalUsed: uses.Add);
         }
         catch (UndoListUnreadableException) { return new UndoOutcome(UndoOutcomeKind.ListUnavailable); }
         _seams?.AfterTheCheck?.Invoke();
         if (Stops("afterTheCheck")) return new UndoOutcome(UndoOutcomeKind.StoppedByATest);
         if (plan is UndoCheck.PlanResult.NotReadable or UndoCheck.PlanResult.FolderCannotBeReached)
             return new UndoOutcome(UndoOutcomeKind.NotAvailable);
+        if (plan is UndoCheck.PlanResult.ContentMissing && keptOriginalNotRead is { } notRead)
+            return new UndoOutcome(UndoOutcomeKind.Refused, seq, new UndoRefusal(UndoRefusalKind.CannotTellNow, notRead));
         if (plan is not UndoCheck.PlanResult.Ready ready)
         {
             UndoRefusal refusal = RefusalOf(plan);
@@ -483,6 +537,7 @@ internal sealed class UndoDoor
 
         // 3. Say it is under way, as long as it is still the one to move.
         string starting = backward ? "undoing" : "redoing";
+        UndoWhatTheListCouldNotTake notTaken = UndoWhatTheListCouldNotTake.Nothing;
         try
         {
             bool stillTheOne = _journal.WithLock(writer =>
@@ -490,6 +545,10 @@ internal sealed class UndoDoor
                 UndoOffered offered = _journal.Offer(writer.Folded);
                 UndoAnswer now = backward ? offered.Undo : offered.Redo;
                 if (now.Kind != UndoAnswerKind.Step || now.Step!.Seq != seq) return false;
+                // What the kept originals give, and what the swap sets aside
+                // for the other direction, into the list first, inside the lock
+                // and before the swap (the first review of U3c, MEDIUM).
+                if (uses.Count > 0) notTaken = UndoRecovery.StoreWhatKeptOriginalsGive(uses, writer, _journal);
                 writer.Append(new JsonObject { ["seq"] = seq, ["event"] = starting, ["process"] = _process.DeepClone() });
                 writer.Sync();
                 return true;
@@ -504,7 +563,7 @@ internal sealed class UndoDoor
 
         // 4. Swap.
         string label = $"{seq}-" + (backward ? "undo" : "redo");
-        switch (UndoSwap.Swap(TargetsOf(ready, root), label, RootOrNull(root), _seams, _places))
+        switch (UndoSwap.Swap(TargetsOf(ready, root), label, RootOrNull(root), _seams, _places, notTaken.OutgoingOf))
         {
             case UndoSwapResult.StoppedByATest:
                 return new UndoOutcome(UndoOutcomeKind.StoppedByATest);
@@ -520,9 +579,59 @@ internal sealed class UndoDoor
                 return new UndoOutcome(UndoOutcomeKind.Refused, seq, refused.Refusal, AnswerARefusal(refused.Refusal, seq, backward));
         }
         if (Stops(backward ? "beforeUndone" : "beforeRedone")) return new UndoOutcome(UndoOutcomeKind.StoppedByATest);
+        if (uses.Count > 0 && root.Length > 0)
+        {
+            // The kept original it was put back from is now a copy of its page,
+            // and its bytes are in the list: nothing of the step's is left
+            // beside it but what the list could not take (a kept original
+            // whose own bytes the list would not take stays, though its page
+            // holds the same: the second review of U3c, MEDIUM).
+            try
+            {
+                UndoSwap.TidyLeftovers(seq, record.Step.Paths, root, UndoRecovery.AsideListings(record.Step, root), null,
+                                       keepingOnlyCopies: true, keepingCopiesHolding: notTaken.KeptOriginalsHolding);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        }
         Finish(seq, backward ? "undone" : "redone", null, null);
+        if (!notTaken.IsEmpty && root.Length > 0) SayWhatItKept(record.Step, root, label, notTaken, backward);
         Rederive(record.Step.Ops, root);
         return new UndoOutcome(backward ? UndoOutcomeKind.Undone : UndoOutcomeKind.Redone, seq);
+    }
+
+    /// <summary>
+    /// The list could not take all the step needs: the step stays on the list
+    /// with the other direction offered, resting on what is kept beside its
+    /// pages, as recovery's does (Russell's ruling of 2026-11-20, night). If
+    /// that file is gone or changed by then, that Undo or Redo is refused then,
+    /// with its true sentence. One line, "undo kept what it replaced", naming
+    /// each kept file as it is on the disk now.
+    /// </summary>
+    private void SayWhatItKept(UndoStep step, string root, string label, UndoWhatTheListCouldNotTake notTaken, bool backward)
+    {
+        var keptOfWhatItHeld = new List<string>();
+        var keptOfWhatItHoldsNow = new List<string>();
+        var pathsOfTheStep = new List<string>();
+        foreach (UndoOp op in step.Ops)
+        {
+            if (op.Path is { } path && !pathsOfTheStep.Contains(path)) pathsOfTheStep.Add(path);
+        }
+        foreach (string path in pathsOfTheStep)
+        {
+            if (!UndoPlaces.StaysInside(root, path)) continue;
+            foreach (string kept in UndoRecovery.KeptOriginalFiles(step, FullPath(root, path)))
+            {
+                string name = Path.GetFileName(kept);
+                if (keptOfWhatItHeld.Contains(name) || keptOfWhatItHoldsNow.Contains(name)) continue;
+                if (notTaken.OutgoingOf.Contains(path) && UndoSwap.IsStaged(name, label)) keptOfWhatItHeld.Add(name);
+                else if (UndoSwap.HoldsAnyOf(notTaken.KeptOriginalsHolding, kept)) keptOfWhatItHoldsNow.Add(name);
+                else continue;
+                UndoSwap.HideAKeptFileLeft(kept);
+            }
+        }
+        _trail?.Invoke(new UndoTrailLine(ActivityTrail.Event.UndoKeptWhatItReplaced, step.Course, step.Section,
+                                         UndoTrail.KeptWhatItReplacedWords(backward, keptOfWhatItHeld, keptOfWhatItHoldsNow),
+                                         [.. keptOfWhatItHeld, .. keptOfWhatItHoldsNow]));
     }
 
     /// <summary>
@@ -574,7 +683,7 @@ internal sealed class UndoDoor
     internal void RecoverThenPrune(UndoJournalWriter writer)
     {
         UndoRecovery.Run(writer, _journal, _mode, trySwapsNow: false, leavingStepsThatRederive: true, _maintainers, _trail, _seams, _places);
-        _journal.Prune(writer);
+        _journal.Prune(writer, _trail);
     }
 
     /// <summary>The files every step recovery settled keeps true by a rule, re-derived (outside the lock), whichever way it settled; never in shadow.</summary>
@@ -687,7 +796,7 @@ internal sealed class UndoDoor
             case UndoSwapResult.Refused { LeftPartWay: true } partWay:
                 // Half applied: left in flight for recovery, never failed (LOW 1).
                 Abandon(seq, UndoStepState.Begun);
-                return new UndoOutcome(UndoOutcomeKind.Refused, seq, partWay.Refusal);
+                return new UndoOutcome(UndoOutcomeKind.Refused, seq, partWay.Refusal) { LeftPartWay = true };
             case UndoSwapResult.Refused refused:
                 Finish(seq, "failed", "begin", "refused");
                 return new UndoOutcome(UndoOutcomeKind.Refused, seq, refused.Refusal);
@@ -767,11 +876,20 @@ internal sealed class UndoDoor
 
     private bool CanRederive(UndoOp op) => op.Maintainer is { } maintainer && _maintainers?.CanRun(maintainer) == true;
 
+    /// <remarks>
+    /// Runs AFTER the swap, so whatever it throws must never reach a caller
+    /// as a failure before the swap: the step's pages are in, and a caller
+    /// that read it as "nothing was changed" would say so of a disk where
+    /// every page was written (W7a review 1, MEDIUM 4). A re-derivation that
+    /// throws leaves its file as it was, as one that returns false does.
+    /// </remarks>
     private void Rederive(IEnumerable<UndoOp> ops, string root)
     {
         foreach (UndoOp op in ops)
         {
-            if (op.Kind == UndoOp.Recompute && _maintainers is not null) _maintainers.Rederive(op, root);
+            if (op.Kind != UndoOp.Recompute || _maintainers is null) continue;
+            try { _maintainers.Rederive(op, root); }
+            catch (Exception) { }
         }
     }
 

@@ -16,7 +16,7 @@ namespace Plantoir.UiTests;
 /// of the run, and every later test typed into a keyboard with a key
 /// already down. The fix is <c>Keyboard.Type</c> (down and up) or
 /// <c>using (Keyboard.Pressing(...))</c> (up on dispose).
-/// <see cref="HarnessSourceRuleTests"/> keeps the call from coming back, and
+/// <c>Plantoir.Tests.HarnessSourceRuleTests</c> keeps the call from coming back, and
 /// this sweep catches a key held any other way.</para>
 ///
 /// <para><b>How it fails, and why not from <see cref="DrivenApp.Dispose"/>.</b>
@@ -38,8 +38,9 @@ public static class HeldKeys
     /// <summary>Every modifier in its generic and left/right forms, and every
     /// key the suite names as a <c>VirtualKeyShort</c> (letters typed as TEXT
     /// go down and up inside <c>Keyboard.Type</c> and are not watched).
-    /// <see cref="HarnessSourceRuleTests"/> fails when a test names a key
-    /// missing here.</summary>
+    /// <c>Plantoir.Tests.HarnessSourceRuleTests</c> reads this list from
+    /// this file and fails when a test names a key missing here, so keep it
+    /// one array of <c>VirtualKeyShort.NAME</c> entries.</summary>
     public static readonly VirtualKeyShort[] Watched =
     {
         VirtualKeyShort.SHIFT, VirtualKeyShort.LSHIFT, VirtualKeyShort.RSHIFT,
@@ -50,7 +51,7 @@ public static class HeldKeys
         VirtualKeyShort.DELETE, VirtualKeyShort.BACK,
         VirtualKeyShort.UP, VirtualKeyShort.DOWN, VirtualKeyShort.LEFT, VirtualKeyShort.RIGHT,
         VirtualKeyShort.F2, VirtualKeyShort.F4,
-        VirtualKeyShort.KEY_D, VirtualKeyShort.KEY_N, VirtualKeyShort.KEY_O, VirtualKeyShort.KEY_R,
+        VirtualKeyShort.KEY_D, VirtualKeyShort.KEY_K, VirtualKeyShort.KEY_N, VirtualKeyShort.KEY_O, VirtualKeyShort.KEY_R,
     };
 
     /// <summary>The watched keys that read DOWN right now.</summary>
@@ -72,6 +73,35 @@ public static class HeldKeys
         }
         if (down.Count > 0) Thread.Sleep(100);
         return down;
+    }
+
+    /// <summary>
+    /// A key HELD the way a keyboard sends it: one key-down, then after
+    /// <paramref name="firstDelayMs"/> (the repeat delay) a further key-down
+    /// every <paramref name="repeatMs"/>, with no key-up between (SendInput of a
+    /// key already down is a repeat: its previous-state bit is set), and ONE
+    /// key-up at the end, in a <c>finally</c>, so a failing step cannot leave
+    /// the key down (#638). Neither <c>Keyboard.Type</c> nor
+    /// <c>Keyboard.Pressing</c> can send repeats, so this is the one place the
+    /// down-only call is allowed (#1035). <paramref name="whileHeld"/> runs
+    /// once, after the repeat delay and before the repeats. The waits are the
+    /// behaviour being imitated (a keyboard's repeat timing), not a wait for
+    /// something to settle.
+    /// </summary>
+    public static void HoldWithRepeats(VirtualKeyShort key, int firstDelayMs, int repeats, int repeatMs, Action? whileHeld = null)
+    {
+        try
+        {
+            Keyboard.Press(key);
+            Thread.Sleep(firstDelayMs);
+            whileHeld?.Invoke();
+            for (int repeat = 0; repeat < repeats; repeat++)
+            {
+                Keyboard.Press(key);
+                Thread.Sleep(repeatMs);
+            }
+        }
+        finally { Keyboard.Release(key); }
     }
 
     public static string Names(IEnumerable<VirtualKeyShort> keys) => string.Join(", ", keys);

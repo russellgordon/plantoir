@@ -528,7 +528,7 @@ public sealed partial class AssistWindow : Window
             ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
             // "Rebuild" means rebuild (#489, Q1): a serving preview is stopped
             // and started again, where ShowPreviewFor would leave it as it was.
-            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section),
+            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section) ?? Task.FromResult<string?>(null),
             // The Section menu's claim (#489): this window's change to a
             // section the menu is changing right now is refused, never interleaved.
             SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, _course.Code, _section),
@@ -596,8 +596,7 @@ public sealed partial class AssistWindow : Window
             },
             // Read from disk at the call: a course marked by hand while this
             // window was open is refused all the same (doors 2-4).
-            CourseIsKeptForReference = () => Workspace.DiscoverCourses(_folder)
-                .Any(c => c.Code.Equals(_course.Code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
+            CourseIsKeptForReference = () => Workspace.CourseIsKeptForReference(_folder, _course.Code),
             // "What does Unit 2, Day 3 in SPH3U link to?": SPH3U is a course
             // because it is a code in the shipped lists, not because of its
             // shape (#305 / mac #167).
@@ -808,7 +807,10 @@ public sealed partial class AssistWindow : Window
             {
                 Say(Speaker(line.Speaker), line.Text);
                 if (line.NeedsApproval) ShowApproval(line.Text);
-                if (line.Text.Contains(AssistWording.MayIAskForYourDates)) ShowDatesOffer();
+                // Either noun's question offers the sheet: a club's teacher copy
+                // asks for meeting dates (#1027 round 4).
+                if (line.Text.Contains(AssistWording.MayIAskForYourDates)
+                    || line.Text.Contains(AssistWording.MayIAskForYourDatesForAMeeting)) ShowDatesOffer();
             }
         }
         catch (OperationCanceledException) { /* the window is closing */ }
@@ -1163,7 +1165,7 @@ public sealed partial class AssistWindow : Window
             var xamlRoot = Root.XamlRoot ?? Content?.XamlRoot;
             if (xamlRoot is null)
             {
-                Say("Assistant", "Could not open class dates dialog.");
+                Say("Assistant", ClassDatesDialogWords.CouldNotOpen(_course));
                 return;
             }
             var dialog = new SectionScheduleDialog(_folder, _course, _section, hwnd)
@@ -1175,17 +1177,17 @@ public sealed partial class AssistWindow : Window
                 var result = await dialog.ShowWithTheFirstFocusInTheBoxAsync();
                 if (result == ContentDialogResult.Primary && dialog.SavedDates is { Count: > 0 } dates)
                 {
-                    Say("Assistant", $"Remembered {dates.Count} class {(dates.Count == 1 ? "date" : "dates")} for {_course.Code} Section {_section}.");
+                    Say("Assistant", ClassDatesDialogWords.Remembered(dates.Count, _course, _section));
                 }
                 else
                 {
-                    Say("Assistant", "No class dates were recorded.");
+                    Say("Assistant", ClassDatesDialogWords.NoneRecorded(_course));
                 }
             }
             catch (Exception ex)
             {
                 App.LogDiagnostic($"SectionScheduleDialog ShowAsync exception: {ex.Message}");
-                Say("Assistant", "No class dates were recorded.");
+                Say("Assistant", ClassDatesDialogWords.NoneRecorded(_course));
             }
         };
 
@@ -1193,7 +1195,7 @@ public sealed partial class AssistWindow : Window
         {
             buttons.Visibility = Visibility.Collapsed;
             Say("You", AssistWording.DeclineDatesButton);
-            Say("Assistant", "No class dates recorded. You can add them anytime.");
+            Say("Assistant", ClassDatesDialogWords.NotGivenYet(_course));
         };
 
         buttons.Children.Add(enterBtn);

@@ -45,6 +45,15 @@ public static class Workspace
     /// Courses = subfolders of courses/ holding a course_config.json, sorted
     /// by code. A malformed config is skipped silently — it must not hide
     /// every other course.
+    ///
+    /// <para>A config that is there and could not be read just now (a build
+    /// swapping it in, a scanner, a deny rule; #874) is not malformed: the
+    /// course keeps the settings this app last read for it, so it never
+    /// vanishes from the sidebar or the assistant's list for a moment. The
+    /// last good read is kept HERE, by the file's full path, not by the
+    /// caller: the window's reload, the assistant and every door then hold
+    /// the same answer. With no earlier read in this run there is nothing
+    /// true to show for it, and it is listed at the next read.</para>
     /// </summary>
     public static List<Course> DiscoverCourses(string workspacePath)
     {
@@ -59,11 +68,56 @@ public static class Workspace
             if (name.StartsWith('.') || name.StartsWith('_')) continue;
             string configPath = Path.Combine(dir, "course_config.json");
             if (!File.Exists(configPath)) continue;
-            try { courses.Add(new Course(name, dir, CourseConfiguration.Load(configPath))); }
-            catch { }
+            if (ReadCourse(name, dir, configPath, out bool couldNotRead) is { } course) courses.Add(course);
+            else if (couldNotRead && LastGoodRead(configPath) is { } earlier) courses.Add(new Course(name, dir, CourseConfiguration.FromBytes(earlier)));
         }
         courses.Sort((a, b) => string.CompareOrdinal(a.Code, b.Code));
         return courses;
+    }
+
+    /// <summary>
+    /// Whether the course in <paramref name="code"/>'s folder is kept for
+    /// reference, read from disk at the call, and FAILING CLOSED: settings
+    /// that are there and cannot be read just now answer as this app last
+    /// read them, and with no earlier read, TRUE, so a door never lets a
+    /// write through to a course that might be frozen (the MCP gate's
+    /// stance). No settings file, or one that is not valid JSON, is no
+    /// reference course, as before.
+    /// </summary>
+    public static bool CourseIsKeptForReference(string workspacePath, string code)
+    {
+        string wanted = code.Trim();
+        if (wanted.Length == 0 || wanted.StartsWith('.') || wanted.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return false;
+        string dir = Path.Combine(CoursesDirectory(workspacePath), wanted);
+        string configPath = Path.Combine(dir, "course_config.json");
+        if (!File.Exists(configPath)) return false;
+        if (ReadCourse(Path.GetFileName(dir), dir, configPath, out bool couldNotRead) is { } course)
+            return ReferenceCourse.IsKeptForReference(course);
+        if (!couldNotRead) return false;
+        return LastGoodRead(configPath) is not { } earlier || CourseConfiguration.FromBytes(earlier).KeptForReference;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> LastGoodReads =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The bytes of this run's last good read of <paramref name="configPath"/>, or null.</summary>
+    internal static byte[]? LastGoodRead(string configPath) =>
+        LastGoodReads.TryGetValue(Path.GetFullPath(configPath), out var bytes) ? bytes : null;
+
+    /// <summary>One course read from its settings; null when not valid JSON, or (<paramref name="couldNotRead"/>) when refused.</summary>
+    private static Course? ReadCourse(string name, string dir, string configPath, out bool couldNotRead)
+    {
+        couldNotRead = false;
+        var read = CourseConfiguration.ReadBytes(configPath);
+        if (read.Outcome == HeldFiles.ReadOutcome.CouldNotReadNow) { couldNotRead = true; return null; }
+        if (read.Outcome != HeldFiles.ReadOutcome.Read) return null;
+        try
+        {
+            var course = new Course(name, dir, CourseConfiguration.FromBytes(read.Data!));
+            LastGoodReads[Path.GetFullPath(configPath)] = read.Data!;
+            return course;
+        }
+        catch { return null; }
     }
 
     /// <summary>

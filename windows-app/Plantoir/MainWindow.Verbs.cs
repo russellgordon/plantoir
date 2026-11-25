@@ -15,7 +15,7 @@ namespace Plantoir;
 /// <summary>
 /// The assistant's functions from the Section menu (#489, the mac's #457
 /// batch B): Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild
-/// Preview, Undo Last Change · Add Next Class, Re-date Classes…, Make Room for
+/// Preview, Undo Last Change · Add Class…, Re-date Classes…, Make Room for
 /// Classes…, Class Dates…. Each runs the TOOL's own code through
 /// <see cref="AssistToolRunner"/> on the Menu surface, with a call built in
 /// code — never through a model, so a teacher who declined the assistant's
@@ -29,7 +29,7 @@ namespace Plantoir;
 /// the window, or closing it, stops that server and its undo list goes with
 /// it — the mac's ruling (Russell's decision 4).</para>
 ///
-/// <para><b>Class dates first.</b> Add Next Class, Re-date Classes… and Make
+/// <para><b>Class dates first.</b> Add Class…, Re-date Classes… and Make
 /// Room for Classes… need them; with none on file this window shows its own
 /// class dates dialog with the reason, and the item runs once they are
 /// written — never the assistant's offer, which only the assistant's window
@@ -79,6 +79,7 @@ public sealed partial class MainWindow
     private AssistToolRunner MenuRunner(string folder, string code, int section, IToolServer tools) =>
         new(tools, code, section, AssistSurface.Menu)
         {
+            CourseNoun = Workspace.ClassNounOf(code),
             ShowPreviewInApp = () => ShowPreviewFor(code, section),
             RebuildPreviewInApp = () => RebuildPreviewFor(code, section),
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>
@@ -87,8 +88,7 @@ public sealed partial class MainWindow
                 && lease.SectionNumber == section),
             StopPreviewInAppAsync = () => StopPreviewForAsync(folder, code, section),
             SectionIsBeingDeployed = () => CourseActivity.IsPublishingSection(folder, code, section),
-            CourseIsKeptForReference = () => Plantoir.Core.Models.Workspace.DiscoverCourses(folder)
-                .Any(c => c.Code.Equals(code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
+            CourseIsKeptForReference = () => Plantoir.Core.Models.Workspace.CourseIsKeptForReference(folder, code),
             CourseIsBeingCopied = () => WorkLease.IsHeld(folder, code, WorkLease.Copying) || SidebarPane.IsZipping(folder, code),
         };
 
@@ -106,10 +106,12 @@ public sealed partial class MainWindow
         if (Verbs() is not { } verbs) return null;
         // Its "ran from a menu" line names Hide Pages…, whose call it is, and
         // says where it came from, as the mac's does.
+        // A club's line says Meetings ▸ and counts meetings (#990, #1027).
+        var noun = Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun ?? ClassNoun.Class;
         var answer = await verbs.Perform(SectionVerbs.HidePages(code, section, places, plan: false),
-                                         SectionVerbDialog.MenuPath(Item.HidePages, Workspace.Courses.FirstOrDefault(c => c.Code == code)?.Configuration.ClassNoun ?? ClassNoun.Class), code, section,
+                                         SectionVerbDialog.MenuPath(Item.HidePages, noun), code, section,
                                          SubjectMenuLayout.MenuContaining(Item.HidePages),
-                                         ClassesDatedLater.UntickedAtDeployCounts(places.Count),
+                                         ClassesDatedLater.UntickedAtDeployCounts(places.Count, noun),
                                          previewFollows: false);
         ApplyMenuEnablement();
         return answer;
@@ -154,7 +156,6 @@ public sealed partial class MainWindow
             || Content?.XamlRoot is not { } root
             || Verbs() is not { } verbs) return;
         string code = course.Code;
-        bool meeting = course.Configuration.ClassNoun == ClassNoun.Meeting;
         try
         {
             switch (item)
@@ -172,8 +173,9 @@ public sealed partial class MainWindow
                     var rebuilt = await verbs.Perform(SectionVerbs.RebuildPreview(code, number),
                                                       SectionVerbDialog.MenuPath(item, course.Configuration.ClassNoun), code, number,
                                                       SubjectMenuLayout.MenuContaining(item));
-                    // Rebuilding is watched happening; only a refusal is said.
-                    if (rebuilt.Summary != AssistWording.PreviewIsRebuilding(code, number.ToString()))
+                    // Rebuilding is watched happening; only a refusal is said,
+                    // and one the window has already shown is not said twice (M3).
+                    if (rebuilt.Summary != AssistWording.PreviewIsRebuilding(code, number.ToString()) && !rebuilt.ShownInTheWindow)
                         await SectionVerbDialog.ShowAnswer(root, verbs, course, number, item,
                                                            AssistWording.MenuRebuildPreviewTitle, rebuilt.Summary);
                     break;
@@ -181,14 +183,22 @@ public sealed partial class MainWindow
                     await SectionVerbDialog.RunAtOnce(root, verbs, course, number, item, SectionVerbs.UndoLastChange(),
                                                       AssistWording.MenuUndoLastChangeTitle);
                     break;
-                case Item.AddNextClass:
+                case Item.AddClass:
+                    // #927: how the class is added, then (for a copy) which
+                    // class and the plan. Class dates first, as Add Next Class.
                     if (!await ClassDatesFirst(folder, course, number, item, root)) return;
-                    await SectionVerbDialog.RunAtOnce(root, verbs, course, number, item, SectionVerbs.AddNextClass(code, number),
-                        meeting ? AssistWording.MenuAddNextClassTitleForAMeeting : AssistWording.MenuAddNextClassTitle);
+                    await SectionVerbDialog.ChooseHowToAddAClass(root, verbs, course, number);
                     break;
                 case Item.ReDateClasses:
                     if (!await ClassDatesFirst(folder, course, number, item, root)) return;
                     await SectionVerbDialog.PlanReDate(root, verbs, course, number);
+                    break;
+                case Item.RollOverToANewYear:
+                    // #954 (the mac's #897 piece B): the dates, the website
+                    // question where there is a website (nothing chosen),
+                    // then the plan. Class dates first, as Re-date Classes….
+                    if (!await ClassDatesFirst(folder, course, number, item, root)) return;
+                    await SectionVerbDialog.ChooseHowToRollOver(root, verbs, course, number);
                     break;
                 case Item.MakeRoomForClasses:
                     if (!await ClassDatesFirst(folder, course, number, item, root)) return;
@@ -225,8 +235,8 @@ public sealed partial class MainWindow
         bool meeting = course.Configuration.ClassNoun == ClassNoun.Meeting;
         string reason = item switch
         {
-            Item.AddNextClass => meeting ? AssistWording.DatesForTheNextPageForAMeeting : AssistWording.DatesForTheNextPage,
-            Item.ReDateClasses => meeting ? AssistWording.DatesToReDateForAMeeting : AssistWording.DatesToReDate,
+            Item.AddClass => meeting ? AssistWording.DatesForTheNextPageForAMeeting : AssistWording.DatesForTheNextPage,
+            Item.ReDateClasses or Item.RollOverToANewYear => meeting ? AssistWording.DatesToReDateForAMeeting : AssistWording.DatesToReDate,
             _ => meeting ? AssistWording.DatesToMakeRoomForAMeeting : AssistWording.DatesToMakeRoom,
         };
         return await ShowClassDates(folder, course, section, root, reason);
@@ -256,9 +266,16 @@ public sealed partial class MainWindow
     /// to promise and not do. Used by Rebuild Preview and by the in-app
     /// assistant's rebuild_preview alike.
     /// </summary>
-    public void RebuildPreviewFor(string courseCode, int section)
+    /// <returns>
+    /// The start's answer, once it is decided (#928 review 2, M3): null when it
+    /// went ahead, otherwise the sentence the window is showing under "Cannot
+    /// Preview Yet", which the menu and the assistant then say instead of
+    /// "rebuilding".
+    /// </returns>
+    public Task<string?> RebuildPreviewFor(string courseCode, int section)
     {
-        DispatcherQueue.TryEnqueue(async () =>
+        var decided = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool queued = DispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
@@ -269,13 +286,21 @@ public sealed partial class MainWindow
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
-                if (DetailHost.Content is SectionDetailView detail) await detail.RebuildPreviewAsync();
+                string? refused = null;
+                if (DetailHost.Content is SectionDetailView detail) refused = await detail.RebuildPreviewAsync();
                 ComeForwardIfHidden();
+                decided.TrySetResult(refused);
             }
             catch (Exception ex)
             {
                 App.LogDiagnostic($"RebuildPreviewFor exception: {ex}");
             }
+            finally
+            {
+                decided.TrySetResult(null);
+            }
         });
+        if (!queued) decided.TrySetResult(null);
+        return decided.Task;
     }
 }

@@ -30,7 +30,8 @@ public sealed class UndoHistory
     public sealed record Entry(string Description, DateTime When, IReadOnlyDictionary<string, FileState> Files);
 
     /// <summary>What a file held before and after. Null means it did not exist.</summary>
-    public readonly record struct FileState(string? Before, string? After);
+    /// <param name="BeforeBytes">The file's bytes before, when the writer had them (#899 W7a, review 1 MEDIUM 3): written back as they were, so a page in another encoding (UTF-16) or with a byte-order mark comes back byte for byte.</param>
+    public readonly record struct FileState(string? Before, string? After, byte[]? BeforeBytes = null);
 
     private readonly List<Entry> _entries = new();
     private Dictionary<string, FileState>? _open;
@@ -120,12 +121,12 @@ public sealed class UndoHistory
     /// Note a file about to be written. Called before the write, so the
     /// "before" is genuinely what was there.
     /// </summary>
-    public void Touch(string path, string? before)
+    public void Touch(string path, string? before, byte[]? beforeBytes = null)
     {
         if (_open is null) return;
         // Only the FIRST before matters: if one operation writes a file twice,
         // undoing it should reach back past both writes.
-        if (!_open.ContainsKey(path)) _open[path] = new FileState(before, null);
+        if (!_open.ContainsKey(path)) _open[path] = new FileState(before, null, beforeBytes);
     }
 
     /// <summary>Note what was actually written, so a later change by someone else is detectable.</summary>
@@ -192,6 +193,7 @@ public sealed class UndoHistory
             try
             {
                 if (state.Before is null) File.Delete(path);
+                else if (state.BeforeBytes is { } bytes) File.WriteAllBytes(path, bytes);
                 else File.WriteAllText(path, state.Before);
                 restored.Add(path);
             }

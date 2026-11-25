@@ -331,6 +331,26 @@ internal static class NamedGapLedger
     internal const string UndoTraces = "undo-traces.json → traces";
 
     /// <summary>
+    /// <c>undo-traces.json</c> → <c>actionTraces</c>, by trace <c>name</c>: a
+    /// trace whose recorded step has <c>moves</c> (U3b's rollover, W7c) or
+    /// <c>members</c> and <c>trees</c> (U4a's Course Settings and Add folder,
+    /// W8), which this replay does not make yet. A held trace must still stop
+    /// at its step (<c>UndoActionTraceContractTests.EveryCallOfEveryActionTrace</c>).
+    /// </summary>
+    internal const string UndoActionTraces = "undo-traces.json → actionTraces";
+
+    /// <summary>
+    /// <c>class-planning.json</c> → <c>duplicatingAsTheNextClass.cases</c>, by
+    /// case <c>name</c>: a case whose <c>expectUndoEntries</c> this app does
+    /// not record, because the entry is the old in-memory list's and Windows'
+    /// final form is the journal step (W7 for #899). A held case must still
+    /// record NO entry here, and everything else it says is asserted exactly
+    /// (<c>AddClassContractTests.TheMenusCopyIsTheContracts</c>). Wired in by
+    /// #927 (2026-11-20).
+    /// </summary>
+    internal const string MenuCopyUndoEntries = "class-planning.json → duplicatingAsTheNextClass (expectUndoEntries)";
+
+    /// <summary>
     /// <c>shared-rules.json</c> → <c>undo.recoveryCases</c>, by case <c>name</c>:
     /// a case that needs a key this replay does not check yet (U2b's
     /// <c>withAMove</c>, <c>withATree</c>, <c>withAPreference</c>,
@@ -347,9 +367,8 @@ internal static class NamedGapLedger
     internal static readonly IReadOnlyDictionary<string, string> SubjectMenuItemsOlderNames =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            // #897 piece A: "Add Class…" replaced "Add Next Class" on the mac;
-            // its enablement did not change (#927).
-            ["addClass"] = "addNextClass",
+            // Empty since #927 brought Add Class… (2026-11-20); kept, with its
+            // hook, for the next item the contract renames.
         };
 
     // The milestones, spelled EXACTLY as their GitHub titles. NamedGapLedgerTests
@@ -418,7 +437,6 @@ internal static class NamedGapLedger
     // #884's first part (2026-11-13): the mac's #783 and #850 merged into dev.
     private const string Reason884Door = "GitHub Copilot as a third outside door (its launcher, detection, menu items and buttons) is #884's piece of v2.0.0, not built here yet";
     private const string Reason884Naming = "naming the assistant at work through {assistant} needs plantoir-mcp to write the door's key as the assist lease's fifth line (#884 item 7, with WorkLease); until then every Windows hold names none, and the contract's anyAssistant for that names GitHub Copilot, which a Windows teacher cannot open yet, so the older 'Claude or Codex' words stay the true ones";
-    private const string Reason889 ="Open in Browser for a section deployed to a folder is #889's piece of v2.0.0 (the mac's #850), not built here yet";
 
     // #868's held-by-name piece (2026-11-13): the mac's #835 part 3 and #855 merged into dev.
     private const string Reason868Sections = "a build, preview or deploy holding only its own section (a work lease's sixth line, the mac's #835 part 3) is #868's piece of v2.0.0; until it lands every Windows lease holds the whole course and a lease's sixth line is read as course-wide, so no hold here is ever on one section and the course-wide sentence is the true one";
@@ -432,11 +450,8 @@ internal static class NamedGapLedger
     // The fourth hold (2026-11-14): the mac's fourteen pieces merged at cadd8eb11.
     private const string Reason920 = "the invented sample names on the surname and website-address sheets (the mac's #891) are #920's piece of v2.0.0, with the colour pickers and the switch; until it lands Windows' sheets carry the older example names, which name nothing a teacher acts on";
     private const string Reason921 = "Settings ▸ Deploying, the tokens checked before they are saved and the Cloudflare token's end date (the mac's #696), are #921's piece of v2.0.0; until it lands Windows shows no end date and warns of none, so its older words for the TTL step are the true ones, and it records, says and explains none of the pane's events, problems or refusals";
-    private const string Reason927 = "Classes ▸ Add Class… in place of Add Next Class, with its three ways (the mac's #897 piece A), is #927's piece of v2.0.0; until it lands Windows' menus have Add Next Class, enabled exactly where the contract enables Add Class…, and none of the sheet's sentences";
-    private const string Reason928 = "a preview start that does nothing while the window's own start waits, a run that never started, and a repair's Preview Again that does not survive its stop (the mac's #812 and #813) are #928's piece of v2.0.0, not built here yet";
     private const string Reason936 = "PhET simulations and the kept-downloads folder (the mac's #674) are #936's piece of v2.0.0; until it lands Windows reads no PLANTOIR_DOWNLOADED: line, explains no stop for a simulation (the raw output is shown) and has no Science simulation row on the Problems tab";
     // The same hold, after the mac's stack 13 (956defd43, #800, #829, #897 piece B, #904).
-    private const string Reason897RollOver = "Classes ▸ Roll Over to a New Year… with its sheet (the mac's #897 piece B) is #954's piece of v2.0.0 (Windows' issue for #897 piece B), not built here yet; until it lands Windows' menus have no Roll Over item and none of its sentences, and the built-in assistant's roll_over_section is unchanged";
     private const string Reason829 = "a lease whose start is in WHOLE seconds, compared on whole seconds (the one deploy.sh writes since the mac's #829), is #956's piece of v2.0.0 (Windows' issue for the mac's #829, now closed); until it lands nothing on Windows writes such a lease (deploy.ps1 takes none yet, and this app's own leases carry the start to the microsecond), so no hold here is read as gone this way";
     // The same hold, brought up to dev 39d83a0a7 (2026-11-18): stack 14's #901 piece 901a and #952.
     private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
@@ -446,8 +461,9 @@ internal static class NamedGapLedger
     private const string Reason899W8U4b = "the mac's U4b for #899 (2026-11-20): opKinds.wholeOps' one exception, an edit named at a move's new place after the move, made and redone after it, taken back before it, with the move judged as if its own edits there were taken back (and a folder move's listingSha never asked for as a blob); Windows' W8 (Rename folder through the door) builds it in UndoCheck and UndoSwap; until it lands this replay does not know the calls moveAFolderWithAPageEditedInside, addAFileInsideTheMovedFolder, editThePageInsideByHand and stepEditingInsideAMovesFrom, nor the key movedFolder; and in recoveryCases (its recovery: a step killed between its move and the edits it carries settled whole, by content, with no kept original left inside the moved folder) the keys withAMovedFolder, movedFolder and keptCopyLeftInsideTheFolder; and a capitalisation-only move (opKinds.move: from and to spelled alike but for case, in the last part only) readable and judged by the spelling the folder lists, with the calls renameAFolderInCaseOnly and spellTheFolderAnotherWay and the key caseOnlyFolder";
     private const string Reason899W4cKeptAlert = "the mac's U3c for #899 (Russell's rulings of 2026-11-20, night): when Show on Front Page goes in while another program edits the page at that instant, what the page held is kept in a hidden file beside it and ONE alert names it (keptTitle, kept), with OK, the default, and a button that shows the kept file selected in its folder (showKept: Show in Finder on the mac, Show in File Explorer here, as workingFolderPathBar's reveal; what File Explorer does for a hidden file is to be measured before it is built). When the kept file is gone by the time the button is pressed, keptGone is said instead and nothing is shown (the mac's U4a, from U3c review 3). Windows' W4c builds the part-way outcome this alert reports; until it lands Windows has no part-way front page to report and says none of these";
     private const string Reason899W4cWithW7 = "the merge of the mac's U3b and U3c for #899 (2026-11-20): a rollover's Undo needs no content from the list, so no kept original is looked for for a moveApart or a setAside, and a rollover's Undo that leaves its record apart never touches another step's kept original, which is still used by its hash; Windows runs these once both W4c (kept-original recovery) and W7 (the rollover as a step) have landed, whichever is later; until then this replay does not know the calls and keys those cases use";
+    private const string Reason899W8U4a = "the mac's U4a for #899 (2026-11-20): Course Settings and Set School Year as editJSON ops made member by member (members, the member rule's bytes of undo-json-cases.json → editJSONCases) and Add folder as one createTree (trees); Windows' W8 makes those steps from its own actions, and until then this replay makes no step with members or trees";
     private const string Reason899W7U3b = "the mac's U3b for #899 (2026-11-20): the rollover as one step, whose site markers are the op kind moveApart (judged as move, but an Undo or Redo that finds it changed since leaves it and goes on with the rest: Russell's ruling of 2026-11-19 on Q3, #959), and a step's moveApart ops move as a group, all left apart when any one is changed since (the director's decision of 2026-11-20), as is a deploy set for later the swap cannot set at an Undo or Redo (the U3b review's LOW 3); a leftover no deploy reads is the op kind setAside, judged as move and standing apart ON ITS OWN, never one of that group, and a deploy set for later put back whose job will start only at the next login is named in startsAtTheNextLogin with its own sentence, undoScheduleStartsAtTheNextLogin (U3b's fix round three, 2026-11-20; which record a deploy reads is undo.netlifyRecordCases, which W7 runs as well); Windows' W7 for #899 builds it (documentation 12, the W7 row); until it lands this app's reader takes moveApart for a kind it does not know, which the contract makes a barrier that is never acted on and never a reason to clear, so nothing it reads is guessed at";
-    private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) has no action wired on Windows yet (W7 wires them, with 'undo could not record a step'); 'undo rolled back' is written by W3's recovery and 'undo found a folder set aside' by W6's";
+    private const string Reason899MenuCopy = "the menu's copy of a class as the next class (#927, the mac's #897 piece A) is ONE undo entry on the mac's old in-memory list; the night-3 ruling (no new action gets an entry in the old lists, no interim states) leaves it to the journal step the mac's U3a defines and Windows' W7 copies, so until W7 lands Windows records no entry for it, and Undo Last Change does not take the copy back: it takes back the change BEFORE the copy, the menu's last change with an entry (an Add Class… as the next class, say, whose page it removes unless edited since; the course copy saved before the copy is the way back)";
 
     /// <summary>
     /// The outside doors the contract names that this app does not have,
@@ -546,10 +562,6 @@ internal static class NamedGapLedger
              "backupKeptForAClaudeSession", "backupsKeptForAClaudeSession",
              "finishTheClaudeSessionToDeleteItsBackup", "finishTheClaudeSessionToDeleteItsBackups"),
         Owed(TrailLineSaidDifferently, 884, V200, Reason884Naming, "outside session held a course"),
-        Owed(ActivityTrailEvents, 889, V200, Reason889,
-             "deployed folder opened in the web browser", "deployed folder no longer shown", "deployed folder could not be opened"),
-        Owed(SubjectMenuItems, 889, V200, Reason889, "stopShowingDeployedFolder"),
-        Owed(SubjectMenuSituationKeys, 889, V200, Reason889, "deployedFolderReady", "deployedFolderShown"),
 
         // ---- #868's held-by-name piece (2026-11-13): what the mac's #835
         // part 3 (holds narrow to the section) and #855 (Set Up an
@@ -577,20 +589,12 @@ internal static class NamedGapLedger
         // contract without the switch (test code only, #920 item 3); the
         // redactor's 24 cases are NOT held: a credential shape that leaks is
         // a defect (#941), never a gap.
-        Owed(ActivityTrailEvents, 928, V200, Reason928,
-             "preview already starting", "preview again abandoned", "preview could not start"),
         Owed(ActivityTrailEvents, 921, V200, Reason921,
              "deploy token changed in Settings", "deploy token removed in Settings",
              "deploy token change refused in Settings", "old deploy token kept in Settings",
              "Cloudflare token end date learned"),
         Owed(ActivityTrailEvents, 936, V200, Reason936,
              "files for the site downloaded", "files for the site could not be downloaded"),
-        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step"),
-        Owed(ActivityTrailEvents, 899, V200, Reason899W4c,
-             "undo could not put back a change that stopped",
-             "undo kept what a page held",
-             "undo refused for a change left part way",
-             "undo kept what it replaced"),
         Owed(UndoEditJsonCasesRefusedHere, 899, V200, Reason899Measured,
              "a new object's keys beyond ASCII: the mac sorts them by Unicode collation (an emoji first, \u00e9 between E and f, a full-width \uff21 beside A, \u00df after ss, a tab passed over)",
              "a new object holding \u00e9 written two ways (one character, and e with a combining accent): the mac takes them for one key",
@@ -606,19 +610,6 @@ internal static class NamedGapLedger
              "editJSON: a member holding text that starts with a byte-order mark (written \\ufeff), which the mac reads without it",
              "editJSON: a file's key that is the Kelvin sign, the key path the letter K, the step having added the member",
              "editJSON: another member's number written with 168 digits after the point, which the mac cannot read: the file is not JSON there"),
-        Owed(UndoStackCases, 899, V200, Reason899W4c,
-             "U3c: an Undo whose content is missing, with the page's kept original matching what the journal recorded, is undone from it and leaves nothing beside the page (Russell's ruling of 2026-11-20, 15:20)",
-             "U3c: and the Redo it offers then goes forward from the list: the page is as the step left it, nothing beside it",
-             "U3c: the same Undo when the list cannot keep a copy of what the page held a moment before: undone, what the page held kept beside it under its hidden name, and the kept original it put back kept too, the Redo still offered, and the trail line says so",
-             "U3c: and the Redo it offers goes forward from what is kept beside the page, with the step's Undo still offered and the list never cleared (Russell's ruling of 2026-11-20, night)",
-             "U3c: and that Undo goes back again from what is kept beside the page",
-             "U3c: the same, with what is kept beside the page changed before that Undo: refused once for content missing, the list cleared, and every kept file left beside the page",
-             "U3c: the same, with what is kept beside the page changed before the Redo: refused once for content missing, only the redo dropped, and every kept file left beside the page",
-             "U3c: an Undo put back from a kept original when only that content is missing from the list and the list will not take it again: the kept original stays beside the page, and after a Redo the Undo is still real",
-             "U3c: and that Undo goes back from the kept original again",
-             "U3c: the same Undo with the kept original there but unreadable just now (a cloud placeholder not downloaded): refused as cannot tell now, the list kept, never refused for content missing",
-             "U3c: the same with the kept original no longer matching: refused once with its reason, the list cleared, and the kept original left beside the page",
-             "U3c: a kept original another Mac or an earlier list left under the very name the next step's swap would use is never removed or reused: the step keeps its own original under the next free name and goes in (the third review of U3a, LOW 6: step numbers are not unique across two Macs syncing one folder, or after a list is started again)"),
         Owed(UndoStackCases, 899, V200, Reason899W4c,
              "U4a, LOW 4 (a), stored: a whole-file step whose after content is gone from the list: the Undo writes what it took off into the list before its swap, nothing is kept beside the page, and the Redo is made from the list",
              "U4a, LOW 4 (a): the same with the list taking no new file: what the Undo took off is kept beside the page, and the Redo is made from it",
@@ -638,6 +629,10 @@ internal static class NamedGapLedger
              "move between two names that differ only in case, in the last part: the folder lists it as `to`, holding the content: as the step left it",
              "move between two names that differ only in case, in the last part: the folder lists it as `from`, holding the content: as before",
              "move between two names that differ only in case, in the last part: the folder lists it as `to`, holding something else: changed since"),
+        // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
+        // recompute run were held here from 2026-11-19 (60 checkCases, 19
+        // stackCases, 15 traces, 21 recoveryCases) and went when Windows' W6
+        // built them (2026-11-20).
         Owed(TodaysClassWording, 899, V200, Reason899W4cKeptAlert, "keptTitle", "kept", "showKept", "keptGone"),
         Owed(UndoCheckCases, 899, V200, Reason899W7U3b,
              "moveApart (U3b): judged as move is: the place it left free, the place it went holding it: as the step left it",
@@ -661,24 +656,21 @@ internal static class NamedGapLedger
              "U3b, a leftover: with nothing changed between, Undo puts the record and the leftover back with the rest and leaves nothing apart",
              "U3b: a deploy set for later put back at Undo whose job the computer will not start now, and which cannot be taken away again, starts at the next login: named as such, never as left apart and never as simply back (the re-review of U3b's fixes, LOW 2); the rest is taken back"),
         Owed(AssistWordingKeys, 899, V200, Reason899W7U3b, "undoScheduleStartsAtTheNextLogin"),
+        // The rollover (moves) and U4a (members, trees) traces below fail by the
+        // replay's own guard, which names the part of the step it does not make
+        // yet, before any door is asked (part three, review 1, LOW 2): they can
+        // pass only once that guard is taken out for their kind.
+        Owed(UndoActionTraces, 899, V200, Reason899W7U3b,
+             "action-121", "action-122", "action-123", "action-124", "action-125", "action-126",
+             "action-127", "action-128", "action-129", "action-130", "action-131", "action-132"),
+        Owed(UndoActionTraces, 899, V200, Reason899W8U4a,
+             "action-133", "action-134", "action-135", "action-136", "action-137", "action-138",
+             "action-139", "action-140", "action-141", "action-142", "action-143", "action-144",
+             "action-145", "action-146", "action-147", "action-148", "action-149", "action-150"),
         Owed(UndoStackCases, 899, V200, Reason899W4cWithW7,
              "U3b with U3c: the Undo of a rollover of only its records, a leftover and the year, with the list's content gone, needs nothing from it (each record and leftover is a rename judged by its hash, the school year a member derived from the file), so no kept original is looked for and the Undo goes, never refused for content missing",
              "U3c with U3b: a later rollover's Undo that leaves its record apart keeps an earlier page's kept original beside it, untouched",
              "U3c with U3b: an earlier page's kept original, the only copy of what it held, outlives a later rollover's Undo that leaves its record apart, and that page's Undo is then put back from it"),
-        // The mac's U3 rows (U3a's third review, U3c's kept originals and
-        // its two fix rounds) arrived with W3's reader already on dev: each
-        // uses a key this replay does not check, and W4c builds them.
-        Owed(UndoRecoveryCases, 899, V200, Reason899W4c,
-             "a step dies part way and its content is then missing, but the page's kept original matches what the journal recorded: the page is put back from it, rolled back, and nothing is left beside the pages (Russell's ruling of 2026-11-20, 15:20)",
-             "a step left part way whose first page's kept original holds exactly what the list gives for it: the tidy before the plan keeps it, and only once the step is put back does it go",
-             "the same, with the kept original there but unreadable just now (a cloud placeholder not downloaded): cannot tell now, so the step is left for the next recovery, never closed, the list kept, and an Undo is refused naming the page",
-             "the same, with the kept original no longer matching what the journal recorded: closed as interrupted naming the page left part way, the list cleared, the kept original left beside its page, and the trail line names it",
-             "a step whose first page was edited in place by another program as the swap went in, and whose put-back then failed, is left part way; recovery rolls it back and keeps the edit, in the kept original, beside the page, naming it on the trail",
-             "a file still in use when that Undo tries the put-back again: the Undo is refused naming the file, never another change under way, the list kept, and the refusal is on the trail",
-             "an undo of a step with a page now missing its content dies part way, the page's kept original matching what the journal recorded: the undone page goes forward again from it, and the undo ends where it began",
-             "the same undo when the list cannot keep a copy of what the page held as it went forward again: ended where it began, and that content kept beside the page under the put-back's hidden name, with the kept original it went forward from, and both named on the trail as no longer in the list",
-             "the same undo when only the content its kept original holds is gone from the list and the list will not take it again: ended where it began, and the kept original stays beside the page, though the page now holds the same, and is named on the trail as no longer in the list",
-             "the same undo, with the kept original no longer matching: closed as interrupted naming the page, the list cleared, and the kept original left beside its page and named on the trail"),
         Owed(UndoRecoveryCases, 899, V200, Reason899W8U4b,
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies before anything is swapped in: nothing took effect, the folder where it was",
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies with the folder moved and nothing else in: the folder goes back, the edit inside judged where its folder now is",
@@ -691,10 +683,10 @@ internal static class NamedGapLedger
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder moved again and nothing else: put back",
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder and both pages in and the edit inside not: put back",
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with every change in but before redone: completed"),
-        // ---- U2b (the mac's U2b for #899, 2026-11-19): the six op kinds and
-        // recompute run were held here from 2026-11-19 (60 checkCases, 19
-        // stackCases, 15 traces, 21 recoveryCases) and went when Windows' W6
-        // built them (2026-11-20).
+        // ---- U3c (the mac's U3c for #899, 2026-11-20): its 4 trail events, 12
+        // stackCases and 10 recoveryCases were held here under Reason899W4c and
+        // went when Windows' W4c built them (2026-11-20, night). The kept-file
+        // alert's three keys stay held (Reason899W4cKeptAlert).
         Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
         Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921, "cloudflareToken"),
         Owed(CredentialRequestsSaidDifferently, 920, V200, Reason920, "teacherSurname", "siteName", "siteNameConflict"),
@@ -708,36 +700,13 @@ internal static class NamedGapLedger
              "GitHub #696, the second ruling and review MUST 1",
              "GitHub #696, the paste rule (deployTokens.paste), in deploy.ps1's shape"),
         Owed(SectionProblemKinds, 936, V200, Reason936, "phetSimulationsNotReady"),
-        Owed(SubjectMenuItemsUnderAnOlderName, 927, V200, Reason927, "addClass"),
-        Owed(AssistWordingKeys, 927, V200, Reason927,
-             "menuAddClassTitle", "menuAddClassTitleForAMeeting",
-             "menuHowToAddAClass", "menuHowToAddAClassForAMeeting",
-             "menuAddClassNextInThisUnit", "menuAddClassNextInThisUnitForAMeeting",
-             "menuAddClassNextInANumberedCourse", "menuAddClassNextInANumberedCourseForAMeeting",
-             "menuAddClassInANewUnit", "menuAddClassInANewUnitForAMeeting",
-             "menuAddClassAsACopy", "menuAddClassAsACopyForAMeeting",
-             "menuAddClassInANewUnitInAModuleCourse", "menuAddClassNextInThisUnitInAModuleCourse",
-             "menuAddClassGreyedNoUnits", "menuAddClassGreyedNoUnitsForAMeeting",
-             "menuAddClassGreyedNothingToCopy", "menuAddClassGreyedNothingToCopyForAMeeting",
-             "menuAddClassGreyedRenameUnfinished", "menuAddClassGreyedRenameUnfinishedForAMeeting",
-             "menuAddClassGreyedRenameHoldsACopyInANumberedCourse", "menuAddClassGreyedRenameHoldsACopyInANumberedCourseForAMeeting",
-             "menuNeedsClassDatesFirst", "menuNeedsClassDatesFirstForAMeeting",
-             "menuPickClassToDuplicate", "menuPickClassToDuplicateForAMeeting",
-             "menuUnitWordRenameUnfinished", "menuUnitWordRenameUnfinishedForAMeeting",
-             "menuAddClassGreyedRenameHoldsANewUnit",
-             "menuAddButton", "menuDuplicateButton", "duplicatedFromTheMenu",
-             "theCopyCouldNotBeMadeHiddenFromTheMenu", "menuTheNextPageIsAlreadyThere"),
-        // The mac's stack 13 (956defd43), folded into the same hold.
-        Owed(SubjectMenuItems, 954, V200, Reason897RollOver, "rollOverToANewYear"),
-        Owed(AssistWordingKeys, 954, V200, Reason897RollOver,
-             "menuRollOverTitle", "menuRollOverIntro", "menuRollOverIntroForAMeeting",
-             "menuRollOverDates", "menuRollOverDatesForAMeeting", "menuRollOverDatesAreOld", "menuRollOverDatesAreOldForAMeeting",
-             "menuRollOverKeepWebsite", "menuRollOverNewWebsite", "menuRollOverANewWebsiteWouldReuseItsAddress",
-             "menuRollOverDeploysToAFolder", "menuRollOverNotDeployedYet",
-             "menuRollOverPlanKeepsTheWebsite", "menuRollOverPlanSetsTheRecordAside", "menuRollOverButton",
-             "rolloverANewWebsiteIsMadeAtTheNextDeploy", "rolloverCouldNotStartANewWebsiteFromTheMenu",
-             "rolloverDeploysToAFolderFromTheMenu", "rolloverStartedANewWebsiteFromTheMenu",
-             "rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder"),
+        // #927 (2026-11-20): the menu's copy records no entry on the old list.
+        Owed(MenuCopyUndoEntries, 899, V200, Reason899MenuCopy,
+             "the copy is the section's next class, and nothing else moves",
+             "a course-level page with the same title is not the source",
+             "a class page with no numbers in its name can be duplicated",
+             "a numbered course's copy is its next number",
+             "a source carrying a per-section publish key still gives a hidden copy"),
         Owed(LeaseLivenessCases, 956, V200, Reason829,
              "#829: a deploy typed in Terminal - bash, its start in whole seconds - is alive while that bash runs"),
         // Stack 14 (dev 39d83a0a7), folded into the same hold on 2026-11-18.

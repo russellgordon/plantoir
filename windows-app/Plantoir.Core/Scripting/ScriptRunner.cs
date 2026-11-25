@@ -56,6 +56,24 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     public bool IsRunning { get; private set; }
     public int? LastExitCode { get; private set; }
     public string? LaunchProblem { get; private set; }
+
+    /// <summary>
+    /// What a teacher never reads about a run that could not start: the
+    /// launcher's file name, or the system's own description of the error
+    /// (#928 items 8 and 9, the mac's <c>launchProblemDetail</c>). The
+    /// section's preview writes it to the trail after the sentence
+    /// (<c>preview could not start</c>); <see cref="LaunchProblem"/> names no
+    /// file and carries no system text.
+    /// </summary>
+    public string? LaunchProblemDetail { get; private set; }
+
+    /// <summary>The launch itself failed (a pseudo console that would not open, a process that would not start), in Plantoir's words for Windows.</summary>
+    public const string CouldNotGetStarted =
+        "Could not get started. Try again, or restart this computer if it happens again.";
+
+    /// <summary>The launcher a run needs is not in the working folder; the file's name goes to <see cref="LaunchProblemDetail"/>.</summary>
+    public const string FolderIsMissingAPiece =
+        "This working folder is missing a piece it needs. Try choosing your working folder again from the File menu.";
     public DateTime LastOutputAt { get; private set; }
     public DateTime? StartedAt { get; private set; }
     public bool IsAwaitingInput { get; private set; }
@@ -232,6 +250,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         if (!keepTranscript) { Transcript = new TranscriptBuilder(); Notify(nameof(Transcript)); }
         LastExitCode = null;
         LaunchProblem = null;
+        LaunchProblemDetail = null;
         WasCancelled = false;
         WasStoppedByUser = false;
         WasClosedForADeploy = false;
@@ -287,13 +306,14 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         string scriptPath = Path.Combine(workingDirectory, scriptName);
         if (!File.Exists(scriptPath))
         {
-            LaunchProblem = $"This working folder is missing a piece it needs ({scriptName}). Try choosing your working folder again from the File menu.";
+            LaunchProblem = FolderIsMissingAPiece;
+            LaunchProblemDetail = "the working folder has no " + scriptName;
             Notify(nameof(LaunchProblem));
             // A task that never started still happened to the teacher — a
             // launch that fails silently is how a problem report arrives
             // carrying "the last 0 tasks" after three visible failures.
             ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
-                $"could not start {scriptName} — {LaunchProblem}");
+                $"could not start {scriptName} — {LaunchProblemDetail}");
             IsBetweenPhases = false;
             return;
         }
@@ -324,7 +344,8 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         }
         catch (Exception error)
         {
-            LaunchProblem = $"Could not get started: {error.Message}";
+            LaunchProblem = CouldNotGetStarted;
+            LaunchProblemDetail = "the system said: " + error.Message;
             Notify(nameof(LaunchProblem));
             IsBetweenPhases = false;
             return;
@@ -563,23 +584,48 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// Sends an interrupt signal (Control-C) through the pseudo-terminal
     /// so foreground process groups and traps terminate cleanly, falling back
     /// to direct termination after two seconds.
+    ///
+    /// <para>The fallback belongs to the run it was set for (#1026): it
+    /// remembers that run's number and process and terminates only while
+    /// that run is still the current one. A preview started on this runner
+    /// inside the two seconds (Stop, then Preview again) is a different run;
+    /// the old fallback asked only <see cref="IsRunning"/> and killed it,
+    /// with the stop flags already reset, so it ended "Something went
+    /// wrong". The two seconds are Control-C's grace, the behaviour, not a
+    /// wait for anything. The returned task completes when the fallback has
+    /// decided, which a test awaits instead of a clock.</para>
     /// </summary>
-    public void CancelByUser(Action? onCleanup = null)
+    public Task CancelByUser(Action? onCleanup = null)
     {
         WasCancelled = true;
         WasStoppedByUser = true;
         Notify(nameof(WasCancelled));
         Notify(nameof(WasStoppedByUser));
         onCleanup?.Invoke();
+        int cancelledRun = CurrentRunNumber;
+        ConPtyProcess? cancelledProcess = _process;
         SendRaw("\x03");
-        Task.Delay(2000).ContinueWith(_ =>
+        return Task.Delay(ControlCGrace).ContinueWith(_ =>
         {
-            if (IsRunning)
+            if (TheFallbackStillOwnsTheRun(cancelledRun))
             {
-                Terminate();
+                Interlocked.Increment(ref _fallbackTerminations);
+                cancelledProcess?.Kill();
             }
-        });
+        }, TaskScheduler.Default);
     }
+
+    /// <summary>Control-C's grace before the stop's fallback terminates the run (behaviour, #1026).</summary>
+    internal static readonly TimeSpan ControlCGrace = TimeSpan.FromSeconds(2);
+
+    private int _fallbackTerminations;
+
+    /// <summary>How many times a stop's fallback has terminated a run (#1026's test reads it).</summary>
+    internal int FallbackTerminations => Volatile.Read(ref _fallbackTerminations);
+
+    /// <summary>The fallback set for run <paramref name="cancelledRun"/> may act only while that run is still the current one and still running.</summary>
+    private bool TheFallbackStillOwnsTheRun(int cancelledRun) =>
+        IsRunning && CurrentRunNumber == cancelledRun;
 
     /// <summary>An ending the teacher asked for is not a fault.</summary>
     public void StopByUser()

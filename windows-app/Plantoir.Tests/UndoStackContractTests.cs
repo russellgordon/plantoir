@@ -21,6 +21,8 @@ public sealed class UndoStackContractTests
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList", "expectLast", "cleared",
         "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned", "blobKept", "interrupted",
         "markers", "folderKept", "rederived", "nothingMovedOutside",
+        // U3c's (W4c)
+        "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
     };
 
     public static IEnumerable<object[]> Cases() =>
@@ -72,8 +74,11 @@ public sealed class UndoStackContractTests
             Assert.True(KeysChecked.Contains(key.Name), "a key this replay does not check: " + key.Name);
 
         using var scribe = new UndoScribe();
-        var replay = new StackReplay(scribe);
+        using var denials = new UndoDenials();
+        var replay = new StackReplay(scribe, denials);
         foreach (JsonElement call in stackCase.GetProperty("calls").EnumerateArray()) replay.Call(call.GetString()!);
+        // Every deny entry goes before the checks read the disk.
+        denials.Dispose();
 
         UndoFolded folded = scribe.Fold();
         UndoOffered offered = scribe.Journal.Offer(folded);
@@ -114,8 +119,27 @@ public sealed class UndoStackContractTests
             Assert.Equal(rederived.GetInt32(), scribe.Maintainers.Rederived);
         if (stackCase.TryGetProperty("nothingMovedOutside", out JsonElement nothingMoved) && nothingMoved.GetBoolean())
             Assert.Empty(Directory.EnumerateFileSystemEntries(replay.Outside));
-        // No case leaves a staged file anywhere in the working folder (stackCasesHow).
-        Assert.Empty(scribe.StagedLeftovers("A"));
+        // U3c's keys (W4c).
+        if (stackCase.TryGetProperty("keptWhatItReplacedLines", out JsonElement keptLines))
+        {
+            int said;
+            lock (scribe.TrailLines) said = scribe.TrailLines.Count(line => line.Event == Plantoir.Core.Scripting.ActivityTrail.Event.UndoKeptWhatItReplaced);
+            Assert.Equal(keptLines.GetInt32(), said);
+        }
+        if (stackCase.TryGetProperty("foreignKeptOriginalUntouched", out JsonElement untouched) && untouched.GetBoolean())
+        {
+            Assert.NotNull(replay.ForeignKept);
+            Assert.True(scribe.Page("A", replay.ForeignKept!.Value.Relative) is { } foreign && foreign.AsSpan().SequenceEqual(replay.ForeignKept.Value.Bytes),
+                        "the other list's kept original was changed or removed");
+        }
+        // No case leaves a staged file anywhere in the working folder
+        // (stackCasesHow), but a kept original where keptOriginalLeft says so.
+        List<string> leftovers = scribe.StagedLeftovers("A");
+        bool keptOriginalLeft = stackCase.TryGetProperty("keptOriginalLeft", out JsonElement keptLeft) && keptLeft.GetBoolean();
+        foreach (string leftover in leftovers)
+            Assert.True(keptOriginalLeft && leftover.EndsWith("-orig", StringComparison.Ordinal), "a staged file left behind: " + leftover);
+        if (stackCase.TryGetProperty("keptOriginalLeft", out _))
+            Assert.Equal(keptOriginalLeft, leftovers.Count > 0);
     }
 
     private static long? NullableSeq(JsonElement element, string key) =>
@@ -131,9 +155,12 @@ public sealed class UndoStackContractTests
         private readonly string _p2;
         private readonly Stack<(long Seq, byte[] After)> _held = new();
 
-        internal StackReplay(UndoScribe scribe)
+        private readonly UndoDenials _denials;
+
+        internal StackReplay(UndoScribe scribe, UndoDenials denials)
         {
             _scribe = scribe;
+            _denials = denials;
             var fixture = UndoContract.Fixture;
             _p1 = fixture.Single(page => page.Id == "p1").Path;
             _p2 = fixture.Single(page => page.Id == "p2").Path;
@@ -148,6 +175,29 @@ public sealed class UndoStackContractTests
         internal List<(string Reason, long Seq)> Clearings { get; } = [];
         internal int? LinesWrittenByTheDeploy { get; private set; }
         internal string? ForeignBlob { get; private set; }
+        internal (string Relative, byte[] Bytes)? ForeignKept { get; private set; }
+
+        /// <summary>The newest step's writeFile op on p1, for the U3c calls.</summary>
+        private (long Seq, UndoOp Op) HeadWriteFileOnP1()
+        {
+            UndoFoldedStep head = _scribe.Offer().Head ?? throw new InvalidOperationException("no step on the list");
+            foreach (UndoOp op in head.Step.Ops)
+            {
+                if (op.Kind == UndoOp.WriteFile && op.Path == _p1) return (head.Seq, op);
+            }
+            throw new InvalidOperationException("no whole-file step on p1");
+        }
+
+        /// <summary>Every kept original beside p1, as their relative paths.</summary>
+        private List<string> KeptOriginalsBesideP1()
+        {
+            var kept = new List<string>();
+            foreach (string staged in _scribe.StagedLeftovers("A"))
+            {
+                if (staged.EndsWith("-orig", StringComparison.Ordinal)) kept.Add(staged);
+            }
+            return kept;
+        }
 
         private byte[] Flipped(string folder, string path)
         {
@@ -240,6 +290,47 @@ public sealed class UndoStackContractTests
                     return;
                 }
                 case "removeContent": _scribe.RemoveContent(); return;
+                case "contentCannotBeStored":
+                    // The list's content folder, there and taking no new file
+                    // (a full or read-only disk, as far as the list can tell).
+                    _denials.FolderTakesNothingNew(Path.Combine(_scribe.JournalFolder, "content"));
+                    return;
+                case "beforeContentGoneAndCannotBeStored":
+                {
+                    // Only the newest step's content for what p1 held before
+                    // is gone, and its folder in the list takes no new file.
+                    (_, UndoOp op) = HeadWriteFileOnP1();
+                    string blob = _scribe.Journal.BlobPath(op.BeforeSha!);
+                    File.Delete(blob);
+                    _denials.FolderTakesNothingNew(Path.GetDirectoryName(blob)!);
+                    return;
+                }
+                case "keepTheOriginal":
+                {
+                    // The newest step's kept original of p1, as a swap whose
+                    // tidy could not remove it leaves it: what p1 held before.
+                    (long seq, UndoOp op) = HeadWriteFileOnP1();
+                    byte[] before = _scribe.Journal.Blob(op.BeforeSha!)!;
+                    File.WriteAllBytes(UndoSwap.BesidePath(_scribe.FullPath("A", _p1), $"{seq}-apply", "orig"), before);
+                    return;
+                }
+                case "foreignKeptOriginal":
+                {
+                    // A kept original left under the next step's own label by
+                    // another computer or an earlier list.
+                    long next = _scribe.Fold().NextSeq;
+                    string foreign = UndoSwap.BesidePath(_scribe.FullPath("A", _p1), $"{next}-apply", "orig");
+                    byte[] bytes = "What another computer's list kept.\n"u8.ToArray();
+                    File.WriteAllBytes(foreign, bytes);
+                    ForeignKept = (Path.GetRelativePath(_scribe.FullPath("A", ""), foreign).Replace('\\', '/'), bytes);
+                    return;
+                }
+                case "makeTheKeptOriginalUnreadable":
+                    foreach (string kept in KeptOriginalsBesideP1()) _denials.FileCannotBeRead(kept);
+                    return;
+                case "changeTheKeptOriginal":
+                    foreach (string kept in KeptOriginalsBesideP1()) File.AppendAllText(kept, "A line added to the kept original.\n");
+                    return;
                 case "begin:held": BeginHeld(); return;
                 case "finish:held":
                 {

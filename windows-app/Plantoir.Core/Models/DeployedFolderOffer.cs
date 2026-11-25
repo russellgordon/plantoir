@@ -72,6 +72,16 @@ public static class DeployedFolderOffer
         _ => null,
     };
 
+    /// <summary>
+    /// What a press of Open in Browser says when the offer, read again at the
+    /// press, no longer holds (#1027's review, low 2): a greyed decision's
+    /// reason, the same sentence the dimmed item gives; null when it is
+    /// offered, or absent (no folder destination now, which has no reason, as
+    /// every menu item greys with none).
+    /// </summary>
+    public static string? SaidAtAPressNoLongerOffered(Decision decision) =>
+        decision.Kind == Kind.Greyed ? Sentence(decision.ReasonKey) : null;
+
     // ---- Which folder -----------------------------------------------------------------
 
     /// <summary>

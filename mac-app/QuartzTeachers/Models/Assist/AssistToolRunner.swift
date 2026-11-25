@@ -85,6 +85,13 @@ final class AssistToolRunner {
     /// Section or Classes. Section otherwise.
     var menuMakingTheChange: SubjectMenuLayout.Menu = .section
 
+    /// On `.menu`: the course of the section the running item was chosen
+    /// on, set by `SectionVerbs.perform` for the length of one call (#1027),
+    /// so a sentence with no course of its own, Undo Last Change's "nothing
+    /// to undo", names the menus as that course's menu bar titles them (the
+    /// Section or Meetings menu in a club). nil otherwise.
+    var menuSelectedCourseCode: String?
+
     /// Where the courses are.
     private let workspace: WorkspaceModel
 
@@ -659,12 +666,12 @@ final class AssistToolRunner {
             return await makeRoomForClasses(arguments)
         case "plan_add_classes":
             if let question = addClassesQuestion(arguments) {
-                return AssistToolOutcome.couldNotRead(question)
+                return AssistToolOutcome.couldNotRead(question.forTheModel, showingTheTeacher: question.forTheTeacher)
             }
             return planAddNextClass(addClassesArguments(from: arguments))
         case "add_classes":
             if let question = addClassesQuestion(arguments) {
-                return AssistToolOutcome.refused(question)
+                return AssistToolOutcome.refused(question.forTheModel, showingTheTeacher: question.forTheTeacher)
             }
             return await addNextClass(addClassesArguments(from: arguments), actionKey: "addClasses")
         case "list_courses":
@@ -1096,6 +1103,17 @@ final class AssistToolRunner {
                 askForTheTimetable(
                     courseCode: code, sectionNumber: number,
                     because: AssistWording.datesToFindADaysPage(noun: course.configuration.classNoun)
+                )
+            }
+            // The model reads the class form (#267); the teacher reads the
+            // course's noun (#1027 round 4).
+            if surface != .menu, case .noClassOn(let day, let code, let number) = refusal {
+                return AssistToolOutcome.refused(
+                    sayingWhy(refusal),
+                    showingTheTeacher: AssistWording.noClassOnThatDay(
+                        weekday: day.weekdayName, date: day.text, code: code, number: number,
+                        noun: classNoun(ofCourse: code)
+                    )
                 )
             }
             return AssistToolOutcome.refused(sayingWhy(refusal))
@@ -2928,7 +2946,9 @@ final class AssistToolRunner {
         // The Section menu's undo is not a conversation (#457 batch B): its
         // sentences are the `…FromTheMenu` twins, chosen here.
         let fromTheMenu: Bool = surface == .menu
-        let nothingToUndo: String = fromTheMenu ? AssistWording.nothingToUndoFromTheMenu : AssistWording.nothingToUndo
+        let nothingToUndo: String = fromTheMenu
+            ? AssistWording.nothingToUndoFromTheMenu(noun: classNoun(ofCourse: menuSelectedCourseCode ?? ""))
+            : AssistWording.nothingToUndo
         let stillAvailable: String = fromTheMenu
             ? AssistWording.undoIsStillAvailableFromTheMenu : AssistWording.undoIsStillAvailable
         if history.isEmpty {
@@ -3546,14 +3566,25 @@ final class AssistToolRunner {
             ClassesDatedLater.heldBackLine(count: flagged.count),
             course: course.code, section: section
         )
+        let noun: ClassNoun = course.configuration.classNoun
         if surface == .mcp {
-            return AssistToolOutcome.refused(AssistWording.deployHasClassesDatedLater(
-                course: course.code, section: String(section), pages: pages, count: flagged.count
-            ))
+            return AssistToolOutcome.refused(
+                AssistWording.deployHasClassesDatedLater(
+                    course: course.code, section: String(section), pages: pages, count: flagged.count
+                ),
+                showingTheTeacher: AssistWording.deployHasClassesDatedLater(
+                    course: course.code, section: String(section), pages: pages, count: flagged.count, noun: noun
+                )
+            )
         }
-        return AssistToolOutcome.refused(AssistWording.deployHasClassesDatedLaterAndNoWindow(
-            course: course.code, section: String(section), pages: pages, count: flagged.count
-        ))
+        return AssistToolOutcome.refused(
+            AssistWording.deployHasClassesDatedLaterAndNoWindow(
+                course: course.code, section: String(section), pages: pages, count: flagged.count
+            ),
+            showingTheTeacher: AssistWording.deployHasClassesDatedLaterAndNoWindow(
+                course: course.code, section: String(section), pages: pages, count: flagged.count, noun: noun
+            )
+        )
     }
 
     // MARK: - Deploying later
@@ -3951,6 +3982,22 @@ final class AssistToolRunner {
         )
     }
 
+    /// A timetable refusal as the teacher reads it, in the course's noun
+    /// (#1027); the model is given `localizedDescription`, the class form.
+    private func timetableRefusalForTheTeacher(_ problem: Error, _ arguments: [String: Any]) -> String {
+        return refusalForTheTeacher(problem, course: text("course", in: arguments))
+    }
+
+    /// Any planner's refusal as the teacher reads it, in the course's noun
+    /// (#1027 round 4); the model is given `localizedDescription`, the class
+    /// form, as it is given every detail (#267).
+    private func refusalForTheTeacher(_ problem: Error, course code: String) -> String {
+        guard let refusal = problem as? SaidInACoursesNoun else {
+            return problem.localizedDescription
+        }
+        return refusal.sentence(noun: classNoun(ofCourse: code))
+    }
+
     private struct PlannedTimetable {
         let located: Located
         let plan: RememberTimetablePlan
@@ -3994,13 +4041,18 @@ final class AssistToolRunner {
     private func planRememberTimetable(_ arguments: [String: Any]) -> AssistToolOutcome {
         switch timetablePlan(arguments) {
         case .failure(let problem):
-            return AssistToolOutcome.couldNotRead(problem.localizedDescription)
+            return AssistToolOutcome.couldNotRead(
+                problem.localizedDescription,
+                showingTheTeacher: timetableRefusalForTheTeacher(problem, arguments)
+            )
         case .success(let asked):
+            let noun: ClassNoun = asked.located.course.configuration.classNoun
             return AssistToolOutcome.planned(
                 asked.plan.changesNothing
                     ? "Those dates are already remembered."
-                    : "Worked out what recording those class dates would do.",
-                plan: asked.plan.description
+                    : AssistWording.workedOutTheClassDates(noun: noun),
+                plan: asked.plan.description,
+                card: asked.plan.description(noun: noun)
             )
         }
     }
@@ -4008,7 +4060,10 @@ final class AssistToolRunner {
     private func rememberTimetable(_ arguments: [String: Any]) async -> AssistToolOutcome {
         switch timetablePlan(arguments) {
         case .failure(let problem):
-            return AssistToolOutcome.refused(problem.localizedDescription)
+            return AssistToolOutcome.refused(
+                problem.localizedDescription,
+                showingTheTeacher: timetableRefusalForTheTeacher(problem, arguments)
+            )
         case .success(let asked):
             if asked.plan.changesNothing {
                 return AssistToolOutcome.wrote(
@@ -4037,16 +4092,18 @@ final class AssistToolRunner {
                 )
             }
 
-            let summary: String = "Remembered \(asked.plan.dates.count) class "
-                + "\(asked.plan.dates.count == 1 ? "date" : "dates") for "
-                + "\(asked.plan.courseCode) Section \(asked.plan.sectionNumber)."
+            let place: String = "\(asked.plan.courseCode) Section \(asked.plan.sectionNumber)"
+            let summary: String = AssistWording.rememberedTheClassDates(count: asked.plan.dates.count, place: place)
+            let teachersSummary: String = AssistWording.rememberedTheClassDates(
+                count: asked.plan.dates.count, place: place, noun: asked.located.course.configuration.classNoun
+            )
             var detail: String = asked.plan.description + "\n\nDone: \(summary)"
             detail += "\n\nNo page was touched and no student saw anything. New class pages take their "
                     + "dates from these, so this is worth reading back if a date ever looks wrong."
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
-            return AssistToolOutcome.wrote(summary, detail: detail)
+            return AssistToolOutcome.wrote(teachersSummary, detail: detail)
         }
     }
 
@@ -4188,7 +4245,10 @@ final class AssistToolRunner {
         switch nextClassPlan(arguments) {
         case .failure(let problem):
             askForTheTimetableIfThatIsWhatIsMissing(problem)
-            return AssistToolOutcome.couldNotRead(problem.localizedDescription)
+            return AssistToolOutcome.couldNotRead(
+                problem.localizedDescription,
+                showingTheTeacher: refusalForTheTeacher(problem, course: text("course", in: arguments))
+            )
         case .success(let asked):
             return AssistToolOutcome.planned(
                 asked.plan.changesNothing
@@ -4223,8 +4283,8 @@ final class AssistToolRunner {
             return nil
         }
         guard case .success(let request) = asked else {
-            if case .failure(let message) = asked {
-                return AssistToolOutcome.refused(message)
+            if case .failure(let message, let teachersMessage) = asked {
+                return AssistToolOutcome.refused(message, showingTheTeacher: teachersMessage ?? message)
             }
             return nil
         }
@@ -4305,10 +4365,14 @@ final class AssistToolRunner {
                 + "and other classes may already have moved",
                 course: request.located.course.code, section: request.located.sectionNumber
             )
-            return AssistToolOutcome.refused(AssistWording.thePlaceForTheCopyIsStillTaken(
-                page: request.newTitle,
-                backupNamed: conversationBackups[request.located.course.code]?.lastPathComponent
-            ))
+            let backupName: String? = conversationBackups[request.located.course.code]?.lastPathComponent
+            return AssistToolOutcome.refused(
+                AssistWording.thePlaceForTheCopyIsStillTaken(page: request.newTitle, backupNamed: backupName),
+                showingTheTeacher: AssistWording.thePlaceForTheCopyIsStillTaken(
+                    page: request.newTitle, backupNamed: backupName,
+                    noun: request.located.course.configuration.classNoun
+                )
+            )
         }
 
         // The new page exists as a blank class page; give it the source's
@@ -4402,11 +4466,16 @@ final class AssistToolRunner {
                 + "of a published lesson must never arrive where students can read it",
                 course: request.located.course.code, section: request.located.sectionNumber
             )
-            return AssistToolOutcome.refused(AssistWording.theCopyCouldNotBeMadeHidden(
-                page: request.sourceTitle,
-                as: request.newTitle,
-                backupNamed: conversationBackups[request.located.course.code]?.lastPathComponent
-            ))
+            let backupName: String? = conversationBackups[request.located.course.code]?.lastPathComponent
+            return AssistToolOutcome.refused(
+                AssistWording.theCopyCouldNotBeMadeHidden(
+                    page: request.sourceTitle, as: request.newTitle, backupNamed: backupName
+                ),
+                showingTheTeacher: AssistWording.theCopyCouldNotBeMadeHidden(
+                    page: request.sourceTitle, as: request.newTitle, backupNamed: backupName,
+                    noun: request.located.course.configuration.classNoun
+                )
+            )
         }
 
         // Nil, and provably so. Past the guard above, either this page did not
@@ -4494,8 +4563,8 @@ final class AssistToolRunner {
             return nil
         }
         guard case .success(let request) = asked else {
-            if case .failure(let message) = asked {
-                return AssistToolOutcome.couldNotRead(message)
+            if case .failure(let message, let teachersMessage) = asked {
+                return AssistToolOutcome.couldNotRead(message, showingTheTeacher: teachersMessage ?? message)
             }
             return nil
         }
@@ -4548,7 +4617,9 @@ final class AssistToolRunner {
     /// Everything both halves of a duplicate need, or why it cannot be done.
     private enum DuplicateAsked {
         case success(DuplicateRequest)
-        case failure(String)
+        /// Why not, as the model reads it, and as the teacher does when the
+        /// two differ by the course's noun (#1027).
+        case failure(String, forTheTeacher: String? = nil)
     }
 
     private struct DuplicateRequest {
@@ -4584,7 +4655,12 @@ final class AssistToolRunner {
         guard let numbers = UnitDay(
             pageTitle: source.title, naming: located.course.configuration.classPageNaming
         ) else {
-            return .failure(AssistWording.notANumberedClassPage(page: source.displayTitle))
+            return .failure(
+                AssistWording.notANumberedClassPage(page: source.displayTitle),
+                forTheTeacher: AssistWording.notANumberedClassPage(
+                    page: source.displayTitle, noun: located.course.configuration.classNoun
+                )
+            )
         }
 
         let plan: ClassInsertionPlan
@@ -4595,10 +4671,16 @@ final class AssistToolRunner {
             )
         } catch {
             askForTheTimetableIfDuplicatingNeedsIt(error, located: located)
-            return .failure(error.localizedDescription)
+            return .failure(
+                error.localizedDescription,
+                forTheTeacher: refusalForTheTeacher(error, course: located.course.code)
+            )
         }
         guard let added = plan.added.first else {
-            return .failure("There is no class date left for another class.")
+            return .failure(
+                AssistWording.noClassDateLeftForTheCopy(),
+                forTheTeacher: AssistWording.noClassDateLeftForTheCopy(noun: located.course.configuration.classNoun)
+            )
         }
         guard let sourceText = try? String(contentsOf: source.fileURL, encoding: .utf8) else {
             return .failure("“\(source.displayTitle)” could not be read, so nothing was changed.")
@@ -4736,7 +4818,7 @@ final class AssistToolRunner {
             if case NextClassPlanner.Problem.noTimetable = error {
                 return .failure(AssistWording.menuNeedsClassDatesFirst(noun: noun))
             }
-            return .failure(error.localizedDescription)
+            return .failure((error as? SaidInACoursesNoun)?.sentence(noun: noun) ?? error.localizedDescription)
         }
         guard let newPage = plan.classes.first else {
             return .failure(AssistWording.menuTheNextPageIsAlreadyThere(page: plan.alreadyThere.first ?? ""))
@@ -4904,7 +4986,10 @@ final class AssistToolRunner {
         switch reDatePlan(arguments) {
         case .failure(let problem):
             askForTheTimetableIfReDatingNeedsIt(problem, arguments)
-            return AssistToolOutcome.couldNotRead(problem.localizedDescription)
+            return AssistToolOutcome.couldNotRead(
+                problem.localizedDescription,
+                showingTheTeacher: refusalForTheTeacher(problem, course: text("course", in: arguments))
+            )
         case .success(let asked):
             // A ROLLOVER carrying an answer is still a plan even when the
             // dates are already right, and this is what makes the answer turn
@@ -5121,7 +5206,10 @@ final class AssistToolRunner {
         switch reDatePlan(arguments) {
         case .failure(let problem):
             askForTheTimetableIfReDatingNeedsIt(problem, arguments)
-            return AssistToolOutcome.refused(problem.localizedDescription)
+            return AssistToolOutcome.refused(
+                problem.localizedDescription,
+                showingTheTeacher: refusalForTheTeacher(problem, course: text("course", in: arguments))
+            )
         case .success(let asked):
             if asked.plan.changesNothing && surface == .menu && isARollover(arguments) {
                 return await menuRolloverWithTheDatesAlreadyRight(
@@ -6049,8 +6137,8 @@ final class AssistToolRunner {
     /// What making room part-way through a unit would do.
     private func planMakeRoomForClasses(_ arguments: [String: Any]) -> AssistToolOutcome {
         switch roomPlan(arguments) {
-        case .couldNot(let message):
-            return AssistToolOutcome.couldNotRead(message)
+        case .couldNot(let message, let teachersMessage):
+            return AssistToolOutcome.couldNotRead(message, showingTheTeacher: teachersMessage ?? message)
         case .planned(let asked):
             // The ENGINE's own description, not a summary of it. It names
             // every rename from → to, the link count, every date move and
@@ -6098,8 +6186,8 @@ final class AssistToolRunner {
     /// else on the surface.
     private func makeRoomForClasses(_ arguments: [String: Any]) async -> AssistToolOutcome {
         switch roomPlan(arguments) {
-        case .couldNot(let message):
-            return AssistToolOutcome.couldNotRead(message)
+        case .couldNot(let message, let teachersMessage):
+            return AssistToolOutcome.couldNotRead(message, showingTheTeacher: teachersMessage ?? message)
         case .planned(let asked):
             // **Said BEFORE anything is written, because the engine reports
             // both of these by returning a plan rather than by throwing.** A
@@ -6110,10 +6198,14 @@ final class AssistToolRunner {
             // ("add 3 more class dates and ask again") thrown away.
             if asked.plan.added.isEmpty {
                 let why: String = asked.plan.problems.joined(separator: " ")
+                if why.isEmpty {
+                    return AssistToolOutcome.refused("There is nothing to make room for there.")
+                }
+                // The teacher reads the course's noun; the model, the class form (#1027).
+                let noun: ClassNoun = asked.located.course.configuration.classNoun
                 return AssistToolOutcome.refused(
-                    why.isEmpty
-                        ? "There is nothing to make room for there."
-                        : why
+                    why,
+                    showingTheTeacher: PlanProblem.sentences(asked.plan.plannedProblems, noun: noun).joined(separator: " ")
                 )
             }
 
@@ -6175,7 +6267,9 @@ final class AssistToolRunner {
     /// A plan, or the sentence saying why there is not one.
     private enum PlannedRoomOutcome {
         case planned(PlannedRoom)
-        case couldNot(String)
+        /// The model's sentence and, when it differs by the course's noun
+        /// (#1027), the teacher's.
+        case couldNot(String, forTheTeacher: String? = nil)
     }
 
     private struct PlannedRoom {
@@ -6219,7 +6313,12 @@ final class AssistToolRunner {
                 )
             }
             guard let askedDay = number("atDay", in: arguments) else {
-                return .couldNot("Which day should the new class take?")
+                return .couldNot(
+                    AssistWording.whichDayShouldTheNewClassTake(),
+                    forTheTeacher: AssistWording.whichDayShouldTheNewClassTake(
+                        noun: located.course.configuration.classNoun
+                    )
+                )
             }
             unit = askedUnit
             atDay = askedDay
@@ -6238,7 +6337,10 @@ final class AssistToolRunner {
             )
         } catch {
             askForTheTimetableIfDuplicatingNeedsIt(error, located: located)
-            return .couldNot(error.localizedDescription)
+            return .couldNot(
+                error.localizedDescription,
+                forTheTeacher: refusalForTheTeacher(error, course: located.course.code)
+            )
         }
     }
 
@@ -6251,15 +6353,16 @@ final class AssistToolRunner {
     /// path: a call to add days to Unit 4 planned ONE class after the last
     /// one in the section. Asked only once the course and section are found,
     /// so a call that is wrong about those hears that first.
-    private func addClassesQuestion(_ arguments: [String: Any]) -> String? {
-        guard case .success = locate(arguments) else {
+    private func addClassesQuestion(_ arguments: [String: Any]) -> (forTheModel: String, forTheTeacher: String)? {
+        guard case .success(let located) = locate(arguments) else {
             return nil
         }
+        let noun: ClassNoun = located.course.configuration.classNoun
         if number("unit", in: arguments) == nil {
-            return AssistWording.addClassesNeedsAUnit
+            return (AssistWording.addClassesNeedsAUnit(), AssistWording.addClassesNeedsAUnit(noun: noun))
         }
         guard let howMany = number("howMany", in: arguments), howMany > 0 else {
-            return AssistWording.addClassesNeedsACount
+            return (AssistWording.addClassesNeedsACount(), AssistWording.addClassesNeedsACount(noun: noun))
         }
         return nil
     }
@@ -6467,7 +6570,10 @@ final class AssistToolRunner {
         switch nextClassPlan(arguments) {
         case .failure(let problem):
             askForTheTimetableIfThatIsWhatIsMissing(problem)
-            return AssistToolOutcome.refused(problem.localizedDescription)
+            return AssistToolOutcome.refused(
+                problem.localizedDescription,
+                showingTheTeacher: refusalForTheTeacher(problem, course: text("course", in: arguments))
+            )
         case .success(let asked):
             if asked.plan.changesNothing {
                 return AssistToolOutcome.wrote(

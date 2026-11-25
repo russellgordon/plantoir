@@ -200,13 +200,20 @@ nonisolated enum SectionScheduleSource {
         case noStartDatesInCalendar(String)
 
         var errorDescription: String? {
+            return sentence(noun: .class)
+        }
+
+        /// The refusal in a course's own noun: the Class Dates sheet says
+        /// the one sentence naming classes as meetings in a club (#1027).
+        func sentence(noun: ClassNoun) -> String {
             switch self {
             case .nothingToRead(let place):
                 return "There are no dates in \(place), so there is nothing to remember."
 
             case .unreadableEntries(let place, let offenders):
-                let subject: String = offenders.count == 1 ? "isn’t a date" : "aren’t dates"
-                return "\(SectionTimetableStore.list(offenders)) \(subject) Plantoir can read, so nothing was taken from \(place). A half-read timetable would date the wrong classes, so the whole list is refused — fix those and try again. Dates written 2026-09-08 always work."
+                return AssistWording.classDatesHalfRead(
+                    offenders: SectionTimetableStore.list(offenders), count: offenders.count, from: place, noun: noun
+                )
 
             case .contradictoryOrdering(let place, let dayFirst, let monthFirst):
                 return "\(place) is written both ways round: “\(dayFirst)” can only be day/month/year, and “\(monthFirst)” can only be month/day/year. Nothing was read, because either reading would be wrong for half the column. Write them all the same way, or as 2026-09-08."

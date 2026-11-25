@@ -189,6 +189,8 @@ public sealed class DeployedFolderShows
     private readonly List<Running> _running = [];
     private readonly Dictionary<string, Task<Attempt>> _startsUnderWay = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _startingFor = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>How many presses joined a start still under way, per folder (the fixes review's L-c, #889b).</summary>
+    private readonly Dictionary<string, int> _joinedStarts = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _stopsAskedWhileStarting = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _folderWentAway = new(StringComparer.OrdinalIgnoreCase);
 
@@ -268,7 +270,9 @@ public sealed class DeployedFolderShows
         lock (_gate)
         {
             already = _running.Select(r => r.Show).FirstOrDefault(s => string.Equals(s.Id, canonical, StringComparison.OrdinalIgnoreCase));
-            if (already is null && !_startsUnderWay.TryGetValue(canonical, out joining))
+            if (already is null && _startsUnderWay.TryGetValue(canonical, out joining))
+                _joinedStarts[canonical] = _joinedStarts.GetValueOrDefault(canonical) + 1;
+            else if (already is null)
             {
                 if (_files.FinalPath(Path.Join(canonical, "index.html")) is not { } index || _files.IsFolder(index))
                     nothingDeployed = true;
@@ -290,15 +294,21 @@ public sealed class DeployedFolderShows
             // quick presses start ONE show (the mac's implementation review M1).
             var joined = await joining;
             if (joined.Show is null) return new OpenOutcome(null, joined.Why);
+            // The fixes review's L-c: the show handed over may have been
+            // stopped meanwhile (Stop, or the first press's browser refusing);
+            // its address is then never opened.
+            if (!IsRunning(joined.Show)) return new OpenOutcome(null, null);
             return HandOver(joined.Show, courseCode, sectionNumber, from, alreadyOpen: true, addressMoved: false, openInBrowser, startedHere: false);
         }
 
         Attempt attempt;
+        bool joinedByAnother;
         try { attempt = await starting!; }
         finally
         {
             lock (_gate)
             {
+                joinedByAnother = _joinedStarts.Remove(canonical);
                 _startsUnderWay.Remove(canonical);
                 _startingFor.Remove(canonical);
                 _stopsAskedWhileStarting.Remove(canonical);
@@ -306,7 +316,15 @@ public sealed class DeployedFolderShows
         }
         // Null with no reason: a Stop pressed while it started ended it.
         if (attempt.Show is null) return new OpenOutcome(null, attempt.Why);
-        return HandOver(attempt.Show, courseCode, sectionNumber, from, alreadyOpen: false, attempt.AddressMoved, openInBrowser, startedHere: true);
+        // L-c: the press that STARTED it stops it when its browser refuses
+        // only if no other press joined it, whose browser may take it.
+        return HandOver(attempt.Show, courseCode, sectionNumber, from, alreadyOpen: false, attempt.AddressMoved, openInBrowser,
+                        startedHere: !joinedByAnother);
+    }
+
+    private bool IsRunning(Show show)
+    {
+        lock (_gate) return _running.Any(running => ReferenceEquals(running.Show, show));
     }
 
     /// <summary>What one start came to: a show, or none and why (null: Stop was pressed while it started).</summary>
