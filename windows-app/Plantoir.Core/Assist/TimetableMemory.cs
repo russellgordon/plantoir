@@ -312,12 +312,23 @@ public sealed class TimetableMemory
         AssistWording.ClassDatesAreRemembered(course.Code, sectionNumber.ToString(CultureInfo.InvariantCulture),
                                               course.Configuration.ClassNoun) + " " + whatWasKept;
 
-    /// <summary><c>undo.wording.classDatesKeptLead</c>.</summary>
-    internal const string KeptLead = "Another program may have changed their file as they were saved.";
+    /// <summary>
+    /// Why a re-date could not read the section's timetable at plan time, in
+    /// a teacher's words and naming no hidden path (#899 W7b1 review 3, LOW 1):
+    /// another program holding it, or the system's own words without the path.
+    /// In no contract on either side (the mac's file system has no such lock);
+    /// the wording is parked for the director (W7b2-11's notes).
+    /// </summary>
+    internal static string WhyTheClassDatesCouldNotBeRead(IOException error) => HeldFiles.IsSharingViolation(error)
+        ? "the section's class dates are in use by another program."
+        : "the section's class dates could not be read. Windows said: " + HeldFiles.SystemWords(error);
 
-    /// <summary><c>undo.wording.classDatesKeptBesideIt</c>; <paramref name="place"/> is already quoted.</summary>
+    /// <summary><c>undo.wording.classDatesKeptLead</c>, read from the contract (W7b1 review 2, LOW 4).</summary>
+    internal static string KeptLead => UndoContractWording.Of("classDatesKeptLead");
+
+    /// <summary><c>undo.wording.classDatesKeptBesideIt</c>, read from the contract; <paramref name="place"/> is already quoted.</summary>
     internal static string KeptBesideIt(string place, string kept) =>
-        $"What {place} held just before is kept beside it as the hidden file “{kept}”.";
+        UndoContractWording.Filled("classDatesKeptBesideIt", new Dictionary<string, string> { ["place"] = place, ["kept"] = kept });
 
     /// <summary>The shape on disk, kept separate so the in-memory type stays clean.</summary>
     private sealed class Stored

@@ -180,18 +180,21 @@ internal static class UndoSwap
         var staged = new UndoStagedFile?[targets.Count];
         var originals = new UndoStagedFile?[targets.Count];
         var foldersMade = new List<string>();
+        UndoSwapResult? result = null;
         try
         {
-            UndoSwapResult result = SwapStaged(targets, label, root, seams, places, staged, originals, keepingTheOriginalsOf, foldersMade);
-            // A refused swap leaves no empty folder it made behind (the W7b1
-            // review's LOW 1; the digest's trap "empty folders left behind").
-            if (result is UndoSwapResult.Refused) RemoveTheEmptyFoldersMade(foldersMade);
+            result = SwapStaged(targets, label, root, seams, places, staged, originals, keepingTheOriginalsOf, foldersMade);
             return result;
         }
         finally
         {
             foreach (UndoStagedFile? file in staged) file?.LetGo();
             foreach (UndoStagedFile? file in originals) file?.LetGo();
+            // A refused swap, or one an exception cut short (no result), leaves
+            // no empty folder it made behind (the W7b1 review's LOW 1, and its
+            // review 2, LOW 5; the digest's trap "empty folders left behind").
+            // A test's kill point is a process that died there: it tidies nothing.
+            if (result is null or UndoSwapResult.Refused) RemoveTheEmptyFoldersMade(foldersMade);
         }
     }
 
