@@ -1059,6 +1059,43 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(target, "Ideas", "a refused retry cleared the earlier run's record")
     }
 
+    // MARK: - U4b2-5: a finish run's part-way line names the folders as the disk has them
+
+    /// A run FINISHING an interrupted rename moves no folder (the earlier
+    /// run did), so a part-way ending must read the disk for the folders at
+    /// the new name: "Ideas" is there, so the trail line and the sentence say
+    /// the rename stopped only in part, never that the folder was not
+    /// renamed (part nine's review, L1). The swap fails at the settings
+    /// and the page's put-back fails, so its original is kept beside it.
+    /// MUST FAIL with the folders taken from this run's planned moves.
+    func testAFinishStoppedPartWaySaysTheFolderIsAtItsNewName() async throws {
+        let course: Course = try await courseWithAnInterruptedRename()
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index == 1 }
+        UndoKillPoints.putBackFailsAt = { @Sendable (index: Int) in index == 0 }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Concepts", to: "Ideas", scope: .shared)
+
+        let said: String = try XCTUnwrap(failed(result), "\(result)")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: course.directoryURL.appendingPathComponent("Ideas").path))
+        let expectedSentence: String = SpecialFolderRenamer.renamedOnlyInPart(
+            renaming: "Concepts", to: "Ideas", places: ["Ideas"], said: ""
+        )
+        XCTAssertTrue(said.hasPrefix(expectedSentence), said)
+        let expectedLine: String = SpecialFolderRenamer.renamedOnlyInPartLine(
+            renaming: "Concepts", to: "Ideas", course: "ICS3U", scope: .shared,
+            places: ["Ideas"], keptBeside: 1
+        )
+        XCTAssertTrue(trail().contains(expectedLine), trail())
+        XCTAssertFalse(trail().contains("did not rename the folder Concepts"), trail())
+        var linesForThisEnding: Int = 0
+        for line in trail().components(separatedBy: "\n") {
+            if line.contains("the folder Concepts to Ideas") && line.contains("could not put everything back") {
+                linesForThisEnding += 1
+            }
+        }
+        XCTAssertEqual(linesForThisEnding, 1, trail())
+    }
+
     // MARK: - U4b2-3: another folder's record is never this rename's to clear
 
     /// Another folder's interrupted rename, as a run killed part way leaves

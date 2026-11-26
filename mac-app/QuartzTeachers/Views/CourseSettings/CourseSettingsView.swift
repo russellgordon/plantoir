@@ -1259,14 +1259,17 @@ struct CourseSettingsView: View {
                 continue
             } catch let partWay as JournaledStepError {
                 if case .leftPartWay(_, _, let keptOriginals) = partWay {
-                    // Said as the disk is: a folder whose move back failed is
-                    // named at its new name (part four's review, L1). Each
-                    // part-way ending leaves its line on the trail BEFORE it
-                    // returns (the final sweep, M1): these are the states
-                    // somebody will be asked to explain next week. The
-                    // record stays, as a stopped rename's does.
-                    let leftRenamed: [String] = SpecialFolderRenamer.foldersLeftAtTheirNewName(
-                        planned.moves, courseDirectory: courseDirectory
+                    // Said as the disk is: a folder at its new name is named
+                    // there (part four's review, L1), whether this run moved
+                    // it or an earlier, interrupted run did (U4b2-5: a run
+                    // finishing a rename moves nothing). Each part-way ending
+                    // leaves its line on the trail BEFORE it returns (the
+                    // final sweep, M1): these are the states somebody will
+                    // be asked to explain next week. The record stays, as a
+                    // stopped rename's does.
+                    let leftRenamed: [String] = SpecialFolderRenamer.foldersAtTheirNewName(
+                        renaming: oldName, to: newName, scope: scope,
+                        courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
                     )
                     if !leftRenamed.isEmpty {
                         ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.renamedOnlyInPartLine(

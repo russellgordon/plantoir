@@ -755,30 +755,42 @@ enum SpecialFolderRenamer {
             + keptBesideWords(keptBeside) + ")"
     }
 
-    /// Each planned folder that is at its new name now, by its path inside
-    /// the course: what a rename stopped part way left renamed. Whatever is
-    /// at the OLD name does not count (U4b part six's review, L1): the
-    /// likeliest reason a move back fails is that something appeared there,
-    /// and the folder is then still at its new name. The plan refused a new
-    /// name that was taken, so what is at `to` is the moved folder.
+    /// Each of this rename's folders that is at its new name now, by its
+    /// path inside the course, read from the disk: what a rename stopped
+    /// part way left renamed. Read from the disk, never from the run's
+    /// planned moves (U4b2-5, part nine's review, L1): a run FINISHING an
+    /// interrupted rename moves no folder, because the earlier run did, and
+    /// its folders are at the new name all the same. Whatever is at the OLD
+    /// name does not count (U4b part six's review, L1): the likeliest reason
+    /// a move back fails is that something appeared there, and the folder is
+    /// then still at its new name. The plan refused a new name that was
+    /// taken, so what is at the new name is the renamed folder.
     ///
     /// Presence only, by `lstat` (part six's review, L2): nothing is read
-    /// or hashed, so it costs nothing on the main actor.
-    nonisolated static func foldersLeftAtTheirNewName(_ moves: [FolderRenamePlan.Move], courseDirectory: URL) -> [String] {
+    /// or hashed, so it costs nothing on the main actor. A rename that only
+    /// changes capitalisation counts a folder only when its directory lists
+    /// the new spelling, since the old spelling also "exists" there.
+    nonisolated static func foldersAtTheirNewName(
+        renaming oldName: String, to newName: String, scope: FolderScope,
+        courseDirectory: URL, sectionNumbers: [Int]
+    ) -> [String] {
         var result: [String] = []
         let prefix: String = courseDirectory.standardizedFileURL.path + "/"
-        for move in moves {
-            let isCaseOnly: Bool = move.from.lastPathComponent.caseInsensitiveCompare(move.to.lastPathComponent) == .orderedSame
-            var leftRenamed: Bool = somethingIsThere(at: move.to)
+        let isCaseOnly: Bool = oldName.caseInsensitiveCompare(newName) == .orderedSame
+        let places: [URL] = folderLocations(
+            named: newName, scope: scope, courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+        )
+        for place in places {
+            var isThere: Bool = somethingIsThere(at: place)
             if isCaseOnly {
-                let listed: [String] = (try? FileManager.default.contentsOfDirectory(atPath: move.to.deletingLastPathComponent().path)) ?? []
-                leftRenamed = listed.contains(move.to.lastPathComponent)
+                let listed: [String] = (try? FileManager.default.contentsOfDirectory(atPath: place.deletingLastPathComponent().path)) ?? []
+                isThere = listed.contains(place.lastPathComponent)
             }
-            if !leftRenamed {
+            if !isThere {
                 continue
             }
-            let path: String = move.to.standardizedFileURL.path
-            result.append(path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : move.to.lastPathComponent)
+            let path: String = place.standardizedFileURL.path
+            result.append(path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : place.lastPathComponent)
         }
         return result
     }
