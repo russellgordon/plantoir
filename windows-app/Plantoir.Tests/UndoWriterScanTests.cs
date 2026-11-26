@@ -108,7 +108,7 @@ public sealed class UndoWriterScanTests
         ["Plantoir.Core/Models/BackupDeleter.cs"] = (3, W9 + " (Delete Backup, to the Recycle Bin by ruling 12, the mac's U5)"),
         ["Plantoir.Core/Models/BuildOutputLocation.cs"] = (4, "notAStep: the built websites' folder and its marker, carried to a renamed course's new code (#805)"),
         ["Plantoir.Core/Models/CourseArchiver.cs"] = (4, W9 + " (the archive zip it makes, seen since W4's review, LOW 3)"),
-        ["Plantoir.Core/Models/CourseConfiguration.cs"] = (5, W8 + " (a course's course_config.json, as editJSON)"),
+        ["Plantoir.Core/Models/CourseConfiguration.cs"] = (5, W8 + " (a course's course_config.json written whole by Write and RecordOnDisk, its one replace shared by both: Course Settings' Save as editJSON, W8-12, Rename folder, W8b, and Add Section, archive, restore and rename. Set School Year goes through the door as one editJSON since W8-11, WriteMemberAsOneStep, which holds no writing call)"),
         ["Plantoir.Core/Models/CoursePageCopy.cs"] = (6, W8 + " (Copy a Page, the mac's CoursePageCopier)"),
         ["Plantoir.Core/Models/CourseRenamer.cs"] = (1, W8),
         ["Plantoir.Core/Models/CourseRestorer.cs"] = (34, W9 + " (restore, remove, archive and delete, the mac's CourseRestorer)"),

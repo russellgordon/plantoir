@@ -18,8 +18,10 @@ namespace Plantoir.Tests;
 /// undo, redo, hand edits by <c>path</c> and notes as in the seeded traces;
 /// <c>afterUndoingAll</c> and <c>final</c> by path. The front page is
 /// re-derived as the app does (<see cref="UndoSectionFrontPage"/>: a course
-/// with no settings is left alone). A recorded step with <c>moves</c>,
-/// <c>members</c> or <c>trees</c> is held by name in the ledger.
+/// with no settings is left alone). A recorded step with <c>members</c> is
+/// made as its recorded <c>editJSON</c> ops (#899 W8-11); one with
+/// <c>moves</c>, <c>folderMoves</c> or <c>trees</c> is held by name in the
+/// ledger.
 /// </summary>
 public sealed class UndoActionTraceContractTests
 {
@@ -66,7 +68,11 @@ public sealed class UndoActionTraceContractTests
         JsonElement trace = UndoContract.Traces.RootElement.GetProperty("actionTraces").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == name);
         JsonElement recorded = RecordedStep(trace.GetProperty("step").GetString()!);
-        foreach (string unmade in new[] { "moves", "members", "trees" })
+        // A step with members is made as its recorded editJSON ops (#899
+        // W8-11). Rename folder's steps hold members AND folderMoves: the
+        // guard names folderMoves, so they still stop here rather than run
+        // with no folder move made.
+        foreach (string unmade in new[] { "moves", "folderMoves", "trees" })
         {
             if (recorded.TryGetProperty(unmade, out _))
                 Assert.Fail($"{name}: a step this replay does not make yet ({unmade})");
@@ -124,7 +130,9 @@ public sealed class UndoActionTraceContractTests
                     }
                     else
                     {
-                        UndoOutcome outcome = Door().Perform(Draft(scribe, recorded));
+                        UndoOutcome outcome = recorded.TryGetProperty("members", out _)
+                            ? Door().Perform(MembersDraft(scribe, recorded))
+                            : Door().Perform(Draft(scribe, recorded));
                         made = (outcome.Word, outcome.Seq);
                     }
                     Assert.True(call.GetProperty("expect").GetString() == made.Word, $"{where}: came to {made.Word}");
@@ -239,6 +247,55 @@ public sealed class UndoActionTraceContractTests
             Holds = "section",
             Changes = changes,
             Recomputes = recomputes,
+        };
+    }
+
+    /// <summary>
+    /// A recorded step with <c>members</c> as its action hands it to the door
+    /// (#899 W8-11; the mac's <c>JournaledStep.makeAsOps</c>): each member as
+    /// the recorded <c>editJSON</c> op, its key path, before and after (no
+    /// before or after where the member was absent), in the recorded order,
+    /// then its recompute ops, through the door that takes every kind. Never
+    /// the file worked out by the door's line rule.
+    /// </summary>
+    private static UndoOpsDraft MembersDraft(UndoScribe scribe, JsonElement recorded)
+    {
+        var ops = new JsonArray();
+        foreach (JsonElement member in recorded.GetProperty("members").EnumerateArray())
+        {
+            var op = new JsonObject
+            {
+                ["kind"] = UndoOp.EditJson,
+                ["path"] = member.GetProperty("path").GetString(),
+                ["keyPath"] = JsonNode.Parse(member.GetProperty("keyPath").GetRawText()),
+            };
+            if (member.TryGetProperty("before", out JsonElement before)) op["before"] = JsonNode.Parse(before.GetRawText());
+            if (member.TryGetProperty("after", out JsonElement after)) op["after"] = JsonNode.Parse(after.GetRawText());
+            ops.Add(op);
+        }
+        foreach (JsonElement recompute in recorded.GetProperty("recomputes").EnumerateArray())
+        {
+            ops.Add(new JsonObject
+            {
+                ["kind"] = UndoOp.Recompute,
+                ["maintainer"] = recompute.GetProperty("maintainer").GetString(),
+                ["path"] = recompute.GetProperty("path").GetString(),
+                ["section"] = recompute.GetProperty("section").GetInt64(),
+            });
+        }
+        return new UndoOpsDraft
+        {
+            ActionKey = recorded.GetProperty("action").GetString()!,
+            ActionArguments = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["pageCount"] = recorded.GetProperty("files").GetArrayLength().ToString(System.Globalization.CultureInfo.InvariantCulture),
+            },
+            MadeBy = recorded.GetProperty("madeBy").GetString()!,
+            WorkingFolder = scribe.FullPath("A", ""),
+            Course = "ICS3U",
+            Class = "A",
+            Holds = "course",
+            Ops = ops,
         };
     }
 

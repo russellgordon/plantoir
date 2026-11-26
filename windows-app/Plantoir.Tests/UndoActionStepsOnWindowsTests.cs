@@ -35,7 +35,7 @@ internal static class WindowsActionsOnTheMacFixture
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
         "showTodaysClassOnTheFrontPage", "notTodayOnTheFrontPage", "keepClassesDatedLater", "answerTheLinksChecklist",
-        "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass",
+        "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass", "setSchoolYear",
     ];
 
     /// <summary>
@@ -285,6 +285,17 @@ internal static class WindowsActionsOnTheMacFixture
             return LinksChecklist.WriteAnswered(workspace.FolderPath, Course, courseDirectory, 1,
                 ["section1/All Classes/Unit 1, Day 2.md"], [], new DateTime(2026, 9, 8, 11, 0, 0, DateTimeKind.Utc),
                 new UndoStepMaker("sheet", LinksChecklist.AnsweredActionKey), workspace.UndoList, workspace.UndoDoorOfATest).ToString();
+        }
+        // Set School Year is the sheet's write, given the year and the day
+        // the mac's SetSchoolYearSheet.write(2025, to:on:) was given, on the
+        // workspace's list and door (#899 W8-11).
+        if (stepName == "setSchoolYear")
+        {
+            string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
+            var course = new Plantoir.Core.Models.Course(Course, courseDirectory,
+                CourseConfiguration.Load(Path.Combine(courseDirectory, "course_config.json")));
+            return ReferenceCourseUpkeep.WriteSchoolYear(course, 2025, new DateOnly(2026, 11, 20),
+                workspace.UndoList, workspace.UndoDoorOfATest) ?? "filed";
         }
         var tools = new PlantoirTools(workspace);
         // The MCP server always hands a tool a progress (the SDK's own when the
@@ -639,6 +650,31 @@ public sealed class UndoActionStepsOnWindowsTests : IDisposable
         foreach (JsonElement recompute in recorded.GetProperty("recomputes").EnumerateArray())
             recordedRecomputes.Add(recompute.GetProperty("maintainer").GetString() + " " + recompute.GetProperty("path").GetString() + " " + recompute.GetProperty("section").GetInt64());
         Assert.True(recordedRecomputes.SequenceEqual(recomputes), $"{name}: recomputes {string.Join(" | ", recomputes)}");
+        // A step with members: each editJSON op is the recorded member, its
+        // path, key path, before and after, in the recorded order (#899 W8-11).
+        if (recorded.TryGetProperty("members", out JsonElement members))
+        {
+            var editJsonOps = new List<JsonObject>();
+            foreach (JsonNode? op in step["ops"]!.AsArray())
+            {
+                if ((string?)op!["kind"] == UndoOp.EditJson) editJsonOps.Add(op.AsObject());
+            }
+            Assert.True(members.GetArrayLength() == editJsonOps.Count, $"{name}: {editJsonOps.Count} editJSON ops");
+            for (int index = 0; index < editJsonOps.Count; index++)
+            {
+                JsonElement member = members[index];
+                JsonObject op = editJsonOps[index];
+                Assert.Equal(member.GetProperty("path").GetString(), (string?)op["path"]);
+                Assert.True(JsonNode.DeepEquals(JsonNode.Parse(member.GetProperty("keyPath").GetRawText()), op["keyPath"]), $"{name}: keyPath {op["keyPath"]?.ToJsonString()}");
+                foreach (string side in new[] { "before", "after" })
+                {
+                    bool recordedHasIt = member.TryGetProperty(side, out JsonElement value);
+                    Assert.True(recordedHasIt == op.ContainsKey(side), $"{name}: {side} {(recordedHasIt ? "missing" : "present")}");
+                    if (recordedHasIt)
+                        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(value.GetRawText()), op[side]), $"{name}: {side} {op[side]?.ToJsonString()}");
+                }
+            }
+        }
 
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
         {
