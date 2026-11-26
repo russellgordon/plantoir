@@ -23062,6 +23062,32 @@ replay can place the swap at the same instant on both platforms): the
 folder-id rule is held by `undoJournal.identifierFiles.unreadable` and
 `UndoJournalCoreTests`.
 
+### #1004-b: what cannot be read is cannot tell
+
+`UndoWebsite.readRecord` now lists the section's published-pages folder with
+the same `UndoJournal.namesListed(in:)` and returns nil, never `[]`, for a
+folder that is there and cannot be listed; `UndoWebsite.answer` takes that
+nil as Windows' `Answer` takes a null record: cannot tell for a section that
+deploys anywhere now, whatever its site markers say, and no offer only when
+it deploys nowhere. Before, `try?` read such a folder as no fragments, and a
+section with no site marker (any folder destination) was told "never
+deployed". Only `ENOENT` or `ENOTDIR` is a folder that is not there. Three
+agreements are pinned too, each a row that passed on the base: a move whose
+path ends `.MD` names the same page as `.md` (`deployedCases`); a fragment
+whose moment, and a segment whose number, is written in digits that are not
+ASCII is not one (`deployedCases`, and `stackCases` call
+`aSegmentNamedWithOtherDigits`; Windows' fragment pattern already says
+`[0-9]`, its segment pattern's `\d` still matches any Unicode digit, held
+under `Reason1004JournalReading`); and a step whose `madeAt` is not a moment
+is a barrier that carries the step before's time, so it is never pruned as
+old on its own (`stackCases` call `stepWithAMadeAtThatIsNotAMoment`). An
+unreadable `madeAt` read as the oldest moment would carry the same time,
+since a step's time is the latest so far; the rule that matters is that it
+has no time of its own. `readRecord` has no caller yet: U6's offer to deploy
+is the first. `UndoWebsite.siteMarkers` still asks `fileExists`, so a marker
+that cannot be looked at reads as absent, on both platforms; that is left
+for the next piece.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
