@@ -954,6 +954,15 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
     }
 }
 
+/// What a relinking move's swap came to (U4b3 relink-3): made, failed
+/// with nothing of its own left, or stopped inside by a test or the
+/// harness, as a process killed there would stop.
+nonisolated enum UndoRelinkOutcome: Equatable, Sendable {
+    case made
+    case failed
+    case stoppedByATest
+}
+
 /// A relinking move's two texts as one swap goes (U4b3 relink-1): the
 /// text the link holds where it moves from, and the text the new link is
 /// made with where it goes. Read from the list by their blobs.
@@ -1281,10 +1290,10 @@ nonisolated enum UndoSwap {
                         // Made back the same way the other way round: the
                         // source's text made beside `from`, renamed in, the
                         // link this swap made removed (U4b3 relink-1).
-                        if failsHere || !UndoSwap.relinkLink(
+                        if failsHere || UndoSwap.relinkLink(
                             leaving: target.url, holding: relink.destinationText,
                             onto: from, holding: relink.sourceText, label: label
-                        ) {
+                        ) != .made {
                             everyOnePutBack = false
                         }
                     } else if failsHere || !UndoSwap.renameExclusively(target.url, onto: from) {
@@ -1466,10 +1475,15 @@ nonisolated enum UndoSwap {
                     // re-read (U4b3 relink-1). Nothing is written through
                     // either link.
                     makeTheFolder(for: target.url)
-                    if !UndoSwap.relinkLink(
+                    let relinked: UndoRelinkOutcome = UndoSwap.relinkLink(
                         leaving: from, holding: relink.sourceText,
-                        onto: target.url, holding: relink.destinationText, label: label
-                    ) {
+                        onto: target.url, holding: relink.destinationText, label: label,
+                        stoppingAt: index
+                    )
+                    if relinked == .stoppedByATest {
+                        return .stoppedByATest
+                    }
+                    if relinked == .failed {
                         refusal = .fileIsInUse(path: namedAs)
                     }
                 } else {
@@ -1805,30 +1819,43 @@ nonisolated enum UndoSwap {
     /// `newText` is made under a staged name beside `new`, renamed in
     /// exclusively (never over anything), and only then is the link at
     /// `old` removed, once it is re-read (`lstat`, `readlink`) holding
-    /// `oldText`. Neither link is ever followed or written through. False
-    /// when any step fails; whatever this call made is then taken away
-    /// again, and the old link is left as it was.
-    static func relinkLink(leaving old: URL, holding oldText: Data, onto new: URL, holding newText: Data, label: String) -> Bool {
+    /// `oldText`. Neither link is ever followed or written through.
+    /// `.failed` when any step fails; whatever this call made is then taken
+    /// away again, and the old link is left as it was. A swap going in
+    /// passes its target's index (`stoppingAt`), so a test or the harness
+    /// can stop it inside, as a process killed there would stop (U4b3
+    /// relink-3): with the new link staged (`relinkStaged`), or renamed in
+    /// beside the old (`relinkRenamedIn`); a reversal passes none.
+    static func relinkLink(
+        leaving old: URL, holding oldText: Data, onto new: URL, holding newText: Data, label: String,
+        stoppingAt index: Int? = nil
+    ) -> UndoRelinkOutcome {
         let stagedURL: URL = UndoSwap.besideURL(for: new, label: label, role: "new")
         _ = UndoSwap.removeStaged(stagedURL)
         if !UndoSwap.makeALink(at: stagedURL, holding: newText) {
             _ = UndoSwap.removeStaged(stagedURL)
-            return false
+            return .failed
+        }
+        if let index, UndoKillPoints.stopsHere(.relinkStaged(index)) {
+            return .stoppedByATest
         }
         let renameFails: Bool = UndoKillPoints.relinkRenameInFails?(new) == true
         if renameFails || !UndoSwap.renameExclusively(stagedURL, onto: new) {
             _ = UndoSwap.removeStaged(stagedURL)
-            return false
+            return .failed
+        }
+        if let index, UndoKillPoints.stopsHere(.relinkRenamedIn(index)) {
+            return .stoppedByATest
         }
         if UndoSwap.linkHolds(old, oldText) && UndoSwap.removeALink(at: old) {
-            return true
+            return .made
         }
         // The old link changed under the swap, or would not go: the new one
         // is taken away again (it is this call's own), the old left whole.
         if UndoSwap.linkHolds(new, newText) {
             _ = UndoSwap.removeALink(at: new)
         }
-        return false
+        return .failed
     }
 
     /// A symbolic link at `url` holding exactly `text`, made with

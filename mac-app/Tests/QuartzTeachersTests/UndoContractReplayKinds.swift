@@ -44,6 +44,7 @@ nonisolated enum UndoContractKinds {
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
         "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
+        "relinkALink", "relinkALinkLeavingAHandedOverPlace",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
         "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
         "makeRoomWithALaterClassThatIsABrokenLink",
@@ -77,6 +78,10 @@ nonisolated enum UndoContractKinds {
     /// `handAPlaceOverBeforeALinksMove` hand over, by day, and the library
     /// their links lead to (relative targets).
     static let handedOverDays: [Int] = [2, 3, 4]
+
+    /// U4b3 relink-3: the class pages `relinkALink` and
+    /// `relinkALinkLeavingAHandedOverPlace` change, by day.
+    static let relinkedDays: [Int] = [3, 4, 5]
 
     static func classPage(_ day: Int) -> String {
         return "courses/TST1O/section1/Unit 1, Day \(day).md"
@@ -573,6 +578,30 @@ nonisolated enum UndoContractKinds {
                 UndoOp.writeFile(path: classPage(2), beforeSha: nil, afterSha: UndoHash.sha256(of: new)),
             ]
             return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [three, new], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
+        case "relinkALink", "relinkALinkLeavingAHandedOverPlace":
+            // U4b3 relink-3: Day 3 a page, Day 4 a link holding `Unit 1,
+            // Day 3.md`; ONE step: the link moved to Day 5 holding `Unit 1,
+            // Day 4.md` (a relinking move); leaving a handed-over place, as
+            // Insert Class makes it, Day 3's page then moved into Day 4 and
+            // `New.` written at Day 3.
+            let oldText: Data = Data("Unit 1, Day 3.md".utf8)
+            let newText: Data = Data("Unit 1, Day 4.md".utf8)
+            if !somethingIsAt(classPage(3), in: root) && !somethingIsAt(classPage(4), in: root) {
+                try UndoContractReplay.write("Three.\n", to: classPage(3), in: root)
+                try layALink(classPage(4), leadingTo: "Unit 1, Day 3.md", root: root)
+            }
+            var ops: [UndoOp] = [
+                UndoOp.relinkLink(from: classPage(4), to: classPage(5), linkShaBefore: UndoHash.sha256(of: oldText), linkShaAfter: UndoHash.sha256(of: newText)),
+            ]
+            var blobs: [Data] = [oldText, newText]
+            if value == "relinkALinkLeavingAHandedOverPlace" {
+                let three: Data = Data("Three.\n".utf8)
+                let new: Data = Data("New.\n".utf8)
+                ops.append(UndoOp.moveFile(from: classPage(3), to: classPage(4), sha: UndoHash.sha256(of: three)))
+                ops.append(UndoOp.writeFile(path: classPage(3), beforeSha: nil, afterSha: UndoHash.sha256(of: new)))
+                blobs.append(new)
+            }
+            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: blobs, root: root, action: "insertClass"), in: journal, mode: .live, places: places))
         case "editTheHandedOverPageByHand":
             try? FileManager.default.removeItem(at: root.appendingPathComponent(classPage(3)))
             try UndoContractReplay.write("Hand.\n", to: classPage(3), in: root)
@@ -743,9 +772,10 @@ nonisolated enum UndoContractKinds {
     /// `Day <n>: link <target>` or `Day <n>: nothing`, then `library:
     /// untouched` when every page the links lead to holds what the call laid
     /// (else `changed`), joined by `; `.
-    static func handedOver(in root: URL) -> String {
+    /// U4b3 relink-3 reads `relinkedDays` instead (Day 3 to Day 5).
+    static func handedOver(in root: URL, days: [Int] = handedOverDays) -> String {
         var parts: [String] = []
-        for day in handedOverDays {
+        for day in days {
             let url: URL = root.appendingPathComponent(classPage(day))
             var what: String = "nothing"
             if let bytes = UndoTreeReading.linkTarget(at: url), let target = UndoText.decode(bytes) {

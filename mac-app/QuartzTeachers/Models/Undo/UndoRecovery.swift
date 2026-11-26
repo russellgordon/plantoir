@@ -876,6 +876,47 @@ nonisolated enum UndoRecovery {
         return result
     }
 
+    /// U4b3 relink-3: for each relinking move of the step whose two links
+    /// both stand (`from` holding the `linkShaBefore` text, `to` the
+    /// `linkShaAfter` text), the link the interrupted swap had just made is
+    /// removed: at `to` going forward (an apply or a Redo), at `from` going
+    /// back (an Undo), once it is re-read holding that side's text. Both
+    /// texts are in the list, so neither link is an only copy; the one
+    /// removed is the swap's own change not yet complete. Read with `lstat`
+    /// and `readlink`, removed with `unlink`, never followed. A plan never
+    /// does this: a link at the other name may be the teacher's. Answers
+    /// the place that cannot be read just now (the step is then left for
+    /// the next recovery), or nil.
+    static func removeTheLinksJustMade(of step: UndoStep, root: URL, goingForward: Bool) -> String? {
+        for op in step.ops where op.isARelink {
+            guard let from = op.from, let to = op.to, let before = op.linkShaBefore, let after = op.linkShaAfter else {
+                continue
+            }
+            if !UndoPlaces.staysInside(root, from, namedBy: op) || !UndoPlaces.staysInside(root, to, namedBy: op) {
+                continue
+            }
+            let fromURL: URL = root.appendingPathComponent(from)
+            let toURL: URL = root.appendingPathComponent(to)
+            let atFrom: UndoMoveSide = UndoMoveSide.readLink(at: fromURL, linkSha: before)
+            let atTo: UndoMoveSide = UndoMoveSide.readLink(at: toURL, linkSha: after)
+            if atFrom == .cannotRead {
+                return from
+            }
+            if atTo == .cannotRead {
+                return to
+            }
+            if atFrom != .holdsTheContent || atTo != .holdsTheContent {
+                continue
+            }
+            let justMade: URL = goingForward ? toURL : fromURL
+            let justMadeSha: String = goingForward ? after : before
+            if UndoMoveSide.readLink(at: justMade, linkSha: justMadeSha) == .holdsTheContent && !UndoSwap.removeALink(at: justMade) {
+                return goingForward ? to : from
+            }
+        }
+        return nil
+    }
+
     /// U4b3 door-3: the step's moves that leave or fill a handed-over
     /// place, by their index in the step.
     static func movesHandingOver(_ handovers: [UndoHandover], in ops: [UndoOp]) -> Set<Int> {
@@ -1077,6 +1118,14 @@ nonisolated enum UndoRecovery {
         // Which state the work was moving FROM, and TO.
         let startedFromBefore: Bool = phase == .begin || phase == .redoing
         let startState: UndoOpState = startedFromBefore ? .before : .after
+        // U4b3 relink-3: a relinking move's swap killed with both links
+        // standing loses the link it had just made first, so the op stands
+        // where the swap began; only then is the step judged.
+        if mode == .live, let unreadable = UndoRecovery.removeTheLinksJustMade(of: step, root: root, goingForward: startedFromBefore) {
+            swapRefused = true
+            leftFor = .cannotTellNow(path: unreadable)
+            return nil
+        }
         var files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root, places: places, journal: writer.journal)
         // A teacher's folder still set aside after the tidying (its place
         // could not be read, or a rename failed) is IN THE WAY: never

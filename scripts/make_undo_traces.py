@@ -1437,10 +1437,14 @@ def swap_groups(ops, backward):
     return leading + files + wholes
 
 
-def stopped_part_way(ops, backward, pages, swapped):
+def stopped_part_way(ops, backward, pages, swapped, inside=None):
     """What a step's swap leaves when its process is killed before the
     target numbered `swapped` (None: every target in): each group made in
-    turn, judged and moved on its own."""
+    turn, judged and moved on its own. `inside` (U4b3 relink-3) stops
+    INSIDE that target's swap instead, a relinking move's: relinkStaged
+    (its new link made under its staged name, which the model, holding no
+    staged files, does not show) or relinkRenamedIn (the new link renamed
+    in at its destination, the old one not yet removed: both stand)."""
     pages = dict(pages)
     groups = swap_groups(ops, backward)
     for group in groups[:len(groups) if swapped is None else swapped]:
@@ -1451,6 +1455,31 @@ def stopped_part_way(ops, backward, pages, swapped):
                 pages.pop(path, None)
             else:
                 pages[path] = text
+    if inside is not None:
+        op = groups[swapped][0]
+        assert "linkShaBefore" in op and inside in ("relinkStaged", "relinkRenamedIn"), (op, inside)
+        if inside == "relinkRenamedIn":
+            made = whole_moved(op, backward, pages)
+            for path, value in made.items():
+                if value is not None:
+                    pages[path] = value
+    return pages
+
+
+def remove_the_links_just_made(ops, pages, started_from_before):
+    """UndoRecovery.removeTheLinksJustMade (U4b3 relink-3): each relinking
+    move with both links standing, each holding its own side's text, loses
+    the link its interrupted swap had just made: at `to` going forward, at
+    `from` going back. A plan never does this."""
+    pages = dict(pages)
+    for op in ops:
+        if "linkShaBefore" not in op:
+            continue
+        at_from, at_to = pages.get(op["from"]), pages.get(op["to"])
+        from_holds = isinstance(at_from, tuple) and at_from[0] == "link" and sha(at_from[1]) == op["linkShaBefore"]
+        to_holds = isinstance(at_to, tuple) and at_to[0] == "link" and sha(at_to[1]) == op["linkShaAfter"]
+        if from_holds and to_holds:
+            pages.pop(op["to"] if started_from_before else op["from"], None)
     return pages
 
 
@@ -1605,6 +1634,9 @@ def recover(ops, pages, started_from_before):
       step's own kept copy inside the folder out, is refused and the step
       closes couldNotPutBack with nothing put back (the U7 gap)."""
     start, end = ("before", "after") if started_from_before else ("after", "before")
+    # U4b3 relink-3: the link an interrupted relink had just made goes
+    # first, so its op stands where its swap began.
+    pages = remove_the_links_just_made(ops, pages, started_from_before)
     states = recovery_states(ops, pages)
     in_the_way = [place for place, state in states.items() if state == "neither"]
     if not in_the_way and all(state == start for state in states.values()):
@@ -1750,6 +1782,12 @@ def whole_moved(op, backward, pages):
                 if isinstance(path, str) and path.startswith(prefix):
                     moved[destination + path[len(source):]] = value
             return moved
+        if "linkShaBefore" in op:
+            # U4b3 relink: the link made again at its destination holding
+            # that side's own text (the model's `linkTexts` stands for the
+            # list's two blobs: each sha's text).
+            wanted = op["linkShaBefore"] if backward else op["linkShaAfter"]
+            return {destination: ("link", op["linkTexts"][wanted]), source: None}
         return {destination: pages.get(source), source: None}
     if kind in ("createTree", "removeTree"):
         makes = (kind == "createTree") != backward

@@ -1757,6 +1757,58 @@ class ContractCaseTests(unittest.TestCase):
                 self.assertEqual(self.handed_over(settled_model), case["handedOver"])
                 self.assertEqual(named, case.get("pathsNamed", []))
 
+    def relinked_days(self, model):
+        """U4b3 relink-3's files: what Day 3, Day 4 and Day 5 hold, each a
+        page by its text, a link by its text, or nothing."""
+        parts = []
+        for number in (3, 4, 5):
+            held = model.get(self.day(number))
+            if held is None:
+                parts.append("Day %d: nothing" % number)
+            elif isinstance(held, tuple) and held[0] == "link":
+                parts.append("Day %d: link %s" % (number, held[1]))
+            else:
+                parts.append("Day %d: page %s" % (number, held))
+        return "; ".join(parts)
+
+    def test_recovery_cases_with_a_relink(self):
+        """undo.recoveryCases' U4b3 relink-3 rows (withARelink): a step
+        holding a relinking move, killed before a swap or inside the
+        relink's (relinkStaged, relinkRenamedIn), going forward or back,
+        settles whole: recovery first removes the link the interrupted swap
+        had just made when both stand, then judges by content."""
+        cases = [case for case in shared_undo()["recoveryCases"] if case.get("withARelink")]
+        self.assertEqual(len(cases), 7)
+        phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
+                  ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done"}
+        old, new = "Unit 1, Day 3.md", "Unit 1, Day 4.md"
+        for case in cases:
+            with self.subTest(case["name"]):
+                self.assertIn(case["withARelink"], ("alone", "leavingAHandedOverPlace"))
+                pages = {self.day(3): "Three.\n", self.day(4): ("link", old)}
+                ops = [{"kind": "move", "from": self.day(4), "to": self.day(5),
+                        "linkShaBefore": traces.sha(old), "linkShaAfter": traces.sha(new),
+                        "blobs": [traces.sha(old), traces.sha(new)],
+                        "linkTexts": {traces.sha(old): old, traces.sha(new): new}}]
+                if case["withARelink"] == "leavingAHandedOverPlace":
+                    ops.append({"kind": "move", "from": self.day(3), "to": self.day(4), "sha": traces.sha("Three.\n")})
+                    ops += traces.ops_for_change(self.day(3), None, "New.\n")
+                    self.assertTrue(traces.handovers(ops))
+                work, stop = case["work"], case["stopAt"]
+                point, number = stop.split(":")
+                inside = None if point == "beforeSwap" else point
+                after_pages = traces.stopped_part_way(ops, False, pages, None)
+                starting = after_pages if work == "undo" else pages
+                left = traces.stopped_part_way(ops, work == "undo", starting, int(number), inside)
+                if inside == "relinkRenamedIn":
+                    self.assertIsNotNone(left.get(self.day(4)))
+                    self.assertIsNotNone(left.get(self.day(5)))
+                outcome, settled, named = traces.recover(ops, left, work != "undo")
+                self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
+                wanted = {"before": pages, "after": after_pages}[case["files"]]
+                self.assertEqual(self.relinked_days(settled), self.relinked_days(wanted))
+                self.assertEqual(named, case.get("pathsNamed", []))
+
     def edited_by_hand(self, pages, page, first, second):
         """recoveryCasesHow's handEdit: `first` or `second`, the publish line
         changed by hand (the traces' sameLine edit); `carried`, the line

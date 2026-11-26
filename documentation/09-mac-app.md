@@ -23801,7 +23801,14 @@ whose verdict is not `notReadable` are held for Windows under
 whose `linkSha` is given beside the pair is unreadable on the Mac
 (`UndoRelinkTests`, "Readable"), but it is no shared row yet: Windows today
 reads `linkSha` and ignores the pair, so such a row could neither pass nor
-be held there until its piece 21b.
+be held there until its piece 21b. A relink killed inside its swap (relink-3: the
+stop points `relinkStaged:N`, the new link staged, and `relinkRenamedIn:N`,
+both links standing) is settled whole by a live recovery, which first
+removes the link the interrupted swap had just made (at `to` going forward,
+at `from` for an Undo; `UndoRecovery.removeTheLinksJustMade`), re-read with
+that side's text, so the op stands where its swap began and is then judged
+as any other; a plan never does this, since a link at the other name may be
+the teacher's (seven `recoveryCases` rows, key `withARelink`).
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

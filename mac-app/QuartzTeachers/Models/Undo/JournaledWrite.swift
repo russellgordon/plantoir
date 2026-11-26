@@ -1099,6 +1099,12 @@ nonisolated enum UndoKillPoint: Equatable, Sendable {
     /// clearing takes a step in flight (`undo.rule.clearing`).
     case afterTheCheck
     case beforeSwap(Int)
+    /// U4b3 relink-3: inside a relinking move's swap at target N, the new
+    /// link made under its staged name and not yet renamed in.
+    case relinkStaged(Int)
+    /// U4b3 relink-3: inside the same swap, the new link renamed in and the
+    /// old one not yet removed: both links stand.
+    case relinkRenamedIn(Int)
     case beforeApplied
     case afterUndoing
     case beforeUndone

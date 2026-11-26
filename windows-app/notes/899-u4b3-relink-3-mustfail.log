@@ -1,0 +1,8 @@
+U4b3 relink-3 (#899) must-fail, 2026-11-26. Each sabotage built and run through xlock.sh, then restored from a saved copy (git diff clean against the green tree).
+
+M1 (removal skipped: the settle call disabled) .dd/run-r3-red2.log: UndoJournalContractTests.testRecoveryCases fails the three relinkRenamedIn rows ("the class pages are not before (Day 3: page Three.; Day 4: link Unit 1, Day 3.md; Day 5: link Unit 1, Day 4.md ...)", "the step is interrupted, not failed"); UndoRelinkTests.testARelinkKilledAtAnyMomentIsWholeAfterRecovery fails at every relinkRenamedIn point ("links Unit 1, Day 3.md and Unit 1, Day 4.md"). 38 failures. RED. (Also the red-first run.)
+M2 (the SOURCE's link removed instead) .dd/run-r3-mf2.log: testRecoveryCases ("the same step dies with the new link renamed in at Day 5 ..."), the kill test at leavingAHandedOverPlace-undo-inside-relinkRenamedIn(2) ("neither whole before nor whole after"). 3 failures. RED.
+M3 (the removal applied in a plan too, at the top of UndoCheck.plan) .dd/run-r3-mf3.log: UndoRelinkTests.testAnUndoWithBothLinksStandingRemovesNothing ("the undo came to undone(seq: 1 ...), not changedSince"), testBothLinksStandingIsChangedSinceBothWays. 5 failures. RED.
+M4 (Python: recover without remove_the_links_just_made): test_make_undo_traces.py test_recovery_cases_with_a_relink fails the three relinkRenamedIn rows ('interrupted' != 'failed', 'interrupted' != 'done'). RED.
+
+RED 4 of 4.
