@@ -1749,9 +1749,12 @@ class Model:
         result = {}
         running = None
         for step in self.steps:
-            if running is None or step["made"] > running:
+            # A step with no time of its own (a madeAt that is not a moment,
+            # #1004-b) carries the time of the step before; none, none.
+            if step["made"] is not None and (running is None or step["made"] > running):
                 running = step["made"]
-            result[step["seq"]] = running
+            if running is not None:
+                result[step["seq"]] = running
         return result
 
     def reference_time(self):
@@ -1769,7 +1772,7 @@ class Model:
         listed = self.on_list()
         expired = 0
         for step in listed:
-            if times[step["seq"]] < judged - DAYS_KEPT:
+            if step["seq"] in times and times[step["seq"]] < judged - DAYS_KEPT:
                 expired = step["seq"]
         remaining = [step for step in listed if step["seq"] > expired]
         skip = max(0, len(remaining) - STEPS_KEPT)
@@ -1824,11 +1827,11 @@ class Model:
 
     # -- writing --------------------------------------------------------
 
-    def begin(self, ops, readable=True, made=None, dead=False):
+    def begin(self, ops, readable=True, made=None, dead=False, no_time=False):
         self.highest += 1
         seq = self.highest
         self.steps.append({"seq": seq, "ops": ops, "phase": "begun",
-                           "made": self.clock if made is None else made,
+                           "made": None if no_time else (self.clock if made is None else made),
                            "readable": readable, "clearedInFlight": False, "dead": dead})
         self.write_line()
         return seq
@@ -1953,7 +1956,7 @@ class Model:
         remaining = len(listed)
         for step in listed:
             too_many = remaining > STEPS_KEPT
-            too_old = trust and times[step["seq"]] < self.clock - (DAYS_KEPT + GRACE_DAYS)
+            too_old = trust and step["seq"] in times and times[step["seq"]] < self.clock - (DAYS_KEPT + GRACE_DAYS)
             if step["phase"] == "begun":
                 if not step["dead"] or (not too_many and not too_old):
                     break

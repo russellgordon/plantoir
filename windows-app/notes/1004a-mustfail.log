@@ -1,0 +1,37 @@
+# #1004-a must-fail log (2026-11-26), each sabotage in place, built, run (UndoJournalCoreTests + UndoJournalContractTests), restored with git checkout (git diff clean after)
+
+## Red on the base product (seams + tests at 2925e32b6, product unchanged)
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalContractTests.swift:118: error: -[QuartzTeachersTests.UndoJournalContractTests testStackCases] : XCTAssertEqual failed: ("["stackCases \'#1004: the newest segment gone after th
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:103: error: -[QuartzTeachersTests.UndoJournalCoreTests testAFileThatIsNotTheOneReadIsPutBack] : XCTAssertEqual failed: ("["the name holds 70304130-044b-41d9-997
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:98: error: -[QuartzTeachersTests.UndoJournalCoreTests testAFolderIDReplacedByAGoodOneIsNeverSetAside] : XCTAssertEqual failed: ("["alone: the good folder-id was
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:115: error: -[QuartzTeachersTests.UndoJournalCoreTests testAListFolderThatCannotBeListedIsUnreadable] : XCTAssertEqual failed: ("["a list folder that cannot be 
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:109: error: -[QuartzTeachersTests.UndoJournalCoreTests testTheNewestSegmentGoneAfterTheListingIsAnUnreadableList] : XCTAssertEqual failed: ("["read on: the newe
+
+## M1 to M3 (Swift)
+== M1
+	 Executed 19 tests, with 0 failures (0 unexpected) in 17.391 (17.395) seconds
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:98: error: -[QuartzTeachersTests.UndoJournalCoreTests testAFolderIDReplacedByAGoodOneIsNeverSetAside] : XCTAssertEqual failed: ("["alone: the good folder-id was moved aside (a put-back was needed)", "with a third file at the put-b
+	 Executed 16 tests, with 1 failure (0 unexpected) in 1.034 (1.039) seconds
+	 Executed 35 tests, with 1 failure (0 unexpected) in 18.425 (18.435) seconds
+	 Executed 35 tests, with 1 failure (0 unexpected) in 18.425 (18.435) seconds
+** TEST FAILED **
+== M2
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalContractTests.swift:118: error: -[QuartzTeachersTests.UndoJournalContractTests testStackCases] : XCTAssertEqual failed: ("["stackCases \'#1004: the newest segment gone after the list was listed: the list cannot be read, the undo is refused, nothi
+	 Executed 19 tests, with 1 failure (0 unexpected) in 17.487 (17.491) seconds
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:109: error: -[QuartzTeachersTests.UndoJournalCoreTests testTheNewestSegmentGoneAfterTheListingIsAnUnreadableList] : XCTAssertEqual failed: ("["read on: the newest segment gone after the listing gave a fold of 0 steps, not an unrea
+	 Executed 16 tests, with 1 failure (0 unexpected) in 1.083 (1.088) seconds
+	 Executed 35 tests, with 2 failures (0 unexpected) in 18.570 (18.579) seconds
+	 Executed 35 tests, with 2 failures (0 unexpected) in 18.570 (18.580) seconds
+** TEST FAILED **
+== M3
+	 Executed 19 tests, with 0 failures (0 unexpected) in 18.569 (18.573) seconds
+/Users/russellgordon/plantoir/wt-1004a/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:115: error: -[QuartzTeachersTests.UndoJournalCoreTests testAListFolderThatCannotBeListedIsUnreadable] : XCTAssertEqual failed: ("["a list folder that cannot be listed answered [], not a throw"]") is not equal to ("[]")
+	 Executed 16 tests, with 1 failure (0 unexpected) in 1.037 (1.042) seconds
+	 Executed 35 tests, with 1 failure (0 unexpected) in 19.606 (19.616) seconds
+	 Executed 35 tests, with 1 failure (0 unexpected) in 19.606 (19.616) seconds
+** TEST FAILED **
+
+## M4 (Python model: the call answers nothingToUndo, a gone newest passed over)
+test_stack_cases (case='#1004: the newest segment gone after the list was listed: the list cannot be read, the undo is refused, nothing is cleared') ... FAIL
+AssertionError: 'nothingToUndo' != 'listUnavailable'
+Ran 36 tests; FAILED (failures=1)

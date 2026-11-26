@@ -1,0 +1,52 @@
+#1004-b must-fail log (Mac, 2026-11-26). Each sabotage in place, built, run (UndoJournalContractTests + UndoJournalCoreTests through xlock.sh), then restored with git checkout; git status clean after all five.
+
+== base behaviour (new signature, readRecord's old try? -> [] body), run-base.log
+/Users/russellgordon/plantoir/wt-1004b/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:146: error: -[QuartzTeachersTests.UndoJournalCoreTests testAPublishedPagesFolderThatCannotBeListedIsNotNoFragments] : XCTAssertNil failed: "[]" - a folder that cannot be listed is not []
+	 Executed 37 tests, with 1 failure (0 unexpected) in 17.656 (17.663) seconds
+
+== M1: readRecord back to try? FileManager.contentsOfDirectory returning []
+/Users/russellgordon/plantoir/wt-1004b/mac-app/Tests/QuartzTeachersTests/UndoJournalCoreTests.swift:146: error: -[QuartzTeachersTests.UndoJournalCoreTests testAPublishedPagesFolderThatCannotBeListedIsNotNoFragments] : XCTAssertNil failed: "[]" - a folder that cannot be listed is not []
+	 Executed 37 tests, with 1 failure (0 unexpected) in 18.594 (18.604) seconds
+exit 65
+
+== M1b: answer reading a nil record as [] (the base's answer, which took no nil)
+/Users/russellgordon/plantoir/wt-1004b/mac-app/Tests/QuartzTeachersTests/UndoJournalContractTests.swift:127: error: -[QuartzTeachersTests.UndoJournalContractTests testDeployedCases] : XCTAssertEqual failed: ("["deployedCases \'#1004-b: a published-pages folder that is there and cannot be listed: cannot tell, never \'never deployed\'\': noOffer, not cannotTell"]") is not equal to ("[]")
+	 Executed 37 tests, with 1 failure (0 unexpected) in 19.315 (19.325) seconds
+exit 65
+
+== M2: place(ofPath:) matching .md case-sensitively
+/Users/russellgordon/plantoir/wt-1004b/mac-app/Tests/QuartzTeachersTests/UndoJournalContractTests.swift:127: error: -[QuartzTeachersTests.UndoJournalContractTests testDeployedCases] : XCTAssertEqual failed: ("["deployedCases \'#1004-b: a page whose name ends .MD is the page the same name ending .md is\': a move this replay cannot read", "deployedCases \'#1004-b: a page whose name ends .MD is the page the same name ending .md is\': noOffer, not offerToDeploy"]") is not equal to ("[]")
+	 Executed 37 tests, with 1 failure (0 unexpected) in 18.907 (18.916) seconds
+exit 65
+
+== M3: segmentNumber(inName:) accepting any isNumber character (its value by wholeNumberValue)
+/Users/russellgordon/plantoir/wt-1004b/mac-app/Tests/QuartzTeachersTests/UndoContractReplay.swift:1353: error: -[QuartzTeachersTests.UndoJournalContractTests testStackCases] : failed: caught error: "couldNotRead"
+	 Executed 37 tests, with 1 failure (1 unexpected) in 15.357 (15.365) seconds
+exit 65
+
+== M4: effectiveTimes giving a step with no readable madeAt the oldest moment (Date.distantPast), not the step before's time
+/Users/russellgordon/plantoir/wt-1004b/mac-app/Tests/QuartzTeachersTests/UndoJournalContractTests.swift:118: error: -[QuartzTeachersTests.UndoJournalContractTests testStackCases] : XCTAssertEqual failed: ("["stackCases \'#1004-b: a step whose madeAt is not a moment, on top of a readable one: a barrier, never undone, never cleared, and with the step before\'s time it is not old\': head nil", "stackCases \'#1004-b: a step whose madeAt is not a moment, on top of a readable one: a barrier, never undone, never cleared, and with the step before\'s time it is not old\': offered [], not [1, 2]", "stackCases \'#1004-b: a step whose madeAt is not a moment, on top of a readable one: a barrier, never undone, never cleared, and with the step before\'s time it is not old\': the last call came to nothingToUndo, not notAvailable"]") is not equal to ("[]")
+	 Executed 37 tests, with 1 failure (0 unexpected) in 18.507 (18.516) seconds
+exit 65
+
+== Python (M5), scripts/test_make_undo_traces.py, each restored with git checkout
+== M5a FRAGMENT back to \d
+  test_deployed_cases (__main__.ContractCaseTests.test_deployed_cases) (case='#1004-b: a file whose moment is written in digits that are not ASCII is not a fragment') ... FAIL
+FAIL: test_deployed_cases (__main__.ContractCaseTests.test_deployed_cases) (case='#1004-b: a file whose moment is written in digits that are not ASCII is not a fragment')
+AssertionError: 'offerToDeploy' != 'noOffer'
+Ran 36 tests in 0.738s
+FAILED (failures=1)
+== M5b recordListed ignored
+  test_deployed_cases (__main__.ContractCaseTests.test_deployed_cases) (case="#1004-b: a published-pages folder that is there and cannot be listed: cannot tell, never 'never deployed'") ... FAIL
+FAIL: test_deployed_cases (__main__.ContractCaseTests.test_deployed_cases) (case="#1004-b: a published-pages folder that is there and cannot be listed: cannot tell, never 'never deployed'")
+AssertionError: 'noOffer' != 'cannotTell'
+Ran 36 tests in 0.748s
+FAILED (failures=1)
+== M5c a step with no time given the oldest moment
+Ran 36 tests in 0.758s
+OK
+== M5c' effective_times gives a step with no time the oldest moment (not carried)
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case="#1004-b: a step whose madeAt is not a moment, on top of a readable one: a barrier, never undone, never cleared, and with the step before's time it is not old")
+AssertionError: None != 2
+Ran 36 tests in 0.722s
+FAILED (failures=1)
