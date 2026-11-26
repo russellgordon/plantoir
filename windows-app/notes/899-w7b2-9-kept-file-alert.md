@@ -1,6 +1,6 @@
 # W7b2-9 (#899, Windows #949): the kept-file alert for Show on Front Page
 
-**contracts/ changed:** `class-planning.json` → `todaysClassOnTheFrontPage.keptOnWindows` (new) and that section's `fill` sentence (its Windows clause). The Mac gate comes back. No `mac-app/` change.
+**contracts/ changed:** `class-planning.json` → `todaysClassOnTheFrontPage.keptOnWindows` (new), `plainWordsExceptions` (new, review 1), `plainWordsCheck` (one sentence added) and the Windows clause of `fill`; `contracts/README.md`'s `todaysClassOnTheFrontPage` row (review 1). The Mac gate comes back. No `mac-app/` change.
 
 Branch `issue/899-w7b2-9-kept-file-alert`, from `origin/issue/899-w7b2-6-todays-class` 43fd9af96 (reviewed CLEAN). It merges together with W7b2-6. `origin/dev` 0a0fbe267 was merged in first, in a0c2567f1. That merge had conflicts in two notes files (`899-w7b2-5-start-of-year.md` and `899-w7b2-11-w7b1-small-lows.md`): `dev`'s fold removed their "For PROGRESS" and "For documentation 12" sections, and W7b2-6 had edited those sections. I took the fold's removal and kept W7b2-6's edits everywhere else. It was merged again before hand-back: "Already up to date", so there is no second merge commit.
 
@@ -24,7 +24,7 @@ This copies the Mac's `FolderActions.showInFinder(files:)`: its plan and its ord
 
 The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C# and pinned against `wording` by `TheSentencesAreTheContracts`, the house pattern. The app reads no contract at runtime; the brief's "never from a C# literal" is met the same way every other sentence in this file meets it. The two Windows words are new keys beside `wording`, not inside it:
 
-- `keptOnWindows.hiddenItems`: "To see it in File Explorer, select View > Show, then select Hidden items."
+- `keptOnWindows.hiddenItems`: "To see it, open View in File Explorer and turn on Hidden items." (review 1, MEDIUM 2: the director's wording, true on Windows 10 and 11 alike, awaiting Russell's confirmation; it replaced the Windows 11 path "View > Show". After `kept`, which ends "… hidden, as “{kept}”.", it reads well: "… as “.index.md.plantoir-undo-1-apply-orig”. To see it, open View in File Explorer and turn on Hidden items.")
 - `keptOnWindows.showKept`: "Open Folder". It is also pinned equal to `shared-rules.json` → `workingFolderPathBar`'s open action `windowsLabel`.
 - **Why beside `wording`:** the Mac's `TodaysClassOnTheFrontPageTests.testTheWordingIsTheContracts` compares the WHOLE `wording` dictionary with its own (`XCTAssertEqual(ours, wording)`). A Windows key inside it would turn the Mac red, and this piece may not change `mac-app/`. The section's `fill` sentence said Windows' button "reads 'Show in File Explorer' … to be measured". That clause is now untrue, and it was rewritten to point at `keptOnWindows`.
 - **`contracts/README.md`:** `class-planning.json` is one of the eight AUTHORED files. The README's opening paragraph names the five generated files, and `class-planning.json` is not among them. Nothing was parked.
@@ -45,6 +45,15 @@ The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C
   - Button titles: "Aim for a one- or two-word title that describes the result of selecting the button": Open Folder.
 - **The Mac's alert** (`SectionDetailView.swift` about 1110 and 2130, `FrontPageWording.swift` 45 to 90, `FolderActions.swift` 25 to 110) has the title `keptTitle`, the message `kept`, OK as `.defaultAction`, and then Show in Finder. A gone file gets an `NSAlert` whose messageText is `keptGone`, with OK, and Finder then selects only what is still there. Windows copies that order and opens the folder instead of selecting the file, by ruling (a).
 - **A plain-words note for the director:** `plainWordsCheck` keeps "file" out of the sentences. The hidden-items sentence says "File Explorer", which is the name of Windows' program, and the new key's `why` says so. It lives outside `wording`, so no check reads it today.
+
+## Review 1 (2026-11-25): 2 MEDIUM and 4 LOW, all fixed at c00d4b852
+
+- **MEDIUM 1, fixed.** The alert is now plain data in Core: `TodaysClassOnTheFrontPage.AlertDescription(Title, Message, ActionButton, CloseButton, Default)` and `KeptAlert(Shows, KeptOriginals)`, built by `KeptAlertFor(offer, kept)`, with `PressedAsync(pressed, show, openFolder)` and `GoneAlert(sentences)`. The section window only renders a description (`ShowAlertAsync`, the one `new ContentDialog` for both alerts, so the census is 16) and wires the press in two lines. Tests: `TheKeptAlertIsTitledWithTheClassNowShownWithOkTheDefaultAndTheClose` (record equality against the contract's words), `TheGoneAlertSaysItsSentenceWithOkAlone`, `OnlyOpenFolderOpensAndAGoneFileShowsTheGoneAlert` (OK, Escape and never-shown open nothing; Open Folder opens the folder; gone shows the gone alert), and `TheSectionWindowOnlyRendersTheKeptAlertsDescription`, which pins each rendering and wiring line whole, once. That last one replaces the loose source test. Each of the review's five slips has a must-fail row (7 to 11), plus two in the view (12, 13).
+- **MEDIUM 2, built as the director gave it:** see `keptOnWindows.hiddenItems` above; under "For the director" as awaiting Russell.
+- **LOW 1, fixed.** `plainWordsExceptions` lists "File Explorer", with where it is and why, following `userFacingLabelWords.exceptions`' shape; `plainWordsCheck` says a listed name is taken out before checking. `NoKeptAlertSentenceSaysATechnicalWord` checks the filled kept-alert sentences against the mac's T3 word list (must-fail 15).
+- **LOW 2, fixed.** `contracts/README.md`'s row names `keptOnWindows` and `plainWordsExceptions`.
+- **LOW 3, fixed.** `ReDateTests.ATimetableWindowsRefusesSaysWindowsWordsAfterTheCurlyApostrophe` (must-fail 14).
+- **LOW 4, noted.** Tests-first still rests on the must-fail rows; with M1 fixed, each of them reads the alert's real make-up.
 
 ## For PROGRESS
 
@@ -79,6 +88,9 @@ All on Windows VM A, under `vm-tools/runs/VM.lock` (`winvm.sh lock w7b2-9`; the 
 - **Tests first:** the tests were written before the product, but no separate red run was made before the product went in. The red evidence is the must-fail rows, one per behaviour, each RED against its own test.
 - **UI check:** no `Plantoir.UiTests` class drives Show on Front Page (`git grep` for "Show on Front Page", `TodaysClassOnTheFrontPage` and `ShowTodaysClass` there finds nothing), so no `[UiFact]` was added and there is no screenshot. The part-way stop cannot be reached from the window without a seam, which the UI harness does not have.
 
+- **e. c00d4b852 (review 1), classes.** Both builds 0 errors; **356 of 356 passed.**
+- **f. c00d4b852, must-fail: 15 RED of 15**; restored, 0 changed files, 356 of 356.
+
 ## Riding lows
 
 - **W7b2-6 review 1 L1, fixed.** `TimetableMemory.cs` 331 to 332 and `TimetableTests.cs` 788: `'` became `’`, and no other character changed. Must-fail 5.
@@ -105,11 +117,12 @@ Nothing of this alert.
    - (a) Keep it. **Recommended:** the plan is recomputed from disk and holds what is still to do, with a fresh code.
    - (b) Answer the sentence alone, as for Changed.
 4. **Documentation 12 and PROGRESS corrections** that the fold did not carry: the `writeFailed` "in no contract" clause, and the straight apostrophe in the quoted held-timetable sentence (see "For documentation 12").
-5. **The Mac gate comes back** for the `class-planning.json` change. The Mac's tests read `wording` (unchanged) and the section keys it lists (unchanged), so I expect the Mac to stay green, but the gate has not run on this change.
+5. **Awaiting Russell's confirmation: the hidden-items sentence**, "To see it, open View in File Explorer and turn on Hidden items." (the director's wording, review 1 MEDIUM 2), built as given.
+6. **The Mac gate comes back** for the `class-planning.json` change. The Mac's tests read `wording` (unchanged) and the section keys it lists (unchanged), so I expect the Mac to stay green, but the gate has not run on this change.
 
 ## Self-check
 
-1. Broke each fix and watched its test fail: must-fail 6 RED of 6 (run d for row 5).
+1. Broke each fix and watched its test fail: must-fail 15 RED of 15 (run f).
 2. No timed waits in the product or the tests. The VM waits are `winvm.sh`'s own.
 3. Every sentence is true. The alert says the page now shows the class, that what it held is kept hidden under its name, and how to see hidden items. Open Folder opens the folder (tested). A gone file says `keptGone` and nothing opens (tested).
 4. `dev` 0a0fbe267 was merged before proving (a0c2567f1) and fetched again before hand-back: up to date.
@@ -122,3 +135,5 @@ Nothing of this alert.
 11. The guidance was read today: both Microsoft pages and the HIG's Alerts, with URLs above.
 12. No invisible control. Both buttons are visible ContentDialog buttons, and there is no key catcher. Escape is WinUI's own Close.
 13. The file is still hidden. Nothing clears its attribute, and `OpenFolderOpens…` asserts the Hidden attribute on Windows.
+
+Must-fail rows 7 to 15 (review 1), all RED in run f, each against its own test: 7 Open Folder made the default; 8 OK removed; 9 OK opening the folder; 10 the gone alert drops its sentence; 11 `offer.Shows` in the title; 12 the view maps the default the wrong way round; 13 the view never shows the gone alert; 14 the Windows-said apostrophe straight; 15 the hidden-items sentence says "file". Row 2 now sabotages the press line `ShowAlertAsync, FolderActions.OpenFolder);`.
