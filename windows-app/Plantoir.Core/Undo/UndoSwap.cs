@@ -347,8 +347,9 @@ internal static class UndoSwap
         // moves, found by the one comparison (UndoOp.PartInside): their
         // handles let go (Windows will not rename a folder with a file open
         // below it), and each named, relative to the place, to be left out
-        // of the move's last look. Never another swap's or step's files
-        // (piece 3 judges those at the plan). #899 W8-2b.
+        // of the move's last look. What the step's EARLIER swaps left is
+        // added at the forward call (StepsOwnFilesInside, W8-3); never
+        // another step's files. #899 W8-2b.
         Dictionary<string, UndoCurrent> LetGoOwnFilesInside(string place)
         {
             var leftOut = new Dictionary<string, UndoCurrent>(StringComparer.Ordinal);
