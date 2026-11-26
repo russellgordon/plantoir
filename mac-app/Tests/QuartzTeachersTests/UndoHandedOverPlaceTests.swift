@@ -30,6 +30,7 @@ final class UndoHandedOverPlaceTests: XCTestCase {
 
     override func tearDownWithError() throws {
         UndoKillPoints.fileInUseAtSwap = nil
+        UndoKillPoints.hook = nil
         try? FileManager.default.removeItem(at: parent)
         try? FileManager.default.removeItem(at: outside)
     }
@@ -242,7 +243,197 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         XCTAssertEqual(try folderNow(laid.root), after)
     }
 
+    // MARK: - Recovery's judgement (door-3)
+
+    /// Shape A's table: each disk state, made by hand.
+    func testRecoveryJudgesShapeAsPairTogether() throws {
+        let laid: LaidStep = try layShapeA(leadingOut: false)
+        let day3: String = section + "Unit 1, Day 3.md"
+        let day4: String = section + "Unit 1, Day 4.md"
+        let move: String = day3 + " → " + day4
+        // Link at P, Q free: all before.
+        XCTAssertEqual(try judged(laid), [move: .before, day3: .before])
+        // P free, link at Q: part way.
+        try FileManager.default.moveItem(at: laid.root.appendingPathComponent(day3), to: laid.root.appendingPathComponent(day4))
+        XCTAssertEqual(try judged(laid), [move: .after, day3: .before])
+        // New at P, link at Q: all after.
+        try UndoContractReplay.write("New.\n", to: day3, in: laid.root)
+        XCTAssertEqual(try judged(laid), [move: .after, day3: .after])
+        // Something else at P, link at Q: both in the way.
+        try UndoContractReplay.write("Someone else's.\n", to: day3, in: laid.root)
+        XCTAssertEqual(try judged(laid), [move: .neither, day3: .neither])
+    }
+
+    /// Shape B's table, at Day 3: the removal and the link's move into it.
+    func testRecoveryJudgesShapeBsPairTogether() throws {
+        let laid: LaidStep = try layShapeB(leadingOut: false)
+        let day2: String = section + "Unit 1, Day 2.md"
+        let day3: String = section + "Unit 1, Day 3.md"
+        let move: String = day2 + " → " + day3
+        // Three at P, link at Day 2: all before.
+        var states: [String: UndoOpState] = try judged(laid)
+        XCTAssertEqual(states[day3], .before)
+        XCTAssertEqual(states[move], .before)
+        // P free, link at Day 2: part way.
+        try FileManager.default.removeItem(at: laid.root.appendingPathComponent(day3))
+        states = try judged(laid)
+        XCTAssertEqual(states[day3], .after)
+        XCTAssertEqual(states[move], .before)
+        // Link at P, Day 2 free: all after.
+        try FileManager.default.moveItem(at: laid.root.appendingPathComponent(day2), to: laid.root.appendingPathComponent(day3))
+        states = try judged(laid)
+        XCTAssertEqual(states[day3], .after)
+        XCTAssertEqual(states[move], .after)
+        // A link at P with another target: both in the way.
+        try FileManager.default.removeItem(at: laid.root.appendingPathComponent(day3))
+        try layLink(day3, leadingTo: try layLibraryPage("Other.md", text: "Other.\n", root: laid.root), root: laid.root)
+        states = try judged(laid)
+        XCTAssertEqual(states[day3], .neither)
+        XCTAssertEqual(states[move], .neither)
+    }
+
+    /// Shape C's first and third rows: the first link's move away from Day
+    /// 3 and the second link's move into it.
+    func testRecoveryJudgesShapeCsPairTogether() throws {
+        let laid: LaidStep = try layShapeC(leadingOut: false)
+        let day2: String = section + "Unit 1, Day 2.md"
+        let day3: String = section + "Unit 1, Day 3.md"
+        let day4: String = section + "Unit 1, Day 4.md"
+        let first: String = day3 + " → " + day4
+        let second: String = day2 + " → " + day3
+        var states: [String: UndoOpState] = try judged(laid)
+        XCTAssertEqual(states[first], .before)
+        XCTAssertEqual(states[second], .before)
+        try FileManager.default.moveItem(at: laid.root.appendingPathComponent(day3), to: laid.root.appendingPathComponent(day4))
+        try FileManager.default.moveItem(at: laid.root.appendingPathComponent(day2), to: laid.root.appendingPathComponent(day3))
+        states = try judged(laid)
+        XCTAssertEqual(states[first], .after)
+        XCTAssertEqual(states[second], .after)
+    }
+
+    /// Each shape stopped before every swap in turn, going forward and
+    /// going back: all before, part way or all after, never in the way.
+    func testAStepStoppedAtAnySwapIsNeverInTheWay() throws {
+        let shapes: [String] = ["A", "B", "C"]
+        for shape in shapes {
+            for direction in [UndoDirection.forward, UndoDirection.backward] {
+                var index: Int = 0
+                var stopped: Bool = true
+                while stopped {
+                    let laid: LaidStep = try lay(shape)
+                    if direction == .backward {
+                        try makeItForward(laid)
+                    }
+                    let targets: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: direction, root: laid.root, journal: laid.journal))
+                    let stopAt: Int = index
+                    UndoKillPoints.hook = { point in
+                        point == .beforeSwap(stopAt)
+                    }
+                    let result: UndoSwapResult = UndoSwap.swap(targets, label: "1-test", root: laid.root)
+                    UndoKillPoints.hook = nil
+                    stopped = result == .stoppedByATest
+                    let census: (before: Int, after: Int, neither: Int) = UndoRecovery.census(of: step(laid.ops), root: laid.root)
+                    XCTAssertEqual(census.neither, 0, "shape \(shape) \(direction) stopped before swap \(index)")
+                    if stopped && index > 0 {
+                        XCTAssertGreaterThan(census.before, 0, "shape \(shape) \(direction) at \(index)")
+                        XCTAssertGreaterThan(census.after, 0, "shape \(shape) \(direction) at \(index)")
+                    }
+                    index += 1
+                }
+                XCTAssertGreaterThanOrEqual(index, 3, "shape \(shape) has at least two swaps")
+            }
+        }
+    }
+
+    /// Door-1's place filled since the link left: the swap left the link
+    /// at Day 4 and someone's file at Day 3. Recovery finds both in the way,
+    /// so neither is put back over the other and nothing is lost.
+    func testAPlaceFilledSinceTheLinkLeftIsInTheWayForRecovery() throws {
+        let laid: LaidStep = try layShapeA(leadingOut: false)
+        let targets: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: .forward, root: laid.root, journal: laid.journal))
+        let intruder: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 3.md")
+        UndoKillPoints.fileInUseAtSwap = { index in
+            if index == 1 {
+                try? Data("Someone else's.\n".utf8).write(to: intruder)
+            }
+            return false
+        }
+        _ = UndoSwap.swap(targets, label: "1-apply", root: laid.root)
+        UndoKillPoints.fileInUseAtSwap = nil
+        let census: (before: Int, after: Int, neither: Int) = UndoRecovery.census(of: step(laid.ops), root: laid.root)
+        XCTAssertEqual(census.neither, 2)
+    }
+
+    /// Shape A made and taken back, its new page kept beside Day 3 as the
+    /// swap keeps an original: the list holds it, judged with the link's
+    /// move that hands Day 3 over.
+    func testTheListHoldsAKeptOriginalAtAHandedOverPlace() throws {
+        let laid: LaidStep = try layShapeA(leadingOut: false)
+        try makeItForward(laid)
+        let back: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: .backward, root: laid.root, journal: laid.journal))
+        XCTAssertEqual(UndoSwap.swap(back, label: "1-undo", root: laid.root), .swapped)
+        let place: URL = laid.root.appendingPathComponent(section + "Unit 1, Day 3.md")
+        let kept: URL = laid.root.appendingPathComponent(section + ".Unit 1, Day 3.md-kept-by-test")
+        try Data("New.\n".utf8).write(to: kept)
+        XCTAssertTrue(UndoRecovery.listHolds(step(laid.ops), root: laid.root, from: laid.journal)(kept, place))
+    }
+
+    /// Inertness: a readable U4b step (a folder's move carrying an edit, a
+    /// file's move, a page outside) is judged by place as it always was.
+    func testAReadableStepIsJudgedAsToday() throws {
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "readable-states")
+        let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+        let root: URL = place.root
+        try UndoContractReplay.write("Inside.\n", to: "courses/TST1O/Old/a.md", in: root)
+        try UndoContractReplay.write("Outside.\n", to: "courses/TST1O/b.md", in: root)
+        try UndoContractReplay.write("Moved.\n", to: "courses/TST1O/c.md", in: root)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: root.appendingPathComponent("courses/TST1O/Old")).listingSha)
+        let ops: [UndoOp] = [
+            UndoOp.writeFile(path: "courses/TST1O/b.md", beforeSha: try store("Outside.\n", in: journal), afterSha: try store("Outside, relinked.\n", in: journal)),
+            UndoOp.moveFile(from: "courses/TST1O/c.md", to: "courses/TST1O/d.md", sha: UndoHash.sha256(of: Data("Moved.\n".utf8))),
+            UndoOp.moveFolder(from: "courses/TST1O/Old", to: "courses/TST1O/New", listingSha: listingSha),
+            UndoOp.writeFile(path: "courses/TST1O/New/a.md", beforeSha: try store("Inside.\n", in: journal), afterSha: try store("Inside, relinked.\n", in: journal)),
+        ]
+        var found: [String] = []
+        for file in UndoRecovery.fileStates(of: step(ops), root: root, journal: journal) {
+            found.append(file.path + " " + "\(file.state)")
+        }
+        XCTAssertEqual(found, [
+            "courses/TST1O/b.md before", "courses/TST1O/c.md before", "courses/TST1O/Old before", "courses/TST1O/New/a.md before",
+        ])
+    }
+
     // MARK: - Functions
+
+    /// An in-memory step holding these ops.
+    func step(_ ops: [UndoOp]) -> UndoStep {
+        return UndoStep(
+            seq: 1, madeAt: "2026-11-26T12:00:00Z",
+            action: UndoAction(key: "insertClass", arguments: [:]),
+            madeBy: "menu", workingFolder: nil, course: "TST1O", section: 1,
+            actionClass: "A", holds: "section", ops: ops
+        )
+    }
+
+    /// Recovery's judgement of a laid step, by place.
+    func judged(_ laid: LaidStep) throws -> [String: UndoOpState] {
+        var found: [String: UndoOpState] = [:]
+        for file in UndoRecovery.fileStates(of: step(laid.ops), root: laid.root, journal: laid.journal) {
+            XCTAssertNil(found[file.path], "one place judged twice: \(file.path)")
+            found[file.path] = file.state
+        }
+        return found
+    }
+
+    func lay(_ shape: String) throws -> LaidStep {
+        if shape == "A" {
+            return try layShapeA(leadingOut: false)
+        }
+        if shape == "B" {
+            return try layShapeB(leadingOut: false)
+        }
+        return try layShapeC(leadingOut: false)
+    }
 
     /// A step laid on disk as it stands before the step: its folder, its
     /// journal and its ops.

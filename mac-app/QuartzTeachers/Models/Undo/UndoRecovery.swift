@@ -283,13 +283,18 @@ nonisolated enum UndoRecovery {
             }
             let wanted: String = place.standardizedFileURL.path
             var opsOnThePlace: [UndoOp] = []
+            var indicesOnThePlace: [Int] = []
             let carriers: [String: UndoOp] = UndoCheck.carriers(in: step.ops)
-            for op in step.ops where op.knownKind != .recompute && !op.isWhole {
-                guard let path = op.path else {
+            var opIndex: Int = 0
+            for op in step.ops {
+                let index: Int = opIndex
+                opIndex += 1
+                guard op.knownKind != .recompute, !op.isWhole, let path = op.path else {
                     continue
                 }
                 if root.appendingPathComponent(path).standardizedFileURL.path == wanted {
                     opsOnThePlace.append(op)
+                    indicesOnThePlace.append(index)
                 } else if let carrier = carriers[path], let from = carrier.from, let to = carrier.to {
                     // A carried page whose folder has moved back (U4b): the
                     // same op, judged at its old place.
@@ -298,7 +303,39 @@ nonisolated enum UndoRecovery {
                         var atTheOldPlace: UndoOp = op
                         atTheOldPlace.path = oldPlace
                         opsOnThePlace.append(atTheOldPlace)
+                        indicesOnThePlace.append(index)
                     }
+                }
+            }
+            // U4b3 door-3: a page at a handed-over place is planned with the
+            // other op of its pair, in the step's order, so the plan judges
+            // the place as handed over (the write at a place a link leaves,
+            // judged alone against the link still there, is never ready).
+            var partners: [Int] = []
+            for handover in UndoCheck.handovers(in: step.ops) {
+                if indicesOnThePlace.contains(handover.leaverIndex) && !indicesOnThePlace.contains(handover.fillerIndex) {
+                    partners.append(handover.fillerIndex)
+                }
+                if indicesOnThePlace.contains(handover.fillerIndex) && !indicesOnThePlace.contains(handover.leaverIndex) {
+                    partners.append(handover.leaverIndex)
+                }
+            }
+            if !partners.isEmpty {
+                var together: [(index: Int, op: UndoOp)] = []
+                var position: Int = 0
+                while position < opsOnThePlace.count {
+                    together.append((index: indicesOnThePlace[position], op: opsOnThePlace[position]))
+                    position += 1
+                }
+                for partner in partners {
+                    together.append((index: partner, op: step.ops[partner]))
+                }
+                together.sort { first, second in
+                    first.index < second.index
+                }
+                opsOnThePlace = []
+                for entry in together {
+                    opsOnThePlace.append(entry.op)
                 }
             }
             if opsOnThePlace.isEmpty {
@@ -720,31 +757,108 @@ nonisolated enum UndoRecovery {
         for (_, carrier) in carriers where !carryingMoves.contains(carrier) {
             carryingMoves.append(carrier)
         }
-        for op in step.ops {
+        // Each page is read once, where it is now.
+        for op in step.ops where !op.isWhole {
+            guard let kind = op.knownKind, kind != .recompute, let path = op.path, items[path] == nil else {
+                continue
+            }
+            var readPath: String = path
+            if let carrier = carriers[path] {
+                readPath = UndoRecovery.placeNow(of: path, carriedBy: carrier, root: root)
+            }
+            items[path] = UndoItem.read(at: root.appendingPathComponent(readPath))
+        }
+        // U4b3 door-3: a handed-over place's two ops are judged together
+        // (`UndoCheck.handovers`, the one rule the plan uses too). The
+        // leaver is judged with the place free once its filler stands on
+        // its after side there; the filler with the place absent while its
+        // leaver still stands on its before side there. So a step stopped
+        // before, between or after the pair's swaps is all before, part
+        // way or all after; a place holding something neither op recorded
+        // leaves both `.neither`. Judged again until nothing changes, for
+        // a chain of places (two links in a row).
+        let handovers: [UndoHandover] = UndoCheck.handovers(in: step.ops)
+        var freeFrom: [Bool] = Array(repeating: false, count: step.ops.count)
+        var freeTo: [Bool] = Array(repeating: false, count: step.ops.count)
+        var absentHere: [Bool] = Array(repeating: false, count: step.ops.count)
+        func judge(_ index: Int) -> UndoOpState? {
+            let op: UndoOp = step.ops[index]
             if op.isWhole {
-                let place: String = op.placeName
+                if carryingMoves.contains(op) {
+                    return UndoRecovery.carryingMoveState(op, of: step, carriers: carriers, root: root, places: places, journal: journal)
+                }
+                return UndoCheck.wholeState(
+                    of: op, root: root, places: places,
+                    toIsHandedOver: freeTo[index], fromIsHandedOver: freeFrom[index]
+                )
+            }
+            guard let kind = op.knownKind, kind != .recompute, let path = op.path else {
+                return nil
+            }
+            if absentHere[index] {
+                return UndoCheck.state(of: op, in: .absent)
+            }
+            return UndoCheck.state(of: op, in: items[path] ?? .absent)
+        }
+        var opStates: [UndoOpState?] = []
+        var opIndex: Int = 0
+        while opIndex < step.ops.count {
+            opStates.append(judge(opIndex))
+            opIndex += 1
+        }
+        var round: Int = 0
+        while !handovers.isEmpty && round <= step.ops.count {
+            var changed: Bool = false
+            for handover in handovers {
+                let leaver: Int = handover.leaverIndex
+                let filler: Int = handover.fillerIndex
+                if opStates[filler] == .after && !freeFrom[leaver] && !absentHere[leaver] {
+                    if step.ops[leaver].isWhole {
+                        freeFrom[leaver] = true
+                    } else {
+                        absentHere[leaver] = true
+                    }
+                    opStates[leaver] = judge(leaver)
+                    changed = true
+                }
+                if opStates[leaver] == .before && !freeTo[filler] && !absentHere[filler] {
+                    if step.ops[filler].isWhole {
+                        freeTo[filler] = true
+                    } else {
+                        absentHere[filler] = true
+                    }
+                    opStates[filler] = judge(filler)
+                    changed = true
+                }
+            }
+            if !changed {
+                break
+            }
+            round += 1
+        }
+        let movesHandingOver: Set<Int> = UndoRecovery.movesHandingOver(handovers, in: step.ops)
+        var pathsSeen: Set<String> = []
+        opIndex = 0
+        while opIndex < step.ops.count {
+            let op: UndoOp = step.ops[opIndex]
+            let judged: UndoOpState? = opStates[opIndex]
+            let index: Int = opIndex
+            opIndex += 1
+            if op.isWhole {
+                let place: String = UndoRecovery.placeJudged(of: op, at: index, movesHandingOver: movesHandingOver)
                 if states[place] == nil {
                     order.append(place)
                 }
-                if carryingMoves.contains(op) {
-                    states[place] = UndoRecovery.carryingMoveState(op, of: step, carriers: carriers, root: root, places: places, journal: journal)
-                } else {
-                    states[place] = UndoCheck.wholeState(of: op, root: root, places: places)
-                }
+                states[place] = judged ?? .neither
                 continue
             }
-            guard let kind = op.knownKind, kind != .recompute, let path = op.path else {
+            guard let state = judged, let path = op.path else {
                 continue
             }
-            if items[path] == nil {
-                var readPath: String = path
-                if let carrier = carriers[path] {
-                    readPath = UndoRecovery.placeNow(of: path, carriedBy: carrier, root: root)
-                }
-                items[path] = UndoItem.read(at: root.appendingPathComponent(readPath))
+            if !pathsSeen.contains(path) {
+                pathsSeen.insert(path)
                 order.append(path)
             }
-            let state: UndoOpState = UndoCheck.state(of: op, in: items[path] ?? .absent)
             if let earlier = states[path] {
                 if earlier == .cannotTell || state == .cannotTell {
                     states[path] = .cannotTell
@@ -760,6 +874,33 @@ nonisolated enum UndoRecovery {
             result.append((path: path, state: states[path] ?? .neither))
         }
         return result
+    }
+
+    /// U4b3 door-3: the step's moves that leave or fill a handed-over
+    /// place, by their index in the step.
+    static func movesHandingOver(_ handovers: [UndoHandover], in ops: [UndoOp]) -> Set<Int> {
+        var found: Set<Int> = []
+        for handover in handovers {
+            if ops[handover.leaverIndex].isWhole {
+                found.insert(handover.leaverIndex)
+            }
+            if ops[handover.fillerIndex].isWhole {
+                found.insert(handover.fillerIndex)
+            }
+        }
+        return found
+    }
+
+    /// The name `fileStates` judges a whole op under: its `placeName`, but
+    /// for a move that hands a place over, its two places ("from → to"),
+    /// since its `from` (its `placeName`) is the path of the file op it
+    /// shares the place with, and the two are judged apart (U4b3 door-3).
+    /// `settle` picks the ops to put back by the same name.
+    static func placeJudged(of op: UndoOp, at index: Int, movesHandingOver: Set<Int>) -> String {
+        if movesHandingOver.contains(index), let from = op.from, let to = op.to {
+            return from + " → " + to
+        }
+        return op.placeName
     }
 
     /// Whether the folder (or file) a move carries edits with is at its old
@@ -1007,10 +1148,16 @@ nonisolated enum UndoRecovery {
             var putBack: Int = 0
             if mode == .live && !endPaths.isEmpty {
                 var opsToPutBack: [UndoOp] = []
+                let movesHandingOver: Set<Int> = UndoRecovery.movesHandingOver(UndoCheck.handovers(in: step.ops), in: step.ops)
+                var opIndex: Int = 0
                 for op in step.ops {
-                    if op.knownKind != .recompute && endPaths.contains(op.placeName) {
+                    let place: String = op.isWhole
+                        ? UndoRecovery.placeJudged(of: op, at: opIndex, movesHandingOver: movesHandingOver)
+                        : op.placeName
+                    if op.knownKind != .recompute && endPaths.contains(place) {
                         opsToPutBack.append(op)
                     }
+                    opIndex += 1
                 }
                 let back: UndoDirection = startedFromBefore ? .backward : .forward
                 // Content the list no longer holds is taken from the step's
