@@ -392,9 +392,9 @@ def is_blob_name(name):
 
 
 def overlap(first, second):
-    """Without regard to case: one place on a case-insensitive volume."""
-    first, second = first.lower(), second.lower()
-    return first == second or first.startswith(second + "/") or second.startswith(first + "/")
+    """Without regard to case: one place on a case-insensitive volume, by
+    the model's one comparison (U4b2-9)."""
+    return traces.places_overlap(first, second)
 
 
 def readable_op(op):
@@ -573,7 +573,13 @@ class ContractCaseTests(unittest.TestCase):
                     # No check (opKinds.recompute): re-derived, never compared.
                     state = "after"
                 elif kind in ("move", "moveApart", "setAside"):
-                    state = traces.move_state(op, current["atFrom"], current["atTo"])
+                    at_to = current["atTo"]
+                    if current.get("listedAs") not in (None, op["from"], op["to"]):
+                        # U4b2-9: listed under a third spelling. The model's
+                        # pages are keyed as spelled (is_case_only_move), so
+                        # that spelling is a third place and `to` is free.
+                        at_to = {"absent": True}
+                    state = traces.move_state(op, current["atFrom"], at_to)
                 elif kind in ("createTree", "removeTree"):
                     state = traces.tree_state(op, current)
                 elif kind == "external":

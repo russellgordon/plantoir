@@ -555,8 +555,14 @@ nonisolated enum UndoContractReplay {
                 }
                 if let to = string(given["to"]), UndoOp.isSafeRelativePath(to), to != string(given["from"]),
                    let side = current["atTo"] as? [String: Any] {
+                    // U4b2-9: `listedAs`, a third spelling the folder lists
+                    // the item under, neither from nor to.
+                    var spelling: String = to
+                    if let listedAs = string(current["listedAs"]), UndoOp.isSafeRelativePath(listedAs) {
+                        spelling = listedAs
+                    }
                     if FileManager.default.fileExists(atPath: place.root.appendingPathComponent(to).path) == false {
-                        try self.place(side, at: place.root.appendingPathComponent(to))
+                        try self.place(side, at: place.root.appendingPathComponent(spelling))
                     }
                 }
             } else if kind != "external" {

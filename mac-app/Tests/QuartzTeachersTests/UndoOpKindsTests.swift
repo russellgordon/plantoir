@@ -92,6 +92,70 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertNil(PlantoirDefaults.shared.object(forKey: key), "the app's own store is never touched")
     }
 
+    /// U4b2-9 (the part-two review of U4b, LOW 2): an edit spelled with
+    /// other capitals than the move's `to` (`Renamed/a.md` under a move to
+    /// `renamed`) is carried by the move, and the swap that takes it back
+    /// leaves the edit's own kept files out of the move's pair and follows
+    /// them when the folder moves, by the same comparison
+    /// (`UndoOp.partInside`). The Undo of an untouched step goes back and
+    /// leaves nothing of its own behind; so does the Redo. FAILED before the
+    /// one comparison, when `ownFilesInside` and `followTheMove` compared
+    /// paths as spelled.
+    func testAnEditSpelledWithOtherCapitalsUnderACarryingMoveIsUndoneAndRedone() throws {
+        let root: URL = scratchURL.appendingPathComponent("folder", isDirectory: true)
+        let journal: UndoJournal = UndoJournal(folderURL: scratchURL.appendingPathComponent("undo", isDirectory: true))
+        let places: UndoMemoryPlaces = UndoMemoryPlaces()
+        let oldFolder: String = "courses/TST1O/media"
+        let newFolder: String = "courses/TST1O/renamed"
+        try UndoContractReplay.write("Intro.\nLine one: old.\nEnd.\n", to: oldFolder + "/a.md", in: root)
+        try UndoContractReplay.write("B\n", to: oldFolder + "/b.md", in: root)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: root.appendingPathComponent(oldFolder)).listingSha)
+        let move: UndoOp = UndoOp.moveFolder(from: oldFolder, to: newFolder, listingSha: listingSha)
+        let edit: UndoOp = UndoOp.replaceText(
+            path: "courses/TST1O/Renamed/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+        )
+        XCTAssertTrue(UndoOp.moveCarries(move, edit), "the move carries the edit, compared without regard to case")
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [move, edit], blobs: [], root: root, action: "renameFolder")
+        XCTAssertEqual(JournaledWrite.perform(ops: draft, in: journal, mode: .live, places: places), .applied(seq: 1))
+        let movedPage: URL = root.appendingPathComponent(newFolder + "/a.md")
+        XCTAssertEqual(try String(contentsOf: movedPage, encoding: .utf8), "Intro.\nLine one: new.\nEnd.\n")
+
+        XCTAssertEqual(journal.undoNewest(places: places), .undone(seq: 1))
+        let pageBack: URL = root.appendingPathComponent(oldFolder + "/a.md")
+        XCTAssertEqual(try String(contentsOf: pageBack, encoding: .utf8), "Intro.\nLine one: old.\nEnd.\n")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(newFolder).path))
+        XCTAssertEqual(namesLeftBySwaps(under: root), [], "the Undo leaves nothing of its own")
+
+        XCTAssertEqual(journal.redoNewest(places: places), .redone(seq: 1))
+        XCTAssertEqual(try String(contentsOf: movedPage, encoding: .utf8), "Intro.\nLine one: new.\nEnd.\n")
+        XCTAssertEqual(namesLeftBySwaps(under: root), [], "the Redo leaves nothing of its own")
+    }
+
+    /// The one comparison itself: part by part, without regard to case,
+    /// the rest spelled as the path spells it.
+    func testThePartInsideAPlaceIsFoundWithoutRegardToCase() {
+        XCTAssertEqual(UndoOp.partInside("courses/X/renamed", of: "courses/X/Renamed/a/b.md"), "a/b.md")
+        XCTAssertEqual(UndoOp.partInside("courses/X/renamed", of: "courses/X/RENAMED"), "")
+        XCTAssertNil(UndoOp.partInside("courses/X/renamed", of: "courses/X/renamedToo/a.md"))
+        XCTAssertNil(UndoOp.partInside("courses/X/renamed", of: "courses/X"))
+        XCTAssertEqual(UndoOp.partInside("/tmp/w/Media", of: "/tmp/w/media/.plantoir-undo-1-x"), ".plantoir-undo-1-x")
+    }
+
+    /// Every name a swap leaves beside a page (`UndoSwap.stagedMarker`)
+    /// anywhere under `root`.
+    func namesLeftBySwaps(under root: URL) -> [String] {
+        var found: [String] = []
+        guard let walker = FileManager.default.enumerator(atPath: root.path) else {
+            return found
+        }
+        while let inside = walker.nextObject() as? String {
+            if (inside as NSString).lastPathComponent.contains(UndoSwap.stagedMarker) {
+                found.append(inside)
+            }
+        }
+        return found
+    }
+
     /// A move is one rename that never replaces: with something already at
     /// the destination it refuses and both stay as they were.
     func testAMoveNeverReplacesWhatIsAtItsDestination() throws {

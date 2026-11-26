@@ -1141,7 +1141,7 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             read_path = path
             carrier = carriers.get(path)
             if carrier is not None and carrier["to"] in moving_now:
-                read_path = carrier["from"] + path[len(carrier["to"]):]
+                read_path = place_before_the_move(path, carrier)
             original[path] = pages_by_path.get(read_path)
             working[path] = original[path]
         state = op_state(op, working[path])
@@ -1198,20 +1198,49 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
 EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
 
 
+def part_inside(place, path):
+    """UndoOp.partInside (U4b2-9): the part of `path` inside `place`,
+    spelled as `path` spells it ("" for the place itself), or None when it
+    is neither the place nor inside it. Part by part, without regard to
+    case: the ONE comparison for "at or inside" (places overlapping, a
+    move carrying an edit, a carried page's place before the move)."""
+    place_parts, path_parts = place.split("/"), path.split("/")
+    if len(path_parts) < len(place_parts):
+        return None
+    for mine, theirs in zip(place_parts, path_parts):
+        if mine.lower() != theirs.lower():
+            return None
+    return "/".join(path_parts[len(place_parts):])
+
+
+def places_overlap(first, second):
+    """UndoOp.placesOverlap: the same place, or one a folder holding the
+    other, by part_inside."""
+    return part_inside(first, second) is not None or part_inside(second, first) is not None
+
+
+def place_before_the_move(path, move):
+    """UndoOp.placeBeforeTheMove: a path inside a move's `to`, at the same
+    place under its `from`."""
+    inside = part_inside(move["to"], path)
+    if inside is None:
+        return path
+    return move["from"] + "/" + inside if inside else move["from"]
+
+
 def move_carries(move, edit):
     """UndoOp.moveCarries: an edit of the file a move moved, or of a file
     inside the folder it moved, named at the new place and nothing inside
-    the old one (U4b, opKinds.wholeOps). Compared without regard to case."""
+    the old one (U4b, opKinds.wholeOps). At or inside `to` is part_inside,
+    without regard to case (U4b2-9)."""
     if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
         return False
-    place, new_place = edit["path"].lower(), move["to"].lower()
-    if place != new_place and not place.startswith(new_place + "/"):
+    if part_inside(move["to"], edit["path"]) is None:
         return False
     if is_case_only_move(move):
         # One place under two spellings: named at the new one, as spelled.
         return edit["path"] != move["from"] and not edit["path"].startswith(move["from"] + "/")
-    old_place = move["from"].lower()
-    return not (place == old_place or place.startswith(old_place + "/") or old_place.startswith(place + "/"))
+    return not places_overlap(move["from"], edit["path"])
 
 
 def is_case_only_move(op):
@@ -1311,7 +1340,7 @@ def recovery_states(ops, pages):
                 for path, carrier in carriers.items():
                     if carrier is not op:
                         continue
-                    side = carrier["from"] + path[len(carrier["to"]):] if old_place else path
+                    side = place_before_the_move(path, carrier) if old_place else path
                     edits = [dict(edit, path=side) for edit in ops if edit.get("path") == path]
                     taken_back = plan(edits, True, seen)
                     if taken_back[0] == "ready" and side in taken_back[1]:
@@ -1322,7 +1351,7 @@ def recovery_states(ops, pages):
         read_path = path
         carrier = carriers.get(path)
         if carrier is not None and move_is_at_its_old_place(carrier, pages):
-            read_path = carrier["from"] + path[len(carrier["to"]):]
+            read_path = place_before_the_move(path, carrier)
         state = op_state(op, pages.get(read_path))
         earlier = states.get(path)
         states[path] = state if earlier in (None, state) else "neither"

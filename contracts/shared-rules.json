@@ -50133,7 +50133,37 @@
         "redo": "canRedo"
       },
       {
-        "name": "move between two names that differ only in case, in the last part: the folder lists it as `to`, holding something else: changed since",
+        "name": "move of a folder between two names that differ only in case, in the last part: the folder lists it as `to`, holding the content: as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/Media",
+          "to": "courses/TST1O/media",
+          "listing": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "tree": {
+              "folders": [],
+              "files": {
+                "a.md": "A\n"
+              }
+            }
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "U4b2-9 (the part-two review of U4b, LOW 1): the rename a teacher makes is of a folder, judged by its listing at the spelling the folder lists; without that rule both spellings read the one folder and the answer would be changed since. It replaces the row 'the folder lists it as `to`, holding something else: changed since', which gave changed since with the rule or without it, as the pair rule gives for any move whose copy changed ('move: the moved copy changed since')."
+      },
+      {
+        "name": "move between two names that differ only in case, in the last part: the folder lists it under a third spelling, holding the content: changed since",
         "op": {
           "kind": "move",
           "from": "courses/TST1O/m/a.json",
@@ -50145,11 +50175,13 @@
             "absent": true
           },
           "atTo": {
-            "text": "{\"site_id\": \"zzz-999\"}\n"
-          }
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "listedAs": "courses/TST1O/m/a.JSON"
         },
         "undo": "changedSince",
-        "redo": "changedSince"
+        "redo": "changedSince",
+        "why": "U4b2-9: renamed by hand since to a spelling that is neither of the move's; the content is the step's, but the folder lists neither `from` nor `to`, so the move is neither as the step left it nor as before. Neither spelling may stand for a third one: read as `from` it would be already back, read as `to` it could be undone."
       },
       {
         "name": "move between two names that differ in case in a folder above the last part: not readable",
@@ -50562,7 +50594,7 @@
         "why": "The mac's verdict, measured through its own reader (JSONSerialization) on macOS 26.7.3, 2026-11-20 (#899 W6 review 2)."
       }
     ],
-    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. Places, and the places two ops name, are compared without regard to case.",
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those; listedAs (U4b2-9, a capitalisation-only move only) is a third spelling of the same place, neither from nor to, that the folder lists the item under: what atTo describes is made at that spelling instead (on a case-insensitive volume one item under a spelling that is neither side's; on a case-sensitive one a third place, so both sides are free). For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText). A place may also be a link (link: its target), and a tree may hold links (links: {path: target}); a link is never followed. Places, and the places two ops name, are compared without regard to case, part by part, and so is whether an edit is at or inside a move's `to` (U4b2-9: one comparison for both).",
     "listingCases": [
       {
         "name": "an empty folder: an empty listing",

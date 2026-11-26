@@ -305,8 +305,7 @@ nonisolated enum UndoCheck {
                         }
                     }
                     for (path, carrier) in carriers where carrier == op {
-                        if direction == .backward, let item = working[path] {
-                            let inside: String = path.count == to.count ? "" : String(path.dropFirst(to.count + 1))
+                        if direction == .backward, let item = working[path], let inside = UndoOp.partInside(to, of: path) {
                             overridingTo[inside] = item
                             if op.isCaseOnlyMove {
                                 overridingFrom[inside] = item
@@ -891,10 +890,11 @@ nonisolated enum UndoSwap {
         /// a move's pair is judged without them (U4b).
         func ownFilesInside(_ folder: URL) -> [String: UndoItem] {
             var found: [String: UndoItem] = [:]
-            let prefix: String = folder.path + "/"
             for url in staged + originals {
-                if let url, url.path.hasPrefix(prefix) {
-                    found[String(url.path.dropFirst(prefix.count))] = .absent
+                // Inside as `moveCarries` judges it (`UndoOp.partInside`,
+                // without regard to case: U4b2-9).
+                if let url, let inside = UndoOp.partInside(folder.path, of: url.path), !inside.isEmpty {
+                    found[inside] = .absent
                 }
             }
             return found
@@ -903,18 +903,19 @@ nonisolated enum UndoSwap {
         /// After a folder moved from `old` to `new`: every staged file and
         /// kept original of this swap inside it is named at its new place.
         func followTheMove(from old: URL, to new: URL) {
-            let prefix: String = old.path + "/"
+            // Inside as `moveCarries` judges it (`UndoOp.partInside`,
+            // without regard to case: U4b2-9).
             var position: Int = 0
             while position < staged.count {
-                if let url = staged[position], url.path.hasPrefix(prefix) {
-                    staged[position] = URL(fileURLWithPath: new.path + "/" + String(url.path.dropFirst(prefix.count)))
+                if let url = staged[position], let inside = UndoOp.partInside(old.path, of: url.path), !inside.isEmpty {
+                    staged[position] = URL(fileURLWithPath: new.path + "/" + inside)
                 }
                 position += 1
             }
             position = 0
             while position < originals.count {
-                if let url = originals[position], url.path.hasPrefix(prefix) {
-                    originals[position] = URL(fileURLWithPath: new.path + "/" + String(url.path.dropFirst(prefix.count)))
+                if let url = originals[position], let inside = UndoOp.partInside(old.path, of: url.path), !inside.isEmpty {
+                    originals[position] = URL(fileURLWithPath: new.path + "/" + inside)
                 }
                 position += 1
             }
