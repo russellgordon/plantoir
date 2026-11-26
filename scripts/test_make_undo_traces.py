@@ -1066,6 +1066,22 @@ class ContractCaseTests(unittest.TestCase):
                 + traces.ops_for_change(self.LINKED_FILE, pages[self.LINKED_FILE], self.linked_redated())
                 + traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
                 + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
+        if call == "makeRoomWithALaterClassThatIsABrokenLink":
+            # Russell, 2026-11-26 ("Never refuse"): the same course with the
+            # file the link leads to taken away. The link is moved as itself
+            # to Day 4 and nothing is written for it or through it; Day 2's
+            # page is renamed into the place it left, the new class at Day 2.
+            if pages.get(self.linked_day(3)) is None and pages.get(self.linked_day(4)) is None:
+                for number in (1, 2):
+                    pages[self.linked_day(number)] = self.linked_text(number, number)
+                pages[self.linked_day(3)] = ("link", self.LINKED_TARGET)
+            pages.pop(self.LINKED_FILE, None)
+            two = pages.get(self.linked_day(2))
+            return self.vetted_ops_step(model,
+                [{"kind": "move", "from": self.linked_day(3), "to": self.linked_day(4),
+                  "linkSha": traces.sha(self.LINKED_TARGET)}]
+                + traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
+                + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
         if call == "makeRoomWithALaterClassLinkedToAnEarlierClass":
             # Review B of U4b3, MEDIUM 1: Day 3 a link to Day 1's own page,
             # another class page of the section: Insert Class refuses
@@ -1296,7 +1312,8 @@ class ContractCaseTests(unittest.TestCase):
                   "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
                   "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
                   "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
-                  "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass")
+                  "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
+                  "makeRoomWithALaterClassThatIsABrokenLink")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)

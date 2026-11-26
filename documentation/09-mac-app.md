@@ -23608,8 +23608,9 @@ option (a); `undo.rule.shadow`). The file the link leads to is never moved,
 renamed or removed, and never retitled ("Shared pages never have day 'x'
 titles in them", Russell, 2026-11-26): only the moved date is written into it,
 under the key the FILE's own place calls for (`created` inside this section's
-folder; `createdSection<N>` for this section only on a course-level page,
-every other date line left byte for byte; fix 4 of the review round), because
+folder; `createdSection<N>` for this section only for a file anywhere else, a
+course-level page, another section's folder or outside the course, every
+other date line left byte for byte; fix 4 of the review round), because
 a write planned at a link move's `to`, within the same folder, is
 planned at the file the link leads to (`JournaledStep.placeALinkLeadsTo`,
 this piece's first half), and the `[[link]]` rewrite reaches it the same way,
@@ -23620,11 +23621,21 @@ so two links in a row and a link below a plain class are one step too.
 target's `stat` (`isALinkToAFile`); a link to a folder, or one whose target
 cannot be read, is not renamed, as before. A later class whose link leads,
 through any number of links, to another class page of the same section
-(judged by device and inode, `firstLinkThatCannotBeMoved`), or a dangling
-later-class link, is refused before anything changes with the refusal given
-before this piece ("cannot tell now", said as the file that could not be
-saved): never skipped, nothing written through it (the review round's fixes 2
-and 3). Before
+(judged by device and inode, `firstLinkThatCannotBeMoved`) is refused before
+anything changes with the refusal given before this piece ("cannot tell
+now", said as the file that could not be saved; the review round's fix 2).
+A later class whose link leads NOWHERE is never refused (Russell, 2026-11-26:
+"Why would it refuse? Why does it care where a later class links to?", then
+"Never refuse"; this reverses the review round's fix 3): the link is moved as
+itself (`isALinkToNothing`), its text byte for byte, and nothing else is
+written for it, no date and never a write through it, so no file appears
+where it points, inside the working folder or outside it. The step finds the
+place the link leaves by its spelling, so the link's `from` is spelled from
+the same folder as its `to` (`spelledAsItsNewPlace`): the folder lister names
+`/private/var/...` where the plan names `/var/...`, standardizing drops
+`/private` only from a path that leads somewhere, and spelled apart the class
+below wrote THROUGH the broken link (seen in the second fix round's first
+run, where the shadow path then lost Day 2's lesson). Before
 this piece the same Insert Class was refused "cannot tell now" before
 anything changed, because the rename was planned as "write the new name,
 remove the old one" and the door's `remove` never follows a link; that rule

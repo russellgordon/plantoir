@@ -46,6 +46,7 @@ nonisolated enum UndoContractKinds {
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
         "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
+        "makeRoomWithALaterClassThatIsABrokenLink",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -778,7 +779,7 @@ nonisolated enum UndoContractKinds {
     /// (the replay hops there for it).
     @MainActor
     static func makeRoomWithALaterClassThatIsALink(
-        root: URL, journal: UndoJournal, places: UndoMemoryPlaces, linkedToDay1: Bool = false
+        root: URL, journal: UndoJournal, places: UndoMemoryPlaces, linkedToDay1: Bool = false, broken: Bool = false
     ) throws -> String {
         // U4b3 part 2: Unit 1, Day 1 to Day 3 in section 1, Day 3 a link
         // to a file elsewhere in the course; room for one class at Day
@@ -797,6 +798,16 @@ nonisolated enum UndoContractKinds {
             let day3: URL = root.appendingPathComponent(linkedPageDay(3))
             try FileManager.default.removeItem(at: day3)
             try layALink(linkedPageDay(3), leadingTo: "Unit 1, Day 1.md", root: root)
+        }
+        if broken {
+            // `makeRoomWithALaterClassThatIsABrokenLink`: the file the link
+            // at Day 3 leads to taken away, so the link leads nowhere.
+            // Insert Class renames it as itself and writes nothing through
+            // it (Russell, 2026-11-26: "Never refuse").
+            let file: URL = root.appendingPathComponent(linkedPageFile)
+            if FileManager.default.fileExists(atPath: file.path) {
+                try FileManager.default.removeItem(at: file)
+            }
         }
         let plan: ClassInsertionPlan
         do {

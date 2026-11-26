@@ -364,18 +364,19 @@ enum ClassInsertionPlanner {
         // 1. The renames, highest day first.
         var renamed: [String: String] = [:]
         for rename in plan.renames {
-            if !step.fileExists(rename.fromURL) {
+            // A later class that is a link leading to nothing is still a
+            // class: its link is renamed as any other (Russell, 2026-11-26:
+            // "Why would it refuse? Why does it care where a later class
+            // links to?"), and nothing is written for it or through it.
+            let isABrokenLink: Bool = isALinkToNothing(rename.fromURL)
+            if !isABrokenLink && !step.fileExists(rename.fromURL) {
                 continue
             }
             if step.fileExists(rename.toURL) {
                 notFinished.notRenamed.append(rename.from)
                 continue
             }
-            guard let text = step.readText(rename.fromURL) else {
-                notFinished.notRenamed.append(rename.from)
-                continue
-            }
-            if isALinkToAFile(rename.fromURL) {
+            if isABrokenLink || isALinkToAFile(rename.fromURL) {
                 // A later class that is a symbolic link to a file (#899
                 // U4b3, `undo.rule.shadow`): the LINK is moved as itself to
                 // the new name, judged by the target it holds, never
@@ -385,14 +386,18 @@ enum ClassInsertionPlanner {
                 // in them" (Russell, 2026-11-26). Only the moved date is
                 // written into it (step 3). The place the link leaves is
                 // handed over, in this same step, to the class below it or
-                // the new class.
-                _ = text
+                // the new class. A broken link is moved the same way, and
+                // as it leads to no file, no date is written for it.
                 guard let linkSha = UndoTreeReading.linkSha(at: rename.fromURL) else {
                     notFinished.notRenamed.append(rename.from)
                     continue
                 }
-                step.moveLink(rename.fromURL, to: rename.toURL, linkSha: linkSha)
+                step.moveLink(spelledAsItsNewPlace(rename.fromURL, beside: rename.toURL), to: rename.toURL, linkSha: linkSha)
             } else {
+                guard let text = step.readText(rename.fromURL) else {
+                    notFinished.notRenamed.append(rename.from)
+                    continue
+                }
                 // The title inside the file follows the file name: a page
                 // whose name and title disagree is worse than either being
                 // wrong alone.
@@ -443,6 +448,12 @@ enum ClassInsertionPlanner {
         // it was about it.
         var notDated: [String] = []
         for move in plan.moves {
+            // A class that is a link leading to nothing has no file to date,
+            // and nothing is ever written through it (Russell, 2026-11-26):
+            // its new name would be read back through the place it leaves.
+            if isALinkToNothing(move.fileURL) {
+                continue
+            }
             // A renamed page is found under its NEW name by now — but only if
             // THIS run renamed it (#425): when its rename could not be done,
             // the page under the new name is somebody else's, and re-dating it
@@ -570,6 +581,32 @@ enum ClassInsertionPlanner {
         return targetResult == 0 && (targetStatus.st_mode & S_IFMT) == S_IFREG
     }
 
+    /// The link's place spelled from the same folder as its new place, when
+    /// the two are in one folder. The step finds a place by its spelling,
+    /// and a listed page can carry a spelling of the folder its new name
+    /// does not: the folder lister names `/private/var/...` where the plan
+    /// names `/var/...`, and standardizing drops `/private` only from a path
+    /// that leads somewhere, never from a link that leads to nothing. Spelled
+    /// apart, the class below would not find the place the link leaves and
+    /// would write THROUGH the link.
+    static func spelledAsItsNewPlace(_ url: URL, beside newPlace: URL) -> URL {
+        let folder: URL = url.deletingLastPathComponent().resolvingSymlinksInPath()
+        let newFolder: URL = newPlace.deletingLastPathComponent().resolvingSymlinksInPath()
+        if folder.path != newFolder.path {
+            return url
+        }
+        return newPlace.deletingLastPathComponent().appendingPathComponent(url.lastPathComponent)
+    }
+
+    /// Whether the page at `url` is a symbolic link that leads to nothing:
+    /// `lstat` sees the link, `stat` cannot follow it to anything (its
+    /// target, or a link further along, is not there, or the links go
+    /// round). Insert Class renames such a link as itself and writes
+    /// nothing through it (Russell, 2026-11-26).
+    static func isALinkToNothing(_ url: URL) -> Bool {
+        return ResolvedFile.isALink(url) && ResolvedFile.throughLinks(at: url) == nil
+    }
+
     /// The file a symbolic link at `url` leads to, followed link by link
     /// (each target read as written, a relative one against its link's
     /// folder), or nil when `url` is not a link or the chain does not end
@@ -596,16 +633,11 @@ enum ClassInsertionPlanner {
     }
 
     /// The first later class that is a symbolic link this piece cannot
-    /// move, or nil. Such a link is refused rather than moved:
-    ///
-    /// * a link whose target is not there (a dangling link: `lstat` sees
-    ///   it, `stat` cannot follow it), which Insert Class would otherwise
-    ///   skip in silence and then write the class below THROUGH, making
-    ///   the missing file wherever it names, perhaps outside the working
-    ///   folder (review B of U4b3, MEDIUM 2);
-    /// * a link that leads, through any number of links, to one of this
-    ///   section's own class pages, whose title and date the step would
-    ///   then write onto another class (review B, MEDIUM 1).
+    /// move, or nil: a link that leads, through any number of links, to
+    /// one of this section's own class pages, whose title and date the
+    /// step would then write onto another class (review B, MEDIUM 1). A
+    /// link that leads to nothing is never refused (Russell, 2026-11-26):
+    /// it is renamed, and nothing is written through it.
     ///
     /// "Leads to a class page" is judged by the resolved identity of the
     /// file, never by name or path spelling: the device and inode `stat`
@@ -634,7 +666,7 @@ enum ClassInsertionPlanner {
                 continue
             }
             guard let leadsTo = ResolvedFile.throughLinks(at: place) else {
-                return place
+                continue
             }
             for identity in classPageIdentities where identity == leadsTo {
                 return place

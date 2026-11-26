@@ -5,10 +5,12 @@ import XCTest
 /// same code) renaming a later class page that is a symbolic link to a file
 /// (#899 U4b3 part 2, `undo.rule.shadow`): the step MOVES THE LINK ITSELF to
 /// the new name, its target as written, never followed; the file it leads to
-/// is never moved, renamed or removed, and the new title and the moved date
-/// are written into it; the place the link leaves is handed over, in the same
-/// step, to the class below it or the new class. Before this piece the same
-/// Insert Class was refused "cannot tell now" before anything changed.
+/// is never moved, renamed or removed, and only the moved date is written
+/// into it, never a title; a link leading nowhere is moved the same way with
+/// nothing written for it or through it; the place the link leaves is handed
+/// over, in the same step, to the class below it or the new class. Before
+/// this piece the same Insert Class was refused "cannot tell now" before
+/// anything changed.
 @MainActor
 final class UndoMakeRoomLinkedPageTests: XCTestCase {
 
@@ -421,21 +423,51 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
 
     // MARK: - Tests: what stays as it was
 
-    /// A dangling later-class link (its target is gone): Insert Class
-    /// refuses before anything changes, naming it, and never writes the
-    /// class below through it (review B of U4b3, MEDIUM 2). MUST FAIL with
-    /// the link skipped in silence and Day 2's lesson written through it,
-    /// making the file it names.
-    func testADanglingLinkedLaterClassIsRefusedAndNothingChanges() throws {
+    /// A broken later-class link (it leads to nothing, here a place OUTSIDE
+    /// the working folder): Insert Class never refuses because of where a
+    /// link leads (Russell, 2026-11-26: "Never refuse"). The link is renamed,
+    /// its text byte for byte; nothing else is written for it, and above
+    /// all nothing THROUGH it, so no file appears where it points; every
+    /// other class is handled as usual; Undo and Redo return the folder
+    /// exactly. MUST FAIL with the link refused, or skipped in silence and
+    /// Day 2's lesson written through it, making the file it names.
+    func testABrokenLinkedLaterClassIsRenamedAndNothingIsWrittenThroughIt() throws {
         let made = try makeCourse()
-        let target: String = "../../elsewhere/Unit 1, Day 3.md"
-        let file: URL = try makeALink("Unit 1, Day 3", holding: target, in: made)
-        try FileManager.default.removeItem(at: file)
+        let outside: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("make-room-broken-\(UUID().uuidString)", isDirectory: true)
+        folders.append(outside)
+        let target: String = outside.appendingPathComponent("Unit 1, Day 3.md").path
+        try replaceWithALink("Unit 1, Day 3", holding: target, in: made)
+        let before: [String: String] = everything(under: made)
 
-        try checkRefused(atDay: 2, naming: "Unit 1, Day 3", in: made)
+        let result = try makeRoom(atDay: 2, in: made)
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "nothing written through the link")
-        XCTAssertEqual(linkTarget("Unit 1, Day 3", in: made), target)
+        XCTAssertEqual(result.steps, 1, "one step")
+        XCTAssertEqual(result.couldNotRecord, [], "nothing is written outside, so the step is recorded")
+        XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), target, "the broken link renamed, its text byte for byte")
+        XCTAssertNil(linkTarget("Unit 1, Day 3", in: made), "the old Day 2 at Day 3 is a plain page")
+        let day3: String = try text("Unit 1, Day 3", in: made)
+        XCTAssertTrue(day3.contains("Two.") && day3.contains("title: Unit 1, Day 3"), day3)
+        XCTAssertTrue(day3.contains("created: 2026-09-14"), day3)
+        XCTAssertTrue(try text("Unit 1, Day 2", in: made).contains("publish: false"), "the new blank class")
+        XCTAssertTrue(try text("Unit 1, Day 1", in: made).contains("One."), "Day 1 as it was")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path), "nothing made where the link points, nothing outside changed")
+        let after: [String: String] = everything(under: made)
+        XCTAssertEqual(after.count, before.count + 1, "one new page, nothing else: \(after)")
+
+        let journal: UndoJournal = try UndoJournalLocation.standardJournal()
+        let root: URL = made.root
+        let undone: UndoOutcome = journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+        guard case .undone = undone else {
+            return XCTFail("Undo came to \(undone)")
+        }
+        XCTAssertEqual(everything(under: made), before, "Undo puts the broken link's name back")
+        let redone: UndoOutcome = journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+        guard case .redone = redone else {
+            return XCTFail("Redo came to \(redone)")
+        }
+        XCTAssertEqual(everything(under: made), after, "Redo makes it again")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path), "still nothing made where the link points")
     }
 
     /// Day 4 a link to Day 3's page, in the same run; room at Day 2: refused
