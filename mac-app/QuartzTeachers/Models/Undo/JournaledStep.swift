@@ -196,14 +196,22 @@ nonisolated final class JournaledStep {
     /// folder and its two pages), as one `createTree`, in the order planned.
     private(set) var plannedTrees: [(url: URL, listing: UndoTreeListing, contents: [String: Data])] = []
 
+    /// One planned folder move, a link's move or a relinking move.
+    typealias PlannedFolderMove = (
+        from: URL, to: URL, listingSha: String?, linkSha: String?, textBefore: Data?, textAfter: Data?
+    )
+
     /// Each FOLDER planned to be moved whole (#899 U4b: Rename folder), in
     /// the order planned, with the SHA-256 of its listing when planned. A
     /// file planned at or inside a folder move's `to` is an edit the move
     /// carries (`undoJournal.opKinds.wholeOps`): its `before` is read where
     /// the file is now, under `from`, and its op goes after the move. A
     /// symbolic link moved as itself (U4b2-15) carries its `linkSha`
-    /// instead (`moveLink`), and carries no edit.
-    private(set) var plannedFolderMoves: [(from: URL, to: URL, listingSha: String?, linkSha: String?)] = []
+    /// instead (`moveLink`), and carries no edit. A RELINKING move (U4b3
+    /// relink-4, `relinkLink`) carries `linkSha` as the sha of the text the
+    /// link holds now, and both texts, `textBefore` and `textAfter`; every
+    /// other move carries neither text.
+    private(set) var plannedFolderMoves: [PlannedFolderMove] = []
 
     /// A write planned at a place no step can judge yet, refusing the step
     /// "cannot tell now" when it is made, before anything changes (#899
@@ -375,7 +383,7 @@ nonisolated final class JournaledStep {
         guard let sha = listingSha ?? UndoTreeReading.read(at: from).listingSha else {
             return false
         }
-        plannedFolderMoves.append((from: from, to: to, listingSha: sha, linkSha: nil))
+        plannedFolderMoves.append((from: from, to: to, listingSha: sha, linkSha: nil, textBefore: nil, textAfter: nil))
         return true
     }
 
@@ -386,14 +394,77 @@ nonisolated final class JournaledStep {
     /// What it leads to is never opened, listed or touched. Plan no edit
     /// inside its `to`: a link's move carries none.
     func moveLink(_ from: URL, to: URL, linkSha: String) {
-        plannedFolderMoves.append((from: from, to: to, listingSha: nil, linkSha: linkSha))
+        plannedFolderMoves.append((from: from, to: to, listingSha: nil, linkSha: linkSha, textBefore: nil, textAfter: nil))
     }
 
-    /// A planned folder move as its op, between the paths given: a link's
-    /// move by `linkSha`, a folder's by `listingSha`.
-    static func folderMoveOp(
-        from: String, to: String, planned: (from: URL, to: URL, listingSha: String?, linkSha: String?)
-    ) -> UndoOp {
+    /// Plans the symbolic LINK at `from` to be moved to `to` holding
+    /// `textAfter` instead of the text it holds now (#899 U4b3 relink-4, a
+    /// relinking move: `undoJournal.opKinds.move`). The text now is read
+    /// here, with `readlink`, never followed (the bytes
+    /// `UndoTreeReading.linkSha(at:)` hashes); both texts go to the list as
+    /// blobs before the step begins. As `moveLink`, the place it leaves is
+    /// handed over (a write there makes a new file, a move may fill it,
+    /// U4b3 door-6), and nothing is ever written through either name: a
+    /// write planned at `to` refuses the step before anything changes, as
+    /// the link there holds a text the step is changing. False, planning
+    /// nothing, when the link cannot be read now. A `textAfter` equal to
+    /// the text now is the link's plain move (`moveLink`).
+    @discardableResult
+    func relinkLink(_ from: URL, to: URL, textAfter: Data) -> Bool {
+        guard let textBefore = UndoTreeReading.linkTarget(at: from) else {
+            return false
+        }
+        if textBefore == textAfter {
+            moveLink(from, to: to, linkSha: UndoHash.sha256(of: textBefore))
+            return true
+        }
+        plannedFolderMoves.append((
+            from: from, to: to, listingSha: nil, linkSha: UndoHash.sha256(of: textBefore),
+            textBefore: textBefore, textAfter: textAfter
+        ))
+        return true
+    }
+
+    /// Whether a planned folder move is a symbolic link's (`moveLink` or
+    /// `relinkLink`): the one test every reading of the plan asks.
+    static func isALinksMove(_ planned: PlannedFolderMove) -> Bool {
+        return planned.linkSha != nil
+    }
+
+    /// Whether a planned folder move changes the text its link holds
+    /// (`relinkLink`).
+    static func isARelink(_ planned: PlannedFolderMove) -> Bool {
+        return planned.textBefore != nil && planned.textAfter != nil
+    }
+
+    /// The blobs a planned folder move needs in the list: a relinking
+    /// move's two texts, before then after; none for any other.
+    static func blobs(of planned: PlannedFolderMove) -> [Data] {
+        guard let textBefore = planned.textBefore, let textAfter = planned.textAfter else {
+            return []
+        }
+        return [textBefore, textAfter]
+    }
+
+    /// A planned relinking move's two texts for the swap made without the
+    /// list (`makeWithoutARecord`), going forward; nil for any other move.
+    static func relinkGoingForward(_ planned: PlannedFolderMove) -> UndoRelink? {
+        guard let textBefore = planned.textBefore, let textAfter = planned.textAfter else {
+            return nil
+        }
+        return UndoRelink(sourceText: textBefore, destinationText: textAfter, sourceIsFrom: true)
+    }
+
+    /// A planned folder move as its op, between the paths given: a
+    /// relinking move by both texts' shas, a link's move by `linkSha`, a
+    /// folder's by `listingSha`.
+    static func folderMoveOp(from: String, to: String, planned: PlannedFolderMove) -> UndoOp {
+        if let textBefore = planned.textBefore, let textAfter = planned.textAfter {
+            return UndoOp.relinkLink(
+                from: from, to: to,
+                linkShaBefore: UndoHash.sha256(of: textBefore), linkShaAfter: UndoHash.sha256(of: textAfter)
+            )
+        }
         if let linkSha = planned.linkSha {
             return UndoOp.moveLink(from: from, to: to, linkSha: linkSha)
         }
@@ -648,7 +719,7 @@ nonisolated final class JournaledStep {
             }
             result.append(url)
         }
-        for move in plannedFolderMoves where move.linkSha != nil {
+        for move in plannedFolderMoves where JournaledStep.isALinksMove(move) {
             let key: String = JournaledStep.key(of: move.to)
             if seen.contains(key) || !key.hasPrefix(folderPrefix) || move.to.pathExtension.lowercased() != "md" {
                 continue
@@ -800,6 +871,13 @@ nonisolated final class JournaledStep {
             ops.append(op)
             changedFiles += 1
         }
+        // A relinking move's two texts, written to the list before the step
+        // begins with every other blob (U4b3 relink-4).
+        for planned in plannedFolderMoves {
+            for blob in JournaledStep.blobs(of: planned) {
+                blobs.append(blob)
+            }
+        }
         for change in changes {
             changeIndex += 1
             if change.before == change.after {
@@ -922,7 +1000,7 @@ nonisolated final class JournaledStep {
             // A link's `from` is named from the folder above it, never
             // resolved: `relativePath` would name what it leads to.
             var named: String? = nil
-            if planned.linkSha == nil {
+            if !JournaledStep.isALinksMove(planned) {
                 named = UndoFolderPlaces.relativePath(of: planned.from, under: root)
             } else if let above = UndoFolderPlaces.relativePath(of: planned.from.deletingLastPathComponent(), under: root) {
                 named = above + "/" + planned.from.lastPathComponent
@@ -972,9 +1050,12 @@ nonisolated final class JournaledStep {
         // turn, once the folder is at its new place (U4b).
         for planned in plannedFolderMoves {
             let op: UndoOp = JournaledStep.folderMoveOp(from: planned.from.path, to: planned.to.path, planned: planned)
+            // A relinking move is made as the door makes it: a new link
+            // holding the new text, renamed in, the old one then removed.
             targets.append(UndoSwapTarget(
                 url: planned.to, relativePath: planned.to.lastPathComponent,
-                change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op)
+                change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op),
+                relink: JournaledStep.relinkGoingForward(planned)
             ))
             targetOps.append([JournaledStep.folderMoveOp(
                 from: JournaledStep.key(of: planned.from), to: JournaledStep.key(of: planned.to), planned: planned
@@ -1188,7 +1269,7 @@ nonisolated final class JournaledStep {
         // same folder, is the file the link at its `from` leads to now,
         // the same file before and after the move. Never the link's new
         // place itself, which would be an edit inside a link's `to`.
-        if let linkMove = plannedLinkMove(endingAt: url), JournaledStep.staysInItsFolder(linkMove) {
+        if let linkMove = plannedLinkMove(endingAt: url), JournaledStep.staysInItsFolder(linkMove), !isARelink(endingAt: url) {
             return CourseConfiguration.fileALinkLeadsTo(linkMove.from)
         }
         // The place a link's move leaves is the place itself, never the
@@ -1289,7 +1370,7 @@ nonisolated final class JournaledStep {
     /// exactly `url`, or nil.
     func plannedLinkMove(endingAt url: URL) -> (from: URL, to: URL)? {
         let key: String = JournaledStep.key(of: url)
-        for move in plannedFolderMoves where move.linkSha != nil {
+        for move in plannedFolderMoves where JournaledStep.isALinksMove(move) {
             if JournaledStep.key(of: move.to) == key {
                 return (from: move.from, to: move.to)
             }
@@ -1301,7 +1382,7 @@ nonisolated final class JournaledStep {
     /// or nil.
     func plannedLinkMove(startingAt url: URL) -> (from: URL, to: URL)? {
         let key: String = JournaledStep.key(of: url)
-        for move in plannedFolderMoves where move.linkSha != nil {
+        for move in plannedFolderMoves where JournaledStep.isALinksMove(move) {
             if JournaledStep.key(of: move.from) == key {
                 return (from: move.from, to: move.to)
             }
@@ -1309,8 +1390,22 @@ nonisolated final class JournaledStep {
         return nil
     }
 
+    /// Whether a planned RELINKING move (`relinkLink`) ends at `url`.
+    func isARelink(endingAt url: URL) -> Bool {
+        let key: String = JournaledStep.key(of: url)
+        for move in plannedFolderMoves where JournaledStep.isARelink(move) {
+            if JournaledStep.key(of: move.to) == key {
+                return true
+            }
+        }
+        return false
+    }
+
     /// Whether a link's move keeps it in the folder it was in, so a
-    /// relative target leads to the same file from either name.
+    /// relative target leads to the same file from either name. Never asked
+    /// of a relinking move (U4b3 relink-4): its text is changed on purpose,
+    /// so its new name leads elsewhere whichever folder it is in, and a
+    /// write there is refused (`refusesAWrite`).
     static func staysInItsFolder(_ move: (from: URL, to: URL)) -> Bool {
         let fromFolder: String = JournaledStep.key(of: move.from.deletingLastPathComponent())
         let toFolder: String = JournaledStep.key(of: move.to.deletingLastPathComponent())
@@ -1319,10 +1414,15 @@ nonisolated final class JournaledStep {
 
     /// Whether a write at `url` is one no step can judge yet (U4b3), noting
     /// the first such place in `refusedBeforeMaking`: at the `to` of a link
-    /// moved to another folder.
+    /// moved to another folder, or of a relinking move (U4b3 relink-4),
+    /// whose link holds a text the step changes, so a write there would be
+    /// a write through it.
     private func refusesAWrite(at url: URL) -> Bool {
         var refused: Bool = false
         if let linkMove = plannedLinkMove(endingAt: url), !JournaledStep.staysInItsFolder(linkMove) {
+            refused = true
+        }
+        if isARelink(endingAt: url) {
             refused = true
         }
         if refused && refusedBeforeMaking == nil {
@@ -1337,7 +1437,7 @@ nonisolated final class JournaledStep {
         let key: String = JournaledStep.key(of: url)
         // A link's new place reads as the file it leads to, even where the
         // step removes the page the link moves over (U4b3 door-6).
-        if let linkMove = plannedLinkMove(endingAt: url), JournaledStep.staysInItsFolder(linkMove) {
+        if let linkMove = plannedLinkMove(endingAt: url), JournaledStep.staysInItsFolder(linkMove), !isARelink(endingAt: url) {
             return JournaledStep.key(of: placeALinkLeadsTo(url))
         }
         if plannedAfter[key] != nil {
