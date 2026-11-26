@@ -1306,9 +1306,6 @@ public sealed partial class SectionDetailView : UserControl
             {
                 TodaysClassOnTheFrontPage.Outcome.NoLongerOffered => TodaysClassOnTheFrontPage.NoLongerOffered(noun),
                 TodaysClassOnTheFrontPage.Outcome.CouldNotSave => TodaysClassOnTheFrontPage.CouldNotSave(offer.Shows),
-                // Mapped exactly as Written until W7b2-9 builds its one alert
-                // naming the kept file (keptTitle, kept, showKept, keptGone).
-                TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept => null,
                 _ => null,
             };
             if (said is not null)
@@ -1318,7 +1315,9 @@ public sealed partial class SectionDetailView : UserControl
                     Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
                     CloseButtonText = "OK",
                 });
-            // The page shows the class either way (W7b2-9: the kept-file alert).
+            if (outcome is TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept kept)
+                await SayWhatTheFrontPageKeptAsync(offer.Show, kept);
+            // The page shows the class either way.
             return outcome is TodaysClassOnTheFrontPage.Outcome.Written or TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept;
         }
         catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
@@ -1327,6 +1326,41 @@ public sealed partial class SectionDetailView : UserControl
             _todaysClassQuestionUp = false;
             QueueTheProblemsAlert();   // #734: it waited behind this question
         }
+    }
+
+    /// <summary>
+    /// The ONE alert when Show on Front Page went in but what the page held
+    /// is kept beside it, hidden (#899 W7b2-9; the mac's U3c alert, Russell's
+    /// ruling of 2026-11-25 (a)). Title <c>keptTitle</c>; message <c>kept</c>
+    /// and how to see hidden items, since the file stays hidden here; OK, the
+    /// default and the Close button, so Enter and Escape are both OK (an
+    /// informational alert: the HIG's Alerts, and Microsoft's dialog guidance,
+    /// whose safe button is the Close button, rightmost, on Escape); and Open
+    /// Folder, a visible button on the left, which opens the folder that holds
+    /// the kept file and never selects it. A kept file gone by then is said
+    /// with <c>keptGone</c> and nothing is opened.
+    /// </summary>
+    private async Task SayWhatTheFrontPageKeptAsync(string shown, TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept kept)
+    {
+        var answer = await ShowDialogSafelyAsync(new ContentDialog
+        {
+            Title = TodaysClassOnTheFrontPage.KeptTitle(shown),
+            Content = new TextBlock { Text = TodaysClassOnTheFrontPage.KeptMessage(kept.KeptNames), TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = TodaysClassOnTheFrontPage.OpenKeptFolder,
+            CloseButtonText = "OK",
+            DefaultButton = ContentDialogButton.Close,
+        });
+        if (answer != ContentDialogResult.Primary) return;
+        await TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync(kept.KeptOriginals,
+            // The mac's NSAlert says the sentence alone, with OK; WinUI's title
+            // is optional (Microsoft's dialog guidance), so it is the content here.
+            async gone => await ShowDialogSafelyAsync(new ContentDialog
+            {
+                Content = new TextBlock { Text = gone, TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = "OK",
+                DefaultButton = ContentDialogButton.Close,
+            }),
+            FolderActions.OpenFolder);
     }
 
     private async Task SayAsync(string sentence)

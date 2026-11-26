@@ -155,15 +155,70 @@ public sealed class TodaysClassContractTests : IDisposable
         Assert.Equal(w["noLongerOffered"]!.ToString().Replace("{noun}", "class"), TodaysClassOnTheFrontPage.NoLongerOffered(ClassNoun.Class));
         Assert.Equal(w["couldNotSave"]!.ToString().Replace("{shown}", "Y"), TodaysClassOnTheFrontPage.CouldNotSave("Y"));
 
+        // The kept-file alert (#899 W7b2-9, Russell's ruling of 2026-11-25 (a)).
+        Assert.Equal(w["keptTitle"]!.ToString().Replace("{class}", "X"), TodaysClassOnTheFrontPage.KeptTitle("X"));
+        Assert.Equal(w["kept"]!.ToString().Replace("{kept}", "K"), TodaysClassOnTheFrontPage.KeptSentence("K"));
+        Assert.Equal(w["keptGone"]!.ToString().Replace("{kept}", "K"), TodaysClassOnTheFrontPage.KeptGoneSentence("K"));
+        // showKept is the one key Windows says in its own words: the button
+        // opens the folder, never the file (keptOnWindows.showKept), the path
+        // bar's open action.
+        var onWindows = Rule["keptOnWindows"]!;
+        Assert.Equal(onWindows["showKept"]!.ToString(), TodaysClassOnTheFrontPage.OpenKeptFolder);
+        Assert.Equal(onWindows["hiddenItems"]!.ToString(), TodaysClassOnTheFrontPage.HiddenItems);
+        var pathBarOpen = ContractLoader.LoadJson("shared-rules.json")["workingFolderPathBar"]!["actions"]!.AsArray()
+            .First(action => action!["action"]!.ToString() == "open")!;
+        Assert.Equal(pathBarOpen["windowsLabel"]!.ToString(), TodaysClassOnTheFrontPage.OpenKeptFolder);
+
         // Every key the contract has is compared above or held by name in
-        // NamedGapLedger (the mac's U3c added the kept-file alert's three,
-        // #899): a key added on the mac turns this red rather than passing
-        // unseen. A held key fails the day it is said here.
-        var saidHere = new[] { "question", "because", "show", "notToday", "notChangedTitle", "noLongerOffered", "couldNotSave" };
+        // NamedGapLedger: a key added on the mac turns this red rather than
+        // passing unseen. A held key fails the day it is said here.
+        var saidHere = new[] { "question", "because", "show", "notToday", "notChangedTitle", "noLongerOffered", "couldNotSave",
+                               "keptTitle", "kept", "showKept", "keptGone" };
         var keys = w.AsObject().Select(pair => pair.Key).ToList();
         var held = NamedGapLedger.GapsIn(NamedGapLedger.TodaysClassWording, keys, saidHere);
         foreach (string key in keys)
             Assert.True(saidHere.Contains(key) || held.Contains(key), $"todaysClassOnTheFrontPage.wording.{key} is neither said here nor held");
+    }
+
+    /// <summary>
+    /// The kept-file alert's message (#899 W7b2-9): one <c>kept</c> sentence
+    /// per kept name, then the sentence that says how to see hidden items,
+    /// since the file stays hidden on Windows (Russell's ruling of 2026-11-25 (a)).
+    /// </summary>
+    [Fact]
+    public void TheKeptAlertNamesTheFileThenSaysHowToSeeHiddenItems()
+    {
+        var w = Rule["wording"]!;
+        string name = ".index.md.plantoir-undo-0123-orig";
+        string expected = w["kept"]!.ToString().Replace("{kept}", name) + " " + Rule["keptOnWindows"]!["hiddenItems"]!.ToString();
+        Assert.Equal(expected, TodaysClassOnTheFrontPage.KeptMessage([name]));
+    }
+
+    /// <summary>
+    /// The alert as the section window builds it (read from source: the WinUI
+    /// app cannot be loaded here): <c>keptTitle</c>, the message, OK as the
+    /// default and the Close button (so Escape is OK), and a visible Open
+    /// Folder button that hands the kept files to
+    /// <see cref="TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync"/> with the
+    /// path bar's open-the-folder action, never Show in File Explorer.
+    /// </summary>
+    [Fact]
+    public void TheSectionWindowShowsTheKeptAlertWithOkAsTheDefaultAndOpensTheFolder()
+    {
+        string view = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"));
+        int start = view.IndexOf("private async Task SayWhatTheFrontPageKeptAsync(", StringComparison.Ordinal);
+        Assert.True(start >= 0, "SayWhatTheFrontPageKeptAsync is gone");
+        int end = view.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string alert = view[start..end];
+        Assert.Contains("Title = TodaysClassOnTheFrontPage.KeptTitle(", alert);
+        Assert.Contains("TodaysClassOnTheFrontPage.KeptMessage(", alert);
+        Assert.Contains("PrimaryButtonText = TodaysClassOnTheFrontPage.OpenKeptFolder", alert);
+        Assert.Contains("CloseButtonText = \"OK\"", alert);
+        Assert.Contains("DefaultButton = ContentDialogButton.Close", alert);
+        Assert.Contains("TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync(", alert);
+        Assert.Contains("FolderActions.OpenFolder", alert);
+        Assert.DoesNotContain("ShowInFileExplorer", alert);
+        Assert.Contains("SayWhatTheFrontPageKeptAsync(", view[..start] + view[end..]);
     }
 
     /// <summary>

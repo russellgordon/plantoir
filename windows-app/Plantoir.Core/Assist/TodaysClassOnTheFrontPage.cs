@@ -51,6 +51,64 @@ public static class TodaysClassOnTheFrontPage
 
     private static string Noun(ClassNoun noun) => noun == ClassNoun.Meeting ? "meeting" : "class";
 
+    // ---- The kept-file alert (#899 W7b2-9; the mac's U3c, Russell's ruling of 2026-11-25 (a))
+    //
+    // When Show on Front Page went in but what the page held could not be
+    // put back (Outcome.ShownWithWhatItHeldKept), ONE alert names the kept
+    // file: keptTitle, then kept and the hidden-items sentence, with OK, the
+    // default, and Open Folder, which opens the front page's folder. The
+    // file stays hidden on Windows, so the alert says how to see hidden
+    // items rather than selecting a file File Explorer would not show.
+
+    /// <summary><c>wording.keptTitle</c>: a complete sentence, so it ends with a full stop.</summary>
+    public static string KeptTitle(string @class) => $"The front page now shows {@class}.";
+
+    /// <summary><c>wording.kept</c>, for one kept name.</summary>
+    public static string KeptSentence(string kept) => $"What the front page held a moment before is kept beside it, hidden, as “{kept}”.";
+
+    /// <summary><c>keptOnWindows.hiddenItems</c>: Microsoft's own Windows 11 path to hidden items.</summary>
+    public const string HiddenItems = "To see it in File Explorer, select View > Show, then select Hidden items.";
+
+    /// <summary><c>keptOnWindows.showKept</c>: the path bar's open-the-folder action (<c>workingFolderPathBar</c>, its <c>windowsLabel</c>).</summary>
+    public const string OpenKeptFolder = "Open Folder";
+
+    /// <summary><c>wording.keptGone</c>, for one kept name.</summary>
+    public static string KeptGoneSentence(string kept) => $"“{kept}” is no longer there, so there is nothing to show.";
+
+    /// <summary>The alert's message: one <c>kept</c> sentence per name, then <see cref="HiddenItems"/>.</summary>
+    public static string KeptMessage(IReadOnlyList<string> keptNames)
+    {
+        var sentences = new List<string>();
+        foreach (string name in keptNames) sentences.Add(KeptSentence(name));
+        sentences.Add(HiddenItems);
+        return string.Join(" ", sentences);
+    }
+
+    /// <summary>
+    /// What Open Folder does (the mac's <c>FolderActions.showInFinder(files:)</c>
+    /// and its plan): a kept file no longer there is said with
+    /// <c>keptGone</c>, one sentence per name, before anything opens; the
+    /// FOLDER that holds the kept files still there is then opened, once.
+    /// The file itself is never selected or revealed (Russell's ruling of
+    /// 2026-11-25 (a)), and with nothing left no folder is opened.
+    /// </summary>
+    /// <param name="keptOriginals">Each kept file's full path (<see cref="Outcome.ShownWithWhatItHeldKept.KeptOriginals"/>).</param>
+    /// <param name="sayGone">Shows the <c>keptGone</c> sentences in an alert with OK.</param>
+    /// <param name="openFolder">Opens a folder in File Explorer (the path bar's <c>FolderActions.OpenFolder</c>).</param>
+    public static async Task OpenTheKeptFolderAsync(IReadOnlyList<string> keptOriginals,
+                                                    Func<string, Task> sayGone, Action<string> openFolder)
+    {
+        var gone = new List<string>();
+        string? folder = null;
+        foreach (string kept in keptOriginals)
+        {
+            if (File.Exists(kept)) folder ??= System.IO.Path.GetDirectoryName(kept);
+            else gone.Add(KeptGoneSentence(System.IO.Path.GetFileName(kept)));
+        }
+        if (gone.Count > 0) await sayGone(string.Join(" ", gone));
+        if (folder is not null) openFolder(folder);
+    }
+
     /// <summary>The class offered and the class the line names, both by file name.</summary>
     public sealed record Offering(string Show, string Shows, string ShowPath);
 
@@ -69,7 +127,8 @@ public static class TodaysClassOnTheFrontPage
         /// hidden file under each name in <see cref="KeptOriginals"/> (#899
         /// W7b2-6; the mac's <c>shownKeepingWhatItHeld</c>, U3c). Never
         /// <see cref="CouldNotSave"/>, which would say the page is as it was.
-        /// W7b2-9 builds the one alert that names the kept file.
+        /// The section window says it in ONE alert that names the kept file
+        /// (<see cref="KeptTitle"/>, <see cref="KeptMessage"/>, W7b2-9).
         /// </summary>
         /// <param name="KeptOriginals">Each kept file's full path.</param>
         public sealed record ShownWithWhatItHeldKept(IReadOnlyList<string> KeptOriginals) : Outcome

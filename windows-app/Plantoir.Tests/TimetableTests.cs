@@ -785,7 +785,7 @@ public class ReDateTests : IDisposable
         File.Delete(timetable);
         Directory.CreateDirectory(timetable);
         var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
-        Assert.Equal("Nothing was changed: this section's class dates could not be read.", refused.Message);
+        Assert.Equal("Nothing was changed: this section’s class dates could not be read.", refused.Message);
         Assert.Equal(secondBefore, File.ReadAllBytes(second));
         Assert.True(Directory.Exists(timetable));
     }

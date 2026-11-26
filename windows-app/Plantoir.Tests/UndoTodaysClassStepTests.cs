@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Scripting;
 using Plantoir.Core.Undo;
 
 namespace Plantoir.Tests;
@@ -56,6 +57,26 @@ public sealed class UndoTodaysClassStepTests : IDisposable
     private static TodaysClassOnTheFrontPage.Offering Offered(AssistWorkspace workspace) =>
         workspace.TodaysClassOffer(Course, 1, Morning) ?? throw new InvalidOperationException("the morning offers nothing");
 
+    /// <summary>Another program edits the page as it is swapped in, and what it held cannot be put back: the step stops part way.</summary>
+    private static UndoSeams PartWay() => new()
+    {
+        BetweenKeepingAndRenaming = (_, fullPath) =>
+        {
+            using var inPlace = new FileStream(fullPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+            byte[] edit = Encoding.UTF8.GetBytes("written by hand\n");
+            inPlace.Write(edit);
+            inPlace.SetLength(edit.Length);
+        },
+        PutBackFailsAt = index => index == 0,
+    };
+
+    private TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept ShowPartWay()
+    {
+        AssistWorkspace workspace = Open(PartWay());
+        return Assert.IsType<TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept>(
+            workspace.ShowTodaysClass(Course, 1, Morning, Offered(workspace)));
+    }
+
     [Fact]
     public void ShowIsOneStepWithTheFrontPageAsItsContent()
     {
@@ -98,18 +119,7 @@ public sealed class UndoTodaysClassStepTests : IDisposable
     [Fact]
     public void APartWayStopIsShownWithWhatItHeldKeptNeverCouldNotSave()
     {
-        var partWay = new UndoSeams
-        {
-            BetweenKeepingAndRenaming = (_, fullPath) =>
-            {
-                using var inPlace = new FileStream(fullPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
-                byte[] edit = Encoding.UTF8.GetBytes("written by hand\n");
-                inPlace.Write(edit);
-                inPlace.SetLength(edit.Length);
-            },
-            PutBackFailsAt = index => index == 0,
-        };
-        AssistWorkspace workspace = Open(partWay);
+        AssistWorkspace workspace = Open(PartWay());
 
         var outcome = workspace.ShowTodaysClass(Course, 1, Morning, Offered(workspace));
 
@@ -149,5 +159,69 @@ public sealed class UndoTodaysClassStepTests : IDisposable
         Assert.IsType<TodaysClassOnTheFrontPage.Outcome.NoLongerOffered>(outcome);
         Assert.Empty(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
         Assert.Equal(before, File.ReadAllBytes(FrontPage));
+    }
+
+    /// <summary>
+    /// The part-way trail line says where what the page held went (W7b2-6
+    /// review 1, L2): the mac's <c>trailLine(for:offer:)</c>, word for word.
+    /// </summary>
+    [Fact]
+    public void ThePartWayTrailLineNamesTheHiddenFileWhatThePageHeldIsKeptIn()
+    {
+        string trail = Path.Combine(_root, "trail.txt");
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            var kept = ShowPartWay();
+            string name = Assert.Single(kept.KeptNames);
+            Assert.Contains("put today's class on the front page — Unit 2, Day 5 in place of Unit 2, Day 4. " +
+                            $"What “index.md” held just before is kept beside it as the hidden file “{name}”",
+                            File.ReadAllText(trail), StringComparison.Ordinal);
+        }
+        finally { ActivityTrail.SetCustomLogPathForTesting(null); }
+    }
+
+    /// <summary>
+    /// The kept-file alert's Open Folder (#899 W7b2-9, Russell's ruling of
+    /// 2026-11-25 (a)): opens the front page's FOLDER, never the kept file,
+    /// and says nothing more while the file is there.
+    /// </summary>
+    [Fact]
+    public async Task OpenFolderOpensTheFolderThatHoldsTheKeptFileNeverTheFile()
+    {
+        var kept = ShowPartWay();
+        var opened = new List<string>();
+        var said = new List<string>();
+
+        await TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync(kept.KeptOriginals,
+            sentence => { said.Add(sentence); return Task.CompletedTask; }, folder => opened.Add(folder));
+
+        Assert.Equal([Path.GetDirectoryName(FrontPage)!], opened);
+        Assert.DoesNotContain(Assert.Single(kept.KeptOriginals), opened);
+        Assert.Empty(said);
+        Assert.True(File.Exists(Assert.Single(kept.KeptOriginals)), "the kept file is left where it is");
+        Assert.True(File.GetAttributes(kept.KeptOriginals[0]).HasFlag(FileAttributes.Hidden) || !OperatingSystem.IsWindows(),
+                    "the kept file stays hidden");
+    }
+
+    /// <summary>
+    /// The kept file is gone by the time Open Folder is pressed: <c>keptGone</c>
+    /// is said, filled with its name, and no folder is opened (the mac's
+    /// <c>showInFinderPlan</c> with nothing still there).
+    /// </summary>
+    [Fact]
+    public async Task AKeptFileGoneByThePressIsSaidAndNothingIsOpened()
+    {
+        var kept = ShowPartWay();
+        File.Delete(kept.KeptOriginals[0]);
+        var opened = new List<string>();
+        var said = new List<string>();
+
+        await TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync(kept.KeptOriginals,
+            sentence => { said.Add(sentence); return Task.CompletedTask; }, folder => opened.Add(folder));
+
+        string keptGone = ContractLoader.LoadJson("class-planning.json")["todaysClassOnTheFrontPage"]!["wording"]!["keptGone"]!.ToString();
+        Assert.Equal([keptGone.Replace("{kept}", kept.KeptNames[0])], said);
+        Assert.Empty(opened);
     }
 }
