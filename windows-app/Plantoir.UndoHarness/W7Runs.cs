@@ -353,8 +353,10 @@ internal static class W7Runs
         return unmoved;
     }
 
+    /// <summary>The section's remembered timetable as laid, and the launcher marker that makes the scratch folder a working folder the real action accepts.</summary>
     private static void WriteTheLaidTimetable(string run)
     {
+        File.WriteAllText(Path.Combine(Root(run), Plantoir.Core.Models.Workspace.MarkerLauncher), "");
         string timetable = Full(run, TimetablePath);
         Directory.CreateDirectory(Path.GetDirectoryName(timetable)!);
         File.WriteAllText(timetable, "{\"section\":1,\"dates\":[\"2026-09-01\",\"2026-09-02\",\"2026-09-03\"],\"source\":\"typed in by hand\",\"recorded\":\"2026-09-01\"}");
