@@ -80,6 +80,13 @@ public sealed class UndoDuplicateClassStepTests : IDisposable
             string full = UndoDoor.FullPath(Folder, file.GetProperty("path").GetString()!);
             Assert.Equal(file.GetProperty("after").GetString(), File.ReadAllText(full));
         }
+        // What the step says it left is what is on the disk, the copy
+        // included: nothing was written beside the step.
+        foreach (JsonNode? op in begin["step"]!["ops"]!.AsArray())
+        {
+            string full = UndoDoor.FullPath(Folder, (string)op!["path"]!);
+            Assert.Equal((string?)op["afterSha"], UndoCheck.Sha(File.ReadAllBytes(full)));
+        }
         Assert.Single(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
         Assert.Contains("Renamed 2,", answered, StringComparison.Ordinal);
         // Other classes moved, so today's in-memory undo records no entry, as before.

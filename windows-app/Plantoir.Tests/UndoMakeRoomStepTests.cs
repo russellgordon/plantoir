@@ -82,14 +82,15 @@ public sealed class UndoMakeRoomStepTests : IDisposable
     }
 
     /// <summary>
-    /// Making room among blank pages (review 1, L3), the shape Make Room is
-    /// most used on: pages that differ only in their title and date, so a
-    /// renamed and re-dated page can come out byte for byte the page that
-    /// stood at its new name. That file is not in the step at all; every
-    /// other is, in the planned order, and every page reads as the plan meant.
+    /// Making room among pages that differ only in their title and date
+    /// (review 1, L3; the shape of blank pages, the one Make Room is most used
+    /// on; named for that shape since W7b2-1's review 2, L2), so a renamed and
+    /// re-dated page can come out byte for byte the page that stood at its
+    /// new name. That file is not in the step at all; every other is, in the
+    /// planned order, and every page reads as the plan meant.
     /// </summary>
     [Fact]
-    public void AmongBlankPagesAPageThatComesOutUnchangedIsNotInTheStep()
+    public void AmongPagesThatDifferOnlyInTitleAndDateAPageThatComesOutUnchangedIsNotInTheStep()
     {
         WindowsActionsOnTheMacFixture.Lay(Folder, Recorded);
         // Day 2 carries Day 3's lesson, so renamed to Day 3 and re-dated it is Day 3 exactly.
