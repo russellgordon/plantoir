@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
@@ -244,17 +243,14 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
     /// pages went in, and the first page cannot be put back: some of the
     /// press went in, and it says the mac's checklist part-way sentence,
     /// naming the kept file, never "Nothing was changed". The words are read
-    /// from the mac's <c>LinksChecklistPublisher.sentence(forRefused:)</c>,
+    /// from <c>shared-rules.json</c> → <c>linksChecklist.wording.pagesYouTicked</c>,
     /// never retyped.
     /// </summary>
     [Fact]
     public void APressLeftPartWaySaysTheChecklistsPartWaySentence()
     {
-        string macSource = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "mac-app", "QuartzTeachers", "Models",
-            "LinksChecklist", "LinksChecklistPublisher.swift"));
-        string macWords = Regex.Match(macSource, @"publishStoppedPartWay\(what: ""([^""]+)""").Groups[1].Value;
-        Assert.NotEqual("", macWords);
-        Assert.Equal(macWords, AssistWorkspace.PagesThePressTicked);
+        string contractWords = ContractLoader.LoadJson("shared-rules.json")!["linksChecklist"]!["wording"]!["pagesYouTicked"]!.GetValue<string>();
+        Assert.Equal(contractWords, LinksChecklistWording.PagesYouTicked);
 
         AssistWorkspace workspace = Open(seams: new UndoSeams { PutBackFailsAt = index => index == 0 });
         LinksChecklistSheet sheet = Sheet(workspace);
@@ -264,7 +260,7 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
 
         var refusal = Assert.Throws<AssistRefusal>(() => workspace.PublishAndRemember(sheet));
 
-        Assert.StartsWith(AssistWording.PublishStoppedPartWay(macWords, ""), refusal.Message, StringComparison.Ordinal);
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay(contractWords, ""), refusal.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("Nothing was", refusal.Message, StringComparison.Ordinal);
         Assert.Contains(UndoSwap.StagedMarker, refusal.Message, StringComparison.Ordinal);
     }

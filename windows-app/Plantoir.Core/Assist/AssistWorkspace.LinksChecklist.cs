@@ -254,15 +254,6 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// What a press on the links checklist says when it stopped part way: the
-    /// mac's <c>LinksChecklistPublisher.sentence(forRefused:)</c> fills
-    /// <c>wording.publishStoppedPartWay</c> with these words, which are in no
-    /// contract (<c>UndoLinksChecklistStepTests</c> reads them from the mac's
-    /// source).
-    /// </summary>
-    internal const string PagesThePressTicked = "the pages you ticked";
-
-    /// <summary>
     /// The sheet's Publish (#899 W7b2-8): ONE step, key
     /// <c>answerTheLinksChecklist</c>, made by the sheet (the mac's
     /// <c>LinksChecklistPublisher.publish</c>, <c>UndoStepMaker.sheet</c>):
@@ -273,7 +264,7 @@ public sealed partial class AssistWorkspace
     /// answered file's leftUnticked holds only rows whose OWN tick was off.
     /// </summary>
     /// <exception cref="AssistRefusal">A deploy is under way; or the step was refused, "Nothing was changed: …", or
-    /// stopped part way, the mac's checklist part-way sentence (<see cref="PagesThePressTicked"/>).</exception>
+    /// stopped part way, the checklist's part-way sentence (<see cref="LinksChecklistWording.PagesYouTicked"/>).</exception>
     public LinksChecklistPublished PublishAndRemember(LinksChecklistSheet sheet)
     {
         var course = Course(sheet.CourseCode);
@@ -324,7 +315,7 @@ public sealed partial class AssistWorkspace
         if (error is UndoStepLeftPartWayException)
         {
             NoteAChangeWithNoUndoEntry();
-            return new AssistRefusal(AssistWording.PublishStoppedPartWay(PagesThePressTicked, ReasonItStopped(error)));
+            return new AssistRefusal(AssistWording.PublishStoppedPartWay(LinksChecklistWording.PagesYouTicked, ReasonItStopped(error)));
         }
         if (error is UndoStepRefusedException { Refusal: { Path: { } named } refusal })
         {

@@ -39,6 +39,8 @@ public static class LinksChecklistWording
     public const string NothingLeftToPublish = @"Those pages have all been published or removed since the website was made.";
     public const string PageChangedSince = @"{name} changed since it was checked, so it was left as it is.";
     public const string Published = @"{count} {pages} will be on the website the next time you deploy.";
+    /// <summary>No sentence of its own: the {what} of <c>publishStoppedPartWay</c> when a Publish from this list stopped part way (#899).</summary>
+    public const string PagesYouTicked = @"the pages you ticked";
 
     /// <summary>"page" or "pages", to agree with <paramref name="count"/>.</summary>
     public static string Pages(int count) => count == 1 ? "page" : "pages";
