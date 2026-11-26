@@ -189,7 +189,11 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         }
         XCTAssertTrue(linkFound, "the link is at Day 2 or Day 3")
         let phase: String = (try survivor.read()).records[1]?.phase.rawValue ?? "missing"
-        XCTAssertTrue(["failed", "rolledBack", "done", "undone", "interrupted"].contains(phase), "the step is \(phase)")
+        // Both of the pair in the way, nothing written over the file put at
+        // Day 3: recovery interrupts the step, as the contract's taken-place
+        // recovery rows say (review C of U4b3, LOW 1: any of five phases
+        // was accepted).
+        XCTAssertEqual(phase, "interrupted", "the step is \(phase)")
     }
 
     /// Shape A, and the link replaced by a plain file between the plan and
