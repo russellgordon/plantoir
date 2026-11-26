@@ -24,7 +24,7 @@ This copies the Mac's `FolderActions.showInFinder(files:)`: its plan and its ord
 
 The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C# and pinned against `wording` by `TheSentencesAreTheContracts`, the house pattern. The app reads no contract at runtime; the brief's "never from a C# literal" is met the same way every other sentence in this file meets it. The two Windows words are new keys beside `wording`, not inside it:
 
-- `keptOnWindows.hiddenItems`: "To see it, open View in File Explorer and turn on Hidden items." (review 1, MEDIUM 2: the director's wording, true on Windows 10 and 11 alike, awaiting Russell's confirmation; it replaced the Windows 11 path "View > Show". After `kept`, which ends "… hidden, as “{kept}”.", it reads well: "… as “.index.md.plantoir-undo-1-apply-orig”. To see it, open View in File Explorer and turn on Hidden items.")
+- `keptOnWindows.hiddenItems`: "To see it, open View in File Explorer and turn on Hidden items." (review 1, MEDIUM 2: the director's wording, true on Windows 10 and 11 alike, which Russell confirmed on 2026-11-26; it replaced the Windows 11 path "View > Show". After `kept`, which ends "… hidden, as “{kept}”.", it reads well: "… as “.index.md.plantoir-undo-1-apply-orig”. To see it, open View in File Explorer and turn on Hidden items.")
 - `keptOnWindows.showKept`: "Open Folder". It is also pinned equal to `shared-rules.json` → `workingFolderPathBar`'s open action `windowsLabel`.
 - **Why beside `wording`:** the Mac's `TodaysClassOnTheFrontPageTests.testTheWordingIsTheContracts` compares the WHOLE `wording` dictionary with its own (`XCTAssertEqual(ours, wording)`). A Windows key inside it would turn the Mac red, and this piece may not change `mac-app/`. The section's `fill` sentence said Windows' button "reads 'Show in File Explorer' … to be measured". That clause is now untrue, and it was rewritten to point at `keptOnWindows`.
 - **`contracts/README.md`:** `class-planning.json` is one of the eight AUTHORED files. The README's opening paragraph names the five generated files, and `class-planning.json` is not among them. Nothing was parked.
@@ -49,7 +49,7 @@ The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C
 ## Review 1 (2026-11-25): 2 MEDIUM and 4 LOW, all fixed at c00d4b852
 
 - **MEDIUM 1, fixed.** The alert is now plain data in Core: `TodaysClassOnTheFrontPage.AlertDescription(Title, Message, ActionButton, CloseButton, Default)` and `KeptAlert(Shows, KeptOriginals)`, built by `KeptAlertFor(offer, kept)`, with `PressedAsync(pressed, show, openFolder)` and `GoneAlert(sentences)`. The section window only renders a description (`ShowAlertAsync`, the one `new ContentDialog` for both alerts, so the census is 16) and wires the press in two lines. Tests: `TheKeptAlertIsTitledWithTheClassNowShownWithOkTheDefaultAndTheClose` (record equality against the contract's words), `TheGoneAlertSaysItsSentenceWithOkAlone`, `OnlyOpenFolderOpensAndAGoneFileShowsTheGoneAlert` (OK, Escape and never-shown open nothing; Open Folder opens the folder; gone shows the gone alert), and `TheSectionWindowOnlyRendersTheKeptAlertsDescription`, which pins each rendering and wiring line whole, once. That last one replaces the loose source test. Each of the review's five slips has a must-fail row (7 to 11), plus two in the view (12, 13).
-- **MEDIUM 2, built as the director gave it:** see `keptOnWindows.hiddenItems` above; under "For the director" as awaiting Russell.
+- **MEDIUM 2, built as the director gave it:** see `keptOnWindows.hiddenItems` above; under "For the director"; Russell confirmed it on 2026-11-26.
 - **LOW 1, fixed.** `plainWordsExceptions` lists "File Explorer", with where it is and why, following `userFacingLabelWords.exceptions`' shape; `plainWordsCheck` says a listed name is taken out before checking. `NoKeptAlertSentenceSaysATechnicalWord` checks the filled kept-alert sentences against the mac's T3 word list (must-fail 15).
 - **LOW 2, fixed.** `contracts/README.md`'s row names `keptOnWindows` and `plainWordsExceptions`.
 - **LOW 3, fixed.** `ReDateTests.ATimetableWindowsRefusesSaysWindowsWordsAfterTheCurlyApostrophe` (must-fail 14).
@@ -105,7 +105,7 @@ Nothing of this alert.
    - (a) Keep it. **Recommended:** the plan is recomputed from disk and holds what is still to do, with a fresh code.
    - (b) Answer the sentence alone, as for Changed.
 4. **Documentation 12 and PROGRESS corrections** that the fold did not carry: the `writeFailed` "in no contract" clause, and the straight apostrophe in the quoted held-timetable sentence. Both carried by the fold of this merge window (night25/integration-3), in documentation 12 and PROGRESS.
-5. **Awaiting Russell's confirmation: the hidden-items sentence**, "To see it, open View in File Explorer and turn on Hidden items." (the director's wording, review 1 MEDIUM 2), built as given.
+5. **Confirmed by Russell on 2026-11-26: the hidden-items sentence**, "To see it, open View in File Explorer and turn on Hidden items." (the director's wording, review 1 MEDIUM 2), built as given.
 6. **The Mac gate comes back** for the `class-planning.json` change. The Mac's tests read `wording` (unchanged) and the section keys it lists (unchanged), so I expect the Mac to stay green, but the gate has not run on this change.
 
 ## Self-check

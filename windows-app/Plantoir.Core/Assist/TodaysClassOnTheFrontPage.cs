@@ -72,8 +72,12 @@ public static class TodaysClassOnTheFrontPage
     /// <summary><c>keptOnWindows.showKept</c>: the path bar's open-the-folder action (<c>workingFolderPathBar</c>, its <c>windowsLabel</c>).</summary>
     public const string OpenKeptFolder = "Open Folder";
 
-    /// <summary><c>wording.keptGone</c>, for one kept name.</summary>
-    public static string KeptGoneSentence(string kept) => $"“{kept}” is no longer there, so there is nothing to show.";
+    /// <summary>
+    /// <c>keptOnWindows.keptGone</c>, for one kept name: said in place of the
+    /// mac's <c>wording.keptGone</c>, because here the button opens the folder
+    /// and the file stays hidden (Russell's ruling 9 of 2026-11-26).
+    /// </summary>
+    public static string KeptGoneSentence(string kept) => $"“{kept}” is no longer there, so the folder was not opened.";
 
     /// <summary>The alert's message: one <c>kept</c> sentence per name, then <see cref="HiddenItems"/>.</summary>
     public static string KeptMessage(IReadOnlyList<string> keptNames)
@@ -103,7 +107,7 @@ public static class TodaysClassOnTheFrontPage
     {
         /// <summary>
         /// A press: Open Folder (the action) opens the folder that holds the
-        /// kept file, or says <c>keptGone</c> through <paramref name="show"/>;
+        /// kept file, or says <c>keptOnWindows.keptGone</c> through <paramref name="show"/>;
         /// OK, Escape, or an alert that was never shown (null) does nothing.
         /// </summary>
         public Task PressedAsync(AlertButton? pressed, Func<AlertDescription, Task> show, Action<string> openFolder)
@@ -125,20 +129,20 @@ public static class TodaysClassOnTheFrontPage
         new(new AlertDescription(KeptTitle(offer.Show), KeptMessage(kept.KeptNames), OpenKeptFolder, "OK", AlertButton.Close),
             kept.KeptOriginals);
 
-    /// <summary>The <c>keptGone</c> alert: the sentences alone, with OK (the mac's NSAlert; WinUI's title is optional).</summary>
+    /// <summary>The <c>keptOnWindows.keptGone</c> alert: the sentences alone, with OK (the mac's NSAlert; WinUI's title is optional).</summary>
     public static AlertDescription GoneAlert(string keptGoneSentences) =>
         new(null, keptGoneSentences, null, "OK", AlertButton.Close);
 
     /// <summary>
     /// What Open Folder does (the mac's <c>FolderActions.showInFinder(files:)</c>
     /// and its plan): a kept file no longer there is said with
-    /// <c>keptGone</c>, one sentence per name, before anything opens; the
+    /// <c>keptOnWindows.keptGone</c>, one sentence per name, before anything opens; the
     /// FOLDER that holds the kept files still there is then opened, once.
     /// The file itself is never selected or revealed (Russell's ruling of
     /// 2026-11-25 (a)), and with nothing left no folder is opened.
     /// </summary>
     /// <param name="keptOriginals">Each kept file's full path (<see cref="Outcome.ShownWithWhatItHeldKept.KeptOriginals"/>).</param>
-    /// <param name="sayGone">Shows the <c>keptGone</c> sentences in an alert with OK.</param>
+    /// <param name="sayGone">Shows the <c>keptOnWindows.keptGone</c> sentences in an alert with OK.</param>
     /// <param name="openFolder">Opens a folder in File Explorer (the path bar's <c>FolderActions.OpenFolder</c>).</param>
     public static async Task OpenTheKeptFolderAsync(IReadOnlyList<string> keptOriginals,
                                                     Func<string, Task> sayGone, Action<string> openFolder)

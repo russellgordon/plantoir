@@ -205,7 +205,7 @@ public sealed class UndoTodaysClassStepTests : IDisposable
     }
 
     /// <summary>
-    /// The kept file is gone by the time Open Folder is pressed: <c>keptGone</c>
+    /// The kept file is gone by the time Open Folder is pressed: <c>keptOnWindows.keptGone</c>
     /// is said, filled with its name, and no folder is opened (the mac's
     /// <c>showInFinderPlan</c> with nothing still there).
     /// </summary>
@@ -220,7 +220,7 @@ public sealed class UndoTodaysClassStepTests : IDisposable
         await TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync(kept.KeptOriginals,
             sentence => { said.Add(sentence); return Task.CompletedTask; }, folder => opened.Add(folder));
 
-        string keptGone = ContractLoader.LoadJson("class-planning.json")["todaysClassOnTheFrontPage"]!["wording"]!["keptGone"]!.ToString();
+        string keptGone = ContractLoader.LoadJson("class-planning.json")["todaysClassOnTheFrontPage"]!["keptOnWindows"]!["keptGone"]!.ToString();
         Assert.Equal([keptGone.Replace("{kept}", kept.KeptNames[0])], said);
         Assert.Empty(opened);
     }
@@ -228,7 +228,7 @@ public sealed class UndoTodaysClassStepTests : IDisposable
     /// <summary>
     /// The alert's presses (W7b2-9 review 1, MEDIUM 1): OK, Escape, or an
     /// alert never shown opens nothing and says nothing; Open Folder opens the
-    /// folder; Open Folder with the file gone shows the keptGone alert and opens nothing.
+    /// folder; Open Folder with the file gone shows the keptGone alert (<c>keptOnWindows.keptGone</c>) and opens nothing.
     /// </summary>
     [Fact]
     public async Task OnlyOpenFolderOpensAndAGoneFileShowsTheGoneAlert()
@@ -251,7 +251,7 @@ public sealed class UndoTodaysClassStepTests : IDisposable
         opened.Clear();
         File.Delete(kept.KeptOriginals[0]);
         await alert.PressedAsync(TodaysClassOnTheFrontPage.AlertButton.Action, Show, opened.Add);
-        string keptGone = ContractLoader.LoadJson("class-planning.json")["todaysClassOnTheFrontPage"]!["wording"]!["keptGone"]!.ToString();
+        string keptGone = ContractLoader.LoadJson("class-planning.json")["todaysClassOnTheFrontPage"]!["keptOnWindows"]!["keptGone"]!.ToString();
         Assert.Equal([new TodaysClassOnTheFrontPage.AlertDescription(null, keptGone.Replace("{kept}", kept.KeptNames[0]), null, "OK",
                                                                       TodaysClassOnTheFrontPage.AlertButton.Close)], shown);
         Assert.Empty(opened);
