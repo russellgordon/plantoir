@@ -2,18 +2,6 @@
 
 Branch `issue/899-u4b2-1-linked-page-written-through`, from `origin/dev` a03fecefd (U4b merged).
 
-## For PROGRESS
-
-- Mac: with `undoJournalIsLive` off, a daily action whose page is a symbolic link now writes the file the link leads to, and the link stays a link (Russell's ruling on #899, 2026-11-25). Before, the Mac refused such a page from U3 on. Windows already behaved so; no Windows code owed.
-
-## For documentation 12
-
-- `undo.rule.shadow` now states ONE rule for both platforms: a linked page is written through its link and stays a link; a folder (a link to a folder included) or a file that cannot be read is refused before anything changes; a part-way stop keeps what the file held beside the file the link leads to. Windows' `UndoActionStepTests.WithTheSwitchOffALinkedPageIsWrittenThroughItsLinkAndStaysALink` and `APlainWriteLeftPartWayIsSaidAsPartWayAndNamesTheKeptFile(throughALink: true)` are the twins of the Mac's `UndoSweepFindingsTests` cases.
-- Insert Class on Windows (`ApplyInsertClasses`, `AssistWorkspace.cs` about lines 4201 to 4213) goes ahead today when a later class is a link: it saves a plain copy at the new name and deletes the link with `File.Delete`, outside the door. The Mac refuses that step before anything changes. The contract names this as the Mac's. When W7b2 converts Make Room for Classes, the held row `makeRoomForClasses` carries this, and pieces 14 and 15 decide which behaviour holds. Twin on the Mac: `UndoSweepFindingsTests.testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges`.
-- A dangling link whose folder is missing: both platforms make the folder and the file (Windows `UndoSwap.MakeTheFolderOf`; the Mac's door). Twin: `testAShadowStepOnADanglingLinkWhoseFolderIsMissingMakesTheFolderAndTheFile`.
-- Stale line to correct: documentation 12, about line 18033, "2. **Switch-off refusals (finding 3).** `undo.rule.shadow` now says: with the switch off, a daily action whose file is a link, a folder or unreadable is refused before anything changes ..." The link part is no longer true on either platform.
-- One difference that stays (shadow only, nothing offered): the Mac NAMES a link to a file inside the working folder in a step, at that file (a shadow record, no trail line); Windows writes every linked page plainly with a `wentAhead` trail line. A link to a file outside the working folder is plain, with a `wentAhead` line, on both. See "For U7".
-
 ## Review 1 fixes (1 MEDIUM, 5 LOW)
 
 - MEDIUM 1, fixed: `undo.rule.shadow` now says the rule is for a WRITE: a step that removes a page that is a link, or renames one away (Insert Class renaming a later class that is a link), never follows the link and is refused before anything changes until the pieces that move a link (14 and 15); a new file planned where a link is is refused as there. Behaviour unchanged. Pinned by `testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges` (write the new name, remove the link: refused `cannotTellNow`, "Nothing was changed.", new name not written, linked file and link untouched).
@@ -64,7 +52,7 @@ All on the main Mac, through `xlock.sh`, derived data `.dd/`.
 
 ## Left for the next piece
 
-- A link whose target is missing (a dangling link) is now written through: the file is made at the place the link names, as Windows' `File.ResolveLinkTarget` path does. No test pins it either way; say if it should be refused.
+- A link whose target is missing (a dangling link) is now written through: the file is made at the place the link names, as Windows' `File.ResolveLinkTarget` path does. (Settled since this was written: reviews 1 and 2 pinned it, written through, the folder made too.)
 - `remove` of a linked page is still refused (not a plain file). Which actions remove a page that could be a link, and whether that should remove the link, belongs with the move pieces (14 and 15).
 
 ## For U7

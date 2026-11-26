@@ -13,22 +13,7 @@ Branch `issue/899-u4b2-2-leaving-place-named`, from `origin/dev` a03fecefd. Writ
 
 - MEDIUM 1 (the director's instruction to merge was withdrawn): the U2 link row is back exactly as at a03fecefd (no `refusalNamed`, not held, checked by script against `git show a03fecefd`), so the PC still proves that nothing is moved out through a link. The separate Undo row "U4b2-2: only the move's old place leads out ..." is back, carrying `refusalNamed`, held.
 - Held rows: 6, all `U4b2-2`: three Undo (only the new place, only the old place, both) and three Redo (the same three).
-- LOW 1 and LOW 2: "For documentation 12" corrected below.
-
-## For PROGRESS
-
-- Mac: no product change (U4b part I already names the first of `path`, `from`, `to` that leads out). Pinned by three `undo.stackCases` rows read through a new key `refusalNamed`, a sentence in `undo.rule.stagedThenSwapped`, and five `UndoDoorGuardTests` (Undo and Redo; only the new place, only the old place for Redo, both). The Python model (`scripts/make_undo_traces.py` `plan`) names the same place now; it named `path or from` before. `undo-traces.json` unchanged (`make_undo_traces.py` says current).
-- Windows: six stack rows held under `Reason899W8U4b` (sentence extended to name the calls and key): the three U4b2-2 Undo rows and the three U4b2-2 Redo rows. The U2 link row is unchanged and still runs on Windows.
-
-## For documentation 12
-
-W8 (Rename folder through the door) owes:
-
-- `UndoCheck.Plan`, the leaves-the-folder block (about line 375): put in `inTheWay` the FIRST of `op.PathsNamed` (`Path`, then `From`, then `To`) for which `UndoPlaces.StaysInside(whole.Root, place)` is false, not `op.PlaceName`. Today a move whose `To` alone leads out is named by its `From`, the side that is as the step left it.
-- The same rule at the two checks Windows makes again just before each change, read in `windows-app/Plantoir.Core/Undo/UndoSwap.cs` on a03fecefd: the staging loop (about line 306) and the swap loop for a whole op (about line 370) both refuse with `new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath)` when `StaysInside(target, root)` (line 401) fails, and for a `MoveHere` that test covers `move.FromRelative` and `target.RelativePath`. So today a link made between the plan and the change that takes only the other side out names the side as the step left it (Undo, only `to` out: names `from`; Redo, only `from` out: names `to`), which is what the Mac did before review 1. W8: for a `MoveHere` target name the first of `move.Op.PathsNamed` that fails `UndoPlaces.StaysInside`, by the same function `UndoCheck.Plan` uses (the record carries `Op`, `UndoCheck.cs:573`); for any other change keep `target.RelativePath`. The file checks at lines 636 and 687 (`SwapAFile`, one path) already name the only place. No contract row reaches this window on either platform; the Mac's four `UndoDoorGuardTests` `...AtTheStagingCheck...` and `...AtTheSwapCheck...` make the link from a kill-point hook after the plan.
-- `UndoStackContractTests`: the key `refusalNamed` (the `ChangedSince` refusal's first path after the last `undo` or `redo`; compare as a string) and three calls: `moveThePageIntoAFolder` (courses/TST1O/b.md, made holding `page\n` when neither place holds it, moved to courses/TST1O/new/b.md, one `move`), `moveThePageBetweenFolders` (courses/TST1O/old/c.md to courses/TST1O/new/c.md, the same way), `linkItsNewFolderOutside` (courses/TST1O/new removed and replaced by a junction to the same `Outside` folder `linkItsOldFolderOutside` uses). Then take the six `U4b2-2` rows (three Undo, three Redo) out of the ledger.
-
-Why the held rows fail on Windows today: all six carry `refusalNamed`, which `KeysChecked` does not hold, so each fails at "a key this replay does not check: refusalNamed" before any call. Four of them (the Undo and Redo "only the old place" rows and both "both" rows) would pass on Windows as soon as the replay reads the key, because `op.PlaceName` is `From` and `From` leads out in each; the Undo and Redo "only the new place" rows need the UndoCheck change. They are held, not left, because the key itself is unknown there (the brief's "not held if they would pass" does not apply: they would not pass).
+- LOW 1 and LOW 2: "For documentation 12" corrected (folded since into documentation 12, "What W8 owes from U4b2-2").
 
 ## Must-fail lines
 

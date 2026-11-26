@@ -2,15 +2,6 @@
 
 Branch `issue/899-u4b2-3-rename-record-owned`, from `origin/dev` a03fecefd. Mac only; no `contracts/` change; no ledger row.
 
-## For PROGRESS
-
-- Mac, U4b2-3: `SpecialFolderRenamer.rename` (the one-call rename for a caller with no settings to change; no caller in the app, tests only) now clears the interrupted-rename record it wrote once its step is made or refused with nothing changed, and puts back byte for byte any record an earlier run left there (which its own had replaced on disk). Only a step left part way (`leftPartWay`) or killed (`stoppedByATest`) keeps its record. A success that finishes the recorded rename (the record names this same rename) clears it. Fixes the U4b final sweep's L5. Eight new tests in `SpecialFolderRenamerTests`.
-
-## For documentation 12
-
-- Windows as it is today (checked in `windows-app/`): `SpecialFolderRenamer.Rename` (Plantoir.Core/Models/SpecialFolderRenamer.cs:269) writes the record, overwriting any record on disk, only when there are folders to move. Its caller, `CourseSettingsView.xaml.cs:501`, clears the record unconditionally after the settings are written, including when nothing moved, so another folder's unfinished rename is lost the same way the Mac lost it before this piece. A first `Directory.Move` that fails (SpecialFolderRenamer.cs:271-277, nothing moved) throws `RenameException` with nothing changed and leaves this run's record, which then greys the one-section restore (`OneSectionRestore.cs:217-218`). A later move that fails (part way) or a failed settings write leaves the record, which is right.
-- What Windows must do (one instruction for W8): read the record already on disk before writing its own. After a refusal that changed nothing (a first move that fails with nothing moved included), put that earlier record back byte for byte, or leave no record when there was none. After a rename that stopped part way, keep this run's record. Once the rename is whole (folders moved and settings written): clear a record of this same rename; clear a record of this folder renamed to another name too, since the settings no longer name the old folder; put back any other earlier record; and touch nothing when no folder moved and the record is another folder's. If the put-back or clear fails, write a `folder renamed` trail line saying "did not rename" after a refusal and "renamed" only once the rename is whole.
-
 ## Must-fail lines
 
 See `windows-app/notes/899-u4b2-3-mustfail.log`. 4 RED of 4, plus tests first (R0: 5 tests red on dev's `rename`).
@@ -38,7 +29,7 @@ All through `xlock.sh`, 15-minute kill, logs in `/Users/russellgordon/plantoir/w
 - L4: pinned, `testARefusedFinishOfTheRecordedRenameKeepsItsRecord`.
 - L5: `AssistCurriculumMentionsTests` sets `UndoJournalLocation.folderOverride` to a temp folder in setUp and clears it in tearDown.
 - Runs: `run-r2-good.log` SpecialFolderRenamerTests 42/0, AssistCurriculumMentionsTests 14/0, UndoRenameFolderStepTests 34/0, UndoWriterScanTests 6/0 (the allowance stays 5: the same write and remove, moved into the claim). Must-fail round 2: 5 RED of 5, plus tests first (mustfail log).
-- For documentation 12: see that section (rewritten after review 2, L-C, to match Windows as it is).
+- For documentation 12: rewritten after review 2, L-C, to match Windows as it is (folded since into documentation 12, "What W8 owes from U4b2-3").
 
 ## Review 2 (L-A, L-B, L-C), fixed in this branch
 
