@@ -150,3 +150,11 @@ Two passages describe #550's part-way list of re-dated pages, which W7b1 removed
 
 - `documentation/12-windows-app.md`, about lines 8825-8830, the bullet "**Re-date Classes… that stopped part way** (`ApplyReDate`)". Replace its first two sentences ("After the first page is written … which are the mac's words.") with: "Re-date Classes… is one step (#899 W7b1): a refusal says the mac's \"Nothing was changed: …\"; a step the door left part way says `PublishStoppedPartWay(\"the section's class dates\", …)` naming each kept file. The list \"The pages already re-dated:\" is gone with the writing page by page." The rest of the bullet (an `AssistRefusal` answered by `re_date_classes` and `roll_over_section`) stays true.
 - `documentation/10-local-ai-assistant.md`, about lines 4516-4518. Replace "Re-date Classes… that stops part way says `publishStoppedPartWay` with the pages already re-dated, on both" with "Re-date Classes… is all or none since #899 W7b1: it says \"Nothing was changed: …\", or, when a page was left holding its new date with its earlier content kept beside it, `publishStoppedPartWay` naming each kept file, on both".
+
+### Runs (PC, CRLF checkout)
+
+- `899w7b1-r3a` at 7d7962b07 (holds 79871a6f8 and `dev` bfe28b848): both builds 0; **Passed 217, Failed 0, Total 217** (UndoActionTraceContractTests 152, UndoActionStepsOnWindowsTests 30, NewClassesTests 16, CurriculumMentionsTests 11, NamedGapLedgerTests 8). No step differs from the Mac's recorded bytes with the pins gone, `addCurriculumMentions`' traces through the real Windows action included.
+
+### Must-fail (`vm-tools/guest/899-w7b1-mustfail-4.json`)
+
+**2 of 2 RED**, build 0 each: (1) `PageTextFromLiteral` made the identity (#1040 reverted): 21 failed; (2) `CurriculumHeading` put back to "Today's work points here:" (#1039 reverted): 4 failed. Restored: Passed 217, Failed 0; HEAD the same, status clean.
