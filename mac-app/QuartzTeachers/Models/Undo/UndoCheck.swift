@@ -2206,25 +2206,31 @@ nonisolated extension UndoJournal {
             }
             for path in pathsOfTheStep {
                 let place: URL = root.appendingPathComponent(path)
+                // Each kept file by its path in the working folder, so two
+                // pages with the same name in two folders stay two (the
+                // part-two review of U4b, LOW 4).
+                let folder: String = (path as NSString).deletingLastPathComponent
                 for keptURL in UndoRecovery.keptOriginalFiles(of: record.step, beside: place) {
                     let name: String = keptURL.lastPathComponent
-                    if keptOfWhatItHeld.contains(name) || keptOfWhatItHoldsNow.contains(name) {
+                    let kept: String = folder.isEmpty ? name : folder + "/" + name
+                    if keptOfWhatItHeld.contains(kept) || keptOfWhatItHoldsNow.contains(kept) {
                         continue
                     }
                     if notTaken.outgoingOf.contains(path) && UndoSwap.isStaged(name, label: label) {
-                        keptOfWhatItHeld.append(name)
+                        keptOfWhatItHeld.append(kept)
                     } else if UndoSwap.holdsAnyOf(notTaken.keptOriginalsHolding, keptURL) {
-                        keptOfWhatItHoldsNow.append(name)
+                        keptOfWhatItHoldsNow.append(kept)
                     }
                 }
             }
             // Page by page: "from what was kept beside it" only of a page a
-            // use names (U4b part one's review, LOW 1).
+            // use names (U4b part one's review, LOW 1), by its path in the
+            // working folder, as `UndoTrail.pageOfKept` gives a kept file's
+            // page (the part-two review, LOW 4).
             var putBackFromAKeptOriginal: [String] = []
             for use in uses {
-                let page: String = (use.path as NSString).lastPathComponent
-                if !putBackFromAKeptOriginal.contains(page) {
-                    putBackFromAKeptOriginal.append(page)
+                if !putBackFromAKeptOriginal.contains(use.path) {
+                    putBackFromAKeptOriginal.append(use.path)
                 }
             }
             UndoTrailHook.keptWhatItReplacedLine?(
