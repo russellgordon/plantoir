@@ -323,7 +323,10 @@ public static class TodaysClassOnTheFrontPage
         // The record is in, what it held kept beside it: it IS remembered
         // (the trail's own line names the kept file, from the door).
         catch (UndoStepLeftPartWayException) { remembered = true; }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { remembered = false; }
+        // Anything else, the door's refusal or an error that is not the
+        // disk's (a stop with the switch on): the record is not written, and
+        // the sheet goes on (W7b2-7 review 1, LOW 1).
+        catch { remembered = false; }
         Note(course, section, $"left the front page as it was — Not Today: {offering.Show} offered, it showed {offering.Shows}");
         return remembered;
     }

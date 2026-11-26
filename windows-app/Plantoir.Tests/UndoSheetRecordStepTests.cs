@@ -78,11 +78,11 @@ public sealed class UndoSheetRecordStepTests : IDisposable
         return new ClassesDatedLater.Page(ClassesDatedLater.PlaceOf(CourseDirectory, page), "Unit 1, Day 3", new DateOnly(2026, 9, 14), true);
     }
 
-    private bool KeepAtDeploy(UndoSeams? seams = null)
+    private bool KeepAtDeploy(UndoSeams? seams = null, DateTime? at = null)
     {
         UndoForThisProcess list = List();
         UndoDoor? door = seams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: seams, trail: list.Trail);
-        return LaterClassesKept.KeepAtDeploy(Folder, Course, CourseDirectory, 1, [Ticked()], Answered,
+        return LaterClassesKept.KeepAtDeploy(Folder, Course, CourseDirectory, 1, [Ticked()], at ?? Answered,
                                              new UndoStepMaker("sheet", KeptKey), list, door);
     }
 
@@ -188,8 +188,13 @@ public sealed class UndoSheetRecordStepTests : IDisposable
         Assert.Equal(first, File.ReadAllBytes(NotTodayRecord));
     }
 
+    /// <summary>
+    /// The same answer at the same moment changes no byte, so no step is
+    /// made. Only at the same moment: the record stamps when it was answered
+    /// (the next test), as the mac's <c>KeptRecord.adding</c> stamps <c>Date()</c>.
+    /// </summary>
     [Fact]
-    public void TheSameKeptAnswerAgainMakesNoStep()
+    public void TheSameKeptAnswerAtTheSameMomentMakesNoStep()
     {
         Assert.True(KeepAtDeploy());
         byte[] first = File.ReadAllBytes(KeptRecord);
@@ -201,10 +206,56 @@ public sealed class UndoSheetRecordStepTests : IDisposable
     }
 
     /// <summary>
+    /// The same classes kept a minute later are a second answer: its moment
+    /// is stamped, a step of its own, the kept classes the same (W7b2-7
+    /// review 1, LOW 3: what the test above proves, said plainly).
+    /// </summary>
+    [Fact]
+    public void TheSameKeptAnswerLaterStampsItsMomentOnAStepOfItsOwn()
+    {
+        Assert.True(KeepAtDeploy());
+
+        Assert.True(KeepAtDeploy(at: Answered.AddMinutes(1)));
+
+        Assert.Equal([KeptKey, KeptKey], WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
+        JsonNode record = JsonNode.Parse(File.ReadAllText(KeptRecord))!;
+        Assert.Equal("2026-09-08T11:01:00Z", (string?)record["answeredAt"]);
+        Assert.Equal([new LaterClassesKept.Row("section1/All Classes/Unit 1, Day 3", "2026-09-14")], LaterClassesKept.Read(CourseDirectory, 1));
+    }
+
+    /// <summary>
+    /// A stop that is not the disk's (here a test's kill point, which Make
+    /// answers with an <see cref="InvalidOperationException"/> whatever the
+    /// switch says) costs only the record too: false, no throw, nothing
+    /// written, so the deploy goes on (W7b2-7 review 1, LOW 1).
+    /// </summary>
+    [Fact]
+    public void AKeptRecordStoppedForAnyReasonCostsOnlyTheRecord()
+    {
+        bool kept = KeepAtDeploy(new UndoSeams { StopsHere = (point, _) => point == "afterBegin" });
+
+        Assert.False(kept);
+        Assert.False(File.Exists(KeptRecord));
+    }
+
+    /// <summary>The same for Not Today: false, no throw, and the trail's line is still true (the front page was left as it was).</summary>
+    [Fact]
+    public void ANotTodayStoppedForAnyReasonCostsOnlyTheRecord()
+    {
+        AssistWorkspace workspace = Open(seams: new UndoSeams { StopsHere = (point, _) => point == "afterBegin" });
+
+        bool remembered = workspace.DeclineTodaysClass(Course, 1, Morning, Offered());
+
+        Assert.False(remembered);
+        Assert.False(File.Exists(NotTodayRecord));
+        Assert.Contains("left the front page as it was — Not Today: Unit 2, Day 5 offered, it showed Unit 2, Day 4", File.ReadAllText(_trail));
+    }
+
+    /// <summary>
     /// The window cannot be built in a unit test, so its answer at Deploy is
     /// read from the source: the ticked classes are kept through the step,
     /// with this workspace's folder, never by the plain <c>Keep</c> (the
-    /// links checklist's, until W7b2-8).
+    /// links checklist's until W7b2-8, now gone).
     /// </summary>
     [Fact]
     public void TheDeployQuestionKeepsItsAnswerThroughTheStep()

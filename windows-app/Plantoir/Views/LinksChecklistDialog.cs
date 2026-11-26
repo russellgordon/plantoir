@@ -205,8 +205,11 @@ public sealed class LinksChecklistDialog
             return LinksChecklistWording.Fill(LinksChecklistWording.DeployUnderWay,
                 new Dictionary<string, string> { ["course"] = course.Code });
 
-        var published = workspace.PublishAndRemember(sheet);
-        return published.Reply(sheet);
+        // ONE step (#899 W7b2-8): a press that is refused changed nothing and
+        // says so ("Nothing was changed: …"); one left part way says the
+        // checklist's part-way sentence. Either is told, never dropped.
+        try { return workspace.PublishAndRemember(sheet).Reply(sheet); }
+        catch (AssistRefusal refusal) { return refusal.ForTheTeacher; }
     }
 
     /// <summary>Publishing pages launches nothing; anything that tries is refused.</summary>

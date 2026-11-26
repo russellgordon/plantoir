@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -321,12 +322,71 @@ public static class LinksChecklist
         Path.Combine(courseDirectory, ".publish_state", $"section{section}.links-checklist-answered.json");
 
     /// <summary>
-    /// Written by the app only, after Publish or Not Now. <c>leftUnticked</c>
-    /// holds rows whose OWN tick was off (#399) — a locked row with its own
-    /// tick on is not remembered as unticked.
+    /// The answered record on a step of its own (#899 W7b2-8; the mac's
+    /// <c>LinksChecklistAnswered.write</c> with no step given, key
+    /// <c>answerTheLinksChecklist</c>, made by <c>sheet</c>), on this
+    /// process's list: the working folder is the one holding the course's
+    /// <c>courses</c> folder, as the mac's <c>JournaledStep(courseCode:courseDirectory:)</c>
+    /// finds it. Written by the app only, after Publish or Not Now
+    /// (<see cref="PlanAnswered"/>).
     /// </summary>
-    public static void WriteAnswered(string courseDirectory, int section, IEnumerable<string> offered,
+    /// <returns>False when the record could not be written: the checklist is offered again, nothing else.</returns>
+    public static bool WriteAnswered(string courseDirectory, int section, IEnumerable<string> offered,
                                      IEnumerable<string> leftUnticked, DateTime answeredAtUtc)
+    {
+        string full = Path.GetFullPath(courseDirectory);
+        string? courses = Path.GetDirectoryName(full);
+        string? workspacePath = courses is not null && string.Equals(Path.GetFileName(courses), "courses", StringComparison.OrdinalIgnoreCase)
+            ? Path.GetDirectoryName(courses) : null;
+        return WriteAnswered(workspacePath, Path.GetFileName(full), courseDirectory, section, offered, leftUnticked, answeredAtUtc,
+                             new UndoStepMaker("sheet", AnsweredActionKey), undo: null, door: null);
+    }
+
+    /// <summary>The same, with the step's working folder, maker, and a test's own list and door (this process's when null).</summary>
+    internal static bool WriteAnswered(string? workspacePath, string courseCode, string courseDirectory, int section,
+                                       IEnumerable<string> offered, IEnumerable<string> leftUnticked, DateTime answeredAtUtc,
+                                       UndoStepMaker by, UndoForThisProcess? undo, UndoDoor? door)
+        => RecordTheAnswer(new UndoActionStep(by, workspacePath, courseCode, section, undo: undo, door: door),
+                           courseDirectory, section, offered, leftUnticked, answeredAtUtc);
+
+    /// <summary>The links checklist's answer, as a step's key (<c>undo-action-steps.json</c> → <c>answerTheLinksChecklist</c>).</summary>
+    internal const string AnsweredActionKey = "answerTheLinksChecklist";
+
+    /// <summary>
+    /// Plans the answered record into <paramref name="step"/> and makes it:
+    /// ONE step of that one file (Not Now's, and the record on a step of its
+    /// own). The step must be new.
+    /// </summary>
+    /// <returns>
+    /// False when the record could not be written, for any reason, the door's
+    /// refusal or anything else: it costs only the record (the checklist is
+    /// offered again), never the answer, as the mac's <c>try?</c>. A step
+    /// left part way has written the record, and says true.
+    /// </returns>
+    internal static bool RecordTheAnswer(UndoActionStep step, string courseDirectory, int section, IEnumerable<string> offered,
+                                         IEnumerable<string> leftUnticked, DateTime answeredAtUtc)
+    {
+        try
+        {
+            PlanAnswered(step, courseDirectory, section, offered, leftUnticked, answeredAtUtc);
+            step.Make();
+            return true;
+        }
+        catch (UndoStepLeftPartWayException) { return true; }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Plans the answered record in <paramref name="step"/>, without making
+    /// it: Not Now's one file, and a file of the press's own step after its
+    /// pages (#899 W7b2-8). <c>leftUnticked</c> holds rows whose OWN tick was
+    /// off (#399) — a locked row with its own tick on is not remembered as
+    /// unticked. Its folder is made by the swap. Never told to today's undo
+    /// (it never was); the bytes are Windows' own, as before
+    /// (System.Text.Json, indented).
+    /// </summary>
+    internal static void PlanAnswered(UndoActionStep step, string courseDirectory, int section, IEnumerable<string> offered,
+                                      IEnumerable<string> leftUnticked, DateTime answeredAtUtc)
     {
         var json = new JsonObject
         {
@@ -335,9 +395,8 @@ public static class LinksChecklist
             ["offered"] = new JsonArray(offered.Select(p => (JsonNode)JsonValue.Create(p)!).ToArray()),
             ["leftUnticked"] = new JsonArray(leftUnticked.Select(p => (JsonNode)JsonValue.Create(p)!).ToArray()),
         };
-        string path = AnsweredPathFor(courseDirectory, section);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        step.Write(AnsweredPathFor(courseDirectory, section), json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
+                   todaysUndoKeepsIt: false);
     }
 
     /// <summary>(offered, leftUnticked) as places in composed form; empty when there is no answer yet.</summary>

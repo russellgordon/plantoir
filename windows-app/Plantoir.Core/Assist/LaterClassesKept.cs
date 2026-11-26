@@ -70,34 +70,6 @@ public static class LaterClassesKept
     }
 
     /// <summary>
-    /// Adds <paramref name="pages"/> to what is kept — a page's older date is
-    /// replaced, so the record never holds one place twice — stamped with
-    /// <paramref name="now"/> (UTC). Written through a temporary file and a
-    /// move, so a reader never meets half a file; last writer wins between two
-    /// windows, and the worst outcome is being asked once more.
-    /// </summary>
-    /// <returns>False when the record could not be written.</returns>
-    /// <remarks>Written outside the door: the links checklist's Publish only
-    /// (<see cref="AssistWorkspace.PublishAndRemember"/>), which W7b2-8 puts
-    /// into that sheet's own step. Deploy's answer is
-    /// <see cref="KeepAtDeploy(string?, string, string, int, IEnumerable{ClassesDatedLater.Page}, DateTime?, string?)"/>.</remarks>
-    public static bool Keep(string courseDirectory, int section, IEnumerable<ClassesDatedLater.Page> pages,
-                            DateTime? now = null)
-    {
-        if (RecordKeeping(Read(courseDirectory, section), pages, now) is not { } record) return true;
-        try
-        {
-            string path = PathFor(courseDirectory, section);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            string temporary = path + ".tmp";
-            File.WriteAllText(temporary, record);
-            File.Move(temporary, path, overwrite: true);
-            return true;
-        }
-        catch { return false; }
-    }
-
-    /// <summary>
     /// The teacher's answer at Deploy (#726): the ticked classes kept, as ONE
     /// step of that one record (#899 W7b2-7; the mac's
     /// <c>KeptRecord.write</c> on a step of its own, key
@@ -105,9 +77,10 @@ public static class LaterClassesKept
     /// by the swap. The caller names the working folder and the maker, as
     /// <see cref="TimetableMemory.WriteDown(string, string, int, IEnumerable{DateOnly}, string, DateOnly, string?)"/>
     /// does. Never told to today's undo (it never was); the bytes are
-    /// Windows' own, as <see cref="Keep(string, int, IEnumerable{ClassesDatedLater.Page}, DateTime?)"/>
-    /// writes them. Nothing dated to add, or the same answer again, makes no
-    /// step.
+    /// Windows' own, as <see cref="RecordKeeping"/> makes them. Nothing dated
+    /// to add, or the same answer at the same moment, makes no step: the
+    /// same answer later stamps its new moment, a step of its own, as the
+    /// mac's <c>KeptRecord.adding</c> stamps <c>Date()</c>.
     /// </summary>
     /// <param name="workspacePath">The folder holding <c>courses\</c>, or null when the course is not inside one (the step is then made without the list, in shadow).</param>
     /// <returns>False when the record could not be written: it costs the question once more at the next Deploy, nothing else, and the deploy goes on (the mac's <c>try?</c>).</returns>
@@ -131,7 +104,10 @@ public static class LaterClassesKept
         // The record is in, what it held kept beside it: the classes ARE kept
         // (the trail's own line names the kept file, from the door).
         catch (UndoStepLeftPartWayException) { return true; }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+        // Anything else, the door's refusal or an error that is not the
+        // disk's (a stop with the switch on): the record is not written, and
+        // the deploy goes on (W7b2-7 review 1, LOW 1).
+        catch { return false; }
     }
 
     /// <summary>
@@ -153,7 +129,7 @@ public static class LaterClassesKept
 
     /// <summary>
     /// The record's text once <paramref name="pages"/> are added to
-    /// <paramref name="existing"/> (as <see cref="Keep"/> writes it), or null
+    /// <paramref name="existing"/> (as every writer plans it), or null
     /// when there is nothing dated to add. An Undo step plans this text
     /// (#899 W7a: Publish Class for a Date).
     /// </summary>
