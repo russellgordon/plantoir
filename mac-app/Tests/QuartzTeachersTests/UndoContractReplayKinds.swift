@@ -38,7 +38,9 @@ nonisolated enum UndoContractKinds {
         "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
         "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
         "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
-        "leaveAKeptCopyInsideTheMovedFolder",
+        "leaveAKeptCopyInsideTheMovedFolder", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder",
+        "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt", "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt",
+        "finderRecordsAWindowInTheMadeFolder",
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
     ]
 
@@ -53,6 +55,10 @@ nonisolated enum UndoContractKinds {
     static let mediaFolder: String = "courses/TST1O/media"
     static let renamedFolder: String = "courses/TST1O/renamed"
     static let mediaFiles: [String: String] = ["a.md": "Intro.\nLine one: old.\nEnd.\n", "b.md": "B\n"]
+
+    /// U4b2-10: the file `moveAFolderWithAFileMadeInANewFolderInside` makes,
+    /// in a folder (`sub`) the step makes for it inside the moved folder.
+    static let madeFolderFile: String = "courses/TST1O/renamed/sub/x.md"
 
     static let asidePage: String = "courses/TST1O/old/a.md"
     static let asidePageMoved: String = "courses/TST1O/a.md"
@@ -95,6 +101,46 @@ nonisolated enum UndoContractKinds {
         }
         let op: UndoOp = UndoOp.moveFile(from: from, to: to, sha: UndoHash.sha256(of: Data("page\n".utf8)))
         return word(JournaledWrite.perform(ops: draft(ops: [op], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+    }
+
+    /// Review 1 of U4b2-10: media (a.md, b.md and an empty folder sub,
+    /// made when neither place is there), then ONE step: its move to
+    /// renamed, the edit of a.md, and one `writeFile` making each of
+    /// `making`, in the order of their paths.
+    static func moveTheFolderHoldingAnEmptyFolder(
+        making: [String: String], root: URL, journal: UndoJournal, places: UndoMemoryPlaces
+    ) throws -> String {
+        if !somethingIsAt(mediaFolder, in: root) && !somethingIsAt(renamedFolder, in: root) {
+            for (name, content) in mediaFiles {
+                try UndoContractReplay.write(content, to: mediaFolder + "/" + name, in: root)
+            }
+            try FileManager.default.createDirectory(
+                at: root.appendingPathComponent(mediaFolder + "/sub"), withIntermediateDirectories: true
+            )
+        }
+        guard let listingSha = UndoTreeReading.read(at: root.appendingPathComponent(mediaFolder)).listingSha else {
+            return "noFolderToMove"
+        }
+        var ops: [UndoOp] = [
+            UndoOp.moveFolder(from: mediaFolder, to: renamedFolder, listingSha: listingSha),
+            UndoOp.replaceText(
+                path: renamedFolder + "/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+            ),
+        ]
+        var blobs: [Data] = []
+        var paths: [String] = []
+        for (path, _) in making {
+            paths.append(path)
+        }
+        paths.sort()
+        for path in paths {
+            let content: Data = Data((making[path] ?? "").utf8)
+            ops.append(UndoOp.writeFile(path: path, beforeSha: nil, afterSha: UndoHash.sha256(of: content)))
+            blobs.append(content)
+        }
+        return word(JournaledWrite.perform(
+            ops: draft(ops: ops, blobs: blobs, root: root, action: "renameFolder"), in: journal, mode: .live, places: places
+        ))
     }
 
     /// The folder at `folder`, replaced by a link to the folder beside the
@@ -323,6 +369,47 @@ nonisolated enum UndoContractKinds {
                 path: renamedFolder + "/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
             )
             return word(JournaledWrite.perform(ops: draft(ops: [move, edit], blobs: [], root: root, action: "renameFolder"), in: journal, mode: .live, places: places))
+        case "moveAFolderWithAFileMadeInANewFolderInside":
+            // U4b2-10: one step, the folder moved, a page inside it edited,
+            // and a file made in a folder that was not there, both named at
+            // the new place (opKinds.wholeOps' order).
+            if !somethingIsAt(mediaFolder, in: root) && !somethingIsAt(renamedFolder, in: root) {
+                for (name, content) in mediaFiles {
+                    try UndoContractReplay.write(content, to: mediaFolder + "/" + name, in: root)
+                }
+            }
+            guard let listingSha = UndoTreeReading.read(at: root.appendingPathComponent(mediaFolder)).listingSha else {
+                return "noFolderToMove"
+            }
+            let madeContent: Data = Data("X\n".utf8)
+            let move: UndoOp = UndoOp.moveFolder(from: mediaFolder, to: renamedFolder, listingSha: listingSha)
+            let edit: UndoOp = UndoOp.replaceText(
+                path: renamedFolder + "/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+            )
+            let made: UndoOp = UndoOp.writeFile(path: madeFolderFile, beforeSha: nil, afterSha: UndoHash.sha256(of: madeContent))
+            return word(JournaledWrite.perform(
+                ops: draft(ops: [move, edit, made], blobs: [madeContent], root: root, action: "renameFolder"),
+                in: journal, mode: .live, places: places
+            ))
+        case "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt":
+            // Review 1 of U4b2-10, MEDIUM 1 (a): the content's own empty
+            // sub, and a folder the step makes inside it.
+            return try moveTheFolderHoldingAnEmptyFolder(
+                making: ["courses/TST1O/renamed/sub/deeper/x.md": "X\n"], root: root, journal: journal, places: places
+            )
+        case "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt":
+            // MEDIUM 1 (b): a file made in the content's own empty sub, and
+            // a folder made beside it.
+            return try moveTheFolderHoldingAnEmptyFolder(
+                making: ["courses/TST1O/renamed/sub/x.md": "X\n", "courses/TST1O/renamed/new/y.md": "Y\n"],
+                root: root, journal: journal, places: places
+            )
+        case "finderRecordsAWindowInTheMadeFolder":
+            try UndoContractReplay.write("Finder\n", to: renamedFolder + "/sub/" + UndoTreeListing.ignoredName, in: root)
+            return nil
+        case "addAFolderInsideTheMadeFolder":
+            try UndoContractReplay.write("Y\n", to: renamedFolder + "/sub/mine/y.md", in: root)
+            return nil
         case "renameAFolderInCaseOnly":
             // U4b: one step, the folder renamed in its capitals only, then a
             // page inside it edited, named at the new spelling.
@@ -408,6 +495,45 @@ nonisolated enum UndoContractKinds {
             }
         }
         return place + ", " + page
+    }
+
+    /// U4b2-10's `madeFolder`: what the folder `sub` holds wherever the
+    /// moved folder is now (renamed if it is there, else media), every name
+    /// in the order of its bytes, `empty` or `none`.
+    static func madeFolder(in root: URL) -> String {
+        let folder: String = somethingIsAt(renamedFolder, in: root) ? renamedFolder : mediaFolder
+        var isAFolder: ObjCBool = false
+        let made: URL = root.appendingPathComponent(folder + "/sub")
+        if !FileManager.default.fileExists(atPath: made.path, isDirectory: &isAFolder) || !isAFolder.boolValue {
+            return "none"
+        }
+        let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: made.path)) ?? []
+        if names.isEmpty {
+            return "empty"
+        }
+        var inByteOrder: [String] = names
+        inByteOrder.sort { first, second in
+            Array(first.utf8).lexicographicallyPrecedes(Array(second.utf8))
+        }
+        return inByteOrder.joined(separator: ", ")
+    }
+
+    /// Review 1 of U4b2-10's `foldersInside`: every folder below the moved
+    /// folder wherever it is now (renamed if it is there, else media), in
+    /// the order of their bytes, or `none`.
+    static func foldersInside(in root: URL) -> String {
+        let folder: String = somethingIsAt(renamedFolder, in: root) ? renamedFolder : mediaFolder
+        guard case .tree(let listing, _) = UndoTreeReading.read(at: root.appendingPathComponent(folder)) else {
+            return "none"
+        }
+        if listing.folders.isEmpty {
+            return "none"
+        }
+        var inByteOrder: [String] = listing.folders
+        inByteOrder.sort { first, second in
+            Array(first.utf8).lexicographicallyPrecedes(Array(second.utf8))
+        }
+        return inByteOrder.joined(separator: ", ")
     }
 
     /// The spelling courses/TST1O lists for the folder a capitalisation-only

@@ -808,6 +808,11 @@ nonisolated enum UndoSwap {
         // again, when empty, by a swap that is refused (the review of U3b,
         // LOW 4: a refused step left an empty kept folder behind).
         var foldersMade: [URL] = []
+        // U4b2-10: each folder a moved folder's last look left out (one the
+        // step's carried edits made, holding nothing of the content), where
+        // it is once moved, deepest first: removed, when empty, once every
+        // swap has gone in and the tidy has run.
+        var foldersLeftOutOfAMove: [URL] = []
 
         /// Makes the folder a place goes in, noting each level it made.
         func makeTheFolder(for url: URL) {
@@ -1147,7 +1152,8 @@ nonisolated enum UndoSwap {
                         leftOut[inside] = item
                     }
                 }
-                let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: from, overriding: leftOut)
+                let fromReading = UndoMoveSide.readNamingFoldersLeftOut(op, at: from, overriding: leftOut)
+                let atFrom: UndoMoveSide = fromReading.side
                 var atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url)
                 if op.isCaseOnlyMove, let spelled = UndoMoveSide.spellingListed(from: from, to: target.url) {
                     // One item under two spellings (U4b): it goes in only
@@ -1173,6 +1179,9 @@ nonisolated enum UndoSwap {
                         refusal = .fileIsInUse(path: namedAs)
                     } else {
                         followTheMove(from: from, to: target.url)
+                        for inside in fromReading.foldersLeftOut {
+                            foldersLeftOutOfAMove.append(target.url.appendingPathComponent(inside))
+                        }
                     }
                 }
             case .makeTree:
@@ -1253,6 +1262,11 @@ nonisolated enum UndoSwap {
         if tidy() {
             return .stoppedByATest
         }
+        // A folder the step made for a carried edit goes with the edit, if it
+        // is empty now; `rmdir` never removes one holding anything.
+        for folder in foldersLeftOutOfAMove {
+            UndoSwap.removeAFolderLeftOut(folder)
+        }
         for target in targets {
             if case .setExternal = target.change {
                 continue
@@ -1260,6 +1274,43 @@ nonisolated enum UndoSwap {
             UndoFiles.syncFolder(target.url.deletingLastPathComponent())
         }
         return .swapped
+    }
+
+    /// U4b2-10: a folder a moved folder's last look left out, removed
+    /// where it now is when it holds nothing but, perhaps, the Finder's
+    /// record of a window (`UndoTreeListing.ignoredName`, never listed,
+    /// which goes with its folder as a folder taken out takes it: review 1
+    /// of U4b2-10, MEDIUM 2). That record goes first only when it is a
+    /// regular file and the folder holds nothing else; a link of that name,
+    /// or anything else inside, leaves the folder and everything in it.
+    static func removeAFolderLeftOut(_ folder: URL) {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            return
+        }
+        if names == [UndoTreeListing.ignoredName] {
+            let record: URL = folder.appendingPathComponent(UndoTreeListing.ignoredName)
+            var information: stat = stat()
+            let found: Int32 = record.withUnsafeFileSystemRepresentation { path in
+                guard let path else {
+                    return -1
+                }
+                return lstat(path, &information)
+            }
+            if found != 0 || information.st_mode & S_IFMT != S_IFREG {
+                return
+            }
+            try? FileManager.default.removeItem(at: record)
+        }
+        // Not told when it fails: every swap has gone in, and a folder that
+        // will not go holds something (a file put there since the last
+        // look), so it is left with what it holds, as `removeTheFoldersMade`
+        // leaves one. Never a refusal after the step is done.
+        _ = folder.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return Int32(-1)
+            }
+            return rmdir(path)
+        }
     }
 
     /// The place to name when a change no longer stays inside the working

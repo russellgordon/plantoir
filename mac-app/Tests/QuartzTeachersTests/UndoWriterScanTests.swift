@@ -192,7 +192,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/ToolchainFingerprints.swift": (7, "notAStep: the toolchain mirror's index"),
         "Models/Undo/JournaledStep.swift": (1, "door: an action's step (U3), written through JournaledWrite, and the front page's rule (UndoKeptFiles); a step that cannot be named is staged and swapped through UndoSwap since U3a's second round"),
         "Models/Undo/JournaledWrite.swift": (4, "door: the notes of a shadow swap made without the list, in the list's own folder (UndoShadowStaging, U3a's second round), never in a working folder"),
-        "Models/Undo/UndoCheck.swift": (15, "door: the staged swaps of an undo, a redo and recovery, and U2's rename that never replaces, a folder renamed aside and one made beside its place, a folder taken out deleted only after its rename to -gone"),
+        "Models/Undo/UndoCheck.swift": (17, "door: the staged swaps of an undo, a redo and recovery, and U2's rename that never replaces, a folder renamed aside and one made beside its place, a folder taken out deleted only after its rename to -gone, and a folder left out of a moved folder's judgement removed after the move when it holds nothing but the Finder's .DS_Store, a regular file (U4b2-10)"),
         "Models/Undo/UndoJournal.swift": (19, "door: the list itself, outside every working folder"),
         "Models/Undo/UndoLock.swift": (1, "door: the list's own lock file"),
         "Models/Undo/UndoOpKinds.swift": (4, "door: a folder a redo of createTree (or an undo of removeTree) makes under its staged name, from the list's content"),
