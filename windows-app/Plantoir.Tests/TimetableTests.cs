@@ -753,6 +753,12 @@ public class ReDateTests : IDisposable
         string first = PagePaths.ResolveInside(_folder, plan.Changing.First().RelativePath);
         byte[] firstBefore = File.ReadAllBytes(first);
         byte[] secondBefore = File.ReadAllBytes(second);
+        // The conversation's copy already made, as it is for every change
+        // after the first in an assistant chat: the copy reads the timetable
+        // too, so without it the backup's own refusal would answer first.
+        typeof(AssistWorkspace).GetMethod("BackUpOnceForThisConversation",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .Invoke(workspace, [workspace.Course("ICS3U"), 1, null]);
         AssistRefusal refused;
         using (new FileStream(timetable, FileMode.Open, FileAccess.Read, FileShare.None))
             refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
