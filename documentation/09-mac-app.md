@@ -22637,6 +22637,28 @@ part-way states are the Mac's and name Windows' one part-way line until W8
 (folders moved, settings not written); README's 2026-09 clause that the event
 "records no link counts" now says it records pages relinked.
 
+Review 1 (M1) found that the disk alone cannot tell a renamed folder from one
+that was at the new name all along (a per-section plan skips a section with no
+folder at the old name before its taken-destination check, so a hand-made
+`section2/Assessments` is never refused), and the reading then said "renamed
+only in part … still called Assessments: section2/Assessments" after a step
+moved wholly back. The rule now: a place is named only if it belongs to this
+rename AND the disk shows it at the new name. Belongs means a destination of
+this run's planned moves, or a place the record of the rename it finishes
+names: the record gains `moved`, one string with a place per line (so every
+reader's map of strings still reads it), written with this run's moves and the
+earlier record's places when that record is of the same rename. A record
+without `moved` (Windows', or one written before this) falls back to the
+reading `looksLikeAnInterruptedRename` already trusts: a new-name place whose
+old name is absent beside it. The disk then decides: `lstat`, never followed;
+a folder counts; a link only where this run moved a link (`Move.isALink`, L3);
+a capitalisation-only rename asks the listing for the new spelling. Only "no
+such file" reads as absent: any other refusal, or a listing that fails, is
+returned as unreadable and told on the trail ("could not tell whether these
+are at the new name: …", L2), while the sheet's sentence is chosen by what
+could be read (no new sentence). Rejected: recording places only in a finish
+run (a start run after a killed one then forgets the earlier run's section).
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

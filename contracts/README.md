@@ -2284,13 +2284,15 @@ itself — so word it deliberately rather than discovering the gap:
   says both until its own piece (W8). What a refused rename says on the Mac is
   in `undo.wording`, three keys: `renameFolderNothingWasChanged` (nothing was
   changed), and two for a refused step that could not all be put back, which
-  is still possible: `renameFolderStoppedPartWay` (no folder at its new name,
-  files kept beside their pages) and `renameFolderRenamedOnlyInPart` (each
-  folder at its new name, named as the disk has it, whether this run moved it
-  or an earlier, interrupted run did, U4b2-5). Both write a `folder renamed`
-  line on the trail. Windows' one part-way line until W8 is a rename whose
-  folders moved but whose settings could not be written ("renamed the folder
-  … but could not write it to this course's settings").
+  is still possible: `renameFolderStoppedPartWay` (none of the rename's
+  folders at its new name, files kept beside their pages) and
+  `renameFolderRenamedOnlyInPart` (each of the rename's folders the disk shows
+  at its new name, named, whether this run moved it or an earlier, interrupted
+  run did; never a folder that was at the new name all along, U4b2-5). Both
+  write a `folder renamed` line on the trail. Windows' one part-way line until
+  W8 is a rename whose folders moved but whose settings could not be written
+  ("renamed the folder … but could not write it to this course's settings");
+  its stop after moving some of the copies writes no line.
 - **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
 - **The assistant's unit sentences**, which an earlier draft wrongly said were
   "listed below with the others" until this line was added. Two of the five are
