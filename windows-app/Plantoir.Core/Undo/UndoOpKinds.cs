@@ -687,6 +687,9 @@ internal static class UndoLinks
         return attributes.HasFlag(FileAttributes.Directory) ? What.Folder : What.File;
     }
 
+    /// <summary>W8-6's seam: not yet written.</summary>
+    internal static string? LinkSha(string fullPath) => null;
+
     /// <summary>A file's bytes, read sharing everything, or null when it cannot be read now.</summary>
     internal static byte[]? ReadAll(string fullPath)
     {

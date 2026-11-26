@@ -88,6 +88,9 @@ internal sealed record UndoOp
     /// <summary>A folder's <c>move</c>, <c>createTree</c> and <c>removeTree</c>: the SHA-256 of the folder's listing (<see cref="UndoTreeListing"/>).</summary>
     internal string? ListingSha { get; init; }
 
+    /// <summary>A link's <c>move</c> (W8-6): read, not yet judged.</summary>
+    internal string? LinkSha { get; init; }
+
     /// <summary><c>external</c>: what outside every working folder it changed (<c>preference:&lt;name&gt;</c>).</summary>
     internal string? Target { get; init; }
 
@@ -691,6 +694,7 @@ internal static class UndoFormat
         if (!OptionalString(element, "to", out string? to)) readable = false;
         if (!OptionalString(element, "sha", out string? sha)) readable = false;
         if (!OptionalString(element, "listingSha", out string? listingSha)) readable = false;
+        if (!OptionalString(element, "linkSha", out string? linkSha)) readable = false;
         if (!OptionalString(element, "target", out string? target)) readable = false;
         List<string>? keyPath = null;
         if (element.TryGetProperty("keyPath", out JsonElement keyPathElement) && keyPathElement.ValueKind != JsonValueKind.Null)
@@ -769,6 +773,7 @@ internal static class UndoFormat
             To = to,
             Sha = sha,
             ListingSha = listingSha,
+            LinkSha = linkSha,
             Target = target,
             Blobs = blobs.Distinct(StringComparer.Ordinal).ToList(),
         };
