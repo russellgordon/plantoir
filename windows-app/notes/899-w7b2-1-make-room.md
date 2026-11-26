@@ -39,6 +39,11 @@ File `vm-tools/guest/899-w7b2-1-mustfail.json` (ASCII anchors: PowerShell 5.1 re
 4. A file out of its planned order (each rename's remove before its write): `MakingRoomIsOneStepInTheMacsFileOrder`.
 5. The old carried-past write failure put back (#550): `InsertClassesTests.MakeRoomWhoseNewPageCouldNotBeSaved_ChangesNothing`.
 6. A change-nothing plan making a step and writing its backup: `APlanThatChangesNothingMakesNoStepAndNoWrite`.
+7. Review 1 L5, `_removedOnce` reverted (the plain write follows a link the step removed): both cases of `ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15` (outside and inside the working folder).
+8. Review 1 L5, a change-nothing plan making a step that writes a file (`course_config.json`): `APlanThatChangesNothingMakesNoStepAndNoWrite`, on its step count.
+9. Review 1 L5, a made page left Hidden: `NoNewOrRenamedPageIsEverHidden`.
+
+Run `w7b2-1-d` on 24574d77f (after review 1): **9 RED of 9**, the restored tree 445 of 445 green.
 
 ## Runs
 
@@ -47,6 +52,9 @@ All on the PC (LENOVO 20QES70500, Intel Core i5-8365U, 16 GB, Windows 11 Pro 262
 - `w7b2-1-a-red`, cf9548fb4 (tests only): both builds exit 0; **8 failed of 71**: five of `UndoMakeRoomStepTests` (one step in the mac's order, taken rename, cannot be written, part way, plan-time befores), the fixture row `TheWindowsActionLeavesTheRecordedStep(makeRoomForClasses)`, `InsertClassesTests.MakeRoomWhoseNewPageCouldNotBeSaved_ChangesNothing`, `DeclinedPagesAreNamedTests.MakingRoomWhoseLinkedPageCannotBeWrittenChangesNothing`. The three that passed before the product change (never Hidden, change-nothing, the linked later class) pin behaviour the old path already had and the conversion must keep; each is proven by must-fail row 6 or by its own assertions on the new path.
 - `w7b2-1-a`, c58cf1acc (before the merge): 443 of 443; must-fail 5 RED, row 3 NOT-FOUND (anchor encoding, fixed); harness 6 failures of 12 in each place, the harness's own fault: its pages were alike but for the day, so a rename left two pages byte for byte as laid and the step held two files (beforeSwap@2 and @3 never reached). Pages now carry their own lesson.
 - `w7b2-1-b`, f21a18782 (merged `dev` da7474047): both builds exit 0; **443 of 443**; must-fail **6 RED of 6**, restored 443 green; harness `w7-make-room-kill` (three renames planned with removes and one new page, real `ApplyInsertClasses`, killed at afterBegin, beforeSwap@0 to @3 and beforeApplied, shadow then live, recovered by a second process): reference 4 of 4 pages changed; **0 failures of 12 outside OneDrive and 0 of 12 inside OneDrive** (running); every page whole, no staged file, nothing Hidden but a kept copy; scratch folders removed.
+
+- `w7b2-1-c` was launched with its mode quoted wrongly (PowerShell `-File` split it), so it would have run the wrong ref; it was stopped while building, its own lock removed (owner line `w7b2-1-c-red`), no other run waiting, the PC checkout clean.
+- `w7b2-1-d`, 24574d77f (review 1's fixes: the clause read by the linked-later-class test, now a theory with a link inside the working folder too; `AmongBlankPagesAPageThatComesOutUnchangedIsNotInTheStep`; the change-nothing test's step count first): both builds exit 0; **445 of 445**; must-fail **9 RED of 9**, restored 445 green. The harness was not changed and not re-run (review 1's L3 is pinned in the unit test instead).
 
 ## Left for the next piece
 
