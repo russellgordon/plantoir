@@ -1718,7 +1718,7 @@ class ContractCaseTests(unittest.TestCase):
         forward or back, settles whole, judged by content with the pair
         judged together (door-3)."""
         cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAHandedOverPlace")]
-        self.assertEqual(len(cases), 8)
+        self.assertEqual(len(cases), 10)
         phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
                   ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done"}
         calls = {"afterALinksMove": "handAPlaceOverAfterALinksMove", "beforeALinksMove": "handAPlaceOverBeforeALinksMove"}
@@ -1745,10 +1745,24 @@ class ContractCaseTests(unittest.TestCase):
                 after_pages = traces.stopped_part_way(ops, False, pages, None)
                 starting = after_pages if work == "undo" else pages
                 left = traces.stopped_part_way(ops, work == "undo", starting, swapped)
+                stopped = left
                 if case.get("handEdit") == "handedOverPlace":
                     left = dict(left)
                     left[self.day(3)] = "Someone else's.\n"
+                taken = "courses/TST1O/section1/Unit 1, Day 3 (kept by Undo).md"
+                if case.get("visibleNameTaken"):
+                    left = dict(left)
+                    left[taken] = "earlier\n"
                 outcome, settled, named = traces.recover(ops, left, work != "undo")
+                # U4b3 kept-original-named: a removed page whose place is
+                # taken is kept under a visible name, named once each.
+                settled, kept_lines = traces.keep_pages_whose_place_is_taken(ops, starting, stopped, settled, outcome)
+                self.assertEqual(len(kept_lines), case.get("keptPageLines", 0))
+                if "keptVisibleAs" in case:
+                    self.assertEqual(kept_lines, [(self.day(3), case["keptVisibleAs"])])
+                    self.assertEqual(settled.get(case["keptVisibleAs"]), "Three.\n")
+                if case.get("visibleNameTaken"):
+                    self.assertEqual(settled.get(taken), "earlier\n")
                 self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
                 settled_model = type("Settled", (), {"pages": settled})
                 if case["files"] != "unchecked":

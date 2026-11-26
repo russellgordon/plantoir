@@ -193,7 +193,11 @@ nonisolated enum UndoRecovery {
             // Closed `interrupted`: the step did not settle, so a kept
             // original that is the only copy of its page's earlier content
             // stays beside the page (the second review of U3a, MEDIUM b).
-            if !tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true) {
+            // A page the step removed or moved away, kept only in its hidden
+            // original because something else now holds its place, is kept
+            // under a visible name beside it first (kept-original-named).
+            let pagesNamed: Bool = mode != .live || UndoRecovery.keepPagesWhosePlaceIsTaken(of: record.step, root: root)
+            if !tidyStagedFiles(of: record.step, root: root, keepingOnlyCopies: true) || !pagesNamed {
                 // Something held or locked: looked for again at the next lock.
                 continue
             }
@@ -614,6 +618,57 @@ nonisolated enum UndoRecovery {
             changes = UndoRecovery.whatChanged(at: found.foundAt, against: step, place: place, journal: journal)
         }
         UndoTrailHook.foundAFolderSetAsideLine?(step.course ?? "", step.section, place, found.hiddenName, keptAs, changes)
+    }
+
+    /// U4b3 kept-original-named: for a step that did not settle, every
+    /// kept original (`-orig`, a file) of a place an op of the step leaves
+    /// or fills whole (`UndoCheck.placeLeft`, `placeFilled`: a page removed
+    /// or moved away going one way or the other) that is the only copy of
+    /// what it holds while something else (a file, a folder or a link) now
+    /// holds that place is renamed, exclusively and never over anything,
+    /// to the first free visible name beside its place, `<name> (kept by
+    /// Undo).md`, then `(kept by Undo 2)` and on (the folder's rule,
+    /// Russell's ruling of 2026-11-19; the words before the extension, his
+    /// ruling of 2026-11-26). The trail line naming the place and the
+    /// visible name is written just before the rename (the intent first).
+    /// A kept original whose place is free, or one beside its own page, is
+    /// left as it is. False when a place or a name cannot be read now: it
+    /// stays hidden for a later try and nothing is said.
+    @discardableResult
+    static func keepPagesWhosePlaceIsTaken(of step: UndoStep, root: URL) -> Bool {
+        var places: [String] = []
+        for op in step.ops {
+            for place in [UndoCheck.placeLeft(by: op), UndoCheck.placeFilled(by: op)] {
+                if let place, !places.contains(place) {
+                    places.append(place)
+                }
+            }
+        }
+        var allNamed: Bool = true
+        for place in places {
+            let placeURL: URL = root.appendingPathComponent(place)
+            for kept in UndoRecovery.keptOriginalFiles(of: step, beside: placeURL) {
+                let inItsPlace: UndoTreeReading = UndoTreeReading.read(at: placeURL)
+                if inItsPlace == .cannotRead {
+                    allNamed = false
+                    continue
+                }
+                if inItsPlace == .absent || UndoSwap.isACopyOfItsPlace(kept, place: placeURL) {
+                    continue
+                }
+                let named: Bool = UndoSwap.renameToAVisibleName(kept, place: placeURL, isAPage: true, tellingFirst: { keptURL in
+                    UndoTrailHook.keptAPageLine?(
+                        step.course ?? "", step.section,
+                        UndoRecovery.insideTheFolder(placeURL, root: root),
+                        UndoRecovery.insideTheFolder(keptURL, root: root)
+                    )
+                })
+                if !named {
+                    allNamed = false
+                }
+            }
+        }
+        return allNamed
     }
 
     /// A place's path inside the working folder, or its last name when it
@@ -1292,6 +1347,9 @@ nonisolated enum UndoRecovery {
                     // staged new content and copies go.
                     UndoSwap.tidyLeftovers(label: label, beside: urls, root: root, keepingOnlyCopies: true)
                     UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true)
+                    // A page the step removed or moved away whose place is now
+                    // taken is kept under a visible name, never left hidden.
+                    UndoRecovery.keepPagesWhosePlaceIsTaken(of: step, root: root)
                     // Said after the tidy, so it names what is on the disk.
                     UndoTrailHook.couldNotPutBackLine?(
                         step.course ?? "", step.section, phase, countShown(leftPartWay),

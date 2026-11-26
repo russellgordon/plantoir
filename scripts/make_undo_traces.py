@@ -1659,6 +1659,53 @@ def recover(ops, pages, started_from_before):
     return ("rolledBack", put_back, [])
 
 
+def visible_name(place, number, is_a_page=False):
+    """UndoSwap.visibleName: `<name> (kept by Undo)`, then `(kept by Undo
+    2)` and on; a page's words go before its extension (U4b3
+    kept-original-named, Russell's ruling of 2026-11-26)."""
+    words = " (kept by Undo)" if number <= 1 else " (kept by Undo %d)" % number
+    folder, _, name = place.rpartition("/")
+    stem, dot, extension = name.rpartition(".")
+    if is_a_page and dot and stem:
+        name = stem + words + "." + extension
+    else:
+        name = name + words
+    return folder + "/" + name if folder else name
+
+
+def keep_pages_whose_place_is_taken(ops, starting, stopped, settled, outcome):
+    """UndoRecovery.keepPagesWhosePlaceIsTaken (U4b3 kept-original-named),
+    as the model can see it: for a step that did not settle
+    (interrupted), a page a whole-file op's swap removed or moved away
+    (it held a page when the work began, `starting`, and its swap had taken
+    it when the work stopped, `stopped`), whose place something else now
+    holds (`settled`), is kept under the first visible name nothing holds,
+    never over anything. Answers (pages, [(place, visible name)], one per
+    trail line)."""
+    if outcome != "interrupted":
+        return settled, []
+    pages = dict(settled)
+    lines = []
+    places = []
+    for op in ops:
+        if op["kind"] == "writeFile" and op.get("path") not in places:
+            places.append(op["path"])
+    for place in places:
+        page = starting.get(place)
+        if not isinstance(page, str) or stopped.get(place) == page:
+            continue
+        now = pages.get(place)
+        if now is None or now == page:
+            continue
+        number = 1
+        while visible_name(place, number, True) in pages:
+            number += 1
+        kept = visible_name(place, number, True)
+        pages[kept] = page
+        lines.append((place, kept))
+    return pages, lines
+
+
 def put_back_what_took_effect(ops, places, started_from_before, pages):
     """The pages once every op whose place is in `places` is taken back the
     way the stopped work came (one plan, as settle's opsToPutBack), or None

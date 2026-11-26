@@ -1650,6 +1650,10 @@ nonisolated enum UndoContractReplay {
     // MARK: - undo.recoveryCases
 
     /// A process that never existed, standing for one that died.
+    /// U4b3 kept-original-named: the visible name recovery keeps the
+    /// removed Day 3 page under when something else holds Day 3.
+    static let keptPageName: String = "courses/TST1O/section1/Unit 1, Day 3 (kept by Undo).md"
+
     static let goneProcess: UndoProcess = UndoProcess(host: "", pid: 2_000_000_001, name: "gone", started: "1.000000")
 
     static let recoveryKeys: Set<String> = [
@@ -1658,7 +1662,7 @@ nonisolated enum UndoContractReplay {
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
         "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace", "nextWrite", "ordinaryWriteOn",
-        "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
+        "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines", "keptPageLines",
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored", "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
@@ -2055,7 +2059,12 @@ nonisolated enum UndoContractReplay {
                 try Data(held.utf8).write(to: UndoSwap.besideURL(for: page, label: "\(workSeq)-undo", role: "orig"))
             }
             if testCase["visibleNameTaken"] as? Bool == true {
-                try write("earlier\n", to: UndoContractKinds.extraFolder + " (kept by Undo)/earlier.md", in: root)
+                if handedOverCall != nil {
+                    // U4b3 kept-original-named: the removed page's visible name.
+                    try write("earlier\n", to: UndoContractReplay.keptPageName, in: root)
+                } else {
+                    try write("earlier\n", to: UndoContractKinds.extraFolder + " (kept by Undo)/earlier.md", in: root)
+                }
             }
             if testCase["deployBeforeRecovery"] as? Bool == true {
                 // A deploy wrote a new marker in the place the move emptied.
@@ -2067,6 +2076,11 @@ nonisolated enum UndoContractReplay {
             let trailHookBefore = UndoTrailHook.foundAFolderSetAsideLine
             UndoTrailHook.foundAFolderSetAsideLine = { _, _, _, _, _, _ in
                 folderLines += 1
+            }
+            var keptPageLines: Int = 0
+            let keptAPageHookBefore = UndoTrailHook.keptAPageLine
+            UndoTrailHook.keptAPageLine = { _, _, _, _ in
+                keptPageLines += 1
             }
             var keptNamedOnTheTrail: [String] = []
             var couldNotPutBackLines: Int = 0
@@ -2089,6 +2103,7 @@ nonisolated enum UndoContractReplay {
             }
             defer {
                 UndoTrailHook.foundAFolderSetAsideLine = trailHookBefore
+                UndoTrailHook.keptAPageLine = keptAPageHookBefore
                 UndoTrailHook.couldNotPutBackLine = couldNotPutBackHookBefore
                 UndoTrailHook.keptAnOriginalLine = keptAnOriginalHookBefore
                 UndoTrailHook.leftNewestLine = leftHookBefore
@@ -2182,10 +2197,25 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': the preference is \(places.read(UndoContractKinds.preference)), not \(wanted)")
             }
             if let wanted = string(testCase["keptVisibleAs"]) {
-                let keptFile: URL = root.appendingPathComponent(wanted).appendingPathComponent("a.md")
-                if !FileManager.default.fileExists(atPath: keptFile.path) {
-                    failures.append("recoveryCases '\(name)': the folder is not kept as \(wanted)")
+                if handedOverCall != nil {
+                    // U4b3 kept-original-named: the removed page, a file
+                    // holding `Three.` byte for byte.
+                    if UndoItem.read(at: root.appendingPathComponent(wanted)) != .file(Data("Three.\n".utf8)) {
+                        failures.append("recoveryCases '\(name)': the page is not kept as \(wanted) (\(UndoItem.read(at: root.appendingPathComponent(wanted))))")
+                    }
+                } else {
+                    let keptFile: URL = root.appendingPathComponent(wanted).appendingPathComponent("a.md")
+                    if !FileManager.default.fileExists(atPath: keptFile.path) {
+                        failures.append("recoveryCases '\(name)': the folder is not kept as \(wanted)")
+                    }
                 }
+            }
+            if testCase["visibleNameTaken"] as? Bool == true && handedOverCall != nil,
+               UndoItem.read(at: root.appendingPathComponent(UndoContractReplay.keptPageName)) != .file(Data("earlier\n".utf8)) {
+                failures.append("recoveryCases '\(name)': the taken name \(UndoContractReplay.keptPageName) was changed")
+            }
+            if let wanted = int(testCase["keptPageLines"]), keptPageLines != wanted {
+                failures.append("recoveryCases '\(name)': \(keptPageLines) 'undo kept a page under a visible name' lines, not \(wanted)")
             }
             if let wanted = int(testCase["folderLines"]), folderLines != wanted {
                 failures.append("recoveryCases '\(name)': \(folderLines) 'undo found a folder set aside' lines, not \(wanted)")

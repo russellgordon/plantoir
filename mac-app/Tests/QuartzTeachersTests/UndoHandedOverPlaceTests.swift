@@ -194,6 +194,38 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         // recovery rows say (review C of U4b3, LOW 1: any of five phases
         // was accepted).
         XCTAssertEqual(phase, "interrupted", "the step is \(phase)")
+        // And the removed page is kept under its visible name, never left
+        // hidden (kept-original-named).
+        XCTAssertEqual(
+            UndoItem.read(at: laid.root.appendingPathComponent(section + "Unit 1, Day 3 (kept by Undo).md")),
+            .file(Data("Three.\n".utf8))
+        )
+    }
+
+    // MARK: - A kept page named (kept-original-named)
+
+    /// The probe of the second fix round, end to end through
+    /// `UndoRecovery.run`: shape B dies with Day 3's page removed and a
+    /// file then written at Day 3. The removed page is kept under the
+    /// visible name beside its place, nothing hidden is left, the file at
+    /// Day 3 is untouched, and the trail is told once, with both names.
+    func testAPageRemovedWhosePlaceIsTakenIsKeptUnderAVisibleName() throws {
+        let found: KeptPageProbe = try probeAKeptPage(visibleNameTaken: false)
+        XCTAssertEqual(stagedLeft(under: found.root), [])
+        XCTAssertEqual(UndoItem.read(at: found.root.appendingPathComponent(section + "Unit 1, Day 3 (kept by Undo).md")), .file(Data("Three.\n".utf8)))
+        XCTAssertEqual(try String(contentsOf: found.root.appendingPathComponent(day(3)), encoding: .utf8), "Someone else's.\n")
+        XCTAssertEqual(found.lines, [day(3) + " -> " + section + "Unit 1, Day 3 (kept by Undo).md"])
+    }
+
+    /// The same with the visible name already taken: kept as `(kept by
+    /// Undo 2)`, the taken name untouched.
+    func testAPageKeptUnderAVisibleNameSkipsATakenName() throws {
+        let found: KeptPageProbe = try probeAKeptPage(visibleNameTaken: true)
+        XCTAssertEqual(stagedLeft(under: found.root), [])
+        XCTAssertEqual(UndoItem.read(at: found.root.appendingPathComponent(section + "Unit 1, Day 3 (kept by Undo).md")), .file(Data("earlier\n".utf8)))
+        XCTAssertEqual(UndoItem.read(at: found.root.appendingPathComponent(section + "Unit 1, Day 3 (kept by Undo 2).md")), .file(Data("Three.\n".utf8)))
+        XCTAssertEqual(try String(contentsOf: found.root.appendingPathComponent(day(3)), encoding: .utf8), "Someone else's.\n")
+        XCTAssertEqual(found.lines, [day(3) + " -> " + section + "Unit 1, Day 3 (kept by Undo 2).md"])
     }
 
     /// Shape A, and the link replaced by a plain file between the plan and
@@ -759,6 +791,17 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         let ops: [UndoOp]
     }
 
+    /// What `probeAKeptPage` found: the working folder after recovery and
+    /// each 'undo kept a page under a visible name' line.
+    struct KeptPageProbe {
+
+        // MARK: - Stored properties
+
+        let root: URL
+
+        let lines: [String]
+    }
+
     func layShapeA(leadingOut: Bool) throws -> LaidStep {
         let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "back-a")
         let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
@@ -1012,6 +1055,49 @@ final class UndoHandedOverPlaceTests: XCTestCase {
 
     /// Whether any file under the root, kept originals included, holds
     /// exactly this text. Never followed through a link.
+    /// Shape B made through the door by a process that dies, with a file
+    /// written at Day 3 once its page is removed (and, when asked, the
+    /// visible name taken first), then recovered by another process; the
+    /// root and every 'undo kept a page under a visible name' line, as
+    /// "place -> visible name".
+    func probeAKeptPage(visibleNameTaken: Bool) throws -> KeptPageProbe {
+        let laid: LaidStep = try layShapeB(leadingOut: false)
+        let dying: UndoJournal = UndoJournal(
+            folderURL: laid.journal.folderURL, process: UndoContractReplay.goneProcess,
+            processIsAlive: { process in process.pid != UndoContractReplay.goneProcess.pid }
+        )
+        let blobs: [Data] = [Data("New.\n".utf8), Data("Three.\n".utf8)]
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: laid.ops, blobs: blobs, root: laid.root, action: "insertClass")
+        let intruder: URL = laid.root.appendingPathComponent(day(3))
+        UndoKillPoints.fileInUseAtSwap = { index in
+            if index == 2 {
+                try? Data("Someone else's.\n".utf8).write(to: intruder)
+            }
+            return false
+        }
+        _ = JournaledWrite.perform(ops: draft, in: dying, mode: .live, places: UndoMemoryPlaces())
+        UndoKillPoints.fileInUseAtSwap = nil
+        if visibleNameTaken {
+            try UndoContractReplay.write("earlier\n", to: section + "Unit 1, Day 3 (kept by Undo).md", in: laid.root)
+        }
+        var lines: [String] = []
+        let hookBefore = UndoTrailHook.keptAPageLine
+        UndoTrailHook.keptAPageLine = { _, _, place, keptAs in
+            lines.append(place + " -> " + keptAs)
+        }
+        defer {
+            UndoTrailHook.keptAPageLine = hookBefore
+        }
+        let survivor: UndoJournal = UndoJournal(
+            folderURL: laid.journal.folderURL,
+            processIsAlive: { process in process.pid != UndoContractReplay.goneProcess.pid }
+        )
+        try survivor.withLock { writer in
+            UndoRecovery.run(writer, mode: .live, resolveRoot: { _ in laid.root })
+        }
+        return KeptPageProbe(root: laid.root, lines: lines)
+    }
+
     func holdsSomewhere(_ text: String, root: URL) throws -> Bool {
         let wanted: String = "file " + Data(text.utf8).base64EncodedString()
         for (name, item) in try folderNow(root) {

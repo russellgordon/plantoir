@@ -1297,6 +1297,13 @@ nonisolated enum UndoTrailHook {
     /// that place. The course and section, its place, its hidden name.
     nonisolated(unsafe) static var foundAFolderSetAsideLine: ((_ course: String, _ section: Int?, _ place: String, _ hiddenName: String, _ keptAs: String?, _ changes: String) -> Void)?
 
+    /// U4b3 kept-original-named: recovery is about to keep a page a step
+    /// that stopped removed or moved away, found only in its hidden kept
+    /// original, under the visible name `keptAs` beside its place, because
+    /// something else now holds that place. The course and section, the
+    /// place and the visible name, both inside the working folder.
+    nonisolated(unsafe) static var keptAPageLine: ((_ course: String, _ section: Int?, _ place: String, _ keptAs: String) -> Void)?
+
     // MARK: - Functions
 
     static func couldNotRecord(draft: UndoStepDraft, change: UndoUnrecordedChange, problem: Error) {

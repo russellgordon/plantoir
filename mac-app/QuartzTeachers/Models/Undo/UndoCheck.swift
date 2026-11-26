@@ -2148,14 +2148,23 @@ nonisolated enum UndoSwap {
         return (try? FileManager.default.removeItem(at: url)) != nil
     }
 
-    /// The visible name a folder set aside is kept under when something
-    /// else holds its place: `<name> (kept by Undo)`, then `(kept by Undo
-    /// 2)`, `(kept by Undo 3)` and on, the first that nothing holds.
-    static func visibleName(for place: String, number: Int) -> String {
-        if number <= 1 {
-            return place + " (kept by Undo)"
+    /// The visible name a folder set aside, or a page kept only in its
+    /// hidden original, is kept under when something else holds its place:
+    /// `<name> (kept by Undo)`, then `(kept by Undo 2)`, `(kept by Undo 3)`
+    /// and on, the first that nothing holds. A page's words go before its
+    /// extension (`Unit 1, Day 3 (kept by Undo).md`, Russell's ruling of
+    /// 2026-11-26); a folder's after its whole name.
+    static func visibleName(for place: String, number: Int, isAPage: Bool = false) -> String {
+        var words: String = " (kept by Undo)"
+        if number > 1 {
+            words = " (kept by Undo \(number))"
         }
-        return place + " (kept by Undo \(number))"
+        let pageExtension: String = (place as NSString).pathExtension
+        if isAPage && !pageExtension.isEmpty {
+            let stem: String = (place as NSString).deletingPathExtension
+            return stem + words + "." + pageExtension
+        }
+        return place + words
     }
 
     /// Renames a folder set aside to the first visible name beside its
@@ -2167,16 +2176,32 @@ nonisolated enum UndoSwap {
         matched: Bool,
         onAside: ((UndoAsideFolder) -> Void)?
     ) -> Bool {
+        return UndoSwap.renameToAVisibleName(stagedURL, place: place, isAPage: false, tellingFirst: { keptURL in
+            onAside?(UndoAsideFolder(place: place, hiddenName: hiddenName, foundAt: stagedURL, keptAs: keptURL, matched: matched))
+        })
+    }
+
+    /// The one naming loop for a folder and a page: renames the hidden item
+    /// to the first visible name beside its place that nothing holds, in a
+    /// rename that never replaces; a name taken is skipped. `tellingFirst`
+    /// is told the name just BEFORE the rename (the intent first). True
+    /// when it went.
+    static func renameToAVisibleName(
+        _ stagedURL: URL,
+        place: URL,
+        isAPage: Bool,
+        tellingFirst: (URL) -> Void
+    ) -> Bool {
         var number: Int = 1
         while number <= 1000 {
             let keptURL: URL = place.deletingLastPathComponent().appendingPathComponent(
-                UndoSwap.visibleName(for: place.lastPathComponent, number: number)
+                UndoSwap.visibleName(for: place.lastPathComponent, number: number, isAPage: isAPage)
             )
             number += 1
             if UndoTreeReading.read(at: keptURL) != .absent {
                 continue
             }
-            onAside?(UndoAsideFolder(place: place, hiddenName: hiddenName, foundAt: stagedURL, keptAs: keptURL, matched: matched))
+            tellingFirst(keptURL)
             if UndoSwap.renameExclusively(stagedURL, onto: keptURL) {
                 return true
             }

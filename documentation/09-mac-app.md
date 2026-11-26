@@ -23714,7 +23714,14 @@ where every handed-over place is left before it is filled
 (`JournaledStep.inHandingOverOrder`, built on the door's own
 `UndoCheck.placeLeft`, `placeFilled` and `handsOverAsAMove`); a step with no
 such pair keeps its order exactly (`JournaledStepTests`, "a place a link's
-move leaves").
+move leaves"). A page such a step removed or moved away, found by recovery only in its
+hidden kept original because something else now holds its place, is kept
+under a visible name beside it, `Unit 1, Day 3 (kept by Undo).md` (then
+`(kept by Undo 2)` and on), by the folder's own naming loop
+(`UndoSwap.renameToAVisibleName`, Russell's rulings of 2026-11-19 and
+2026-11-26), with the trail line 'undo kept a page under a visible name'
+written first (`UndoRecovery.keepPagesWhosePlaceIsTaken`, U4b3
+kept-original-named).
 
 ### #1004-a: the journal's own files are judged by what was read
 

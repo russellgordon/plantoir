@@ -79,6 +79,12 @@ nonisolated enum UndoTrail {
                 UndoTrail.foundAFolderSetAsideLine(course: course, section: section, place: place, hiddenName: hiddenName, keptAs: keptAs, changes: changes)
             )
         }
+        UndoTrailHook.keptAPageLine = { course, section, place, keptAs in
+            ActivityTrail.note(
+                .undoKeptAPageUnderAVisibleName,
+                UndoTrail.keptAPageLine(course: course, section: section, place: place, keptAs: keptAs)
+            )
+        }
         UndoTrailHook.rolledBackLine = { course, section, phase, files in
             ActivityTrail.note(
                 .undoRolledBack,
@@ -385,6 +391,19 @@ nonisolated enum UndoTrail {
             return line + " · the undo list keeps the folder \(place), set aside by a change that stopped, as \(keptAs), because something else now holds \(place)"
         }
         return line + " · the undo list puts the folder \(place) back in its place; it changed while a change that stopped had set it aside (\(changes))"
+    }
+
+    /// `ICS3U/1 · the undo list keeps the page courses/ICS3U/section1/Unit
+    /// 1, Day 3.md, removed or moved away by a change that stopped, as
+    /// courses/ICS3U/section1/Unit 1, Day 3 (kept by Undo).md, because
+    /// something else now holds courses/ICS3U/section1/Unit 1, Day 3.md`.
+    /// Written just before the rename. Never page text.
+    static func keptAPageLine(course: String, section: Int?, place: String, keptAs: String) -> String {
+        var line: String = course
+        if let section {
+            line += "/\(section)"
+        }
+        return line + " · the undo list keeps the page \(place), removed or moved away by a change that stopped, as \(keptAs), because something else now holds \(place)"
     }
 
     /// `ICS3U/1 · the undo list put back 2 files left part way by a change
