@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -221,7 +222,8 @@ public sealed partial class AssistWorkspace
     /// <c>write_how_i_teach</c>: save what the teacher agreed to. Never over a
     /// written page without its mark; backs the course up first (once per
     /// conversation); keeps a replaced page's settings byte for byte, BOM and
-    /// CRLF included; ONE undo entry. Nothing here touches a preview: the
+    /// CRLF included; ONE step through the door and ONE undo entry, none when
+    /// the words are the page's already. Nothing here touches a preview: the
     /// page is never on the site.
     /// </summary>
     public AssistResult WriteHowITeach(string courseCode, string text, string replacing)
@@ -246,23 +248,39 @@ public sealed partial class AssistWorkspace
         try { backup = BackUpOnceForThisConversation(planned.Course, standIn); }
         catch (Exception) { /* recorded on the trail below */ }
 
-        // The backup can take a while; the page must still be the one planned.
-        string? nowPath = HowITeachPage.ExistingPath(planned.Course.DirectoryPath);
-        bool movedOn = planned.ExistingPath is null
-            ? nowPath is not null
-            : nowPath is null || Path.GetFileName(nowPath) != Path.GetFileName(planned.ExistingPath) ||
-              HowITeachPage.MarkOf(File.ReadAllBytes(nowPath)) != planned.ExistingMark;
-        if (movedOn) throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
-
+        // ONE step through the door (#899 W7b2-4; the mac's write_how_i_teach),
+        // held by the course: the page belongs to no section. Its before is
+        // read as it is planned, and only then is the page checked against
+        // the plan (the backup can take a while), so the before the step
+        // holds is the page the plan read, or the swap refuses it.
         bool created = !planned.ExistingIsWritten;
         using (var recording = UndoHistory.Record(_undo,
                    created ? "wrote a new How I Teach page" : "replaced the How I Teach page"))
         {
-            _undo?.Touch(path, planned.ExistingText);
-            File.WriteAllText(path, newText, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            // As the undo will READ it back (ReadAllText drops a BOM), or the
-            // undo would see the page as "edited since" and leave it alone.
-            _undo?.Wrote(path, File.ReadAllText(path));
+            var step = NewCourseUndoStep("writeHowITeach", planned.Course.Code);
+            try
+            {
+                step.Write(path, newText);
+                string? nowPath = HowITeachPage.ExistingPath(planned.Course.DirectoryPath);
+                bool movedOn = planned.ExistingPath is null
+                    ? nowPath is not null
+                    : nowPath is null || Path.GetFileName(nowPath) != Path.GetFileName(planned.ExistingPath) ||
+                      HowITeachPage.MarkOf(File.ReadAllBytes(nowPath)) != planned.ExistingMark;
+                if (movedOn) throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
+                MakeTheUndoStep(step);
+            }
+            catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince)
+            {
+                // A page that appeared, or changed, after the plan read it:
+                // never written over, and said as it always was.
+                throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                // All or none: "Nothing was changed" unless the door left the
+                // page holding the new words, said as part way.
+                throw RefusalForAStepThatStopped(error, "the How I Teach page", standIn);
+            }
             recording.Done();
         }
 

@@ -33,7 +33,7 @@ internal static class WindowsActionsOnTheMacFixture
     [
         "publishPages", "hidePages", "publishPagesAWholeUnit", "publishClassForADate",
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
-        "reDateClasses",
+        "reDateClasses", "writeHowITeach", "startHowITeachPage",
     ];
 
     /// <summary>
@@ -182,6 +182,9 @@ internal static class WindowsActionsOnTheMacFixture
     internal static AssistSurface SurfaceFor(string madeBy) => madeBy switch
     {
         "menu" => AssistSurface.Menu,
+        // A sheet's step is made by the sheet, never by the workspace's
+        // surface; the workspace only lends it its list and door.
+        "sheet" => AssistSurface.Menu,
         "builtInAssistant" => AssistSurface.LocalWindow,
         "outsideAssistant" => AssistSurface.Outside,
         _ => throw new InvalidOperationException($"No Windows surface makes a step as “{madeBy}”."),
@@ -195,6 +198,14 @@ internal static class WindowsActionsOnTheMacFixture
     /// </summary>
     internal static string Run(string stepName, AssistWorkspace workspace)
     {
+        // Course Settings' How I Teach row is a sheet's action, not a tool: it
+        // is pressed as the window presses it, on the workspace's list and door.
+        if (stepName == "startHowITeachPage")
+        {
+            var (outcome, page, problem) = HowITeachSettingsRow.Press(Path.Combine(workspace.FolderPath, "courses", Course), Course,
+                betweenTheLookAndTheWrite: null, workspace.UndoList, workspace.UndoDoorOfATest);
+            return $"{outcome} {page} {problem}";
+        }
         var tools = new PlantoirTools(workspace);
         // The MCP server always hands a tool a progress (the SDK's own when the
         // client asked for none), so the replay does too: null is no caller's.
@@ -211,6 +222,7 @@ internal static class WindowsActionsOnTheMacFixture
             "addCurriculumMentions" => tools.AddCurriculumMentions(Course, 1, page: "Loops", codes: "A1.1"),
             "rememberTimetable" => tools.RememberTimetable(Course, 1, "2026-09-08; 2026-09-10; 2026-09-14"),
             "reDateClasses" => tools.ReDateClasses(Course, 1).GetAwaiter().GetResult(),
+            "writeHowITeach" => tools.WriteHowITeach(Course, "I start every class with a question."),
             _ => throw new InvalidOperationException($"{stepName}: no Windows action is converted for it yet"),
         };
         return string.Join("\n", answered.Content.OfType<TextContentBlock>().Select(block => block.Text));
@@ -225,7 +237,7 @@ internal static class WindowsActionsOnTheMacFixture
     /// </summary>
     internal static readonly IReadOnlyList<string> HeldButRunnable =
     [
-        "makeRoomForClasses", "duplicateClass", "writeHowITeach", "getReadyForTheStartOfTheYear",
+        "makeRoomForClasses", "duplicateClass", "getReadyForTheStartOfTheYear",
     ];
 
     /// <summary>Runs the REAL Windows action of a held step that has one here (<see cref="HeldButRunnable"/>), with the mac's arguments.</summary>
@@ -236,7 +248,6 @@ internal static class WindowsActionsOnTheMacFixture
         {
             "makeRoomForClasses" => tools.MakeRoomForClasses(Course, 1, unit: 1, atDay: 2),
             "duplicateClass" => tools.AddNextClass(Course, 1, duplicate: "Unit 1, Day 1"),
-            "writeHowITeach" => tools.WriteHowITeach(Course, "I start every class with a question."),
             "getReadyForTheStartOfTheYear" => tools.PrepareForStartOfYear(Course, 1, workspace.PlanStartOfYear(Course, 1).Code),
             _ => throw new InvalidOperationException($"{stepName}: not a held step this fixture can run"),
         };
