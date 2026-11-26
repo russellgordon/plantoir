@@ -248,8 +248,11 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
     }
 
     /// <summary>
-    /// Review F1: "moved N onto later class days" counts what was WRITTEN, as
-    /// the mac counts — never a class it declined or a write that failed.
+    /// Review F1: "moved N onto later class days" counts what is WRITTEN, as
+    /// the mac counts — never a class it declined. (A write that fails no
+    /// longer leaves the rest written and that page named: since #899 W7b2-1
+    /// Make Room is ONE step, and a page that cannot be written changes
+    /// nothing, UndoMakeRoomStepTests.)
     /// </summary>
     [Fact]
     public void MakingRoomCountsOnlyTheClassesItActuallyMoved()
@@ -258,22 +261,14 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
         Class("Unit 1, Day 2", "2026-09-10");
         File.WriteAllText(ClassPath("Unit 1, Day 3"), NoRoom);       // declined at the write
         Class("Unit 2, Day 1", "2026-09-14");
-        string locked = ClassPath("Unit 2, Day 1");
-        File.SetAttributes(locked, FileAttributes.ReadOnly);         // its write fails
-        try
-        {
-            var workspace = Open();
-            var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
-            Assert.Contains(plan.Moves, m => m.Title == "Unit 1, Day 4");
-            Assert.Contains(plan.Moves, m => m.Title == "Unit 2, Day 1");
-            var result = workspace.ApplyInsertClasses(plan);
+        var workspace = Open();
+        var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
+        Assert.Contains(plan.Moves, m => m.Title == "Unit 1, Day 4");
+        Assert.Contains(plan.Moves, m => m.Title == "Unit 2, Day 1");
+        var result = workspace.ApplyInsertClasses(plan);
 
-            Assert.Contains($"moved {plan.Moves.Count - 2} onto later class days", result.Message);
-            // #422: the write that FAILED is named, not swallowed.
-            Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 2, Day 1" }), result.Message);
-            Assert.Contains("making room for a class did not finish 1 page: 0 not renamed, 1 not re-dated", TrailText);
-        }
-        finally { File.SetAttributes(locked, FileAttributes.Normal); }
+        Assert.Contains($"moved {plan.Moves.Count - 1} onto later class days", result.Message);
+        Assert.DoesNotContain("did not finish", TrailText);
     }
 
     /// <summary>
@@ -307,11 +302,14 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
     }
 
     /// <summary>
-    /// #422: "updated N links" counts links on pages that were SAVED, and a
-    /// page whose rewritten links could not be saved is named.
+    /// #422 counted links only on pages that were SAVED and named a page whose
+    /// rewritten links could not be saved. Since #899 W7b2-1 Make Room is ONE
+    /// step, all or none: a page whose links cannot be written changes
+    /// nothing, so no class is renamed and the answer says "Nothing was
+    /// changed".
     /// </summary>
     [Fact]
-    public void MakingRoomCountsOnlyTheLinksItSavedAndNamesThePageItCouldNot()
+    public void MakingRoomWhoseLinkedPageCannotBeWrittenChangesNothing()
     {
         Class("Unit 1, Day 1", "2026-09-08");
         Class("Unit 1, Day 2", "2026-09-10");
@@ -325,11 +323,11 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
             var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
             Assert.Equal(1, plan.LinksToRewrite);
 
-            var result = workspace.ApplyInsertClasses(plan);
+            var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyInsertClasses(plan));
 
-            Assert.Contains("Renamed 2,", result.Message);
-            Assert.Contains("updated 0 links", result.Message);
-            Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Notes" }), result.Message);
+            Assert.Equal("Nothing was changed: Plantoir doesn’t have permission to change one of them.", refused.Message);
+            Assert.False(File.Exists(ClassPath("Unit 1, Day 4")), "a class was renamed");
+            Assert.Equal("---\npublish: true\n---\nSee [[Unit 1, Day 3]].\n", File.ReadAllText(notes));
         }
         finally { File.SetAttributes(notes, FileAttributes.Normal); }
     }

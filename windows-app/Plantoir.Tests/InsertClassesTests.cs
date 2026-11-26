@@ -197,28 +197,32 @@ public sealed class InsertClassesTests : IDisposable
     }
 
     /// <summary>
-    /// Make Room on its own: the new page's save fails AFTER the renames (its
-    /// path is made a folder as "Adding the new classes…" begins, so it is not
-    /// "still taken" — that test is for a FILE). It is carried past and named,
-    /// like every other write here, and noted as a change — until #550 it threw
-    /// past the note, so the menu's line said "changed nothing" about a section
-    /// that had been renamed, and the teacher was told "That couldn’t be read".
+    /// Make Room on its own: a new page's place becomes a FOLDER as "Adding
+    /// the new classes…" begins (so it is not "still taken" — that test is for
+    /// a FILE). Since #899 W7b2-1 Make Room is ONE step, all or none, so a page
+    /// that cannot be planned changes nothing: no class is renamed, every page
+    /// is as it was, the answer says "Nothing was changed", and the menu's
+    /// line says "changed nothing". Until then (#550) the failure was carried
+    /// past and named, after the renames were already written.
     /// </summary>
     [Fact]
-    public void MakeRoomWhoseNewPageCouldNotBeSaved_IsCarriedPastAndNotedAsAChange()
+    public void MakeRoomWhoseNewPageCouldNotBeSaved_ChangesNothing()
     {
         FourClasses();
         var workspace = Open();
-        var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 2, atDay: 1, count: 1);
-        string newPage = ClassPath("Unit 2, Day 1");
+        var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 2, atDay: 2, count: 2);
+        string newPage = ClassPath("Unit 2, Day 3");
+        string classes = Path.GetDirectoryName(newPage)!;
+        var before = Directory.GetFiles(classes).ToDictionary(path => path, path => File.ReadAllText(path));
 
-        var result = workspace.ApplyInsertClasses(plan, new AtTheStep("Adding the new", () => Directory.CreateDirectory(newPage)));
+        var refused = Assert.Throws<AssistRefusal>(() =>
+            workspace.ApplyInsertClasses(plan, new AtTheStep("Adding the new", () => Directory.CreateDirectory(newPage))));
 
-        Assert.True(result.Succeeded);
-        Assert.True(File.Exists(ClassPath("Unit 2, Day 3")), "the classes after it were renamed");
-        Assert.True(Directory.Exists(newPage));
-        Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 2, Day 1" }), result.Message);
-        Assert.True(workspace.TakeWhetherTheCallChangedAnything(workspace.TopOfTheUndoList));
+        Assert.StartsWith("Nothing was changed: ", refused.Message);
+        Assert.False(File.Exists(ClassPath("Unit 2, Day 4")), "a class after it was renamed");
+        var after = Directory.GetFiles(classes).ToDictionary(path => path, path => File.ReadAllText(path));
+        Assert.Equal(before, after);
+        Assert.False(workspace.TakeWhetherTheCallChangedAnything(workspace.TopOfTheUndoList));
     }
 
     /// <summary>

@@ -34,6 +34,7 @@ internal static class WindowsActionsOnTheMacFixture
         "publishPages", "hidePages", "publishPagesAWholeUnit", "publishClassForADate",
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
+        "makeRoomForClasses",
     ];
 
     /// <summary>
@@ -224,6 +225,7 @@ internal static class WindowsActionsOnTheMacFixture
             "reDateClasses" => tools.ReDateClasses(Course, 1).GetAwaiter().GetResult(),
             "writeHowITeach" => tools.WriteHowITeach(Course, "I start every class with a question."),
             "getReadyForTheStartOfTheYear" => tools.PrepareForStartOfYear(Course, 1, workspace.PlanStartOfYear(Course, 1).Code),
+            "makeRoomForClasses" => tools.MakeRoomForClasses(Course, 1, unit: 1, atDay: 2),
             _ => throw new InvalidOperationException($"{stepName}: no Windows action is converted for it yet"),
         };
         return string.Join("\n", answered.Content.OfType<TextContentBlock>().Select(block => block.Text));
@@ -238,7 +240,7 @@ internal static class WindowsActionsOnTheMacFixture
     /// </summary>
     internal static readonly IReadOnlyList<string> HeldButRunnable =
     [
-        "makeRoomForClasses", "duplicateClass",
+        "duplicateClass",
     ];
 
     /// <summary>Runs the REAL Windows action of a held step that has one here (<see cref="HeldButRunnable"/>), with the mac's arguments.</summary>
@@ -247,7 +249,6 @@ internal static class WindowsActionsOnTheMacFixture
         var tools = new PlantoirTools(workspace);
         CallToolResult answered = stepName switch
         {
-            "makeRoomForClasses" => tools.MakeRoomForClasses(Course, 1, unit: 1, atDay: 2),
             "duplicateClass" => tools.AddNextClass(Course, 1, duplicate: "Unit 1, Day 1"),
             _ => throw new InvalidOperationException($"{stepName}: not a held step this fixture can run"),
         };
