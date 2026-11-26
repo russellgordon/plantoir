@@ -142,6 +142,11 @@ internal static class WindowsActionsOnTheMacFixture
             LayTheMorning(workingFolder, recorded);
             return;
         }
+        if (recorded.GetProperty("name").GetString() == "addFolder")
+        {
+            LayTheSettingsCourse(workingFolder);
+            return;
+        }
         string course = Path.Combine(workingFolder, "courses", Course);
         Directory.CreateDirectory(course);
         File.WriteAllText(Path.Combine(course, "course_config.json"),
@@ -152,6 +157,27 @@ internal static class WindowsActionsOnTheMacFixture
         foreach ((string path, string text) in MacSection()) WriteAt(workingFolder, path, new UTF8Encoding(false).GetBytes(text));
         foreach (JsonElement file in recorded.GetProperty("files").EnumerateArray())
             WriteAt(workingFolder, file.GetProperty("path").GetString()!, Bytes(file.GetProperty("before")));
+    }
+
+    /// <summary>
+    /// The mac's <c>CourseSettingsGestureScript.makeCourse</c>, the course its
+    /// <c>addFolder</c> was recorded on (#899 W8-13): its folders, the
+    /// curriculum folder among them and EMPTY, so the page to duplicate has no
+    /// curriculum connection, and its settings.
+    /// </summary>
+    private static void LaySettingsCourseFolders(string course)
+    {
+        foreach (string folder in new[] { "section1/All Classes", "section1/Tasks", "Concepts", "Curriculum", "Tasks", "Tests", "Portfolios/Tasks" })
+            Directory.CreateDirectory(Path.Combine(course, folder.Replace('/', Path.DirectorySeparatorChar)));
+    }
+
+    private static void LayTheSettingsCourse(string workingFolder)
+    {
+        string course = Path.Combine(workingFolder, "courses", Course);
+        LaySettingsCourseFolders(course);
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            "{\"course_code\":\"ICS3U\",\"course_name\":\"Introduction to Computer Science\",\"curriculum_folder\":\"Curriculum\",\"expandable\":[\"Concepts\"],\"hidden\":[\"Media\",\"Tasks\"],\"include_curriculum_coverage\":true,\"num_sections\":1,\"per_section_files\":[\"index.md\",\"Announcements.md\"],\"per_section_folders\":[\"All Classes\",\"Tasks\"],\"section_numbers\":[1],\"shared_files\":[\"Learning Goals.md\"],\"shared_folders\":[\"Concepts\",\"Curriculum\",\"Tasks\",\"Tests\"]}");
+        File.WriteAllText(Path.Combine(workingFolder, Workspace.MarkerLauncher), "");
     }
 
     /// <summary>
