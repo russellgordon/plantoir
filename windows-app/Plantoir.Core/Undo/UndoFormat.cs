@@ -88,7 +88,11 @@ internal sealed record UndoOp
     /// <summary>A folder's <c>move</c>, <c>createTree</c> and <c>removeTree</c>: the SHA-256 of the folder's listing (<see cref="UndoTreeListing"/>).</summary>
     internal string? ListingSha { get; init; }
 
-    /// <summary>A link's <c>move</c> (W8-6): read, not yet judged.</summary>
+    /// <summary>
+    /// A link's <c>move</c> (U4b2-14; #899 W8-6): the SHA-256 of the target
+    /// the link holds, as stored (<see cref="UndoLinks.LinkSha"/>), never a
+    /// blob: the link itself is what moves.
+    /// </summary>
     internal string? LinkSha { get; init; }
 
     /// <summary><c>external</c>: what outside every working folder it changed (<c>preference:&lt;name&gt;</c>).</summary>
@@ -108,7 +112,12 @@ internal sealed record UndoOp
         }
     }
 
-    /// <summary>The name recovery and a refusal use for the op's place: its path, a move's <c>from</c>, or an external op's target.</summary>
+    /// <summary>
+    /// The op's place as recovery and the "content missing" refusal name it:
+    /// its path, a move's <c>from</c>, or an external op's target. A move's
+    /// other refusals name <see cref="PlaceAsFound"/> or the place that leads
+    /// out (<see cref="UndoPlaces.FirstPlaceLeadingOut"/>).
+    /// </summary>
     internal string PlaceName => Path ?? From ?? Target ?? Kind ?? "";
 
     /// <summary>
@@ -190,12 +199,15 @@ internal sealed record UndoOp
     /// spellings are one place, so the edit is told to be named at the new
     /// spelling by the moved item's own part alone, as spelled (never the
     /// <c>from</c> spelling), the parts above it by <see cref="PartInside"/>
-    /// (review 1 of U4b2-9, L3). A link's move (piece 6) carries nothing:
-    /// it is not readable on Windows yet.
+    /// (review 1 of U4b2-9, L3). A link's move carries nothing (U4b2-14,
+    /// review 1; #899 W8-6): a link is neither a file nor a folder the move
+    /// moved, so an edit at or inside its <c>to</c> breaks
+    /// <c>opKinds.wholeOps</c> and the step is not readable.
     /// </summary>
     internal static bool MoveCarries(UndoOp move, UndoOp edit)
     {
         if (move.Kind != Move || !move.Readable || move.From is not { } from || move.To is not { } to || edit.Path is not { } path) return false;
+        if (move.LinkSha is not null) return false;
         if (edit.Kind is not (WriteFile or EditLine or ReplaceText or EditJson)) return false;
         if (edit.From is not null || edit.To is not null || edit.Target is not null) return false;
         if (PartInside(to, path) is null) return false;
@@ -792,16 +804,23 @@ internal static class UndoFormat
             if (!IsBlobName(name)) return false;
         }
         if (op.Sha is not null && !IsBlobName(op.Sha)) return false;
+        if (op.LinkSha is not null && !IsBlobName(op.LinkSha)) return false;
         switch (op.Kind)
         {
             case UndoOp.Move:
                 // No path: from and to follow path's rules, differ, and neither
                 // holds the other, but for a capitalisation-only rename (U4b;
-                // W8-5); exactly one of a file's sha and a folder's listingSha.
+                // W8-5); exactly one of a file's sha, a folder's listingSha
+                // and a link's linkSha (U4b2-14; W8-6).
                 if (op.Path is not null || op.From is null || op.To is null) return false;
                 if (!UndoPath.IsWithinTheRules(op.From) || !UndoPath.IsWithinTheRules(op.To)) return false;
                 if (UndoOp.PlacesOverlap(op.From, op.To) && !op.IsCaseOnlyMove) return false;
-                return (op.Sha is not null) != (op.ListingSha is not null);
+                int contents = 0;
+                foreach (string? given in new[] { op.Sha, op.ListingSha, op.LinkSha })
+                {
+                    if (given is not null) contents++;
+                }
+                return contents == 1;
             case UndoOp.External:
             {
                 if (op.Path is not null || op.Target is not { } target) return false;

@@ -748,7 +748,7 @@ internal static class UndoRecovery
                 // that now leads outside the folder is in the way.
                 string place = op.PlaceName;
                 if (!states.ContainsKey(place)) order.Add(place);
-                states[place] = op.PathsNamed.Any(named => !UndoPlaces.StaysInside(root, named))
+                states[place] = UndoPlaces.FirstPlaceLeadingOut(root, op) is not null
                     ? UndoOpState.Neither
                     : UndoCheck.WholeStateOf(op, root, places ?? new UndoAppSettingsPlaces());
                 continue;

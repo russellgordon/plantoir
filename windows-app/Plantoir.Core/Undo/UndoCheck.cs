@@ -440,6 +440,10 @@ internal static class UndoCheck
                 // The step's own staged and kept files inside the folder, from
                 // any of its swaps, on either side, are never its content (U4b,
                 // M1); a carried file's override above wins over its own.
+                // Only for a move that carries edits, as the mac's plan does:
+                // the swap's last look leaves them out for every move, which
+                // is the looser of the two, and so never lets through what the
+                // plan refused (the day26-3 sweep's LOW 4: keep them apart).
                 Dictionary<string, UndoCurrent>? overridingFrom = null;
                 if (carriesEdits && ownSeq is { } seq)
                 {
