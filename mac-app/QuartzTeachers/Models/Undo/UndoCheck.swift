@@ -1265,12 +1265,7 @@ nonisolated enum UndoSwap {
         // A folder the step made for a carried edit goes with the edit, if it
         // is empty now; `rmdir` never removes one holding anything.
         for folder in foldersLeftOutOfAMove {
-            _ = folder.withUnsafeFileSystemRepresentation { path in
-                guard let path else {
-                    return Int32(-1)
-                }
-                return rmdir(path)
-            }
+            UndoSwap.removeAFolderLeftOut(folder)
         }
         for target in targets {
             if case .setExternal = target.change {
@@ -1279,6 +1274,17 @@ nonisolated enum UndoSwap {
             UndoFiles.syncFolder(target.url.deletingLastPathComponent())
         }
         return .swapped
+    }
+
+    /// U4b2-10: a folder a moved folder's last look left out, removed
+    /// where it now is when it holds nothing.
+    static func removeAFolderLeftOut(_ folder: URL) {
+        _ = folder.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return Int32(-1)
+            }
+            return rmdir(path)
+        }
     }
 
     /// The place to name when a change no longer stays inside the working

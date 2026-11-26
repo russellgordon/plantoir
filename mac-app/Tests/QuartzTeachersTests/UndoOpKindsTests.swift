@@ -252,6 +252,139 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(reading.foldersLeftOut, [])
     }
 
+    /// Review 1 of U4b2-10, MEDIUM 1 (a), nested: the content's own empty
+    /// `sub` and the step's `sub/deeper` are decided one by one, so only
+    /// `sub/deeper` is left out. FAILED with all or none.
+    func testTheContentsOwnEmptyFolderAndAFolderMadeInsideItAreToldApart() throws {
+        let folder: URL = scratchURL.appendingPathComponent("renamed", isDirectory: true)
+        try UndoContractReplay.write("A\n", to: "a.md", in: folder)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("sub"), withIntermediateDirectories: true)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: folder).listingSha)
+        try UndoContractReplay.write("X\n", to: "sub/deeper/x.md", in: folder)
+        let move: UndoOp = UndoOp.moveFolder(from: "media", to: "renamed", listingSha: listingSha)
+
+        let reading = UndoMoveSide.readNamingFoldersLeftOut(move, at: folder, overriding: ["sub/deeper/x.md": .absent])
+        XCTAssertEqual(reading.side, .holdsTheContent)
+        XCTAssertEqual(reading.foldersLeftOut, ["sub/deeper"])
+    }
+
+    /// MEDIUM 1 (b), side by side: the content's own empty `sub`, in which
+    /// the step made a file, and the step's `new`. FAILED with all or none.
+    func testTheContentsOwnEmptyFolderAndAFolderMadeBesideItAreToldApart() throws {
+        let folder: URL = scratchURL.appendingPathComponent("renamed", isDirectory: true)
+        try UndoContractReplay.write("A\n", to: "a.md", in: folder)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("sub"), withIntermediateDirectories: true)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: folder).listingSha)
+        try UndoContractReplay.write("X\n", to: "sub/x.md", in: folder)
+        try UndoContractReplay.write("Y\n", to: "new/y.md", in: folder)
+        let move: UndoOp = UndoOp.moveFolder(from: "media", to: "renamed", listingSha: listingSha)
+
+        let reading = UndoMoveSide.readNamingFoldersLeftOut(
+            move, at: folder, overriding: ["sub/x.md": .absent, "new/y.md": .absent]
+        )
+        XCTAssertEqual(reading.side, .holdsTheContent)
+        XCTAssertEqual(reading.foldersLeftOut, ["new"])
+    }
+
+    /// The bound (`opKinds.wholeOps`): up to eight such folders each is
+    /// decided on its own; with seven made and one of the content's own,
+    /// the step's seven are found. FAILED with all or none.
+    func testUpToEightFoldersAreDecidedOneByOne() throws {
+        let reading = try sideBySideFolders(made: 7, ownEmpty: 1)
+        XCTAssertEqual(reading.side, .holdsTheContent)
+        XCTAssertEqual(reading.foldersLeftOut.count, 7)
+        XCTAssertFalse(reading.foldersLeftOut.contains("own0"))
+    }
+
+    /// Beyond eight, only all or none is tried: nine made are left out,
+    /// and eight made beside one of the content's own is refused (changed
+    /// since, which takes nothing back and loses nothing).
+    func testBeyondEightFoldersOnlyAllOrNoneIsTried() throws {
+        let allMade = try sideBySideFolders(made: 9, ownEmpty: 0)
+        XCTAssertEqual(allMade.side, .holdsTheContent)
+        XCTAssertEqual(allMade.foldersLeftOut.count, 9)
+        let mixed = try sideBySideFolders(made: 8, ownEmpty: 1)
+        XCTAssertEqual(mixed.side, .holdsSomethingElse)
+        XCTAssertEqual(mixed.foldersLeftOut, [])
+    }
+
+    /// A moved folder holding `ownEmpty` empty folders of its own, each
+    /// then given a file by a carried edit, and `made` folders the step
+    /// made, each holding one file; read with every such file left out.
+    func sideBySideFolders(made: Int, ownEmpty: Int) throws -> (side: UndoMoveSide, foldersLeftOut: [String]) {
+        let folder: URL = scratchURL.appendingPathComponent("renamed", isDirectory: true)
+        try UndoContractReplay.write("A\n", to: "a.md", in: folder)
+        var leftOut: [String: UndoItem] = [:]
+        var index: Int = 0
+        while index < ownEmpty {
+            try FileManager.default.createDirectory(at: folder.appendingPathComponent("own\(index)"), withIntermediateDirectories: true)
+            index += 1
+        }
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: folder).listingSha)
+        index = 0
+        while index < ownEmpty {
+            try UndoContractReplay.write("X\n", to: "own\(index)/x.md", in: folder)
+            leftOut["own\(index)/x.md"] = .absent
+            index += 1
+        }
+        index = 0
+        while index < made {
+            try UndoContractReplay.write("X\n", to: "made\(index)/x.md", in: folder)
+            leftOut["made\(index)/x.md"] = .absent
+            index += 1
+        }
+        let move: UndoOp = UndoOp.moveFolder(from: "media", to: "renamed", listingSha: listingSha)
+        return UndoMoveSide.readNamingFoldersLeftOut(move, at: folder, overriding: leftOut)
+    }
+
+    /// Review 1 of U4b2-10, LOW 3: a folder holding a file left out is a
+    /// candidate only when it holds nothing else: not a kept file, not a
+    /// link, not a folder that is not itself a candidate.
+    func testAFolderHoldingAnythingKeptIsNeverACandidate() {
+        let listing: UndoTreeListing = UndoTreeListing(
+            folders: ["withFile", "withLink", "withFolder", "withFolder/empty", "alone"],
+            files: [
+                UndoTreeListing.File(path: "withFile/kept.md", sha: "k"),
+                UndoTreeListing.File(path: "withFile/x.md", sha: "x"),
+                UndoTreeListing.File(path: "withLink/x.md", sha: "x"),
+                UndoTreeListing.File(path: "withFolder/x.md", sha: "x"),
+                UndoTreeListing.File(path: "alone/x.md", sha: "x"),
+            ],
+            links: [UndoTreeListing.File(path: "withLink/l", sha: "l")]
+        )
+        let kept: [UndoTreeListing.File] = [UndoTreeListing.File(path: "withFile/kept.md", sha: "k")]
+        let candidates: [String] = UndoMoveSide.foldersHoldingOnly(
+            ["withFile/x.md", "withLink/x.md", "withFolder/x.md", "alone/x.md"], in: listing, keeping: kept
+        )
+        XCTAssertEqual(candidates, ["alone"])
+    }
+
+    /// Review 1 of U4b2-10, MEDIUM 2: the made folder is taken out with the
+    /// Finder's record of a window inside it, a regular file, never a link
+    /// of that name, and never a folder holding anything else.
+    func testAMadeFolderGoesWithTheFindersRecordButNeverWithALink() throws {
+        let withRecord: URL = scratchURL.appendingPathComponent("withRecord", isDirectory: true)
+        try UndoContractReplay.write("Finder\n", to: UndoTreeListing.ignoredName, in: withRecord)
+        UndoSwap.removeAFolderLeftOut(withRecord)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: withRecord.path))
+
+        let withLink: URL = scratchURL.appendingPathComponent("withLink", isDirectory: true)
+        try FileManager.default.createDirectory(at: withLink, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            atPath: withLink.appendingPathComponent(UndoTreeListing.ignoredName).path, withDestinationPath: "elsewhere"
+        )
+        UndoSwap.removeAFolderLeftOut(withLink)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: withLink.path), "a link named .DS_Store is never removed")
+
+        let withMore: URL = scratchURL.appendingPathComponent("withMore", isDirectory: true)
+        try UndoContractReplay.write("Finder\n", to: UndoTreeListing.ignoredName, in: withMore)
+        try UndoContractReplay.write("Mine\n", to: "mine.md", in: withMore)
+        UndoSwap.removeAFolderLeftOut(withMore)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: withMore.appendingPathComponent("mine.md").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: withMore.appendingPathComponent(UndoTreeListing.ignoredName).path),
+                      "nothing is removed from a folder that holds anything else")
+    }
+
     /// The one comparison itself: part by part, without regard to case,
     /// the rest spelled as the path spells it.
     func testThePartInsideAPlaceIsFoundWithoutRegardToCase() {

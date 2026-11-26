@@ -673,7 +673,10 @@ class ContractCaseTests(unittest.TestCase):
                   "refusalNamed", "madeFolder",
                   # U4b2-4: the whole of the line's words, which the model
                   # does not write; the Swift replay checks it.
-                  "keptWhatItReplacedSays"}
+                  "keptWhatItReplacedSays",
+                  # Review 1 of U4b2-10: empty folders, which the model does
+                  # not hold (folder_of_pages); the Swift replay checks it.
+                  "foldersInside"}
 
     # U4b2-4: the two pages wholeFileStepOnTwoPagesNamedIndex writes.
     TWO_PAGES_NAMED_INDEX = ("courses/TST1O/Section 1/Classes/index.md", "courses/TST1O/Section 2/Classes/index.md")
@@ -850,6 +853,30 @@ class ContractCaseTests(unittest.TestCase):
             edit = {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
                     "contextBefore": "Line one: ", "contextAfter": ".\n"}
             return model.ops_step([move, edit] + traces.ops_for_change(self.RENAMED + "/sub/x.md", None, "X\n"))
+        if call in ("moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt",
+                    "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt"):
+            # Review 1 of U4b2-10, MEDIUM 1. The model holds a folder as its
+            # files only, so the content's own empty sub is not in it: the
+            # step is made and judged without it (the outcome is the same;
+            # the Swift replay checks foldersInside).
+            if traces.folder_of_pages(pages, self.MEDIA) is None and traces.folder_of_pages(pages, self.RENAMED) is None:
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.MEDIA + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.MEDIA)
+            if tree is None:
+                return "noFolderToMove"
+            made = {"moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt": {self.RENAMED + "/sub/deeper/x.md": "X\n"},
+                    "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt": {self.RENAMED + "/sub/x.md": "X\n",
+                                                                                      self.RENAMED + "/new/y.md": "Y\n"}}[call]
+            ops = [{"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)},
+                   {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}]
+            for path in sorted(made):
+                ops += traces.ops_for_change(path, None, made[path])
+            return model.ops_step(ops)
+        if call == "finderRecordsAWindowInTheMadeFolder":
+            # Never listed (listingCases): nothing the model holds.
+            return None
         if call == "addAFolderInsideTheMadeFolder":
             pages[self.RENAMED + "/sub/mine/y.md"] = "Y\n"
             return None
@@ -956,7 +983,9 @@ class ContractCaseTests(unittest.TestCase):
                   "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
                   "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
                   "leaveAKeptCopyInsideTheMovedFolder", "moveThePageIntoAFolder", "moveThePageBetweenFolders",
-                  "linkItsNewFolderOutside", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder")
+                  "linkItsNewFolderOutside", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder",
+                  "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt",
+                  "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt", "finderRecordsAWindowInTheMadeFolder")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
