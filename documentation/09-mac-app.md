@@ -22786,6 +22786,31 @@ removed leaves an empty made folder, which recovery then reads as a change
 (by review 1's reading of the code, not run) and settles the step as changed
 by hand, clearing the list and leaving the empty folder; nothing is lost.
 
+### U4b2: rename-step-recorded
+
+Rename folder's step is recorded from its real code into
+`contracts/undo-action-steps.json`, as every other one-step action is:
+`UndoActionStepsTests` (its Course Settings part) runs
+`CourseSettingsView.renameFolder` on `UndoRenameFolderStepTests`' course,
+once for a per-course folder (`renameFolder`: `Concepts` to `Ideas`, one
+move, `expandable` and `shared_folders`) and once per section
+(`renameFolderPerSection`: `Tasks` to `Assessments`, one move per section,
+`expandable`, `hidden` and `per_section_folders`). A move with a
+`listingSha` is recorded under the new key `folderMoves`: from, to, the
+hash, and the listing as it was before the step (the folders inside in byte
+order and every file's text), the recorder checking that the listing makes
+the hash. A page the move carries is in `files` at the folder's new place,
+its before read at the old one. The ops are the moves, then the pages in
+the order the plan's walk found them (the contract asks no order among
+them; here the per-course step relinks the page outside first), then one
+`editJSON` per member. `testEveryRecordedFolderMoveHoldsTheListingItNames`
+reads the committed file, so the key can fail. `scripts/make_undo_traces.py`
+leaves the two steps out of `actionTraces` by name until piece 12 makes
+their traces. A regeneration now keeps each committed `recorded` and
+`answeredAt` moment on a line that is otherwise the same
+(`keepingTheCommittedMoments`), so only the steps whose recording changed
+change (review 1 of U4b2-6, L4).
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

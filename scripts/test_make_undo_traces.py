@@ -176,7 +176,7 @@ class ActionTraceTests(unittest.TestCase):
     real action code (contracts/undo-action-steps.json)."""
 
     def test_every_recorded_step_is_reproduced_by_its_ops_both_ways(self):
-        for step in traces.read_action_steps():
+        for step in traces.steps_with_traces(traces.read_action_steps()):
             pages = {entry["path"]: entry["before"] for entry in step["files"] if entry["before"] is not None}
             for moved in step.get("moves", []):
                 pages[moved["from"]] = moved["content"]
@@ -198,7 +198,7 @@ class ActionTraceTests(unittest.TestCase):
     def test_a_member_by_member_file_is_made_by_the_member_rule_bytes(self):
         # U4a: the after the Mac recorded is exactly what the members'
         # editJSON ops leave, applied in order to its before.
-        for step in traces.read_action_steps():
+        for step in traces.steps_with_traces(traces.read_action_steps()):
             for entry in step["files"]:
                 members = [member for member in step.get("members", []) if member["path"] == entry["path"]]
                 if not members:
@@ -227,7 +227,7 @@ class ActionTraceTests(unittest.TestCase):
         self.assertTrue(found, "no action trace undoes a rollover after a deploy")
 
     def test_there_are_about_120_action_traces_and_each_starts_with_its_step(self):
-        steps = traces.read_action_steps()
+        steps = traces.steps_with_traces(traces.read_action_steps())
         document = committed()
         self.assertEqual(len(document["actionTraces"]), len(steps) * traces.ACTION_TRACES_PER_STEP)
         if steps:
@@ -239,7 +239,7 @@ class ActionTraceTests(unittest.TestCase):
             self.assertEqual(trace["calls"][0]["expect"], "applied")
 
     def test_undoing_an_action_with_no_hand_edits_gives_back_its_befores(self):
-        steps = {step["name"]: step for step in traces.read_action_steps()}
+        steps = {step["name"]: step for step in traces.steps_with_traces(traces.read_action_steps())}
         for trace in committed()["actionTraces"]:
             if trace["handEdits"]:
                 continue
@@ -254,6 +254,21 @@ class ActionTraceTests(unittest.TestCase):
                 self.assertEqual(trace["afterUndoingAll"][entry["path"]], wanted, trace["name"] + " " + entry["path"])
             for tree in step.get("trees", []):
                 self.assertIsNone(trace["afterUndoingAll"][tree["path"]], trace["name"] + " " + tree["path"])
+
+    def test_the_rename_steps_are_recorded_and_left_without_traces_by_name(self):
+        # U4b2-11: recorded with folderMoves, left out of actionTraces by
+        # name until piece 12 makes their traces; nothing else is left out.
+        recorded = traces.read_action_steps()
+        names = [step["name"] for step in recorded]
+        for name in traces.STEPS_WITHOUT_TRACES_YET:
+            self.assertIn(name, names)
+        kept = [step["name"] for step in traces.steps_with_traces(recorded)]
+        self.assertEqual(len(kept), len(recorded) - len(traces.STEPS_WITHOUT_TRACES_YET))
+        for step in recorded:
+            if "folderMoves" in step:
+                self.assertIn(step["name"], traces.STEPS_WITHOUT_TRACES_YET)
+        for trace in committed()["actionTraces"]:
+            self.assertNotIn(trace["step"], traces.STEPS_WITHOUT_TRACES_YET)
 
     def test_the_twenty_seeded_traces_are_unchanged_by_the_action_traces(self):
         with_steps = traces.generate()
