@@ -21057,8 +21057,12 @@ unit as one entry.
 
 - a course not under a `courses` folder (no working folder);
 - a file reached through a link that leads outside the working folder;
-- a target that is not a plain file (a link, a folder, a file that cannot
-  be read).
+- a target that is not a plain file (a folder, a file that cannot be
+  read).
+
+A page that is a link is not among them since U4b2-1 (Russell's ruling of
+2026-11-25): it is planned at the file the link leads to, and is named in a
+step whenever that file is inside the working folder.
 
 In shadow those files are written with one trail line by
 `JournaledStep.writePlainly`, which since U3a's second round is all or none
@@ -21068,12 +21072,13 @@ changed"). It stages every file beside its target and swaps them in
 together (`UndoSwap`, under a label of its own, `shadow-<pid>-<id>`, since
 the third round), each still holding what it held when
 it was planned and a page that was absent still absent. A target that was
-a link, a folder or a file that could not be read when it was planned is
-refused before anything is written, as a live step refuses it: its content
-cannot be checked, and the old `.atomic` write over a link replaced the
-teacher's link with a regular file (measured: `Data.write(.atomic)` to a
-link leaves a regular file at the link's place and the linked file
-untouched). Chosen over making the sentence true of a part-way write,
+a folder or a file that could not be read when it was planned is refused
+before anything is written, as a live step refuses it: its content cannot
+be checked. (Until U4b2-1 a link was refused here too, because the old
+`.atomic` write over a link replaced the teacher's link with a regular file
+(measured: `Data.write(.atomic)` to a link leaves a regular file at the
+link's place and the linked file untouched); a link is now written through,
+"U4b2: linked-page-written-through" below.) Chosen over making the sentence true of a part-way write,
 because every caller would then need a part-way sentence and a trail count
 of its own, and live refuses the same targets anyway. Live (U7), the step
 is refused before anything changes.
@@ -22520,6 +22525,26 @@ shadow publish's old `relativePath` (a front page that does not exist yet,
 under a linked root, falls outside it: reproduced standalone, and red on the
 bench as `UndoShadowPublishTests.testAPublishIsRecordedInShadow`), 785a's 31
 days (the 40-day sweep case), and the second round's scan (11 checks).
+
+### U4b2: linked-page-written-through
+
+With the switch off, a daily action whose page is a symbolic link writes
+the file the link leads to, and the link stays a link: Russell's ruling on
+#899, 2026-11-25, one rule on both platforms (`undo.rule.shadow`; Windows
+already did so, `UndoActionStep.PlaceWritten`). `JournaledStep` plans every
+write at `placeALinkLeadsTo`, which follows the last component link by link
+as U4a's Save does (`CourseConfiguration.fileALinkLeadsTo`), so `before`,
+staging, swap and any kept file are all at that file, and reads through the
+plan find the page by its link as well as by its file. A link to a file in
+the working folder is named in a step at that file; one to a file outside it
+cannot be named and is written by `writePlainly`, with one trail line that
+says the change went ahead. `writeNew` and `remove` never follow a link
+(removing what a link leads to would leave the link pointing at nothing), and
+a link to a folder or to a file that cannot be read is still refused before
+anything changes. Rejected: one rule per action (every writer goes through
+`plan`), and refusing as U3 did (the Publish of a linked page failed for a
+teacher who had linked a class page in from elsewhere).
+`UndoSweepFindingsTests` holds the four cases.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
