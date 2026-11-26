@@ -32,7 +32,33 @@ final class FolderRenameRun {
     /// any window: what a quit halts when they are only planning.
     static var runsUnderWay: [FolderRenameRun] = []
 
+    /// Whether a quit is going ahead (U4b2-7 review 1, M1), observable so
+    /// every rename sheet greys its Rename the moment it is set.
+    static let closing: Closing = Closing()
+
     // MARK: - Computed properties
+
+    /// Whether a quit is going ahead: set in the same main-actor turn as the
+    /// quit decides (`AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans`), after
+    /// the work-under-way question, so a quit called off never sets it; no
+    /// quit that has gone ahead is called off afterwards. From then on no
+    /// rename may start and none may begin its swap, so the quit's wait,
+    /// which counts only swaps already begun, can never miss one.
+    static var quitIsGoingAhead: Bool {
+        get {
+            return closing.quitIsGoingAhead
+        }
+        set {
+            closing.quitIsGoingAhead = newValue
+        }
+    }
+
+    /// Whether Rename may be pressed: nothing is running, and no quit is
+    /// going ahead. The sheet's Rename is disabled, visibly, whenever this
+    /// is false, and `start` refuses then too.
+    var canStart: Bool {
+        return !isRenaming && !FolderRenameRun.quitIsGoingAhead
+    }
 
     /// Whether halting now would leave nothing part way: no rename is
     /// running, or the one running is still only planning.
@@ -56,7 +82,7 @@ final class FolderRenameRun {
         canNoLongerBeHalted: (() -> Bool)?,
         whenFinished: @escaping @MainActor (_ result: RenameResult) -> Void
     ) {
-        if isRenaming {
+        if !canStart {
             return
         }
         isRenaming = true
@@ -101,6 +127,19 @@ final class FolderRenameRun {
         }
     }
 
+    /// The one place a rename passes from planning to swapping
+    /// (`CourseSettingsView.renameFolder`): refused, with nothing marked,
+    /// once a quit is going ahead (review 1, M1), or when the claim is no
+    /// longer held. Called on the main actor in the same turn as the
+    /// rename's own cancellation check, so the quit lands either before it
+    /// (refused) or after it (the swap has begun and is waited for).
+    static func swapBegins(_ claim: CourseActivity.FolderRenameRecord) -> Bool {
+        if quitIsGoingAhead {
+            return false
+        }
+        return CourseActivity.folderRenameSwapBegins(claim)
+    }
+
     /// Takes an ended run out of `runsUnderWay`.
     private static func forget(_ ended: FolderRenameRun) {
         var remaining: [FolderRenameRun] = []
@@ -110,5 +149,19 @@ final class FolderRenameRun {
             }
         }
         runsUnderWay = remaining
+    }
+}
+
+extension FolderRenameRun {
+
+    /// The quit's latch, in an observable object of its own, since a static
+    /// stored property is not observed.
+    @MainActor
+    @Observable
+    final class Closing {
+
+        // MARK: - Stored properties
+
+        var quitIsGoingAhead: Bool = false
     }
 }

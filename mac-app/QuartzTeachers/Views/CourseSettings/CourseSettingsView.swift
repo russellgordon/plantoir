@@ -1230,8 +1230,9 @@ struct CourseSettingsView: View {
             // same turn as the swap is marked begun, so a Cancel lands either
             // before this (and halts it) or after (and is disabled). The swap
             // also refuses a claim no longer held: an ended claim is never
-            // taken up again.
-            if Task.isCancelled || !CourseActivity.folderRenameSwapBegins(claim) {
+            // taken up again; and it refuses once a quit is going ahead, so
+            // the quit's wait never misses a swap (U4b2-7 review 1, M1).
+            if Task.isCancelled || !FolderRenameRun.swapBegins(claim) {
                 return .failed(SpecialFolderRenamer.nothingWasChanged(
                     renaming: oldName, said: CancellationError().localizedDescription
                 ))

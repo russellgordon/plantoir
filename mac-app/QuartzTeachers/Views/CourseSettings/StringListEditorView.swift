@@ -516,7 +516,9 @@ struct StringListEditorView: View {
                 Button("Rename") {
                     startRename(of: item, finishing: finishing)
                 }
-                .defaultButton(isEnabled: problem == nil && !isRenaming)
+                // Disabled too once a quit is going ahead (review 1, L1):
+                // a rename the quit halted cannot be pressed again.
+                .defaultButton(isEnabled: problem == nil && renameRun.canStart)
             }
         }
         .padding([.horizontal, .bottom], 20)
@@ -693,7 +695,7 @@ struct StringListEditorView: View {
     /// too would put the rename in twice, and would put it in even when the
     /// filesystem refused.
     func startRename(of item: String, finishing: Bool) {
-        guard let onRename, !renameRun.isRenaming else {
+        guard let onRename, renameRun.canStart else {
             return
         }
         if renameProblem?(item, proposedName, finishing) != nil {

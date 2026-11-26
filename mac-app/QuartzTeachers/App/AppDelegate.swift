@@ -220,7 +220,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// and nothing waits for it; then whether a tools copy or a rename
     /// whose swap has begun must be waited for. No question either way.
     /// One function, so the quit's own decision is what the test runs.
+    ///
+    /// The quit is going ahead from here: `FolderRenameRun.quitIsGoingAhead`
+    /// is set in this same turn, so no rename starts and none begins its
+    /// swap while the quit waits (review 1, M1); a swap already begun is
+    /// waited for.
     static func quitWaitsAfterHaltingWhatOnlyPlans() -> Bool {
+        FolderRenameRun.quitIsGoingAhead = true
         FolderRenameRun.haltEveryRunStillPlanning()
         return quitWaitsForWorkUnderWay(
             toolchainCopying: ToolchainReadiness.shared.anyCopyIsRunning,

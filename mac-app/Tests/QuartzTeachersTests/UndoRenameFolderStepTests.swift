@@ -63,6 +63,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
         SpecialFolderRenamer.planReadsAPage = nil
         SpecialFolderRenamer.planHasEnded = nil
         FolderRenameRun.runsUnderWay = []
+        FolderRenameRun.quitIsGoingAhead = false
         // The trail put back is the one from before this test, never one
         // this class made: that folder is removed, and every later line
         // would make it again. MUST FAIL with a test that starts over by
@@ -857,6 +858,148 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(try journal().read().records.count, 0)
         let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+    }
+
+    /// A rename pressed while a quit waits (U4b2-7 review 1, M1 and L1):
+    /// once the quit has gone ahead, no rename may start. The run refuses at
+    /// once, claims nothing and writes nothing, and the sheet's Rename is
+    /// disabled by the same `canStart`. MUST FAIL with `start` not asking
+    /// whether a quit is going ahead.
+    func testARenamePressedWhileAQuitWaitsDoesNotStart() async throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let foldersBefore: [String] = listed(course.directoryURL)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let run: FolderRenameRun = FolderRenameRun()
+        XCTAssertTrue(run.canStart)
+
+        // The quit's own decision; nothing is under way, so it would not
+        // wait, but it is going ahead all the same.
+        _ = AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans()
+
+        XCTAssertFalse(run.canStart, "Rename stays enabled while a quit is going ahead")
+        var told: Bool = false
+        run.start(
+            renaming: "Tasks", to: "Assessments", using: view.renameFromTheSheet(scope: .perSection),
+            canNoLongerBeHalted: view.renameSwapHasBegun
+        ) { result in
+            told = true
+        }
+        let started: Bool = run.isRenaming
+        // A run that did start is let finish, so the test ends on its own.
+        if started {
+            var turns: Int = 0
+            while run.isRenaming && turns < 100_000 {
+                await Task.yield()
+                turns += 1
+            }
+        }
+
+        XCTAssertFalse(started, "a rename started while a quit was going ahead")
+        XCTAssertFalse(told)
+        XCTAssertTrue(FolderRenameRun.runsUnderWay.isEmpty)
+        XCTAssertEqual(listed(course.directoryURL), foldersBefore)
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+    }
+
+    /// A plan that finishes while a quit waits (U4b2-7 review 1, M1): a
+    /// rename the quit's halt did not reach (here one started outside any
+    /// sheet's run, as a run registered after the decision would be) is
+    /// held at its first page while the quit goes ahead, then let go. Its
+    /// swap is refused at the one place it would begin, with nothing
+    /// written and no record, so the quit, which waits only for swaps
+    /// already begun, can never end the process inside one. MUST FAIL with
+    /// `FolderRenameRun.swapBegins` not asking whether a quit is going
+    /// ahead (the folders are renamed).
+    func testAPlanThatFinishesWhileAQuitWaitsNeverBeginsItsSwap() async throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let foldersBefore: [String] = listed(course.directoryURL)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let renaming: Task<RenameResult, Never> = Task { @MainActor in
+            return await view.renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        }
+        await fulfillment(of: [reached], timeout: 30)
+
+        XCTAssertFalse(
+            AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans(), "the quit waits for a rename that only plans"
+        )
+        gate.open()
+        let result: RenameResult = await renaming.value
+
+        XCTAssertNotNil(failed(result), "a swap began while a quit was going ahead: \(result)")
+        XCTAssertFalse(CourseActivity.anyFolderRenameSwapIsUnderWay)
+        XCTAssertFalse(course.isRenamingAFolder, "the claim was not ended")
+        XCTAssertEqual(listed(course.directoryURL), foldersBefore)
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path))
+    }
+
+    /// The sheet's three calls into `FolderRenameRun` (U4b2-7 review 1, L2),
+    /// read off the source because a view's `@State` cannot be driven from a
+    /// unit test: Cancel halts through the run, the sheet going away halts
+    /// through the run, Rename starts the run with the closure it was
+    /// handed, and Rename is enabled by the run's `canStart`. MUST FAIL with
+    /// any one of those calls taken out of the view.
+    func testTheRenameSheetCallsItsRunForEveryWayOut() throws {
+        let sourceURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QuartzTeachersTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mac-app
+            .appendingPathComponent("QuartzTeachers/Views/CourseSettings/StringListEditorView.swift")
+        let source: String = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        let cancel: String = UndoRenameFolderStepTests.body(of: "func cancelRename()", in: source)
+        XCTAssertTrue(cancel.contains("if renameRun.haltIfStillPlanning() {"), "Cancel does not halt through the run")
+        XCTAssertTrue(cancel.contains("pendingRename = nil"), "Cancel does not close the sheet")
+        let halt: String = UndoRenameFolderStepTests.body(of: "func haltARenameStillPlanning()", in: source)
+        XCTAssertTrue(halt.contains("renameRun.haltIfStillPlanning()"), "the sheet going away does not halt through the run")
+        XCTAssertTrue(
+            source.contains(".onDisappear {\n                    haltARenameStillPlanning()\n                }"),
+            "the rename sheet going away does not halt its rename"
+        )
+        let start: String = UndoRenameFolderStepTests.body(of: "func startRename(of item: String, finishing: Bool)", in: source)
+        XCTAssertTrue(start.contains("guard let onRename, renameRun.canStart else {"), "Rename starts without asking the run")
+        XCTAssertTrue(start.contains("renameRun.start("), "Rename does not start the run")
+        XCTAssertTrue(start.contains("using: onRename,"), "Rename hands the run something other than its closure")
+        XCTAssertTrue(
+            source.contains(".defaultButton(isEnabled: problem == nil && renameRun.canStart)"),
+            "Rename is not disabled by the run's canStart"
+        )
+        XCTAssertTrue(source.contains(".disabled(cancelIsDisabled)"))
+        XCTAssertTrue(source.contains("let cancelIsDisabled: Bool = !renameRun.canBeHalted"))
+    }
+
+    /// The text of a function, from its signature to the next function or
+    /// section in the same type.
+    static func body(of signature: String, in source: String) -> String {
+        guard let start = source.range(of: signature) else {
+            XCTFail("no \(signature) in the source")
+            return ""
+        }
+        let rest: Substring = source[start.upperBound...]
+        var end: String.Index = rest.endIndex
+        for marker in ["\n    func ", "\n    // MARK: -", "\n    @ViewBuilder"] {
+            if let found = rest.range(of: marker), found.lowerBound < end {
+                end = found.lowerBound
+            }
+        }
+        return String(rest[..<end])
     }
 
     /// The sheet's Cancel reaches the plan (U4b part eight's review, L1;
