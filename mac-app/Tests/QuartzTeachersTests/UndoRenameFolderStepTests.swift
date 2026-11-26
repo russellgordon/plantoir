@@ -248,6 +248,109 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left")
     }
 
+    /// The plan's pages are in the order of their paths after the move
+    /// (`ClassPages.isInPathOrder`), never the order the disk lists them
+    /// (review 1 of U4b2-11, M1). Independent of the volume's own order
+    /// (review 2 of U4b2-11, LOW C: an HFS+ folder lists in path order
+    /// already): the plan's order is checked, and the same pages handed to
+    /// `inPathOrder` in both orders come back in that one order.
+    /// MUST FAIL with the plan's pages left in walk order (on APFS) and with
+    /// `inPathOrder` returning its pages as given (on every volume).
+    func testARenamePlansItsPagesInPathOrderNotTheDisksOrder() throws {
+        let course: Course = try course()
+        try "Start with [[Concepts/Arrays]].\n".write(
+            to: course.directoryURL.appendingPathComponent("section1/index.md"), atomically: true, encoding: .utf8
+        )
+
+        let planned: FolderRenamePlan = try SpecialFolderRenamer.plan(
+            "Concepts", to: "Ideas", scope: .shared,
+            courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+        )
+        XCTAssertEqual(placesInside(course, of: planned.pages), ["Ideas/Arrays.md", "section1/index.md"])
+
+        var reversed: [FolderRenamePlan.Page] = []
+        for page in planned.pages {
+            reversed.insert(page, at: 0)
+        }
+        XCTAssertEqual(
+            placesInside(course, of: SpecialFolderRenamer.inPathOrder(reversed, under: course.directoryURL)),
+            ["Ideas/Arrays.md", "section1/index.md"]
+        )
+        XCTAssertEqual(
+            placesInside(course, of: SpecialFolderRenamer.inPathOrder(planned.pages, under: course.directoryURL)),
+            ["Ideas/Arrays.md", "section1/index.md"]
+        )
+    }
+
+    /// A linked page is ordered by its own place, never its target's (review
+    /// 2 of U4b2-11, LOW B): `section1/zzz.md` is a link to a page outside
+    /// the course whose path sorts before every page of the course, and it
+    /// still comes after `section1/index.md`, by its place in the course.
+    /// MUST FAIL with each page keyed by `UndoFolderPlaces.canonicalPath`
+    /// (which follows the link).
+    func testALinkedPageIsInPathOrderByItsOwnPlaceNotItsTarget() throws {
+        let course: Course = try course()
+        try "Start with [[Concepts/Arrays]].\n".write(
+            to: course.directoryURL.appendingPathComponent("section1/index.md"), atomically: true, encoding: .utf8
+        )
+        let outside: URL = root.deletingLastPathComponent().appendingPathComponent("aaa-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: outside)
+        }
+        let target: URL = outside.appendingPathComponent("aaa.md")
+        try "See [[Concepts/Loops]].\n".write(to: target, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            at: course.directoryURL.appendingPathComponent("section1/zzz.md"), withDestinationURL: target
+        )
+        XCTAssertTrue(
+            UndoFolderPlaces.canonicalPath(of: target).lowercased() < UndoFolderPlaces.canonicalPath(of: course.directoryURL).lowercased(),
+            "the link's target no longer sorts before the course, so this test could not fail"
+        )
+
+        let planned: FolderRenamePlan = try SpecialFolderRenamer.plan(
+            "Concepts", to: "Ideas", scope: .shared,
+            courseDirectory: course.directoryURL, sectionNumbers: [1, 2]
+        )
+
+        XCTAssertEqual(
+            placesInside(course, of: planned.pages),
+            ["Ideas/Arrays.md", "section1/index.md", "section1/zzz.md"]
+        )
+    }
+
+    /// Two paths alike once lowercased, in case only, are ordered by their
+    /// UTF-8 bytes as spelled, no locale (review 2 of U4b2-11, LOW A), so the
+    /// one order is total and never the walk's.
+    /// MUST FAIL with the tie left to the order the pages came in.
+    func testPathsAlikeButForCaseOrUnicodeFormAreOrderedByTheirBytes() {
+        let upper: URL = URL(fileURLWithPath: "/course/Unit/A.md")
+        let lower: URL = URL(fileURLWithPath: "/course/Unit/a.md")
+        XCTAssertTrue(ClassPages.isInPathOrder(upper, lower))
+        XCTAssertFalse(ClassPages.isInPathOrder(lower, upper))
+        // A file URL spells a path in one Unicode form whatever form it was
+        // given in (measured: both come back decomposed), so on the Mac two
+        // URLs that differ only in Unicode form are one place and no tie.
+        let composed: URL = URL(fileURLWithPath: "/course/Unit/caf\u{E9}.md")
+        let decomposed: URL = URL(fileURLWithPath: "/course/Unit/cafe\u{301}.md")
+        XCTAssertEqual(Array(composed.path.utf8), Array(decomposed.path.utf8))
+        XCTAssertFalse(ClassPages.isInPathOrder(composed, decomposed))
+        XCTAssertFalse(ClassPages.isInPathOrder(upper, upper))
+        XCTAssertTrue(ClassPages.isInPathOrder(lower, URL(fileURLWithPath: "/course/Unit/B.md")))
+    }
+
+    /// Each planned page's place inside the course, by the folder's own
+    /// spelling made canonical.
+    func placesInside(_ course: Course, of pages: [FolderRenamePlan.Page]) -> [String] {
+        var placed: [String] = []
+        let prefix: String = UndoFolderPlaces.canonicalPath(of: course.directoryURL) + "/"
+        for page in pages {
+            let path: String = UndoFolderPlaces.placeResolvingOnlyAbove(course.directoryURL, of: page.url) ?? page.url.path
+            placed.append(String(path.dropFirst(prefix.count)))
+        }
+        return placed
+    }
+
     /// A teacher's file put inside the renamed folder after the rename: the
     /// Undo is refused, names that folder, and moves nothing (ruling 4).
     func testUndoWithATeachersFileInsideTheRenamedFolderIsRefusedAndNamesIt() async throws {

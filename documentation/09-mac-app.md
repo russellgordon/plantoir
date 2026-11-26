@@ -22885,6 +22885,86 @@ removed leaves an empty made folder, which recovery then reads as a change
 (by review 1's reading of the code, not run) and settles the step as changed
 by hand, clearing the list and leaving the empty folder; nothing is lost.
 
+### U4b2: rename-step-recorded
+
+Rename folder's step is recorded from its real code into
+`contracts/undo-action-steps.json`, as every other one-step action is:
+`UndoActionStepsTests` (its Course Settings part) runs
+`CourseSettingsView.renameFolder` on `UndoRenameFolderStepTests`' course,
+once for a per-course folder (`renameFolder`: `Concepts` to `Ideas`, one
+move, `expandable` and `shared_folders`) and once per section
+(`renameFolderPerSection`: `Tasks` to `Assessments`, one move per section,
+`expandable`, `hidden` and `per_section_folders`). A move with a
+`listingSha` is recorded under the new key `folderMoves`: from, to, the
+hash, and the listing as it was before the step (the folders inside in byte
+order and every file's text), the recorder checking that the listing makes
+the hash. A page the move carries is in `files` at the folder's new place,
+its before read at the old one. The ops are the moves, then the pages in
+the order of their paths after the move, then one `editJSON` per member.
+Review 1 found the plan kept its pages in the order the disk listed them
+(hashed on APFS, sorted on HFS+ and NTFS), so the recorded order was the
+volume's; `SpecialFolderRenamer.inPathOrder` now puts them in
+`ClassPages.isInPathOrder`, the one page order (lowercased path) that a
+section's pages and the door's folder listing already used, each place read
+canonical once (a carried page's place is spelled from the course, `/var`,
+the walk's from the disk, `/private/var`). Each page is judged and changed on
+its own, so the order changes no answer of the move check. `testEveryRecordedFolderMoveHoldsTheListingItNames`
+reads the committed file, so the key can fail. `scripts/make_undo_traces.py`
+leaves the two steps out of `actionTraces` by name until piece 12 makes
+their traces. A regeneration now keeps each committed `recorded` and
+`answeredAt` moment on a line that is otherwise the same
+(`keepingTheCommittedMoments`), so only the steps whose recording changed
+change (review 1 of U4b2-6, L4).
+
+### U4b2: rename-traces-made
+
+The two recorded Rename folder steps now have their action traces (twelve,
+`action-151` to `action-162`), and the leave-out by name is gone. A trace
+lays each folder's listing at its `from` (never a carried page's before at its
+new place), and the step goes through `JournaledWrite.perform(ops:)`: one
+`move` per folder with its `listingSha` first, then the pages' ops (a carried
+page named at the new place), then the `editJSON` members. A folder is hashed
+by its listing's SHA-256 at both places in `afterUndoingAll` and `final`, and
+every page of the listing is hashed at both places too. The model holds a
+folder as its files, so it cannot hold one left empty. For that reason a
+rename trace never makes the `deletePage` that would take the last page out of
+a moved folder: the Mac would keep the empty folder there.
+
+The first replay found one disagreement, and the model was wrong. A refused
+Undo of a rename names the folder at its new name (`UndoOp.placeAsFound`,
+U4b), and the model named its old one. The model's `place_as_found` now
+follows the Mac's rule. Three lows from review 2 of piece 11 were fixed in the
+same branch:
+
+- **The tie-break.** `ClassPages.isInPathOrder` breaks a tie between two paths
+  that are alike once lowercased by comparing their UTF-8 bytes as spelled.
+  A file URL spells every path in one Unicode form, so on the Mac only a
+  case-only pair can tie.
+- **A link's own place.** A rename's page is ordered by its own place
+  (`UndoFolderPlaces.placeResolvingOnlyAbove`: the course folder canonical,
+  then the page's parts as written), never by a link's target.
+- **The order test.** The test no longer depends on the volume's own listing
+  order.
+
+No recorded step changed.
+
+### U4b2: model-recover-hand-edits
+
+The Python model's `recover` now does what `UndoRecovery.settle` does when a
+place of a stopped step was changed by hand since: every place that is not in
+the way and took effect is still put back (one plan, the ops whose place is at
+the end, as settle's `opsToPutBack`), and the step is interrupted naming the
+places in the way. Before, the model returned at the first place in the way
+and put nothing back; no row had a hand edit with a moved folder, so the two
+agreed row for row without the model modelling that branch. Two
+`recoveryCases` rows reach it now: a page outside the moved folder changed by
+hand (the folder and the other page go back), and the page inside the moved
+folder changed by hand (`handEdit: carried`), which puts the move in the way as
+well, since the folder then holds what neither side of the move recorded: both
+plain pages go back, and the folder stays where it was moved. Neither row is
+the U7 gap of a step killed after its edit inside went in (that one is still
+U7's). No product code changed.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

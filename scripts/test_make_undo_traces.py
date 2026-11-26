@@ -177,19 +177,18 @@ class ActionTraceTests(unittest.TestCase):
 
     def test_every_recorded_step_is_reproduced_by_its_ops_both_ways(self):
         for step in traces.read_action_steps():
-            pages = {entry["path"]: entry["before"] for entry in step["files"] if entry["before"] is not None}
-            for moved in step.get("moves", []):
-                pages[moved["from"]] = moved["content"]
+            pages, _ = traces.action_fixture(step)
             model = traces.Model(pages=pages)
-            outcome = model.files_step([(entry["path"], entry["before"], entry["after"]) for entry in step["files"]],
-                                       step.get("recomputes", []), step.get("moves", []),
-                                       step.get("members", []), step.get("trees", []))
+            outcome = traces.make_recorded_step(model, step)
             self.assertEqual(outcome[0], "applied", step["name"])
             self.assertEqual([op["kind"] for op in outcome[2]], step["ops"], step["name"] + ": the op kinds")
             undone = traces.plan(outcome[2], True, dict(model.pages))
             self.assertEqual(undone[0], "ready", step["name"])
             for entry in step["files"]:
-                self.assertEqual(undone_as_read(step, entry["path"], undone[1].get(entry["path"], model.pages.get(entry["path"]))),
+                # U4b2-12: a page a folder's move carries is undone at its
+                # folder's old place.
+                place = traces.place_before_the_moves(entry["path"], step.get("folderMoves", []))
+                self.assertEqual(undone_as_read(step, entry["path"], undone[1].get(place, model.pages.get(place))),
                                  undone_as_read(step, entry["path"], entry["before"]),
                                  step["name"] + ": " + entry["path"] + " undone")
             for tree in step.get("trees", []):
@@ -251,9 +250,98 @@ class ActionTraceTests(unittest.TestCase):
                     # its bytes (test_every_recorded_step_... checks them).
                     continue
                 wanted = None if entry["before"] is None else traces.sha(entry["before"])
+                if traces.is_carried(entry["path"], step.get("folderMoves", [])):
+                    # U4b2-12: a page a folder's move carries is named at the
+                    # new place, empty once the step is undone (its before is
+                    # back at the old place, in the folder's listing).
+                    wanted = None
                 self.assertEqual(trace["afterUndoingAll"][entry["path"]], wanted, trace["name"] + " " + entry["path"])
             for tree in step.get("trees", []):
                 self.assertIsNone(trace["afterUndoingAll"][tree["path"]], trace["name"] + " " + tree["path"])
+
+    def test_a_rename_step_undone_ends_at_its_fixture_and_redone_at_the_recorded_after(self):
+        # U4b2-12: a step recorded with folderMoves (Rename folder) starts
+        # from each folder's listing at its old place; undone, every folder
+        # is back at its old name with every page's bytes as before and
+        # nothing at the new name; redone, every file the step names holds
+        # its recorded after and the folder's other pages moved untouched.
+        found = 0
+        for step in traces.read_action_steps():
+            if "folderMoves" not in step:
+                continue
+            found += 1
+            start, _ = traces.action_fixture(step)
+            for moved in step["folderMoves"]:
+                for inside, text in moved["files"].items():
+                    self.assertEqual(start[moved["from"] + "/" + inside], text, step["name"])
+                self.assertFalse(any(path.startswith(moved["to"] + "/") for path in start), step["name"])
+            model = traces.Model(pages=dict(start))
+            outcome = traces.make_recorded_step(model, step)
+            self.assertEqual(outcome[0], "applied", step["name"])
+            self.assertEqual([op["kind"] for op in outcome[2]], step["ops"], step["name"])
+            self.assertEqual(model.undo()[0], "undone", step["name"])
+            self.assertEqual(set(model.pages), set(start), step["name"] + ": the places after the undo")
+            for path, text in start.items():
+                self.assertEqual(undone_as_read(step, path, model.pages[path]), undone_as_read(step, path, text),
+                                 step["name"] + ": " + path + " undone")
+            self.assertEqual(model.redo()[0], "redone", step["name"])
+            wanted = {}
+            for moved in step["folderMoves"]:
+                for inside, text in moved["files"].items():
+                    wanted[moved["to"] + "/" + inside] = text
+            for entry in step["files"]:
+                wanted[entry["path"]] = entry["after"]
+            self.assertEqual(set(model.pages), set(wanted), step["name"] + ": the places after the redo")
+            for path, text in wanted.items():
+                self.assertEqual(undone_as_read(step, path, model.pages[path]), undone_as_read(step, path, text),
+                                 step["name"] + ": " + path + " redone")
+        self.assertEqual(found, 2)
+
+    def test_a_refused_undo_of_a_rename_names_the_renamed_folder(self):
+        # U4b2-12 (UndoOp.placeAsFound, U4b): a page taken out of the folder
+        # at its new name since; the Undo is refused naming the folder where
+        # the teacher finds it, the new name, never the old one; a refused
+        # Redo names the old name, where the folder is then.
+        step = [recorded for recorded in traces.read_action_steps() if recorded["name"] == "renameFolder"][0]
+        moved = step["folderMoves"][0]
+        pages, _ = traces.action_fixture(step)
+        model = traces.Model(pages=pages)
+        self.assertEqual(traces.make_recorded_step(model, step)[0], "applied")
+        self.assertTrue(model.hand_edit_path("deletePage", moved["to"] + "/Loops.md"))
+        self.assertEqual(model.undo(), ("changedSince", moved["to"], 0))
+        pages, _ = traces.action_fixture(step)
+        model = traces.Model(pages=pages)
+        traces.make_recorded_step(model, step)
+        self.assertEqual(model.undo()[0], "undone")
+        self.assertTrue(model.hand_edit_path("body", moved["from"] + "/Loops.md"))
+        self.assertEqual(model.redo(), ("changedSince", moved["from"], 1))
+
+    def test_a_rename_trace_hashes_each_folder_by_its_listing_at_both_ends(self):
+        # U4b2-12: every rename trace with no hand edits ends its undos with
+        # each folder's listing (its recorded listingSha) at the old name and
+        # nothing at the new one, and its redos the other way round, the
+        # folder at the new name holding the carried pages' afters.
+        steps = {step["name"]: step for step in traces.read_action_steps()}
+        traced = 0
+        for trace in committed()["actionTraces"]:
+            step = steps[trace["step"]]
+            if "folderMoves" not in step:
+                continue
+            traced += 1
+            if trace["handEdits"]:
+                continue
+            for moved in step["folderMoves"]:
+                after = dict(moved["files"])
+                for entry in step["files"]:
+                    inside = traces.part_inside(moved["to"], entry["path"])
+                    if inside:
+                        after[inside] = entry["after"]
+                self.assertEqual(trace["afterUndoingAll"][moved["from"]], moved["listingSha"], trace["name"])
+                self.assertIsNone(trace["afterUndoingAll"][moved["to"]], trace["name"])
+                self.assertIsNone(trace["final"][moved["from"]], trace["name"])
+                self.assertEqual(trace["final"][moved["to"]],
+                                 traces.listing_sha({"folders": moved["folders"], "files": after}), trace["name"])
+        self.assertEqual(traced, 2 * traces.ACTION_TRACES_PER_STEP)
 
     def test_the_twenty_seeded_traces_are_unchanged_by_the_action_traces(self):
         with_steps = traces.generate()
@@ -1278,7 +1366,7 @@ class ContractCaseTests(unittest.TestCase):
         content. The model holds no staged files, so
         keptCopyLeftInsideTheFolder is the Swift replay's alone."""
         cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAMovedFolder")]
-        self.assertEqual(len(cases), 11)
+        self.assertEqual(len(cases), 13)
         first, second = "courses/TST1O/Section 1/Classes/A.md", "courses/TST1O/Section 1/Classes/B.md"
         before_text = "---\ntitle: A\npublish: false\n---\nBody.\n"
         texts = {first: before_text, second: before_text.replace("title: A", "title: B")}
@@ -1302,11 +1390,41 @@ class ContractCaseTests(unittest.TestCase):
                 swapped = int(stop.split(":")[1]) if stop.startswith("beforeSwap:") else None
                 starting = after_pages if work == "undo" else pages
                 left = traces.stopped_part_way(ops, work == "undo", starting, swapped)
-                outcome, settled = traces.recover(ops, left, work != "undo")
+                edited = case.get("handEdit")
+                if edited is not None:
+                    left = self.edited_by_hand(left, edited, first, second)
+                outcome, settled, named = traces.recover(ops, left, work != "undo")
                 self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
-                wanted = pages if case["files"] == "before" else after_pages
-                self.assertEqual((settled.get(first), settled.get(second)), (wanted[first], wanted[second]))
+                wanted = {"before": (pages[first], pages[second]), "after": (after_pages[first], after_pages[second]),
+                          "firstBeforeSecondEdited": (pages[first], left.get(second))}[case["files"]]
+                self.assertEqual((settled.get(first), settled.get(second)), wanted)
                 self.assertEqual(self.moved_folder(type("Settled", (), {"pages": settled})), case["movedFolder"])
+                if "pathsNamed" in case:
+                    pages_named = {"first": first, "second": second}
+                    self.assertEqual(named, [pages_named.get(page, page) for page in case["pathsNamed"]])
+                else:
+                    self.assertEqual(named, [])
+
+    def edited_by_hand(self, pages, page, first, second):
+        """recoveryCasesHow's handEdit: `first` or `second`, the publish line
+        changed by hand (the traces' sameLine edit); `carried`, the line
+        `Line one: ...` of a.md set to `Line one: by hand.`, wherever its
+        folder is now (U4b2-13)."""
+        pages = dict(pages)
+        if page == "carried":
+            for folder in (self.RENAMED, self.MEDIA):
+                path = folder + "/a.md"
+                if pages.get(path) is not None:
+                    lines = pages[path].split("\n")
+                    for index, line in enumerate(lines):
+                        if line.startswith("Line one: "):
+                            lines[index] = "Line one: by hand."
+                    pages[path] = "\n".join(lines)
+                    return pages
+            self.fail("no a.md to change by hand")
+        holder = type("Edited", (), {"pages": pages})()
+        self.assertTrue(traces.Model.hand_edit_path(holder, "sameLine", {"first": first, "second": second}[page]))
+        return holder.pages
 
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;

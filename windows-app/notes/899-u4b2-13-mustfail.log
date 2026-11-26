@@ -1,0 +1,21 @@
+U4b2-13 must-fail log (#899), 2026-11-26
+
+== M1: Python, recover's old early return put back (any place in the way: interrupted, nothing put back)
+FAIL: test_recovery_cases_with_a_moved_folder (__main__.ContractCaseTests.test_recovery_cases_with_a_moved_folder) [U4b2-13: a step that moves a folder and edits a page inside it dies with the folder moved and the first page in, and the second page is then changed by hand: the folder and the first page are put back, the second left as edited, and the step is interrupted naming the second]
+AssertionError: Tuples differ: ('---[16 chars]ish: true\n---\nBody.\n', '---\ntitle: B\npubl[31 chars].\n') != ('---[16 chars]ish: false\n---\nBody.\n', '---\ntitle: B\npub[32 chars].\n')
+FAIL: test_recovery_cases_with_a_moved_folder (__main__.ContractCaseTests.test_recovery_cases_with_a_moved_folder) [U4b2-13: a step that moves a folder and edits a page inside it dies with the folder and both pages in and the edit inside not, and the page inside the moved folder is then changed by hand: both pages are put back, the folder stays where it was moved with the page as edited, and the step is interrupted naming the folder and that page]
+AssertionError: Tuples differ: ('---[16 chars]ish: true\n---\nBody.\n', '---\ntitle: B\npubl[20 chars].\n') != ('---[16 chars]ish: false\n---\nBody.\n', '---\ntitle: B\npub[22 chars].\n')
+FAILED (failures=2)
+restored: git checkout scripts/make_undo_traces.py; git status clean
+
+== M2: Mac replay, handEdit carried made a no-op (returns true, writes nothing)
+/Users/russellgordon/plantoir/wt-899-u4b2-13/mac-app/Tests/QuartzTeachersTests/UndoJournalContractTests.swift:142: error: -[QuartzTeachersTests.UndoJournalContractTests testRecoveryCases] : XCTAssertEqual failed: ("["recoveryCases \'U4b2-13: a step that moves a folder and edits a page inside it dies with the folder and both pages in and the edit inside not, and the page inside the moved folder is then changed by hand: both pages are put back, the folder stays where it was moved with the page as edited, and the step is interrupted naming the folder and that page\': the moved folder is media, old, not renamed, byHand", "recoveryCases \'U4b2-13: a step that moves a folder and edits a page inside it dies with the folder and both pages in and the edit inside not, and the page inside the moved folder is then changed by hand: both pages are put back, the folder stays where it was moved with the page as edited, and the step is interrupted naming the folder and that page\': the step is rolledBack, not interrupted", "recoveryCases \'U4b2-13: a step that moves a folder and edits a page inside it dies with the folder and both pages in and the edit inside not, and the page inside the moved folder is then changed by hand: both pages are put back, the folder stays where it was moved with the page as edited, and the step is interrupted naming the folder and that page\': no clearing for interrupted", "recoveryCases \'U4b2-13: a step that moves a folder and edits a page inside it dies with the
+...
+	 Executed 19 tests, with 1 failure (0 unexpected) in 17.729 (17.732) seconds
+failing lines in the message: 'the step is rolledBack, not interrupted', 'the moved folder is media, old, not renamed, byHand'
+restored: git checkout mac-app/Tests/QuartzTeachersTests/UndoContractReplayKinds.swift; git status clean
+
+== M3 (review 1, LOW 2): Mac product, settle leaves a move out of opsToPutBack whenever a place is in the way (UndoRecovery.swift, the opsToPutBack loop)
+	 Executed 19 tests, with 1 failure (0 unexpected) in 17.160 (17.164) seconds
+failing line: UndoJournalContractTests.swift:142, recoveryCases row 1 ('... the step is interrupted naming the second'): the moved folder is renamed, old (not media, old); no other row failed
+restored: git checkout mac-app/QuartzTeachers/Models/Undo/UndoRecovery.swift; git status clean

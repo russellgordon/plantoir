@@ -1,5 +1,5 @@
 {
-  "note" : "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `moves` (U3b, only when there are any) every file it moved, in op order, from and to (the moment in a kept copy's name set to one fixed moment), its text, and whether it stands apart from the step (moveApart) or not (move); `members` (U4a, only when there are any) every editJSON op, in op order, its file, keyPath and before and after (left out: absent); `trees` (U4a, only when there are any) every folder made (createTree), in op order, its path, the folders inside it and every file's text by its path inside it; `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
+  "note" : "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `moves` (U3b, only when there are any) every file it moved, in op order, from and to (the moment in a kept copy's name set to one fixed moment), its text, and whether it stands apart from the step (moveApart) or not (move); `members` (U4a, only when there are any) every editJSON op, in op order, its file, keyPath and before and after (left out: absent); `trees` (U4a, only when there are any) every folder made (createTree), in op order, its path, the folders inside it and every file's text by its path inside it; `folderMoves` (U4b2-11, Rename folder, only when there are any) every FOLDER moved (a move op with a listingSha), in op order, from and to, the listing's SHA-256 (`listingSha`) and the listing itself as it was before the step (the folders inside it, in byte order, and every file's text by its path inside it), and a page the move carries is in `files` at its NEW place (opKinds.wholeOps), its before the text it held at the old one; a rename's relinked pages are in the order of their paths after the move, compared as the lowercased path, and two paths alike once lowercased (in case or Unicode form only) by their UTF-8 bytes as spelled, no locale (the Mac's ClassPages.isInPathOrder, the order a section's pages are listed in), each page by its own place inside the course, a link never by its target, never the order the disk lists them; `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
   "steps" : [
     {
       "action" : "publishPages",
@@ -618,6 +618,180 @@
       ],
       "name" : "setSchoolYear",
       "ops" : [
+        "editJSON"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "renameFolder",
+      "files" : [
+        {
+          "after" : "See [[Ideas/Loops]].\n",
+          "before" : "See [[Concepts/Loops]].\n",
+          "path" : "courses/ICS3U/Ideas/Arrays.md"
+        },
+        {
+          "after" : "Start with [[Tasks/Quiz 1]] and [[Ideas/Arrays]].\n",
+          "before" : "Start with [[Tasks/Quiz 1]] and [[Concepts/Arrays]].\n",
+          "path" : "courses/ICS3U/section1/index.md"
+        },
+        {
+          "after" : "{\n  \"course_code\" : \"ICS3U\",\n  \"course_name\" : \"Introduction to Computer Science\",\n  \"expandable\" : [\"Ideas\",\"Tasks\"],\n  \"hidden\" : [\n    \"Tasks\"\n  ],\n  \"num_sections\" : 2,\n  \"per_section_files\" : [\n    \"index.md\"\n  ],\n  \"per_section_folders\" : [\n    \"All Classes\",\n    \"Tasks\"\n  ],\n  \"section_numbers\" : [\n    1,\n    2\n  ],\n  \"shared_folders\" : [\"Ideas\"]\n}",
+          "before" : "{\n  \"course_code\" : \"ICS3U\",\n  \"course_name\" : \"Introduction to Computer Science\",\n  \"expandable\" : [\n    \"Concepts\",\n    \"Tasks\"\n  ],\n  \"hidden\" : [\n    \"Tasks\"\n  ],\n  \"num_sections\" : 2,\n  \"per_section_files\" : [\n    \"index.md\"\n  ],\n  \"per_section_folders\" : [\n    \"All Classes\",\n    \"Tasks\"\n  ],\n  \"section_numbers\" : [\n    1,\n    2\n  ],\n  \"shared_folders\" : [\n    \"Concepts\"\n  ]\n}",
+          "path" : "courses/ICS3U/course_config.json"
+        }
+      ],
+      "folderMoves" : [
+        {
+          "files" : {
+            "Arrays.md" : "See [[Concepts/Loops]].\n",
+            "Loops.md" : "A loop repeats work.\n"
+          },
+          "folders" : [
+
+          ],
+          "from" : "courses/ICS3U/Concepts",
+          "listingSha" : "549369349d1cb0e405091e20e15fef64814f197a6de309b22ae055e723e5f311",
+          "to" : "courses/ICS3U/Ideas"
+        }
+      ],
+      "madeBy" : "sheet",
+      "members" : [
+        {
+          "after" : [
+            "Ideas",
+            "Tasks"
+          ],
+          "before" : [
+            "Concepts",
+            "Tasks"
+          ],
+          "keyPath" : [
+            "expandable"
+          ],
+          "path" : "courses/ICS3U/course_config.json"
+        },
+        {
+          "after" : [
+            "Ideas"
+          ],
+          "before" : [
+            "Concepts"
+          ],
+          "keyPath" : [
+            "shared_folders"
+          ],
+          "path" : "courses/ICS3U/course_config.json"
+        }
+      ],
+      "name" : "renameFolder",
+      "ops" : [
+        "move",
+        "writeFile",
+        "writeFile",
+        "editJSON",
+        "editJSON"
+      ],
+      "recomputes" : [
+
+      ]
+    },
+    {
+      "action" : "renameFolder",
+      "files" : [
+        {
+          "after" : "See [[Assessments/Quiz 2]].\n",
+          "before" : "See [[Tasks/Quiz 2]].\n",
+          "path" : "courses/ICS3U/section1/Assessments/Quiz 1.md"
+        },
+        {
+          "after" : "Start with [[Assessments/Quiz 1]] and [[Concepts/Arrays]].\n",
+          "before" : "Start with [[Tasks/Quiz 1]] and [[Concepts/Arrays]].\n",
+          "path" : "courses/ICS3U/section1/index.md"
+        },
+        {
+          "after" : "{\n  \"course_code\" : \"ICS3U\",\n  \"course_name\" : \"Introduction to Computer Science\",\n  \"expandable\" : [\"Concepts\",\"Assessments\"],\n  \"hidden\" : [\"Assessments\"],\n  \"num_sections\" : 2,\n  \"per_section_files\" : [\n    \"index.md\"\n  ],\n  \"per_section_folders\" : [\"All Classes\",\"Assessments\"],\n  \"section_numbers\" : [\n    1,\n    2\n  ],\n  \"shared_folders\" : [\n    \"Concepts\"\n  ]\n}",
+          "before" : "{\n  \"course_code\" : \"ICS3U\",\n  \"course_name\" : \"Introduction to Computer Science\",\n  \"expandable\" : [\n    \"Concepts\",\n    \"Tasks\"\n  ],\n  \"hidden\" : [\n    \"Tasks\"\n  ],\n  \"num_sections\" : 2,\n  \"per_section_files\" : [\n    \"index.md\"\n  ],\n  \"per_section_folders\" : [\n    \"All Classes\",\n    \"Tasks\"\n  ],\n  \"section_numbers\" : [\n    1,\n    2\n  ],\n  \"shared_folders\" : [\n    \"Concepts\"\n  ]\n}",
+          "path" : "courses/ICS3U/course_config.json"
+        }
+      ],
+      "folderMoves" : [
+        {
+          "files" : {
+            "Quiz 1.md" : "See [[Tasks/Quiz 2]].\n"
+          },
+          "folders" : [
+
+          ],
+          "from" : "courses/ICS3U/section1/Tasks",
+          "listingSha" : "23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df",
+          "to" : "courses/ICS3U/section1/Assessments"
+        },
+        {
+          "files" : {
+            "Quiz 2.md" : "Quiz two.\n"
+          },
+          "folders" : [
+
+          ],
+          "from" : "courses/ICS3U/section2/Tasks",
+          "listingSha" : "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b",
+          "to" : "courses/ICS3U/section2/Assessments"
+        }
+      ],
+      "madeBy" : "sheet",
+      "members" : [
+        {
+          "after" : [
+            "Concepts",
+            "Assessments"
+          ],
+          "before" : [
+            "Concepts",
+            "Tasks"
+          ],
+          "keyPath" : [
+            "expandable"
+          ],
+          "path" : "courses/ICS3U/course_config.json"
+        },
+        {
+          "after" : [
+            "Assessments"
+          ],
+          "before" : [
+            "Tasks"
+          ],
+          "keyPath" : [
+            "hidden"
+          ],
+          "path" : "courses/ICS3U/course_config.json"
+        },
+        {
+          "after" : [
+            "All Classes",
+            "Assessments"
+          ],
+          "before" : [
+            "All Classes",
+            "Tasks"
+          ],
+          "keyPath" : [
+            "per_section_folders"
+          ],
+          "path" : "courses/ICS3U/course_config.json"
+        }
+      ],
+      "name" : "renameFolderPerSection",
+      "ops" : [
+        "move",
+        "move",
+        "writeFile",
+        "writeFile",
+        "editJSON",
+        "editJSON",
         "editJSON"
       ],
       "recomputes" : [

@@ -273,9 +273,7 @@ enum ClassPages {
                 pages.append(entry)
             }
         }
-        pages.sort { first, second in
-            return first.path.lowercased() < second.path.lowercased()
-        }
+        pages.sort(by: ClassPages.isInPathOrder)
         return pages
     }
 
@@ -299,6 +297,28 @@ enum ClassPages {
         return listed
     }
 
+    /// The one order of pages by their paths: compared as the lowercased
+    /// path, so `Ideas/Arrays.md` comes before `section1/index.md` on every
+    /// volume (a folder lister's own order is the disk's: hashed on APFS,
+    /// sorted on HFS+ and NTFS). A section's pages, the door's listing of a
+    /// folder's pages (`JournaledStep.markdownFiles`) and a rename's relinked
+    /// pages (`SpecialFolderRenamer.plan`, U4b2-11) are all put in it. Two
+    /// paths alike once lowercased (in case only, or in Unicode form only,
+    /// which Swift's `<` treats as equal) are ordered by their UTF-8 bytes as
+    /// spelled, no locale (U4b2-12; review 2 of U4b2-11, LOW A), so the order
+    /// is total and a tie is never left to the order the pages came in.
+    nonisolated static func isInPathOrder(_ first: URL, _ second: URL) -> Bool {
+        let firstLowered: String = first.path.lowercased()
+        let secondLowered: String = second.path.lowercased()
+        if firstLowered < secondLowered {
+            return true
+        }
+        if secondLowered < firstLowered {
+            return false
+        }
+        return first.path.utf8.lexicographicallyPrecedes(second.path.utf8)
+    }
+
     /// Every markdown page under a folder, recursively. `nonisolated` because
     /// the unit-word rename walks class folders off the main actor.
     nonisolated static func markdownPages(under root: URL) -> [URL] {
@@ -318,9 +338,7 @@ enum ClassPages {
                 pages.append(entry)
             }
         }
-        pages.sort { first, second in
-            return first.path.lowercased() < second.path.lowercased()
-        }
+        pages.sort(by: ClassPages.isInPathOrder)
         return pages
     }
 
