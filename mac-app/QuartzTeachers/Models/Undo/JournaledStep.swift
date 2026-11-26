@@ -1037,6 +1037,14 @@ nonisolated final class JournaledStep {
             plannedOrder.append(key)
             plannedURL[key] = place
             plannedBefore[key] = UndoItem.read(at: placeOnDiskNow(place))
+            // A link whose file is missing AND whose file's folder is missing
+            // leads nowhere a file can be made: cannot tell now, refused
+            // before anything changes, never a folder made where a stray
+            // link points (the review of U4b2-1, LOW 1).
+            let folder: URL = place.deletingLastPathComponent()
+            if place != url && plannedBefore[key] == .absent && !FileManager.default.fileExists(atPath: folder.path) {
+                plannedBefore[key] = .unreadable
+            }
         }
         plannedAfter[key] = data
     }

@@ -194,6 +194,136 @@ final class UndoSweepFindingsTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: link.path), target.path)
     }
 
+    /// The review of U4b2-1, MEDIUM 1: a step that REMOVES a page that is a
+    /// link (Insert Class renaming a later class: the new name written, the
+    /// old one removed) never follows the link, and is refused before
+    /// anything changes (`undo.rule.shadow`), until the pieces that move a
+    /// link. The link is left as it is and the file it leads to unchanged.
+    /// MUST FAIL with `remove` following the link (the teacher's file is
+    /// removed and the link left pointing at nothing).
+    func testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges() throws {
+        JournaledStep.modeOverride = .shadow
+        UndoJournalLocation.folderOverride = root.appendingPathComponent("undo", isDirectory: true)
+        let made = try linkedPage(outside: false)
+        let renamed: URL = made.course.appendingPathComponent("Unit 1, Day 2.md")
+        var said: [UndoUnrecordedChange] = []
+        UndoTrailHook.couldNotRecordLine = { _, _, _, change, _ in
+            said.append(change)
+        }
+        let step: JournaledStep = step(for: made.course)
+        step.write(published, to: renamed)
+        step.remove(made.link)
+
+        XCTAssertThrowsError(try step.make()) { error in
+            guard case JournaledStepError.refused(.cannotTellNow, _) = error else {
+                return XCTFail("not refused as cannot tell now: \(error)")
+            }
+        }
+
+        XCTAssertEqual(said, [.nothingWasChanged])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: renamed.path), "the new name was written")
+        XCTAssertEqual(try String(contentsOf: made.target, encoding: .utf8), draft, "the linked file was changed")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: made.link.path), made.target.path)
+    }
+
+    /// The review of U4b2-1, LOW 1: a link whose file is missing (a dangling
+    /// link) is written through: the file is made where the link leads, and
+    /// the link is left as it is, as Windows' `PlaceWritten` does. Inside
+    /// the working folder the step is named and writes no trail line;
+    /// outside it, one line says the change went ahead. MUST FAIL with the
+    /// plan made at the link's own place.
+    func testAShadowStepOnADanglingLinkMakesTheFileTheLinkLeadsTo() throws {
+        JournaledStep.modeOverride = .shadow
+        for outside in [false, true] {
+            UndoJournalLocation.folderOverride = root.appendingPathComponent("undo-\(outside)", isDirectory: true)
+            let made = try linkedPage(outside: outside)
+            defer {
+                try? FileManager.default.removeItem(at: made.outsideFolder)
+            }
+            try FileManager.default.removeItem(at: made.target)
+            var said: [UndoUnrecordedChange] = []
+            UndoTrailHook.couldNotRecordLine = { _, _, _, change, _ in
+                said.append(change)
+            }
+            let step: JournaledStep = step(for: made.course)
+            step.write(published, to: made.link)
+            XCTAssertTrue(step.fileExists(made.link), "fileExists does not find the planned file by its link, outside: \(outside)")
+
+            XCTAssertNoThrow(try step.make(), "the dangling link was refused, outside: \(outside)")
+
+            XCTAssertEqual(said, outside ? [.wentAhead] : [], "outside: \(outside)")
+            XCTAssertEqual(try? String(contentsOf: made.target, encoding: .utf8), published, "outside: \(outside)")
+            XCTAssertEqual(
+                try FileManager.default.destinationOfSymbolicLink(atPath: made.link.path), made.target.path,
+                "the link is not still a link to the same file, outside: \(outside)"
+            )
+            try FileManager.default.removeItem(at: made.course.deletingLastPathComponent())
+        }
+    }
+
+    /// A dangling link whose file's FOLDER is missing too: nothing can be
+    /// made where it leads, so the step is refused and nothing is changed
+    /// (no folder is made to hold it).
+    func testAShadowStepOnADanglingLinkWhoseFolderIsMissingIsRefused() throws {
+        JournaledStep.modeOverride = .shadow
+        for outside in [false, true] {
+            UndoJournalLocation.folderOverride = root.appendingPathComponent("undo-\(outside)", isDirectory: true)
+            let made = try linkedPage(outside: outside)
+            defer {
+                try? FileManager.default.removeItem(at: made.outsideFolder)
+            }
+            let folder: URL = made.target.deletingLastPathComponent()
+            try FileManager.default.removeItem(at: folder)
+            var said: [UndoUnrecordedChange] = []
+            UndoTrailHook.couldNotRecordLine = { _, _, _, change, _ in
+                said.append(change)
+            }
+            let step: JournaledStep = step(for: made.course)
+            step.write(published, to: made.link)
+
+            XCTAssertThrowsError(try step.make(), "outside: \(outside)") { error in
+                guard case JournaledStepError.refused(.cannotTellNow, _) = error else {
+                    return XCTFail("not refused as cannot tell now, outside: \(outside): \(error)")
+                }
+            }
+
+            XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path), "a folder was made, outside: \(outside)")
+            XCTAssertEqual(said, [.nothingWasChanged], "outside: \(outside)")
+            XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: made.link.path), made.target.path)
+            try FileManager.default.removeItem(at: made.course.deletingLastPathComponent())
+        }
+    }
+
+    /// The review of U4b2-1, LOW 4: the other two ways a step is planned
+    /// (`write(_:to:plannedFrom:)`, which the folder rename uses, and
+    /// `editJSON`) plan at the file a link leads to too, and every read
+    /// through the plan finds the page by its link. MUST FAIL with either
+    /// entry point, or `plannedKey`, back at the link's own place.
+    func testEveryWayOfPlanningAndReadingFollowsALink() throws {
+        JournaledStep.modeOverride = .shadow
+        UndoJournalLocation.folderOverride = root.appendingPathComponent("undo", isDirectory: true)
+        let made = try linkedPage(outside: false)
+        let media: URL = made.target.deletingLastPathComponent()
+        let jsonTarget: URL = media.appendingPathComponent("real.json")
+        try Data("{\"a\":1}\n".utf8).write(to: jsonTarget)
+        let jsonLink: URL = made.course.appendingPathComponent("settings.json")
+        try FileManager.default.createSymbolicLink(at: jsonLink, withDestinationURL: jsonTarget)
+        let step: JournaledStep = step(for: made.course)
+        step.write(Data(published.utf8), to: made.link, plannedFrom: Data(draft.utf8))
+        step.editJSON(at: jsonLink, read: Data("{\"a\":1}\n".utf8), members: [], leaving: Data("{\"a\":2}\n".utf8))
+
+        XCTAssertEqual(step.readData(made.link), Data(published.utf8), "readData")
+        XCTAssertEqual(try? step.readTextOrThrow(made.link), published, "readTextOrThrow")
+        XCTAssertEqual(step.readText(jsonLink), "{\"a\":2}\n", "readText")
+        XCTAssertTrue(step.fileExists(made.link), "fileExists")
+        XCTAssertNoThrow(try step.make())
+
+        XCTAssertEqual(try String(contentsOf: made.target, encoding: .utf8), published, "write(_:to:plannedFrom:)")
+        XCTAssertEqual(try String(contentsOf: jsonTarget, encoding: .utf8), "{\"a\":2}\n", "editJSON")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: made.link.path), made.target.path)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: jsonLink.path), jsonTarget.path)
+    }
+
     /// The line a step that cannot be named and is refused says.
     func testTheLineForARefusedStepSaysNothingWasChanged() {
         XCTAssertTrue(
@@ -285,7 +415,7 @@ final class UndoSweepFindingsTests: XCTestCase {
         XCTAssertEqual(ours, wording)
     }
 
-    // MARK: - Functions
+    // MARK: - Computed properties
 
     var draft: String {
         return "---\npublish: false\n---\n"
@@ -294,6 +424,8 @@ final class UndoSweepFindingsTests: XCTestCase {
     var published: String {
         return "---\npublish: true\n---\n"
     }
+
+    // MARK: - Functions
 
     func step(for course: URL) -> JournaledStep {
         return JournaledStep(
