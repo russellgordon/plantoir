@@ -230,9 +230,14 @@ public sealed class UndoCheckContractTests : IDisposable
                 string place = UndoTreeReading.Under(root, from!);
                 if (PlaceAt(atFrom, place)) unreadable.Add(place);
             }
-            if (UndoPath.IsWithinTheRules(to) && to != from && current.TryGetProperty("atTo", out JsonElement atTo))
+            // listedAs (U4b2-9; W8-5): a third spelling the folder lists the
+            // item under, neither from nor to: what atTo describes is made
+            // there instead of at to.
+            string? listedAs = current.TryGetProperty("listedAs", out JsonElement listed) && listed.ValueKind == JsonValueKind.String ? listed.GetString() : null;
+            string? laidAt = listedAs ?? to;
+            if (UndoPath.IsWithinTheRules(laidAt) && laidAt != from && current.TryGetProperty("atTo", out JsonElement atTo))
             {
-                string place = UndoTreeReading.Under(root, to!);
+                string place = UndoTreeReading.Under(root, laidAt!);
                 if (UndoLinks.Look(place) == UndoLinks.What.Nothing && PlaceAt(atTo, place)) unreadable.Add(place);
             }
         }

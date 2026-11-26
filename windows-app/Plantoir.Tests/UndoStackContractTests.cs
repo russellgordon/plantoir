@@ -29,6 +29,8 @@ public sealed class UndoStackContractTests
         "movedFolder",
         // U4b2-10's (W8-4)
         "madeFolder", "foldersInside",
+        // U4b part C's (W8-5)
+        "caseOnlyFolder",
     };
 
     public static IEnumerable<object[]> Cases() =>
@@ -108,6 +110,8 @@ public sealed class UndoStackContractTests
             Assert.Equal(expectLast.GetString(), replay.Last);
         if (stackCase.TryGetProperty("movedFolder", out JsonElement movedFolder))
             Assert.Equal(movedFolder.GetString(), replay.MovedFolder());
+        if (stackCase.TryGetProperty("caseOnlyFolder", out JsonElement caseOnlyFolder))
+            Assert.Equal(caseOnlyFolder.GetString(), replay.CaseOnlyFolder());
         if (stackCase.TryGetProperty("madeFolder", out JsonElement madeFolder))
             Assert.Equal(madeFolder.GetString(), replay.MadeFolder());
         if (stackCase.TryGetProperty("foldersInside", out JsonElement foldersInside))
@@ -494,6 +498,22 @@ public sealed class UndoStackContractTests
                 case "finderRecordsAWindowInTheMadeFolder":
                     File.WriteAllBytes(_scribe.FullPath("A", RenamedFolder + "/sub/" + UndoTreeListing.IgnoredName), "Finder"u8.ToArray());
                     return;
+                // U4b part C (W8-5): a capitalisation-only rename carrying an edit inside.
+                case "renameAFolderInCaseOnly":
+                {
+                    if (CaseOnlySpellingListed() is null)
+                    {
+                        _scribe.WritePage("A", CaseOnlyOld + "/a.md", "Intro.\nLine one: old.\nEnd.\n"u8.ToArray());
+                        _scribe.WritePage("A", CaseOnlyOld + "/b.md", "B\n"u8.ToArray());
+                    }
+                    string listingSha = UndoTreeReading.Read(_scribe.FullPath("A", CaseOnlyOld)).ListingSha!;
+                    var move = new JsonObject { ["kind"] = "move", ["from"] = CaseOnlyOld, ["to"] = MediaFolder, ["listingSha"] = listingSha };
+                    Ops(new JsonArray(move, EditInside(MediaFolder + "/a.md")), []);
+                    return;
+                }
+                case "spellTheFolderAnotherWay":
+                    Assert.Equal(0, UndoSwap.Rename(_scribe.FullPath("A", MediaFolder), _scribe.FullPath("A", "courses/TST1O/MEDIA"), replace: false));
+                    return;
                 case "addAFileInsideTheMovedFolder": _scribe.WritePage("A", RenamedFolder + "/c.md", "C\n"u8.ToArray()); return;
                 case "editThePageInsideByHand": _scribe.WritePage("A", RenamedFolder + "/a.md", "Hand.\n"u8.ToArray()); return;
                 // U4b, M1 (W8-3): the newest step's own kept original from an
@@ -594,6 +614,38 @@ public sealed class UndoStackContractTests
             Ops(ops, blobs);
         }
 
+        private const string CaseOnlyOld = "courses/TST1O/Media";
+
+        /// <summary>The spelling courses/TST1O lists for the media folder, as spelled, or null when it lists none.</summary>
+        private string? CaseOnlySpellingListed()
+        {
+            string course = _scribe.FullPath("A", "courses/TST1O");
+            if (!Directory.Exists(course)) return null;
+            foreach (string entry in Directory.EnumerateFileSystemEntries(course))
+            {
+                string name = Path.GetFileName(entry);
+                if (string.Equals(name.ToLowerInvariant(), "media", StringComparison.Ordinal)) return name;
+            }
+            return null;
+        }
+
+        /// <summary><c>caseOnlyFolder</c>: the spelling courses/TST1O lists for the folder (Media, media, MEDIA or none), then what its a.md holds, as <c>movedFolder</c> says it.</summary>
+        internal string CaseOnlyFolder()
+        {
+            string? spelled = CaseOnlySpellingListed();
+            string? text = spelled is null ? null : UndoKindsForTheCases.Text(_scribe.Page("A", "courses/TST1O/" + spelled + "/a.md"));
+            return (spelled ?? "none") + ", " + Holds(text);
+        }
+
+        private static string Holds(string? text) => text switch
+        {
+            null => "none",
+            "Intro.\nLine one: new.\nEnd.\n" => "new",
+            "Intro.\nLine one: old.\nEnd.\n" => "old",
+            "Hand.\n" => "byHand",
+            _ => "something else: " + text,
+        };
+
         /// <summary>Where the moved folder is now: renamed if it is there, else media.</summary>
         private string MovedFolderNow() => Directory.Exists(_scribe.FullPath("A", RenamedFolder)) ? RenamedFolder : MediaFolder;
 
@@ -628,15 +680,7 @@ public sealed class UndoStackContractTests
             bool media = Directory.Exists(_scribe.FullPath("A", MediaFolder));
             string place = renamed && media ? "both" : renamed ? "renamed" : media ? "media" : "neither";
             string? text = UndoKindsForTheCases.Text(_scribe.Page("A", (renamed ? RenamedFolder : MediaFolder) + "/a.md"));
-            string holds = text switch
-            {
-                null => "none",
-                "Intro.\nLine one: new.\nEnd.\n" => "new",
-                "Intro.\nLine one: old.\nEnd.\n" => "old",
-                "Hand.\n" => "byHand",
-                _ => "something else: " + text,
-            };
-            return place + ", " + holds;
+            return place + ", " + Holds(text);
         }
 
         /// <summary>

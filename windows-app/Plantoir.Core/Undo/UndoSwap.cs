@@ -103,6 +103,9 @@ internal sealed class UndoSeams
     /// <summary>A test's: clearing the Hidden attribute the swap set on the kept original at this index fails, as an attribute that will not take does (W7a part two, review 1, LOW 1).</summary>
     internal Func<int, bool>? ShowingTheKeptFileFailsAt { get; init; }
 
+    /// <summary>Called with the two full paths of every rename the swap makes, before it is tried (a test counts a capitalisation-only rename's renames, #899 W8-5).</summary>
+    internal Action<string, string>? EachRename { get; init; }
+
     /// <summary>The POSIX-semantics rename answers "not supported" (87), as on a network share, so every swap takes the fallback (M5).</summary>
     internal bool PosixRenameIsNotSupported { get; init; }
 
@@ -1038,6 +1041,7 @@ internal static class UndoSwap
     private static int RenameWithRetries(string from, string onto, bool replace, UndoSeams? seams)
     {
         int error = 0;
+        seams?.EachRename?.Invoke(from, onto);
         for (int attempt = 0; attempt < RenameTries; attempt++)
         {
             error = Rename(from, onto, replace, seams);
