@@ -22,7 +22,7 @@ See "Runs".
 
 - `w8-11-a`, the PC, bfb94e4bd (before the merge), both builds and the 15 classes of `899-w8-11-go.ps1`: 550 of 550 passed. That includes action-133 to 138 and 145 to 150, and the fixture row `setSchoolYear`.
 - Merge of origin/dev 96a3d2b73 (W8 pieces 7 and 8): 48a25006c. In `NamedGapLedger.cs`, dev's `Reason899W8U4b` was kept and its "hold members" clause changed to folderMoves.
-- `w8-11-b`, the PC, 48a25006c, classes and the 4 must-fail rows: running at hand-back (`C:\vm-setup\w8-11-b\run.log`).
+- `w8-11-b`, the PC, 48a25006c (the merged head), both builds, the classes and the 4 must-fail rows: 550 of 550 passed, and must-fail 4 RED of 4, all passing again once restored (read by the W8-12 writer, recorded here in W8-12's first commit).
 
 ## Left for the next piece
 
