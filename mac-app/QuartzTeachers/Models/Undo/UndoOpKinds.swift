@@ -992,6 +992,17 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         return Data(buffer[0..<count])
     }
 
+    /// A link's `linkSha` (`opKinds.move`, U4b2-14): the SHA-256 of the
+    /// bytes it holds (`linkTarget`), never followed. Nil when it cannot be
+    /// read. The one rule a writer records by (Rename folder, U4b2-15) and
+    /// the door judges by (`UndoMoveSide.readLink`).
+    static func linkSha(at url: URL) -> String? {
+        guard let target = linkTarget(at: url) else {
+            return nil
+        }
+        return UndoHash.sha256(of: target)
+    }
+
     /// Makes the folder a listing describes at a NEW place, with every
     /// file's content as given. False, with whatever it made removed, when
     /// a file's content is missing or a write fails. A listing holding a
@@ -1334,10 +1345,10 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
         if (information.st_mode & S_IFMT) != S_IFLNK {
             return .holdsSomethingElse
         }
-        guard let target = UndoTreeReading.linkTarget(at: url) else {
+        guard let now = UndoTreeReading.linkSha(at: url) else {
             return .cannotRead
         }
-        return UndoHash.sha256(of: target) == linkSha ? .holdsTheContent : .holdsSomethingElse
+        return now == linkSha ? .holdsTheContent : .holdsSomethingElse
     }
 
     /// Review 1 of U4b2-10: the most candidate folders decided one by one.

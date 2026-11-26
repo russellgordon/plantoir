@@ -893,9 +893,22 @@ final class SpecialFolderRenamerTests: XCTestCase {
             planned: [], earlierRecord: record
         )
         XCTAssertEqual(recordedOnly.places, [], "a link was named as the renamed folder")
+        // U4b2-15, riding L3 of the U4b2-6 review: a rename now moves a
+        // linked folder as a link, so a link at a place an earlier run
+        // recorded is told as one this rename cannot tell it moved, never
+        // dropped. MUST FAIL with the link dropped silently.
+        XCTAssertEqual(recordedOnly.cannotTellWhose, ["Ideas"])
+        XCTAssertEqual(recordedOnly.cannotTell, ["Ideas"])
+        let ending: (line: String, sentence: String) = SpecialFolderRenamer.partWayEnding(
+            renaming: "Concepts", to: "Ideas", course: "ICS3U", scope: .shared, left: recordedOnly,
+            keptBeside: 0, said: "S."
+        )
+        XCTAssertTrue(ending.line.hasPrefix("may have renamed the folder Concepts to Ideas"), ending.line)
+        XCTAssertTrue(ending.line.hasSuffix("; could not tell whether this rename moved these: Ideas)"), ending.line)
+        XCTAssertFalse(ending.sentence.contains("was not renamed"), ending.sentence)
 
         let movedALink: FolderRenamePlan.Move = FolderRenamePlan.Move(
-            from: course.appendingPathComponent("Concepts"), to: place, listingSha: "", isALink: true
+            from: course.appendingPathComponent("Concepts"), to: place, sha: "", isALink: true
         )
         let moved: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
             renaming: "Concepts", to: "Ideas", scope: .shared, courseDirectory: course, sectionNumbers: [],
@@ -946,6 +959,35 @@ final class SpecialFolderRenamerTests: XCTestCase {
         XCTAssertFalse(ending.sentence.contains("was not renamed"), ending.sentence)
     }
 
+    /// U4b2-15, riding L3 of the U4b2-6 review: a record that does not say
+    /// what it moved, with a LINK at the new name and nothing at the old:
+    /// an earlier run may have moved it (a rename now moves a linked folder
+    /// as a link), so it is told as one this rename cannot tell it moved,
+    /// carried forward, and never named as still called the new name.
+    /// MUST FAIL with a link there skipped.
+    func testARecordWithoutItsPlacesTellsALinkAtTheNewNameAsMayHaveMoved() throws {
+        let course: URL = temporaryDirectory.appendingPathComponent("courses/ICS3U")
+        let elsewhere: URL = temporaryDirectory.appendingPathComponent("elsewhere")
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: course.appendingPathComponent("section1"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: course.appendingPathComponent("section1/Assessments"), withDestinationURL: elsewhere
+        )
+        let record: Data = try windowsRecord(from: "Tasks", to: "Assessments", scope: "per_section", in: course)
+
+        let mayHaveMoved: [String] = SpecialFolderRenamer.placesAnEarlierRunMayHaveMoved(
+            byTheRecord: record, renaming: "Tasks", to: "Assessments", scope: .perSection,
+            courseDirectory: course, sectionNumbers: [1, 2]
+        )
+        XCTAssertEqual(mayHaveMoved, ["section1/Assessments"])
+        let left: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
+            renaming: "Tasks", to: "Assessments", scope: .perSection, courseDirectory: course, sectionNumbers: [1, 2],
+            planned: [], earlierRecord: record
+        )
+        XCTAssertEqual(left.places, [])
+        XCTAssertEqual(left.cannotTellWhose, ["section1/Assessments"])
+    }
+
     /// Review 2 of U4b2-5, L2: a start run after a record without `moved`
     /// carries the earlier run's possible places forward as `mayHaveMoved`,
     /// so a third run still says it cannot tell. MUST FAIL with the record
@@ -964,7 +1006,7 @@ final class SpecialFolderRenamerTests: XCTestCase {
         )
         let move: FolderRenamePlan.Move = FolderRenamePlan.Move(
             from: course.appendingPathComponent("section2/Tasks"),
-            to: course.appendingPathComponent("section2/Assessments"), listingSha: "", isALink: false
+            to: course.appendingPathComponent("section2/Assessments"), sha: "", isALink: false
         )
 
         claim.renameIsStarting(moving: [move], sectionNumbers: [1, 2])
