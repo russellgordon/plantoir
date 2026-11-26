@@ -372,9 +372,11 @@ internal static class UndoCheck
             // since the step was made is a change since, judged before
             // anything is read through it (the mac's second hard review of
             // U2b, MEDIUM 2).
-            if (whole is { Root.Length: > 0 } && op.PathsNamed.Any(place => !UndoPlaces.StaysInside(whole.Root, place)))
+            // The place named is the first that leads out, never the other
+            // side of a move (U4b2-2; #899 W8-1).
+            if (whole is { Root.Length: > 0 } && UndoPlaces.FirstPlaceLeadingOut(whole.Root, op) is { } leadingOut)
             {
-                if (!inTheWay.Contains(op.PlaceName, StringComparer.Ordinal)) inTheWay.Add(op.PlaceName);
+                if (!inTheWay.Contains(leadingOut, StringComparer.Ordinal)) inTheWay.Add(leadingOut);
                 continue;
             }
             if (op.IsWhole)

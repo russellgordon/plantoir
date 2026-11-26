@@ -306,10 +306,10 @@ internal static class UndoSwap
         for (int index = 0; index < count; index++)
         {
             UndoSwapTarget target = targets[index];
-            if (root is not null && !StaysInside(target, root))
+            if (root is not null && PlaceLeadingOut(target, root) is { } leadingOut)
             {
                 Tidy();
-                return new UndoSwapResult.Refused(new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath));
+                return new UndoSwapResult.Refused(new UndoRefusal(UndoRefusalKind.ChangedSince, leadingOut));
             }
             if (target.Change is UndoSwapChange.MakeTree tree)
             {
@@ -370,8 +370,8 @@ internal static class UndoSwap
             else
             {
                 seams?.BeforeEachSwap?.Invoke(index, target.FullPath);
-                refusal = root is not null && !StaysInside(target, root)
-                    ? new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath)
+                refusal = root is not null && PlaceLeadingOut(target, root) is { } leadingOut
+                    ? new UndoRefusal(UndoRefusalKind.ChangedSince, leadingOut)
                     : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders);
                 wentIn = refusal is null;
             }
@@ -400,12 +400,24 @@ internal static class UndoSwap
         return new UndoSwapResult.Swapped();
     }
 
-    /// <summary>Whether every place a change touches is still inside the working folder, links resolved (a move's two; none for an external target).</summary>
-    private static bool StaysInside(UndoSwapTarget target, string root) => target.Change switch
+    /// <summary>
+    /// The place to name when a change no longer stays inside the working
+    /// folder, links resolved, or null when it does: for a move, the first of
+    /// its op's places, in the order path, from, to, that leads out, by the
+    /// same function the plan uses (<see cref="UndoPlaces.FirstPlaceLeadingOut"/>;
+    /// U4b2-2 review 1, MEDIUM 1; #899 W8-1), never the other side of the
+    /// move; none for an external target; for any other change, the place it
+    /// changes.
+    /// </summary>
+    private static string? PlaceLeadingOut(UndoSwapTarget target, string root) => target.Change switch
     {
-        UndoSwapChange.SetExternal => true,
-        UndoSwapChange.MoveHere move => UndoPlaces.StaysInside(root, move.FromRelative) && UndoPlaces.StaysInside(root, target.RelativePath),
-        _ => UndoPlaces.StaysInside(root, target.RelativePath),
+        UndoSwapChange.SetExternal => null,
+        // The places the swap touches are the op's two; should they ever
+        // differ in spelling, a place the op does not name that leads out is
+        // still named, by the place it changes (as the mac's fallback).
+        UndoSwapChange.MoveHere move => UndoPlaces.FirstPlaceLeadingOut(root, move.Op)
+            ?? (UndoPlaces.StaysInside(root, move.FromRelative) && UndoPlaces.StaysInside(root, target.RelativePath) ? null : target.RelativePath),
+        _ => UndoPlaces.StaysInside(root, target.RelativePath) ? null : target.RelativePath,
     };
 
     /// <summary>One whole op's change (the mac's swap of <c>moveHere</c>, <c>makeTree</c>, <c>takeTree</c>, <c>setExternal</c>); the refusal, or null when it went in.</summary>
