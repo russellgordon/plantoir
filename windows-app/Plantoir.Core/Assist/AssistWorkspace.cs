@@ -4931,12 +4931,19 @@ public sealed partial class AssistWorkspace
             () => NewUndoStep("showTodaysClassOnTheFrontPage", course.Code, section, madeBy: "sheet"));
     }
 
-    /// <summary>Not Today, remembered for this section, day and class.</summary>
-    public void DeclineTodaysClass(string courseCode, int sectionNumber, DateOnly askedOn,
+    /// <summary>
+    /// Not Today, remembered for this section, day and class: ONE step of
+    /// that one record (#899 W7b2-7), made by the sheet's own button (the
+    /// mac's <c>UndoStepMaker.sheet</c>) on this workspace's list and door.
+    /// </summary>
+    /// <returns>False when the record could not be written: the answer stands, and only the record is lost.</returns>
+    public bool DeclineTodaysClass(string courseCode, int sectionNumber, DateOnly askedOn,
                                    TodaysClassOnTheFrontPage.Offering offering)
     {
         var course = Course(courseCode);
-        TodaysClassOnTheFrontPage.RecordNotToday(course, Section(course, sectionNumber), askedOn, offering);
+        int section = Section(course, sectionNumber);
+        return TodaysClassOnTheFrontPage.RecordNotToday(course, section, askedOn, offering,
+            NewUndoStep("notTodayOnTheFrontPage", course.Code, section, madeBy: "sheet"));
     }
 
     /// <summary>

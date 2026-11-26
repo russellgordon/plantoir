@@ -217,8 +217,8 @@ public class AssistScenarioTests : IDisposable
         if (given?["laterClassesKeptAll"]?.GetValue<bool>() == true)
         {
             var course = Workspace.DiscoverCourses(_folder).Single(found => found.Code == Course);
-            LaterClassesKept.Keep(course.DirectoryPath, SectionNumber,
-                                  ClassesDatedLater.FlaggedIn(course, SectionNumber, PinnedToday));
+            LaterClassesKept.KeepAtDeploy(_folder, course.Code, course.DirectoryPath, SectionNumber,
+                                          ClassesDatedLater.FlaggedIn(course, SectionNumber, PinnedToday));
         }
         var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory())
             { Surface = surface, Today = () => PinnedToday });

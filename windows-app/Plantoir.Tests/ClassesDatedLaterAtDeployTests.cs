@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Undo;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 using Plantoir.Mcp;
@@ -278,7 +279,10 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Class("Unit 2, Day 6", Today.AddDays(4), published: true);
         var workspace = new AssistWorkspace(_folder, _launcher) { Today = () => Today };
 
-        workspace.KeepTheClassesItPublished(TheCourse, 1, new[] { "section1/All Classes/Unit 2, Day 5", "section1/All Classes/Unit 2, Day 4" });
+        // Planned into the press's own step (#899 W7b2-8), then made.
+        var step = new UndoActionStep(new UndoStepMaker("sheet", LinksChecklist.AnsweredActionKey), _folder, "ICS3U", 1);
+        workspace.KeepTheClassesItPublished(TheCourse, 1, new[] { "section1/All Classes/Unit 2, Day 5", "section1/All Classes/Unit 2, Day 4" }, step);
+        step.Make();
 
         // Day 4 is the next class and is never asked about, so it leaves no row.
         Assert.Equal(new[] { new LaterClassesKept.Row("section1/All Classes/Unit 2, Day 5", DateText.Iso(Today.AddDays(3))) },

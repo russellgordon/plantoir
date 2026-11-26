@@ -287,19 +287,48 @@ public static class TodaysClassOnTheFrontPage
         catch { return null; }
     }
 
-    /// <summary>Not Today: remembered for that section, the day asked and the class offered.</summary>
-    public static void RecordNotToday(Course course, int section, DateOnly askedOn, Offering offering)
+    /// <summary>
+    /// Not Today: remembered for that section, the day asked and the class
+    /// offered, as ONE step of that one record (#899 W7b2-7; the mac's
+    /// <c>NotToday.write</c>, key <c>notTodayOnTheFrontPage</c>, made by
+    /// <c>sheet</c>), its folder made by the swap. The caller makes the step
+    /// (<see cref="AssistWorkspace.DeclineTodaysClass"/>: its list and door),
+    /// as <see cref="TimetableMemory.WriteDown(string, string, int, IEnumerable{DateOnly}, string, DateOnly, UndoActionStep)"/>
+    /// takes its own. Never told to today's undo (it never was). The bytes
+    /// are Windows' own, as before. The same answer again changes nothing and
+    /// makes no step.
+    /// </summary>
+    /// <returns>
+    /// False when the record could not be written: it costs only the record
+    /// (the question is asked once more today), never the answer, as the
+    /// mac's <c>try?</c>. A step left part way has written the record, and
+    /// says true.
+    /// </returns>
+    internal static bool RecordNotToday(Course course, int section, DateOnly askedOn, Offering offering, UndoActionStep step)
     {
-        string path = NotTodayPath(course, section);
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-        var record = new JObject
+        bool remembered;
+        try
         {
-            ["version"] = "1",
-            ["day"] = askedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            ["class"] = offering.Show,
-        };
-        File.WriteAllText(path, record.ToString(Newtonsoft.Json.Formatting.Indented) + "\n", new UTF8Encoding(false));
+            var record = new JObject
+            {
+                ["version"] = "1",
+                ["day"] = askedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                ["class"] = offering.Show,
+            };
+            step.Write(NotTodayPath(course, section), record.ToString(Newtonsoft.Json.Formatting.Indented) + "\n",
+                       todaysUndoKeepsIt: false);
+            step.Make();
+            remembered = true;
+        }
+        // The record is in, what it held kept beside it: it IS remembered
+        // (the trail's own line names the kept file, from the door).
+        catch (UndoStepLeftPartWayException) { remembered = true; }
+        // Anything else, the door's refusal or an error that is not the
+        // disk's (a stop with the switch on): the record is not written, and
+        // the sheet goes on (W7b2-7 review 1, LOW 1).
+        catch { remembered = false; }
         Note(course, section, $"left the front page as it was — Not Today: {offering.Show} offered, it showed {offering.Shows}");
+        return remembered;
     }
 
     /// <summary>

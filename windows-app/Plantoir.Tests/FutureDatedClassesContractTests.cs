@@ -107,8 +107,8 @@ public sealed class FutureDatedClassesContractTests : IDisposable
         Assert.Equal(Path.Combine(courseDirectory, expectedPath.Replace('/', Path.DirectorySeparatorChar)), path);
 
         var day5 = new ClassesDatedLater.Page("section2/All Classes/Unit 2, Day 5", "Unit 2, Day 5", new DateOnly(2026, 10, 14), true);
-        Assert.True(LaterClassesKept.Keep(courseDirectory, 2, new[] { day5 }, new DateTime(2026, 10, 8, 23, 5, 9, DateTimeKind.Utc)));
-        Assert.True(LaterClassesKept.Keep(courseDirectory, 2, new[] { day5 with { Date = new DateOnly(2026, 10, 16) } },
+        Assert.True(LaterClassesKept.KeepAtDeploy(_folder, "ICS3U", courseDirectory, 2, new[] { day5 }, new DateTime(2026, 10, 8, 23, 5, 9, DateTimeKind.Utc)));
+        Assert.True(LaterClassesKept.KeepAtDeploy(_folder, "ICS3U", courseDirectory, 2, new[] { day5 with { Date = new DateOnly(2026, 10, 16) } },
                                           new DateTime(2026, 10, 9, 1, 0, 0, DateTimeKind.Utc)));
 
         var written = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
@@ -129,7 +129,7 @@ public sealed class FutureDatedClassesContractTests : IDisposable
         string courseDirectory = Path.Combine(_folder, "courses", "ICS3U");
         Directory.CreateDirectory(courseDirectory);
         var day5 = new ClassesDatedLater.Page("section1/All Classes/Unit 2, Day 5", "Unit 2, Day 5", new DateOnly(2026, 10, 14), true);
-        LaterClassesKept.Keep(courseDirectory, 1, new[] { day5 });
+        LaterClassesKept.KeepAtDeploy(_folder, "ICS3U", courseDirectory, 1, new[] { day5 });
         string path = LaterClassesKept.PathFor(courseDirectory, 1);
         string before = File.ReadAllText(path);
 

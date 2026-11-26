@@ -230,8 +230,12 @@ public sealed class TodaysClassContractTests : IDisposable
 
     /// <summary>
     /// The section window only renders the description (read from source:
-    /// the WinUI app cannot be loaded here). Each line that maps a field to
-    /// the dialog, or wires the press, is pinned whole, and each appears once.
+    /// the WinUI app cannot be loaded here). The two lines that wire the
+    /// press are pinned whole, and each appears once; <c>ShowAlertAsync</c>
+    /// is cut out of the file and pinned WHOLE, so a line added to it (a
+    /// second default, another button, an alert not shown answered as Open
+    /// Folder) goes red (W7b2-9 review 2, LOW 1: a line matched anywhere in
+    /// the file, such as <c>_ => null,</c>, proved nothing about the method).
     /// </summary>
     [Fact]
     public void TheSectionWindowOnlyRendersTheKeptAlertsDescription()
@@ -242,22 +246,38 @@ public sealed class TodaysClassContractTests : IDisposable
         [
             "                var alert = TodaysClassOnTheFrontPage.KeptAlertFor(offer, kept);\n",
             "                await alert.PressedAsync(await ShowAlertAsync(alert.Shows), ShowAlertAsync, FolderActions.OpenFolder);\n",
-            "            Title = alert.Title,\n",
-            "            Content = new TextBlock { Text = alert.Message, TextWrapping = TextWrapping.Wrap },\n",
-            "            CloseButtonText = alert.CloseButton,\n",
-            "            DefaultButton = alert.Default == TodaysClassOnTheFrontPage.AlertButton.Action ? ContentDialogButton.Primary : ContentDialogButton.Close,\n",
-            "        if (alert.ActionButton is { } action) dialog.PrimaryButtonText = action;\n",
-            "            ContentDialogResult.Primary => TodaysClassOnTheFrontPage.AlertButton.Action,\n",
-            "            ContentDialogResult.None => TodaysClassOnTheFrontPage.AlertButton.Close,\n",
-            "            _ => null,\n",
         ];
         foreach (string line in lines)
         {
             int first = view.IndexOf(line, StringComparison.Ordinal);
             Assert.True(first >= 0, "missing: " + line.Trim());
-            if (line.Contains("alert", StringComparison.Ordinal))
-                Assert.True(view.IndexOf(line, first + 1, StringComparison.Ordinal) < 0, "said twice: " + line.Trim());
+            Assert.True(view.IndexOf(line, first + 1, StringComparison.Ordinal) < 0, "said twice: " + line.Trim());
         }
+
+        const string signature = "    private async Task<TodaysClassOnTheFrontPage.AlertButton?> ShowAlertAsync(TodaysClassOnTheFrontPage.AlertDescription alert)\n";
+        int start = view.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, "ShowAlertAsync is missing");
+        Assert.True(view.IndexOf(signature, start + 1, StringComparison.Ordinal) < 0, "ShowAlertAsync is said twice");
+        int end = view.IndexOf("\n    }\n", start, StringComparison.Ordinal) + "\n    }\n".Length;
+        Assert.Equal(
+            signature +
+            "    {\n" +
+            "        var dialog = new ContentDialog\n" +
+            "        {\n" +
+            "            Title = alert.Title,\n" +
+            "            Content = new TextBlock { Text = alert.Message, TextWrapping = TextWrapping.Wrap },\n" +
+            "            CloseButtonText = alert.CloseButton,\n" +
+            "            DefaultButton = alert.Default == TodaysClassOnTheFrontPage.AlertButton.Action ? ContentDialogButton.Primary : ContentDialogButton.Close,\n" +
+            "        };\n" +
+            "        if (alert.ActionButton is { } action) dialog.PrimaryButtonText = action;\n" +
+            "        return await ShowDialogSafelyAsync(dialog) switch\n" +
+            "        {\n" +
+            "            ContentDialogResult.Primary => TodaysClassOnTheFrontPage.AlertButton.Action,\n" +
+            "            ContentDialogResult.None => TodaysClassOnTheFrontPage.AlertButton.Close,\n" +
+            "            _ => null,\n" +
+            "        };\n" +
+            "    }\n",
+            view[start..end]);
         Assert.DoesNotContain("ShowInFileExplorer", view[view.IndexOf("KeptAlertFor(", StringComparison.Ordinal)..view.IndexOf("ShowAlertAsync(TodaysClassOnTheFrontPage.AlertDescription", StringComparison.Ordinal)]);
     }
 
@@ -278,17 +298,29 @@ public sealed class TodaysClassContractTests : IDisposable
         foreach (JsonNode? exception in Rule["plainWordsExceptions"]!.AsArray()) exceptions.Add(exception!["name"]!.ToString());
         Assert.Equal(["File Explorer"], exceptions);
 
-        string[] sentences =
+        var scopes = new List<string>();
+        foreach (JsonNode? exception in Rule["plainWordsExceptions"]!.AsArray()) scopes.Add(exception!["in"]!.ToString());
+        Assert.Equal(["keptOnWindows.hiddenItems"], scopes);
+
+        // Each filled sentence by the contract key it says, so a name is taken
+        // out only of the sentence its `in` names (W7b2-9 review 2, LOW 2).
+        string message = TodaysClassOnTheFrontPage.KeptMessage(["KEPT"]);
+        Assert.EndsWith(" " + TodaysClassOnTheFrontPage.HiddenItems, message, StringComparison.Ordinal);
+        (string Key, string Sentence)[] sentences =
         [
-            TodaysClassOnTheFrontPage.KeptTitle("Unit 2, Day 5"),
-            TodaysClassOnTheFrontPage.KeptMessage(["KEPT"]),
-            TodaysClassOnTheFrontPage.OpenKeptFolder,
-            TodaysClassOnTheFrontPage.KeptGoneSentence("KEPT"),
+            ("wording.keptTitle", TodaysClassOnTheFrontPage.KeptTitle("Unit 2, Day 5")),
+            ("wording.kept", message[..^(" " + TodaysClassOnTheFrontPage.HiddenItems).Length]),
+            ("keptOnWindows.hiddenItems", TodaysClassOnTheFrontPage.HiddenItems),
+            ("keptOnWindows.showKept", TodaysClassOnTheFrontPage.OpenKeptFolder),
+            ("wording.keptGone", TodaysClassOnTheFrontPage.KeptGoneSentence("KEPT")),
         ];
-        foreach (string sentence in sentences)
+        foreach ((string key, string sentence) in sentences)
         {
             string checkedText = sentence;
-            foreach (string name in exceptions) checkedText = checkedText.Replace(name, " ", StringComparison.Ordinal);
+            for (int index = 0; index < exceptions.Count; index++)
+            {
+                if (scopes[index] == key) checkedText = checkedText.Replace(exceptions[index], " ", StringComparison.Ordinal);
+            }
             var said = new HashSet<string>();
             foreach (string piece in System.Text.RegularExpressions.Regex.Split(checkedText.ToLowerInvariant(), "[^\\p{L}]+"))
                 if (piece.Length > 0) said.Add(piece);
