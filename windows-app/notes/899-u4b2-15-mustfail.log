@@ -1,0 +1,25 @@
+U4b2-15 must-fail log (#899). Fix committed first (75122d0d9); each sabotage applied by script, built, run (UndoRenameFolderStepTests, SpecialFolderRenamerTests), restored with `git checkout HEAD -- mac-app/QuartzTeachers` (status clean of product files each time). Logs: /Users/russellgordon/plantoir/wt-899-u4b2-15/.dd/run-mf-*.log
+
+RED FIRST (run-red1.log): product at c64e741ef, the new tests: 6 RED of 6.
+  UndoRenameFolderStepTests testAPerSectionFolderThatIsALinkIsRenamedByMovingTheLink :719 failed("“Tasks” was not renamed, and nothing was changed: ...")
+  UndoRenameFolderStepTests testWithTheSwitchOffAPerSectionFolderThatIsALinkIsRenamedAsBeforeU4b
+  UndoRenameFolderStepTests testALinkedSectionsRenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery :787 0 < 4 (no swap reached: refused)
+  UndoRenameFolderStepTests testASharedFolderThatIsALinkOutOfTheWorkingFolderIsRenamedAndWhatItLeadsToIsUntouched
+  SpecialFolderRenamerTests testALinkAtTheNewNameIsNotTheRenamedFolderUnlessALinkWasMoved :900 [] != ["Ideas"] (L3, recorded place)
+  SpecialFolderRenamerTests testARecordWithoutItsPlacesTellsALinkAtTheNewNameAsMayHaveMoved :982 (L3, may-have-moved)
+
+S1 plan's link branch refuses again (link sha nil): RED, the four step tests (:719 refused "cannot tell now", :720, :787).
+S2c the move made on the link's target (target renamed, link renamed after, outside the door): RED, :723 "the folder the link leads to was moved or changed", :724 "the link's target was renamed" (the target-untouched assertions), and the other three step tests.
+S2/S2b the target moved through the door instead of the link: RED, refused by the door before anything changed (:719); kept as extra evidence, not the brief's row.
+S3 a link at a recorded place dropped again (foldersAtTheirNewName): RED, SpecialFolderRenamerTests :900, :901, :906 (line says "did not rename").
+S4 a link at the new name skipped by placesAnEarlierRunMayHaveMoved: RED, SpecialFolderRenamerTests :982, :988.
+S5 a link's `from` named by relativePath (resolved to its target): RED, refused by the door (:719), the four step tests.
+
+Total: 5 of 5 brief/own sabotages RED (S1, S2c, S3, S4, S5).
+
+REVIEW 1 (db41d6729 committed first). Red first (run-r1-red.log, product at c64e741ef): UndoJournalContractTests testStackCases RED on both new U4b2-15 rows ("redo nil", "offered [], not [1]"); testALinkToAnotherSectionsFolderOfTheSameRenameIsMovedAsALink RED (refused); testADanglingLinkAtASectionsPlaceIsSkippedAsBeforeU4b passes at the base (it pins behaviour unchanged since before U4b), pinned by S6.
+S1 again (plan refuses a link): testStackCases RED on the U4b2-15 rows (the call ends renameRefused; "head nil", "offered []"), and every link test.
+S2c again (the link's target moved): testStackCases RED on the U4b2-15 rows, and every link test.
+S6 a dangling link planned as a link's move (the fileExists guard skipped for a link): testADanglingLinkAtASectionsPlaceIsSkippedAsBeforeU4b RED :804 (the dangling link moved).
+S5 again (a link's from resolved): testStackCases RED on the U4b2-15 rows, testALinkToAnotherSectionsFolderOfTheSameRenameIsMovedAsALink RED, and every link test.
+Review total: 4 of 4 RED (S1, S2c, S6, S5); git status clean after each.

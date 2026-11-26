@@ -65,7 +65,8 @@ nonisolated struct FolderRenamePlan: Sendable {
         return FolderRenameOutcome(foldersMoved: moves.count, pagesRelinked: pages.count)
     }
 
-    /// One folder's move, judged by its listing.
+    /// One folder's move, judged by its listing, or one symbolic link's
+    /// move, judged by the target it holds (U4b2-15).
     struct Move: Sendable {
 
         // MARK: - Stored properties
@@ -74,11 +75,14 @@ nonisolated struct FolderRenamePlan: Sendable {
 
         let to: URL
 
-        let listingSha: String
+        /// The SHA-256 of the folder's listing, or, for a link, of the
+        /// target it holds as `readlink` gives it (`linkSha`).
+        let sha: String
 
         /// Whether what moves is a symbolic link (to a folder), read by
-        /// `lstat` when planned: a link at the new name is this rename's
-        /// only when the rename moved a link there (U4b2-5, review 1, L3).
+        /// `lstat` when planned: moved as itself, never followed, and a
+        /// link at the new name is this rename's only when the rename
+        /// moved a link there (U4b2-5, review 1, L3).
         var isALink: Bool = false
     }
 
@@ -641,14 +645,23 @@ enum SpecialFolderRenamer {
                     sentence: SpecialNames.renameFolderProblemDestinationExists(name: newName)
                 )
             }
-            guard let listingSha = UndoTreeReading.read(at: location).listingSha else {
-                // A folder whose content cannot be read cannot be judged as a
-                // pair, so nothing is planned and nothing is changed.
+            // A folder that is itself a symbolic link (to a folder, as the
+            // test above found by following it) is renamed by moving the
+            // LINK, as before U4b (`moveItem` renamed the link): judged by
+            // the target it holds, never followed, so what it leads to is
+            // never read, listed or touched, wherever it is (U4b2-15).
+            let isALink: Bool = presence(at: location, spelledExactly: false) == .link
+            let sha: String? = isALink
+                ? UndoTreeReading.linkSha(at: location)
+                : UndoTreeReading.read(at: location).listingSha
+            guard let sha else {
+                // A folder whose content (or a link whose target) cannot be
+                // read cannot be judged as a pair, so nothing is planned and
+                // nothing is changed.
                 let refusal: UndoRefusal = .cannotTellNow(path: location.path)
                 throw JournaledStepError.refused(refusal, fileName: location.lastPathComponent)
             }
-            let isALink: Bool = presence(at: location, spelledExactly: false) == .link
-            moves.append(FolderRenamePlan.Move(from: location, to: destination, listingSha: listingSha, isALink: isALink))
+            moves.append(FolderRenamePlan.Move(from: location, to: destination, sha: sha, isALink: isALink))
         }
 
         var pages: [FolderRenamePlan.Page] = []
@@ -747,7 +760,11 @@ enum SpecialFolderRenamer {
     /// edit the move carries (`undoJournal.opKinds.wholeOps`).
     nonisolated static func apply(_ planned: FolderRenamePlan, to step: JournaledStep) {
         for move in planned.moves {
-            step.moveFolder(move.from, to: move.to, listingSha: move.listingSha)
+            if move.isALink {
+                step.moveLink(move.from, to: move.to, linkSha: move.sha)
+            } else {
+                step.moveFolder(move.from, to: move.to, listingSha: move.sha)
+            }
         }
         for page in planned.pages {
             step.write(page.rewritten, to: page.url, plannedFrom: page.read)
@@ -996,10 +1013,13 @@ enum SpecialFolderRenamer {
             case .folder, .link, .somethingElse:
                 continue
             }
+            // A link counts too (U4b2-15, riding L3 of the U4b2-6 review):
+            // a rename now moves a linked folder as a link, so a link here
+            // may be an earlier run's, which is never known.
             switch presence(at: place, spelledExactly: isCaseOnly) {
-            case .folder, .unreadable:
+            case .folder, .link, .unreadable:
                 places.append(inside)
-            case .absent, .link, .somethingElse:
+            case .absent, .somethingElse:
                 continue
             }
         }
@@ -1047,7 +1067,8 @@ enum SpecialFolderRenamer {
     ///
     /// The disk decides only which of those places are at the new name:
     /// a folder, by `lstat`, never followed; a link only where this run moved
-    /// a link (review 1, L3); a capitalisation-only rename counts a place only
+    /// a link (review 1, L3), and any other link there is `cannotTellWhose`,
+    /// told, never counted (U4b2-15); a capitalisation-only rename counts a place only
     /// when its directory lists the new spelling. Whatever is at the OLD name
     /// does not count (U4b part six's review, L1). A place that cannot be
     /// read (a refused `lstat`, a listing that fails) is neither counted nor
@@ -1086,13 +1107,13 @@ enum SpecialFolderRenamer {
                     continue
                 }
                 switch presence(at: place, spelledExactly: isCaseOnly) {
-                case .folder:
+                case .folder, .link:
                     result.cannotTellWhose.append(inside)
                     result.cannotTell.append(inside)
                 case .unreadable(let said):
                     result.unreadable.append(inside + " (" + said + ")")
                     result.cannotTell.append(inside)
-                case .absent, .link, .somethingElse:
+                case .absent, .somethingElse:
                     continue
                 }
                 continue
@@ -1101,8 +1122,16 @@ enum SpecialFolderRenamer {
             case .folder:
                 result.places.append(inside)
             case .link:
+                // This run's link is this rename's. A link at a place an
+                // earlier run recorded is told as a place this rename cannot
+                // tell it moved (U4b2-15, riding L3 of the U4b2-6 review):
+                // the record keeps no word of what was a link, and a link a
+                // teacher made reads the same.
                 if movedALinkHere {
                     result.places.append(inside)
+                } else {
+                    result.cannotTellWhose.append(inside)
+                    result.cannotTell.append(inside)
                 }
             case .unreadable(let said):
                 result.unreadable.append(inside + " (" + said + ")")

@@ -1,0 +1,40 @@
+U4b2-14 must-fail log (#899). Fix committed first (e5cf855d5); each sabotage applied alone, built, run
+(UndoOpKindsTests + UndoJournalContractTests), then restored with git checkout (status clean of it).
+Logs: /Users/russellgordon/plantoir/wt-899-u4b2-14/.dd/run-mf-s<n>.log
+
+RED FIRST (run-red1.log, before UndoMoveSide.readLink and staysInside(namedBy:)): 9 failures
+  testCheckCases: "move of a link: judged by the target it names: holds the content" undo changedSince, not canUndo (and redo)
+  testCheckCases: "move of a link: a link leading out of the working folder: holds the content, never followed" undo changedSince, not alreadyBack (and redo)
+  testStackCases: both U4b2-14 rows (nothingToUndo / nothingToRedo; the door refused the step)
+  testALinkItemIsReadWithoutFollowingIt: lines 782, 785 (holdsSomethingElse), 790 (refused notReadable), 791, 792, 795, 796
+  Passed on the old code, as guards: "a link given another target since" and "a plain folder now where the link was" (both changedSince either way); pinned by S3 and S2.
+
+S1 readLink follows the link (stat for lstat): RED
+  testCheckCases: "judged by the target it names" and "a link leading out of the working folder" (changedSince)
+  testStackCases: both U4b2-14 rows
+  testALinkItemIsReadWithoutFollowingIt: 782 (cannotRead: the locked folder outside was reached), 785 (free: the dangling link followed), 790 (refused cannotTellNow), 791-796
+  "another target" row PASSED under S1: following finds no link at all, and anything that is not the link is something else; it is pinned by S3.
+S2 a folder where the link was taken for the link (S_IFDIR answered holdsTheContent): RED
+  testCheckCases: "move of a link: a plain folder now where the link was: changed since" undo canUndo, not changedSince
+S3 any link taken for the content (target bytes ignored): RED
+  testCheckCases: "move of a link: a link given another target since: changed since" undo canUndo, not changedSince
+S4 the leaf of a link move resolved (staysInside(root, path) for every place): RED
+  testALinkItemIsReadWithoutFollowingIt: 790 (refused notReadable: realpath of the link into a folder nobody may enter fails), 791, 792, 795, 796
+S5 (Python) move_state ignores linkSha (a link never holds): RED
+  test_check_cases: "judged by the target it names", "a link leading out of the working folder"; test_stack_cases: both U4b2-14 rows
+
+5 of 5 RED.
+
+LOW 3 of review 1: the brief named the "another target" row as S1's; under S1 it passes (following never finds a link, and a non-link is something else either way), so S3 (the target's bytes ignored) is the sabotage that can turn it red, and it does: the same proof, by the one wrong reading that row can catch. S1 itself stays above, red on the rows it can reach.
+
+REVIEW 1 (fixes committed first, 7022c845e)
+RED FIRST (run-r1-red.log, the two Swift fixes stashed): 2 failures
+  testStackCases: "U4b2-14, review 1: a link's move with an edit inside its new place: a step this version cannot read, a barrier" (changedSince, not notAvailable; head nil)
+  testTheStepsOwnFilesAreNeverListedThroughALink: line 815 (the outside's file found through the link)
+R1 moveCarries carries under a link's move: RED, the barrier stack row
+R2 stepsOwnFilesInside lists through a link: RED, testTheStepsOwnFilesAreNeverListedThroughALink:815
+S4 again (run-mf-s4b.log; the check replay now asks the stays-inside check, LOW 2): RED
+  testCheckCases: "a link leading out of the working folder, to a folder that is there" and "judged by the target it names" (its ../library leads nowhere, so a resolved leaf is refused)
+  testALinkItemIsReadWithoutFollowingIt: 790, 791, 792, 795, 796
+R3 (Python) move_carries carries under a link's move: RED, the barrier stack row
+4 of 4 RED; restored each time (git status clean).
