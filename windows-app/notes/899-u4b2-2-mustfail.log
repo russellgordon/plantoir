@@ -19,3 +19,11 @@ Each sabotage in place, built, run (UndoDoorGuardTests + UndoJournalContractTest
    AssertionError: 'courses/TST1O/b.md' != 'courses/TST1O/new/b.md'
 
 RED 3 of 3. Restored: git status clean after each.
+
+Review 1 round (2026-11-25), on 8b1ff15e6. Tests failed first on ddb585569 (run-r1-first.log): all four new UndoDoorGuardTests red, naming the other side of the move (b.md for Undo, a.md for Redo).
+a. Staging check names target.relativePath again: run-r1-mustfail-a, red: testUndoRefusedAtTheStagingCheckNamesTheNewPlaceThatLeadsOut, testRedoRefusedAtTheStagingCheckNamesTheOldPlaceThatLeadsOut.
+b. Swap check names target.relativePath again: run-r1-mustfail-b, red: testUndoRefusedAtTheSwapCheck..., testRedoRefusedAtTheSwapCheck...
+c. placeLeavingTheFolder returns places[0] (Windows' rule): run-r1-mustfail-c, red: both Undo window tests, the two "only the new place" tests, testStackCases (rows "U4b2-2: only the move's new place" and "U4b2-2, Redo: undone, then only the move's new place").
+d. placeLeavingTheFolder returns the last place: run-r1-mustfail-d, red: both "both" tests, testStackCases (the Undo and the Redo "both" rows).
+e. Python model naming path or from: FAILED (failures=2), the Undo and the Redo "only the new place" rows.
+RED 5 of 5 this round. Restored clean after each.
