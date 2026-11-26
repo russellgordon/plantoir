@@ -22753,23 +22753,38 @@ A carried edit that makes a file in a folder that was not there
 Before this piece the move's judgement left the file out but kept every
 listed folder, so the Undo of an untouched step was refused as changed
 since, and had it gone through the empty `sub` would have gone back with the
-folder. Now `UndoMoveSide.readNamingFoldersLeftOut` also leaves out every
-folder that holds nothing but files left out and folders so left out
-(`foldersHoldingOnly`, inside by `UndoOp.partInside`), judged that way first
-and, failing that, as listed, because the moved folder may have held an
-empty folder of its own in which the edit made its file (then it is the
-content's and stays). The swap's last look before the rename names those
-folders, and once every swap has gone in and the tidy has removed the
-step's own files, each is removed where it now is with `rmdir`, which never
-removes a folder holding anything: a folder the teacher put inside `sub`
-since keeps `sub` in the judgement, so the Undo is refused and nothing is
-moved. Rows: three `stackCases` "U4b, … a folder … carried edit made …"
-with the key `madeFolder`. **Rejected:** having the check hand the swap a
-list of folders to remove (a second judgement of which folders the step
-made, which the swap's own last look already makes); removing every empty
-folder inside the moved folder after an Undo (an empty folder of the
-content's own, or one the teacher made, is never the step's to remove).
-Recovery's put-back runs the same swap, so it tidies the same way.
+folder. Now `UndoMoveSide.readNamingFoldersLeftOut` also leaves out folders that
+hold nothing but files left out and folders so left out (the candidates,
+`foldersHoldingOnly`, inside by `UndoOp.partInside`). A candidate may be the
+step's or an empty folder of the content's own, and the list keeps only the
+listing's hash, so review 1 of this piece had each decided on its own:
+`foldersTheContentLacks` tries every set of candidates that leaves a folder
+out only with every candidate below it, from all down to none, and the one
+whose listing matches `listingSha` is what the content lacked (two sets give
+two listings, so at most one matches). Up to eight candidates (at most 256
+hashes) every such set is tried; beyond eight only all or none, so a step
+with more, some of the content's own, is refused as changed since, which
+takes nothing back. The swap's last look before the rename names the folders
+left out, and once every swap has gone in and the tidy has removed the
+step's own files, `UndoSwap.removeAFolderLeftOut` removes each where it now
+is: first a lone `.DS_Store` if it is a regular file (the Finder writes one
+when the teacher opens the folder; it is never listed, so without this the
+folder stayed and the next Redo was refused), then `rmdir`, which never
+removes a folder holding anything; a failure is not told, because every
+swap has gone in and the folder holds something. A folder the teacher put
+inside `sub` since keeps `sub` in the judgement, so the Undo is refused and
+nothing is moved. Rows: seven `stackCases` with the keys `madeFolder` and
+`foldersInside`. **Rejected:** having the check hand the swap a list of
+folders to remove (a second judgement, which the swap's own last look
+already makes); recording in the step which folders its edits made (a
+journal format change, kept out of this piece by the director); removing
+every empty folder inside the moved folder after an Undo (an empty folder of
+the content's own, or one the teacher made, is never the step's to remove).
+Recovery judges through the same `UndoMoveSide.read` and runs the same swap,
+with one gap: a process killed after the tidy and before the folder is
+removed leaves an empty made folder, which recovery then reads as a change
+(by review 1's reading of the code, not run) and settles the step as changed
+by hand, clearing the list and leaving the empty folder; nothing is lost.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

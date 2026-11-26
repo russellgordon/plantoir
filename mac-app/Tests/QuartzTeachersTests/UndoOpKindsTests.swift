@@ -312,7 +312,8 @@ final class UndoOpKindsTests: XCTestCase {
     /// then given a file by a carried edit, and `made` folders the step
     /// made, each holding one file; read with every such file left out.
     func sideBySideFolders(made: Int, ownEmpty: Int) throws -> (side: UndoMoveSide, foldersLeftOut: [String]) {
-        let folder: URL = scratchURL.appendingPathComponent("renamed", isDirectory: true)
+        // A folder of its own for each call, so two calls never meet.
+        let folder: URL = scratchURL.appendingPathComponent("renamed-\(made)-\(ownEmpty)", isDirectory: true)
         try UndoContractReplay.write("A\n", to: "a.md", in: folder)
         var leftOut: [String: UndoItem] = [:]
         var index: Int = 0

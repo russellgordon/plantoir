@@ -31,13 +31,11 @@ What each new row proves: the Undo row fails without the judgement (S1) and with
 
 ## Left for the next piece
 
-- A link inside a made folder keeps it (the `listing.links` clause), unpinned by any sabotage: no carried edit makes a link today.
-- A made folder holding only the Finder's `.DS_Store` is left out of the judgement (the listing ignores that name) but `rmdir` will not remove it, so `sub/.DS_Store` would be left behind after an Undo. Not reachable by any writer today; the fix would be to remove a lone `.DS_Store` first.
 - The Python model holds folders only as their files (`folder_of_pages`), so it cannot hold an empty folder: no judgement to mirror, and its three rows pass by construction. Said here rather than adding folder state to the model.
 
 ## For U7
 
-- Recovery's put-back runs the same `UndoSwap.swap`, so a recovered step tidies a made folder the same way; recovery's own judgement (`carryingMoveState`) goes through `UndoMoveSide.read`, so it leaves made folders out too. `UndoRecovery.swift` was not changed and not tested for this shape.
+- Recovery judges a carrying move through the same `UndoMoveSide.read` and runs the same `UndoSwap.swap`, so a recovered step leaves made folders out and removes them as an Undo does, with one gap (review 1, LOW 1): a process killed after the swap's tidy and before `removeAFolderLeftOut` leaves an empty made folder at `media`. Recovery then finds the edit back and the move `neither` (the empty folder is listed and no file left out is in it), settles the step as interrupted / changed by hand and clears the list; the empty folder stays. Nothing is lost. Not run here; read from the code by the reviewer, and `UndoRecovery.swift` was not changed. A cure, if U7 wants one: recovery leaves out an empty folder at a carried edit's absent place.
 
 ## For the director
 
@@ -58,3 +56,15 @@ What each new row proves: the Undo row fails without the judgement (S1) and with
 8. Riding low L3 fixed with tests red first.
 9. The rename record is still kept; `undoJournalIsLive` untouched (off).
 10. Every new contract row is in the Mac's replay (`testStackCases`) and Python's, and held by exact name on Windows (3 names).
+
+## Review 1 (2 MEDIUM, 4 LOW), all fixed in this branch
+
+- **MEDIUM 1, mixed folders.** The two tries (all candidates left out, then none) are replaced by `UndoMoveSide.foldersTheContentLacks`: every set of candidates closed below (a folder left out only with every candidate below it), from all down to none, in one order (a bitmask counted down); the one whose listing matches `listingSha` is what the content lacked, and at most one can match. The list keeps only the hash, so the sets are tried, not read. Bound: `mostFoldersDecidedOneByOne` = 8 (at most 256 hashes); beyond it only all or none, so a step with more than eight, some of them the content's own, is refused as changed since (takes nothing back, loses nothing). Said in `wholeOps` and pinned. No journal format change (director's choice). New rows, each failing on the old code: "U4b, an empty folder of the moved folder's own, with a folder a carried edit made inside it: Undo takes the step back and keeps the folder of its own" (a), its "…: undone and redone", and "U4b, an empty folder of the moved folder's own, a file a carried edit made in it and a folder made beside it: …" (b); new key `foldersInside` (read by `UndoContractKinds.foldersInside`; Python lists it as one it does not check, since the model holds no empty folder).
+- **MEDIUM 2, the Finder's record.** `UndoSwap.removeAFolderLeftOut` removes a `.DS_Store` before the `rmdir` only when it is the folder's one entry and a regular file (lstat); a link of that name, or anything else inside, leaves the folder whole. There is no separate `.DS_Store` code in `createTree`'s take-out to share (it removes the whole folder after its rename to -gone); what is shared is the name, `UndoTreeListing.ignoredName`, the one the listing ignores. Row: "U4b, the Finder's record of a window written inside the folder a carried edit made: Undo takes it out with the folder, and the Redo goes in" (call `finderRecordsAWindowInTheMadeFolder`). The writer scan's count for `UndoCheck.swift` is 17 (the `removeItem` of the record).
+- **LOW 1**: "For U7" corrected (above).
+- **LOW 2**: the third row's `why` now says it is a regression guard, not a proof of the rule.
+- **LOW 3**: `testAFolderHoldingAnythingKeptIsNeverACandidate` calls `foldersHoldingOnly` directly with a kept file, a link and a kept folder beside a lone candidate. It passed before the review's fixes (the clauses were there); its must-fail is S3 below.
+- **LOW 4**: the `rmdir`'s result is discarded with a comment saying why nothing is owed (every swap has gone in; a folder that will not go holds something), as `removeTheFoldersMade` treats the same failure.
+- **For documentation 12 (W8)**: decide each candidate on its own as above (sets closed below, all to none, up to eight; beyond, all or none); before removing a left-out folder, delete a lone `.DS_Store` that is a regular file (not a reparse point), then `RemoveDirectory`.
+- **Windows**: 4 more names under `Reason899W8U4b` (7 in all for this piece), checked by script byte for byte; each stops at `KeysChecked` on `foldersInside` or `madeFolder`.
+- **Runs**: `run-r1-red.log` (8 failures: the four rows and four unit cases; the clause and beyond-eight cases passed, as they must on the old code), `run-r1-green.log` (UndoOpKindsTests, UndoJournalContractTests, UndoWriterScanTests: 63, 0 failures), must-fail below, `run-r1-own.log` (all own classes).
