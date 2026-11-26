@@ -145,6 +145,8 @@ internal sealed record UndoOp
     /// them, is a step this version cannot read. That is also why a move that
     /// changes only case is never made as two renames here.
     /// </summary>
+    internal static string? PartInside(string place, string path) => throw new NotImplementedException();
+
     internal static bool PlacesOverlap(string first, string second)
     {
         string one = first.ToLowerInvariant();
