@@ -22969,7 +22969,7 @@ Part seven's review (M1) found that Cancel closed the sheet but did not stop the
 
 #### For U4b2 (the unit-word rename and Rename Course)
 
-- **Owed from U4b, carried here:** the recorded `renameFolder` trace (the recorder, `make_undo_traces.py` and the Swift and Windows action-trace replays know file moves only; folder moves with carried pages); the part-two review's L1 to L5; a per-section folder that is ITSELF a symbolic link, renamed before U4b by `moveItem` (the link moved as a link) and refused since (its place reads `.notATree`): the door's `move` needs a way to judge an item that is a link, by the bytes it holds, in the contract's `opKinds.move` and in recovery, which is a door change for both apps.
+- **Owed from U4b, carried here:** the recorded `renameFolder` trace (the recorder, `make_undo_traces.py` and the Swift and Windows action-trace replays know file moves only; folder moves with carried pages); the part-two review's L1 to L5; a per-section folder that is ITSELF a symbolic link, renamed before U4b by `moveItem` (the link moved as a link) and refused since (its place reads `.notATree`): the door's `move` needs a way to judge an item that is a link, by the bytes it holds, in the contract's `opKinds.move` and in recovery, which is a door change for both apps. (Done since: the recorded trace by U4b2-11 and U4b2-12, the door's move of a link by U4b2-14 and the linked folder's rename by U4b2-15, all below.)
 - Each one's busy claim in `CourseActivity` and the quit's wait, the way `renameFolder` does (fifth part): a Rename Course moves the whole course folder.
 - **Part seven's review, L3 and L4, carried here** (already so on `dev` before U4b, so not regressions): several readers of busy state do not read the rename's claim: Back Up Now (`SidebarView` greys on `isBeingCopied` only; `WorkspaceModel.backUp`), the unit-word rename (`UnitWordRenameSheet.busyProblem` reads `courseIsBusy`, which does not include the claim), and the outside assistant's page writes (no busy check at all); and a scheduled deploy, `Plantoir --mcp-stdio`, another copy of Plantoir and Windows do not see the claim, because the rename takes no lease file (`WorkLeaseRegistry.reconcile` derives leases from previews and publishes only). Give U4b2's claims and the rename's one way every reader sees, a lease included.
 - Each one's plan halted at Cancel the way `renameFolder`'s is (sixth part): `planHaltingAtCancel`, cancellation checked per file, the claim ended at once.
@@ -23417,7 +23417,8 @@ whose listing matches `listingSha` is what the content lacked (two sets give
 two listings, so at most one matches). Up to eight candidates (at most 256
 hashes) every such set is tried; beyond eight only all or none, so a step
 with more, some of the content's own, is refused as changed since, which
-takes nothing back. The swap's last look before the rename names the folders
+takes nothing back and, as every change since does, clears the list (U4b2-14
+made the contract's sentence say so). The swap's last look before the rename names the folders
 left out, and once every swap has gone in and the tidy has removed the
 step's own files, `UndoSwap.removeAFolderLeftOut` removes each where it now
 is: first a lone `.DS_Store` if it is a regular file (the Finder writes one
@@ -23438,6 +23439,153 @@ with one gap: a process killed after the tidy and before the folder is
 removed leaves an empty made folder, which recovery then reads as a change
 (by review 1's reading of the code, not run) and settles the step as changed
 by hand, clearing the list and leaving the empty folder; nothing is lost.
+
+### U4b2: rename-step-recorded
+
+Rename folder's step is recorded from its real code into
+`contracts/undo-action-steps.json`, as every other one-step action is:
+`UndoActionStepsTests` (its Course Settings part) runs
+`CourseSettingsView.renameFolder` on `UndoRenameFolderStepTests`' course,
+once for a per-course folder (`renameFolder`: `Concepts` to `Ideas`, one
+move, `expandable` and `shared_folders`) and once per section
+(`renameFolderPerSection`: `Tasks` to `Assessments`, one move per section,
+`expandable`, `hidden` and `per_section_folders`). A move with a
+`listingSha` is recorded under the new key `folderMoves`: from, to, the
+hash, and the listing as it was before the step (the folders inside in byte
+order and every file's text), the recorder checking that the listing makes
+the hash. A page the move carries is in `files` at the folder's new place,
+its before read at the old one. The ops are the moves, then the pages in
+the order of their paths after the move, then one `editJSON` per member.
+Review 1 found the plan kept its pages in the order the disk listed them
+(hashed on APFS, sorted on HFS+ and NTFS), so the recorded order was the
+volume's; `SpecialFolderRenamer.inPathOrder` now puts them in
+`ClassPages.isInPathOrder`, the one page order (lowercased path) that a
+section's pages and the door's folder listing already used, each place read
+canonical once (a carried page's place is spelled from the course, `/var`,
+the walk's from the disk, `/private/var`; piece 12, next, makes only the
+course folder canonical and adds a tie-break). Each page is judged and changed on
+its own, so the order changes no answer of the move check. `testEveryRecordedFolderMoveHoldsTheListingItNames`
+reads the committed file, so the key can fail. `scripts/make_undo_traces.py`
+left the two steps out of `actionTraces` by name until piece 12 (next) made
+their traces. A regeneration now keeps each committed `recorded` and
+`answeredAt` moment on a line that is otherwise the same
+(`keepingTheCommittedMoments`), so only the steps whose recording changed
+change (review 1 of U4b2-6, L4).
+
+### U4b2: rename-traces-made
+
+The two recorded Rename folder steps now have their action traces (twelve,
+`action-151` to `action-162`), and the leave-out by name is gone. A trace
+lays each folder's listing at its `from` (never a carried page's before at its
+new place), and the step goes through `JournaledWrite.perform(ops:)`: one
+`move` per folder with its `listingSha` first, then the pages' ops (a carried
+page named at the new place), then the `editJSON` members. A folder is hashed
+by its listing's SHA-256 at both places in `afterUndoingAll` and `final`, and
+every page of the listing is hashed at both places too. The model holds a
+folder as its files, so it cannot hold one left empty. For that reason a
+rename trace never makes the `deletePage` that would take the last page out of
+a moved folder: the Mac would keep the empty folder there.
+
+The first replay found one disagreement, and the model was wrong. A refused
+Undo of a rename names the folder at its new name (`UndoOp.placeAsFound`,
+U4b), and the model named its old one. The model's `place_as_found` now
+follows the Mac's rule. Three lows from review 2 of piece 11 were fixed in the
+same branch:
+
+- **The tie-break.** `ClassPages.isInPathOrder` breaks a tie between two paths
+  that are alike once lowercased by comparing their UTF-8 bytes as spelled.
+  A file URL spells every path in one Unicode form, so on the Mac only a
+  case-only pair can tie.
+- **A link's own place.** A rename's page is ordered by its own place
+  (`UndoFolderPlaces.placeResolvingOnlyAbove`: the course folder canonical,
+  then the page's parts as written), never by a link's target.
+- **The order test.** The test no longer depends on the volume's own listing
+  order.
+
+No recorded step changed.
+
+### U4b2: model-recover-hand-edits
+
+The Python model's `recover` now does what `UndoRecovery.settle` does when a
+place of a stopped step was changed by hand since: every place that is not in
+the way and took effect is still put back (one plan, the ops whose place is at
+the end, as settle's `opsToPutBack`), and the step is interrupted naming the
+places in the way. Before, the model returned at the first place in the way
+and put nothing back; no row had a hand edit with a moved folder, so the two
+agreed row for row without the model modelling that branch. Two
+`recoveryCases` rows reach it now: a page outside the moved folder changed by
+hand (the folder and the other page go back), and the page inside the moved
+folder changed by hand (`handEdit: carried`), which puts the move in the way as
+well, since the folder then holds what neither side of the move recorded: both
+plain pages go back, and the folder stays where it was moved. Neither row is
+the U7 gap of a step killed after its edit inside went in (that one is still
+U7's). No product code changed.
+
+### U4b2: a-moved-link-is-judged-by-its-bytes
+
+A `move` whose item is a symbolic link now moves the link itself and is
+judged by `linkSha`, the SHA-256 of the target the link holds (read with
+`readlink`), exactly as a `link` line in a folder's listing already judged a
+link inside a moved folder (`file-formats.json` → `undoJournal.opKinds.move`).
+Before this piece the door could not say it: `UndoTreeReading.read` found no
+folder at the link and answered `.notATree`, so any move of a linked folder
+was refused. One place each: `UndoOp.linkSha` and `UndoOp.moveLink` (the op
+is readable with exactly one of `sha`, `listingSha` and `linkSha`);
+`UndoMoveSide.readLink` (an `lstat` and a `readlink` on the link, never
+followed), called first from `readNamingFoldersLeftOut`, which the check,
+the swap's last look and recovery all go through; and
+`UndoPlaces.staysInside(_:_:namedBy:)`, which resolves only the folders above
+a link move's `from` and `to`, so a link leading out of the working folder,
+or nowhere, is moved as a link and its target is never read (the plan's and
+the swap's leaves-the-folder checks and the door's own check call it). The
+swap renames the link with the same `renamex_np` it uses for any move, and no
+longer walks a link move's `from` for the step's own files, since that walk
+would read through the link. Rows: four `checkCases` (the op key
+`linkTarget`), two `stackCases` (call `moveALinkToAFolder`, key
+`linkedFolder`); held on Windows under `Reason899W8U4b`, where a move with
+neither `sha` nor `listingSha` is not readable. **Rejected:** a one-line
+listing `link <sha> .` under `listingSha`: an older reader would take it for a
+folder's listing and judge a link as a changed folder (changed since, which
+clears the list), where an unknown `linkSha` leaves it with neither `sha` nor
+`listingSha`, so it cannot read the op at all, the barrier a step it does not
+understand is meant to be. This piece left the writers unchanged: Rename folder
+went on refusing a per-section folder that is a link until piece 15 (next),
+and Insert Class still refuses renaming a later class that is a link
+(`undo.rule.shadow`).
+Review 1 of this piece: a link's move carries no edit (`UndoOp.moveCarries`
+answers false for it), so a step pairing one with an edit under its `to` is
+outside `wholeOps`' exception and not readable, decided from its shape; and
+`UndoSwap.stepsOwnFilesInside` never lists through a link, a guard of its own.
+A relative target is kept as written, so a link moved to another depth leads
+elsewhere; nothing is touched or told, and Undo puts it back. The check
+replay now asks the plan's stays-inside check of a move's places
+(`checkCasesHow`), so the leading-out row runs it, with a target that exists.
+
+### U4b2: a-linked-section-folder-is-renamed
+
+Rename folder renames a per-section or shared folder that is itself a
+symbolic link as it did before U4b, now in the one step: the LINK is moved
+(its name changed, its target as written), and what it leads to is never
+read, listed or touched. Before U4b the rename tested `fileExists(atPath:
+isDirectory:)`, which follows the link, then called `moveItem`, which renames
+the link; from U4b until this piece the plan read the link as `.notATree` and
+refused "cannot tell now". Read off the old code (`5cf38d656`): the page walk
+(`markdownPages`, a `FileManager` enumerator) never goes through a link, so
+pages inside the link's target were relinked only when the target sits
+elsewhere in the course, at their own place; and a link leading out of the
+working folder was renamed like any other. Both are kept: nothing is written
+outside the working folder, so nothing was parked. The plan reads a link's
+`linkSha` with `UndoTreeReading.linkSha(at:)`, the one function the door's
+`UndoMoveSide.readLink` now judges by too, and `apply` plans it with
+`JournaledStep.moveLink`; the step names a link's `from` from the folder
+above it, since `relativePath` resolves a link to what it leads to. Riding
+low (L3 of the U4b2-6 review): a link at the new name that this run did not
+move there, at a place an earlier run's record names or may have moved, was
+dropped from the part-way line and the sheet; it is now told as a place the
+rename cannot tell it moved, since the record does not say which places were
+links. `undo.rule.shadow` no longer promises that pieces 14 and 15 settle a
+linked PAGE: they move a link only for Rename folder's folder, and Insert
+Class on the Mac still refuses renaming a later class that is a link. Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

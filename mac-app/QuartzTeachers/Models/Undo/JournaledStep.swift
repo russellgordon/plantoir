@@ -200,8 +200,10 @@ nonisolated final class JournaledStep {
     /// the order planned, with the SHA-256 of its listing when planned. A
     /// file planned at or inside a folder move's `to` is an edit the move
     /// carries (`undoJournal.opKinds.wholeOps`): its `before` is read where
-    /// the file is now, under `from`, and its op goes after the move.
-    private(set) var plannedFolderMoves: [(from: URL, to: URL, listingSha: String)] = []
+    /// the file is now, under `from`, and its op goes after the move. A
+    /// symbolic link moved as itself (U4b2-15) carries its `linkSha`
+    /// instead (`moveLink`), and carries no edit.
+    private(set) var plannedFolderMoves: [(from: URL, to: URL, listingSha: String?, linkSha: String?)] = []
 
     // MARK: - Computed properties
 
@@ -364,8 +366,29 @@ nonisolated final class JournaledStep {
         guard let sha = listingSha ?? UndoTreeReading.read(at: from).listingSha else {
             return false
         }
-        plannedFolderMoves.append((from: from, to: to, listingSha: sha))
+        plannedFolderMoves.append((from: from, to: to, listingSha: sha, linkSha: nil))
         return true
+    }
+
+    /// Plans the symbolic LINK at `from` to be moved as itself to `to`
+    /// (#899 U4b2-15: Rename folder of a per-section or shared folder that
+    /// is a link), judged by `linkSha`, the SHA-256 of the target it holds
+    /// as `readlink` gives it, never followed (`undoJournal.opKinds.move`).
+    /// What it leads to is never opened, listed or touched. Plan no edit
+    /// inside its `to`: a link's move carries none.
+    func moveLink(_ from: URL, to: URL, linkSha: String) {
+        plannedFolderMoves.append((from: from, to: to, listingSha: nil, linkSha: linkSha))
+    }
+
+    /// A planned folder move as its op, between the paths given: a link's
+    /// move by `linkSha`, a folder's by `listingSha`.
+    static func folderMoveOp(
+        from: String, to: String, planned: (from: URL, to: URL, listingSha: String?, linkSha: String?)
+    ) -> UndoOp {
+        if let linkSha = planned.linkSha {
+            return UndoOp.moveLink(from: from, to: to, linkSha: linkSha)
+        }
+        return UndoOp.moveFolder(from: from, to: to, listingSha: planned.listingSha ?? "")
     }
 
     /// Plans the file at `url` to hold these bytes, from `read`: the bytes
@@ -577,9 +600,7 @@ nonisolated final class JournaledStep {
             }
             result.append(url)
         }
-        result.sort { first, second in
-            return first.path.lowercased() < second.path.lowercased()
-        }
+        result.sort(by: ClassPages.isInPathOrder)
         return result
     }
 
@@ -832,11 +853,18 @@ nonisolated final class JournaledStep {
     func recordableFolderMoves(under root: URL) -> [UndoOp]? {
         var result: [UndoOp] = []
         for planned in plannedFolderMoves {
-            guard let from = UndoFolderPlaces.relativePath(of: planned.from, under: root),
-                  let to = namedPath(of: planned.to, under: root) else {
+            // A link's `from` is named from the folder above it, never
+            // resolved: `relativePath` would name what it leads to.
+            var named: String? = nil
+            if planned.linkSha == nil {
+                named = UndoFolderPlaces.relativePath(of: planned.from, under: root)
+            } else if let above = UndoFolderPlaces.relativePath(of: planned.from.deletingLastPathComponent(), under: root) {
+                named = above + "/" + planned.from.lastPathComponent
+            }
+            guard let from = named, let to = namedPath(of: planned.to, under: root) else {
                 return nil
             }
-            result.append(UndoOp.moveFolder(from: from, to: to, listingSha: planned.listingSha))
+            result.append(JournaledStep.folderMoveOp(from: from, to: to, planned: planned))
         }
         return result
     }
@@ -873,7 +901,7 @@ nonisolated final class JournaledStep {
         // A folder's move first, and every file inside it staged only at its
         // turn, once the folder is at its new place (U4b).
         for planned in plannedFolderMoves {
-            let op: UndoOp = UndoOp.moveFolder(from: planned.from.path, to: planned.to.path, listingSha: planned.listingSha)
+            let op: UndoOp = JournaledStep.folderMoveOp(from: planned.from.path, to: planned.to.path, planned: planned)
             targets.append(UndoSwapTarget(
                 url: planned.to, relativePath: planned.to.lastPathComponent,
                 change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op)
@@ -1103,6 +1131,33 @@ nonisolated enum UndoFolderPlaces {
             return nil
         }
         return String(path.dropFirst(rootPath.count))
+    }
+
+    /// A place inside `folder` spelled the one way, its links resolved only
+    /// ABOVE the folder (U4b2-12; review 2 of U4b2-11, LOW B): the folder's
+    /// own path made canonical (`canonicalPath`, so `/var` and
+    /// `/private/var` are one), then every part of `url` below it as written.
+    /// A link inside the folder, a linked page or a linked folder, keeps its
+    /// own place and is never replaced by its target's. The part below is
+    /// found by walking up `url` to the first folder whose canonical path is
+    /// `folder`'s; nil when `url` is not inside it.
+    static func placeResolvingOnlyAbove(_ folder: URL, of url: URL) -> String? {
+        let folderPath: String = canonicalPath(of: folder)
+        var place: URL = url.standardizedFileURL
+        var below: [String] = []
+        while place.path != "/" {
+            below.insert(place.lastPathComponent, at: 0)
+            let parent: URL = place.deletingLastPathComponent()
+            if canonicalPath(of: parent) == folderPath {
+                var resolved: String = folderPath
+                for part in below {
+                    resolved = resolved.hasSuffix("/") ? resolved + part : resolved + "/" + part
+                }
+                return resolved
+            }
+            place = parent
+        }
+        return nil
     }
 
     /// A path with every link resolved, for a file that may not exist yet:

@@ -864,7 +864,7 @@
       "final": {"p1": null, "p2": "e1a799983d5bdf234689bb042ed2bb39633a71f79930aff006bdec24dc0ba712", "p3": "1163d98ddd2ee3a86f580921392d37e6f08d32bbd3cfd9016141535868ecbe0c", "p4": "7aa02bdedca1f66255fbac672555079e4eaf79e79accfbe35724fa7e499c09da", "p5": "191d430b59e1d11165de9ac7a1b85cb95ce7665ade8d891d2498c87a23c9a69b", "p6": "1d885cec3fc46dbcc113e8a78427f9afe2bcb30804c96f74dda292c8d191fe34", "p7": "e063a28c9708626812045524fb2f553f7e72ea648627b18c594f13bc80b92fd4", "p8": null}
     }
   ],
-  "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A step recorded with `members` (U4a, Course Settings) has each file they name made as those editJSON ops, in the order recorded, instead of the door's rule (the member moved by the member rule's bytes, undo-json-cases.json -> editJSONCases); one recorded with `trees` (U4a, Add folder) also makes each folder as one `createTree` (its listing and every file's bytes in the list), after the moves; a folder is hashed as its listing's SHA-256 in `afterUndoingAll` and `final`, and only a `deletePage` hand edit changes one. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
+  "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A step recorded with `members` (U4a, Course Settings) has each file they name made as those editJSON ops, in the order recorded, instead of the door's rule (the member moved by the member rule's bytes, undo-json-cases.json -> editJSONCases); one recorded with `trees` (U4a, Add folder) also makes each folder as one `createTree` (its listing and every file's bytes in the list), after the moves; a folder is hashed as its listing's SHA-256 in `afterUndoingAll` and `final`, and only a `deletePage` hand edit changes one. A step recorded with `folderMoves` (U4b2-11, Rename folder) moves each folder whole, as one `move` carrying the folder's `listingSha` (its listing as recorded: the folders inside and every file's bytes), first in the step, and names each page the move carries at the folder's NEW place, its before the text at the old one (opKinds.wholeOps): its trace writes each folder's listing at its `from` first (every file in `files` there, by its path inside), never a carried page's before at its new place, and its action is made through the door that takes every kind: one `move` per folder (`from`, `to`, `listingSha`), then the files' ops as above, then the recompute ops; each folder is hashed in `afterUndoingAll` and `final` at both places as its listing's SHA-256 (null: no folder there), and every page of its listing at both places too; a hand edit names a page where it is at that moment, and a `deletePage` never takes the last page out of a moved folder. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
   "actionTraces": [
     {
       "name": "action-001",
@@ -3726,6 +3726,231 @@
       ],
       "afterUndoingAll": {"courses/ICS3U/course_config.json": null},
       "final": {"courses/ICS3U/course_config.json": null}
+    },
+    {
+      "name": "action-151",
+      "step": "renameFolder",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "renameFolder", "expect": "applied", "seq": 1, "ops": ["move", "writeFile", "writeFile", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Ideas/Arrays.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "0eb931bf89f1e60fb704a684b124d22d99c3eaa1122e46220ea90e55cbe1a7f7", "courses/ICS3U/Concepts": "549369349d1cb0e405091e20e15fef64814f197a6de309b22ae055e723e5f311", "courses/ICS3U/Ideas": null, "courses/ICS3U/Concepts/Arrays.md": "14abbe31d78ef8bd9de2a5c14077670712dad8a2e0dd92f07986a8a186686fc9", "courses/ICS3U/Concepts/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28", "courses/ICS3U/Ideas/Loops.md": null},
+      "final": {"courses/ICS3U/Ideas/Arrays.md": "f6e09a8e74befa33c3f75e1ec28ddb68aa1f5397dd4d840b6f624a4e365f4237", "courses/ICS3U/section1/index.md": "36a6f817091ac5079c13cf8a1aa9c8817fa634f5b9546a1d1e3d104d4d75bfca", "courses/ICS3U/course_config.json": "b881195b089897271ebd0c0dc22b88c3d723ff804108b34a5515c25660403bd1", "courses/ICS3U/Concepts": null, "courses/ICS3U/Ideas": "d5dcb98ab9f820f483b888b0bbceae85de34bad753bb3262466a99954ad9589b", "courses/ICS3U/Concepts/Arrays.md": null, "courses/ICS3U/Concepts/Loops.md": null, "courses/ICS3U/Ideas/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28"}
+    },
+    {
+      "name": "action-152",
+      "step": "renameFolder",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "renameFolder", "expect": "applied", "seq": 1, "ops": ["move", "writeFile", "writeFile", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "handEdit", "kind": "body", "path": "courses/ICS3U/Concepts/Arrays.md", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "changedSince", "path": "courses/ICS3U/Concepts", "others": 1, "droppedTheRedo": true, "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "handEdit", "kind": "body", "path": "courses/ICS3U/Concepts/Arrays.md", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Ideas/Arrays.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "0eb931bf89f1e60fb704a684b124d22d99c3eaa1122e46220ea90e55cbe1a7f7", "courses/ICS3U/Concepts": "8823624cf5e4b808ad0ec17be14eceddc1feda1ea6b5fd341b53928c5a51a0f4", "courses/ICS3U/Ideas": null, "courses/ICS3U/Concepts/Arrays.md": "0fd2fab138c8c473b9bcf7e35e35ee3932186aadf7c731d0fadae68bffda6918", "courses/ICS3U/Concepts/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28", "courses/ICS3U/Ideas/Loops.md": null},
+      "final": {"courses/ICS3U/Ideas/Arrays.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "0eb931bf89f1e60fb704a684b124d22d99c3eaa1122e46220ea90e55cbe1a7f7", "courses/ICS3U/Concepts": "8823624cf5e4b808ad0ec17be14eceddc1feda1ea6b5fd341b53928c5a51a0f4", "courses/ICS3U/Ideas": null, "courses/ICS3U/Concepts/Arrays.md": "0fd2fab138c8c473b9bcf7e35e35ee3932186aadf7c731d0fadae68bffda6918", "courses/ICS3U/Concepts/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28", "courses/ICS3U/Ideas/Loops.md": null}
+    },
+    {
+      "name": "action-153",
+      "step": "renameFolder",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "renameFolder", "expect": "applied", "seq": 1, "ops": ["move", "writeFile", "writeFile", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Ideas/Arrays.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "0eb931bf89f1e60fb704a684b124d22d99c3eaa1122e46220ea90e55cbe1a7f7", "courses/ICS3U/Concepts": "549369349d1cb0e405091e20e15fef64814f197a6de309b22ae055e723e5f311", "courses/ICS3U/Ideas": null, "courses/ICS3U/Concepts/Arrays.md": "14abbe31d78ef8bd9de2a5c14077670712dad8a2e0dd92f07986a8a186686fc9", "courses/ICS3U/Concepts/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28", "courses/ICS3U/Ideas/Loops.md": null},
+      "final": {"courses/ICS3U/Ideas/Arrays.md": "f6e09a8e74befa33c3f75e1ec28ddb68aa1f5397dd4d840b6f624a4e365f4237", "courses/ICS3U/section1/index.md": "36a6f817091ac5079c13cf8a1aa9c8817fa634f5b9546a1d1e3d104d4d75bfca", "courses/ICS3U/course_config.json": "b881195b089897271ebd0c0dc22b88c3d723ff804108b34a5515c25660403bd1", "courses/ICS3U/Concepts": null, "courses/ICS3U/Ideas": "d5dcb98ab9f820f483b888b0bbceae85de34bad753bb3262466a99954ad9589b", "courses/ICS3U/Concepts/Arrays.md": null, "courses/ICS3U/Concepts/Loops.md": null, "courses/ICS3U/Ideas/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28"}
+    },
+    {
+      "name": "action-154",
+      "step": "renameFolder",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "renameFolder", "expect": "applied", "seq": 1, "ops": ["move", "writeFile", "writeFile", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/Ideas/Loops.md", "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/Ideas", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Ideas/Arrays.md": "f6e09a8e74befa33c3f75e1ec28ddb68aa1f5397dd4d840b6f624a4e365f4237", "courses/ICS3U/section1/index.md": "36a6f817091ac5079c13cf8a1aa9c8817fa634f5b9546a1d1e3d104d4d75bfca", "courses/ICS3U/course_config.json": "b881195b089897271ebd0c0dc22b88c3d723ff804108b34a5515c25660403bd1", "courses/ICS3U/Concepts": null, "courses/ICS3U/Ideas": "96465f3059c525591d79ceaa31b8b6768f2e4236f180cf7203689d6aa43657e7", "courses/ICS3U/Concepts/Arrays.md": null, "courses/ICS3U/Concepts/Loops.md": null, "courses/ICS3U/Ideas/Loops.md": null},
+      "final": {"courses/ICS3U/Ideas/Arrays.md": "f6e09a8e74befa33c3f75e1ec28ddb68aa1f5397dd4d840b6f624a4e365f4237", "courses/ICS3U/section1/index.md": "36a6f817091ac5079c13cf8a1aa9c8817fa634f5b9546a1d1e3d104d4d75bfca", "courses/ICS3U/course_config.json": "b881195b089897271ebd0c0dc22b88c3d723ff804108b34a5515c25660403bd1", "courses/ICS3U/Concepts": null, "courses/ICS3U/Ideas": "96465f3059c525591d79ceaa31b8b6768f2e4236f180cf7203689d6aa43657e7", "courses/ICS3U/Concepts/Arrays.md": null, "courses/ICS3U/Concepts/Loops.md": null, "courses/ICS3U/Ideas/Loops.md": null}
+    },
+    {
+      "name": "action-155",
+      "step": "renameFolder",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "renameFolder", "expect": "applied", "seq": 1, "ops": ["move", "writeFile", "writeFile", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Ideas/Arrays.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "0eb931bf89f1e60fb704a684b124d22d99c3eaa1122e46220ea90e55cbe1a7f7", "courses/ICS3U/Concepts": "549369349d1cb0e405091e20e15fef64814f197a6de309b22ae055e723e5f311", "courses/ICS3U/Ideas": null, "courses/ICS3U/Concepts/Arrays.md": "14abbe31d78ef8bd9de2a5c14077670712dad8a2e0dd92f07986a8a186686fc9", "courses/ICS3U/Concepts/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28", "courses/ICS3U/Ideas/Loops.md": null},
+      "final": {"courses/ICS3U/Ideas/Arrays.md": "f6e09a8e74befa33c3f75e1ec28ddb68aa1f5397dd4d840b6f624a4e365f4237", "courses/ICS3U/section1/index.md": "36a6f817091ac5079c13cf8a1aa9c8817fa634f5b9546a1d1e3d104d4d75bfca", "courses/ICS3U/course_config.json": "b881195b089897271ebd0c0dc22b88c3d723ff804108b34a5515c25660403bd1", "courses/ICS3U/Concepts": null, "courses/ICS3U/Ideas": "d5dcb98ab9f820f483b888b0bbceae85de34bad753bb3262466a99954ad9589b", "courses/ICS3U/Concepts/Arrays.md": null, "courses/ICS3U/Concepts/Loops.md": null, "courses/ICS3U/Ideas/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28"}
+    },
+    {
+      "name": "action-156",
+      "step": "renameFolder",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "renameFolder", "expect": "applied", "seq": 1, "ops": ["move", "writeFile", "writeFile", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/Ideas/Arrays.md", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/Ideas/Arrays.md", "others": 1, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/Ideas/Arrays.md": null, "courses/ICS3U/section1/index.md": "36a6f817091ac5079c13cf8a1aa9c8817fa634f5b9546a1d1e3d104d4d75bfca", "courses/ICS3U/course_config.json": "b881195b089897271ebd0c0dc22b88c3d723ff804108b34a5515c25660403bd1", "courses/ICS3U/Concepts": null, "courses/ICS3U/Ideas": "2a1a2cb42a48f2d71b58520af7839bb71e0701a46b1cc5468c6e38331d201727", "courses/ICS3U/Concepts/Arrays.md": null, "courses/ICS3U/Concepts/Loops.md": null, "courses/ICS3U/Ideas/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28"},
+      "final": {"courses/ICS3U/Ideas/Arrays.md": null, "courses/ICS3U/section1/index.md": "36a6f817091ac5079c13cf8a1aa9c8817fa634f5b9546a1d1e3d104d4d75bfca", "courses/ICS3U/course_config.json": "b881195b089897271ebd0c0dc22b88c3d723ff804108b34a5515c25660403bd1", "courses/ICS3U/Concepts": null, "courses/ICS3U/Ideas": "2a1a2cb42a48f2d71b58520af7839bb71e0701a46b1cc5468c6e38331d201727", "courses/ICS3U/Concepts/Arrays.md": null, "courses/ICS3U/Concepts/Loops.md": null, "courses/ICS3U/Ideas/Loops.md": "89ccb2806305f32b7669dca05cab9155decde4c7e01e1561b07c3dcbf4fb5e28"}
+    },
+    {
+      "name": "action-157",
+      "step": "renameFolderPerSection",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "renameFolderPerSection", "expect": "applied", "seq": 1, "ops": ["move", "move", "writeFile", "writeFile", "editJSON", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/section1/Assessments/Quiz 1.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "286af1bc9b0719e83c79af231896c2d72ff86bc7a46b90a5c3cdfd8f252db556", "courses/ICS3U/section1/Tasks": "23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df", "courses/ICS3U/section1/Assessments": null, "courses/ICS3U/section1/Tasks/Quiz 1.md": "9620d094666c44a7ba4bee42163202e77727349fd0f81e19604cd0e09ce85ade", "courses/ICS3U/section2/Tasks": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Assessments": null, "courses/ICS3U/section2/Tasks/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e", "courses/ICS3U/section2/Assessments/Quiz 2.md": null},
+      "final": {"courses/ICS3U/section1/Assessments/Quiz 1.md": "c3257bfc4cdef27257e19f76b56b8d1f7bada7aea019c101616ba8f885785b97", "courses/ICS3U/section1/index.md": "e430aab3be953dada6f9156c10c026b9246a1498a1aa2d7676755c96d3403a6b", "courses/ICS3U/course_config.json": "9283588b19243ec03e667144e818e984ea0a9d97bec4e1d8957083780309a6a4", "courses/ICS3U/section1/Tasks": null, "courses/ICS3U/section1/Assessments": "6a7ae0ddd02721c044e44de8bc4c428029192916873de4ecda04406e51c60844", "courses/ICS3U/section1/Tasks/Quiz 1.md": null, "courses/ICS3U/section2/Tasks": null, "courses/ICS3U/section2/Assessments": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Tasks/Quiz 2.md": null, "courses/ICS3U/section2/Assessments/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e"}
+    },
+    {
+      "name": "action-158",
+      "step": "renameFolderPerSection",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "renameFolderPerSection", "expect": "applied", "seq": 1, "ops": ["move", "move", "writeFile", "writeFile", "editJSON", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/section1/Assessments/Quiz 1.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "286af1bc9b0719e83c79af231896c2d72ff86bc7a46b90a5c3cdfd8f252db556", "courses/ICS3U/section1/Tasks": "23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df", "courses/ICS3U/section1/Assessments": null, "courses/ICS3U/section1/Tasks/Quiz 1.md": "9620d094666c44a7ba4bee42163202e77727349fd0f81e19604cd0e09ce85ade", "courses/ICS3U/section2/Tasks": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Assessments": null, "courses/ICS3U/section2/Tasks/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e", "courses/ICS3U/section2/Assessments/Quiz 2.md": null},
+      "final": {"courses/ICS3U/section1/Assessments/Quiz 1.md": "c3257bfc4cdef27257e19f76b56b8d1f7bada7aea019c101616ba8f885785b97", "courses/ICS3U/section1/index.md": "e430aab3be953dada6f9156c10c026b9246a1498a1aa2d7676755c96d3403a6b", "courses/ICS3U/course_config.json": "9283588b19243ec03e667144e818e984ea0a9d97bec4e1d8957083780309a6a4", "courses/ICS3U/section1/Tasks": null, "courses/ICS3U/section1/Assessments": "6a7ae0ddd02721c044e44de8bc4c428029192916873de4ecda04406e51c60844", "courses/ICS3U/section1/Tasks/Quiz 1.md": null, "courses/ICS3U/section2/Tasks": null, "courses/ICS3U/section2/Assessments": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Tasks/Quiz 2.md": null, "courses/ICS3U/section2/Assessments/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e"}
+    },
+    {
+      "name": "action-159",
+      "step": "renameFolderPerSection",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "renameFolderPerSection", "expect": "applied", "seq": 1, "ops": ["move", "move", "writeFile", "writeFile", "editJSON", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/section1/Assessments/Quiz 1.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "286af1bc9b0719e83c79af231896c2d72ff86bc7a46b90a5c3cdfd8f252db556", "courses/ICS3U/section1/Tasks": "23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df", "courses/ICS3U/section1/Assessments": null, "courses/ICS3U/section1/Tasks/Quiz 1.md": "9620d094666c44a7ba4bee42163202e77727349fd0f81e19604cd0e09ce85ade", "courses/ICS3U/section2/Tasks": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Assessments": null, "courses/ICS3U/section2/Tasks/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e", "courses/ICS3U/section2/Assessments/Quiz 2.md": null},
+      "final": {"courses/ICS3U/section1/Assessments/Quiz 1.md": "c3257bfc4cdef27257e19f76b56b8d1f7bada7aea019c101616ba8f885785b97", "courses/ICS3U/section1/index.md": "e430aab3be953dada6f9156c10c026b9246a1498a1aa2d7676755c96d3403a6b", "courses/ICS3U/course_config.json": "9283588b19243ec03e667144e818e984ea0a9d97bec4e1d8957083780309a6a4", "courses/ICS3U/section1/Tasks": null, "courses/ICS3U/section1/Assessments": "6a7ae0ddd02721c044e44de8bc4c428029192916873de4ecda04406e51c60844", "courses/ICS3U/section1/Tasks/Quiz 1.md": null, "courses/ICS3U/section2/Tasks": null, "courses/ICS3U/section2/Assessments": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Tasks/Quiz 2.md": null, "courses/ICS3U/section2/Assessments/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e"}
+    },
+    {
+      "name": "action-160",
+      "step": "renameFolderPerSection",
+      "handEdits": false,
+      "calls": [
+        {"call": "action", "step": "renameFolderPerSection", "expect": "applied", "seq": 1, "ops": ["move", "move", "writeFile", "writeFile", "editJSON", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "redo", "expect": "redone", "seq": 1, "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/section1/Assessments/Quiz 1.md": null, "courses/ICS3U/section1/index.md": "0fe15128dafa4207b132aa0a4f031402869f92f28a206ef40e79815b051adf37", "courses/ICS3U/course_config.json": "286af1bc9b0719e83c79af231896c2d72ff86bc7a46b90a5c3cdfd8f252db556", "courses/ICS3U/section1/Tasks": "23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df", "courses/ICS3U/section1/Assessments": null, "courses/ICS3U/section1/Tasks/Quiz 1.md": "9620d094666c44a7ba4bee42163202e77727349fd0f81e19604cd0e09ce85ade", "courses/ICS3U/section2/Tasks": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Assessments": null, "courses/ICS3U/section2/Tasks/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e", "courses/ICS3U/section2/Assessments/Quiz 2.md": null},
+      "final": {"courses/ICS3U/section1/Assessments/Quiz 1.md": "c3257bfc4cdef27257e19f76b56b8d1f7bada7aea019c101616ba8f885785b97", "courses/ICS3U/section1/index.md": "e430aab3be953dada6f9156c10c026b9246a1498a1aa2d7676755c96d3403a6b", "courses/ICS3U/course_config.json": "9283588b19243ec03e667144e818e984ea0a9d97bec4e1d8957083780309a6a4", "courses/ICS3U/section1/Tasks": null, "courses/ICS3U/section1/Assessments": "6a7ae0ddd02721c044e44de8bc4c428029192916873de4ecda04406e51c60844", "courses/ICS3U/section1/Tasks/Quiz 1.md": null, "courses/ICS3U/section2/Tasks": null, "courses/ICS3U/section2/Assessments": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Tasks/Quiz 2.md": null, "courses/ICS3U/section2/Assessments/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e"}
+    },
+    {
+      "name": "action-161",
+      "step": "renameFolderPerSection",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "renameFolderPerSection", "expect": "applied", "seq": 1, "ops": ["move", "move", "writeFile", "writeFile", "editJSON", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/section1/index.md", "head": 1, "redo": null},
+        {"call": "note", "head": 1, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/section1/index.md", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/section1/Assessments/Quiz 1.md": "c3257bfc4cdef27257e19f76b56b8d1f7bada7aea019c101616ba8f885785b97", "courses/ICS3U/section1/index.md": null, "courses/ICS3U/course_config.json": "9283588b19243ec03e667144e818e984ea0a9d97bec4e1d8957083780309a6a4", "courses/ICS3U/section1/Tasks": null, "courses/ICS3U/section1/Assessments": "6a7ae0ddd02721c044e44de8bc4c428029192916873de4ecda04406e51c60844", "courses/ICS3U/section1/Tasks/Quiz 1.md": null, "courses/ICS3U/section2/Tasks": null, "courses/ICS3U/section2/Assessments": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Tasks/Quiz 2.md": null, "courses/ICS3U/section2/Assessments/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e"},
+      "final": {"courses/ICS3U/section1/Assessments/Quiz 1.md": "c3257bfc4cdef27257e19f76b56b8d1f7bada7aea019c101616ba8f885785b97", "courses/ICS3U/section1/index.md": null, "courses/ICS3U/course_config.json": "9283588b19243ec03e667144e818e984ea0a9d97bec4e1d8957083780309a6a4", "courses/ICS3U/section1/Tasks": null, "courses/ICS3U/section1/Assessments": "6a7ae0ddd02721c044e44de8bc4c428029192916873de4ecda04406e51c60844", "courses/ICS3U/section1/Tasks/Quiz 1.md": null, "courses/ICS3U/section2/Tasks": null, "courses/ICS3U/section2/Assessments": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Tasks/Quiz 2.md": null, "courses/ICS3U/section2/Assessments/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e"}
+    },
+    {
+      "name": "action-162",
+      "step": "renameFolderPerSection",
+      "handEdits": true,
+      "calls": [
+        {"call": "action", "step": "renameFolderPerSection", "expect": "applied", "seq": 1, "ops": ["move", "move", "writeFile", "writeFile", "editJSON", "editJSON", "editJSON"], "head": 1, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": 1, "redo": null},
+        {"call": "undo", "expect": "undone", "seq": 1, "head": null, "redo": 1},
+        {"call": "handEdit", "kind": "body", "path": "courses/ICS3U/section1/index.md", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": 1},
+        {"call": "note", "head": null, "redo": 1},
+        {"call": "redo", "expect": "changedSince", "path": "courses/ICS3U/section1/index.md", "others": 0, "droppedTheRedo": true, "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
+        {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
+      ],
+      "afterUndoingAll": {"courses/ICS3U/section1/Assessments/Quiz 1.md": null, "courses/ICS3U/section1/index.md": "96109bad353beadea4be81f0039209f5c44135b8511882bbde4c1106eb17d163", "courses/ICS3U/course_config.json": "286af1bc9b0719e83c79af231896c2d72ff86bc7a46b90a5c3cdfd8f252db556", "courses/ICS3U/section1/Tasks": "23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df", "courses/ICS3U/section1/Assessments": null, "courses/ICS3U/section1/Tasks/Quiz 1.md": "9620d094666c44a7ba4bee42163202e77727349fd0f81e19604cd0e09ce85ade", "courses/ICS3U/section2/Tasks": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Assessments": null, "courses/ICS3U/section2/Tasks/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e", "courses/ICS3U/section2/Assessments/Quiz 2.md": null},
+      "final": {"courses/ICS3U/section1/Assessments/Quiz 1.md": null, "courses/ICS3U/section1/index.md": "96109bad353beadea4be81f0039209f5c44135b8511882bbde4c1106eb17d163", "courses/ICS3U/course_config.json": "286af1bc9b0719e83c79af231896c2d72ff86bc7a46b90a5c3cdfd8f252db556", "courses/ICS3U/section1/Tasks": "23dc9b20edc443f6a84df5c3cee6945e26e2916d80cebb537b821091f00992df", "courses/ICS3U/section1/Assessments": null, "courses/ICS3U/section1/Tasks/Quiz 1.md": "9620d094666c44a7ba4bee42163202e77727349fd0f81e19604cd0e09ce85ade", "courses/ICS3U/section2/Tasks": "27442be4b0b580a302ae1aaa6ac7e86c4951d74290046c9c7a8d4b917446f15b", "courses/ICS3U/section2/Assessments": null, "courses/ICS3U/section2/Tasks/Quiz 2.md": "73ce91677240b3155dc7a3205e1ff8d6dc8b5317f255ff5c99fe875dadc8b20e", "courses/ICS3U/section2/Assessments/Quiz 2.md": null}
     }
   ]
 }

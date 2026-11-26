@@ -1,0 +1,61 @@
+# U4b2-15: a-linked-section-folder-is-renamed (#899)
+
+Branch `issue/899-u4b2-15-a-linked-section-folder-is-renamed`, from piece 14's pushed head c64e741ef (holds `dev` 811c956ce, pieces 9, 10, 14). `origin/dev` merged before proving and again before hand-back: both "Already up to date" (`dev` still 811c956ce), so no merge commit. (Merged on 2026-11-26 in `night25/integration-7`, 69b247fd5, with U4b2-11 to U4b2-15. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12.)
+
+## The old code's answers (read before writing, `5cf38d656`)
+
+1. Pages INSIDE the linked folder's target were not walked through the link: `markdownPages` is a `FileManager` enumerator, which does not descend into a symbolic link (checked by a scratch script: it lists the link, never its contents). A target elsewhere in the course had its pages walked and relinked at their own place; a target outside the course was never touched.
+2. A link leading out of the working folder was renamed like any other: `fileExists(atPath:isDirectory:)` follows the link (a folder), then `moveItem` renames the link itself.
+
+Neither answer writes outside the working folder, so nothing is parked for that case: every case is built to its final state.
+
+## Must-fail lines
+
+`windows-app/notes/899-u4b2-15-mustfail.log`. Red first: the six new or changed tests, 6 of 6. S1 the plan's link branch refusing again: the four step tests RED (`:719`). S2c the move made on the link's target: RED at `:723`/`:724`, the target-untouched assertions. S3, S4 (L3): RED at `SpecialFolderRenamerTests:900` and `:982`. S5 the link's `from` resolved: RED (refused by the door). 5 of 5 RED, restored each time.
+
+What each new test proves: `testAPerSectionFolderThatIsALinkIsRenamedByMovingTheLink` (live): one step, the link's op is `move` with `linkSha` and the link's own `from`, the target untouched, the pages relinked as the old code would, settings changed, Undo and Redo move the link back and forth; `testWithTheSwitchOffAPerSectionFolderThatIsALinkIsRenamedAsBeforeU4b` (shadow, the app today): renamed as before U4b; `testALinkedSectionsRenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery`: killed before each swap, recovery leaves every place whole before or whole after (the link back at `Tasks` or at the new name, same target); `testASharedFolderThatIsALinkOutOfTheWorkingFolderIsRenamedAndWhatItLeadsToIsUntouched`: the shared path and the out-of-folder case.
+
+## Runs
+
+- `run-green1.log`: UndoRenameFolderStepTests, SpecialFolderRenamerTests, UndoJournalContractTests: 113, 0 failures.
+- `run-red1.log`: the product at c64e741ef with the new tests: 6 tests red (29 assertion failures).
+- `run-mf-S1`, `S2`, `S2b`, `S2c`, `S3`, `S4`, `S5`.
+- `run-own.log`: UndoRenameFolderStepTests, SpecialFolderRenamerTests, UndoJournalContractTests, UndoWriterScanTests (reads the three changed product files as text), SharedRulesContractTests, FileFormatsContractTests, UndoSweepFindingsTests (comment changed), UndoOpKindsTests (`readLink` now calls `linkSha`): 250, 0 failures.
+- `python3 scripts/test_make_undo_traces.py`: 33 OK; traces not stale.
+- Logs in `/Users/russellgordon/plantoir/wt-899-u4b2-15/.dd/`.
+
+## Left for the next piece
+
+- A case-only rename (`Tasks` to `tasks`) of a folder that is a link is not exercised; the door's case-only move of a link is piece 14's and has no row.
+- A link whose target is another of the same rename's places is renamed with its target kept as written, so it then leads to the old name, as before U4b; not told (now pinned by a test, review 1 L2).
+- The plan's destination test is `fileExists` (follows): a dangling link at the new name is not refused by the plan; the door then refuses the move (`to` not free). As before; unchanged.
+
+## For the director
+
+- **`undo.rule.shadow` changed.** "Removing a page that is a link, or renaming one away, still differs until the pieces that move a link (14 and 15) settle it:" is now "Removing a page that is a link, or renaming one away, still differs, and no piece yet settles it: the door moves a link as itself (U4b2-14) and Rename folder uses that for a folder that is itself a link (U4b2-15), but no writer of a page does:". The Windows test `UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15` reads only three substrings, all still present byte for byte: "never follows the link and is refused before anything changes", "saving a plain copy at the new name and deleting the link itself, the linked file left untouched", "held by name in UndoMakeRoomStepTests.<its name>". So the PC stays green with no Windows change. Its name and its `settle` message still say "U4b2-14 and 15"; renaming it would need the clause's "held by name" text changed in the same merge: if you rename the test to `…_WhereTheMacRefusesBeforeAnythingChanges`, the clause must then contain "held by name in UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges".
+- **Parked: which piece settles a linked PAGE renamed away or removed (Insert Class renaming a later class that is a link)?** Nothing in v2.0.0 names one (searched the milestone; the digest's rulings do not settle it). Options: (a, recommended) a small Mac piece, U4b3, after this merge: Insert Class renames a later class that is a link by moving the link (`JournaledStep.moveLink`, as Rename folder now does), and W8 does the same, replacing Windows' plain copy plus deleted link (which loses the teacher's link); (b) Windows' behaviour on both: a plain copy at the new name and the link deleted; (c) leave the Mac refusing until U7 decides. (a) keeps the teacher's link and its file exactly as they were, which is what Rename folder now does for a folder.
+- `contracts/` changed: both gates (taken with piece 14 anyway). First round: no new row or key. Review 1 added two `stackCases` rows and one call, both held.
+- HIG: nothing a teacher sees changed (a refused rename now goes ahead with the existing sentences; the part-way sentences are existing ones); no section read.
+
+## Self-check
+
+1. Broke each fix and watched its test fail: red first 6 of 6; S1, S2c, S3, S4, S5 all RED with the line named; restored each time.
+2. No timed waits: none added (the kill test is event-driven by kill points).
+3. Every sentence on the failure paths is true: a link that cannot be read refuses "cannot tell now", nothing changed; a link at the new name not this run's is told "could not tell whether this rename moved these", never "still called" and never dropped (the old "did not rename" for that case is gone, S3).
+4. `dev` merged before proving and before hand-back: 811c956ce, already up to date both times.
+5. No number tuned by trial: the kill test's "at least four swaps" is the step's shape.
+6. Contracts: prose only; no row retyped; nothing outside the brief (one stale test comment in `UndoSweepFindingsTests` corrected).
+7. `grep -n "DispatchQueue\|\.map {\|\.filter {\|\.reduce(\|\$0"` over the added Swift lines: empty; no new type authored (functions added to `JournaledStep`, `UndoTreeReading`, test helpers in their MARK sections; a new MARK section in the test class).
+8. Riding L3 fixed with two tests that failed first (S3, S4).
+9. The rename record is still written before the step and cleared after; `undoJournalIsLive` untouched (off).
+10. First round: no row. Review 1: two new `stackCases` rows, replayed on the Mac (`testStackCases`) and modelled in Python, held on Windows by exact name (2 rows, `Reason899W8U4b2LinkedFolder`).
+
+## Review 1 (4 LOW), all fixed in this branch
+
+- **LOW 1.** The listing's `link` line now takes its hash from `UndoTreeReading.linkSha(at:)`, so one function decides "SHA-256 of what a link holds" for a listing, a link's move and the writer. A refactor with no change of bytes: UndoOpKindsTests and the check and listing replays green.
+- **LOW 2.** `testADanglingLinkAtASectionsPlaceIsSkippedAsBeforeU4b` (skipped, link left with its target, one move; pinned by S6: it passes at the base, since the behaviour is the same as before U4b) and `testALinkToAnotherSectionsFolderOfTheSameRenameIsMovedAsALink` (folder by listing, link by target as written, Undo and Redo; red at the base, and under S5). Removed from "Left for the next piece".
+- **LOW 3.** Two `stackCases` rows, "U4b2-15, Rename folder of a per-section folder that is itself a link to a folder: …" (call, undo) and "…: undone and redone, …" (call, undo, redo). The new call `renameAPerSectionFolderThatIsALink` (`stackCasesHow`) runs Rename folder's own plan and apply on piece 14's link fixture and makes one step of the folder moves planned. The existing key `linkedFolder` reads the result. The rows fail if the plan refuses a link (S1), moves its target (S2c) or names the link by its target (S5). Mac: `UndoContractReplayKinds` (call), `UndoJournalContractTests.testStackCases`. Python: the call is modelled as the step it must make, the same as `moveALinkToAFolder` (`test_make_undo_traces.py`); the plan itself is the Swift replay's to check. 33 OK, traces current. Windows: both held by exact name under a NEW reason `Reason899W8U4b2LinkedFolder` (`UndoStackCases`), checked by script: 1 match each. Why they fail there: the key `linkedFolder` is not in `UndoStackContractTests.KeysChecked` ("a key this replay does not check", which `HeldCaseStillStopsAtItsGap` accepts), and behind it the call is unknown. Both are confirmed in `windows-app/`, and the reason says so: `SpecialFolderRenamer.Rename` moves with `Directory.Move` outside the door (Plantoir.Core, about 274), and `RelinkPages` walks `PagePaths.MarkdownPages` (PagePaths.cs about 165), which recurses into any entry with `FileAttributes.Directory`, a link to a folder included. No Windows test enumerates `stackCases` calls or keys block-wide (piece 14 checked the same; the per-row key check is the gap).
+- **LOW 4 (a).** `folderRenamed.carries` now says that any link at a place at the new name where this run did not move a link is told as "could not tell", whichever way the place is this rename's: one this run moved a folder to, or one an earlier record names or may have moved. That is what `foldersAtTheirNewName` does.
+- **LOW 4 (b), for the director.** The Windows test is not touched. To rename it, in the same merge: rename `UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15` to `…_WhereTheMacRefusesBeforeAnythingChanges`, and change its `settle` message to drop "(U4b2-14 and 15)". In `undo.rule.shadow`, change "held by name in UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15, which reads this clause" to "held by name in UndoMakeRoomStepTests.ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges, which reads this clause". Both change together, or the PC goes red.
+- **Runs.** `run-r1-green.log`: UndoRenameFolderStepTests, SpecialFolderRenamerTests, UndoJournalContractTests, UndoOpKindsTests, UndoWriterScanTests, SharedRulesContractTests, UndoFilesContractTests: 231 tests, 0 failures. `run-r1-red.log`, then `run-mf-S1`, `S2c`, `S6`, `S5` (the first round's logs kept as `-first`). `origin/dev` 811c956ce: already up to date.
+- **Ledger.** 2 rows added for this piece (new reason), 0 changed.

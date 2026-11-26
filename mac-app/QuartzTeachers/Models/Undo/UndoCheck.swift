@@ -277,7 +277,7 @@ nonisolated enum UndoCheck {
             // the other side of a move, which is as the step left it (U4b's
             // `placeAsFound` names a moved item only when the item itself is
             // what changed).
-            if let placeLeavingTheFolder = UndoCheck.placeLeavingTheFolder(op.pathsNamed, root: root) {
+            if let placeLeavingTheFolder = UndoCheck.placeLeavingTheFolder(op, root: root) {
                 if !inTheWay.contains(placeLeavingTheFolder) {
                     inTheWay.append(placeLeavingTheFolder)
                 }
@@ -478,9 +478,9 @@ nonisolated enum UndoCheck {
     /// nil when every one does. The one place a leaves-the-folder refusal
     /// names, at the plan and again just before each change
     /// (`undo.rule.stagedThenSwapped`; U4b2-2).
-    static func placeLeavingTheFolder(_ places: [String], root: URL) -> String? {
-        for place in places {
-            if !UndoPlaces.staysInside(root, place) {
+    static func placeLeavingTheFolder(_ op: UndoOp, root: URL) -> String? {
+        for place in op.pathsNamed {
+            if !UndoPlaces.staysInside(root, place, namedBy: op) {
                 return place
             }
         }
@@ -515,7 +515,7 @@ nonisolated enum UndoCheck {
     ) -> Bool {
         for op in ops where op.knownKind == .moveApart {
             var leavesTheFolder: Bool = false
-            for place in op.pathsNamed where !UndoPlaces.staysInside(root, place) {
+            for place in op.pathsNamed where !UndoPlaces.staysInside(root, place, namedBy: op) {
                 leavesTheFolder = true
             }
             if leavesTheFolder {
@@ -1147,7 +1147,8 @@ nonisolated enum UndoSwap {
                 // a tidy could not remove, or one an outgoing page rests on):
                 // the part-two review's M1.
                 var leftOut: [String: UndoItem] = ownFilesInside(from)
-                if let seq = UndoSwap.stepSeq(ofLabel: label) {
+                // A link's move reads nothing through the link (U4b2-14).
+                if op.linkSha == nil, let seq = UndoSwap.stepSeq(ofLabel: label) {
                     for (inside, item) in UndoSwap.stepsOwnFilesInside(from, seq: seq) {
                         leftOut[inside] = item
                     }
@@ -1324,7 +1325,7 @@ nonisolated enum UndoSwap {
             return nil
         }
         if case .moveHere(_, _, let op) = target.change,
-           let leadingOut = UndoCheck.placeLeavingTheFolder(op.pathsNamed, root: root) {
+           let leadingOut = UndoCheck.placeLeavingTheFolder(op, root: root) {
             return leadingOut
         }
         return target.relativePath
@@ -1336,8 +1337,9 @@ nonisolated enum UndoSwap {
         switch target.change {
         case .setExternal:
             return true
-        case .moveHere(_, let fromPath, _):
-            return UndoPlaces.staysInside(root, fromPath) && UndoPlaces.staysInside(root, target.relativePath)
+        case .moveHere(_, let fromPath, let op):
+            return UndoPlaces.staysInside(root, fromPath, namedBy: op)
+                && UndoPlaces.staysInside(root, target.relativePath, namedBy: op)
         default:
             return UndoPlaces.staysInside(root, target.relativePath)
         }
@@ -1578,6 +1580,12 @@ nonisolated enum UndoSwap {
     static func stepsOwnFilesInside(_ folder: URL, seq: Int) -> [String: UndoItem] {
         var found: [String: UndoItem] = [:]
         let ownMarker: String = stagedMarker + "\(seq)-"
+        // Never through a link (review 1 of U4b2-14): a place that is a
+        // link now holds nothing of the step's, and listing it would read
+        // what it leads to.
+        if UndoTreeReading.linkTarget(at: folder) != nil {
+            return found
+        }
         guard let walker = FileManager.default.enumerator(atPath: folder.path) else {
             return found
         }

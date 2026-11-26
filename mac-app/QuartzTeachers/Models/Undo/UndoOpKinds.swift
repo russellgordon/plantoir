@@ -964,11 +964,11 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
                 }
             } else if type == S_IFLNK {
                 // Listed by what it holds, never followed.
-                guard let target = linkTarget(at: url) else {
+                guard let sha = linkSha(at: url) else {
                     couldNotRead = true
                     return false
                 }
-                links.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: target)))
+                links.append(UndoTreeListing.File(path: path, sha: sha))
             } else {
                 return false
             }
@@ -990,6 +990,18 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
             return nil
         }
         return Data(buffer[0..<count])
+    }
+
+    /// A link's `linkSha` (`opKinds.move`, U4b2-14): the SHA-256 of the
+    /// bytes it holds (`linkTarget`), never followed. Nil when it cannot be
+    /// read. The one rule a writer records by (Rename folder, U4b2-15), the
+    /// door judges by (`UndoMoveSide.readLink`) and a folder's listing
+    /// lists a link inside it by (`link` lines).
+    static func linkSha(at url: URL) -> String? {
+        guard let target = linkTarget(at: url) else {
+            return nil
+        }
+        return UndoHash.sha256(of: target)
     }
 
     /// Makes the folder a listing describes at a NEW place, with every
@@ -1228,6 +1240,10 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
     static func readNamingFoldersLeftOut(
         _ op: UndoOp, at url: URL, overriding: [String: UndoItem] = [:]
     ) -> (side: UndoMoveSide, foldersLeftOut: [String]) {
+        if let linkSha = op.linkSha {
+            // U4b2-14: a link is the item; nothing inside it is the move's.
+            return (side: UndoMoveSide.readLink(at: url, linkSha: linkSha), foldersLeftOut: [])
+        }
         if let sha = op.sha {
             var item: UndoItem = UndoItem.read(at: url)
             if let given = overriding[""], item != .absent {
@@ -1306,6 +1322,34 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
             }
             return (side: .holdsSomethingElse, foldersLeftOut: [])
         }
+    }
+
+    /// U4b2-14, opKinds.move: one side of a link's move, read with `lstat`
+    /// and `readlink` on the link itself and never followed, so what it
+    /// leads to (outside the working folder, or nowhere) is never read. The
+    /// content is a link holding exactly the bytes `linkSha` hashes; a
+    /// folder, a file or a link with another target is something else.
+    static func readLink(at url: URL, linkSha: String) -> UndoMoveSide {
+        var information: stat = stat()
+        let found: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &information)
+        }
+        if found != 0 {
+            if errno == ENOENT || errno == ENOTDIR {
+                return .free
+            }
+            return .cannotRead
+        }
+        if (information.st_mode & S_IFMT) != S_IFLNK {
+            return .holdsSomethingElse
+        }
+        guard let now = UndoTreeReading.linkSha(at: url) else {
+            return .cannotRead
+        }
+        return now == linkSha ? .holdsTheContent : .holdsSomethingElse
     }
 
     /// Review 1 of U4b2-10: the most candidate folders decided one by one.
@@ -1472,6 +1516,25 @@ nonisolated enum UndoPlaces {
             return false
         }
         return real == rootReal || real.hasPrefix(rootReal + "/")
+    }
+
+    /// `staysInside` for a place `op` names. A link's move names the link
+    /// itself at its `from` and `to` (U4b2-14, opKinds.move), so there the
+    /// link is never followed: only the folders above it are resolved, and
+    /// a link that leads out of the working folder, or nowhere, is moved as
+    /// a link like any other.
+    static func staysInside(_ root: URL, _ relativePath: String, namedBy op: UndoOp) -> Bool {
+        if op.linkSha == nil || (relativePath != op.from && relativePath != op.to) {
+            return staysInside(root, relativePath)
+        }
+        if !UndoOp.isSafeRelativePath(relativePath) {
+            return false
+        }
+        let above: String = (relativePath as NSString).deletingLastPathComponent
+        if above.isEmpty {
+            return true
+        }
+        return staysInside(root, above)
     }
 }
 

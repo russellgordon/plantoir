@@ -1,0 +1,64 @@
+# U4b2-12: rename-traces-made (#899)
+
+Branch `issue/899-u4b2-12-rename-traces-made`, from `origin/issue/899-u4b2-11-rename-step-recorded` e21cacb62 (holds `dev` 811c956ce and pieces 9, 10, 11). `origin/dev` was merged before proving and again before hand-back. Both times it was "Already up to date" (`dev` still 811c956ce), so there is no merge commit. (Merged on 2026-11-26 in `night25/integration-7`, 69b247fd5, with U4b2-11 to U4b2-15. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12.)
+
+## Must-fail lines
+
+The log is `windows-app/notes/899-u4b2-12-mustfail.log`. Every sabotage was restored with `git checkout`, and `git status` was clean after each one.
+
+| | Sabotage | Result |
+|---|---|---|
+| M1 | Python: the model's backward order with the move first (`plan` keeps `ordered = list(ops)` going back) | RED, 17 failures, among them both rename tests (`changedSince` != `undone`), the ops both ways, and the U4b stack cases |
+| M2 | Mac: the replay names each carried edit at the folder's OLD place | RED, `UndoActionStepsTests.swift:1671`: the replay throws at `action-154`'s hand edit, because the step did not move the folder |
+| M3 | Python: a refused move always named by its `from` | RED: `test_a_refused_undo_of_a_rename_names_the_renamed_folder` and the stale-traces test |
+| M4 | Mac: a rename's page keyed by `canonicalPath` (follows the link) | RED, `UndoRenameFolderStepTests.swift:312` (zzz.md first) |
+| M5 | Mac: the tie-break removed | RED, `UndoRenameFolderStepTests.swift:325` |
+
+5 of 5 RED. M2, M4 and M5 were in one build: each test has its own sabotage.
+
+What each test proves:
+
+- `test_a_rename_step_undone_ends_at_its_fixture_and_redone_at_the_recorded_after`: undo is the identity on places and bytes, and redo gives the recorded afters. It fails if the move goes back before its edits.
+- `test_a_rename_trace_hashes_each_folder_by_its_listing_at_both_ends`: each folder at its old place carries the recorded `listingSha`. It fails if `folder_hash` or the laying is removed.
+- `test_a_refused_undo_of_a_rename_names_the_renamed_folder`: the place a refusal names, in both directions.
+- The Mac replay: model and Mac agree call by call. It went red before it learned folder moves (`run-red2.log`, the old replay throws at `action-154`).
+
+## Runs
+
+Logs are in `/Users/russellgordon/plantoir/wt-899-u4b2-12/.dd/`.
+
+- Python red first: 2 errors and 2 failures (the new functions absent, the trace count 150 != 162). Then 36 OK. `make_undo_traces.py --check`: current.
+- `run-red1.log`: this build picked up my new replay while it compiled, so it is not the red run. It found the one disagreement (`action-154` call 4, Mac `Ideas`, model `Concepts`), which led to the model fix above.
+- `run-red2.log`: the old replay against the new traces: RED (it throws at `action-154`).
+- `run-red3.log`: the new replay GREEN. The lows' new tests ran against stubs that keep the old behaviour: RED for the linked page (:312) and the case tie (:325), and :329 showed that a file URL folds the Unicode form (the assertion was then corrected to say so).
+- `run-write.log`: re-recorded with `TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1`. `contracts/undo-action-steps.json` changed in its note line only.
+- `run-green1.log`: UndoActionStepsTests, UndoJournalContractTests, UndoFilesContractTests, UndoRenameFolderStepTests, SpecialFolderRenamerTests, UndoWriterScanTests (which reads changed product files as source): 139 tests, 0 failures.
+- `run-mf.log`: M2, M4, M5.
+
+`git diff` of `undo-traces.json` against piece 11: the 150 earlier action traces, the 20 seeded traces, the note and the fixture are unchanged (checked by script). Only `actionNote` and the twelve appended traces changed.
+
+## Left for the next piece
+
+- Piece 13: the model's recovery with a hand edit (not touched).
+- The model cannot hold an empty folder. A rename trace therefore never deletes the last page of a moved folder, and a listing with an empty folder inside raises in `lay_folder_moves`. Neither recorded step has one. If a later recording does, the model needs a representation for an empty folder.
+- Piece 14 merge: my `make_undo_traces.py` edits are in new functions and in `plan`'s whole-op refusal line, `files_step`, `action_trace` and `path_hashes`. Piece 14's hunks are in `tree_reading`, `move_state` and the `page_item` area, so the two should merge without a conflict. The new `place_as_found` sits beside the `EDIT_KINDS` line.
+
+## For the director
+
+- `contracts/` changed: `undo-traces.json` (the note and 12 traces) and `undo-action-steps.json` (the note line). Both gates are needed, taken with piece 11.
+- Windows: the twelve trace names needed ledger entries, and they were added. No other Windows test enumerates them.
+- HIG: nothing a teacher sees or hears changed (the page order of a rename's relink is internal), so no section was read.
+- Nothing is parked. The one disagreement was the model's, and the Mac rule it now copies was settled in U4b.
+
+## Self-check
+
+1. Broke each fix and watched its test fail: M1 to M5, 5 RED.
+2. No timed waits were added.
+3. Every sentence on the failure paths is true. No product sentence changed. The ledger reason and the notes on Windows were read against `UndoActionTraceContractTests.cs`.
+4. `dev` merged before proving and before hand-back: up to date both times.
+5. No number was tuned by trial (12 = 2 steps x 6 traces per step).
+6. Contracts: `undo-traces.json` was written by the generator, and the steps file by the recorder. Nothing outside the brief was touched.
+7. `grep -n "DispatchQueue\|\.map {\|\.filter {\|\.reduce(\|\$0"` over the changed Swift lines: empty. No new type was authored (the static funcs sit inside existing MARK sections).
+8. Lows A, B and C were fixed. A and B have tests that were red first against stubs. C is the restructured test, made independent of the volume's order.
+9. The rename record is still kept, and `undoJournalIsLive` is untouched (off).
+10. All twelve new traces are in the Mac's replay and held on Windows by exact name.

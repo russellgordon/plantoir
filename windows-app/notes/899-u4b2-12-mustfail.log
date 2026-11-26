@@ -1,0 +1,58 @@
+== M1 (Python): the model's backward order with the move first (plan: ordered = list(ops) going back)
+ scripts/make_undo_traces.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+FAIL: test_a_refused_undo_of_a_rename_names_the_renamed_folder (__main__.ActionTraceTests.test_a_refused_undo_of_a_rename_names_the_renamed_folder)
+AssertionError: 'changedSince' != 'undone'
+FAIL: test_a_rename_step_undone_ends_at_its_fixture_and_redone_at_the_recorded_after (__main__.ActionTraceTests.test_a_rename_step_undone_ends_at_its_fixture_and_redone_at_the_recorded_after)
+AssertionError: 'changedSince' != 'undone'
+FAIL: test_every_recorded_step_is_reproduced_by_its_ops_both_ways (__main__.ActionTraceTests.test_every_recorded_step_is_reproduced_by_its_ops_both_ways)
+AssertionError: 'changedSince' != 'ready'
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case="U3b, records as a group (the director's decision, 2026-11-20, on #899): a rollover onto new websites on two hosts, a deploy that reaches one host only, Undo: BOTH records are
+AssertionError: Lists differ: ['courses/TST1O/.netlify_sites/section1.json', 'courses/TS[32 chars]son'] != ['courses/TST1O/.cloudflare_sites/section1.json', 'courses[32 chars]son']
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case='U4b, an edit inside a moved folder: Undo takes the edit back, then the move')
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case='U4b, an edit inside a moved folder: undone and redone, the move goes in before the edit')
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case="U4b, M1: undone, the step's own kept copy left inside the folder at its old place, then redone: the copy is never the folder's content")
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case="U4b, M1: redone, the step's own kept copy left inside the folder at its new place, then undone: the copy is never the folder's content")
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case='U4b, an edit carried by a move makes a folder inside it: Undo takes both back, and nothing is left')
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case='U4b, an edit carried by a move makes a folder inside it: undone and redone, the folder made again with its file')
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case="U4b, an empty folder of the moved folder's own, with a folder a carried edit made inside it: Undo takes the step back and keeps the folder of its own")
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case="U4b, an empty folder of the moved folder's own, with a folder a carried edit made inside it: undone and redone")
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case="U4b, an empty folder of the moved folder's own, a file a carried edit made in it and a folder made beside it: Undo takes the step back and keeps the folder of its own")
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case="U4b, the Finder's record of a window written inside the folder a carried edit made: Undo takes it out with the folder, and the Redo goes in")
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case='U4b, a capitalisation-only rename (Media to media) with a page inside edited: Undo spells the folder Media again, the edit taken back')
+AssertionError: None != 1
+FAIL: test_stack_cases (__main__.ContractCaseTests.test_stack_cases) (case='U4b, a capitalisation-only rename: undone and redone, spelled media again with the edit inside')
+AssertionError: None != 1
+FAIL: test_the_committed_traces_are_what_the_generator_writes (__main__.GeneratorTests.test_the_committed_traces_are_what_the_generator_writes)
+AssertionError: b'{\n[145042 chars] Day 3.md", "others": 1, "clearedTheList": tru[232663 chars]n}\n' != b'{\n[145042 chars] Day 2.md", "others": 1, "clearedTheList": tru[232781 chars]n}\n' : contracts/undo-traces.json is stale: run python3 scripts/ma
+Ran 36 tests in 0.632s
+FAILED (failures=17)
+
+== M3 (Python): a refused move always named by its from (place_as_found)
+ scripts/make_undo_traces.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+FAIL: test_a_refused_undo_of_a_rename_names_the_renamed_folder (__main__.ActionTraceTests.test_a_refused_undo_of_a_rename_names_the_renamed_folder)
+AssertionError: Tuples differ: ('changedSince', 'courses/ICS3U/Concepts', 0) != ('changedSince', 'courses/ICS3U/Ideas', 0)
+FAIL: test_the_committed_traces_are_what_the_generator_writes (__main__.GeneratorTests.test_the_committed_traces_are_what_the_generator_writes)
+AssertionError: b'{\n[355167 chars]CS3U/Ideas", "others": 0, "clearedTheList": tr[22538 chars]n}\n' != b'{\n[355167 chars]CS3U/Concepts", "others": 0, "clearedTheList":[22541 chars]n}\n' : contracts/undo-traces.json is stale: run python3 scripts/make
+Ran 36 tests in 0.676s
+FAILED (failures=2)
+
+== M2 (Mac): the replay names each carried edit at the folder's OLD place (placeBeforeTheMoves) instead of its new one
+== M4 (Mac, same build): a rename's page keyed by UndoFolderPlaces.canonicalPath (follows the link)
+== M5 (Mac, same build): isInPathOrder's tie-break removed (return false on a tie)
+/Users/russellgordon/plantoir/wt-899-u4b2-12/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:312: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testALinkedPageIsInPathOrderByItsOwnPlaceNotItsTarget] : XCTAssertEqual failed: ("["section1/zzz.md", "Ideas/Arrays.md", "section1/index.md"]") is not equal to ("["Ideas/Arrays.md", "section1/index.md", "section1/zzz.md"]")
+/Users/russellgordon/plantoir/wt-899-u4b2-12/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:325: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testPathsAlikeButForCaseOrUnicodeFormAreOrderedByTheirBytes] : XCTAssertTrue failed
+	 Executed 41 tests, with 2 failures (0 unexpected) in 11.250 (11.284) seconds
+	 Executed 42 tests, with 3 failures (1 unexpected) in 17.564 (17.600) seconds
+	 Executed 42 tests, with 3 failures (1 unexpected) in 17.564 (17.600) seconds

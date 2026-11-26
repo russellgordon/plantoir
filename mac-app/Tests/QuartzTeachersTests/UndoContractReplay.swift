@@ -598,6 +598,11 @@ nonisolated enum UndoContractReplay {
                 given["sha"] = UndoHash.sha256(of: Data(text.utf8))
                 given["contentText"] = nil
             }
+            if let target = string(given["linkTarget"]) {
+                // U4b2-14: a link's move, judged by the bytes it holds.
+                given["linkSha"] = UndoHash.sha256(of: Data(target.utf8))
+                given["linkTarget"] = nil
+            }
             if let tree = given["listing"] as? [String: Any] {
                 let made: UndoTreeListing = listing(from: tree)
                 given["listingSha"] = made.sha
@@ -622,7 +627,12 @@ nonisolated enum UndoContractReplay {
             var redo: String = "notReadable"
             if op.isReadable {
                 let state: UndoOpState
-                if op.isWhole {
+                if op.isWhole && op.from != nil && UndoCheck.placeLeavingTheFolder(op, root: place.root) != nil {
+                    // A move's place that leads out of the working folder is
+                    // changed since, as the plan judges it (checkCasesHow;
+                    // review 1 of U4b2-14, LOW 2).
+                    state = .neither
+                } else if op.isWhole {
                     state = UndoCheck.wholeState(of: op, root: place.root, places: places)
                 } else {
                     state = UndoCheck.state(of: op, in: UndoItem.read(at: url))
@@ -793,6 +803,7 @@ nonisolated enum UndoContractReplay {
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
         "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays", "madeFolder", "foldersInside",
+        "linkedFolder",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1382,6 +1393,9 @@ nonisolated enum UndoContractReplay {
             if let wanted = string(testCase["foldersInside"]), UndoContractKinds.foldersInside(in: root) != wanted {
                 failures.append("stackCases '\(name)': the folders inside the moved folder are \(UndoContractKinds.foldersInside(in: root)), not \(wanted)")
             }
+            if let wanted = string(testCase["linkedFolder"]), UndoContractKinds.linkedFolder(in: root) != wanted {
+                failures.append("stackCases '\(name)': the moved link is \(UndoContractKinds.linkedFolder(in: root)), not \(wanted)")
+            }
             if let wanted = int(testCase["keptWhatItReplacedLines"]), keptWhatItReplacedLines != wanted {
                 failures.append("stackCases '\(name)': \(keptWhatItReplacedLines) 'undo kept what it replaced' lines, not \(wanted)")
             }
@@ -1758,8 +1772,22 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': the \(work) was not stopped (\(outcome))")
                 }
             }
-            if let page = string(testCase["handEdit"]), let path = pathOf[page] {
-                try handEdit("sameLine", at: path, in: root)
+            if testCase["handEdit"] != nil && string(testCase["handEdit"]) == nil {
+                // Never skipped: a hand edit the row names is made, or the row fails.
+                failures.append("recoveryCases '\(name)': handEdit is not a string, so not a value this replay knows")
+            }
+            if let page = string(testCase["handEdit"]) {
+                if page == "carried" && withAMovedFolder {
+                    // U4b2-13: the page inside the moved folder, wherever
+                    // the folder is now, its line `Line one: …` set by hand.
+                    if !(try UndoContractKinds.editTheCarriedPageByHand(in: root)) {
+                        failures.append("recoveryCases '\(name)': no page inside the moved folder to change by hand")
+                    }
+                } else if let path = pathOf[page] {
+                    try handEdit("sameLine", at: path, in: root)
+                } else {
+                    failures.append("recoveryCases '\(name)': handEdit '\(page)' is not a value this replay knows")
+                }
             }
             let asLeft: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
             let reachable: Bool = testCase["moveFolderBeforeRecovery"] as? Bool != true

@@ -993,7 +993,8 @@ def tree_reading(item):
             return ("other",)
         return ("tree", listing_sha(item["tree"]))
     if "link" in item:
-        return ("other",)
+        # U4b2-14: a link is read by the bytes it holds, never followed.
+        return ("link", sha(item["link"]))
     if "treeSha" in item:
         return ("tree", item["treeSha"])
     if item.get("folder"):
@@ -1015,6 +1016,9 @@ def move_state(op, at_from, at_to, listed_as=None):
             return "free"
         if "sha" in op:
             return "holds" if reading == ("file", op["sha"]) else "else"
+        if "linkSha" in op:
+            # U4b2-14: a link moved as itself, judged by its target.
+            return "holds" if reading == ("link", op["linkSha"]) else "else"
         return "holds" if reading == ("tree", op["listingSha"]) else "else"
     source, destination = side(at_from), side(at_to)
     if source == "free" and destination == "holds":
@@ -1026,7 +1030,7 @@ def move_state(op, at_from, at_to, listed_as=None):
 
 def tree_state(op, item):
     reading = tree_reading(item)
-    if reading[0] in ("file", "other"):
+    if reading[0] in ("file", "other", "link"):
         return "neither"
     present = reading[0] == "tree"
     if present and reading[1] != op["listingSha"]:
@@ -1129,8 +1133,9 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                 if leaves_apart and stands_apart(op):
                     left_apart.append(place)
                     continue
-                if place not in in_the_way:
-                    in_the_way.append(place)
+                found = place_as_found(op, backward)
+                if found not in in_the_way:
+                    in_the_way.append(found)
                 continue
             if state != wanted_from:
                 continue
@@ -1204,6 +1209,17 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
 EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
 
 
+def place_as_found(op, backward):
+    """UndoOp.placeAsFound (U4b): where a teacher finds the item a whole op
+    names now, the place a refusal names: a `move`'s `to` before it is
+    undone and its `from` before it is redone (a refused Undo of a rename
+    names the renamed folder, never its old name); for every other op its
+    path, its from, or its target."""
+    if op["kind"] == "move" and "from" in op and "to" in op:
+        return op["to"] if backward else op["from"]
+    return op.get("path") or op.get("from") or op.get("target")
+
+
 def part_inside(place, path):
     """UndoOp.partInside (U4b2-9): the part of `path` inside `place`,
     spelled as `path` spells it ("" for the place itself), or None when it
@@ -1240,6 +1256,9 @@ def move_carries(move, edit):
     the old one (U4b, opKinds.wholeOps). At or inside `to` is part_inside,
     without regard to case (U4b2-9)."""
     if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
+        return False
+    if "linkSha" in move:
+        # A link's move carries nothing (review 1 of U4b2-14).
         return False
     if part_inside(move["to"], edit["path"]) is None:
         return False
@@ -1369,28 +1388,65 @@ def recovery_states(ops, pages):
 
 def recover(ops, pages, started_from_before):
     """UndoRecovery.settle, live: nothing took effect, completed, or what
-    took effect put back, judged by content alone; anything neither is in
-    the way. Answers (outcome, pages)."""
+    took effect put back, judged by content alone. A place that is neither
+    is in the way (changed by hand since): every place NOT in the way that
+    took effect is still put back, and the step is interrupted naming the
+    places in the way (U4b2-13, as Swift's settle does). Answers (outcome,
+    pages, the places the interrupted line names).
+
+    Two known differences from settle, which no row run through this model
+    reaches today (it runs only the withAMovedFolder rows, none of which has
+    an external op or stops after the edit inside with a hand edit), so a
+    new row of either kind must not be trusted because it passes here:
+    - the model names an external op's target among the places; settle
+      never does (`pathsOnly`);
+    - the model holds no staged files, so for a step killed after its
+      carried edit went in and then edited by hand elsewhere it puts the
+      places back, where the Mac's put-back plan, which does not leave the
+      step's own kept copy inside the folder out, is refused and the step
+      closes couldNotPutBack with nothing put back (the U7 gap)."""
     start, end = ("before", "after") if started_from_before else ("after", "before")
     states = recovery_states(ops, pages)
-    if any(state == "neither" for state in states.values()):
-        return ("interrupted", pages)
-    if all(state == start for state in states.values()):
-        return ("nothingTookEffect", pages)
-    if all(state == end for state in states.values()):
-        return ("completed", pages)
+    in_the_way = [place for place, state in states.items() if state == "neither"]
+    if not in_the_way and all(state == start for state in states.values()):
+        return ("nothingTookEffect", pages, [])
+    if not in_the_way and all(state == end for state in states.values()):
+        return ("completed", pages, [])
+    at_end = [place for place, state in states.items() if state == end]
+    put_back = put_back_what_took_effect(ops, at_end, started_from_before, pages)
+    if put_back is None:
+        # It can never be put back: closed, naming what is left part way
+        # (Swift's couldNotPutBack line: the places at the end, sorted,
+        # then those in the way).
+        named = sorted(at_end)
+        for place in in_the_way:
+            if place not in named:
+                named.append(place)
+        return ("interrupted", pages, named)
+    if in_the_way:
+        return ("interrupted", put_back, in_the_way)
+    return ("rolledBack", put_back, [])
+
+
+def put_back_what_took_effect(ops, places, started_from_before, pages):
+    """The pages once every op whose place is in `places` is taken back the
+    way the stopped work came (one plan, as settle's opsToPutBack), or None
+    when that plan is refused. Nothing to put back leaves the pages as they
+    are."""
+    if not places:
+        return pages
     at_end = [op for op in ops if op["kind"] != "recompute"
-              and states.get(op.get("path") or op.get("from") or op.get("target")) == end]
+              and (op.get("path") or op.get("from") or op.get("target")) in places]
     result = plan(at_end, started_from_before, pages)
     if result[0] != "ready":
-        return ("interrupted", pages)
+        return None
     pages = dict(pages)
     for path, text in result[1].items():
         if text is None:
             pages.pop(path, None)
         else:
             pages[path] = text
-    return ("rolledBack", pages)
+    return pages
 
 
 def folder_of_pages(pages, place):
@@ -1450,11 +1506,14 @@ DEPLOYED_MARKER = "{\"site_id\": \"this-year\"}"
 
 def page_item(value):
     """A model page as an item spec: text, a tree (("tree", listing sha)),
-    a preference value, or absent (None)."""
+    a link (("link", its target), U4b2-14), a preference value, or absent
+    (None)."""
     if value is None:
         return {"absent": True}
     if isinstance(value, tuple) and value[0] == "tree":
         return {"treeSha": value[1]}
+    if isinstance(value, tuple) and value[0] == "link":
+        return {"link": value[1]}
     return {"text": value}
 
 
@@ -1522,6 +1581,113 @@ def json_moved(op, backward, text):
     if moved is None:
         return None
     return moved.decode("utf-8")
+
+
+def change_ops(changes, members=()):
+    """The ops of an action's files, in the order recorded: a JSON file
+    planned member by member is its editJSON ops (U4a), any other file the
+    door's rule (ops_for_change); a file left as it was has none."""
+    ops = []
+    for path, before, after in changes:
+        if before == after:
+            continue
+        # U4a: a JSON file planned member by member is its editJSON ops,
+        # in the order recorded.
+        file_members = [member for member in members if member["path"] == path]
+        if file_members:
+            for member in file_members:
+                op = {"kind": "editJSON", "path": path, "keyPath": member["keyPath"]}
+                for side in ("before", "after"):
+                    if side in member:
+                        op[side] = member[side]
+                ops.append(op)
+            continue
+        ops.extend(ops_for_change(path, before, after))
+    return ops
+
+
+def recompute_ops(recomputes):
+    """A step's recompute ops, last in the step, in the order recorded."""
+    ops = []
+    for kept in recomputes:
+        ops.append({"kind": "recompute", "path": kept["path"], "maintainer": kept["maintainer"],
+                    "section": kept.get("section")})
+    return ops
+
+
+def folder_move_ops(folder_moves):
+    """U4b2-12: one `move` per folder a step recorded with folderMoves
+    moves (Rename folder), in the order recorded, each judged by its
+    listing's SHA-256 (opKinds.move with a listingSha; no blob)."""
+    ops = []
+    for moved in folder_moves:
+        ops.append({"kind": "move", "from": moved["from"], "to": moved["to"], "listingSha": moved["listingSha"]})
+    return ops
+
+
+def place_before_the_moves(path, folder_moves):
+    """Where a file a step names was before its folders moved: a page a
+    folder's move carries is named at the folder's NEW place, and was at
+    the same place under its old one (the Mac's
+    UndoActionStepsTests.placeBeforeTheMoves, by place_before_the_move)."""
+    for moved in folder_moves:
+        if part_inside(moved["to"], path) is not None:
+            return place_before_the_move(path, moved)
+    return path
+
+
+def is_carried(path, folder_moves):
+    """Whether one of the step's folder moves carries the page at `path`."""
+    return place_before_the_moves(path, folder_moves) != path
+
+
+def lay_folder_moves(pages, paths, folder_moves):
+    """U4b2-12: the working folder a rename trace starts from. Each moved
+    folder's listing is laid at its `from` (as a rollover's `moves` lays
+    `content`), a page the move carries is not laid at its new place, and
+    every folder and every page in it is hashed at both places. The model
+    holds a folder as its files, so a listing with a folder holding no file
+    cannot be laid."""
+    for path in list(pages):
+        if is_carried(path, folder_moves):
+            del pages[path]
+    for moved in folder_moves:
+        for folder in moved["folders"]:
+            prefix = folder + "/"
+            if not any(inside.startswith(prefix) for inside in moved["files"]):
+                raise ValueError(moved["from"] + ": the model cannot hold the empty folder " + folder)
+        places = [moved["from"], moved["to"]]
+        for inside in sorted(moved["files"]):
+            pages[moved["from"] + "/" + inside] = moved["files"][inside]
+            places.extend([moved["from"] + "/" + inside, moved["to"] + "/" + inside])
+        for place in places:
+            if place not in paths:
+                paths.append(place)
+
+
+def empties_a_moved_folder(pages, path, folder_moves):
+    """Whether deleting the page at `path` would leave one of the step's
+    moved folders (at either place) with no page in it: the Mac keeps an
+    empty folder there, which the model, holding a folder as its files,
+    cannot hold, so a rename trace never makes that hand edit."""
+    for moved in folder_moves:
+        for place in (moved["from"], moved["to"]):
+            if part_inside(place, path) is None:
+                continue
+            others = [other for other in pages if other != path and isinstance(other, str)
+                      and other.startswith(place + "/") and pages[other] is not None]
+            if not others:
+                return True
+    return False
+
+
+def folder_hash(pages, place):
+    """A folder the model holds as its files, hashed as its listing's
+    SHA-256 (as `trees` are); None when it holds no file there."""
+    tree = folder_of_pages(pages, place)
+    if tree is None:
+        return None
+    return listing_sha(tree)
 
 
 # --------------------------------------------------------------------------
@@ -1712,22 +1878,7 @@ class Model:
         before and after, as ops (lines where they reproduce the change,
         otherwise the whole file), in the order the action planned them,
         the recompute ops last. ('applied', seq, ops) or ('changedNothing',)."""
-        ops = []
-        for path, before, after in changes:
-            if before == after:
-                continue
-            # U4a: a JSON file planned member by member is its editJSON ops,
-            # in the order recorded.
-            file_members = [member for member in members if member["path"] == path]
-            if file_members:
-                for member in file_members:
-                    op = {"kind": "editJSON", "path": path, "keyPath": member["keyPath"]}
-                    for side in ("before", "after"):
-                        if side in member:
-                            op[side] = member[side]
-                    ops.append(op)
-                continue
-            ops.extend(ops_for_change(path, before, after))
+        ops = change_ops(changes, members)
         for moved in moves:
             # U3b: each file moved, after the files (JournaledStep's order).
             ops.append({"kind": "moveApart" if moved.get("standsApart") else "move",
@@ -1737,9 +1888,7 @@ class Model:
             ops.append({"kind": "createTree", "path": tree["path"], "listingSha": listing_sha(tree)})
         if not ops:
             return ("changedNothing",)
-        for kept in recomputes:
-            ops.append({"kind": "recompute", "path": kept["path"], "maintainer": kept["maintainer"],
-                        "section": kept.get("section")})
+        ops.extend(recompute_ops(recomputes))
         seq = self.begin(ops)
         for path, before, after in changes:
             if after is None:
@@ -1752,6 +1901,22 @@ class Model:
             self.pages[tree["path"]] = ("tree", listing_sha(tree))
         self.finish(seq)
         return ("applied", seq, ops)
+
+    def folder_moves_step(self, changes, recomputes, folder_moves, members=()):
+        """U4b2-12, Rename folder: JournaledWrite.perform(ops:) with one
+        `move` per folder (its listingSha), first, then the files' ops (a
+        page the move carries named at the folder's new place, its before
+        the text at the old one), then the recompute ops; planned forward
+        and made as ops_step makes any step (opKinds.wholeOps: the move
+        first, each carried edit after it). ('applied', seq, ops), or what
+        the plan refused."""
+        ops = folder_move_ops(folder_moves)
+        ops.extend(change_ops(changes, members))
+        ops.extend(recompute_ops(recomputes))
+        outcome = self.ops_step(ops)
+        if outcome[0] != "applied":
+            return outcome
+        return ("applied", outcome[1], ops)
 
     def holds_a_recompute(self, step):
         return any(op["kind"] == "recompute" for op in step["ops"])
@@ -2187,14 +2352,14 @@ def read_action_steps(path=None):
     return document.get("steps", [])
 
 
-def action_trace(rng, recorded, number):
-    """One trace of a recorded action step: the step made from the files it
-    names (their befores, an empty list), then undos, redos, hand edits of
-    its files and notes, then the closing undos and redos."""
+def action_fixture(recorded):
+    """The working folder an action trace starts from ({path: text}) and
+    the places it hashes, in order: every file the step names at its
+    before, each folder a tree makes, each moved file at its `from`, and
+    each folder moved whole laid as its listing (lay_folder_moves)."""
     files = recorded["files"]
     paths = [entry["path"] for entry in files]
     moves = recorded.get("moves", [])
-    members = recorded.get("members", [])
     trees = recorded.get("trees", [])
     paths.extend(tree["path"] for tree in trees)
     pages = {}
@@ -2204,11 +2369,37 @@ def action_trace(rng, recorded, number):
     for moved in moves:
         pages[moved["from"]] = moved["content"]
         paths.extend([moved["from"], moved["to"]])
+    lay_folder_moves(pages, paths, recorded.get("folderMoves", []))
+    return pages, paths
+
+
+def make_recorded_step(model, recorded):
+    """The `action` call: the recorded step made through the door. A step
+    recorded with folderMoves (Rename folder) through the door that takes
+    every kind, its folders' moves first (Model.folder_moves_step); any
+    other as JournaledWrite.perform with its files (Model.files_step)."""
+    changes = [(entry["path"], entry["before"], entry["after"]) for entry in recorded["files"]]
+    recomputes = recorded.get("recomputes", [])
+    members = recorded.get("members", [])
+    folder_moves = recorded.get("folderMoves", [])
+    if folder_moves:
+        if recorded.get("moves") or recorded.get("trees"):
+            raise ValueError(recorded["name"] + ": folderMoves beside moves or trees are not made yet")
+        return model.folder_moves_step(changes, recomputes, folder_moves, members)
+    return model.files_step(changes, recomputes, recorded.get("moves", []), members, recorded.get("trees", []))
+
+
+def action_trace(rng, recorded, number):
+    """One trace of a recorded action step: the step made from the files it
+    names (their befores, an empty list), then undos, redos, hand edits of
+    its files and notes, then the closing undos and redos."""
+    pages, paths = action_fixture(recorded)
+    moves = recorded.get("moves", [])
+    folder_moves = recorded.get("folderMoves", [])
     apart = [moved for moved in moves if moved.get("standsApart")]
     model = Model(pages=dict(pages))
     calls = []
-    changes = [(entry["path"], entry["before"], entry["after"]) for entry in files]
-    outcome = model.files_step(changes, recorded.get("recomputes", []), moves, members, trees)
+    outcome = make_recorded_step(model, recorded)
     call = {"call": "action", "step": recorded["name"], "expect": outcome[0]}
     if outcome[0] == "applied":
         call["seq"] = outcome[1]
@@ -2257,6 +2448,8 @@ def action_trace(rng, recorded, number):
         elif roll < 0.90:
             kind = rng.choice(["body", "body", "otherKey", "sameLine", "deletePage"])
             path = rng.choice(paths)
+            if kind == "deletePage" and empties_a_moved_folder(model.pages, path, folder_moves):
+                continue
             if not model.hand_edit_path(kind, path):
                 continue
             call = {"call": "handEdit", "kind": kind, "path": path}
@@ -2309,8 +2502,11 @@ def path_hashes(model, paths):
         text = model.pages.get(path)
         if isinstance(text, tuple):
             result[path] = text[1]
+        elif text is None:
+            # U4b2-12: a folder a rename moved is held as its files.
+            result[path] = folder_hash(model.pages, path)
         else:
-            result[path] = None if text is None else sha(text)
+            result[path] = sha(text)
     return result
 
 
@@ -2351,7 +2547,7 @@ def generate(seed=SEED, count=TRACE_COUNT, steps=None):
                     for page_id, path, text, shape in FIXTURE],
         "fixtureHashes": {page_id: sha(START[page_id]) for page_id in PAGE_IDS},
         "traces": traces,
-        "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A step recorded with `members` (U4a, Course Settings) has each file they name made as those editJSON ops, in the order recorded, instead of the door's rule (the member moved by the member rule's bytes, undo-json-cases.json -> editJSONCases); one recorded with `trees` (U4a, Add folder) also makes each folder as one `createTree` (its listing and every file's bytes in the list), after the moves; a folder is hashed as its listing's SHA-256 in `afterUndoingAll` and `final`, and only a `deletePage` hand edit changes one. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
+        "actionNote": "U3: the daily page actions' traces, made from contracts/undo-action-steps.json, where the Mac records each action's step from the real action code (UndoActionStepsTests; never typed by hand). Each starts in an empty working folder with an empty list, every file the step names written from its `before` (none when null). An `action` call makes the named recorded step through the door (the mac's JournaledWrite.perform with an UndoStepDraft: each file's before and after, its ops worked out by the door's own rule, editLine where the lines reproduce the change and writeFile otherwise, in the order recorded, then the step's recompute ops) and must come to `expect` with the op kinds `ops` in that order. Hand edits name a file by `path`; a refused undo or redo names the first file in the way by `path`. A step recorded with `moves` (U3b, the rollover) also writes each moved file's `content` at its `from` first, and its action is made through the door that takes every kind (the mac's JournaledWrite.perform(ops:)): the files' ops as above, then one `move` per moved file (`moveApart` when it standsApart), then the recompute ops; its moved places are hashed in `afterUndoingAll` and `final` too. A step recorded with `members` (U4a, Course Settings) has each file they name made as those editJSON ops, in the order recorded, instead of the door's rule (the member moved by the member rule's bytes, undo-json-cases.json -> editJSONCases); one recorded with `trees` (U4a, Add folder) also makes each folder as one `createTree` (its listing and every file's bytes in the list), after the moves; a folder is hashed as its listing's SHA-256 in `afterUndoingAll` and `final`, and only a `deletePage` hand edit changes one. A step recorded with `folderMoves` (U4b2-11, Rename folder) moves each folder whole, as one `move` carrying the folder's `listingSha` (its listing as recorded: the folders inside and every file's bytes), first in the step, and names each page the move carries at the folder's NEW place, its before the text at the old one (opKinds.wholeOps): its trace writes each folder's listing at its `from` first (every file in `files` there, by its path inside), never a carried page's before at its new place, and its action is made through the door that takes every kind: one `move` per folder (`from`, `to`, `listingSha`), then the files' ops as above, then the recompute ops; each folder is hashed in `afterUndoingAll` and `final` at both places as its listing's SHA-256 (null: no folder there), and every page of its listing at both places too; a hand edit names a page where it is at that moment, and a `deletePage` never takes the last page out of a moved folder. A `deploy` call writes `text` at `path` (a new marker in the place a rollover's marker left) and nothing to the list; an undo or redo whose `leftApart` is given must name exactly those places as left apart (none when it is absent). Undo and Redo re-derive a recompute op as the app does (a front page whose course has no settings is left alone). `afterUndoingAll` and `final` are keyed by path. Everything else as `note` says.",
         "actionTraces": action_traces,
     }
 

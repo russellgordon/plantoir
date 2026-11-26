@@ -1,0 +1,27 @@
+U4b2-11 must-fail log (#899). Logs in /Users/russellgordon/plantoir/wt-899-u4b2-11/.dd/. Fix committed first (104f3ea39).
+
+RED FIRST
+- run-red1.log / run-red2.log (before the contract was regenerated, keepingTheCommittedMoments stubbed to return what was written): UndoActionStepsTests 19 tests, 3 failures:
+  UndoActionStepsCourseSettings.swift:225 testARegenerationKeepsTheCommittedMomentOfALineOtherwiseTheSame (the new date kept);
+  UndoActionStepsTests.swift:544 testEveryDailyActionIsOneStepThroughTheDoor (contracts/undo-action-steps.json is not what the actions record now: renameFolder and renameFolderPerSection not recorded);
+  UndoActionStepsCourseSettings.swift:215 testEveryRecordedFolderMoveHoldsTheListingItNames ("0" is not equal to "3": no folder move recorded).
+  (run-red1 also had the first form of the order assertion red on the door's real order: see the notes.)
+
+M1 carried edits recorded at the OLD place (files' path = placeBeforeTheMoves(path)): RED.
+  run-mf1.log: UndoActionStepsCourseSettings.swift:141 testEveryDailyActionIsOneStepThroughTheDoor, both steps ("courses/ICS3U/Concepts/Arrays.md", "courses/ICS3U/section1/Tasks/Quiz 1.md" not the pages at the new place); UndoActionStepsTests.swift:544 (the committed file differs).
+M3 keepingTheCommittedMoments returns what was written (the old stamping): RED.
+  run-mf1.log: UndoActionStepsCourseSettings.swift:225 testARegenerationKeepsTheCommittedMomentOfALineOtherwiseTheSame.
+M2 the committed contract's renameFolder carried page at the OLD place (Ideas/Arrays.md -> Concepts/Arrays.md): RED.
+  run-mf2.log: UndoActionStepsCourseSettings.swift:202 ("named at the place the folder left") and :213 ("no page named inside a moved folder's new place").
+M5 the committed contract's renameFolderPerSection listing text changed (Quiz 2.md "Quiz two." -> "Quiz 2."): RED.
+  run-mf2.log: UndoActionStepsCourseSettings.swift:191 (listingSha 011e67... is not the listing its folders and files make).
+M4 Python STEPS_WITHOUT_TRACES_YET emptied: RED, 4 failures.
+  run-mf3-python.log: test_every_recorded_step_is_reproduced_by_its_ops_both_ways, test_the_rename_steps_are_recorded_and_left_without_traces_by_name, test_there_are_about_120_action_traces_and_each_starts_with_its_step, test_the_committed_traces_are_what_the_generator_writes.
+
+5 of 5 RED. Each restored with git checkout; git status clean after each.
+
+REVIEW 1 (fix committed first, e04fdff09)
+- Red first (run-r1-red.log): UndoActionStepsCourseSettings.swift:143 (pages not in path order), UndoRenameFolderStepTests testARenamePlansItsPagesInPathOrderNotTheDisksOrder :274.
+R1 the plan's pages left in walk order: RED. run-r1-mf.log: UndoActionStepsCourseSettings.swift:143, UndoActionStepsTests.swift:544, UndoRenameFolderStepTests.swift:279.
+R2 Python: "addFolder" added to STEPS_WITHOUT_TRACES_YET (traces regenerated): RED. run-r1-mf-python.log: test_the_rename_steps_are_recorded_and_left_without_traces_by_name.
+2 of 2 RED; restored with git checkout, status clean.
