@@ -1226,7 +1226,7 @@ nonisolated enum UndoTrailHook {
     /// (`keptOfWhatItHoldsNow`, the second review's MEDIUM). The step stays
     /// on the list with both directions offered: the next Undo or Redo of it
     /// uses those files (Russell's ruling of 2026-11-20, night).
-    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String], _ keptOfWhatItHoldsNow: [String]) -> Void)?
+    nonisolated(unsafe) static var keptWhatItReplacedLine: ((_ course: String, _ section: Int?, _ isUndo: Bool, _ keptOriginals: [String], _ keptOfWhatItHoldsNow: [String], _ putBackFromAKeptOriginal: [String]) -> Void)?
 
     /// An Undo (`isUndo`) or a Redo was refused because the newest step is
     /// a gone process's that recovery has just tried and left: the course

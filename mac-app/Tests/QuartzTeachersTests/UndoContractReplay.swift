@@ -642,12 +642,76 @@ nonisolated enum UndoContractReplay {
             let op: UndoOp = try JSONDecoder().decode(UndoOp.self, from: JSONSerialization.data(withJSONObject: given))
             let direction: UndoDirection = string(testCase["direction"]) == "undo" ? .backward : .forward
             let file: Data = Data((string(testCase["file"]) ?? "").utf8)
-            var result: String? = nil
+            var result: Data? = nil
             if let moved = UndoJSONMember.moved(op, from: .file(file), direction: direction), let data = moved.data {
-                result = String(decoding: data, as: UTF8.self)
+                result = data
             }
-            if result != string(testCase["result"]) {
-                failures.append("editJSONCases '\(name)': came to \(String(describing: result))")
+            // Compared as UTF-8 BYTES: Swift's `==` on strings is canonical
+            // equivalence, under which a decomposed é or the Kelvin sign
+            // would pass whatever the mac wrote (the W6 sweep, finding 1).
+            var wanted: Data? = nil
+            if let expected = string(testCase["result"]) {
+                wanted = Data(expected.utf8)
+            }
+            if result != wanted {
+                var said: String = "nil"
+                if let result {
+                    said = String(decoding: result, as: UTF8.self)
+                }
+                failures.append("editJSONCases '\(name)': came to \(said)")
+            }
+        }
+        return (cases: cases.count, failures: failures)
+    }
+
+    // MARK: - undo.numberSpellingCases
+
+    /// Each spelling read by the mac's own reader (`JSONSerialization`) as
+    /// the member a of `{"a": <spelling>, "b": 1}`: notJSON when it cannot
+    /// read the file, else the double it reads (minusInfinity included),
+    /// compared bit for bit so -0.0 is not 0.0. A `cannotTell` row is what
+    /// Windows and the Python model answer, not the mac's: the mac must
+    /// still read it as a number. Every spelling it reads keeps within
+    /// `numberSpellingRule.exponentCharactersAtMost` (the W6 sweep, finding 2).
+    static func runNumberSpellingCases() throws -> (cases: Int, failures: [String]) {
+        let undo: [String: Any] = try undoBlock()
+        let cases: [[String: Any]] = undo["numberSpellingCases"] as? [[String: Any]] ?? []
+        let rule: [String: Any] = undo["numberSpellingRule"] as? [String: Any] ?? [:]
+        let exponentAtMost: Int = int(rule["exponentCharactersAtMost"]) ?? 0
+        var failures: [String] = []
+        for testCase in cases {
+            let name: String = string(testCase["name"]) ?? "?"
+            failures += unknownKeys(in: testCase, allowed: ["name", "spelling", "reads", "why"], list: "numberSpellingCases", name: name)
+            let spelling: String = string(testCase["spelling"]) ?? ""
+            let file: Data = Data("{\"a\": \(spelling), \"b\": 1}".utf8)
+            let object: [String: Any]? = (try? JSONSerialization.jsonObject(with: file)) as? [String: Any]
+            let read: NSNumber? = object?["a"] as? NSNumber
+            var exponentCharacters: Int = 0
+            if let e = spelling.lastIndex(where: { character in character == "e" || character == "E" }) {
+                exponentCharacters = spelling.distance(from: e, to: spelling.endIndex) - 1
+            }
+            if string(testCase["reads"]) == "notJSON" {
+                if object != nil {
+                    failures.append("numberSpellingCases '\(name)': the mac read it")
+                }
+                continue
+            }
+            if exponentCharacters > exponentAtMost {
+                failures.append("numberSpellingCases '\(name)': read, though past numberSpellingRule")
+            }
+            guard let read else {
+                failures.append("numberSpellingCases '\(name)': the mac could not read it")
+                continue
+            }
+            if string(testCase["reads"]) == "cannotTell" {
+                continue
+            }
+            var wanted: Double? = (testCase["reads"] as? NSNumber)?.doubleValue
+            if string(testCase["reads"]) == "minusInfinity" {
+                wanted = -Double.infinity
+            }
+            if wanted?.bitPattern != read.doubleValue.bitPattern {
+                failures.append("numberSpellingCases '\(name)': read as \(read.doubleValue)")
             }
         }
         return (cases: cases.count, failures: failures)
@@ -705,8 +769,9 @@ nonisolated enum UndoContractReplay {
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-        "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
+        "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
+        "movedFolder", "caseOnlyFolder",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -779,7 +844,7 @@ nonisolated enum UndoContractReplay {
             var unreadableKeptOriginals: [URL] = []
             var keptWhatItReplacedLines: Int = 0
             let keptWhatItReplacedHookBefore = UndoTrailHook.keptWhatItReplacedLine
-            UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _, _ in
+            UndoTrailHook.keptWhatItReplacedLine = { _, _, _, _, _, _ in
                 keptWhatItReplacedLines += 1
             }
             defer {
@@ -1056,6 +1121,34 @@ nonisolated enum UndoContractReplay {
                     if !removedOne {
                         failures.append("stackCases '\(name)': no whole-file step whose before content to take away")
                     }
+                } else if value == "afterContentGone" {
+                    // Only the newest step's content for what p1 holds after
+                    // it is gone from the list; the list still takes a new
+                    // file unless a later call says otherwise (U4a review 1,
+                    // LOW 4: U3c review 3's probe shape).
+                    let fold: UndoFold = try journal().read()
+                    var removedOne: Bool = false
+                    if let head = fold.offer(now: journal().now()).head {
+                        for op in head.step.ops where op.path == pagePath && op.knownKind == .writeFile {
+                            if let sha = op.afterSha {
+                                // The blob and, when it is then empty, the
+                                // folder it was in: a later write of the blob
+                                // makes that folder again, so a list taking
+                                // no new file (`contentCannotBeStored`, which
+                                // seals the content folder) cannot take it.
+                                let blobURL: URL = journal().blobURL(sha: sha)
+                                try FileManager.default.removeItem(at: blobURL)
+                                let prefixFolder: URL = blobURL.deletingLastPathComponent()
+                                if (try? FileManager.default.contentsOfDirectory(atPath: prefixFolder.path))?.isEmpty == true {
+                                    try FileManager.default.removeItem(at: prefixFolder)
+                                }
+                                removedOne = true
+                            }
+                        }
+                    }
+                    if !removedOne {
+                        failures.append("stackCases '\(name)': no whole-file step whose after content to take away")
+                    }
                 } else if value == "keepTheOriginal" {
                     // The newest step's kept original of p1, as a swap whose
                     // tidy could not remove it leaves it: what p1 held before.
@@ -1189,6 +1282,12 @@ nonisolated enum UndoContractReplay {
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("stackCases '\(name)': the folder is there: \(!kept)")
             }
+            if let wanted = string(testCase["caseOnlyFolder"]), UndoContractKinds.caseOnlyFolder(in: root) != wanted {
+                failures.append("stackCases '\(name)': the folder renamed in its capitals is \(UndoContractKinds.caseOnlyFolder(in: root)), not \(wanted)")
+            }
+            if let wanted = string(testCase["movedFolder"]), UndoContractKinds.movedFolder(in: root) != wanted {
+                failures.append("stackCases '\(name)': the moved folder is \(UndoContractKinds.movedFolder(in: root)), not \(wanted)")
+            }
             if let wanted = int(testCase["keptWhatItReplacedLines"]), keptWhatItReplacedLines != wanted {
                 failures.append("stackCases '\(name)': \(keptWhatItReplacedLines) 'undo kept what it replaced' lines, not \(wanted)")
             }
@@ -1197,6 +1296,20 @@ nonisolated enum UndoContractReplay {
                     failures.append("stackCases '\(name)': the other list's kept original was changed or removed")
                 } else if foreignKept == nil {
                     failures.append("stackCases '\(name)': no other list's kept original was made")
+                }
+            }
+            if let wanted = int(testCase["keptBesideThePage"]) {
+                // Every file kept beside p1 under a staged name, any step's.
+                let folder: URL = root.appendingPathComponent(pagePath).deletingLastPathComponent()
+                let prefix: String = "." + URL(fileURLWithPath: pagePath).lastPathComponent + UndoSwap.stagedMarker
+                var keptFiles: Int = 0
+                for entry in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] {
+                    if entry.hasPrefix(prefix) && entry.hasSuffix("-orig") {
+                        keptFiles += 1
+                    }
+                }
+                if keptFiles != wanted {
+                    failures.append("stackCases '\(name)': \(keptFiles) files kept beside the page, not \(wanted)")
                 }
             }
             if let kept = testCase["keptOriginalLeft"] as? Bool {
@@ -1344,7 +1457,7 @@ nonisolated enum UndoContractReplay {
         "halfDeleteTheGoneFolder", "visibleNameTaken", "recoveryStopsAfterTheTidy", "keptVisibleAs", "folderLines",
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
-        "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored",
+        "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored", "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1416,6 +1529,21 @@ nonisolated enum UndoContractReplay {
             let withAMove: Bool = testCase["withAMove"] as? Bool == true
             let withATree: Bool = testCase["withATree"] as? Bool == true
             let withAPreference: Bool = testCase["withAPreference"] as? Bool == true
+            // U4b: the same two pages, plus a folder moved and a page inside
+            // it edited at its new place (opKinds.wholeOps' order).
+            let withAMovedFolder: Bool = testCase["withAMovedFolder"] as? Bool == true
+            var folderOps: [UndoOp] = []
+            if withAMovedFolder {
+                for (fileName, content) in UndoContractKinds.mediaFiles {
+                    try write(content, to: UndoContractKinds.mediaFolder + "/" + fileName, in: root)
+                }
+                if let listingSha = UndoTreeReading.read(at: root.appendingPathComponent(UndoContractKinds.mediaFolder)).listingSha {
+                    folderOps.append(UndoOp.moveFolder(from: UndoContractKinds.mediaFolder, to: UndoContractKinds.renamedFolder, listingSha: listingSha))
+                    folderOps.append(UndoOp.replaceText(
+                        path: UndoContractKinds.renamedFolder + "/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+                    ))
+                }
+            }
             let places: UndoMemoryPlaces = UndoMemoryPlaces()
             _ = places.write(UndoContractKinds.preference, .string("a"))
             var treeBlobs: [Data] = []
@@ -1433,7 +1561,7 @@ nonisolated enum UndoContractReplay {
                 }
             }
             func makeTheStep() -> JournaledWriteOutcome {
-                if !withAMove && !withATree && !withAPreference {
+                if !withAMove && !withATree && !withAPreference && !withAMovedFolder {
                     return JournaledWrite.perform(stepDraft, in: dying, mode: mode)
                 }
                 var ops: [UndoOp] = []
@@ -1465,6 +1593,9 @@ nonisolated enum UndoContractReplay {
                         from: UndoContractKinds.markerFrom, to: UndoContractKinds.markerTo,
                         sha: UndoHash.sha256(of: Data(UndoContractKinds.oldMarker.utf8))
                     ))
+                }
+                for folderOp in folderOps {
+                    ops.append(folderOp)
                 }
                 if withAMove {
                     ops.append(UndoOp.recompute(path: "courses/TST1O/Section 1/index.md", maintainer: "sectionFrontPage", section: 1))
@@ -1635,6 +1766,13 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': no folder under its -gone name to half delete")
                 }
             }
+            if testCase["keptCopyLeftInsideTheFolder"] as? Bool == true {
+                // As a tidy that could not remove it leaves it: the undo's
+                // kept copy of a.md, inside the folder moved back (U4b).
+                let page: URL = root.appendingPathComponent(UndoContractKinds.mediaFolder + "/a.md")
+                let held: String = (UndoContractKinds.mediaFiles["a.md"] ?? "").replacingOccurrences(of: "Line one: old.", with: "Line one: new.")
+                try Data(held.utf8).write(to: UndoSwap.besideURL(for: page, label: "\(workSeq)-undo", role: "orig"))
+            }
             if testCase["visibleNameTaken"] as? Bool == true {
                 try write("earlier\n", to: UndoContractKinds.extraFolder + " (kept by Undo)/earlier.md", in: root)
             }
@@ -1755,6 +1893,9 @@ nonisolated enum UndoContractReplay {
             }
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("recoveryCases '\(name)': the folder is there: \(!kept)")
+            }
+            if let wanted = string(testCase["movedFolder"]), UndoContractKinds.movedFolder(in: root) != wanted {
+                failures.append("recoveryCases '\(name)': the moved folder is \(UndoContractKinds.movedFolder(in: root)), not \(wanted)")
             }
             if let wanted = string(testCase["preference"]), places.read(UndoContractKinds.preference) != .value(.string(wanted)) {
                 failures.append("recoveryCases '\(name)': the preference is \(places.read(UndoContractKinds.preference)), not \(wanted)")

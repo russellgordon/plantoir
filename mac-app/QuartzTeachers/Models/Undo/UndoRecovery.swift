@@ -126,8 +126,9 @@ nonisolated enum UndoRecovery {
         // pages like a live one, so one closed interrupted would otherwise
         // leave its dot-files in the course until the switch flips. Shadow
         // removes only the journal's own staged FILES, never a folder set
-        // aside (steps that move or make folders are left to a live
-        // recovery), so it still writes nothing of the teacher's.
+        // aside (steps that make or take out folders are left to a live
+        // recovery; a step that moves them whole sets none aside, U4b), so
+        // it still writes nothing of the teacher's.
         tidyClosedSteps(writer, resolveRoot: resolveRoot, onlyStepsOfFiles: mode == .shadow, mode: mode)
         // And what a shadow swap without the list left when its process
         // died (`UndoShadowStaging`; the first review of U3a, LOW 8).
@@ -176,7 +177,7 @@ nonisolated enum UndoRecovery {
             guard let record = writer.fold.records[seq], record.phase == .interrupted else {
                 continue
             }
-            if onlyStepsOfFiles && !UndoRecovery.changesOnlyFiles(record.step) {
+            if onlyStepsOfFiles && !UndoRecovery.changesOnlyFilesAndMoves(record.step) {
                 continue
             }
             let key: String = writer.journal.folderURL.standardizedFileURL.path + "#" + String(seq)
@@ -205,6 +206,27 @@ nonisolated enum UndoRecovery {
     /// Whether every op of the step changes a file in place (`writeFile`,
     /// `editLine`, `replaceText`, `editJSON`) or is a `recompute`: nothing
     /// it stages is a folder or a moved item.
+    /// Whether a step changes only files and moves files or folders whole
+    /// (U4b: Rename folder): the steps whose staged files shadow tidies. A
+    /// move sets nothing aside, so all its tidy removes is the step's own
+    /// staged files beside its pages, at each page's place and, for a page a
+    /// move carries, at its place before the move; a kept original that
+    /// differs from its page stays (part four's review, L3: with the switch
+    /// off a killed rename's dot-files stayed until the switch flipped).
+    /// A step that makes or takes out a folder, or stands apart, is still
+    /// left to a live recovery.
+    static func changesOnlyFilesAndMoves(_ step: UndoStep) -> Bool {
+        for op in step.ops {
+            switch op.knownKind {
+            case .writeFile, .editLine, .replaceText, .editJSON, .recompute, .move:
+                continue
+            default:
+                return false
+            }
+        }
+        return true
+    }
+
     static func changesOnlyFiles(_ step: UndoStep) -> Bool {
         for op in step.ops {
             switch op.knownKind {
@@ -226,12 +248,7 @@ nonisolated enum UndoRecovery {
         of step: UndoStep, root: URL, keepingOnlyCopies: Bool = false, unlessTheListHoldsFrom journal: UndoJournal? = nil,
         keepingCopiesHolding notInTheList: Set<String> = []
     ) -> Bool {
-        var urls: [URL] = []
-        for op in step.ops {
-            for path in op.pathsNamed {
-                urls.append(root.appendingPathComponent(path))
-            }
-        }
+        let urls: [URL] = UndoRecovery.placesStagedBeside(of: step, root: root)
         var listHolds: ((URL, URL) -> Bool)? = nil
         if let journal {
             listHolds = UndoRecovery.listHolds(step, root: root, from: journal)
@@ -266,9 +283,22 @@ nonisolated enum UndoRecovery {
             }
             let wanted: String = place.standardizedFileURL.path
             var opsOnThePlace: [UndoOp] = []
+            let carriers: [String: UndoOp] = UndoCheck.carriers(in: step.ops)
             for op in step.ops where op.knownKind != .recompute && !op.isWhole {
-                if let path = op.path, root.appendingPathComponent(path).standardizedFileURL.path == wanted {
+                guard let path = op.path else {
+                    continue
+                }
+                if root.appendingPathComponent(path).standardizedFileURL.path == wanted {
                     opsOnThePlace.append(op)
+                } else if let carrier = carriers[path], let from = carrier.from, let to = carrier.to {
+                    // A carried page whose folder has moved back (U4b): the
+                    // same op, judged at its old place.
+                    let oldPlace: String = UndoOp.placeBeforeTheMove(path, from: from, to: to)
+                    if root.appendingPathComponent(oldPlace).standardizedFileURL.path == wanted {
+                        var atTheOldPlace: UndoOp = op
+                        atTheOldPlace.path = oldPlace
+                        opsOnThePlace.append(atTheOldPlace)
+                    }
                 }
             }
             if opsOnThePlace.isEmpty {
@@ -303,8 +333,16 @@ nonisolated enum UndoRecovery {
     static func keptOriginal(
         of step: UndoStep, root: URL, couldNotRead: ((_ path: String) -> Void)? = nil
     ) -> (_ path: String, _ sha: String) -> Data? {
+        // A page inside a folder the step moves is looked for where the
+        // page is now (`placeNow`): after an Undo its kept copies are under
+        // the move's `from` (the part-two review's M1, second layer).
+        let carriers: [String: UndoOp] = UndoCheck.carriers(in: step.ops)
         return { path, sha in
-            let place: URL = root.appendingPathComponent(path)
+            var placePath: String = path
+            if let carrier = carriers[path] {
+                placePath = UndoRecovery.placeNow(of: path, carriedBy: carrier, root: root)
+            }
+            let place: URL = root.appendingPathComponent(placePath)
             var unreadable: Bool = false
             for kept in UndoRecovery.keptOriginalFiles(of: step, beside: place) {
                 let item: UndoItem = UndoItem.read(at: kept)
@@ -662,28 +700,48 @@ nonisolated enum UndoRecovery {
     /// A move, a tree or an external op is one place of its own, named by
     /// `placeName` and judged whole (`UndoCheck.wholeState`): a move by its
     /// pair, never by one side.
+    ///
+    /// U4b (opKinds.wholeOps' order): an edit a move of the step carries is
+    /// read where its folder is now (`placeNow`), and the move is judged as
+    /// if the step's edits inside it were taken back, without the step's own
+    /// staged files and kept originals inside it (`carryingMoveState`), so a
+    /// step killed between its move and its edits settles whole, by content.
     static func fileStates(
         of step: UndoStep,
         root: URL,
-        places: UndoExternalPlaces = UndoAppPreferences()
+        places: UndoExternalPlaces = UndoAppPreferences(),
+        journal: UndoJournal? = nil
     ) -> [(path: String, state: UndoOpState)] {
         var order: [String] = []
         var states: [String: UndoOpState] = [:]
         var items: [String: UndoItem] = [:]
+        let carriers: [String: UndoOp] = UndoCheck.carriers(in: step.ops)
+        var carryingMoves: [UndoOp] = []
+        for (_, carrier) in carriers where !carryingMoves.contains(carrier) {
+            carryingMoves.append(carrier)
+        }
         for op in step.ops {
             if op.isWhole {
                 let place: String = op.placeName
                 if states[place] == nil {
                     order.append(place)
                 }
-                states[place] = UndoCheck.wholeState(of: op, root: root, places: places)
+                if carryingMoves.contains(op) {
+                    states[place] = UndoRecovery.carryingMoveState(op, of: step, carriers: carriers, root: root, places: places, journal: journal)
+                } else {
+                    states[place] = UndoCheck.wholeState(of: op, root: root, places: places)
+                }
                 continue
             }
             guard let kind = op.knownKind, kind != .recompute, let path = op.path else {
                 continue
             }
             if items[path] == nil {
-                items[path] = UndoItem.read(at: root.appendingPathComponent(path))
+                var readPath: String = path
+                if let carrier = carriers[path] {
+                    readPath = UndoRecovery.placeNow(of: path, carriedBy: carrier, root: root)
+                }
+                items[path] = UndoItem.read(at: root.appendingPathComponent(readPath))
                 order.append(path)
             }
             let state: UndoOpState = UndoCheck.state(of: op, in: items[path] ?? .absent)
@@ -702,6 +760,98 @@ nonisolated enum UndoRecovery {
             result.append((path: path, state: states[path] ?? .neither))
         }
         return result
+    }
+
+    /// Whether the folder (or file) a move carries edits with is at its old
+    /// place now: nothing at `to` and something at `from`.
+    static func isAtItsOldPlace(_ move: UndoOp, root: URL) -> Bool {
+        guard let from = move.from, let to = move.to else {
+            return false
+        }
+        let atTo: UndoItem = UndoItem.read(at: root.appendingPathComponent(to))
+        let atFrom: UndoItem = UndoItem.read(at: root.appendingPathComponent(from))
+        return atTo == .absent && atFrom != .absent
+    }
+
+    /// Where an edit named inside a move's new place is on the disk now:
+    /// under the move's `from` while the folder is still (or again) there,
+    /// otherwise where it is named (U4b).
+    static func placeNow(of path: String, carriedBy move: UndoOp, root: URL) -> String {
+        guard let from = move.from, let to = move.to, UndoRecovery.isAtItsOldPlace(move, root: root) else {
+            return path
+        }
+        return UndoOp.placeBeforeTheMove(path, from: from, to: to)
+    }
+
+    /// A move that carries edits (U4b), judged on whichever side its folder
+    /// is: each carried page as it is once the step's edits on it are taken
+    /// back, and the step's own staged files and kept originals inside the
+    /// folder left out, as the swap judges it (`ownFilesInside`). A carried
+    /// page that is neither as the step left it nor as before is left as it
+    /// is, so the move is then a change since too.
+    static func carryingMoveState(
+        _ move: UndoOp, of step: UndoStep, carriers: [String: UndoOp], root: URL,
+        places: UndoExternalPlaces, journal: UndoJournal?
+    ) -> UndoOpState {
+        guard let from = move.from, let to = move.to else {
+            return .neither
+        }
+        let atItsOldPlace: Bool = UndoRecovery.isAtItsOldPlace(move, root: root)
+        let side: URL = root.appendingPathComponent(atItsOldPlace ? from : to)
+        var overriding: [String: UndoItem] = [:]
+        let ownMarker: String = UndoSwap.stagedMarker + "\(step.seq)-"
+        if let walker = FileManager.default.enumerator(atPath: side.path) {
+            while let inside = walker.nextObject() as? String {
+                if (inside as NSString).lastPathComponent.contains(ownMarker) {
+                    overriding[inside] = .absent
+                }
+            }
+        }
+        var index: Int = step.ops.count - 1
+        while index >= 0 {
+            let edit: UndoOp = step.ops[index]
+            index -= 1
+            guard let path = edit.path, edit.isWhole == false, let carrier = carriers[path], carrier == move else {
+                continue
+            }
+            let inside: String = path.count == to.count ? "" : String(path.dropFirst(to.count + 1))
+            let place: URL = inside.isEmpty ? side : side.appendingPathComponent(inside)
+            let current: UndoItem = overriding[inside] ?? UndoItem.read(at: place)
+            guard UndoCheck.state(of: edit, in: current) == .after, let journal else {
+                continue
+            }
+            let takenBack: UndoItem? = (try? UndoCheck.moved(edit, from: current, direction: .backward, journal: journal)) ?? nil
+            if let takenBack {
+                overriding[inside] = takenBack
+            }
+        }
+        if move.isCaseOnlyMove {
+            // One place under two spellings: the same files either way.
+            return UndoCheck.wholeState(of: move, root: root, places: places, overridingTo: overriding, overridingFrom: overriding)
+        }
+        if atItsOldPlace {
+            return UndoCheck.wholeState(of: move, root: root, places: places, overridingFrom: overriding)
+        }
+        return UndoCheck.wholeState(of: move, root: root, places: places, overridingTo: overriding)
+    }
+
+    /// Every place a step's staged files can be beside: each path its ops
+    /// name, and for an edit a move carries, the same page under the move's
+    /// `from`, where the folder takes its kept originals when it moves back
+    /// (U4b).
+    static func placesStagedBeside(of step: UndoStep, root: URL) -> [URL] {
+        var urls: [URL] = []
+        for op in step.ops {
+            for path in op.pathsNamed {
+                urls.append(root.appendingPathComponent(path))
+            }
+        }
+        for (path, carrier) in UndoCheck.carriers(in: step.ops) {
+            if let from = carrier.from, let to = carrier.to {
+                urls.append(root.appendingPathComponent(UndoOp.placeBeforeTheMove(path, from: from, to: to)))
+            }
+        }
+        return urls
     }
 
     /// Where every content op of a step stands now, counted by file.
@@ -749,12 +899,7 @@ nonisolated enum UndoRecovery {
         default:
             return nil
         }
-        var urls: [URL] = []
-        for op in step.ops {
-            for path in op.pathsNamed {
-                urls.append(root.appendingPathComponent(path))
-            }
-        }
+        let urls: [URL] = UndoRecovery.placesStagedBeside(of: step, root: root)
         if mode == .live {
             // Before the plan is known to settle, every kept original that
             // differs from its page stays, even one whose bytes the list
@@ -776,7 +921,7 @@ nonisolated enum UndoRecovery {
         // Which state the work was moving FROM, and TO.
         let startedFromBefore: Bool = phase == .begin || phase == .redoing
         let startState: UndoOpState = startedFromBefore ? .before : .after
-        var files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root, places: places)
+        var files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root, places: places, journal: writer.journal)
         // A teacher's folder still set aside after the tidying (its place
         // could not be read, or a rename failed) is IN THE WAY: never
         // settled as if the folder were gone (the second hard review of
@@ -879,7 +1024,8 @@ nonisolated enum UndoRecovery {
                             keptOriginalNotRead = path
                         }
                     }),
-                    keptOriginalUsed: { use in uses.append(use) }
+                    keptOriginalUsed: { use in uses.append(use) },
+                    ownSeq: step.seq
                 )
                 if case .refused(.contentMissing) = plan, let keptOriginalNotRead {
                     // A kept original that cannot be read just now may be the

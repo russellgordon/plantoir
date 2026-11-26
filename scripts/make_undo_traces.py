@@ -1068,6 +1068,12 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
     rename, judged by its hash), so no kept original is ever looked for
     for one (the merge of U3b and U3c)."""
     ordered = list(reversed(ops)) if backward else list(ops)
+    # U4b (opKinds.wholeOps' order): an edit named inside a move's new place,
+    # after the move, is carried by it. Forward it is judged where the file
+    # is before the move and made after it; backward it is taken back first,
+    # and the move is judged as if it were.
+    carriers = carried_edits(ops)
+    moving_now = set()
     group_stays_apart = leaves_apart and any(
         op["kind"] == "moveApart" and whole_state(op, pages_by_path) == "neither" for op in ordered
     )
@@ -1093,7 +1099,17 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             continue
         if kind in WHOLE_KINDS:
             # Judged whole against what is there (opKinds.wholeOps).
-            state = whole_state(op, pages_by_path)
+            seen = pages_by_path
+            carries = any(carrier is op for carrier in carriers.values())
+            if backward and carries:
+                seen = dict(pages_by_path)
+                for path, carrier in carriers.items():
+                    if carrier is op and path in working:
+                        if working[path] is None:
+                            seen.pop(path, None)
+                        else:
+                            seen[path] = working[path]
+            state = whole_state(op, seen)
             place = op.get("path") or op.get("from") or op.get("target")
             if group_stays_apart and kind == "moveApart" and state in ("neither", wanted_from):
                 left_apart.append(place)
@@ -1111,11 +1127,17 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                 # A tree is never made or taken out unless the list holds
                 # everything needed to make it (the hard review of U2b, HIGH 2).
                 return ("contentMissing", place)
-            whole_changes.update(whole_moved(op, backward, pages_by_path))
+            if carries and not backward:
+                moving_now.add(op["to"])
+            whole_changes.update(whole_moved(op, backward, seen))
             continue
         path = op["path"]
         if path not in original:
-            original[path] = pages_by_path.get(path)
+            read_path = path
+            carrier = carriers.get(path)
+            if carrier is not None and carrier["to"] in moving_now:
+                read_path = carrier["from"] + path[len(carrier["to"]):]
+            original[path] = pages_by_path.get(read_path)
             working[path] = original[path]
         state = op_state(op, working[path])
         if state == "neither":
@@ -1153,12 +1175,197 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
             working[path] = moving(op, source, target, working[path])
     if in_the_way:
         return ("changedSince", in_the_way[0], len(in_the_way) - 1)
-    changes = {}
+    file_changes = {}
     for path in original:
         if original[path] != working[path]:
-            changes[path] = working[path]
-    changes.update(whole_changes)
+            file_changes[path] = working[path]
+    # Forward, a carried edit goes in after its move; backward, before it.
+    changes = {}
+    if backward:
+        changes.update(file_changes)
+        changes.update(whole_changes)
+    else:
+        changes.update(whole_changes)
+        changes.update(file_changes)
     return ("ready", changes, left_apart)
+
+
+EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
+
+
+def move_carries(move, edit):
+    """UndoOp.moveCarries: an edit of the file a move moved, or of a file
+    inside the folder it moved, named at the new place and nothing inside
+    the old one (U4b, opKinds.wholeOps). Compared without regard to case."""
+    if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
+        return False
+    place, new_place = edit["path"].lower(), move["to"].lower()
+    if place != new_place and not place.startswith(new_place + "/"):
+        return False
+    if is_case_only_move(move):
+        # One place under two spellings: named at the new one, as spelled.
+        return edit["path"] != move["from"] and not edit["path"].startswith(move["from"] + "/")
+    old_place = move["from"].lower()
+    return not (place == old_place or place.startswith(old_place + "/") or old_place.startswith(place + "/"))
+
+
+def is_case_only_move(op):
+    """UndoOp.isCaseOnlyMove (U4b): a move whose from and to are spelled
+    alike but for case, in their last part only. The model's pages are
+    keyed as spelled, as on a case-sensitive volume, where the ordinary
+    pair rule gives the answers the spelling a case-insensitive folder
+    lists gives."""
+    if op.get("kind") != "move":
+        return False
+    source, destination = op.get("from"), op.get("to")
+    if not isinstance(source, str) or not isinstance(destination, str) or source == destination:
+        return False
+    if source.lower() != destination.lower():
+        return False
+    return source.rsplit("/", 1)[0] == destination.rsplit("/", 1)[0] if "/" in source else "/" not in destination
+
+
+def carried_edits(ops):
+    """Each edit's path a move of the step carries (the edit after the
+    move), with that move."""
+    found = {}
+    for index, move in enumerate(ops):
+        for edit in ops[index + 1:]:
+            if move_carries(move, edit):
+                found[edit["path"]] = move
+    return found
+
+
+def swap_groups(ops, backward):
+    """The order a swap makes a step's changes in (UndoCheck.plan's targets),
+    one group of ops per target: forward, each move that carries edits
+    first, then each file in the order the ops first name it, then every
+    other whole op; backward, each file in the reversed ops' order, then
+    every whole op, reversed (U4b, opKinds.wholeOps' order)."""
+    ordered = list(reversed(ops)) if backward else list(ops)
+    carriers = carried_edits(ops)
+    carrying = [op for op in ordered if any(carrier is op for carrier in carriers.values())]
+    leading = [] if backward else [[op] for op in carrying]
+    files, by_path, wholes = [], {}, []
+    for op in ordered:
+        if op["kind"] == "recompute" or any(group[0] is op for group in leading):
+            continue
+        if op["kind"] in WHOLE_KINDS:
+            wholes.append([op])
+            continue
+        if op["path"] not in by_path:
+            by_path[op["path"]] = []
+            files.append(by_path[op["path"]])
+        by_path[op["path"]].append(op)
+    return leading + files + wholes
+
+
+def stopped_part_way(ops, backward, pages, swapped):
+    """What a step's swap leaves when its process is killed before the
+    target numbered `swapped` (None: every target in): each group made in
+    turn, judged and moved on its own."""
+    pages = dict(pages)
+    groups = swap_groups(ops, backward)
+    for group in groups[:len(groups) if swapped is None else swapped]:
+        result = plan(group, backward, pages)
+        assert result[0] == "ready", result
+        for path, text in result[1].items():
+            if text is None:
+                pages.pop(path, None)
+            else:
+                pages[path] = text
+    return pages
+
+
+def move_is_at_its_old_place(move, pages):
+    """Nothing at a move's `to` and something at its `from`."""
+    def there(place):
+        return pages.get(place) is not None or folder_of_pages(pages, place) is not None
+    return not there(move["to"]) and there(move["from"])
+
+
+def recovery_states(ops, pages):
+    """UndoRecovery.fileStates: where each place of a step stands now. An
+    edit a move carries is read where its folder is now, and the move is
+    judged as if the step's edits inside it were taken back (U4b). The
+    model holds no staged files, so it cannot show the swap's own kept
+    originals inside the folder being left out: only the Swift replay
+    shows that."""
+    carriers = carried_edits(ops)
+    states = {}
+    for op in ops:
+        kind = op["kind"]
+        if kind == "recompute":
+            continue
+        if kind in WHOLE_KINDS:
+            place = op.get("path") or op.get("from") or op.get("target")
+            seen = pages
+            if any(carrier is op for carrier in carriers.values()):
+                old_place = move_is_at_its_old_place(op, pages)
+                seen = dict(pages)
+                for path, carrier in carriers.items():
+                    if carrier is not op:
+                        continue
+                    side = carrier["from"] + path[len(carrier["to"]):] if old_place else path
+                    edits = [dict(edit, path=side) for edit in ops if edit.get("path") == path]
+                    taken_back = plan(edits, True, seen)
+                    if taken_back[0] == "ready" and side in taken_back[1]:
+                        seen[side] = taken_back[1][side]
+            states[place] = whole_state(op, seen)
+            continue
+        path = op["path"]
+        read_path = path
+        carrier = carriers.get(path)
+        if carrier is not None and move_is_at_its_old_place(carrier, pages):
+            read_path = carrier["from"] + path[len(carrier["to"]):]
+        state = op_state(op, pages.get(read_path))
+        earlier = states.get(path)
+        states[path] = state if earlier in (None, state) else "neither"
+    return states
+
+
+def recover(ops, pages, started_from_before):
+    """UndoRecovery.settle, live: nothing took effect, completed, or what
+    took effect put back, judged by content alone; anything neither is in
+    the way. Answers (outcome, pages)."""
+    start, end = ("before", "after") if started_from_before else ("after", "before")
+    states = recovery_states(ops, pages)
+    if any(state == "neither" for state in states.values()):
+        return ("interrupted", pages)
+    if all(state == start for state in states.values()):
+        return ("nothingTookEffect", pages)
+    if all(state == end for state in states.values()):
+        return ("completed", pages)
+    at_end = [op for op in ops if op["kind"] != "recompute"
+              and states.get(op.get("path") or op.get("from") or op.get("target")) == end]
+    result = plan(at_end, started_from_before, pages)
+    if result[0] != "ready":
+        return ("interrupted", pages)
+    pages = dict(pages)
+    for path, text in result[1].items():
+        if text is None:
+            pages.pop(path, None)
+        else:
+            pages[path] = text
+    return ("rolledBack", pages)
+
+
+def folder_of_pages(pages, place):
+    """A folder the model holds as its files (U4b): the files under `place`
+    as a tree, or None when it holds none."""
+    prefix = place + "/"
+    files = {}
+    folders = set()
+    for path, value in pages.items():
+        if isinstance(path, str) and path.startswith(prefix) and value is not None and not isinstance(value, tuple):
+            inside = path[len(prefix):]
+            files[inside] = value
+            parts = inside.split("/")[:-1]
+            for depth in range(1, len(parts) + 1):
+                folders.add("/".join(parts[:depth]))
+    if not files:
+        return None
+    return {"folders": sorted(folders), "files": files}
 
 
 WHOLE_KINDS = ("move", "moveApart", "setAside", "createTree", "removeTree", "external")
@@ -1211,7 +1418,13 @@ def page_item(value):
 def whole_state(op, pages):
     kind = op["kind"]
     if kind in ("move", "moveApart", "setAside"):
-        return move_state(op, page_item(pages.get(op["from"])), page_item(pages.get(op["to"])))
+        def side(place):
+            if pages.get(place) is None and "listingSha" in op:
+                tree = folder_of_pages(pages, place)
+                if tree is not None:
+                    return {"tree": tree}
+            return page_item(pages.get(place))
+        return move_state(op, side(op["from"]), side(op["to"]))
     if kind in ("createTree", "removeTree"):
         return tree_state(op, page_item(pages.get(op["path"])))
     target = op["target"]
@@ -1224,6 +1437,17 @@ def whole_moved(op, backward, pages):
     kind = op["kind"]
     if kind in ("move", "moveApart", "setAside"):
         source, destination = (op["to"], op["from"]) if backward else (op["from"], op["to"])
+        if pages.get(source) is None and "listingSha" in op:
+            # A folder held as its files: each one moves (U4b).
+            moved = {}
+            prefix = source + "/"
+            for path, value in pages.items():
+                if isinstance(path, str) and path.startswith(prefix):
+                    moved[path] = None
+            for path, value in pages.items():
+                if isinstance(path, str) and path.startswith(prefix):
+                    moved[destination + path[len(source):]] = value
+            return moved
         return {destination: pages.get(source), source: None}
     if kind in ("createTree", "removeTree"):
         makes = (kind == "createTree") != backward
@@ -1599,12 +1823,15 @@ class Model:
         changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
             not_whole = self.store_what_kept_originals_give(used)
+            if self.store_what_the_other_direction_needs(undo["ops"], True, used):
+                not_whole = True
             self.write(changes)
             if self.holds_a_recompute(undo):
                 self.rederived += 1
             undo["phase"] = "undone"
             self.write_line()
             self.tidy_kept_copies()
+            self.remove_superseded_kept_copies()
             if not_whole:
                 # The Redo stays offered, resting on what is kept beside the
                 # page (Russell's ruling of 2026-11-20, night).
@@ -1639,12 +1866,15 @@ class Model:
         changes, left_apart = set_or_leave_apart(self, result)
         if not dry:
             not_whole = self.store_what_kept_originals_give(used)
+            if self.store_what_the_other_direction_needs(candidate["ops"], False, used):
+                not_whole = True
             self.write(changes)
             if self.holds_a_recompute(candidate):
                 self.rederived += 1
             candidate["phase"] = "done"
             self.write_line()
             self.tidy_kept_copies()
+            self.remove_superseded_kept_copies()
             if not_whole:
                 # Its Undo stays offered, resting on what is kept beside the
                 # page; cleared only if it is refused then (Russell's ruling
@@ -1700,6 +1930,42 @@ class Model:
             not_whole = True
             self.kept.setdefault(path, []).append(outgoing)
         return not_whole
+
+    def store_what_the_other_direction_needs(self, ops, backward, used):
+        """Before the swap (U4a, the U3c review 3 LOW 3 fix): each page a
+        whole-file op moves from the list, whose outgoing text the other
+        direction needs and the list lacks, has that text written into the
+        list; when the list will not take it, it is kept beside the page
+        instead, unless a kept copy there already holds it. True when
+        anything is kept beside a page."""
+        taken_from_kept = set(use[0] for use in used)
+        kept_any = False
+        for op in ops:
+            if op["kind"] != "writeFile" or op["path"] in taken_from_kept:
+                continue
+            path = op["path"]
+            other = op["afterText"] if backward else op["beforeText"]
+            if other is None or self.in_the_list(other) or self.pages.get(path) != other:
+                continue
+            if self.storable(other):
+                self.stored.add(other)
+                continue
+            if other in self.kept.get(path, []):
+                continue
+            self.kept.setdefault(path, []).append(other)
+            kept_any = True
+        return kept_any
+
+    def remove_superseded_kept_copies(self):
+        """UndoRecovery.removeSupersededKeptCopies (U3c review 3, LOW 1):
+        after each move, the kept copies beside a page thinned to one per
+        content, so Undo and Redo again and again never pile them up."""
+        for path in list(self.kept):
+            one_of_each = []
+            for text in self.kept[path]:
+                if text not in one_of_each:
+                    one_of_each.append(text)
+            self.kept[path] = one_of_each
 
     def tidy_kept_copies(self):
         """A kept original whose page holds the same text is a copy: gone,

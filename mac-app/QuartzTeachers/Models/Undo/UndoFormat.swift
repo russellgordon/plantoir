@@ -378,6 +378,13 @@ nonisolated struct UndoStep: Codable, Equatable, Sendable {
                         if let target = op.target, second.target == target {
                             return false
                         }
+                        // U4b: an edit inside what a move moved, named at its
+                        // new place and written after it, is the one op that
+                        // may share a move's place (opKinds.wholeOps' order).
+                        if other > index && UndoOp.moveCarries(op, second) {
+                            other += 1
+                            continue
+                        }
                         for mine in op.pathsNamed {
                             for theirs in second.pathsNamed where UndoOp.placesOverlap(mine, theirs) {
                                 return false
@@ -713,7 +720,11 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         if let afterSha {
             names.append(afterSha)
         }
-        if let listingSha, !names.contains(listingSha) {
+        // A moved folder's listing is never a blob: the folder itself is
+        // what moves (opKinds.move). Found by the first folder moved through
+        // the door (U4b).
+        let isAMove: Bool = knownKind == .move || knownKind == .moveApart || knownKind == .setAside
+        if let listingSha, !isAMove, !names.contains(listingSha) {
             names.append(listingSha)
         }
         return names
@@ -745,6 +756,17 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             return from
         }
         return target ?? kind
+    }
+
+    /// Where a teacher finds the item a step names now, going this way: a
+    /// `move`'s `to` before it is undone and its `from` before it is redone
+    /// (U4b: a refused Undo of a rename names the renamed folder, never the
+    /// place it had before the step); `placeName` for every other op.
+    func placeAsFound(going direction: UndoDirection) -> String {
+        if knownKind == .move, let from, let to {
+            return direction == .backward ? to : from
+        }
+        return placeName
     }
 
     /// A move, a tree or an external op: checked and changed as a whole, on
@@ -921,7 +943,9 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
             if !UndoOp.isSafeRelativePath(from) || !UndoOp.isSafeRelativePath(to) {
                 return false
             }
-            if UndoOp.placesOverlap(from, to) {
+            // One exception (U4b): a capitalisation-only rename, the two
+            // spellings one place on a case-insensitive volume.
+            if UndoOp.placesOverlap(from, to) && !op.isCaseOnlyMove {
                 return false
             }
             return (op.sha != nil) != (op.listingSha != nil)
@@ -981,6 +1005,61 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         case .move, .moveApart, .setAside, .external:
             return false
         }
+    }
+
+    /// Whether `edit` is an edit (a `writeFile`, an `editLine`, a
+    /// `replaceText` or an `editJSON`) of the file a `move` moved, or of a
+    /// file inside the folder it moved, named at the NEW place and naming
+    /// nothing inside the old one (U4b, opKinds.wholeOps). Such an edit is
+    /// made, and redone, after the move, and taken back before it; the move
+    /// is judged against what it holds once that step's own edits inside
+    /// are taken back. Whether it comes after the move in the step's ops is
+    /// the caller's to check. Places compared as `placesOverlap` compares
+    /// them, without regard to case.
+    static func moveCarries(_ move: UndoOp, _ edit: UndoOp) -> Bool {
+        guard move.knownKind == .move, let from = move.from, let to = move.to, let path = edit.path else {
+            return false
+        }
+        switch edit.knownKind {
+        case .writeFile, .editLine, .replaceText, .editJSON:
+            break
+        default:
+            return false
+        }
+        if edit.from != nil || edit.to != nil || edit.target != nil {
+            return false
+        }
+        let place: String = path.lowercased()
+        let newPlace: String = to.lowercased()
+        if place != newPlace && !place.hasPrefix(newPlace + "/") {
+            return false
+        }
+        if move.isCaseOnlyMove {
+            // The two spellings are one place: the edit is named at the new
+            // spelling, never at the old one, as spelled.
+            return path != from && !path.hasPrefix(from + "/")
+        }
+        return !UndoOp.placesOverlap(from, path)
+    }
+
+    /// U4b: a `move` whose `from` and `to` are spelled alike but for case,
+    /// and differ in their last part only (`Media` to `media`): a
+    /// capitalisation-only rename, readable although the two places overlap
+    /// as `placesOverlap` compares them (opKinds.move). On a case-insensitive
+    /// volume the two spellings are one place, judged by the spelling its
+    /// folder lists (`UndoMoveSide.spellingListed`); on a case-sensitive one
+    /// they are two places, judged as any move.
+    var isCaseOnlyMove: Bool {
+        guard knownKind == .move, let from, let to, from != to, from.lowercased() == to.lowercased() else {
+            return false
+        }
+        return (from as NSString).deletingLastPathComponent == (to as NSString).deletingLastPathComponent
+    }
+
+    /// The place `path`, named inside a move's `to`, had before the move:
+    /// the same path under its `from`.
+    static func placeBeforeTheMove(_ path: String, from: String, to: String) -> String {
+        return from + String(path.dropFirst(to.count))
     }
 
     /// Whether two places are the same, or one is a folder holding the

@@ -1,0 +1,65 @@
+#899 U4b, must-fail of 5e86f6e65's Cancel fix, 2026-11-25, branch after merging dev 45be52fbf (a79d13c10).
+Sabotage: CourseSettingsView.renameFolder awaits Task.detached { SpecialFolderRenamer.plan(...) }.value instead of planHaltingAtCancel. Each run under xlock.sh with a 900 s kill limit.
+
+== Run 1, sabotaged, test at c1dc75aa1: fails at its 30 s wait, then HANGS at the wait for 'ended' (stopped by hand after about 3 minutes) ==
+/Users/russellgordon/plantoir/wt-899-u4b/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:819: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing] : failed - the rename waited for the held plan after Cancel
+Test Case '-[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing]' started.
+XLOCK_HELD 15:41:17
+
+== Run 2, sabotaged, test returning after its failure (this commit): fails, no hang ==
+	 Executed 1 test, with 1 failure (0 unexpected) in 30.615 (30.616) seconds
+	 Executed 1 test, with 1 failure (0 unexpected) in 30.615 (30.617) seconds
+/Users/russellgordon/plantoir/wt-899-u4b/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:823: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing] : failed - the rename waited for the held plan after Cancel
+Test Case '-[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing]' failed (30.615 seconds).
+Test Case '-[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing]' started.
+TIMED_EXIT 65
+XLOCK_DONE exit=65 15:45:35
+XLOCK_HELD 15:44:57
+
+== Run 3, fix restored, the seven classes ==
+XLOCK_HELD 15:46:00
+Test Case '-[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing]' passed (0.232 seconds).
+** TEST EXECUTE SUCCEEDED **
+XLOCK_DONE exit=0 15:47:19
+CourseActivityTests: 9 run, 0 failures
+QuitConfirmationTests: 13 run, 0 failures
+SaveEnablesTests: 9 run, 0 failures
+SpecialFolderRenamerTests: 31 run, 0 failures
+UndoFilesContractTests: 3 run, 0 failures
+UndoJournalContractTests: 19 run, 0 failures
+UndoRenameFolderStepTests: 26 run, 0 failures
+
+#899 U4b, final sweep M1 and L4, must-fail, 2026-11-25, branch at 0ff56c51c plus this commit, dev 45be52fbf merged. Each run under xlock.sh with a 900 s kill limit.
+Sabotage A: both part-way ActivityTrail.note calls dropped (M1), and both refusal clears made unconditional (L4).
+== Run A, sabotaged: 4 of 4 fail ==
+	 Executed 4 tests, with 4 failures (0 unexpected) in 1.333 (1.336) seconds
+	 Executed 4 tests, with 4 failures (0 unexpected) in 1.333 (1.337) seconds
+	 Executed 4 tests, with 4 failures (0 unexpected) in 1.333 (1.338) seconds
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:1014: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARefusedFinishOfAnInterruptedRenameKeepsItsRecord] : XCTAssertEqual failed: ("nil") is not equal to ("Optional("Ideas")") - the r
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:1041: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAFinishRefusedAsChangedSinceOnEveryTryKeepsItsRecord] : XCTAssertEqual failed: ("nil") is not equal to ("Optional("Ideas")") - a 
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:958: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARenameLeftRenamedOnlyInPartWritesATrailLine] : XCTAssertTrue failed
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:978: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testARenameStoppedPartWayWithItsFoldersPutBackWritesATrailLine] : XCTAssertTrue failed
+Sabotage B: only the changed-since retry's clear made unconditional (L4).
+== Run B, sabotaged: the retry test fails, the plain refusal test passes ==
+	 Executed 2 tests, with 1 failure (0 unexpected) in 0.420 (0.421) seconds
+	 Executed 2 tests, with 1 failure (0 unexpected) in 0.420 (0.422) seconds
+mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:1041: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAFinishRefusedAsChangedSinceOnEveryTryKeepsItsRecord] : XCTAssertEqual failed: ("nil") is not equal to ("Optional("Ideas")") - a 
+== Run C, fixes restored, the six classes ==
+UndoRenameFolderStepTests: 30 run, 0 failures
+SpecialFolderRenamerTests: 31 run, 0 failures
+CourseActivityTests: 9 run, 0 failures
+UndoFilesContractTests: 3 run, 0 failures
+UndoJournalContractTests: 19 run, 0 failures
+SharedRulesContractTests: 67 run, 0 failures
+
+== Part I, 2026-11-25 19:03, merged dev bfe28b848 (head a0c872002 + fix) ==
+BROKEN (UndoCheck.swift as at d47276b8f; the loop test calling setUp() again):
+UndoDoorGuardTests.swift:172: XCTAssertEqual failed: changedSince(firstPath: "courses/TST1O/a.md") is not equal to changedSince(firstPath: "courses/TST1O/old/a.md")
+UndoRenameFolderStepTests.swift:69 (tearDown): XCTAssertFalse failed - the trail put back is one of this class's own (testARenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery)
+FIXED, 19:06:
+SpecialFolderRenamerTests: 31 run, 0 failures
+UndoDoorGuardTests: 9 run, 0 failures
+UndoFilesContractTests: 3 run, 0 failures
+UndoJournalContractTests: 19 run, 0 failures
+UndoRenameFolderStepTests: 30 run, 0 failures
+temp-growth.py: test temp folders left by this run: 0

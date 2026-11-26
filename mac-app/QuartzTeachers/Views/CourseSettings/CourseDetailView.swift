@@ -246,10 +246,10 @@ enum CourseDetailTabs {
     ) -> CourseSettingsCommands {
         let form: CourseSettingsView = CourseSettingsView(course: course, session: session)
         return CourseSettingsCommands(
-            maySave: course.configuration.hasUnsavedChanges,
+            maySave: course.configuration.hasUnsavedChanges && !course.isRenamingAFolder,
             mayRevert: false,
             perform: { (item: SubjectMenuRules.Item) in
-                if item != .saveCourseSettings || !course.configuration.hasUnsavedChanges {
+                if item != .saveCourseSettings || !course.configuration.hasUnsavedChanges || course.isRenamingAFolder {
                     return
                 }
                 form.save()

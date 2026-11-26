@@ -4353,14 +4353,18 @@ folder the teacher adds to the shared or per-section list, then hands
 `FolderScaffold` the folders it has JUST made (a location already on disk is
 skipped and gets nothing). `FolderScaffold.pages` is pure — folder, scope,
 section numbers, the primary curriculum folder's top-level file names, the
-moment and the template in; paths and texts out — and `writePages` writes
-each page with `.withoutOverwriting`, only into a folder in that list. The
+moment and the template in; paths and texts out — and `planPages` (which
+replaced `writePages` in #899 U4a) plans each folder with its two pages as one
+`createTree`, built beside its place and renamed in, never over anything, only
+for a folder in that list (documentation 09, "U4a"). The
 template comes from the bundle through `SkeletonCatalog.duplicateMeTemplateURL()`
 (the generic family's `Concepts/_DUPLICATE ME.md`); the moment is
 `SectionAdder.timestamp()`; the primary curriculum folder is the first one
-`CurriculumFolderRule.resolvedFolders(for:)` gives (#128), read AFTER the new
-folder is made, so a "Curriculum" folder added to a course with none is
-empty and its own template's connection is taken out.
+`CurriculumFolderRule.resolvedFolders(for:)` gives (#128), read BEFORE the
+step that makes the new folder (since U4a the folder is made with its pages
+in one step), so a "Curriculum" folder added to a course with none finds no
+curriculum page either way: none and an empty folder are treated alike, and
+its own template's connection is taken out.
 
 What was MEASURED before choosing this: there is no shared writer — the
 course creator is `setup_course.py` inside the builder, and each app makes a
@@ -22079,8 +22083,10 @@ stays off.
   never an empty list (#986 section 4.5: the first Marks tick creates
   `graded_folders`). The bytes each member leaves are worked out at plan
   time by the member rule (`UndoJSONMember.moved`, the bytes
-  `undo-json-cases.json` → `editJSONCases` pins), so `lastSavedData` is exactly the file the
-  step leaves. A file that is missing, is not one JSON object, or whose
+  `undo-json-cases.json` → `editJSONCases` pins). After the make `finishWrite` reads the file
+  back, so `lastSavedData` and `values` are the file as it is, a member
+  another program changed between the plan and the make included (U4b,
+  from U4a review 1, LOW 2). A file that is missing, is not one JSON object, or whose
   bytes the member rule cannot move (a key written twice, a number a double
   cannot hold) is planned WHOLE, the bytes `write(to:)` writes, and the door
   chooses `writeFile`. `writeAsOneStep(to:madeBy:)` plans, makes and
@@ -22204,6 +22210,216 @@ moves are `move` ops on folders in the same step. `JournaledStep.editJSON(at:rea
 takes a file once; a step that edits `course_config.json` twice (a rename
 and its record) works out both changes on one read and plans once. When
 U4b moves its callers, `CourseConfiguration`'s scan reason loses U4b.
+
+### U4b, first part: U4a's lows and the U4a sweep's (#899)
+
+Branch `issue/899-u4b-rename-folder`. Nothing a teacher sees changes, and
+the switch stays off. Rename folder through the door is NOT in this part
+(see "For U4b", above, which still holds for it).
+
+- **After the make, this copy is the file** (U4a review 1, LOW 2):
+  `CourseConfiguration.finishWrite` reads `course_config.json` back once the
+  step is made, so `lastSavedData` and `values` hold another program's
+  change of ANOTHER member made between the plan and the make (the door
+  kept it), never the plan's read. Only a file that cannot be read back as
+  one object leaves this copy as the plan said
+  (`UndoCourseSettingsStepTests.testAfterTheMakeThisCopyIsTheFileWithAnotherMemberChangedInTheGap`).
+- **A fourth refusal in a row** (LOW 3): a Save whose own member is changed
+  by something else before every make is tried four times in all; the
+  fourth refusal writes nothing, keeps the edits unsaved, and the sheet
+  says "Could not save: The file “course_config.json” couldn’t be saved."
+  (`…testAFourthRefusalInARowWritesNothingAndKeepsTheEditsUnsaved`). The
+  sentence is true of the disk. `write(to:)` wrote after its third
+  read-again; the refusal is deliberate, since writing over a member that
+  just changed is what #265 forbids.
+- **Two contract rows for U3c review 3's kept-copy rules** (LOW 4):
+  `stackCases` 'U4a, LOW 4 (a)' (the outgoing bytes kept beside the page
+  when the list takes no new file, and the Redo made from them), 'U4a, LOW
+  4 (a), stored' (the same with the list taking the bytes: nothing kept,
+  the Redo made from the list; added in U4b, the part-one review's LOW 2,
+  and measured to fail with only the store branch of
+  `storeWhatTheOtherDirectionNeeds` taken out, the Redo coming to
+  `contentMissing`; an earlier row for it was dropped in 4cd1ccac4 because
+  that one passed either way) and
+  'U4a, LOW 4 (b)' (seven moves, two kept files), with the call
+  `afterContentGone` and the key `keptBesideThePage` (`stackCasesHow`). The
+  Python model (`make_undo_traces.py`) now stores the outgoing bytes as the
+  door does (`store_what_the_other_direction_needs`); before, it had only
+  the U3c store from a kept original. Held for Windows under W4c.
+- **The trail line `undo kept what it replaced` is true on the list's path**
+  (the sweep, LOW 1): it said the page was put back "from what was kept
+  beside it" whenever anything was kept, also when the page came from the
+  list and only its outgoing bytes were kept
+  (`storeWhatTheOtherDirectionNeeds`). The phrase is now said only when a
+  kept original was used, decided page by page since U4b (the part-one
+  review's LOW 1: a step of two pages, one put back from the list with its
+  outgoing bytes kept and one from its kept original, said it of both):
+  `putBackFromAKeptOriginal` names the pages the check's uses name, and a
+  step with pages both ways says "put back “A.md”, and put back “B.md” from
+  what was kept beside it"; `activityTrail.mustRecord` says so
+  (`UndoKeptCopiesTests.testTheKeptLineSaysFromTheListWhenThePageCameFromTheList`,
+  `…testTheKeptLineIsDecidedPageByPage`).
+- **A settings file that is a link is saved again with the switch off** (the
+  sweep, LOW 2, run, not only read): U4a planned the Save at the link's own
+  place, the swap found a link there (`lstat`), refused it as changed since,
+  and after four tries the Save said "Could not save". `planWrite` now plans
+  where the link leads (`CourseConfiguration.fileALinkLeadsTo`, the last
+  component's links followed, at most `MAXSYMLINKS`), and the link stays a
+  link, for a target inside the course and one outside the working folder
+  (`…testASettingsFileThatIsALinkIsSavedThroughTheLinkWithTheSwitchOff`).
+  Measured with the fix taken out: only the link leading OUTSIDE the working
+  folder was refused ("Could not save"); one leading inside it was saved.
+  Measured: before U4a, `write(to:)`'s atomic write REPLACED the link with a
+  plain file and left the teacher's real file as it was; rejected, for the
+  reason `rule.shadow` gives for a daily page.
+  **Owed at U7, written down now (U4b part one's review, LOW 4):** a link
+  leading OUTSIDE the working folder is saved through `writePlainly` with
+  the switch off, since `UndoFolderPlaces.relativePath` cannot name it;
+  LIVE, `makeAsOps` throws `couldNotRecordTheStep` and that Save is refused.
+  That refusal is right by "live never writes outside what the step names",
+  but it is a Save the teacher could make before Undo, so U7 decides it
+  before the flip (keep the refusal with a sentence of its own, or save it
+  off the list as credentials are) and says it in `rule.shadow`.
+  **A dangling link** (the same review, LOW 5): `fileALinkLeadsTo` gives the
+  missing target, `before` is nil, and the Save makes a new file where the
+  link points, which with the switch off can be outside the working folder;
+  nothing is overwritten, and before U4a the link itself was replaced by a
+  file. A link that loops ends at a link after `MAXSYMLINKS` hops,
+  `UndoItem.read` answers not-a-file, and the Save is refused writing
+  nothing, its "Could not save" sentence true.
+- **Show in Finder's real path is read by a test** (the sweep's note): the
+  alert and what Finder selects are worked out first
+  (`FolderActions.showInFinderPlan`), and the app's path follows that plan
+  (`…testShowInFinderTheAppsPathAlertsForAGoneFileAndSelectsOnlyWhatIsThere`);
+  before, only the debug recorder's branch was tested.
+- Documentation's #506 section no longer says `writePages` writes with
+  `.withoutOverwriting` (the sweep, LOW 3), and `undo.laterPieces.U4` says
+  what U4a landed and what U4b still owes (LOW 4).
+
+### U4b, second part: an edit inside a moved folder, its recovery, and a capitalisation-only rename (#899)
+
+- **The order rule** (`opKinds.wholeOps`' one exception, commit 2410aed27):
+  an edit named at a move's new place, after the move, is made and redone
+  after it and taken back before it; the move is judged as if its own edits
+  there were taken back. Five `stackCases` rows ("U4b, ...").
+- **Recovery settles a step killed between its move and its edits whole, by
+  content.** `UndoRecovery.fileStates` reads a carried edit where its folder
+  is NOW (`placeNow`: under the move's `from` while the folder is still, or
+  again, there; before the fix such an edit read as "neither" and the step
+  was closed as interrupted, the list cleared, at every kill point but the
+  middle ones) and judges the carrying move as if the step's edits inside
+  were taken back, without the step's own staged files and kept originals
+  inside the folder (`carryingMoveState`; before the fix the undo's kept
+  copy of the page, kept by the first tidy as differing from its page, made
+  the folder "changed since"). Its tidy and `listHolds` also look beside the
+  carried page at the folder's old place (`placesStagedBeside`), so a kept
+  copy the folder took with it when it moved back is removed once the list
+  holds what it holds. Eleven `recoveryCases` rows (`withAMovedFolder`; each
+  kill point of a step, an undo and a redo, and one with a kept copy left
+  inside the folder moved back), run from the JSON and modelled in
+  `make_undo_traces.py` (`swap_groups`, `stopped_part_way`, `recover`; the
+  model holds no staged files, so the left-out kept copies are the Swift
+  replay's alone). Measured before the fix: seven of the first ten rows
+  failed. Not settled here, for U7: a step killed after its edit went in
+  and then edited by hand elsewhere puts its other pages back through a
+  plan that does not leave the step's own kept copy inside the folder out,
+  so the folder is then refused as changed since too and the step is closed
+  as interrupted without those pages put back (the list is cleared either
+  way).
+- **A capitalisation-only rename** (`Media` to `media`; `opKinds.move` now
+  says so). The pair rule as written found both places holding the folder
+  on a case-insensitive volume, and the contract called such a move
+  unreadable, so the rename the teacher asked for could be neither one step
+  nor undone (invariant 1). Now a `move` whose `from` and `to` are spelled
+  alike but for case, in the last part only (`UndoOp.isCaseOnlyMove`), is
+  readable; where the two spellings are ONE item (the same device and file
+  number, `UndoMoveSide.spellingListed`) it is judged by the spelling the
+  folder lists (as `to` holding the content: as the step left it; as `from`:
+  as before; a third spelling or other content: changed since), and the swap
+  renames it only while the folder lists the spelling it leaves. Where they
+  are two items (a case-sensitive volume) it is any move. Measured on this
+  Mac's APFS (case-insensitive): `renamex_np(RENAME_EXCL)` renames `Media`
+  to `media` and returns 0, so the same rename serves; the notes' guess
+  that it refuses was wrong. An edit the rename carries is named at the new
+  spelling, never the old one as spelled. A move whose folders above the
+  last part differ in case stays unreadable. Rows: three `checkCases` (the
+  old "not readable" row replaced) and one more for a folder above, three
+  `stackCases` (undo, undo and redo, and a third spelling by hand since).
+  Rejected: two moves through a middle name (they share a place, which
+  `wholeOps` forbids), and a removeTree with a createTree (they overlap the
+  same way).
+
+### U4b, third part: Rename folder is one step (#899)
+
+**What it is.** Course Settings' Rename folder (`CourseSettingsView.renameFolder`) is ONE step, key `renameFolder`, made through the door: every folder's `move` first (one per section that has the folder, for a per-section folder), then every page whose qualified links change, inside the moved folder (named at its new place, so the move carries it, `opKinds.wholeOps`) and outside it, then one `editJSON` per `course_config.json` member `SpecialFolderRenamer.renaming` changes (`CourseConfiguration.planRecordOnDisk`, the planning form of `recordOnDisk`). All of it goes in or none of it does.
+
+**How it is planned.** `SpecialFolderRenamer.plan` reads the disk OFF the main actor and writes nothing: each folder's listing SHA-256 (the move's pair) and each page's bytes and rewritten bytes (`FolderRenamePlan`, `Sendable`). On the main actor `apply` plans it into a `JournaledStep` (`moveFolder(_:to:listingSha:)`, `write(_:to:plannedFrom:)`, whose `before` is the walk's read, never a second one), the settings are planned from one read, and the step is made. A step refused as changed since (a page or a setting changed between the plan and the make) is planned again from the disk, up to three times, as Save is. In `JournaledStep`, a place at or inside a planned folder move's `to` is read where it is now (`placeOnDiskNow`) and named from the folder above `to` with `to`'s own spelling (`namedPath`), so a capitalisation-only rename is not named by the spelling the disk lists now (`realpath` gives the old one). A step that cannot be recorded in shadow is swapped in without the list (`makeWithoutARecord`): the folder moves first, each carried page staged only at its turn.
+
+**Refused.** A refused rename writes nothing and the sheet says `undo.wording.renameFolderNothingWasChanged` ("“{old}” was not renamed, and nothing was changed: {said}"); one refused part way whose swaps could not all be put back says `renameFolderStoppedPartWay`, with each kept file named. The two old half-failure sentences ("renamed N of M copies", and "renamed, but could not write the change to this course's settings") are gone: neither state can happen now.
+
+**The rename record is KEPT while the switch is off** (the director, 2026-11-21, after the part-two review's L6). With `undoJournalIsLive` off, recovery records and repairs nothing, so a rename killed part way (say between its moves and its pages) would be left half done with nothing to finish it. So `courses/.internal/renames/<code>.json` is still written before the step is made (when a folder moves) and cleared once the step is made or refused with nothing changed; a refusal left part way, or a kill, leaves it, and `interruptedRenameTarget` finishes the rename as before (`testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord`). **U7 owes**: once the switch is on and recovery settles a killed rename whole before or whole after, stop writing the record (keep reading one an earlier version left), and drop its writer-scan entry (`SpecialFolderRenamer.swift`, `waitsFor: U7`).
+
+**Save, then rename, then Undo, Undo** (U4a review 1, L1): both are `editJSON` on `course_config.json`, so the rename's Undo puts its members back by value and the Save's Undo then finds its members as it left them (`testSaveThenRenameThenUndoAndUndoTakesBothBack`, both touching `expandable`). The whole-file fallback (`writeFile`, for a file the member rule cannot move) below a Save's `editJSON` steps is refused by the Save's Undo BY DESIGN: a `writeFile` is judged by the whole file's hash, and a member put back by value is spelled compactly, so no writer of this file plans one except that fallback.
+
+**What is on disk if the app dies** between any two writes: the step's own staged files beside their places and the folders part moved; with the switch on, recovery settles it by content, whole before or whole after, at EVERY kill point (`testARenameKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery` kills before each swap in turn until none is left; the swap's order is each move, then the pages it carries, then the rest, so `beforeSwap(1)` is between the two sections' folders and `beforeSwap(2)` after the first section's carried page). One thing stays beside the settings file when the step is put back after its settings swap went in: the apply's kept original of `course_config.json`, because the members are put back by value and the teacher's spacing is then only in that copy (an only copy is never deleted); the test checks it is the file exactly as it was. With the switch off nothing is repaired (shadow recovery runs inside the next step's begin and records only) and the rename record finishes it: a shared folder killed after its move is finished by renaming again (`testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord`). A per-section rename killed BETWEEN its sections is a mixture, which the record's rule has never finished (`interruptedRenameTarget` is nil, the record kept): pinned as today's behaviour by `testWithTheSwitchOffARenameKilledBetweenItsSectionsIsLeftAsTodaysRecordLeavesIt`, and owed to U7, whose live recovery settles it whole.
+
+**Not in this part.** The recorded trace (`renameFolder` in `undo-action-steps.json` and `undo-traces.json`): `UndoActionStepsTests.record` and `make_undo_traces.py`'s `action_trace` know file moves only, and a folder move with carried pages needs both, and the Swift action-trace replay, to learn one.
+
+**The part-two review's M1, fixed.** The step's own staged files and kept originals inside a folder a move carries edits with (named `.<file>.plantoir-undo-<seq>-…`, from ANY of its swaps) are never the folder's content: the check of an Undo, a Redo or a recovery's put-back (`UndoCheck.plan`'s `ownSeq`, `UndoSwap.stepsOwnFilesInside`) and each swap's last look before the rename (by the step number in its label) leave them out, on either side; only the step's own names, anything else inside still counts. Before, a kept copy a tidy could not remove (or one a page's outgoing bytes rest on) made the next Undo "changed since", clearing the list and naming a folder the teacher never touched, and a per-section rename killed after its first carried page could not be put back (a page missing, a kept file left). `UndoRecovery.keptOriginal` looks where the page is now (`placeNow`). Rows: the two `stackCases` "U4b, M1: …" (`leaveAKeptCopyInsideTheMovedFolder`); `opKinds.wholeOps` says it. A refused Undo or Redo names a moved folder where the teacher finds it now (`UndoOp.placeAsFound`: `to` before an Undo, `from` before a Redo), in the plan and in the swap; a marker's `moveApart` keeps its name.
+
+#### U4b, fourth part: off the main actor, links, and the part-way sentences (#899)
+
+**The step is made off the main actor** (part four's review, M1). The door's forward check (`UndoCheck.plan`) and the swap's last look before each folder's rename each read and SHA-256 every file in every moved folder, a megabyte at a time; measured by the reviewer on this Mac, 0.46 to 0.49 s per GB per pass, warm cache. Made on the main actor (as it was from part D), a 2 GB shared `Media` froze the window for about two seconds where the old rename was one instant `moveItem`. `SpecialFolderRenamer.make` now hands the planned step to a detached task (`StepHandedOver`, unchecked `Sendable` because the planner touches the step no more until it returns) and the view awaits it; `finishRecord` and the trail line stay on the main actor. The list's one queued lock is held only while the step is begun and while it is finished (`JournaledWrite.perform(ops:)`: `beginOps`, then `finish`); the check (`UndoCheck.plan`) and the swap run OUTSIDE it, for this step as for every step. What keeps another step of the same course out meanwhile is the rename's claim in `CourseActivity` (fifth part, below), and for anything else (another program, a step of another course touching the same file) the swap's content checks. While a rename is under way `Course.isRenamingAFolder` is true in every window (it reads `CourseActivity`): Save (the button, Course ▸ Save Course Settings, and the Planning tab's ⌘S) is disabled, a second `renameFolder` is refused with nothing changed, and the rename sheet keeps its small spinner beside Rename with the field and an interactive dismiss disabled. The HIG's progress-indicators page (read 2026-11-21): an indeterminate spinner where the length cannot be known, in one consistent place, and "when it's feasible, let people halt processing": Cancel halts the rename while it only plans, and is visibly disabled, never hidden, once its check and swap begin, because a rename halted part way is the negative side effect. `testTheRenameIsMadeOffTheMainActorAndNothingElseStartsMeanwhile` holds the swap at its first page on an event (an `NSCondition` the main actor opens), not a time.
+
+**The two reads are kept, not shared.** The check is the step's judgement (made outside the list's lock, after the step is begun under it), the contract's `opKinds.move` rule, the same for a make, a Redo and a recovery's put-back; the swap's read is its last look just before the rename. Letting the check's read stand for the last look would leave the time between them (staging every page and the settings) unseen; letting the last look stand for the check would make a forward folder move a case of its own in the contract. Both now cost nothing a teacher sees: the window stays live and the sheet says the rename is under way. (The plan's own walk, `SpecialFolderRenamer.plan`, is a third read, off the main actor since part D, and is what the step's `before` is.)
+
+**A folder holding a symbolic link** (L4). A folder's listing now lists a link as `link <SHA-256 of the bytes the link holds> <path>` (`readlink`, never followed), so a folder move with a link inside is judged by it and renamed as before U4b, the link moved as a link (`testAFolderHoldingASymbolicLinkIsRenamedWithTheLinkMovedAsALink`, a link that leads nowhere). Before, the reading answered `.notATree` and the rename was refused "cannot tell now". A listing holding a link is never made from blobs (`UndoTreeReading.make` refuses it), and `createTree`'s check still finds a link inside a made folder changed since, because the step's listing has none. No contract row yet: `listingCases` has no way for Windows to hold a row by name, and a held `checkCases` row must read as not readable there; W8 adds the row with its listing. Not changed: a per-section folder that is ITSELF a link is still refused (its place reads `.notATree`); rare, and the old rename moved the link. Owed to U4b2 (see the fifth part).
+
+**With the switch off, a killed rename's staged files are tidied** (L3). Shadow recovery tidied only steps that change files (`changesOnlyFiles`), so a rename killed part way left `.course_config.json.plantoir-undo-<seq>-apply-…` beside the settings (and its pages') until the switch flipped. Now it tidies steps that change files and move files or folders whole (`changesOnlyFilesAndMoves`): a move sets nothing aside, so all the tidy removes is the step's own staged names beside each page, at its place and, for a carried page, at its place before the move; a kept original that differs from its page stays. A step that makes or takes out a folder, or stands apart, is still left to a live recovery. The files go at the next shadow recovery, which runs inside the next step's begin.
+
+**The sentences on the part-way paths match the disk** (L1). A per-section rename refused at a later section whose earlier folder then cannot be moved back says `undo.wording.renameFolderRenamedOnlyInPart` ("“{old}” was renamed only in part, and Plantoir could not put everything back as it was. Still called “{new}”: {places}. {said}"), naming each folder left at its new name (`SpecialFolderRenamer.foldersLeftAtTheirNewName`, read from the disk after the refusal, by the listed spelling for a capitalisation-only rename); "was not renamed" is said only when no folder is. (Fifth part: a folder counts as left renamed when something is at its new name, whatever is at its old one, read by `lstat` only.) A retry after a changed-since refusal clears the rename record before it plans again (L2), so a re-plan that is refused (a destination that appeared, a frozen course, an unreadable listing) leaves no record hiding the one-section restore offer: the record is written before each make and cleared once the step is made or refused with nothing changed, on every path.
+
+**Must-fail, part four** (each sabotaged in place, built, run, restored; `git status` clean after): the step made on the caller's actor fails the off-main test ("the swap ran on the main thread"; the second rename then ran too, two steps); a link read as not a tree fails the link test (refused, nothing to undo); shadow tidying only steps of files fails `testWithTheSwitchOffARenameKilledPartWayIsFinishedFromItsRecord` ("a staged file was left"); the old part-way sentence fails `testARenameStoppedWithAFolderLeftRenamedSaysWhichFolder`; the record not cleared before the retry fails `testARetryWhoseReplanIsRefusedLeavesNoRecord`.
+
+**Not in this part.** The recorded `renameFolder` trace (the recorder, `make_undo_traces.py` and the Swift action-trace replay know file moves only), and the part-two review's L1 to L5.
+
+#### U4b, fifth part: one piece of work the whole app knows about (#899)
+
+Part four put the check and the swap off the main actor, and two things that had been impossible became possible part way through a rename (part six's review): a quit, and another window's act on the same course. The invariant: a rename under way is ONE piece of work the whole app knows about; nothing else in the app can change that course meanwhile, and the app does not quit out from under it. With `undoJournalIsLive` off the teacher meets nothing different from before U4b except that the window stays responsive.
+
+- **The claim is the course's, not the window's** (M2). `CourseActivity.beginFolderRename` records the rename by working folder and course code (`FolderRenameRecord`), as copies, publishes and plan work are recorded, and refuses a second one of the same course from any window: so a second rename can neither overwrite nor clear the first's interrupted-rename record (`courses/.internal/renames/<code>.json`, one file per course). `Course.isRenamingAFolder` now reads it, so every window's copy of the course, and a copy remade by File ▸ Reload Courses, knows. While it is held: another window's Save is disabled and says "Available once the folder rename has finished" beside it (a press that reaches `save()` anyway is refused with the click sentence); that window's rename sheet shows the click sentence "A folder in {course} is being renamed right now. Try again once the rename has finished." with Rename disabled; Rename Course, Add Section… and restoring a backup are greyed through `structuralHoldReason` with the menu reason and refused at the click through `structuralRefusal` with the click sentence (the `whenBusy` sentences name a preview or a deploy and would be false); removing a course or a section is refused with it (`ScheduledDeployCleanup`); Replace reference course is refused with it (`ReferenceReplacer.Problem.folderBeingRenamed`, key `replaceWhileAFolderIsRenamed`, Mac only: no contract case, since Windows has no off-thread rename yet); Preview and Deploy are greyed and refused the way a copy being zipped greys them (the section window's buttons, `verbMayRunNow`, the press, the in-app and outside assistant's deploy and rebuild, which say the click sentence). A rename is refused while the course is being copied (#351), so the archive before a removal or restore never zips a course half renamed. **Rejected:** putting the rename into `busyDescription`, which would have reached every reader at once, because a dozen of its readers answer with a sentence about a preview or a deploy.
+- **The quit waits for it** (M1), as it waits for a tools copy (#476): `applicationShouldTerminate` answers `.terminateLater` while `CourseActivity.anyFolderRenameIsUnderWay` (`AppDelegate.quitWaitsForWorkUnderWay`), awaits `CourseActivity.waitForAllFolderRenames()` (a continuation resumed when the last claim ends, an event, not a time), then finishes terminating. No question: the tools copy's pattern asks none, the rename is bounded by itself, and its sheet keeps its spinner. Once its swap has begun, closing the window does not end it either: the rename runs in an unstructured task started by the sheet's button, which a closed window does not cancel. (Sixth part: while it only plans, Cancel or the sheet going halts it and gives the course back at once, so the quit never waits for a plan.)
+- **Cancel halts a rename that is only planning** (L3). The sheet keeps the rename's task; Cancel cancels it and closes the sheet. `renameFolder` asks `Task.isCancelled` on the main actor after the plan (which writes nothing) and in the same turn marks the swap begun (`folderRenameSwapBegins`), so a Cancel lands either before (nothing is made, no record) or after, when the button is disabled (`renameCanNoLongerBeHalted`) and a press that lands as it greys is ignored. (Part seven's review found the plan itself was not halted: see the sixth part.)
+- **The part-way sentence** (L1, L2): `foldersLeftAtTheirNewName` counts a folder left renamed when something is at its new name (by `lstat`, nothing read or hashed on the main actor), whatever is at its old one: the likeliest reason a move back fails is that something appeared at the old name.
+- Tests: `UndoRenameFolderStepTests.testWhileARenameRunsAnotherWindowsCopyOfTheCourseIsHeldToo`, `testAQuitDuringARenameWaitsForItToFinish`, `testARenameCancelledWhileItPlansChangesNothing`, `testAMoveBackBlockedAtTheOldNameStillSaysWhichFolderIsRenamed`; must-fail logs in the notes.
+
+#### U4b, sixth part: Cancel gives the course back (#899)
+
+Part seven's review (M1) found that Cancel closed the sheet but did not stop the plan: the walk ran in a `Task.detached`, which does not inherit cancellation, and `renameFolder` awaited its `value`, so the claim (and every greyed control in every window, and a ⌘Q's wait) lasted until the walk ended, which on an iCloud vault with evicted pages is minutes and on a network volume gone away is never. The invariant: **Cancel gives the course back.**
+
+- **The walk is told to stop, and nobody waits for it** (`SpecialFolderRenamer.planHaltingAtCancel`). The walk still runs detached, off the main actor; the caller's cancellation is forwarded to it (`withTaskCancellationHandler`), and `plan` checks for cancellation before each folder and each page (`Task.checkCancellation()`), so it stops at its next file. A read that blocks inside the system cannot be interrupted, so the caller does not wait for the walk at all: the plan comes back through an `AsyncThrowingStream`, whose `next()` returns nil the moment the waiting task is cancelled. `renameFolder` then returns "nothing was changed" (said to no one: the sheet has gone), and its `defer` ends the claim in the same moment: Save is enabled, the course is free in every window, and a quit does not wait. Nothing was written: the plan writes nothing, and the rename record is written only after the plan, just before the make.
+- **A cancelled plan can never reach the swap.** Its result has nowhere to go (the stream was given up); a plan that returned just before the Cancel is caught by the `Task.isCancelled` check in the turn the swap is marked begun; and `CourseActivity.folderRenameSwapBegins` now returns false, marking nothing, for a claim no longer held, so an ended claim is never taken up again.
+- **The sheet going halts it too**, however it goes (`onDisappear` → `haltARenameStillPlanning`), but never once the swap has begun.
+- **Rejected:** ending the claim from the sheet at Cancel while the rename's own task still waited for the walk. It would have given the course back, but left a task holding a stale view's state and needed the sheet to know the claim; returning at once from the one place that holds the claim is simpler and true by construction.
+- **Rejected:** a timed give-up. The stream's cancellation is the event.
+- **What a quit waiting on a swap shows** (L5): what the tools copy's wait shows, the work's own indicator and nothing quit-specific. For the tools copy that is the window's getting-ready banner; for a rename, the sheet's spinner beside Rename (the sheet cannot be dismissed while the swap runs: Cancel and an interactive dismiss are disabled) and, in every window, the course's sidebar row spinner, labelled "Renaming a folder" (L2, below). Nothing new was added for the quit.
+- **A copy being saved refuses a rename before it plans** (L1): the sheet's Rename is disabled with, and a press that reaches `renameFolder` is refused with, `AssistWording.courseIsBeingCopiedFromTheMenu` ("A copy of {course} is being saved in Plantoir. Wait for that to finish, then try again."), as the other menu-path busy refusals say it. Before, the refusal said `CocoaError(.fileWriteUnknown)`'s "The file couldn’t be saved.". A second rename of the same course reached by a path that is not a control now says the rename sentence (`CourseActivity.folderRenameIsUnderWay`) for the same reason.
+- **Greyed Preview, Deploy and section actions say why** (L2), where the app's other busy states say it: Preview's and Deploy's help tags give `CourseActivity.availableOnceTheFolderIsRenamed` after the folder-getting-ready reason (`SectionDetailView.greyedReason`), and the course's sidebar row shows the small spinner a copy being zipped shows, labelled (and with a help tag) "Renaming a folder" (`CourseRowLabel.workUnderWay`; the copy's spinner now carries its "Saving a copy" as a help tag too). The section actions are greyed with no help tag of their own, as for a copy; the row says why.
+- **The quit's wait is one function** (L6): `AppDelegate.waitForWorkUnderWay()` (every tools copy, then every rename), awaited by `applicationShouldTerminate` and by `testAQuitDuringARenameWaitsForItToFinish`.
+- Tests: `testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing` (the plan held at its first page on an `NSCondition`; seams `SpecialFolderRenamer.planReadsAPage` and `planHasEnded`, nil in the app), `testTheSwapRefusesARenameWhoseClaimHasEnded`, `testARenameWhileACopyIsBeingSavedIsRefusedNamingTheCopy`, `testWhileARenameRunsPreviewDeployAndTheSidebarRowSayWhy`; must-fail logs in the notes.
+
+#### For U4b2 (the unit-word rename and Rename Course)
+
+- **Owed from U4b, carried here:** the recorded `renameFolder` trace (the recorder, `make_undo_traces.py` and the Swift and Windows action-trace replays know file moves only; folder moves with carried pages); the part-two review's L1 to L5; a per-section folder that is ITSELF a symbolic link, renamed before U4b by `moveItem` (the link moved as a link) and refused since (its place reads `.notATree`): the door's `move` needs a way to judge an item that is a link, by the bytes it holds, in the contract's `opKinds.move` and in recovery, which is a door change for both apps.
+- Each one's busy claim in `CourseActivity` and the quit's wait, the way `renameFolder` does (fifth part): a Rename Course moves the whole course folder.
+- **Part seven's review, L3 and L4, carried here** (already so on `dev` before U4b, so not regressions): several readers of busy state do not read the rename's claim: Back Up Now (`SidebarView` greys on `isBeingCopied` only; `WorkspaceModel.backUp`), the unit-word rename (`UnitWordRenameSheet.busyProblem` reads `courseIsBusy`, which does not include the claim), and the outside assistant's page writes (no busy check at all); and a scheduled deploy, `Plantoir --mcp-stdio`, another copy of Plantoir and Windows do not see the claim, because the rename takes no lease file (`WorkLeaseRegistry.reconcile` derives leases from previews and publishes only). Give U4b2's claims and the rename's one way every reader sees, a lease included.
+- Each one's plan halted at Cancel the way `renameFolder`'s is (sixth part): `planHaltingAtCancel`, cancellation checked per file, the claim ended at once.
+
+- `UnitWordRenamer` still calls `recordOnDisk`; give it `planRecordOnDisk` and `finishRecord` in one step with its page renames, the way `renameFolder` does. Its pages are files moved (`move`), not folders, and an edit of a moved file is carried the same way (`wholeOps`).
+- Rename Course (`CourseRenamer`) moves the course's own folder: every op of the step then sits inside that move's `to`; plan the move first through `moveFolder`, and every edit after it at its new place.
+- Keep each one's interrupted-rename record, if it has one, while the switch is off, for the reason above.
+- Make each step off the main actor the way `renameFolder` does (`SpecialFolderRenamer.make`), with Save disabled meanwhile and its sheet's Cancel halting the plan and disabled once the swap begins: a course folder's move reads every file in the course twice.
+- Rename Course moves the course folder with the kept `-apply-orig` of `course_config.json` a put-back may have left beside it (part four's review, L6): it is content of the folder, and an only copy.
 
 ### The U1 harness
 
