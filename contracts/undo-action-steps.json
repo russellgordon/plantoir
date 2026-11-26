@@ -431,7 +431,7 @@
       "action" : "keepClassesDatedLater",
       "files" : [
         {
-          "after" : "{\n  \"answeredAt\" : \"2026-09-08T11:00:00Z\",\n  \"kept\" : [\n    {\n      \"date\" : \"2026-09-14\",\n      \"place\" : \"section1\\/All Classes\\/Unit 1, Day 3.md\"\n    }\n  ],\n  \"version\" : 1\n}",
+          "after" : "{\n  \"answeredAt\" : \"2026-09-08T11:00:00Z\",\n  \"kept\" : [\n    {\n      \"date\" : \"2026-09-14\",\n      \"place\" : \"section1\\/All Classes\\/Unit 1, Day 3\"\n    }\n  ],\n  \"version\" : 1\n}",
           "before" : null,
           "path" : "courses/ICS3U/.publish_state/section1.later-classes-kept.json"
         }

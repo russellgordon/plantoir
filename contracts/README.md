@@ -1343,7 +1343,8 @@ them is a LIVE Windows defect today (its anchored `Scheme` test misses
 `<https://…`), which the mirrored fix clears. That is the
 request, owed by the `windows` issue from #97, and a named gap if it cannot
 land in its milestone. `activityTrail.mustRecord` is unchanged at **83** (no
-new event: `folder renamed` records no link counts, so its line stays true).
+new event; `folder renamed` recorded no link counts then, and since #899 U4b
+it records how many pages were relinked, which both platforms' lines say).
 **Re-taken 2026-09-26 with [#291](https://github.com/russellgordon/plantoir/issues/291)**
 (the preview check looks for the live-reload client's tag and first
 statement, not the bare address), counted ON THIS BRANCH (off `dev` 92a7099a,
@@ -2283,10 +2284,15 @@ itself — so word it deliberately rather than discovering the gap:
   says both until its own piece (W8). What a refused rename says on the Mac is
   in `undo.wording`, three keys: `renameFolderNothingWasChanged` (nothing was
   changed), and two for a refused step that could not all be put back, which
-  is still possible: `renameFolderStoppedPartWay` (every folder back at its old
-  name, files kept beside their pages) and `renameFolderRenamedOnlyInPart`
-  (a folder left at its new name, named). Both write a `folder renamed` line
-  on the trail.
+  is still possible: `renameFolderStoppedPartWay` (none of the rename's
+  folders at its new name, files kept beside their pages) and
+  `renameFolderRenamedOnlyInPart` (each of the rename's folders the disk shows
+  at its new name, named, whether this run moved it or an earlier, interrupted
+  run did; never a folder that was at the new name all along, U4b2-5). Both
+  write a `folder renamed` line on the trail. Windows' one part-way line until
+  W8 is a rename whose folders moved but whose settings could not be written
+  ("renamed the folder … but could not write it to this course's settings");
+  its stop after moving some of the copies writes no line.
 - **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
 - **The assistant's unit sentences**, which an earlier draft wrongly said were
   "listed below with the others" until this line was added. Two of the five are

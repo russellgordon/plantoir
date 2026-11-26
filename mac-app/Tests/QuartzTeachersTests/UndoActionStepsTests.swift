@@ -356,7 +356,7 @@ final class UndoActionStepsTests: XCTestCase {
         recorded.append(try await record("keepClassesDatedLater", root: kept.root) {
             try ClassesDatedLater.KeptRecord(
                 answeredAt: "2026-09-08T11:00:00Z",
-                kept: [ClassesDatedLater.Kept(place: "section1/All Classes/Unit 1, Day 3.md", date: "2026-09-14")]
+                kept: [ClassesDatedLater.Kept(place: "section1/All Classes/Unit 1, Day 3", date: "2026-09-14")]
             ).write(courseDirectory: kept.course.directoryURL, section: 1)
         })
 

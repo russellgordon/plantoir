@@ -1233,7 +1233,7 @@ struct CourseSettingsView: View {
             // way can be recognised and finished: with the switch off, recovery
             // records and repairs nothing (`interruptedRenameTarget`).
             if !planned.moves.isEmpty {
-                record.renameIsStarting()
+                record.renameIsStarting(moving: planned.moves, sectionNumbers: sectionNumbers)
             }
             do {
                 // The check and the swap read and hash every file in each
@@ -1259,31 +1259,30 @@ struct CourseSettingsView: View {
                 continue
             } catch let partWay as JournaledStepError {
                 if case .leftPartWay(_, _, let keptOriginals) = partWay {
-                    // Said as the disk is: a folder whose move back failed is
-                    // named at its new name (part four's review, L1). Each
-                    // part-way ending leaves its line on the trail BEFORE it
-                    // returns (the final sweep, M1): these are the states
-                    // somebody will be asked to explain next week. The
-                    // record stays, as a stopped rename's does.
-                    let leftRenamed: [String] = SpecialFolderRenamer.foldersLeftAtTheirNewName(
-                        planned.moves, courseDirectory: courseDirectory
+                    // Said as the disk is: each of this rename's folders at its
+                    // new name is named there (part four's review, L1),
+                    // whether this run moved it or an earlier, interrupted run
+                    // of it did (U4b2-5: a run finishing a rename moves
+                    // nothing), and a folder that was never this rename's is
+                    // not (review 1, M1). A place that cannot be read, or that
+                    // an earlier run whose record did not say may have moved,
+                    // is told on the trail and, when nothing is known at the
+                    // new name, on the sheet (U4b2-6).
+                    // Each part-way ending leaves its line on the trail BEFORE
+                    // it returns (the final sweep, M1): these are the states
+                    // somebody will be asked to explain next week. The record
+                    // stays, as a stopped rename's does.
+                    let left: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
+                        renaming: oldName, to: newName, scope: scope,
+                        courseDirectory: courseDirectory, sectionNumbers: sectionNumbers,
+                        planned: planned.moves, earlierRecord: record.earlierRecord
                     )
-                    if !leftRenamed.isEmpty {
-                        ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.renamedOnlyInPartLine(
-                            renaming: oldName, to: newName, course: course.code, scope: scope,
-                            places: leftRenamed, keptBeside: keptOriginals.count
-                        ))
-                        return .failed(SpecialFolderRenamer.renamedOnlyInPart(
-                            renaming: oldName, to: newName, places: leftRenamed, said: partWay.localizedDescription
-                        ))
-                    }
-                    ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.stoppedPartWayLine(
-                        renaming: oldName, to: newName, course: course.code, scope: scope,
-                        keptBeside: keptOriginals.count
-                    ))
-                    return .failed(SpecialFolderRenamer.stoppedPartWay(
-                        renaming: oldName, said: partWay.localizedDescription
-                    ))
+                    let ending: (line: String, sentence: String) = SpecialFolderRenamer.partWayEnding(
+                        renaming: oldName, to: newName, course: course.code, scope: scope, left: left,
+                        keptBeside: keptOriginals.count, said: partWay.localizedDescription
+                    )
+                    ActivityTrail.note(.folderRenamed, ending.line)
+                    return .failed(ending.sentence)
                 }
                 if case .stoppedByATest = partWay {
                     // A process that died here leaves its record, as a kill does.
