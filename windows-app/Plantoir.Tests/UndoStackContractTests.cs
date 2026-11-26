@@ -544,6 +544,7 @@ public sealed class UndoStackContractTests
                         _scribe.WritePage("A", LinkLibrary + "/a.md", "A"u8.ToArray());
                         _scribe.WritePage("A", LinkLibrary + "/pictures/b.md", "B"u8.ToArray());
                         _libraryListing = UndoTreeReading.Read(_scribe.FullPath("A", LinkLibrary)).ListingSha;
+                        Directory.CreateDirectory(Path.GetDirectoryName(media)!);
                         Directory.CreateSymbolicLink(media, LinkTarget);
                     }
                     Ops(new JsonArray(TheLinksMove()), []);
