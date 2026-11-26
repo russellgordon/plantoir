@@ -110,3 +110,26 @@ Merged `origin/dev` 66c9853a8 first (818f5753b; `NamedGapLedger.cs` kept both si
 9. LOW 1, the empty folders left: `ARefusedStepLeavesNoEmptyClassFolder`.
 10. M1, the sheet's lead not the contract's: `TheSheetsWordsForAKeptTimetableAreTheContracts`.
 11. LOW 4, a read-only page said as a full disk: `CurriculumMentionsOnAPageThatCannotBeWrittenChangeNothing`.
+
+## Review 2 round (2026-11-25): Re-date and Roll Over are ONE step
+
+### For PROGRESS
+
+- **M1 (the director's ruling: one teacher action is one step, as on the mac).** The timetable a re-date or rollover writes down is now a file of the re-date's own step (`reDateClasses` / `rollOver`), planned after the pages by `TimetableMemory.PlanInto` (writeFile, never told to today's undo, Windows' own bytes as before); there is no `rememberTimetable` step before it. `WriteDown` (the Class Dates sheet, `remember_timetable`) plans through the same `PlanInto` and makes its own one step. One change of behaviour: a timetable file that cannot be swapped in now refuses the whole re-date (all or none), where before it cost only the record.
+- **Pins:** `WindowsOwnStepBefore` is gone (test side only, `UndoActionStepsOnWindowsTests.cs`); in its place `WindowsOwnFileInTheStep["reDateClasses"]` measures the one file more (`courses/ICS3U/.internal/timetable/section1.json`, writeFile, after the recorded files, before the recompute), and the fixture row now asserts ONE new begin. `UndoActionTraceContractTests` reads the new dictionary (its traces still make the recorded draft). Nothing under `contracts/` and nothing in `NamedGapLedger` changed (the ledger never named the pair).
+- **M2.** A refusal leaves the timetable as it was, so "Nothing was changed" and the trail's "changed nothing" are true. `AndTheTimetableKept` is gone: a part-way stop names every kept file through `StoppedPartWay`, the timetable's included. This also settles LOW 2 (the kept-file lead's "their" is no longer appended to the re-date's answer).
+- **LOW 1.** The assistant's dates card says what is on disk however the sheet closed (`dialog.SavedDates`), so a Cancel after the part-way message no longer says "No class dates were recorded". The menu path still stops the action on Cancel and says nothing (comment updated).
+- Tests: `ReDateTests.AReDateWhosePagesAreRefusedLeavesTheTimetableAsItWas`, `ReDateTests.AReDateStoppedPartWayLeavesTheTimetableAsItWas`; `RolloverWebsiteTests.RollOverWhoseSecondPageCannotBeWritten_ChangesNothing` now checks the timetable. Harness `w7-redate-kill` (three pages and the timetable in one step, killed at afterBegin, beforeSwap@0..3, beforeApplied, shadow and live, recovered by a second process).
+- Not this round: LOW 3 (front page dated), LOW 4, LOW 5 and review 1's LOW 2 and rest of LOW 3 ride to W7b2.
+
+### For documentation 12
+
+- Re-date Classes and Roll Over are each one step on Windows: one Undo puts back the pages and the timetable they were re-dated onto.
+
+### Runs (PC)
+
+- `899w7b1-r2a` at e025a638d (`dev` bfe28b848 merged): both builds 0; ReDateTests, RolloverWebsiteTests, SectionVerbsTests, UndoActionStepsOnWindowsTests, NamedGapLedgerTests, UndoClassDatesStepTests, UndoActionTrace/OpKinds/Website/Trace contract tests, UndoWriterScanTests: **Passed 407, Failed 0, Skipped 1**. Harness outside OneDrive: `w7-redate-kill` total=12 failures=0; scratch removed; HEAD the same, status clean.
+
+### Must-fail (`vm-tools/guest/899-w7b1-mustfail-3.json`)
+
+The separate `rememberTimetable` step put back (`WriteDown` through `NewUndoStep("rememberTimetable", …)` in place of `PlanInto`): **4 of 4 RED**, build 0 each: the fixture row `TheWindowsActionLeavesTheRecordedStep`, `AReDateWhosePagesAreRefusedLeavesTheTimetableAsItWas`, `AReDateStoppedPartWayLeavesTheTimetableAsItWas`, `RollOverWhoseSecondPageCannotBeWritten_ChangesNothing`. Restored: Passed 407, Failed 0, Skipped 1.
