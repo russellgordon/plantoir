@@ -473,6 +473,15 @@ public sealed class UndoStackContractTests
                 }
                 case "addAFileInsideTheMovedFolder": _scribe.WritePage("A", RenamedFolder + "/c.md", "C\n"u8.ToArray()); return;
                 case "editThePageInsideByHand": _scribe.WritePage("A", RenamedFolder + "/a.md", "Hand.\n"u8.ToArray()); return;
+                // U4b, M1 (W8-3): the newest step's own kept original from an
+                // undo, beside a.md wherever the folder is now, an only copy.
+                case "leaveAKeptCopyInsideTheMovedFolder":
+                {
+                    string folder = Directory.Exists(_scribe.FullPath("A", RenamedFolder)) ? RenamedFolder : MediaFolder;
+                    long seq = _scribe.Fold().NextSeq - 1;
+                    File.WriteAllBytes(UndoSwap.BesidePath(_scribe.FullPath("A", folder + "/a.md"), $"{seq}-undo", "orig"), "Kept.\n"u8.ToArray());
+                    return;
+                }
                 case "stepEditingInsideAMovesFrom":
                 {
                     long seq = _scribe.Fold().NextSeq;

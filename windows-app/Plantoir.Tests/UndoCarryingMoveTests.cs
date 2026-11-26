@@ -313,4 +313,20 @@ public sealed class UndoCarryingMoveTests
         Assert.Equal([From + "/a.md"], askedAt);
         Assert.IsType<UndoCheck.PlanResult.Ready>(plan);
     }
+
+    /// <summary>A file added inside the moved folder between the check and the swap: the swap's own late refusal names the folder where it is now, as the plan's does (<c>placeAsFound</c>; W8-3's riding low).</summary>
+    [Fact]
+    public void ALateRefusalOfTheMoveNamesTheFolderWhereItIsNow()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        var seams = new UndoSeams { AfterTheCheck = () => scribe.WritePage("A", To + "/c.md", Encoding.UTF8.GetBytes("C\n")) };
+
+        UndoOutcome undo = scribe.Door(seams).Undo();
+
+        Assert.Equal(UndoOutcomeKind.Refused, undo.Kind);
+        Assert.Equal(UndoRefusalKind.ChangedSince, undo.Refusal?.Kind);
+        Assert.Equal(To, undo.Refusal?.Path);
+        Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
+    }
 }
