@@ -40,3 +40,12 @@ N6 nothingWasChanged removing instead of putting back.
   RED, 5: testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder (2 lines), testARefusedFinishOfTheRecordedRenameKeepsItsRecord, testARefusedRenameOfAnotherFolderLeavesAnEarlierRecord, testARetryOfARenameOfAnotherFolderLeavesAnEarlierRecord.
 
 Round 2 must-fail: 5 RED of 5 (N2 to N6), plus N1 tests first. Logs: /Users/russellgordon/plantoir/wt-899-u4b2-3/.dd/run-n*.log
+
+Round 3 (review 2: L-A, L-B). Class: SpecialFolderRenamerTests. Each restored to the tested source (status clean but for the round's own commit).
+
+P1 the round-2 rule: any record of this folder cleared on success, moved or not (L-A).
+  RED: testARenameThatMovesNothingKeepsTheRecordOfThisFoldersUnfinishedRename ("nil") is not equal to ("Optional(71 bytes)") - the record of a rename that can still be finished was cleared; ("nil") is not equal to ("Optional("All Days")").
+P2 the tidy-failure line always saying "renamed the folder" (L-B).
+  RED: testARecordThatCannotBeTidiedIsToldOnTheTrail, both the contains and the not-contains assertions.
+
+Round 3 must-fail: 2 RED of 2. Logs: /Users/russellgordon/plantoir/wt-899-u4b2-3/.dd/run-p1.log, run-p2.log

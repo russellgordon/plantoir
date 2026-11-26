@@ -742,11 +742,44 @@ final class SpecialFolderRenamerTests: XCTestCase {
         ))
 
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        // Said as a refusal: nothing was renamed (review 2, L-B). MUST FAIL
+        // with the line saying "renamed the folder".
         let expectedStart: String = SpecialFolderRenamer.renameNoteNotTidiedLine(
-            renaming: "Tasks", to: "Assessments", course: "ICS3U", said: ""
+            renaming: "Tasks", to: "Assessments", course: "ICS3U", wasRenamed: false, said: ""
         )
         let withoutReason: String = String(expectedStart.dropLast(2))
+        XCTAssertTrue(withoutReason.hasPrefix("did not rename the folder Tasks"), withoutReason)
         XCTAssertTrue(trail.contains(withoutReason), trail)
+        XCTAssertFalse(trail.contains("· renamed the folder Tasks"), trail)
+    }
+
+    /// A `rename` of the recorded folder to ANOTHER name that moves nothing
+    /// and changes no settings leaves the record: the settings still name
+    /// the old folder, so the recorded rename can still be finished (review
+    /// 2, L-A). MUST FAIL with any record of this folder cleared on success.
+    func testARenameThatMovesNothingKeepsTheRecordOfThisFoldersUnfinishedRename() throws {
+        let course: URL = temporaryDirectory.appendingPathComponent("ICS3U")
+        try FileManager.default.createDirectory(
+            at: course.appendingPathComponent("All Days"), withIntermediateDirectories: true
+        )
+        SpecialFolderRenamer.recordRenameStarting(
+            from: "All Classes", to: "All Days", scope: .shared, courseDirectory: course
+        )
+        let marker: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course)
+        let earlier: Data = try Data(contentsOf: marker)
+
+        let outcome: FolderRenameOutcome = try SpecialFolderRenamer.rename(
+            "All Classes", to: "Every Class", scope: .shared, courseDirectory: course, sectionNumbers: [1]
+        )
+
+        XCTAssertEqual(outcome.foldersMoved, 0)
+        XCTAssertEqual(try? Data(contentsOf: marker), earlier, "the record of a rename that can still be finished was cleared")
+        XCTAssertEqual(
+            SpecialFolderRenamer.interruptedRenameTarget(
+                from: "All Classes", scope: .shared, courseDirectory: course, sectionNumbers: [1]
+            ),
+            "All Days"
+        )
     }
 
     // MARK: - Helpers

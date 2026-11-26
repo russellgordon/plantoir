@@ -22533,15 +22533,20 @@ its own has replaced whatever was there (another folder's interrupted
 rename); the claim reads that earlier record once, before the first write.
 Refused with nothing changed (a changed-since retry included): the earlier
 record is put back byte for byte, or no record is left when there was none.
-Stopped part way or killed: this run's record stays. Whole: a record of a
-rename of this same folder is cleared, whatever its target (this rename
-finished it, or took the old name away so it can never be finished); any
-other earlier record is put back, and a rename that moved no folder touches
-nothing. Before this, `renameFolder` cleared the file on every success, retry
+Stopped part way or killed: this run's record stays. Whole: a record of
+this same rename (folder and target) is cleared, since it is finished. A
+record of this folder renamed to another name is cleared only when the old
+name is gone for good: this run moved the folders, or the caller writes the
+settings away from it (`renameFolder` does; `rename` does not, so a `rename`
+that moves nothing leaves that record, whose rename can still be finished).
+Any other earlier record is put back, and a rename that moved no folder
+touches nothing else. Before this, `renameFolder` cleared the file on every success, retry
 and refusal, so renaming one folder lost another folder's unfinished rename
 and the sheet stopped offering to finish it (review 1, M1; the final sweep's
 L5 for `rename`). A put-back or clear that fails writes a `folder renamed`
-trail line, since a record left by mistake greys the one-section restore.
+trail line, since a record left by mistake greys the one-section restore;
+it says "did not rename" after a refusal and "renamed" only once the rename
+is whole.
 One window is accepted: a kill between this run's write and the put-back
 loses the earlier record, as it always did before; refusing a rename while
 another is unfinished would be a new sentence and its own contract piece,

@@ -1175,7 +1175,8 @@ struct CourseSettingsView: View {
         // or the one this run finishes) is never cleared by a refusal (the
         // final sweep, L4; U4b2-3). Read once, before the loop writes it.
         var record: RenameRecordClaim = RenameRecordClaim(
-            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory
+            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory,
+            changesTheSettings: true
         )
         var outcome: FolderRenameOutcome = FolderRenameOutcome(foldersMoved: 0, pagesRelinked: 0)
         while true {
