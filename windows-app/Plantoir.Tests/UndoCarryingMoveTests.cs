@@ -329,4 +329,20 @@ public sealed class UndoCarryingMoveTests
         Assert.Equal(To, undo.Refusal?.Path);
         Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
     }
+
+    /// <summary>The tidy of a carrying step looks where the folder is now: undone, a kept copy of a.md inside the folder at its old place is found and, a copy of its page, removed.</summary>
+    [Fact]
+    public void TheTidyFindsTheStepsOwnFilesWhereTheMovedFolderIsNow()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        Assert.Equal("undone", scribe.Undo().Name);
+        string kept = UndoSwap.BesidePath(scribe.FullPath("A", From + "/a.md"), "1-undo", "orig");
+        File.WriteAllBytes(kept, OldA);
+        UndoStep step = scribe.Fold().Steps[1].Step;
+        string root = Path.GetDirectoryName(scribe.FullPath("A", "x"))!;
+
+        Assert.True(UndoSwap.TidyLeftovers(1, step.PathsToTidy, root, keepingOnlyCopies: true));
+        Assert.False(File.Exists(kept));
+    }
 }
