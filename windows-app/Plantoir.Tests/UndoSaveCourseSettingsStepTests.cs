@@ -180,6 +180,26 @@ public sealed class UndoSaveCourseSettingsStepTests : IDisposable
     }
 
     [Fact]
+    public void TheStepsOwnMemberChangedBetweenThePlanAndTheMakeRefusesTheStep()
+    {
+        Course course = TheCourse();
+        course.Configuration.HiddenItems = ["Media"];
+        UndoForThisProcess list = List();
+        var step = new UndoActionStep(new UndoStepMaker("sheet", "saveCourseSettings"), Folder, "ICS3U", section: null,
+                                      holds: "course", undo: list, door: Door(list));
+
+        course.Configuration.PlanWrite(ConfigPath, step);
+        // The befores are the plan's read: another window's hides are never written over.
+        ChangeOnDisk("hidden", new JsonArray("Theirs"));
+        byte[] theirs = File.ReadAllBytes(ConfigPath);
+        var refused = Assert.Throws<UndoStepRefusedException>(step.Make);
+
+        Assert.Equal(UndoRefusalKind.ChangedSince, refused.Refusal.Kind);
+        Assert.Equal(theirs, File.ReadAllBytes(ConfigPath));
+        Assert.Empty(AppliedSteps());
+    }
+
+    [Fact]
     public void AFourthRefusalInARowWritesNothingAndKeepsTheEditsUnsaved()
     {
         Course course = TheCourse();
