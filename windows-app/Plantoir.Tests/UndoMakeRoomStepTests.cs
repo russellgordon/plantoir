@@ -81,6 +81,36 @@ public sealed class UndoMakeRoomStepTests : IDisposable
         Assert.Single(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
     }
 
+    /// <summary>
+    /// Making room among blank pages (review 1, L3), the shape Make Room is
+    /// most used on: pages that differ only in their title and date, so a
+    /// renamed and re-dated page can come out byte for byte the page that
+    /// stood at its new name. That file is not in the step at all; every
+    /// other is, in the planned order, and every page reads as the plan meant.
+    /// </summary>
+    [Fact]
+    public void AmongBlankPagesAPageThatComesOutUnchangedIsNotInTheStep()
+    {
+        WindowsActionsOnTheMacFixture.Lay(Folder, Recorded);
+        // Day 2 carries Day 3's lesson, so renamed to Day 3 and re-dated it is Day 3 exactly.
+        string day3 = File.ReadAllText(Page("Unit 1, Day 3"));
+        File.WriteAllText(Page("Unit 1, Day 2"), day3.Replace("Unit 1, Day 3", "Unit 1, Day 2").Replace("2026-09-14", "2026-09-10"));
+
+        WindowsActionsOnTheMacFixture.Run(StepName, Workspace());
+
+        JsonObject begin = Assert.Single(WindowsActionsOnTheMacFixture.AppliedBegins(ListFolder));
+        var expected = new List<string>(RecordedPaths());
+        expected.Remove("courses/ICS3U/section1/All Classes/Unit 1, Day 3.md");
+        Assert.Equal(expected, OpPaths(begin));
+        Assert.Equal(day3, File.ReadAllText(Page("Unit 1, Day 3")));
+        foreach (JsonElement file in Recorded.GetProperty("files").EnumerateArray())
+        {
+            string path = file.GetProperty("path").GetString()!;
+            if (path.EndsWith("Unit 1, Day 3.md", StringComparison.Ordinal)) continue;
+            Assert.Equal(file.GetProperty("after").GetString(), File.ReadAllText(UndoDoor.FullPath(Folder, path)));
+        }
+    }
+
     /// <summary>No new page and no renamed page is ever left Hidden (the swap hides only what it keeps aside).</summary>
     [Fact]
     public void NoNewOrRenamedPageIsEverHidden()
@@ -231,8 +261,8 @@ public sealed class UndoMakeRoomStepTests : IDisposable
         var result = workspace.ApplyInsertClasses(nothing);
 
         Assert.Equal("Nothing needed moving.", result.Message);
-        Assert.Equal(before, WindowsActionsOnTheMacFixture.EveryFileBut(Folder, ListFolder));
         Assert.Equal(0, WindowsActionsOnTheMacFixture.Begins(ListFolder));
+        Assert.Equal(before, WindowsActionsOnTheMacFixture.EveryFileBut(Folder, ListFolder));
     }
 
     /// <summary>
@@ -246,14 +276,27 @@ public sealed class UndoMakeRoomStepTests : IDisposable
     /// touched, and no step recorded. The pieces that move a link (U4b2-14
     /// and 15) settle which of the two holds; until then this test holds the
     /// difference by name (it took the place of the ledger's
-    /// Reason899W7b2MakeRoomLinkedPage row when Make Room was converted).
+    /// Reason899W7b2MakeRoomLinkedPage row when Make Room was converted), and
+    /// it reads the clause: once the contract no longer states both sides, it
+    /// fails, so the difference never outlives its requirement. For a link to
+    /// a file outside the working folder and one inside it alike, as the
+    /// clause says.
     /// </summary>
-    [Fact]
-    public void ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15(bool insideTheWorkingFolder)
     {
+        string clause = UndoContract.Undo.GetProperty("rule").GetProperty("shadow").GetString()!;
+        const string settle = "undo.rule.shadow no longer states the linked-page difference this test holds: settle it (U4b2-14 and 15) and change this test to the contract's one rule";
+        Assert.True(clause.Contains("never follows the link and is refused before anything changes", StringComparison.Ordinal), settle + " (the mac's refusal is gone)");
+        Assert.True(clause.Contains("saving a plain copy at the new name and deleting the link itself, the linked file left untouched", StringComparison.Ordinal), settle + " (Windows' plain copy is gone)");
+        Assert.True(clause.Contains("held by name in UndoMakeRoomStepTests." + nameof(ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15), StringComparison.Ordinal),
+                    "undo.rule.shadow no longer names this test as where the difference is held");
+
         WindowsActionsOnTheMacFixture.Lay(Folder, Recorded);
         string linked = Page("Unit 1, Day 3");
-        string outside = Path.Combine(_root, "elsewhere");
+        string outside = insideTheWorkingFolder ? Path.Combine(Folder, "elsewhere") : Path.Combine(_root, "elsewhere");
         Directory.CreateDirectory(outside);
         string target = Path.Combine(outside, "Unit 1, Day 3.md");
         byte[] targetBytes = File.ReadAllBytes(linked);
