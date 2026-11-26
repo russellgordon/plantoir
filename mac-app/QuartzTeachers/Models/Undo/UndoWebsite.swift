@@ -100,17 +100,29 @@ nonisolated enum UndoWebsite {
     /// - `moves`: every page the step changes, visibility before and after.
     /// - `changesMoreThanVisibility`: the step also changes what some page
     ///   says (or a file that is not a page), which the record does not hold.
-    /// - `record`: every file in the section's published-pages folder.
+    /// - `record`: every file in the section's published-pages folder; nil
+    ///   when that folder is there and cannot be listed (#1004-b), so what
+    ///   every destination shows is unknown.
     /// - `destinations`: the destination types the section deploys to NOW
     ///   (`netlify`, `cloudflare`, `folder`): its primary and any additional.
     /// - `siteMarkers`: those of them that have a site marker.
     static func answer(
         moves: [PageMove],
         changesMoreThanVisibility: Bool,
-        record: [Fragment],
+        record: [Fragment]?,
         destinations: [String],
         siteMarkers: Set<String>
     ) -> Answer {
+        guard let record else {
+            // The folder could not be listed: every destination deployed to
+            // now is one whose newest fragment cannot be read, as Windows'
+            // Answer reads a null record. A section that deploys nowhere has
+            // nothing to offer.
+            if destinations.isEmpty {
+                return .noOffer
+            }
+            return .cannotTell
+        }
         var newestByDestination: [String: Fragment] = [:]
         var newestStamp: [String: String] = [:]
         for fragment in record {
@@ -245,13 +257,22 @@ nonisolated enum UndoWebsite {
     }
 
     /// Every file of a section's published-pages folder, read. A file that
-    /// cannot be read as the record's JSON has nil places.
-    static func readRecord(courseFolder: URL, section: Int) -> [Fragment] {
+    /// cannot be read as the record's JSON has nil places. A folder that is
+    /// not there is no fragments (`[]`); one that is there and cannot be
+    /// listed (a permission, a file a sync service holds, a volume gone part
+    /// way) is nil, never `[]`, so `answer` says cannot tell rather than
+    /// never deployed (#1004-b). Decided from the folder's own `errno`
+    /// (`UndoJournal.namesListed(in:)`): only `ENOENT` or `ENOTDIR` is not
+    /// there.
+    static func readRecord(courseFolder: URL, section: Int) -> [Fragment]? {
         let folder: URL = courseFolder
             .appendingPathComponent(".publish_state", isDirectory: true)
             .appendingPathComponent("section\(section).published-pages", isDirectory: true)
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
-            return []
+        let names: [String]
+        do {
+            names = try UndoJournal.namesListed(in: folder)
+        } catch {
+            return nil
         }
         var fragments: [Fragment] = []
         for name in names {

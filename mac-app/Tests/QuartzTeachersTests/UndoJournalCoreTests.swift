@@ -13,6 +13,13 @@ final class UndoJournalCoreTests: XCTestCase {
 
     var scratchURL: URL = FileManager.default.temporaryDirectory
 
+    // MARK: - Computed properties
+
+    /// A course folder for the published-pages record tests (#1004-b).
+    var courseFolder: URL {
+        return scratchURL.appendingPathComponent("courses/TST1O", isDirectory: true)
+    }
+
     // MARK: - Setting up
 
     override func setUp() {
@@ -24,6 +31,9 @@ final class UndoJournalCoreTests: XCTestCase {
         // Given back even when a test failed before its own clean-up.
         try? FileManager.default.setAttributes(
             [.posixPermissions: 0o755], ofItemAtPath: UndoCoreChecks.unlistableParent(under: scratchURL).path
+        )
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: recordFolder(ofCourse: courseFolder).path
         )
         try? FileManager.default.removeItem(at: scratchURL)
     }
@@ -113,5 +123,37 @@ final class UndoJournalCoreTests: XCTestCase {
     /// read an unlistable folder as no segments.
     func testAListFolderThatCannotBeListedIsUnreadable() throws {
         XCTAssertEqual(try UndoCoreChecks.aListFolderThatCannotBeListedIsUnreadable(under: scratchURL), [])
+    }
+
+    // MARK: - Functions
+
+    /// `courses/TST1O/.publish_state/section1.published-pages`.
+    func recordFolder(ofCourse course: URL) -> URL {
+        return course
+            .appendingPathComponent(".publish_state", isDirectory: true)
+            .appendingPathComponent("section1.published-pages", isDirectory: true)
+    }
+
+    /// #1004-b, gap 3. MUST FAIL with `readRecord` back to `try?`, which
+    /// read a folder that is there and cannot be listed as no fragments.
+    func testAPublishedPagesFolderThatCannotBeListedIsNotNoFragments() throws {
+        let folder: URL = recordFolder(ofCourse: courseFolder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("{\"version\": 1, \"places\": [\"Section 1/index\"]}\n".utf8)
+            .write(to: folder.appendingPathComponent("20261113T090000Z-netlify.json"))
+        XCTAssertEqual(UndoWebsite.readRecord(courseFolder: courseFolder, section: 1)?.count, 1)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: folder.path)
+        XCTAssertNil(UndoWebsite.readRecord(courseFolder: courseFolder, section: 1), "a folder that cannot be listed is not []")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+    }
+
+    /// #1004-b: a folder that is not there is no fragments, and so is a
+    /// file where the folder would be (`ENOTDIR`). Passes on the base too.
+    func testAPublishedPagesFolderThatIsNotThereIsNoFragments() throws {
+        XCTAssertEqual(UndoWebsite.readRecord(courseFolder: courseFolder, section: 1), [])
+        let folder: URL = recordFolder(ofCourse: courseFolder)
+        try FileManager.default.createDirectory(at: folder.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("not a folder".utf8).write(to: folder)
+        XCTAssertEqual(UndoWebsite.readRecord(courseFolder: courseFolder, section: 1), [])
     }
 }

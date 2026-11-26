@@ -85,7 +85,8 @@ def committed():
         return json.load(handle)
 
 
-FRAGMENT = re.compile(r"^(\d{8}T\d{6}Z)-(.+)\.json$")
+# ASCII digits only (#1004-b): Python's \d, like .NET's, matches any Unicode digit.
+FRAGMENT = re.compile(r"^([0-9]{8}T[0-9]{6}Z)-(.+)\.json$")
 
 
 def nfc(text):
@@ -100,6 +101,10 @@ def deployed_answer(case):
     marker with no fragment cannot tell; places compare in NFC."""
     destinations = case["destinations"]
     markers = set(case.get("siteMarkers", []))
+    if case.get("recordListed") is False:
+        # #1004-b: a folder that is there and cannot be listed: what every
+        # destination deployed to now shows is unknown.
+        return "cannotTell" if destinations else "noOffer"
     newest = {}
     for fragment in case["record"]:
         found = FRAGMENT.match(fragment["name"])
@@ -1341,6 +1346,19 @@ class ContractCaseTests(unittest.TestCase):
                         seq = model.begin(ops, readable=readable_step(step))
                         model.pages[p1] = after
                         model.finish(seq)
+                    elif call == "aSegmentNamedWithOtherDigits":
+                        # #1004-b: undoJournal.files, six ASCII digits: a
+                        # name with other digits is not a segment, so the
+                        # step written in it is never read.
+                        pass
+                    elif call == "stepWithAMadeAtThatIsNotAMoment":
+                        # #1004-b: unreadable (a barrier); for the limits it
+                        # carries the time of the step before (no time of its own).
+                        before = model.pages[p1]
+                        after = flipped(p1)
+                        seq = model.begin(traces.ops_for_change(p1, before, after), readable=False, no_time=True)
+                        model.pages[p1] = after
+                        model.finish(seq)
                     elif call == "foreignStep":
                         seq = model.begin([{"kind": "aKindNobodyKnows", "from": "a", "to": "b"}], readable=False)
                         model.find(seq)["phase"] = "done"
@@ -1493,7 +1511,7 @@ class ContractCaseTests(unittest.TestCase):
         # against the contract's cases (UndoWebsite.answer on the mac).
         for case in shared_undo()["deployedCases"]:
             with self.subTest(case=case["name"]):
-                self.assertEqual(set(case) - {"name", "moves", "changesMoreThanVisibility", "record", "destinations",
+                self.assertEqual(set(case) - {"name", "moves", "changesMoreThanVisibility", "record", "recordListed", "destinations",
                                               "siteMarkers", "answer", "why"}, set())
                 self.assertEqual(deployed_answer(case), case["answer"])
 
