@@ -226,25 +226,29 @@ public sealed class InsertClassesTests : IDisposable
     }
 
     /// <summary>
-    /// The duplicate keeps what it did (#550's ruling): its new page's save
-    /// failing is noted as a change and THROWN, never carried past — carried
-    /// past, the duplicate would find no page of its own and tell the teacher
-    /// "the place for the copy is still taken" about a plain write failure.
+    /// A duplicate whose new page cannot be planned (a folder took its place
+    /// while the room was planned) changes nothing (#899 W7b2-2: the room and
+    /// the copy are one step, all or none), and is never answered "the place
+    /// for the copy is still taken" about what is a plain write failure (#550).
     /// </summary>
     [Fact]
-    public void ADuplicateWhoseNewPageCouldNotBeSaved_ThrowsAndIsNotStillTaken()
+    public void ADuplicateWhoseNewPageCouldNotBeSaved_ChangesNothingAndIsNotStillTaken()
     {
         FourClasses();
         var workspace = Open();
-        var plan = workspace.PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 1");
+        // Unit 1, Day 2's copy: Unit 2's classes are re-dated, and the new
+        // page's place is one no rename touches.
+        var plan = workspace.PlanDuplicateClass("ICS3U", 1, "Unit 1, Day 2");
         string newPage = ClassPath(plan.NewTitle);
+        string later = File.ReadAllText(ClassPath("Unit 2, Day 1"));
 
-        var thrown = Record.Exception(() => workspace.ApplyDuplicateClass(
+        var refusal = Assert.Throws<AssistRefusal>(() => workspace.ApplyDuplicateClass(
             plan, new AtTheStep("Adding the new", () => Directory.CreateDirectory(newPage))));
 
-        Assert.True(thrown is IOException or UnauthorizedAccessException, $"threw {thrown?.GetType().Name}: {thrown?.Message}");
-        Assert.DoesNotContain("is still there", thrown!.Message);
-        Assert.True(workspace.TakeWhetherTheCallChangedAnything(workspace.TopOfTheUndoList), "the renames were written");
+        Assert.StartsWith("Nothing was changed: ", refusal.Message);
+        Assert.DoesNotContain("is still there", refusal.Message);
+        Assert.Equal(later, File.ReadAllText(ClassPath("Unit 2, Day 1")));
+        Assert.False(workspace.TakeWhetherTheCallChangedAnything(workspace.TopOfTheUndoList), "nothing was written");
     }
 
     private static string TextOf(ModelContextProtocol.Protocol.CallToolResult result) =>

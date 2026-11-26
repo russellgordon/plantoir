@@ -273,27 +273,31 @@ public sealed class DuplicateClassTests : IDisposable
     [Fact]
     public void ALinkRewrittenInsideTheLessonCannotFoolTheGuard()
     {
-        // #200 A, the mac's deterministic construction with a FOLDER standing in
-        // for invalid UTF-8 (which .NET reads without complaint): Unit 1 Days
-        // 1-6, duplicate Day 2, so the copy is to become Day 3 — a real lesson
-        // linking to Day 6. Day 5 cannot be read, so Day 6 -> 7 is the only
-        // rename; the link pass then rewrites [[Unit 1, Day 6]] inside Day 3,
-        // and the old text comparison read the lesson as "not the same page".
-        var dates = new[] { "2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16", "2026-09-18" };
-        for (int day = 1; day <= 6; day++)
-            Lesson($"Unit 1, Day {day}", dates[day - 1],
-                   day == 3 ? "The real Day 3. See [[Unit 1, Day 6]].\n" : $"Body of day {day}.\n");
+        // #200 A: Unit 1 Days 1-4 and 6 (no Day 5), duplicate Day 2, so the
+        // copy is to become Day 3 — a real lesson linking to Day 6. The plan
+        // renames 6 -> 7, 4 -> 5 and 3 -> 4. A page of the teacher's own takes
+        // Day 5 after the plan, so 4 -> 5 and 3 -> 4 are skipped and 6 -> 7 is
+        // the only rename; the link pass then rewrites [[Unit 1, Day 6]] inside
+        // Day 3, and the old text comparison read the lesson as "not the same
+        // page". (Before #899 W7b2-2 a FOLDER at Day 5 skipped the rename, the
+        // mac's construction with an unreadable page; a page that cannot be
+        // read or written now refuses the whole step, changing nothing.)
+        var dates = new[] { "2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-18" };
+        int[] days = [1, 2, 3, 4, 6];
+        for (int index = 0; index < days.Length; index++)
+            Lesson($"Unit 1, Day {days[index]}", dates[index],
+                   days[index] == 3 ? "The real Day 3. See [[Unit 1, Day 6]].\n" : $"Body of day {days[index]}.\n");
         var workspace = Open();
         var plan = workspace.PlanDuplicateClass("ICS3U", 1, "Unit 1, Day 2");
 
-        // Day 5 becomes something that cannot be read as a page (a folder of
-        // the same name) after the plan, so its rename is skipped.
-        File.Delete(ClassPath("Unit 1, Day 5"));
-        Directory.CreateDirectory(ClassPath("Unit 1, Day 5"));
+        Lesson("Unit 1, Day 5", "2026-09-16", "A lesson written in Obsidian just now.\n");
         var refusal = Assert.Throws<AssistRefusal>(() => workspace.ApplyDuplicateClass(plan));
 
         Assert.StartsWith("“Unit 1, Day 3” is still there", refusal.Message);
-        Assert.Contains("The real Day 3.", File.ReadAllText(ClassPath("Unit 1, Day 3")));
+        string standing = File.ReadAllText(ClassPath("Unit 1, Day 3"));
+        Assert.Contains("The real Day 3.", standing);
+        Assert.Contains("[[Unit 1, Day 7]]", standing);
+        Assert.True(File.Exists(ClassPath("Unit 1, Day 7")), "the room alone is made");
     }
 
     // ---- Undo, and when it is deliberately not offered ---------------------
