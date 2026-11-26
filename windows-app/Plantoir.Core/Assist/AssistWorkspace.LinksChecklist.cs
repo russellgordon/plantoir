@@ -287,14 +287,17 @@ public sealed partial class AssistWorkspace
         using var recording = UndoHistory.Record(_undo, $"published pages that links lead to in {course.Code} Section {section}");
         var step = NewUndoStep(LinksChecklist.AnsweredActionKey, course.Code, section, madeBy: "sheet");
         LinksChecklistPublished result;
-        try
-        {
-            result = PlanThePress(sheet, step);
-            MakeTheUndoStep(step);
-        }
+        try { result = PlanThePress(sheet, step); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            throw RefusalForAPressThatStopped(error);
+            // A page the plan needs could not be read: nothing was written
+            // (the mac's catch around planning, AssistToolRefusal.unreadablePage).
+            throw RefusalForAPressThatStopped(error, sheet, planning: true);
+        }
+        try { MakeTheUndoStep(step); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw RefusalForAPressThatStopped(error, sheet, planning: false);
         }
         recording.Done();
         NotePublished(sheet, result);
@@ -302,21 +305,50 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// A press whose step failed: "Nothing was changed" when the door wrote
-    /// nothing; when it left a file holding the new content, its earlier
-    /// content kept beside it, the mac's checklist part-way sentence, which
-    /// names each kept file, and nothing more (the mac's sheet points at no
-    /// button after it).
+    /// A press whose step failed, said as the mac's <c>publish</c> and
+    /// <c>LinksChecklistPublisher.sentence(forRefused:)</c> say it (W7b2-8
+    /// review 1, L1). Every refusal wrote nothing (the press is one step):
+    /// a page the plan could not read, and a file the door could not read
+    /// just now that really cannot be read, are the unreadable-page sentence
+    /// naming the course; a section page changed since it was checked is
+    /// <c>linksChecklist.wording.pageChangedSince</c>, the page named as the
+    /// sheet names it; a file left holding the new content, its earlier
+    /// content kept beside it, is the checklist part-way sentence naming each
+    /// kept file, and nothing more (the mac's sheet points at no button
+    /// after it); anything else is "Nothing was changed: …".
     /// </summary>
-    /// <summary>Tests-first stub (#899 W7b2-3): the old answer for every refusal.</summary>
-    internal AssistRefusal RefusalForAPressThatStopped(Exception error, LinksChecklistSheet sheet, bool planning) =>
-        RefusalForAPressThatStopped(error);
-
-    private AssistRefusal RefusalForAPressThatStopped(Exception error)
+    internal AssistRefusal RefusalForAPressThatStopped(Exception error, LinksChecklistSheet sheet, bool planning)
     {
-        if (error is not UndoStepLeftPartWayException) return new AssistRefusal(NothingWasChanged(error));
-        NoteAChangeWithNoUndoEntry();
-        return new AssistRefusal(AssistWording.PublishStoppedPartWay(PagesThePressTicked, ReasonItStopped(error)));
+        var course = Course(sheet.CourseCode);
+        if (planning) return new AssistRefusal(UnreadablePage(course.Code));
+        if (error is UndoStepLeftPartWayException)
+        {
+            NoteAChangeWithNoUndoEntry();
+            return new AssistRefusal(AssistWording.PublishStoppedPartWay(PagesThePressTicked, ReasonItStopped(error)));
+        }
+        if (error is UndoStepRefusedException { Refusal: { Path: { } named } refusal })
+        {
+            string full = Path.IsPathRooted(named) ? named : UndoDoor.FullPath(_folder, named);
+            if (refusal.Kind == UndoRefusalKind.ChangedSince && PageNameOnTheSheet(sheet, course, full) is { } name)
+                return new AssistRefusal(LinksChecklistWording.Fill(LinksChecklistWording.PageChangedSince,
+                    new Dictionary<string, string> { ["name"] = name }));
+            // "Could not be read" only for a file that really cannot be read
+            // now; a page that is a link, or a folder, cannot be checked and
+            // so was not written, which "Nothing was changed" says.
+            if (refusal.Kind == UndoRefusalKind.CannotTellNow && UndoCurrent.Read(full) is UndoCurrent.CannotReadNow)
+                return new AssistRefusal(UnreadablePage(course.Code));
+        }
+        return new AssistRefusal(NothingWasChanged(error));
+    }
+
+    /// <summary>The page at <paramref name="fullPath"/> as the sheet names it, or null when it is not one of the course's pages (the answered record, the kept record).</summary>
+    private string? PageNameOnTheSheet(LinksChecklistSheet sheet, Course course, string fullPath)
+    {
+        if (!fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) return null;
+        string place = PlaceOf(course, Relative(Path.GetFullPath(fullPath)));
+        string key = LinksChecklist.Key(place);
+        if (!PlaceIndex(course).ContainsKey(key)) return null;
+        return sheet.RowTitles.TryGetValue(key, out string? title) ? title : sheet.NameOf(place);
     }
 
     /// <summary>

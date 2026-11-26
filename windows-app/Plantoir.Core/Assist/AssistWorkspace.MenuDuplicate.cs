@@ -1,5 +1,6 @@
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Assist;
 
@@ -134,8 +135,9 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// The write: a copy of the course first, the plan made again and held to
-    /// the one shown, then ONE new file. Returns the finished sentence.
+    /// The write: a copy of the course first, then ONE step holding ONE new
+    /// file, the plan made again and held to the one shown after the step's
+    /// before is read. Returns the finished sentence.
     /// </summary>
     public string ApplyMenuDuplicate(MenuDuplicateRequest request, IProgress<string>? progress = null)
     {
@@ -147,44 +149,42 @@ public sealed partial class AssistWorkspace
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so nothing was copied: {error.Message}");
         }
 
-        // Held again to the plan after the copy (#351's plan/write gap).
-        MenuDuplicateRequest again;
-        try { again = PlanMenuDuplicate(request.CourseCode, request.Section, request.SourcePath); }
-        catch (CopyCannotBeHidden) { throw; }
-        catch (AssistRefusal) { again = request with { CopyText = "" }; }
-        if (again != request)
-            throw new AssistRefusal(AssistWording.ChangedWhileSavingACopyFromTheMenu(course.Code,
-                request.Section.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-
-        Directory.CreateDirectory(Path.GetDirectoryName(request.NewPath)!);
-        bool created = false;
+        // ONE step through the door (#899 W7b2-3; the mac's
+        // duplicateAsTheNextClassFromTheMenu, JournaledStep.writeNew): the one
+        // new page, staged beside its place and renamed in whole, so nothing
+        // half written is ever left, and the class folder is made by the
+        // swap, never beforehand. Never written over, as the exclusive
+        // create never wrote over one: a page at the new name when planned is
+        // refused (after the plan made again, whose sentence comes first, as
+        // before), and its before (none) is read as it is planned, so a page
+        // that appears after this is a change since the plan, refused by the
+        // door's check or by its rename in the last instant.
+        var step = NewUndoStep("duplicateAsTheNextClass", course.Code, request.Section);
         try
         {
-            using (var stream = new FileStream(request.NewPath, FileMode.CreateNew, FileAccess.Write))
-            {
-                created = true;
-                using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
-                writer.Write(request.CopyText);
-            }
+            bool alreadyThere = step.Exists(request.NewPath);
+            step.Write(request.NewPath, request.CopyText);
+
+            // Held again to the plan after the copy and after the step's
+            // before is read (#351's plan/write gap): the source's words, the
+            // page it becomes and the copy itself.
+            MenuDuplicateRequest again;
+            try { again = PlanMenuDuplicate(request.CourseCode, request.Section, request.SourcePath); }
+            catch (CopyCannotBeHidden) { throw; }
+            catch (AssistRefusal) { again = request with { CopyText = "" }; }
+            if (again != request)
+                throw new AssistRefusal(AssistWording.ChangedWhileSavingACopyFromTheMenu(course.Code,
+                    request.Section.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            // A page at the new name that the plan made again did not see
+            // either: never written over, as the exclusive create refused it.
+            if (alreadyThere)
+                throw new AssistRefusal(AssistWording.MenuTheNextPageIsAlreadyThere(request.NewTitle));
+
+            MakeTheUndoStep(step);
         }
-        catch (IOException) when (!created && File.Exists(request.NewPath))
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            // A page appeared at that name meanwhile: never written over.
-            throw new AssistRefusal(AssistWording.MenuTheNextPageIsAlreadyThere(request.NewTitle));
-        }
-        catch (IOException error) when (!created)
-        {
-            // Not there, and still not made (a path too long, a cloud-file
-            // error, a drive gone): said as what it is, never "already there"
-            // (lane B review, low 4; the mac matches only fileWriteFileExists).
-            throw new AssistRefusal(NothingWasCreated(error));
-        }
-        catch (Exception error) when (created)
-        {
-            // This call made the file, so a half-written one goes; the copy
-            // of the course saved first is the way back for anything else.
-            try { File.Delete(request.NewPath); } catch { }
-            throw new AssistRefusal(NothingWasCreated(error));
+            throw RefusalForAMenuCopyThatStopped(error, request);
         }
         // Changed, with no entry on the old list (see the remarks above), so
         // the trail's "ran from a menu" line says "carried out".
@@ -192,7 +192,24 @@ public sealed partial class AssistWorkspace
         return AssistWording.DuplicatedFromTheMenu(request.SourceTitle, request.NewTitle, DateText.Iso(request.NewDate));
     }
 
-    /// <summary>Tests-first stub (#899 W7b2-3): the answer the old path gave any failed write.</summary>
-    internal AssistRefusal RefusalForAMenuCopyThatStopped(Exception error, MenuDuplicateRequest request) =>
-        new(NothingWasCreated(error));
+    /// <summary>
+    /// What the menu's copy says when its ONE step fails (the mac's
+    /// <c>saidWhenTheStepStopped(error, nothing: "Nothing was created", what:
+    /// "the copy of the class")</c>): a page that appeared at the new name
+    /// since the plan, today's <see cref="AssistWording.MenuTheNextPageIsAlreadyThere"/>
+    /// (the mac's <c>changedSince</c> and <c>fileWriteFileExists</c>); a stop
+    /// that left the page holding the copy, the part-way sentence naming
+    /// each kept file; anything else "Nothing was created: …", as since #927.
+    /// </summary>
+    internal AssistRefusal RefusalForAMenuCopyThatStopped(Exception error, MenuDuplicateRequest request)
+    {
+        if (error is UndoStepLeftPartWayException) return RefusalForAStepThatStopped(error, "the copy of the class", request.Section);
+        // A page there now that the plan did not see: changed since to the
+        // door's check, or, appearing in the last instant, refused by the
+        // rename itself, which no-overwrite answers as "in use".
+        if (error is UndoStepRefusedException refused
+            && (refused.Refusal.Kind == UndoRefusalKind.ChangedSince || File.Exists(request.NewPath)))
+            return new AssistRefusal(AssistWording.MenuTheNextPageIsAlreadyThere(request.NewTitle));
+        return new AssistRefusal(NothingWasCreated(error));
+    }
 }
