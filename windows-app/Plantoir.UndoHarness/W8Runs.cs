@@ -72,7 +72,9 @@ internal static class W8Runs
     /// live, recovered by a second process. Every place (each page, the
     /// folder's place, the page inside it) whole before or whole after; live,
     /// all one way as the list says; nothing staged inside the folder at
-    /// either place, and no staged new content anywhere.
+    /// either place, and no staged new content anywhere. In shadow, a step
+    /// left part way keeps a kept original that differs from its page (the
+    /// only copy, U3c), inside the folder too: counted apart, never live.
     /// </summary>
     internal static int CarryingMoveKill(string folder)
     {
@@ -99,7 +101,7 @@ internal static class W8Runs
                     }
                     string said = Child(["child-w8-carry", run, mode.ToString(), work, point], kill: true);
                     string recovered = Child(["child-w8-recover", run, mode.ToString()], kill: false);
-                    (List<string> states, int stagedInside, int stagedNew) = Look(run);
+                    (List<string> states, int stagedInside, int stagedNew, int onlyCopies) = Look(run);
                     UndoFoldedStep? step = List(run, mode).Journal.Read().Folded.Steps.Values.LastOrDefault();
                     bool eachWhole = !states.Contains("NEITHER");
                     bool reachedItsPoint = said.StartsWith("AT ", StringComparison.Ordinal);
@@ -107,10 +109,10 @@ internal static class W8Runs
                     if (mode == UndoMode.Live)
                     {
                         string expected = step?.State == UndoStepState.Done ? "after" : "before";
-                        consistent = consistent && states.All(state => state == expected);
+                        consistent = consistent && states.All(state => state == expected) && onlyCopies == 0;
                     }
                     Console.WriteLine($"RESULT w8-carrying-move-kill mode={mode} work={work} point={point} setUp=[{setUp}] child=[{said}] recovered=[{recovered}] " +
-                                      $"step={step?.State.ToString() ?? "none"} places={string.Join(",", states)} stagedInside={stagedInside} stagedNew={stagedNew} {(consistent ? "WHOLE" : "NOT-WHOLE")}");
+                                      $"step={step?.State.ToString() ?? "none"} places={string.Join(",", states)} stagedInside={stagedInside} onlyCopiesInside={onlyCopies} stagedNew={stagedNew} {(consistent ? "WHOLE" : "NOT-WHOLE")}");
                     if (!consistent) failures++;
                 }
             }
@@ -120,7 +122,7 @@ internal static class W8Runs
     }
 
     /// <summary>first, second, the folder's place, the page inside it: before, after or NEITHER; the staged entries inside the folder at either place; the staged new contents anywhere.</summary>
-    private static (List<string> States, int StagedInside, int StagedNew) Look(string run)
+    private static (List<string> States, int StagedInside, int StagedNew, int OnlyCopies) Look(string run)
     {
         string Of(byte[]? now, byte[] before, byte[] after) =>
             now is null ? "NEITHER" : now.AsSpan().SequenceEqual(before) ? "before" : now.AsSpan().SequenceEqual(after) ? "after" : "NEITHER";
@@ -134,12 +136,20 @@ internal static class W8Runs
         states.Add(folderAt);
         states.Add(Of(Read(inside + "/a.md"), Encoding.UTF8.GetBytes(Old), Encoding.UTF8.GetBytes(New)));
         int stagedInside = 0;
+        int onlyCopies = 0;
         foreach (string place in new[] { Media, Renamed })
         {
             if (!Directory.Exists(Full(run, place))) continue;
             foreach (string entry in Directory.EnumerateFileSystemEntries(Full(run, place), "*", SearchOption.AllDirectories))
             {
-                if (Path.GetFileName(entry).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal)) stagedInside++;
+                string name = Path.GetFileName(entry);
+                if (!name.Contains(UndoSwap.StagedMarker, StringComparison.Ordinal)) continue;
+                // A kept original that differs from its page is the only copy
+                // of what it held, and stays by U3c's rule (a closed shadow
+                // step is never put back): counted apart, allowed only in shadow.
+                if (name.EndsWith("-orig", StringComparison.Ordinal) && File.Exists(entry) && UndoSwap.PlaceOfStagedName(name) is { } page
+                    && !UndoSwap.IsACopyOfItsPlace(entry, Path.Combine(Path.GetDirectoryName(entry)!, page))) onlyCopies++;
+                else stagedInside++;
             }
         }
         int stagedNew = 0;
@@ -148,7 +158,7 @@ internal static class W8Runs
             string name = Path.GetFileName(entry);
             if (name.Contains(UndoSwap.StagedMarker, StringComparison.Ordinal) && name.EndsWith("-new", StringComparison.Ordinal)) stagedNew++;
         }
-        return (states, stagedInside, stagedNew);
+        return (states, stagedInside, stagedNew, onlyCopies);
     }
 
     /// <summary>The working child: the step, its Undo or its Redo, through a door that stops at <paramref name="point"/>.</summary>
