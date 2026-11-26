@@ -195,21 +195,28 @@ final class UndoOpKindsTests: XCTestCase {
     }
 
     /// U4b2-10 (the part-two review of U4b, L3): the judgement alone. A
-    /// moved folder holding a folder `sub` made for a carried edit's file,
-    /// with that file left out, holds the content: `sub`, holding nothing
-    /// else, is left out with it. FAILED before, when the override kept
-    /// every folder listed.
+    /// moved folder holding folders made for a carried edit's files, with
+    /// those files left out, holds the content: each made folder, holding
+    /// nothing else, is left out with them (`made`, `made/one`, and
+    /// `sub/deeper` inside the content's own `sub`), while a folder of the
+    /// content's that holds a file (`sub`) or a folder (`keep`) besides a
+    /// file left out stays. FAILED before, when the override kept every
+    /// folder listed.
     func testAFolderMadeForALeftOutFileIsLeftOutOfTheMovesJudgement() throws {
         let folder: URL = scratchURL.appendingPathComponent("renamed", isDirectory: true)
         try UndoContractReplay.write("A\n", to: "a.md", in: folder)
+        try UndoContractReplay.write("B\n", to: "sub/b.md", in: folder)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("keep/empty"), withIntermediateDirectories: true)
         let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: folder).listingSha)
         try UndoContractReplay.write("X\n", to: "sub/deeper/x.md", in: folder)
+        try UndoContractReplay.write("X\n", to: "keep/x.md", in: folder)
+        try UndoContractReplay.write("X\n", to: "made/one/x.md", in: folder)
         let move: UndoOp = UndoOp.moveFolder(from: "media", to: "renamed", listingSha: listingSha)
-        let leftOut: [String: UndoItem] = ["Sub/deeper/x.md": .absent]
+        let leftOut: [String: UndoItem] = ["Sub/deeper/x.md": .absent, "keep/x.md": .absent, "made/one/x.md": .absent]
 
         let reading = UndoMoveSide.readNamingFoldersLeftOut(move, at: folder, overriding: leftOut)
         XCTAssertEqual(reading.side, .holdsTheContent)
-        XCTAssertEqual(reading.foldersLeftOut, ["sub/deeper", "sub"], "deepest first, as the disk spells them")
+        XCTAssertEqual(reading.foldersLeftOut, ["made/one", "sub/deeper", "made"], "deepest first, as the disk spells them")
         XCTAssertEqual(UndoMoveSide.read(move, at: folder, overriding: leftOut), .holdsTheContent)
     }
 

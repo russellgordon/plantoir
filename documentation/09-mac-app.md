@@ -22746,6 +22746,31 @@ it; it is replaced by a folder row that fails without it, and a row with a
 third spelling (`current.listedAs`, `a.JSON`) pins `.another` in
 `wholeState`: folded into `.from` it says already back.
 
+### U4b2: carried-subfolder-left-out
+
+A carried edit that makes a file in a folder that was not there
+(`renamed/sub/x.md`) makes the folder too (the swap's `makeTheFolder`).
+Before this piece the move's judgement left the file out but kept every
+listed folder, so the Undo of an untouched step was refused as changed
+since, and had it gone through the empty `sub` would have gone back with the
+folder. Now `UndoMoveSide.readNamingFoldersLeftOut` also leaves out every
+folder that holds nothing but files left out and folders so left out
+(`foldersHoldingOnly`, inside by `UndoOp.partInside`), judged that way first
+and, failing that, as listed, because the moved folder may have held an
+empty folder of its own in which the edit made its file (then it is the
+content's and stays). The swap's last look before the rename names those
+folders, and once every swap has gone in and the tidy has removed the
+step's own files, each is removed where it now is with `rmdir`, which never
+removes a folder holding anything: a folder the teacher put inside `sub`
+since keeps `sub` in the judgement, so the Undo is refused and nothing is
+moved. Rows: three `stackCases` "U4b, … a folder … carried edit made …"
+with the key `madeFolder`. **Rejected:** having the check hand the swap a
+list of folders to remove (a second judgement of which folders the step
+made, which the swap's own last look already makes); removing every empty
+folder inside the moved folder after an Undo (an empty folder of the
+content's own, or one the teacher made, is never the step's to remove).
+Recovery's put-back runs the same swap, so it tidies the same way.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
