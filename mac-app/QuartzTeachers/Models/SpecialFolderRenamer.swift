@@ -47,7 +47,61 @@ struct FolderRenameOutcome {
     let pagesRelinked: Int
 }
 
-/// Something that stopped a rename after it had started, or before it could.
+/// What a rename will do (#899 U4b), read from the disk before anything is
+/// written: `SpecialFolderRenamer.plan`, planned into one step by `apply`.
+nonisolated struct FolderRenamePlan: Sendable {
+
+    // MARK: - Stored properties
+
+    /// The folders that move, in order.
+    let moves: [Move]
+
+    /// The pages whose qualified links change, at their places after the move.
+    let pages: [Page]
+
+    // MARK: - Computed properties
+
+    var outcome: FolderRenameOutcome {
+        return FolderRenameOutcome(foldersMoved: moves.count, pagesRelinked: pages.count)
+    }
+
+    /// One folder's move, judged by its listing.
+    struct Move: Sendable {
+
+        // MARK: - Stored properties
+
+        let from: URL
+
+        let to: URL
+
+        let listingSha: String
+    }
+
+    /// One page relinked: the bytes read and the bytes it is left holding.
+    struct Page: Sendable {
+
+        // MARK: - Stored properties
+
+        let url: URL
+
+        let read: Data
+
+        let rewritten: Data
+    }
+}
+
+/// A planned step handed to the task that makes it off the main actor.
+/// Unchecked, and safe for one reason only: the planner hands the step over
+/// and does not touch it again until the task has finished
+/// (`SpecialFolderRenamer.make`).
+nonisolated struct StepHandedOver: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    let step: JournaledStep
+}
+
+/// Something that stopped a rename before it could start.
 struct FolderRenameProblem: LocalizedError {
 
     // MARK: - Stored properties
@@ -92,6 +146,16 @@ enum SpecialFolderRenamer {
         ".merged_output", "merged_output", ".obsidian", ".netlify_sites",
         ".toolchain", "node_modules", ".git",
     ]
+
+    /// Tests only: called as the plan is about to read each page, off the
+    /// main actor, so a test can hold the plan open on an event (U4b part
+    /// seven's review, M1). Nil in the app.
+    nonisolated(unsafe) static var planReadsAPage: (@Sendable (URL) -> Void)?
+
+    /// Tests only: called once the plan's detached walk has ended, however
+    /// it ended, so a test can tell a cancelled plan has stopped. Nil in the
+    /// app.
+    nonisolated(unsafe) static var planHasEnded: (@Sendable () -> Void)?
 
     // MARK: - Functions
 
@@ -193,6 +257,11 @@ enum SpecialFolderRenamer {
     /// Where a rename records that it has started, so that one interrupted
     /// half way can be recognised rather than guessed at.
     ///
+    /// Kept while the switch is off (#899 U4b): the rename is one step,
+    /// made in shadow, and shadow recovery repairs nothing, so a rename
+    /// killed part way is finished from this record, as before. Dropping it
+    /// belongs to the piece that turns the switch on (U7).
+    ///
     /// Inside `courses/.internal/`, which is where this project already keeps
     /// transient per-course state (the work leases, the tokens). Deliberately
     /// NOT a key in `course_config.json`: the whole failure being handled here
@@ -205,9 +274,10 @@ enum SpecialFolderRenamer {
             .appendingPathComponent(courseDirectory.lastPathComponent + ".json")
     }
 
-    /// Records that a rename is about to move folders. Written BEFORE anything
-    /// moves and deleted once the configuration has been written, so its
-    /// presence means exactly one thing: a rename got part way and stopped.
+    /// Records that a rename is about to move folders. Written BEFORE the
+    /// rename's step is made and cleared once it is made (or refused with
+    /// nothing changed), so its presence means one thing: a rename got part
+    /// way and stopped.
     nonisolated static func recordRenameStarting(
         from oldName: String, to newName: String, scope: FolderScope, courseDirectory: URL
     ) {
@@ -225,8 +295,8 @@ enum SpecialFolderRenamer {
         }
     }
 
-    /// Clears the record. Called once the configuration has been written, at
-    /// which point the rename is whole.
+    /// Clears the record. Called once the rename's step is made, at which
+    /// point the rename is whole.
     nonisolated static func clearRenameRecord(courseDirectory: URL) {
         try? FileManager.default.removeItem(at: renameMarkerURL(courseDirectory: courseDirectory))
     }
@@ -349,13 +419,12 @@ enum SpecialFolderRenamer {
         }
     }
 
-    /// Moves the folder, then points every qualified link at its new name.
-    ///
-    /// Nothing is moved until EVERY destination has been checked, so a
-    /// per-section rename cannot get half way through four sections and stop:
-    /// either all of them move or none of them do. A move that fails after
-    /// that check is a filesystem fault, and it is reported with the sections
-    /// that had already moved named in the message rather than silently.
+    /// Moves the folder, then points every qualified link at its new name,
+    /// as ONE step through the door (#899 U4b): every folder's move and
+    /// every page's relink, all of them or none. The configuration is the
+    /// caller's to plan into the same step (`CourseSettingsView.renameFolder`
+    /// plans `course_config.json` too); this form, for a caller with no
+    /// settings to change, makes the step itself.
     @discardableResult
     nonisolated static func rename(
         _ oldName: String,
@@ -365,6 +434,39 @@ enum SpecialFolderRenamer {
         sectionNumbers: [Int],
         fileManager: FileManager = .default
     ) throws -> FolderRenameOutcome {
+        let planned: FolderRenamePlan = try plan(
+            oldName, to: newName, scope: scope,
+            courseDirectory: courseDirectory, sectionNumbers: sectionNumbers, fileManager: fileManager
+        )
+        let step: JournaledStep = JournaledStep(
+            courseCode: courseDirectory.lastPathComponent, courseDirectory: courseDirectory,
+            section: nil, maker: UndoStepMaker.sheet("renameFolder"), holds: "course"
+        )
+        apply(planned, to: step)
+        if !planned.moves.isEmpty {
+            recordRenameStarting(from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory)
+        }
+        try step.make()
+        return planned.outcome
+    }
+
+    /// What a rename will do, read from the disk and written nowhere: each
+    /// folder that moves (with its listing's SHA-256, the move's pair) and
+    /// each page whose qualified links change (the bytes read, the bytes
+    /// rewritten, at the page's place AFTER the move). Read off the main
+    /// actor; `apply` plans it into a step.
+    ///
+    /// Nothing is planned unless EVERY destination is free, so a per-section
+    /// rename cannot get half way through four sections: the step moves all
+    /// of them or none. A page that cannot be read is left out, as before.
+    nonisolated static func plan(
+        _ oldName: String,
+        to newName: String,
+        scope: FolderScope,
+        courseDirectory: URL,
+        sectionNumbers: [Int],
+        fileManager: FileManager = .default
+    ) throws -> FolderRenamePlan {
         // Asked of the config on DISK, because this function takes a folder
         // rather than a loaded course — and a course kept for reference does
         // not have its folders renamed. Course Settings is not offered on one;
@@ -377,8 +479,12 @@ enum SpecialFolderRenamer {
             courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
         )
 
-        var moves: [(from: URL, to: URL)] = []
+        var moves: [FolderRenamePlan.Move] = []
         for location in locations {
+            // A Cancel stops the walk between folders and between pages
+            // (part seven's review, M1): the plan writes nothing, so it can
+            // stop anywhere.
+            try Task.checkCancellation()
             var isDirectory: ObjCBool = false
             if !fileManager.fileExists(atPath: location.path, isDirectory: &isDirectory) {
                 continue
@@ -393,7 +499,8 @@ enum SpecialFolderRenamer {
             // move a folder onto itself. On a case-insensitive volume — which
             // is the default on a Mac — the destination "exists" because it IS
             // the source, so the check below would refuse a rename that is
-            // perfectly reasonable.
+            // perfectly reasonable. The door judges it as one item under two
+            // spellings (`undoJournal.opKinds.move`, U4b).
             let isOnlyACapitalisationChange: Bool =
                 oldName.caseInsensitiveCompare(newName) == .orderedSame
             if !isOnlyACapitalisationChange && fileManager.fileExists(atPath: destination.path) {
@@ -401,51 +508,21 @@ enum SpecialFolderRenamer {
                     sentence: SpecialNames.renameFolderProblemDestinationExists(name: newName)
                 )
             }
-            moves.append((from: location, to: destination))
-        }
-
-        // Recorded BEFORE anything moves, so that a rename interrupted between
-        // the move and the configuration write can be recognised rather than
-        // guessed at from the disk — see `looksLikeAnInterruptedRename` for
-        // why the disk alone is not evidence.
-        if !moves.isEmpty {
-            recordRenameStarting(
-                from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory
-            )
-        }
-
-        var moved: Int = 0
-        for move in moves {
-            do {
-                try fileManager.moveItem(at: move.from, to: move.to)
-                moved += 1
-            } catch {
-                throw FolderRenameProblem(
-                    sentence: "Plantoir renamed \(moved) of \(moves.count) copies of “\(oldName)” "
-                            + "and then could not rename the one in "
-                            + "\(move.from.deletingLastPathComponent().lastPathComponent): "
-                            + error.localizedDescription
-                )
+            guard let listingSha = UndoTreeReading.read(at: location).listingSha else {
+                // A folder whose content cannot be read cannot be judged as a
+                // pair, so nothing is planned and nothing is changed.
+                let refusal: UndoRefusal = .cannotTellNow(path: location.path)
+                throw JournaledStepError.refused(refusal, fileName: location.lastPathComponent)
             }
+            moves.append(FolderRenamePlan.Move(from: location, to: destination, listingSha: listingSha))
         }
 
-        let relinked: Int = relinkPages(
-            in: courseDirectory, folderNamed: oldName, to: newName, fileManager: fileManager
-        )
-        return FolderRenameOutcome(foldersMoved: moved, pagesRelinked: relinked)
-    }
-
-    /// Rewrites every qualified link in the course's pages, returning how many
-    /// pages changed.
-    nonisolated static func relinkPages(
-        in courseDirectory: URL,
-        folderNamed oldName: String,
-        to newName: String,
-        fileManager: FileManager = .default
-    ) -> Int {
-        var changed: Int = 0
+        var pages: [FolderRenamePlan.Page] = []
         for pageURL in markdownPages(in: courseDirectory, fileManager: fileManager) {
-            guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+            try Task.checkCancellation()
+            planReadsAPage?(pageURL)
+            try Task.checkCancellation()
+            guard let read = try? Data(contentsOf: pageURL), let text = String(data: read, encoding: .utf8) else {
                 continue
             }
             if FolderPathRewriter.countReferences(to: oldName, in: text) == 0 {
@@ -455,17 +532,216 @@ enum SpecialFolderRenamer {
             if rewritten == text {
                 continue
             }
+            pages.append(FolderRenamePlan.Page(
+                url: placeAfter(moves, of: pageURL), read: read, rewritten: Data(rewritten.utf8)
+            ))
+        }
+        return FolderRenamePlan(moves: moves, pages: pages)
+    }
+
+    /// Plans a rename OFF the main actor, and gives up waiting the moment the
+    /// caller is cancelled (U4b part seven's review, M1): Cancel gives the
+    /// course back at once.
+    ///
+    /// The walk runs in a detached task, because it must not hold the main
+    /// actor, and a detached task does not inherit cancellation; so the
+    /// caller's cancellation is forwarded to it (`withTaskCancellationHandler`)
+    /// and `plan` stops at its next page (`Task.checkCancellation`). A read
+    /// that blocks inside the system (an evicted iCloud page, a network
+    /// volume gone away) cannot be interrupted, so the caller does not wait
+    /// for the walk to stop: the result comes through a stream, whose
+    /// `next()` returns nil as soon as the waiting task is cancelled. The
+    /// walk then ends on its own, writes nothing, and whatever it finds is
+    /// never read by anyone: the stream it would be delivered through has
+    /// already been given up.
+    nonisolated static func planHaltingAtCancel(
+        _ oldName: String,
+        to newName: String,
+        scope: FolderScope,
+        courseDirectory: URL,
+        sectionNumbers: [Int]
+    ) async throws -> FolderRenamePlan {
+        let (results, delivery) = AsyncThrowingStream<FolderRenamePlan, Error>.makeStream()
+        let walk: Task<Void, Never> = Task.detached(priority: .userInitiated) {
             do {
-                try rewritten.write(to: pageURL, atomically: true, encoding: .utf8)
-                changed += 1
+                let planned: FolderRenamePlan = try plan(
+                    oldName, to: newName, scope: scope,
+                    courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+                )
+                delivery.yield(planned)
+                delivery.finish()
             } catch {
-                // One unwritable page must not abandon the rest: the folder has
-                // already moved, so stopping here would leave MORE links broken
-                // than carrying on does.
+                delivery.finish(throwing: error)
+            }
+            planHasEnded?()
+        }
+        return try await withTaskCancellationHandler {
+            var waiting: AsyncThrowingStream<FolderRenamePlan, Error>.Iterator = results.makeAsyncIterator()
+            if let planned = try await waiting.next() {
+                return planned
+            }
+            // Nil only when the wait was given up at Cancel.
+            throw CancellationError()
+        } onCancel: {
+            walk.cancel()
+        }
+    }
+
+    /// Plans a rename into `step`: each folder's move first, then each page
+    /// at its place after the move, so a page inside a moved folder is an
+    /// edit the move carries (`undoJournal.opKinds.wholeOps`).
+    nonisolated static func apply(_ planned: FolderRenamePlan, to step: JournaledStep) {
+        for move in planned.moves {
+            step.moveFolder(move.from, to: move.to, listingSha: move.listingSha)
+        }
+        for page in planned.pages {
+            step.write(page.rewritten, to: page.url, plannedFrom: page.read)
+        }
+    }
+
+    /// Makes a planned rename's step OFF the main actor (U4b part four's
+    /// review, M1): the door's check and its swap each read and hash every
+    /// file in every moved folder, a megabyte at a time, which on the main
+    /// actor froze the window for about half a second per gigabyte. The
+    /// caller awaits it, showing the rename under way.
+    ///
+    /// The two reads are kept, not shared: the check is the step's judgement
+    /// under the lock (the contract's `opKinds.move` rule, the same for a
+    /// make, a Redo and recovery's put-back), and the swap's read is its last
+    /// look just before the rename. Letting the first stand for the second
+    /// would leave the time between them (staging every page) unseen, and
+    /// letting the second stand for the first would make a forward move a
+    /// case of its own in the contract.
+    ///
+    /// The step is handed over whole: the caller plans it, then touches it
+    /// no more until this returns.
+    nonisolated static func make(_ step: JournaledStep) async throws {
+        let handed: StepHandedOver = StepHandedOver(step: step)
+        try await Task.detached(priority: .userInitiated) {
+            try handed.step.make()
+        }.value
+    }
+
+    /// The sentence when a rename's step is refused and nothing was changed
+    /// (`shared-rules.json` → `undo.wording.renameFolderNothingWasChanged`).
+    nonisolated static func nothingWasChanged(renaming oldName: String, said: String) -> String {
+        return "“\(oldName)” was not renamed, and nothing was changed: \(said)"
+    }
+
+    /// The sentence when a rename's step was refused part way and could not
+    /// all be put back (`undo.wording.renameFolderStoppedPartWay`): `said`
+    /// names each file kept beside its page.
+    nonisolated static func stoppedPartWay(renaming oldName: String, said: String) -> String {
+        return "“\(oldName)” was not renamed, and Plantoir could not put everything back as it was: \(said)"
+    }
+
+    /// The sentence when a rename's step stopped part way with a folder
+    /// still at its new name, because its move back failed
+    /// (`undo.wording.renameFolderRenamedOnlyInPart`): `places` are those
+    /// folders inside the course, spelled with their new name.
+    nonisolated static func renamedOnlyInPart(renaming oldName: String, to newName: String, places: [String], said: String) -> String {
+        var joined: String = ""
+        for place in places {
+            if !joined.isEmpty {
+                joined += ", "
+            }
+            joined += "“" + place + "”"
+        }
+        return "“\(oldName)” was renamed only in part, and Plantoir could not put everything back as it was. "
+            + "Still called “\(newName)”: \(joined). \(said)"
+    }
+
+    /// How many files were kept beside their pages, as a trail line says it.
+    nonisolated static func keptBesideWords(_ count: Int) -> String {
+        if count == 1 {
+            return "1 file kept beside its page"
+        }
+        return String(count) + " files kept beside their pages"
+    }
+
+    /// The trail line (`folder renamed`) for a rename stopped part way with
+    /// folders left at their new name (the final sweep, M1). It names the
+    /// folders, which are the course's own special folders, and counts the
+    /// kept files, never naming a page.
+    nonisolated static func renamedOnlyInPartLine(
+        renaming oldName: String, to newName: String, course: String, scope: FolderScope,
+        places: [String], keptBeside: Int
+    ) -> String {
+        var joined: String = ""
+        for place in places {
+            if !joined.isEmpty {
+                joined += ", "
+            }
+            joined += place
+        }
+        return "renamed the folder " + oldName + " to " + newName + " in " + course
+            + " only in part, and could not put everything back (" + scope.configurationKey
+            + ", still called " + newName + ": " + joined + "; " + keptBesideWords(keptBeside)
+            + ")"
+    }
+
+    /// The trail line (`folder renamed`) for a rename stopped part way with
+    /// every folder back at its old name but files kept beside their pages
+    /// (the final sweep, M1).
+    nonisolated static func stoppedPartWayLine(
+        renaming oldName: String, to newName: String, course: String, scope: FolderScope, keptBeside: Int
+    ) -> String {
+        return "did not rename the folder " + oldName + " to " + newName + " in " + course
+            + ", and could not put everything back (" + scope.configurationKey + ", "
+            + keptBesideWords(keptBeside) + ")"
+    }
+
+    /// Each planned folder that is at its new name now, by its path inside
+    /// the course: what a rename stopped part way left renamed. Whatever is
+    /// at the OLD name does not count (U4b part six's review, L1): the
+    /// likeliest reason a move back fails is that something appeared there,
+    /// and the folder is then still at its new name. The plan refused a new
+    /// name that was taken, so what is at `to` is the moved folder.
+    ///
+    /// Presence only, by `lstat` (part six's review, L2): nothing is read
+    /// or hashed, so it costs nothing on the main actor.
+    nonisolated static func foldersLeftAtTheirNewName(_ moves: [FolderRenamePlan.Move], courseDirectory: URL) -> [String] {
+        var result: [String] = []
+        let prefix: String = courseDirectory.standardizedFileURL.path + "/"
+        for move in moves {
+            let isCaseOnly: Bool = move.from.lastPathComponent.caseInsensitiveCompare(move.to.lastPathComponent) == .orderedSame
+            var leftRenamed: Bool = somethingIsThere(at: move.to)
+            if isCaseOnly {
+                let listed: [String] = (try? FileManager.default.contentsOfDirectory(atPath: move.to.deletingLastPathComponent().path)) ?? []
+                leftRenamed = listed.contains(move.to.lastPathComponent)
+            }
+            if !leftRenamed {
                 continue
             }
+            let path: String = move.to.standardizedFileURL.path
+            result.append(path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : move.to.lastPathComponent)
         }
-        return changed
+        return result
+    }
+
+    /// Whether anything is at the path, a link included and never followed.
+    nonisolated static func somethingIsThere(at url: URL) -> Bool {
+        var information: stat = stat()
+        let found: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &information)
+        }
+        return found == 0
+    }
+
+    /// Where a page is once the folders move: under a move's `to` when it
+    /// is inside its `from`.
+    nonisolated static func placeAfter(_ moves: [FolderRenamePlan.Move], of url: URL) -> URL {
+        let path: String = url.standardizedFileURL.path
+        for move in moves {
+            let from: String = move.from.standardizedFileURL.path
+            if path.hasPrefix(from + "/") {
+                return URL(fileURLWithPath: move.to.standardizedFileURL.path + String(path.dropFirst(from.count)))
+            }
+        }
+        return url
     }
 
     /// Every Markdown page under a course, skipping generated and private trees.

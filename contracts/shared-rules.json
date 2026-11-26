@@ -368,7 +368,7 @@
         "why": "A teacher tried to remove or untick a folder or file a feature depends on (Course Settings or the New Course Wizard) and was shown why it cannot go. 'I could not remove the folder' is a report support will receive; the line says which rule refused, and whether it happened while a course was being made or in one that already exists."
       },
       {
-        "carries": "the course code, the old folder name, the new one, which list it was in, and how many folders on disk were moved",
+        "carries": "the course code, the old folder name, the new one, which list it was in, and how many folders on disk were moved and pages relinked. The same event records a rename that stopped part way and could not all be put back (#899 U4b, the final sweep's M1): one left renamed only in part names each folder still at its new name (a path inside the course, the course's own special folder) and counts the files kept beside their pages; one whose folders are all back at the old name counts the kept files. Never a page's name: a kept file is a count",
         "event": "folder renamed",
         "why": "A rename leaves nothing behind to look at: a folder called 'Class Pages' is indistinguishable from one that was always called that, and every key that named the old one has been rewritten. Without this line, 'when did this course stop having a Tasks folder?' — the first question asked when a curriculum map goes wrong — has no answer at all. The folder NAME is recorded; nothing from inside the folder ever is."
       },
@@ -1422,7 +1422,7 @@
         "why": "#899, piece U3c (the third review of U3a, LOW 1). An edit another program made in place as a swap went in is kept only in the kept original, under a hidden name; recovery settles the step and never deletes that file, and this line is how anyone finds it. The second reason is the first review of U3c's LOW 2: a step that completes while its before content is missing from the list keeps the kept original, whose hash is exactly what was recorded, so 'it differs' would be untrue. Never page text. First written live at U7."
       },
       {
-        "carries": "the course and the section, Undo or Redo, the page put back from the kept original beside it, that the list could not keep a copy of all it needs for the change, so what it could not keep stays beside the page and the next Undo or Redo of the change uses it, and the hidden name of each such file: what the page held a moment before (the swap's own `-undo-orig` or `-redo-orig`), and a kept original it put back whose bytes the list would not take (what the page holds now)",
+        "carries": "the course and the section, Undo or Redo, the page put back (said as put back \"from what was kept beside it\" only when it was put back from a kept original; when the list gave its content and would not take the outgoing bytes, the line says only that it was put back: the U4a sweep, LOW 1; decided page by page, so a step of two pages, one of each, says \"put back “A.md”, and put back “B.md” from what was kept beside it\": U4b part one's review, LOW 1), that the list could not keep a copy of all it needs for the change, so what it could not keep stays beside the page and the next Undo or Redo of the change uses it, and the hidden name of each such file: what the page held a moment before (the swap's own `-undo-orig` or `-redo-orig`), and a kept original it put back whose bytes the list would not take (what the page holds now)",
         "event": "undo kept what it replaced",
         "line": "ICS3U/1 · Undo put back “A.md” from what was kept beside it, but the list could not keep a copy of all it needs for this change, so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it. What “A.md” held a moment before is kept beside it as the hidden file “.A.md.plantoir-undo-4-undo-orig”.",
         "why": "#899, U3c's first review, MEDIUM. An Undo or Redo that takes a page's content from its kept original writes both of the page's contents back into the list before the swap, so its other direction can be made; when the list will not take the outgoing content (a full or read-only disk), that content would be in no file at all once the swap tidied. It is kept beside the page instead, and this line is how anyone finds it. The second review of U3c: a kept original whose own bytes the list will not take is kept too (MEDIUM), and the step stays on the list with both directions offered, resting on those files, as recovery's does (Russell's ruling of 2026-11-20, night): if a file is gone or changed by the time it is needed, that Undo or Redo is refused then, with its true sentence. Nothing is dropped or cleared at the move, so the line says nothing of either (LOW 1). Never page text. First written live at U7."
@@ -48182,7 +48182,7 @@
     "laterPieces": {
       "U2": "the remaining op kinds (file-formats.json -> undoJournal.opKinds.reserved), their checkCases rows, and running `recompute`. Recovery then re-derives a step's `recompute` files whenever it settles the step, in either direction (re-deriving is idempotent): rule.recovery judges a step by its content ops only, so a step that died after its swaps and before its re-derivation would otherwise be settled completed with its front page stale (the Fable sweep of U1, T5).",
       "U3": "the daily page actions wired through the door, and the traces grown to about 120 through the real action code. U3a (landed): every daily action but the rollover is ONE step through the door (documentation 09, U3), recorded from the real code into undo-action-steps.json and replayed as undo-traces.json -> actionTraces (120). U3b (landed): the rollover as ONE step, from the menu and from either assistant (documentation 09, U3b): its re-dated pages (editLine), its record's fragments (move) and answered records (writeFile, removed), its site markers (moveApart), the deploy set for later it turns off (external, scheduledDeploy:<label>) and the front page (recompute), under one begin, all or none; the legacy Netlify marker in the built output (.merged_output/section<N>/.netlify_site.json, a link out of the working folder) brought into the working folder in the current format BEFORE the step, by deploy.py's own migration rule (load_netlify_marker: written to .netlify_sites/section<N>.json when that is free, then removed), so the step names it as a moveApart like any other record and Undo puts it back whole (Russell's ruling of 2026-11-20); a legacy marker that cannot be brought in (not JSON, not removable, or a different record already in the current place) refuses the rollover before anything is changed. No record is moved outside a step. Was planned as: the rollover as ONE step (its re-dated pages, its record fragments and markers as move ops, the schedule it removes as an external op), Russell's ruling of 2026-11-19 on Q3 (after a deploy has filled the place a marker left, Undo takes back the rest, leaves both markers, says once that the section stays on its new website, and the step leaves the list: #959 in the journal's terms), and releaseSite and PublishedPagesRecord.release, which are U3's.",
-      "U4": "settings, renames, the wizard (New Course, Scripting/NewCourseCreator.swift), reference courses; steps with no course or no working folder (a preference).",
+      "U4": "settings, renames, the wizard (New Course, Scripting/NewCourseCreator.swift), reference courses; steps with no course or no working folder (a preference). U4a (landed): Course Settings' Save (one editJSON per changed top-level member), Add folder (one createTree per folder made) and Set School Year (one editJSON) are each ONE step through the door (documentation 09, U4a). U4b (landed on the Mac): U4a's lows, Rename folder as one step (folder moves, the pages it relinks, and course_config.json through a planning form of recordOnDisk), the order of an edit inside a moved folder (opKinds.wholeOps), and a move that changes only capitalisation. U4b2: the leftovers of U4b's final sweep.",
       "U5": "the 785 store's undo lists and the Trash (ruling 12: Delete Backup and Delete Archive to the Trash, Undo brings them back): trashCases.",
       "U6": "the offer to deploy after an Undo or a Redo takes back something a website shows (ruling 19, for a deploy and for shared unit plans alike: ruling 18), asked of rule.deployed (UndoWebsite.answer) after the move, with its own cases for when the offer is made and what a decline leaves; what cannotTell comes to (a move that changes what a page says, which no marker records) is the director's to settle first. A deploy, a deploy set for later and sharing unit plans write nothing to the list and clear nothing (rulings 17 and 18); no `outside` op and no `scheduledRun` maker.",
       "U7": "the switch, and the one clearing at the flip (rule.shadow: reason wentLive, written once at the first launch with the switch on and before Undo is offered; how that launch knows it is the first is U7's to settle); recovery at every launch; reachCases (ruling 10's greyed plain 'Undo' in the menu, and ruling 11: a step in another course or window is done with no question, the menu names the course, and Plantoir shows it after); menuTitleCases; holdCases; the built-in assistant's 'undo that' as Edit > Undo (ruling 15, as given finally); the two-process test against the app binary; Open Recent as the second place a folder is looked for. Before Windows ships anything, U7 settles a process still in shadow after the flip (knownLimits.shadowProcessAfterTheFlip): either the shadow list is kept in a folder of its own (undo-shadow/, one line in UndoJournalLocation and one sentence in undoJournal.directory, the cheapest today), so a shadow process never touches the live list and the flip needs no first-launch test at all, or every shadow begin carries one optional step key that live readers treat as never offered. And the `undo rolled back` trail line, first written live here, names what stopped recovery: for reason couldNotPutBack it says content the step needs was missing, never that files were changed by hand (activityTrail.mustRecord's `line` corrected with it; the Fable sweep of U1, T11). And before the switch, the main-actor wait (the first review of U3a, LOW 9): the Mac's daily actions make their step on the main actor, which in shadow waits at most 0.05 s for the lock to begin a step and 0.05 s to finish it, but live up to 2 s to begin and up to 10 s (finishWaitSeconds) to finish, per action; U7 either moves the step off the main actor or bounds those live waits there, and says which (documentation 09, U3, 'For U7, to settle before the switch')."
@@ -50093,7 +50093,27 @@
         "redo": "cannotTell"
       },
       {
-        "name": "move between two names that differ only in case: not readable",
+        "name": "move between two names that differ only in case, in the last part: the folder lists it as `to`, holding the content: as the step left it",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m/a.json",
+          "to": "courses/TST1O/m/A.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          }
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone",
+        "why": "U4b, a capitalisation-only rename (Media to media): on a case-insensitive volume (a Mac's by default, and Windows') the two spellings are one place, so the pair rule as written would find both holding it; one rename the teacher asked for is one step that undoes and redoes (invariant 1), so such a move is readable when the two differ in their last part only, and judged by the spelling the folder lists. On a case-sensitive volume they are two places and the ordinary pair rule gives the same answers."
+      },
+      {
+        "name": "move between two names that differ only in case, in the last part: the folder lists it as `from`, holding the content: as before",
         "op": {
           "kind": "move",
           "from": "courses/TST1O/m/a.json",
@@ -50108,9 +50128,47 @@
             "absent": true
           }
         },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "move between two names that differ only in case, in the last part: the folder lists it as `to`, holding something else: changed since",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/m/a.json",
+          "to": "courses/TST1O/m/A.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"zzz-999\"}\n"
+          }
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "move between two names that differ in case in a folder above the last part: not readable",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/M/a.json",
+          "to": "courses/TST1O/m/a.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "text": "{\"site_id\": \"aaa-111\"}\n"
+          },
+          "atTo": {
+            "absent": true
+          }
+        },
         "undo": "notReadable",
         "redo": "notReadable",
-        "why": "On a case-insensitive volume (a Mac's by default, and Windows') the two are one place: places are compared without regard to case."
+        "why": "Only the last part may differ, so the rename names one item; a folder above spelled two ways is two places on a case-sensitive volume and one on a case-insensitive one, and no single rename settles which."
       },
       {
         "name": "move to an absolute path: not readable",
@@ -52376,9 +52434,239 @@
         "cleared": "changedSince",
         "clearedSeq": 1,
         "nothingMovedOutside": true
+      },
+      {
+        "name": "U4a, LOW 4 (a), stored: a whole-file step whose after content is gone from the list: the Undo writes what it took off into the list before its swap, nothing is kept beside the page, and the Redo is made from the list",
+        "calls": [
+          "step",
+          "wholeFileStep",
+          "afterContentGone",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ],
+        "keptOriginalLeft": false,
+        "keptBesideThePage": 0,
+        "keptWhatItReplacedLines": 0,
+        "why": "U4b part one's review, LOW 2: dropping a row in 4cd1ccac4 left the row below saying \"the same\" of nothing, and no row was left for the branch of storeWhatTheOtherDirectionNeeds that stores the outgoing bytes in the list. Without that store the swap's tidy deletes the only copy of what the Undo took off, and the Redo comes to contentMissing."
+      },
+      {
+        "name": "U4a, LOW 4 (a): the same with the list taking no new file: what the Undo took off is kept beside the page, and the Redo is made from it",
+        "calls": [
+          "step",
+          "wholeFileStep",
+          "afterContentGone",
+          "contentCannotBeStored",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ],
+        "keptOriginalLeft": true,
+        "keptBesideThePage": 1,
+        "keptWhatItReplacedLines": 2,
+        "why": "U4a review 1, LOW 4: the same with the list taking no new file: the swap keeps what the Undo took off beside the page under its own -undo-orig name, and the Redo is made from that kept file; the file stays, since the list would not take its bytes either, and each move says so on the trail."
+      },
+      {
+        "name": "U4a, LOW 4 (b): both contents gone and the list taking no new file, seven moves: one kept copy per content per page, two files in all",
+        "calls": [
+          "step",
+          "wholeFileStep",
+          "keepTheOriginal",
+          "removeContent",
+          "contentCannotBeStored",
+          "undo",
+          "redo",
+          "undo",
+          "redo",
+          "undo",
+          "redo",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ],
+        "keptOriginalLeft": true,
+        "keptBesideThePage": 2,
+        "why": "U4a review 1, LOW 4, with U3c review 3's probe shape (seven moves): after each move the step's kept copies beside a page are thinned to ONE per content (UndoRecovery.removeSupersededKeptCopies), never piled up and never the only copy of anything, so seven moves leave exactly two files, one holding what p1 held before the step and one what it held after."
+      },
+      {
+        "name": "U4b, an edit inside a moved folder: Undo takes the edit back, then the move",
+        "calls": [
+          "moveAFolderWithAPageEditedInside",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "movedFolder": "media, old",
+        "why": "opKinds.wholeOps' order: the page inside is named at the folder's new place; going back it is taken back first, and the move is judged against the folder as it holds once that edit is taken back, so an untouched rename always undoes."
+      },
+      {
+        "name": "U4b, an edit inside a moved folder: undone and redone, the move goes in before the edit",
+        "calls": [
+          "moveAFolderWithAPageEditedInside",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "movedFolder": "renamed, new"
+      },
+      {
+        "name": "U4b, M1: undone, the step's own kept copy left inside the folder at its old place, then redone: the copy is never the folder's content",
+        "calls": [
+          "moveAFolderWithAPageEditedInside",
+          "undo",
+          "leaveAKeptCopyInsideTheMovedFolder",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "movedFolder": "renamed, new",
+        "keptOriginalLeft": true,
+        "why": "opKinds.wholeOps: the step's own staged files and kept originals inside the folder are left out of every judgement of the move's pair, the check and the swap alike (the part-two review's M1); counted, the Redo would be refused changed since and the redo dropped (ruling 20)."
+      },
+      {
+        "name": "U4b, M1: redone, the step's own kept copy left inside the folder at its new place, then undone: the copy is never the folder's content",
+        "calls": [
+          "moveAFolderWithAPageEditedInside",
+          "undo",
+          "redo",
+          "leaveAKeptCopyInsideTheMovedFolder",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "movedFolder": "media, old",
+        "keptOriginalLeft": true,
+        "why": "The same rule going back: counted, the Undo would be refused changed since, naming a folder the teacher never touched, and the list cleared (ruling 13)."
+      },
+      {
+        "name": "U4b, a file added inside the moved folder since: Undo refuses, nothing moved, the list cleared",
+        "calls": [
+          "moveAFolderWithAPageEditedInside",
+          "addAFileInsideTheMovedFolder",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 1,
+        "movedFolder": "renamed, new"
+      },
+      {
+        "name": "U4b, the page inside the moved folder edited by hand since: Undo refuses, nothing moved, the list cleared",
+        "calls": [
+          "moveAFolderWithAPageEditedInside",
+          "editThePageInsideByHand",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 1,
+        "movedFolder": "renamed, byHand"
+      },
+      {
+        "name": "U4b, an op naming a path inside the place a move leaves: a step this version cannot read, a barrier",
+        "calls": [
+          "step",
+          "stepEditingInsideAMovesFrom",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "U4b, a capitalisation-only rename (Media to media) with a page inside edited: Undo spells the folder Media again, the edit taken back",
+        "calls": [
+          "renameAFolderInCaseOnly",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "caseOnlyFolder": "Media, old",
+        "why": "On a case-insensitive volume the two spellings are one place: the move is judged by the spelling the folder lists (opKinds.move), so the one rename the teacher asked for is one step that undoes (invariant 1)."
+      },
+      {
+        "name": "U4b, a capitalisation-only rename: undone and redone, spelled media again with the edit inside",
+        "calls": [
+          "renameAFolderInCaseOnly",
+          "undo",
+          "redo"
+        ],
+        "expectLast": "redone",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ],
+        "caseOnlyFolder": "media, new"
+      },
+      {
+        "name": "U4b, a capitalisation-only rename, the folder spelled MEDIA by hand since: Undo refuses, nothing moved, the list cleared",
+        "calls": [
+          "renameAFolderInCaseOnly",
+          "spellTheFolderAnotherWay",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 1,
+        "caseOnlyFolder": "MEDIA, new"
       }
     ],
-    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a begin and applied, readable as lines, whose only op is of a kind no reader knows (`aKindNobodyKnows`, with from, to and blobs naming a blob it put in content/; U1's used `move`, which U2 defines); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. U3c: `keepTheOriginal` leaves the newest step's kept original of p1 beside it, as its swap's tidy leaves one it could not remove (a file held): `.<p1's name>.plantoir-undo-<seq>-apply-orig`, holding exactly what p1 held before that step; `changeTheKeptOriginal` then adds a line to it, so its hash no longer matches. `foreignKeptOriginal` writes a file of other bytes at `.<p1's name>.plantoir-undo-<the next step's seq>-apply-orig`, as a kept original left by another Mac or an earlier list; foreignKeptOriginalUntouched: it still holds exactly those bytes after the last call. keptOriginalLeft: whether a kept original is still beside p1 after the last call. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to. U2's calls (contracts/undo-traces.json's folder A, each a step through the door that plans it forward as a Redo would, JournaledWrite.perform(ops:)): `moveTheMarker` moves courses/TST1O/.netlify_sites/section1.json (made first, holding {\"site_id\": \"aaa-111\"}, when neither place holds it) to section1.previous.json beside it, one `move`; `deployANewMarker` writes a new marker ({\"site_id\": \"bbb-222\"}) in the place the move emptied, as a deploy after a rollover onto a new website does, and nothing to the list; `makeAFolder` makes courses/TST1O/extra (a.md, sub/b.md) as one `createTree`; `addAFileToTheFolder` adds a file inside it by hand; `removeTheFolder` removes it, one `removeTree`; `editTheSettings` sets courses/TST1O/settings.json's school_year (made first holding 2025-2026) to 2026-2027, or back, one `editJSON`; `editTheSettingsByHand` sets it to 2030-2031 by hand; `editAHunk` turns `Line one: old.` in courses/TST1O/notes.md into `new`, or back, one `replaceText`; `setAPreference` sets the preference undoCasesPreference to b (or back to a), one `external`, in a step with no working folder; `changeThePreferenceByHand` sets it to z; `forgetTheMaintainer` takes away the runner of the sectionFrontPage maintainer (UndoMaintainers), which every case otherwise has. markers is what the two marker places hold after the last call (moved: only the moved copy; movedBack: only the original place; bothKept: the new marker in the original place and the moved copy beside it); folderKept whether the made folder is there; rederived how many times the front page's maintainer ran. No case leaves a staged file anywhere in the working folder. `stepFromAnotherVersion:twoWholeOpsOnOnePlace` adds two createTree ops, one inside the other, which breaks opKinds.wholeOps. `moveThePageAside` moves courses/TST1O/old/a.md (made first) to courses/TST1O/a.md, one `move`; `linkItsOldFolderOutside` replaces courses/TST1O/old by a link to a folder beside the working folder; nothingMovedOutside says nothing reached that folder. U3b's call: `rollOverOntoANewWebsite` is ONE step of two ops: courses/TST1O/settings.json's school_year set from 2025-2026 to 2026-2027 (editJSON; the file made first as editTheSettings makes it) and the marker moved as moveTheMarker moves it, as a `moveApart`. `rollOverOntoNewWebsitesOnTwoHosts` is ONE step of three ops: the same school_year, the same Netlify marker as a `moveApart`, and a second host's marker courses/TST1O/.cloudflare_sites/section1.json (made first, holding {\"project\": \"tst1o-s1-2025\"}, when neither place holds it) moved to section1.previous.json beside it, also a `moveApart`; cloudflareMarkers says what that second pair holds, as markers does (moved, movedBack). `rollOverTurningOffASchedule` is ONE step of two ops: the same school_year, and the external target scheduledDeploy:org.plantoir.deploy.undo-cases (set first to {\"plist\": \"cGxpc3Q=\", \"script\": \"c2NyaXB0\"}) removed; `theScheduleCannotBeSetNow` makes every later write to a scheduledDeploy target fail, as a launchd refusal does. leftApart is what the last undo or redo named as left apart (opKinds.moveApart: the places, in order; [] for none); schoolYear the settings file's school_year after the last call. `rollOverSettingALeftoverAside` is ONE step of three ops: the same school_year, the same Netlify marker as a `moveApart`, and a leftover courses/TST1O/.netlify_sites/section1.from-built-output.json (made first, holding {\"site_id\": \"ccc-333\"}, when neither place holds it) moved to section1.from-built-output.previous.json beside it, a `setAside`; `removeTheKeptLeftover` deletes that kept copy by hand; leftoverMarkers says what the leftover's pair holds, as markers does (moved, movedBack; gone: neither place holds it). `theScheduleStartsOnlyAtTheNextLogin` makes every later write that sets a scheduledDeploy target answer that the job is back on disk and was not started now, so it starts at the next login, as a launchd refusal whose plist cannot be taken away again does; startsAtTheNextLogin is what the last undo or redo named so (the targets, in order; absent: none).",
+    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a begin and applied, readable as lines, whose only op is of a kind no reader knows (`aKindNobodyKnows`, with from, to and blobs naming a blob it put in content/; U1's used `move`, which U2 defines); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. U3c: `keepTheOriginal` leaves the newest step's kept original of p1 beside it, as its swap's tidy leaves one it could not remove (a file held): `.<p1's name>.plantoir-undo-<seq>-apply-orig`, holding exactly what p1 held before that step; `changeTheKeptOriginal` then adds a line to it, so its hash no longer matches. `foreignKeptOriginal` writes a file of other bytes at `.<p1's name>.plantoir-undo-<the next step's seq>-apply-orig`, as a kept original left by another Mac or an earlier list; foreignKeptOriginalUntouched: it still holds exactly those bytes after the last call. keptOriginalLeft: whether a kept original is still beside p1 after the last call. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to. U2's calls (contracts/undo-traces.json's folder A, each a step through the door that plans it forward as a Redo would, JournaledWrite.perform(ops:)): `moveTheMarker` moves courses/TST1O/.netlify_sites/section1.json (made first, holding {\"site_id\": \"aaa-111\"}, when neither place holds it) to section1.previous.json beside it, one `move`; `deployANewMarker` writes a new marker ({\"site_id\": \"bbb-222\"}) in the place the move emptied, as a deploy after a rollover onto a new website does, and nothing to the list; `makeAFolder` makes courses/TST1O/extra (a.md, sub/b.md) as one `createTree`; `addAFileToTheFolder` adds a file inside it by hand; `removeTheFolder` removes it, one `removeTree`; `editTheSettings` sets courses/TST1O/settings.json's school_year (made first holding 2025-2026) to 2026-2027, or back, one `editJSON`; `editTheSettingsByHand` sets it to 2030-2031 by hand; `editAHunk` turns `Line one: old.` in courses/TST1O/notes.md into `new`, or back, one `replaceText`; `setAPreference` sets the preference undoCasesPreference to b (or back to a), one `external`, in a step with no working folder; `changeThePreferenceByHand` sets it to z; `forgetTheMaintainer` takes away the runner of the sectionFrontPage maintainer (UndoMaintainers), which every case otherwise has. markers is what the two marker places hold after the last call (moved: only the moved copy; movedBack: only the original place; bothKept: the new marker in the original place and the moved copy beside it); folderKept whether the made folder is there; rederived how many times the front page's maintainer ran. No case leaves a staged file anywhere in the working folder. `stepFromAnotherVersion:twoWholeOpsOnOnePlace` adds two createTree ops, one inside the other, which breaks opKinds.wholeOps. `moveThePageAside` moves courses/TST1O/old/a.md (made first) to courses/TST1O/a.md, one `move`; `linkItsOldFolderOutside` replaces courses/TST1O/old by a link to a folder beside the working folder; nothingMovedOutside says nothing reached that folder. U3b's call: `rollOverOntoANewWebsite` is ONE step of two ops: courses/TST1O/settings.json's school_year set from 2025-2026 to 2026-2027 (editJSON; the file made first as editTheSettings makes it) and the marker moved as moveTheMarker moves it, as a `moveApart`. `rollOverOntoNewWebsitesOnTwoHosts` is ONE step of three ops: the same school_year, the same Netlify marker as a `moveApart`, and a second host's marker courses/TST1O/.cloudflare_sites/section1.json (made first, holding {\"project\": \"tst1o-s1-2025\"}, when neither place holds it) moved to section1.previous.json beside it, also a `moveApart`; cloudflareMarkers says what that second pair holds, as markers does (moved, movedBack). `rollOverTurningOffASchedule` is ONE step of two ops: the same school_year, and the external target scheduledDeploy:org.plantoir.deploy.undo-cases (set first to {\"plist\": \"cGxpc3Q=\", \"script\": \"c2NyaXB0\"}) removed; `theScheduleCannotBeSetNow` makes every later write to a scheduledDeploy target fail, as a launchd refusal does. leftApart is what the last undo or redo named as left apart (opKinds.moveApart: the places, in order; [] for none); schoolYear the settings file's school_year after the last call. `rollOverSettingALeftoverAside` is ONE step of three ops: the same school_year, the same Netlify marker as a `moveApart`, and a leftover courses/TST1O/.netlify_sites/section1.from-built-output.json (made first, holding {\"site_id\": \"ccc-333\"}, when neither place holds it) moved to section1.from-built-output.previous.json beside it, a `setAside`; `removeTheKeptLeftover` deletes that kept copy by hand; leftoverMarkers says what the leftover's pair holds, as markers does (moved, movedBack; gone: neither place holds it). `theScheduleStartsOnlyAtTheNextLogin` makes every later write that sets a scheduledDeploy target answer that the job is back on disk and was not started now, so it starts at the next login, as a launchd refusal whose plist cannot be taken away again does; startsAtTheNextLogin is what the last undo or redo named so (the targets, in order; absent: none). U4a review 1, LOW 4: `afterContentGone` takes only the newest step's content for what p1 holds after it out of the list (the list still takes a new file unless `contentCannotBeStored` follows); keptBesideThePage is how many files are kept beside p1 under a staged name ending -orig, of any step, after the last call. U4b: `moveAFolderWithAPageEditedInside` makes courses/TST1O/media (a.md holding the lines `Intro.`, `Line one: old.` and `End.`; b.md holding `B`) when neither it nor courses/TST1O/renamed is there, then makes ONE step: the folder's `move` to courses/TST1O/renamed (its listingSha), then a `replaceText` naming courses/TST1O/renamed/a.md that turns `Line one: old.` into `new` (opKinds.wholeOps' order); `addAFileInsideTheMovedFolder` adds courses/TST1O/renamed/c.md by hand; `editThePageInsideByHand` rewrites courses/TST1O/renamed/a.md as `Hand.`; `leaveAKeptCopyInsideTheMovedFolder` (the part-two review's M1) puts a file holding `Kept.` beside a.md wherever the folder is now, named as the newest step's own kept original from an undo (`.a.md.plantoir-undo-<seq>-undo-orig`), as a tidy that could not remove it leaves one, and an only copy (it holds what nothing else holds), so it stays (keptOriginalLeft); a model that holds no staged files changes nothing for it; `stepEditingInsideAMovesFrom` appends a begin and applied, changing nothing, whose ops are that move and a replaceText naming courses/TST1O/media/a.md, inside the place the move leaves. movedFolder: which place holds the folder (renamed, media, both or neither), a comma and a space, then what its a.md holds (new, old, byHand, none). `renameAFolderInCaseOnly` makes courses/TST1O/Media (the same a.md and b.md) when no spelling of it is there, then makes ONE step: its `move` to courses/TST1O/media, a capitalisation-only rename (opKinds.move), then a `replaceText` naming courses/TST1O/media/a.md that turns `Line one: old.` into `new`; `spellTheFolderAnotherWay` renames it by hand to courses/TST1O/MEDIA. caseOnlyFolder: the spelling the folder courses/TST1O lists for it (Media, media, MEDIA or none), a comma and a space, then what its a.md holds, as movedFolder says it.",
     "netlifyRecordCasesHow": "U3b, the review of U3b's fixes, round three: which Netlify record a deploy of a section reads, by deploy.py's own rule (scripts/deploy.py load_netlify_marker): a current record (courses/<CODE>/.netlify_sites/section<N>.json) that parses as JSON wins, whatever it holds; else a legacy record (.merged_output/section<N>/.netlify_site.json, in the built output) that parses, which the deploy migrates; else none, and the deploy starts a new website. `current` and `legacy` are each file's text, absent when the file is not there (`currentStartsWithAByteOrderMark`: the current record's bytes start with the UTF-8 byte order mark, EF BB BF, before that text; a JSON reader may drop the mark from a string, so it is never written inside one; `currentEndsWithAByteThatIsNotUTF8`: the byte FF follows that text, so the file is not UTF-8); `reads` is current, legacy or none; `site` the `id` of what the deploy then goes on with (null: none, a record that is not an object, or an `id` absent or empty: a new website). Round four: `site` is the section's website. A rollover moves a Netlify record only when `site` is not null, and then only what must move: the record a deploy reads (a legacy one first brought into the current place, a current record there that does not parse first moved to section<N>.unreadable.json, never moved again), and a legacy record that parses and differs, which must leave the built output (section<N>.from-built-output.json, set aside by the step); a file no deploy can parse is ignored by every deploy wherever it sits, so it is never moved. The record a deploy reads is the section's website; every other record is a leftover no deploy reads, and a leftover never decides anything: a rollover onto a new website and its Undo leave a deploy reading the same site in every one of these states. scripts/test_netlify_record_a_deploy_reads.py runs every row through deploy.py's own function; the Mac runs them through DeployCommand.netlifyRecordADeployReads, and rolls each over, undoes and redoes it (UndoRolloverStepTests). Known to differ only on what no tool writes: Python's json also takes NaN and Infinity, and numbers too large for a double.",
     "netlifyRecordCases": [
       {
@@ -53178,9 +53466,120 @@
         "markers": "moved",
         "rederived": 0,
         "why": "The third hard review of U2b, LOW 1: the plain door's recovery cannot re-derive, so it leaves the step in flight; a write landing over it would be settled later as a hand edit and clear the list."
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies before anything is swapped in: nothing took effect, the folder where it was",
+        "work": "step",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:0",
+        "files": "before",
+        "phase": "failed",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies with the folder moved and nothing else in: the folder goes back, the edit inside judged where its folder now is",
+        "work": "step",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:1",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies with the folder and both pages in and the edit inside not: everything goes back",
+        "work": "step",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:3",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), dies with every change in but before applied: completed, the folder judged as if its edit were taken back and nothing staged left inside it",
+        "work": "step",
+        "withAMovedFolder": true,
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "movedFolder": "renamed, new"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies with only the edit inside taken back: put forward again, the kept copy of the page inside the folder never judged part of it",
+        "work": "undo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:1",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "movedFolder": "renamed, new"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies with the edit inside and both pages back and the folder not: put forward again",
+        "work": "undo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:3",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "movedFolder": "renamed, new"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies with everything back but before undone: completed, the edit judged in the folder's old place and no kept copy left inside it",
+        "work": "undo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeUndone",
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies the same way with the undo's kept copy of the page still inside the folder at its old place, as a tidy that could not remove it leaves it: completed, the copy never judged part of the folder, and removed, since the list holds what it holds",
+        "work": "undo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeUndone",
+        "keptCopyLeftInsideTheFolder": true,
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder moved again and nothing else: put back",
+        "work": "redo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:1",
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder and both pages in and the edit inside not: put back",
+        "work": "redo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeSwap:3",
+        "files": "before",
+        "phase": "undone",
+        "head": null,
+        "movedFolder": "media, old"
+      },
+      {
+        "name": "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with every change in but before redone: completed",
+        "work": "redo",
+        "withAMovedFolder": true,
+        "stopAt": "beforeRedone",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "movedFolder": "renamed, new"
       }
     ],
-    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared. withATree: the step also removes courses/TST1O/extra (a.md, sub/b.md: one removeTree, its content in the list) and moves the marker, so it swaps first, second, the folder aside, then the move (an undo: second, first, the move back, then the folder made); folderKept whether the folder is there after recovery. withAPreference: the step also sets the preference undoCasesPreference from a to b (one external op, its place after the pages); preference is its value after recovery. recoveredBy: who recovers: recovery (the default: the app's recovery, which re-derives what it settles), theNextWrite (the next step through the door for ops, which recovers and re-derives first), or anOrdinaryWrite (a step through U1's door, whose recovery inside its lock leaves a step that keeps a file true by a rule in flight, for a recovery that will re-derive it). changeTheFolderSetAside: before recovery a file is saved into the folder the stopped work set aside (under its hidden staged name); keptAside whether a folder is still kept aside after recovery. somethingInItsPlace: before recovery a different folder is made at the place of the folder set aside. visibleNameTaken: before recovery a folder is made at the visible name `courses/TST1O/extra (kept by Undo)` too. keptVisibleAs: the path of the visible name the folder set aside is kept under after recovery (it holds a.md). recoveryStopsAfterTheTidy: the first recovery stops at the kill point afterRecoveryTidied, once it has tidied and before it writes to the list (it must not have recorded the step interrupted), and a second recovery then runs. folderLines: how many 'undo found a folder set aside' trail lines the recoveries wrote. stopAt whileDeletingAFolder: the work stops after a folder it took out has been renamed to its `-gone` name and before its delete ends; halfDeleteTheGoneFolder then removes a.md from that `-gone` folder, as a delete that died part way leaves it. ordinaryWriteOn: first makes that write set the first page's title (the very file the stopped work left), otherwise a third page's; nextWrite is what that write comes to (anotherChangeIsUnderWay: refused, nothing changed). U3c: changeTheKeptOriginal: after the content is removed and before recovery, a line is added to every kept original (`-orig`) the stopped work left beside a page, so its hash no longer matches what the journal recorded; keptOriginalsBeside: the pages beside which a kept original of the step is still on the disk after recovery, and nothing else staged, which is also exactly what the 'undo could not put back a change that stopped' trail line names (when absent, nothing staged may be left). editRacesTheSwap: instead of stopping at stopAt, the step is made while another program appends a line to that page IN PLACE between its swap's re-read and its rename, and putting the original back then fails, so the step answers part way (leftPartWay) and is left in flight; keptOriginalsBeside then also matches what the 'undo kept what a page held' line names. fileInUseAtTheUndo: the final `undo` is made while every swap is still refused as a file in use; leftLines: how many 'undo refused for a change left part way' trail lines that undo wrote.",
+    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared. withATree: the step also removes courses/TST1O/extra (a.md, sub/b.md: one removeTree, its content in the list) and moves the marker, so it swaps first, second, the folder aside, then the move (an undo: second, first, the move back, then the folder made); folderKept whether the folder is there after recovery. withAPreference: the step also sets the preference undoCasesPreference from a to b (one external op, its place after the pages); preference is its value after recovery. recoveredBy: who recovers: recovery (the default: the app's recovery, which re-derives what it settles), theNextWrite (the next step through the door for ops, which recovers and re-derives first), or anOrdinaryWrite (a step through U1's door, whose recovery inside its lock leaves a step that keeps a file true by a rule in flight, for a recovery that will re-derive it). changeTheFolderSetAside: before recovery a file is saved into the folder the stopped work set aside (under its hidden staged name); keptAside whether a folder is still kept aside after recovery. somethingInItsPlace: before recovery a different folder is made at the place of the folder set aside. visibleNameTaken: before recovery a folder is made at the visible name `courses/TST1O/extra (kept by Undo)` too. keptVisibleAs: the path of the visible name the folder set aside is kept under after recovery (it holds a.md). recoveryStopsAfterTheTidy: the first recovery stops at the kill point afterRecoveryTidied, once it has tidied and before it writes to the list (it must not have recorded the step interrupted), and a second recovery then runs. folderLines: how many 'undo found a folder set aside' trail lines the recoveries wrote. stopAt whileDeletingAFolder: the work stops after a folder it took out has been renamed to its `-gone` name and before its delete ends; halfDeleteTheGoneFolder then removes a.md from that `-gone` folder, as a delete that died part way leaves it. ordinaryWriteOn: first makes that write set the first page's title (the very file the stopped work left), otherwise a third page's; nextWrite is what that write comes to (anotherChangeIsUnderWay: refused, nothing changed). U3c: changeTheKeptOriginal: after the content is removed and before recovery, a line is added to every kept original (`-orig`) the stopped work left beside a page, so its hash no longer matches what the journal recorded; keptOriginalsBeside: the pages beside which a kept original of the step is still on the disk after recovery, and nothing else staged, which is also exactly what the 'undo could not put back a change that stopped' trail line names (when absent, nothing staged may be left). editRacesTheSwap: instead of stopping at stopAt, the step is made while another program appends a line to that page IN PLACE between its swap's re-read and its rename, and putting the original back then fails, so the step answers part way (leftPartWay) and is left in flight; keptOriginalsBeside then also matches what the 'undo kept what a page held' line names. fileInUseAtTheUndo: the final `undo` is made while every swap is still refused as a file in use; leftLines: how many 'undo refused for a change left part way' trail lines that undo wrote. U4b: withAMovedFolder makes the step the same two pages through JournaledWrite.perform(ops:) plus courses/TST1O/media (a.md holding the lines `Intro.`, `Line one: old.` and `End.`; b.md holding `B`) moved to courses/TST1O/renamed and a `replaceText` naming courses/TST1O/renamed/a.md that turns `Line one: old.` into `new`, in that order, so it swaps the folder first, then first, second, then the edit inside (an undo: the edit inside, second, first, then the folder back); movedFolder is what stackCases' movedFolder says after recovery. keptCopyLeftInsideTheFolder: before recovery a file is written inside the folder at its old place under the undo's kept-original name for a.md (`.a.md.plantoir-undo-<seq>-undo-orig`), holding what a.md held before the undo (`Line one: new.`). No staged file or kept original may be left anywhere in the working folder, the moved folder included.",
     "deployedCases": [
       {
         "name": "never deployed: no fragment, no offer",
@@ -53581,7 +53980,7 @@
     ],
     "deployedCasesHow": "Each case is one move (an Undo or a Redo) of one section, asked of rule.deployed. moves: every page the move changes, by its op path inside the working folder, with whether students can see it in the course before and after the move (the build's own hide rule, worked out by the caller). changesMoreThanVisibility: the move also changes what some page says. record: every file in the section's published-pages folder, by name, with the places it lists (null: the file could not be read). destinations: the destination types the section deploys to NOW (netlify, cloudflare, folder), its primary and any additional. siteMarkers: those of them that have a site marker (file-formats.json -> firstDeployMarkers; absent: none). answer: offerToDeploy, noOffer or cannotTell.",
     "wording": {
-      "note": "Sentences the Mac says on the undo line's failure paths that were in Swift alone (the U3 sweep, finding 5; fixed in #899 U4a). Placeholders: {place} is the page a kept file stands beside, already quoted (“Unit 1, Day 2.md”); {kept} its hidden name; {code} and {number} the course and section; {legacy}, {place}, {current} and {aside} website records as a teacher would find them; {said} the refusal's own sentence. Windows owes the same sentences where it builds the same failure (W4c for the kept files, W7 for the rollover's records); no Windows reader exists yet.",
+      "note": "Sentences the Mac says on the undo line's failure paths that were in Swift alone (the U3 sweep, finding 5; fixed in #899 U4a). Placeholders: {place} is the page a kept file stands beside, already quoted (“Unit 1, Day 2.md”); {kept} its hidden name; {code} and {number} the course and section; {legacy}, {place}, {current} and {aside} website records as a teacher would find them; {said} the refusal's own sentence; {old} a folder's name before a rename and {new} after it, {places} the folders a rename stopped part way left at the new name, each quoted and inside the course (U4b, W8). Windows owes the same sentences where it builds the same failure (W4c for the kept files, W7 for the rollover's records); no Windows reader exists yet.",
       "keptBesideIt": "What {place} held before is kept beside it as the hidden file “{kept}”.",
       "classDatesRememberedTitle": "The class dates for {code} Section {number} are remembered.",
       "classDatesKeptLead": "Another program may have changed their file as they were saved.",
@@ -53589,7 +53988,10 @@
       "rolloverNothingElseWasChanged": "Nothing else was changed: {said}",
       "rolloverRecordStillMoved": "The website record “{legacy}” is now at “{place}”, where a deploy reads it; it names the same website.",
       "rolloverLeftoverStillMoved": "The old website record “{legacy}” is now at “{place}”, where no deploy reads it.",
-      "rolloverUnreadableStillMoved": "The website record “{current}”, which no deploy could read, is now at “{aside}”, where no deploy reads it either."
+      "rolloverUnreadableStillMoved": "The website record “{current}”, which no deploy could read, is now at “{aside}”, where no deploy reads it either.",
+      "renameFolderNothingWasChanged": "“{old}” was not renamed, and nothing was changed: {said}",
+      "renameFolderStoppedPartWay": "“{old}” was not renamed, and Plantoir could not put everything back as it was: {said}",
+      "renameFolderRenamedOnlyInPart": "“{old}” was renamed only in part, and Plantoir could not put everything back as it was. Still called “{new}”: {places}. {said}"
     },
     "traces": "contracts/undo-traces.json, generated by scripts/make_undo_traces.py (seeded, deterministic, with its own scripts/test_make_undo_traces.py) and replayed by both suites through each app's own journal and door. U1's traces are publish and hide only, set at the line with JournaledWrite.settingEntry's rule (which drops a leading byte-order mark, as today's publish does); U3 grows them to about 120 through the real action code. Since U2 they also move pages aside (a `move` call: one `move` op, judged as a pair, made through the door that plans a step forward), 31 moves among 690 calls, so linear undo and redo, refusals and the closing runs cross a second kind.",
     "knownLimits": {

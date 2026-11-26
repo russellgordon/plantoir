@@ -406,7 +406,8 @@ struct SectionDetailView: View {
         if previewRunner.isRunning {
             return true
         }
-        return !(isBusy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+        return !(isBusy || workspace.isBeingCopied(course.code) || workspace.isRenamingAFolder(course.code)
+            || workspace.folderIsGettingReady)
     }
 
     /// The Deploy button's enablement — read by the button and by Section ▸
@@ -417,7 +418,10 @@ struct SectionDetailView: View {
             folderPath: workspace.workspaceURL?.path,
             courseCode: course.code,
             sectionNumber: sectionNumber,
-            isBeingCopied: workspace.isBeingCopied(course.code),
+            // A Rename folder of the course (#899 U4b) holds Deploy as a
+            // copy being zipped does: the site would be built from a course
+            // half renamed.
+            isBeingCopied: workspace.isBeingCopied(course.code) || workspace.isRenamingAFolder(course.code),
             folderIsGettingReady: workspace.folderIsGettingReady,
             heldElsewhere: courseIsHeldElsewhere
         )
@@ -506,6 +510,28 @@ struct SectionDetailView: View {
             return SectionDetailView.deployIsHeldElsewhere(course: courseCode)
         }
         return SectionDetailView.deployOrdinaryHelp
+    }
+
+    /// Why Preview and Deploy are greyed for the whole folder or course, in
+    /// their help tags, or nil: the folder's tools getting ready (#476), else
+    /// a Rename folder of the course under way in any window (#899 U4b part
+    /// seven's review, L2), in the menu-reason wording.
+    var greyedReason: String? {
+        return SectionDetailView.greyedReason(
+            folderReadinessReason: workspace.folderReadinessReason,
+            renamingAFolder: workspace.isRenamingAFolder(course.code)
+        )
+    }
+
+    /// The rule of `greyedReason`, as a test can run it.
+    static func greyedReason(folderReadinessReason: String?, renamingAFolder: Bool) -> String? {
+        if let folderReadinessReason {
+            return folderReadinessReason
+        }
+        if renamingAFolder {
+            return CourseActivity.availableOnceTheFolderIsRenamed
+        }
+        return nil
     }
 
     /// The Deploy button's help when nothing is in its way.
@@ -838,7 +864,7 @@ struct SectionDetailView: View {
                     // Nor while the folder's tools are still being copied, or
                     // that copy failed (#476): the help says why, no dialog.
                     .disabled(!previewButtonIsEnabled)
-                    .help(previewRunner.isRunning ? "Stop previewing this section" : (workspace.folderReadinessReason ?? "Preview this section's website"))
+                    .help(previewRunner.isRunning ? "Stop previewing this section" : (greyedReason ?? "Preview this section's website"))
                     .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
 
                     // "Deploy", NOT "Publish" — a page is published (the
@@ -867,7 +893,7 @@ struct SectionDetailView: View {
                     // removal waiting on that zip deletes what this would publish.
                     .disabled(!deployButtonIsEnabled)
                     .help(SectionDetailView.deployHelp(
-                        folderReadinessReason: workspace.folderReadinessReason,
+                        folderReadinessReason: greyedReason,
                         heldElsewhere: courseIsHeldElsewhere,
                         courseCode: course.code,
                         heldSection: sectionHeldElsewhere
@@ -875,7 +901,7 @@ struct SectionDetailView: View {
                     // The same sentence for VoiceOver while another program
                     // holds the course or this section (#729, #835);
                     // nothing extra otherwise.
-                    .accessibilityHint(courseIsHeldElsewhere && workspace.folderReadinessReason == nil
+                    .accessibilityHint(courseIsHeldElsewhere && greyedReason == nil
                         ? SectionDetailView.deployHelp(
                             folderReadinessReason: nil, heldElsewhere: true,
                             courseCode: course.code, heldSection: sectionHeldElsewhere
@@ -2423,7 +2449,8 @@ struct SectionDetailView: View {
             return
         }
         // Every way in, not only the button (#351): see its `.disabled`.
-        if workspace.isBeingCopied(course.code) {
+        // A Rename folder of the course too (#899 U4b).
+        if workspace.isBeingCopied(course.code) || workspace.isRenamingAFolder(course.code) {
             return
         }
         // A preview of this section cannot start while this same section is
@@ -2941,6 +2968,12 @@ struct SectionDetailView: View {
         if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
             return AssistSiteWorkResult(
                 succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
+            )
+        }
+        // Nor while a folder of the course is being renamed (#899 U4b).
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: CourseActivity.folderRenameIsUnderWay(course: course.code)
             )
         }
 

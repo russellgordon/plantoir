@@ -285,6 +285,9 @@ enum ScheduledDeployCleanup {
         runner: LaunchControlRunning = LaunchControl()
     ) async -> RemovalResult {
         let workingFolderURL: URL = coursesDirectoryURL.deletingLastPathComponent()
+        if let renaming = folderRenameRefusal(course, workingFolderURL: workingFolderURL) {
+            return RemovalResult(stoppedSections: [], didRemove: false, problem: renaming)
+        }
         // Before anything is turned off or zipped (#351's second review).
         if isBusy(course, workingFolderURL: workingFolderURL) {
             return RemovalResult(
@@ -367,6 +370,9 @@ enum ScheduledDeployCleanup {
             )
         }
         let workingFolderURL: URL = coursesDirectoryURL.deletingLastPathComponent()
+        if let renaming = folderRenameRefusal(course, workingFolderURL: workingFolderURL) {
+            return RemovalResult(stoppedSections: [], didRemove: false, problem: renaming)
+        }
         if isBusy(course, workingFolderURL: workingFolderURL) {
             return RemovalResult(
                 stoppedSections: [], didRemove: false,
@@ -480,6 +486,16 @@ enum ScheduledDeployCleanup {
         var errorDescription: String? {
             return sentence
         }
+    }
+
+    /// The sentence a removal is refused with while a Rename folder of the
+    /// course is under way in any window (#899 U4b), or nil: the archive
+    /// would zip, and the removal take away, a course half renamed.
+    private static func folderRenameRefusal(_ course: Course, workingFolderURL: URL) -> String? {
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workingFolderURL.path, courseCode: course.code) {
+            return CourseActivity.folderRenameIsUnderWay(course: course.displayCode)
+        }
+        return nil
     }
 
     /// Whether the course is busy in this process, by the one reading every

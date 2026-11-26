@@ -37,28 +37,62 @@ enum FolderActions {
     /// is gone (`FrontPageWording.keptGone`), and Finder shows only what is
     /// still there, if anything is.
     static func showInFinder(files: [URL]) {
-        let found: (there: [URL], gone: [String]) = FolderActions.whatIsStillThere(files)
+        let plan: ShowInFinderPlan = FolderActions.showInFinderPlan(files)
         #if DEBUG
         if let showInFinderRecorder = FolderActions.showInFinderRecorder {
-            if !found.gone.isEmpty {
-                FolderActions.goneRecorder?(found.gone)
+            if !plan.gone.isEmpty {
+                FolderActions.goneRecorder?(plan.gone)
             }
-            if !found.there.isEmpty {
-                showInFinderRecorder(found.there)
+            if !plan.selected.isEmpty {
+                showInFinderRecorder(plan.selected)
             }
             return
         }
         #endif
-        if !found.gone.isEmpty {
+        if let sentence = plan.alertSentence {
             let alert: NSAlert = NSAlert()
             alert.alertStyle = .informational
-            alert.messageText = FrontPageWording.keptGone(found.gone)
-            alert.addButton(withTitle: "OK")
+            alert.messageText = sentence
+            for title in plan.alertButtons {
+                alert.addButton(withTitle: title)
+            }
             alert.runModal()
         }
-        if !found.there.isEmpty {
-            NSWorkspace.shared.activateFileViewerSelecting(found.there)
+        if !plan.selected.isEmpty {
+            NSWorkspace.shared.activateFileViewerSelecting(plan.selected)
         }
+    }
+
+    /// What Show in Finder does for these files, worked out before any
+    /// window is touched, so the path the app takes (the alert, then
+    /// Finder) is the one a test reads (the U4a sweep: the test read only
+    /// the recorder's branch).
+    struct ShowInFinderPlan: Equatable {
+
+        // MARK: - Stored properties
+
+        /// The names of the kept files that are no longer there.
+        let gone: [String]
+
+        /// The alert's sentence, or nil when every file is there.
+        let alertSentence: String?
+
+        /// The alert's buttons, in order; empty with no alert.
+        let alertButtons: [String]
+
+        /// What Finder is asked to select; empty when nothing is there.
+        let selected: [URL]
+    }
+
+    static func showInFinderPlan(_ files: [URL]) -> ShowInFinderPlan {
+        let found: (there: [URL], gone: [String]) = FolderActions.whatIsStillThere(files)
+        if found.gone.isEmpty {
+            return ShowInFinderPlan(gone: [], alertSentence: nil, alertButtons: [], selected: found.there)
+        }
+        return ShowInFinderPlan(
+            gone: found.gone, alertSentence: FrontPageWording.keptGone(found.gone),
+            alertButtons: ["OK"], selected: found.there
+        )
     }
 
     /// Of these files, those still there, and the names of those that are

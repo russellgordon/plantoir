@@ -4512,9 +4512,7 @@ assistant's own duplicate is unchanged.)
 **On Windows since #550 (2026-10-16).** The same endings, and the same five
 paths, each pinned. The undo ending comes from the depth the menu's server
 sends plus its `changed` flag, never from the sentence; it used to count
-"is put back", which the partial sentence also contains. Re-date Classes… that
-stops part way says `publishStoppedPartWay` with the pages already re-dated,
-on both `re_date_classes` and `roll_over_section`, each through its own
+"is put back", which the partial sentence also contains. Re-date Classes… is all or none since #899 W7b1: it says "Nothing was changed: …", or, when a page was left holding its new date with its earlier content kept beside it, `publishStoppedPartWay` naming each kept file, on both `re_date_classes` and `roll_over_section`, each through its own
 `catch (AssistRefusal)`. Before, both let the `IOException` escape as the
 SDK's generic protocol error. A first write
 that fails says the mac's "Nothing was changed: …", and that now includes a

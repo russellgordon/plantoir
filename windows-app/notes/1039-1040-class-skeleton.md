@@ -15,16 +15,6 @@ Rulings: Russell, 2026-11-25, on each issue. Found by Windows Undo W7b1.
 - `TaskScheduling.TaskXml`: the Task Scheduler definition, written UTF-16 to a temporary file for `schtasks /create /xml`. Not a teacher's page and not compared with the Mac, so left as it is.
 - Outside Core (not in scope, listed for completeness): `Plantoir/Views/NewCourseDialog.cs` holds a XAML raw literal that is parsed in memory, never written to a file.
 
-## For PROGRESS
-
-- **#1039, #1040 (2026-11-25):** a new class page written by Windows is LF whatever checkout built the app (`AssistWorkspace.PageTextFromLiteral` at the point the skeleton literal becomes text), and a new curriculum block opens with the Mac's `## Curriculum connection`. Existing pages are never rewritten; a block is found by its markers, so pages with the old "Today's work points here:" line are still added to. Tests: `NewClassesTests.ANewClassPageIsWrittenWithLfWhateverCheckoutBuiltTheApp`, `NewClassesTests.TheSkeletonFromACrlfCheckoutStillBecomesLfText` (the literal given CRLF in the test, so it fails on any checkout if the normalising step breaks), `CurriculumMentionsTests.ANewBlockIsTheBlockTheMacWrites` (from `undo-action-steps.json`, step `addCurriculumMentions`), `CurriculumMentionsTests.AnExistingBlockIsAddedToRatherThanReplaced` (now a theory over the old line and the new heading).
-
-## For documentation 12
-
-Under the assistant's page-writing section, add:
-
-> **A new page's bytes are the Mac's (#1039, #1040).** A page Windows writes from a C# raw string literal (the class page skeleton) is made LF by `AssistWorkspace.PageTextFromLiteral` before it is saved, because a raw literal takes its line ends from the checkout that compiled it: built from a `core.autocrlf true` checkout, the skeleton was CRLF on every line but the unit tag's two. A new curriculum block opens with `## Curriculum connection`, the Mac's heading (the Mac's output is the `addCurriculumMentions` step in `contracts/undo-action-steps.json`, which `CurriculumMentionsTests` reads). Until #1039 Windows opened it with "Today's work points here:"; pages that carry that line keep it, since a block is found by its `%%curriculum-start%%` and `%%curriculum-end%%` markers, never by its first line. The only other raw literal in `Plantoir.Core` that reaches a file, `TaskScheduling.TaskXml`, is Task Scheduler's own XML, not a teacher's page.
-
 ## Runs
 
 Every line below is copied from a log in `vm-tools/runs/1039-1040/` (ignored by git, kept on the main Mac). The first runs, earlier the same day, printed only to the writer's terminal, and the VM's own log (`C:\vm-setup\unit-run.txt`) went when the park restored snapshot 02. So these runs were made again, on 2026-11-25, to leave logs; their results match the first runs.

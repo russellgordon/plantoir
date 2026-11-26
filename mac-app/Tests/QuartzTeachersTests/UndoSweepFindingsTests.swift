@@ -151,6 +151,10 @@ final class UndoSweepFindingsTests: XCTestCase {
             "rolloverRecordStillMoved": AssistToolRunner.RolloverStoppedAfterARecordMoved.recordStillMoved(legacy: "{legacy}", place: "{place}"),
             "rolloverLeftoverStillMoved": AssistToolRunner.RolloverStoppedAfterARecordMoved.leftoverStillMoved(legacy: "{legacy}", place: "{place}"),
             "rolloverUnreadableStillMoved": AssistToolRunner.RolloverStoppedAfterARecordMoved.unreadableStillMoved(current: "{current}", aside: "{aside}"),
+            "renameFolderNothingWasChanged": SpecialFolderRenamer.nothingWasChanged(renaming: "{old}", said: "{said}"),
+            "renameFolderStoppedPartWay": SpecialFolderRenamer.stoppedPartWay(renaming: "{old}", said: "{said}"),
+            "renameFolderRenamedOnlyInPart": SpecialFolderRenamer.renamedOnlyInPart(renaming: "{old}", to: "{new}", places: ["{places}"], said: "{said}")
+                .replacingOccurrences(of: "“{places}”", with: "{places}"),
         ]
         XCTAssertEqual(ours, wording)
     }

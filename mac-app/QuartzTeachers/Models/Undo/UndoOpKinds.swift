@@ -759,6 +759,13 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
 
     let files: [File]
 
+    /// Each symbolic link inside, by its path, with the SHA-256 of the
+    /// bytes it holds (its target as written, never what it leads to): a
+    /// link is listed, never followed (U4b part four's review, L4: a folder
+    /// holding a link is renamed as before, the link moved as a link). A
+    /// listing with a link is never made from its blobs (`make`).
+    var links: [File] = []
+
     /// The one name a listing passes over, wherever it is: the Finder's
     /// `.DS_Store`.
     static let ignoredName: String = ".DS_Store"
@@ -773,6 +780,9 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
         }
         for file in files {
             entries.append((path: file.path, line: "file " + file.sha + " " + file.path + "\n"))
+        }
+        for link in links {
+            entries.append((path: link.path, line: "link " + link.sha + " " + link.path + "\n"))
         }
         entries.sort { first, second in
             return first.path.utf8.lexicographicallyPrecedes(second.path.utf8)
@@ -801,6 +811,7 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
         }
         var folders: [String] = []
         var files: [File] = []
+        var links: [File] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
             if line.hasPrefix("folder ") {
                 let path: String = String(line.dropFirst("folder ".count))
@@ -819,11 +830,22 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
                     return nil
                 }
                 files.append(File(path: path, sha: sha))
+            } else if line.hasPrefix("link ") {
+                let rest: Substring = line.dropFirst("link ".count)
+                guard let space = rest.firstIndex(of: " ") else {
+                    return nil
+                }
+                let sha: String = String(rest[rest.startIndex..<space])
+                let path: String = String(rest[rest.index(after: space)...])
+                if !UndoOp.isBlobName(sha) || !UndoOp.isSafeRelativePath(path) {
+                    return nil
+                }
+                links.append(File(path: path, sha: sha))
             } else {
                 return nil
             }
         }
-        let listing: UndoTreeListing = UndoTreeListing(folders: folders, files: files)
+        let listing: UndoTreeListing = UndoTreeListing(folders: folders, files: files, links: links)
         if listing.data != data {
             return nil
         }
@@ -875,12 +897,13 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         }
         var folders: [String] = []
         var files: [UndoTreeListing.File] = []
+        var links: [UndoTreeListing.File] = []
         var contents: [String: Data] = [:]
         var couldNotRead: Bool = false
-        if !walk(url, prefix: "", keepingContents: keepingContents, folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
+        if !walk(url, prefix: "", keepingContents: keepingContents, folders: &folders, files: &files, links: &links, contents: &contents, couldNotRead: &couldNotRead) {
             return couldNotRead ? .cannotRead : .notATree
         }
-        return .tree(UndoTreeListing(folders: folders, files: files), contents: contents)
+        return .tree(UndoTreeListing(folders: folders, files: files, links: links), contents: contents)
     }
 
     private static func walk(
@@ -889,6 +912,7 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         keepingContents: Bool,
         folders: inout [String],
         files: inout [UndoTreeListing.File],
+        links: inout [UndoTreeListing.File],
         contents: inout [String: Data],
         couldNotRead: inout Bool
     ) -> Bool {
@@ -920,7 +944,7 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
             let type: mode_t = information.st_mode & S_IFMT
             if type == S_IFDIR {
                 folders.append(path)
-                if !walk(url, prefix: path, keepingContents: keepingContents, folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
+                if !walk(url, prefix: path, keepingContents: keepingContents, folders: &folders, files: &files, links: &links, contents: &contents, couldNotRead: &couldNotRead) {
                     return false
                 }
             } else if type == S_IFREG {
@@ -938,6 +962,13 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
                     }
                     files.append(UndoTreeListing.File(path: path, sha: sha))
                 }
+            } else if type == S_IFLNK {
+                // Listed by what it holds, never followed.
+                guard let target = linkTarget(at: url) else {
+                    couldNotRead = true
+                    return false
+                }
+                links.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: target)))
             } else {
                 return false
             }
@@ -945,10 +976,30 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         return true
     }
 
+    /// The bytes a symbolic link holds, read with `readlink`: the link
+    /// itself, never what it leads to. Nil when it cannot be read.
+    static func linkTarget(at url: URL) -> Data? {
+        var buffer: [UInt8] = [UInt8](repeating: 0, count: Int(PATH_MAX) + 1)
+        let count: Int = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return readlink(path, &buffer, buffer.count)
+        }
+        if count < 0 {
+            return nil
+        }
+        return Data(buffer[0..<count])
+    }
+
     /// Makes the folder a listing describes at a NEW place, with every
     /// file's content as given. False, with whatever it made removed, when
-    /// a file's content is missing or a write fails.
+    /// a file's content is missing or a write fails. A listing holding a
+    /// link is never made: a link is moved, never written from a blob.
     static func make(_ listing: UndoTreeListing, contents: [String: Data], at url: URL) -> Bool {
+        if !listing.links.isEmpty {
+            return false
+        }
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
         } catch {
@@ -1006,14 +1057,45 @@ nonisolated extension UndoCheck {
     /// free, either holding something else) is a change since, so an undo
     /// leaves BOTH where they are and takes nothing back, and never deletes
     /// the destination alone.
-    static func wholeState(of op: UndoOp, root: URL, places: UndoExternalPlaces) -> UndoOpState {
+    ///
+    /// `overridingTo` and `overridingFrom` give, for paths inside the place
+    /// on that side, what they would hold once the step's own edits there
+    /// are taken back, and `.absent` for the step's own staged files and
+    /// kept originals (U4b, opKinds.wholeOps): see `UndoMoveSide.read`.
+    static func wholeState(
+        of op: UndoOp, root: URL, places: UndoExternalPlaces,
+        overridingTo: [String: UndoItem] = [:], overridingFrom: [String: UndoItem] = [:]
+    ) -> UndoOpState {
         switch op.knownKind {
         case .move, .moveApart, .setAside:
             guard let from = op.from, let to = op.to else {
                 return .neither
             }
-            let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(from))
-            let atTo: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(to))
+            if op.isCaseOnlyMove, let spelled = UndoMoveSide.spellingListed(
+                from: root.appendingPathComponent(from), to: root.appendingPathComponent(to)
+            ) {
+                // One place, two spellings (U4b): judged by the spelling its
+                // folder lists, holding the content.
+                switch spelled {
+                case .cannotRead:
+                    return .cannotTell
+                case .another:
+                    return .neither
+                case .to, .from:
+                    let side: UndoMoveSide = spelled == .to
+                        ? UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)
+                        : UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
+                    if side == .cannotRead {
+                        return .cannotTell
+                    }
+                    if side != .holdsTheContent {
+                        return .neither
+                    }
+                    return spelled == .to ? .after : .before
+                }
+            }
+            let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
+            let atTo: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)
             if atFrom == .cannotRead || atTo == .cannotRead {
                 return .cannotTell
             }
@@ -1092,9 +1174,58 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
 
     // MARK: - Functions
 
-    static func read(_ op: UndoOp, at url: URL) -> UndoMoveSide {
+    /// `overriding` gives, for a path inside the place ("" for a file
+    /// moved itself), what it would hold once the step's own edits there are
+    /// taken back (U4b, opKinds.wholeOps): `.absent` leaves it out of the
+    /// listing. A swap passes its own kept originals inside a moved folder
+    /// as `.absent`, so the move's pair is judged without them.
+    /// U4b, a capitalisation-only move: which spelling the folder holding
+    /// `from` and `to` lists, when the two are ONE item there (a
+    /// case-insensitive volume: the same device and file number at both
+    /// spellings). Nil when they are not one item (a case-sensitive volume,
+    /// or nothing there), so the move is judged as any move is.
+    static func spellingListed(from: URL, to: URL) -> UndoCaseOnlySpelling? {
+        var atFrom: stat = stat()
+        var atTo: stat = stat()
+        let foundFrom: Int32 = from.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &atFrom)
+        }
+        let foundTo: Int32 = to.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &atTo)
+        }
+        if foundFrom != 0 || foundTo != 0 || atFrom.st_dev != atTo.st_dev || atFrom.st_ino != atTo.st_ino {
+            return nil
+        }
+        let folder: URL = from.deletingLastPathComponent()
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            return .cannotRead
+        }
+        let wanted: String = from.lastPathComponent.lowercased()
+        for name in names where name.lowercased() == wanted {
+            if name == to.lastPathComponent {
+                return .to
+            }
+            if name == from.lastPathComponent {
+                return .from
+            }
+            return .another
+        }
+        return .another
+    }
+
+    static func read(_ op: UndoOp, at url: URL, overriding: [String: UndoItem] = [:]) -> UndoMoveSide {
         if let sha = op.sha {
-            switch UndoItem.read(at: url) {
+            var item: UndoItem = UndoItem.read(at: url)
+            if let given = overriding[""], item != .absent {
+                item = given
+            }
+            switch item {
             case .absent:
                 return .free
             case .file(let data):
@@ -1113,7 +1244,25 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
         case .cannotRead:
             return .cannotRead
         case .tree(let listing, _):
-            return listing.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
+            if overriding.isEmpty {
+                return listing.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
+            }
+            var files: [UndoTreeListing.File] = []
+            for file in listing.files where overriding[file.path] == nil {
+                files.append(file)
+            }
+            for (path, given) in overriding {
+                switch given {
+                case .absent:
+                    continue
+                case .file(let data):
+                    files.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: data)))
+                case .notAFile, .unreadable:
+                    return .holdsSomethingElse
+                }
+            }
+            let judged: UndoTreeListing = UndoTreeListing(folders: listing.folders, files: files, links: listing.links)
+            return judged.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
         }
     }
 }
@@ -1377,4 +1526,14 @@ nonisolated enum UndoMaintainers {
         }
         await rederive(record.step.ops, root: root)
     }
+}
+
+/// Which spelling a folder lists for a capitalisation-only move's one item
+/// (U4b, `UndoMoveSide.spellingListed`).
+nonisolated enum UndoCaseOnlySpelling: Equatable, Sendable {
+    case from
+    case to
+    /// A third spelling (renamed by hand since), or no entry at all.
+    case another
+    case cannotRead
 }
