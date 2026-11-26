@@ -27,3 +27,12 @@ Review 1 fix round (class UndoSweepFindingsTests; logs .dd/run-r1-mf-*.log, run-
 Each restored with git checkout of the committed file; git diff of JournaledStep.swift empty.
 
 RED 8 of 8 in all.
+
+Review 2 fix round (logs .dd/run-r2-mf-*.log)
+
+9. placeALinkLeadsTo returns url: RED. testAShadowStepOnADanglingLinkWhoseFolderIsMissingMakesTheFolderAndTheFile: "[nothingWasChanged] is not equal to []" - outside: false (and the outside line).
+10. The missing-folder refusal put back in plan: RED, same test, same lines.
+Must-fail 8 of review 1 (the refusal dropped) is retired with the refusal it pinned.
+Restored with git checkout; git diff of JournaledStep.swift empty.
+
+RED 9 of 9 standing (two first round, five review 1, two review 2).

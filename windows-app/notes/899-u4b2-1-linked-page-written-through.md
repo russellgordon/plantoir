@@ -9,23 +9,29 @@ Branch `issue/899-u4b2-1-linked-page-written-through`, from `origin/dev` a03fece
 ## For documentation 12
 
 - `undo.rule.shadow` now states ONE rule for both platforms: a linked page is written through its link and stays a link; a folder (a link to a folder included) or a file that cannot be read is refused before anything changes; a part-way stop keeps what the file held beside the file the link leads to. Windows' `UndoActionStepTests.WithTheSwitchOffALinkedPageIsWrittenThroughItsLinkAndStaysALink` and `APlainWriteLeftPartWayIsSaidAsPartWayAndNamesTheKeptFile(throughALink: true)` are the twins of the Mac's `UndoSweepFindingsTests` cases.
-- Windows' `UndoActionStep` has no remove yet. When Windows journals a remove (Insert Class renaming a later class), it must refuse a step that removes a page that is a link, before anything changes, as the contract now says; and refuse a dangling link whose file's folder is missing (the Mac reads it as cannot tell now; Windows' `PlaceWritten` would write to the missing folder, which `File.WriteAllText` refuses with DirectoryNotFoundException, so check the sentence it gives). Twins on the Mac: `UndoSweepFindingsTests.testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges`, `testAShadowStepOnADanglingLinkWhoseFolderIsMissingIsRefused`.
+- Insert Class on Windows (`ApplyInsertClasses`, `AssistWorkspace.cs` about lines 4201 to 4213) goes ahead today when a later class is a link: it saves a plain copy at the new name and deletes the link with `File.Delete`, outside the door. The Mac refuses that step before anything changes. The contract names this as the Mac's. When W7b2 converts Make Room for Classes, the held row `makeRoomForClasses` carries this, and pieces 14 and 15 decide which behaviour holds. Twin on the Mac: `UndoSweepFindingsTests.testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges`.
+- A dangling link whose folder is missing: both platforms make the folder and the file (Windows `UndoSwap.MakeTheFolderOf`; the Mac's door). Twin: `testAShadowStepOnADanglingLinkWhoseFolderIsMissingMakesTheFolderAndTheFile`.
 - Stale line to correct: documentation 12, about line 18033, "2. **Switch-off refusals (finding 3).** `undo.rule.shadow` now says: with the switch off, a daily action whose file is a link, a folder or unreadable is refused before anything changes ..." The link part is no longer true on either platform.
 - One difference that stays (shadow only, nothing offered): the Mac NAMES a link to a file inside the working folder in a step, at that file (a shadow record, no trail line); Windows writes every linked page plainly with a `wentAhead` trail line. A link to a file outside the working folder is plain, with a `wentAhead` line, on both. See "For U7".
 
 ## Review 1 fixes (1 MEDIUM, 5 LOW)
 
 - MEDIUM 1, fixed: `undo.rule.shadow` now says the rule is for a WRITE: a step that removes a page that is a link, or renames one away (Insert Class renaming a later class that is a link), never follows the link and is refused before anything changes until the pieces that move a link (14 and 15); a new file planned where a link is is refused as there. Behaviour unchanged. Pinned by `testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges` (write the new name, remove the link: refused `cannotTellNow`, "Nothing was changed.", new name not written, linked file and link untouched).
-- LOW 1, fixed: a dangling link is written through (`testAShadowStepOnADanglingLinkMakesTheFileTheLinkLeadsTo`, inside: no trail line; outside: `wentAhead`). A dangling link whose file's folder is missing too made that folder (the door makes missing folders); it is now refused, `plan` reading it as cannot tell now, no folder made (`testAShadowStepOnADanglingLinkWhoseFolderIsMissingIsRefused`). This is a small new refusal, stated in the contract; see "For the director".
+- LOW 1, fixed: a dangling link is written through (`testAShadowStepOnADanglingLinkMakesTheFileTheLinkLeadsTo`, inside: no trail line; outside: `wentAhead`). The refusal added here for a missing folder was reversed in review 2 (MEDIUM A).
 - LOW 2, fixed: the contract names the recording difference (Mac names an inside link in a shadow step, no trail line; Windows writes it without the list with a `wentAhead` line; outside links unrecorded on both; which holds live is U7's).
 - LOW 3, carried to U7: live, an inside link is now recorded at its file rather than refused. Unreachable while the switch is off; U7 decides it (already under "For U7"; now also in documentation 09).
 - LOW 4, fixed: `testEveryWayOfPlanningAndReadingFollowsALink` plans through `write(_:to:plannedFrom:)` and `editJSON` on links inside and outside the working folder, and reads through `readData`, `readTextOrThrow`, `readText`; `fileExists` through a link is pinned in the dangling-link test (the disk says no file there, the plan says one). An end-to-end Publish action test was not added: the rule reaches actions only through `plan` and these entry points, every one now pinned.
 - LOW 5, fixed: `// MARK: - Computed properties` before `// MARK: - Functions` in the test class.
 - The unreadable-file test (the review's note) is unchanged and still not shown red by a sabotage of its own.
 
+## Review 2 fixes (2 MEDIUM)
+
+- MEDIUM A, fixed by the director's decision: the refusal of a dangling link whose folder is missing is gone. The Mac now makes the folder and writes the file through the link, as Windows does (`UndoSwap.MakeTheFolderOf`, `UndoSwap.cs` about line 336). The contract clause now says so. `testAShadowStepOnADanglingLinkWhoseFolderIsMissingMakesTheFolderAndTheFile` pins it: folder and file made, link still a link, no trail line inside, `wentAhead` outside.
+- MEDIUM B, fixed in the contract and held: the removed or renamed-away clause is now marked as the Mac's. It says what Windows does today: `ApplyInsertClasses` saves a plain copy at the new name and deletes the link itself, outside the door. Neither platform's behaviour was changed. In `NamedGapLedger.cs`, `makeRoomForClasses` (UndoActionStepsOnWindows) moves to its own held row with a reason of its own, `Reason899W7b2MakeRoomLinkedPage`. That reason names W7b2's conversion and this linked-page difference, which pieces 14 and 15 settle. The row still fails on Windows: `MakeRoomForClasses` (the call the fixture runs, `UndoActionStepsOnWindowsTests` line 249) still writes file by file through `ApplyInsertClasses`, with no step of its own. The name matches the contract's `undo-action-steps.json` row byte for byte (checked by script). Limit: see "For the director".
+
 ## Must-fail lines
 
-RED 8 of 8 (two in the first round, six in the fix round); detail in `windows-app/notes/899-u4b2-1-mustfail.log`.
+RED 9 of 9 standing (two in the first round, five from review 1, two from review 2; review 1's eighth pinned the missing-folder refusal, now reversed); detail in `windows-app/notes/899-u4b2-1-mustfail.log`.
 
 1. Plan at the link's own place: `testAShadowStepOnALinkWritesThroughTheLinkAndTheLinkStaysALink` fails with "XCTAssertNoThrow failed: threw error refused(cannotTellNow ...) - the linked page was refused, outside: false" (and true); the part-way test fails at line 114, "not refused part way".
 2. Folder refusal dropped in `writePlainly`: `testAShadowStepOnALinkToAFolderIsStillRefusedBeforeAnythingChanges` fails, "not refused as cannot tell now: refused(changedSince(... Media))".
@@ -41,6 +47,7 @@ All on the main Mac, through `xlock.sh`, derived data `.dd/`.
 - run-fix2.log: UndoSweepFindingsTests, 8 tests, 0 failures.
 - run-mustfail1.log, run-mustfail1b.log, run-mustfail2.log: see above.
 - run-own.log: UndoSweepFindingsTests, UndoActionStepsTests, UndoCourseSettingsStepTests, UndoJournalContractTests, UndoFilesContractTests, UndoWriterScanTests, SharedRulesContractTests, JournaledStepTests, and the three classes reading `CourseConfiguration.swift` as source (FileFormatsContractTests, CourseNameCharactersTests, ScheduledDeployCleanupTests): 219 tests, 0 failures, 0 skipped.
+- Review 2 round: run-r2-own.log, the eleven classes plus the twelve documentation 09 readers, 318 tests, 0 failures; `test_make_undo_traces.py` OK; `origin/dev` still a03fecefd.
 - Review 1 round: run-r1-own.log, the same eleven classes, 223 tests, 0 failures; run-r1-doc09.log, the twelve documentation 09 readers, 95 tests, 0 failures; `test_make_undo_traces.py` OK. `origin/dev` still a03fecefd.
 - run-doc09.log: the twelve other classes that read documentation 09 as text (ListTableGoldenTests, DetailTabsLayoutTests, TickTableTests, UnsavedSettingsNoticeLayoutTests, CloudSyncNoticeLayoutTests, AboutWindowLinksTests, TodaysClassOnTheFrontPageTests, ProgressViewSizeTests, AlertKeysTests, WorkingFolderSelectionTests, CourseSettingsTeardownTests, UpdateRemindersTests): 95 tests, 0 failures.
 - `python3 scripts/test_make_undo_traces.py`: 31 tests OK (no undo-trace rows changed).
@@ -66,7 +73,11 @@ All on the main Mac, through `xlock.sh`, derived data `.dd/`.
 
 ## For the director
 
-- No parked questions. One choice made on the review's word: a dangling link whose file's folder is missing is REFUSED (cannot tell now) rather than having the folder made where the link points (what the door did). Reverse by deleting the four lines in `JournaledStep.plan` and the contract's "unless that file's folder is missing as well" clause.
+- The missing-folder refusal is reversed, as decided.
+- One limit on the held row for MEDIUM B. On the PC, `makeRoomForClasses` fails today because W7b2 has not converted it. That failure does not come from the linked-page difference. No list Windows already runs can hold an action that is refused: a refused step records no row in `undo-action-steps.json`, and a new row shape would need Windows test code, which this piece may not write. So the PC run proves the row is held, not the difference. The difference travels in the row's reason, which W7b2's writer meets when converting it. Note that `makeRoomForClasses` is now on a line of its own, so a W7b2 branch that edits the old seven-key line will conflict here.
+  Options, recommendation first:
+  1. Accept this. When W7b2 converts Make Room, it adds a Windows case for a linked later class at the same moment.
+  2. Brief a later piece to add a refused-action row shape to `undo-action-steps.json` and Windows' fixture.
 - `contracts/` touched (`undo.rule.shadow` text only): both gates. No ledger rows (no new case).
 
 ## Self-check
