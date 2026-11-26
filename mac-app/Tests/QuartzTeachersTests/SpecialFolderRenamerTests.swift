@@ -669,6 +669,86 @@ final class SpecialFolderRenamerTests: XCTestCase {
         XCTAssertFalse(exists(SpecialFolderRenamer.renameMarkerURL(courseDirectory: course)), "the finished rename's record was left")
     }
 
+    /// A run FINISHING the recorded rename that is refused leaves that
+    /// record byte for byte (review 1 of U4b2-3, L4). MUST FAIL with the
+    /// refusal clearing a record that names this rename.
+    func testARefusedFinishOfTheRecordedRenameKeepsItsRecord() throws {
+        let course: URL = try makeCourse(sections: [1, 2], perSectionFolders: [])
+        try FileManager.default.createDirectory(
+            at: course.appendingPathComponent("section1/All Days"), withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: course.appendingPathComponent("section2/All Classes"), withIntermediateDirectories: true
+        )
+        SpecialFolderRenamer.recordRenameStarting(
+            from: "All Classes", to: "All Days", scope: .perSection, courseDirectory: course
+        )
+        let marker: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course)
+        let earlier: Data = try Data(contentsOf: marker)
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index == 0 }
+
+        XCTAssertThrowsError(try SpecialFolderRenamer.rename(
+            "All Classes", to: "All Days", scope: .perSection, courseDirectory: course, sectionNumbers: [1, 2]
+        ))
+
+        XCTAssertTrue(exists(course.appendingPathComponent("section2/All Classes")), "the refusal changed something")
+        XCTAssertEqual(try? Data(contentsOf: marker), earlier, "the record of the rename being finished was not left as it was")
+    }
+
+    /// A rename of the recorded folder to ANOTHER name that succeeds takes
+    /// the old name away for good, so the earlier record goes rather than
+    /// being put back for a rename nobody can finish (review 1, L3). MUST
+    /// FAIL with the earlier record put back whenever its target differs.
+    func testRenamingTheRecordedFolderElsewhereClearsItsRecord() throws {
+        let course: URL = try makeCourse(sections: [1, 2], perSectionFolders: [])
+        try FileManager.default.createDirectory(
+            at: course.appendingPathComponent("section1/All Days"), withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: course.appendingPathComponent("section2/All Classes"), withIntermediateDirectories: true
+        )
+        SpecialFolderRenamer.recordRenameStarting(
+            from: "All Classes", to: "All Days", scope: .perSection, courseDirectory: course
+        )
+
+        try SpecialFolderRenamer.rename(
+            "All Classes", to: "Every Class", scope: .perSection, courseDirectory: course, sectionNumbers: [1, 2]
+        )
+
+        XCTAssertTrue(exists(course.appendingPathComponent("section2/Every Class")))
+        XCTAssertFalse(exists(SpecialFolderRenamer.renameMarkerURL(courseDirectory: course)), "a record nobody can finish was left")
+    }
+
+    /// The record cannot be tidied (its folder will not take a change):
+    /// said on the trail, never kept quiet (review 1, L2). MUST FAIL with
+    /// the failure silent.
+    func testARecordThatCannotBeTidiedIsToldOnTheTrail() throws {
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: temporaryDirectory.appendingPathComponent(".trail"))
+        let course: URL = try makeCourse(sections: [1, 2], perSectionFolders: ["Tasks"])
+        let recordFolder: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: course).deletingLastPathComponent()
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in
+            // The record is written by now: its folder stops taking changes.
+            try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: recordFolder.path)
+            return index == 1
+        }
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: recordFolder.path)
+            ActivityTrail.store = previousTrail
+        }
+
+        XCTAssertThrowsError(try SpecialFolderRenamer.rename(
+            "Tasks", to: "Assessments", scope: .perSection, courseDirectory: course, sectionNumbers: [1, 2]
+        ))
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        let expectedStart: String = SpecialFolderRenamer.renameNoteNotTidiedLine(
+            renaming: "Tasks", to: "Assessments", course: "ICS3U", said: ""
+        )
+        let withoutReason: String = String(expectedStart.dropLast(2))
+        XCTAssertTrue(trail.contains(withoutReason), trail)
+    }
+
     // MARK: - Helpers
 
     private func makeCourse(sections: [Int], perSectionFolders: [String]) throws -> URL {

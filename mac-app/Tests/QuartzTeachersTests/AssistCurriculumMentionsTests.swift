@@ -16,6 +16,27 @@ import XCTest
 /// leave a teacher's live site pointing at a page that does not exist.
 final class AssistCurriculumMentionsTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    /// The undo list of this test's own: `SpecialFolderRenamer.rename` makes
+    /// a step through the door, whose list must never be the Mac's (review 1
+    /// of U4b2-3, L5).
+    var undoListFolder: URL!
+
+    // MARK: - Setup
+
+    override func setUpWithError() throws {
+        undoListFolder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("curriculum-mentions-undo-\(UUID().uuidString)", isDirectory: true)
+        UndoJournalLocation.folderOverride = undoListFolder
+    }
+
+    override func tearDownWithError() throws {
+        UndoJournalLocation.folderOverride = nil
+        try? FileManager.default.removeItem(at: undoListFolder)
+        undoListFolder = nil
+    }
+
     // MARK: - The two surfaces
 
     /// The local model sees the narrowed surface, and the MCP client sees that
