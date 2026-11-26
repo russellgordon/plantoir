@@ -160,6 +160,7 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
         AssistWorkspace workspace = Open(history);
 
         LinksChecklistSheet sheet = Sheet(workspace);
+        PublishPlan planBefore = Open().PlanPublish(Course, 1, [Relative(_pages["Unit 2, Day 5"])]);
         LinksChecklistPublished published = workspace.PublishAndRemember(sheet);
 
         Assert.Equal([Key], WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
@@ -170,15 +171,13 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
         Assert.Equal([UndoOp.WriteFile, UndoOp.WriteFile], kinds.TakeLast(2).ToList());
         Assert.DoesNotContain(UndoOp.WriteFile, kinds.SkipLast(2));
         // The pages the class publishes and dates, in the plan's order (W7b2-8
-        // review 1, L4): the ticked class first, then the pages it brings in
-        // the sheet's order; then the two records.
-        var pagesWritten = new List<string> { Relative(_pages["Unit 2, Day 5"]) };
-        foreach (LinksChecklistRow row in sheet.Rows)
-        {
-            foreach (string title in new[] { "Class Notes", "Worksheet" })
-                if (string.Equals(Path.GetFileName(row.Place), title, StringComparison.Ordinal)) pagesWritten.Add(Relative(_pages[title]));
-        }
-        Assert.Equal(3, pagesWritten.Count);
+        // review 1, L4): the order the class's own publish plan names them
+        // (the class, then the pages it brings), asked of a second workspace
+        // on the folder as it was; then the two records.
+        var pagesWritten = new List<string>();
+        foreach (var page in planBefore.Changing) pagesWritten.Add(page.RelativePath.Replace('\\', '/'));
+        Assert.Equal(new[] { "Unit 2, Day 5", "Class Notes", "Worksheet" }.Select(t => Relative(_pages[t])).Order(StringComparer.Ordinal),
+                     pagesWritten.Order(StringComparer.Ordinal));
         Assert.Equal(pagesWritten, paths.Take(3).ToList());
         Assert.Equal([AnsweredPath, KeptPath], paths.Skip(3).ToList());
         Assert.Equal(3, published.Written.Count);
