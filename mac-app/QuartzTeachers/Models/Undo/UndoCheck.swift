@@ -2235,7 +2235,7 @@ nonisolated extension UndoJournal {
             }
             UndoTrailHook.keptWhatItReplacedLine?(
                 record.step.course ?? "", record.step.section, direction == .backward, keptOfWhatItHeld, keptOfWhatItHoldsNow,
-                putBackFromAKeptOriginal
+                putBackFromAKeptOriginal, pathsOfTheStep
             )
         }
         // Only now, the whole swap in and the step closed, the trail says a

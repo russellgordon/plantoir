@@ -100,13 +100,13 @@ nonisolated enum UndoTrail {
                 )
             )
         }
-        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal in
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal, pagesOfTheStep in
             ActivityTrail.note(
                 .undoKeptWhatItReplaced,
                 UndoTrail.keptWhatItReplacedLine(
                     course: course, section: section, isUndo: isUndo,
                     keptOriginals: keptOriginals, keptOfWhatItHoldsNow: keptOfWhatItHoldsNow,
-                    putBackFromAKeptOriginal: putBackFromAKeptOriginal
+                    putBackFromAKeptOriginal: putBackFromAKeptOriginal, pagesOfTheStep: pagesOfTheStep
                 )
             )
         }
@@ -166,12 +166,15 @@ nonisolated enum UndoTrail {
     /// night; the second review of U3c, MEDIUM and LOW 1).
     static func keptWhatItReplacedLine(
         course: String, section: Int?, isUndo: Bool, keptOriginals: [String], keptOfWhatItHoldsNow: [String] = [],
-        putBackFromAKeptOriginal: [String]? = nil
+        putBackFromAKeptOriginal: [String]? = nil, pagesOfTheStep: [String] = []
     ) -> String {
         // Each kept file is given by its path in the working folder, so two
         // pages with the same name in two sections are two pages (the
         // part-two review of U4b, LOW 4). A bare hidden name stands for a
-        // page with no folder.
+        // page at the top of the working folder. `pagesOfTheStep` is every
+        // page the step changes, by path: a named page whose file name
+        // another of them shares is named by its path, even when that other
+        // page is not named here (U4b2-4 review 1, LOW 1).
         var everyKept: [String] = []
         for kept in keptOriginals {
             everyKept.append(kept)
@@ -186,6 +189,15 @@ nonisolated enum UndoTrail {
                 pages.append(page)
             }
         }
+        var pagesThatCouldBeMistaken: [String] = []
+        for page in pages {
+            pagesThatCouldBeMistaken.append(page)
+        }
+        for page in pagesOfTheStep {
+            if !pagesThatCouldBeMistaken.contains(page) {
+                pagesThatCouldBeMistaken.append(page)
+            }
+        }
         let which: String = isUndo ? "Undo" : "Redo"
         // Said "from what was kept beside it" of a page only when it was:
         // an Undo or a Redo whose content came from the list, and whose
@@ -198,7 +210,7 @@ nonisolated enum UndoTrail {
         var fromTheList: [String] = []
         var fromKept: [String] = []
         for page in pages {
-            let named: String = UndoTrail.nameOnTheLine(page, among: pages, course: course)
+            let named: String = UndoTrail.nameOnTheLine(page, among: pagesThatCouldBeMistaken, course: course)
             if putBackFromAKeptOriginal == nil || putBackFromAKeptOriginal?.contains(page) == true {
                 fromKept.append(named)
             } else {
@@ -219,12 +231,12 @@ nonisolated enum UndoTrail {
         line += ", but the list could not keep a copy of all it needs for this change, "
         line += "so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it."
         for kept in keptOriginals {
-            let named: String = UndoTrail.nameOnTheLine(UndoTrail.pageOfKept(kept), among: pages, course: course)
+            let named: String = UndoTrail.nameOnTheLine(UndoTrail.pageOfKept(kept), among: pagesThatCouldBeMistaken, course: course)
             let hidden: String = (kept as NSString).lastPathComponent
             line += " What \(named) held a moment before is kept beside it as the hidden file “\(hidden)”."
         }
         for kept in keptOfWhatItHoldsNow {
-            let named: String = UndoTrail.nameOnTheLine(UndoTrail.pageOfKept(kept), among: pages, course: course)
+            let named: String = UndoTrail.nameOnTheLine(UndoTrail.pageOfKept(kept), among: pagesThatCouldBeMistaken, course: course)
             let hidden: String = (kept as NSString).lastPathComponent
             line += " What \(named) holds now is kept beside it as the hidden file “\(hidden)”."
         }
@@ -249,6 +261,10 @@ nonisolated enum UndoTrail {
     /// A page as the line names it, quoted: by its file name (“index.md”),
     /// or, when another page in `pages` has the same file name, by its path
     /// inside the course (“Section 1/index.md”), so the two are told apart.
+    /// A page not under `courses/<course>/` (at the top of the working
+    /// folder, in another course, or with no course given) is then named by
+    /// its whole path in the working folder (U4b2-4 review 1, LOW 3). Names
+    /// that differ only in capitals are different names.
     static func nameOnTheLine(_ page: String, among pages: [String], course: String) -> String {
         let pageName: String = (page as NSString).lastPathComponent
         var sharesItsName: Bool = false
