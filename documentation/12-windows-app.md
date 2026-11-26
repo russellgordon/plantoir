@@ -8822,10 +8822,7 @@ pinned:
   existing `changedAnything`). On an `IOException` or
   `UnauthorizedAccessException`, `StoppedWhileWriting` notes the change and
   rethrows, so the teacher still hears `PublishStoppedPartWay`.
-- **Re-date Classes… that stopped part way** (`ApplyReDate`). After the first
-  page is written it notes the change and throws an `AssistRefusal`:
-  `PublishStoppedPartWay("the section's class dates", …)` with its way back,
-  then "The pages already re-dated:" and the pages, which are the mac's words.
+- **Re-date Classes… that stopped part way** (`ApplyReDate`). Re-date Classes… is one step (#899 W7b1): a refusal says the mac's "Nothing was changed: …"; a step the door left part way says `PublishStoppedPartWay("the section's class dates", …)` naming each kept file. The list "The pages already re-dated:" is gone with the writing page by page.
   It is an `AssistRefusal` so that both callers ANSWER it, each through its
   own `catch (AssistRefusal)`: `re_date_classes` and `roll_over_section`.
   Neither goes through `Guarded`. (The plan said the re-date's error reached
@@ -17937,6 +17934,16 @@ The bullets above, plus: the door is the product's through `UndoForThisProcess.C
 - Entry points: `AssistWorkspace.NewUndoStep(key, course, section)`, then `step.ReadText` / `step.Write` / `step.KeepsTheFrontPageTrue`, then `MakeTheUndoStep(step)` inside the action's `UndoHistory.Record`, and in its `catch (IOException or UnauthorizedAccessException)` `StoppedWhileWriting(error is UndoStepLeftPartWayException, error)`.
 - Still to go through it: every action W7b lists (writer scan entries `waitsFor: W7`; `LaterClassesKept.Keep` stays for Deploy's and the links checklist's records).
 - The planners read through the step while `_planningThrough` is set: an action that plans several things in one step sets it for its planning, as `Apply` and `ApplyWholeUnit` do.
+
+### What Windows has built: W7b1, the class pages' daily actions (#899, #949)
+
+The bullets above. Correction to W7a's "For W7b": the planners read through the step while `PlanningThrough` is set (an `AsyncLocal`, per flow; never `_planningThrough`, which W7a's round four replaced): an action that plans several things in one step sets it for its planning, as `Apply` and `ApplyWholeUnit` do (LOW 5). With the switch off a teacher meets the same files and the same answers as before W7b1, except that a failure is now all or none and says "Nothing was changed: …" where nothing was.
+
+- A Windows step left part way is never said as "couldn’t be read" or as plainly done: every converted action says "Nothing was changed" or the part-way sentence naming each kept file; Class Dates says the dates are remembered and names the hidden file (the mac's sheet words).
+- A refused swap leaves no empty folder it made.
+- Re-date Classes and Roll Over are each one step on Windows: one Undo puts back the pages and the timetable they were re-dated onto.
+
+**A new page's bytes are the Mac's (#1039, #1040).** A page Windows writes from a C# raw string literal (the class page skeleton) is made LF by `AssistWorkspace.PageTextFromLiteral` before it is saved, because a raw literal takes its line ends from the checkout that compiled it: built from a `core.autocrlf true` checkout, the skeleton was CRLF on every line but the unit tag's two. A new curriculum block opens with `## Curriculum connection`, the Mac's heading (the Mac's output is the `addCurriculumMentions` step in `contracts/undo-action-steps.json`, which `CurriculumMentionsTests` reads). Until #1039 Windows opened it with "Today's work points here:"; pages that carry that line keep it, since a block is found by its `%%curriculum-start%%` and `%%curriculum-end%%` markers, never by its first line. The only other raw literal in `Plantoir.Core` that reaches a file, `TaskScheduling.TaskXml`, is Task Scheduler's own XML, not a teacher's page.
 
 ### The pieces still owed for #899 on Windows, and what each waits for
 

@@ -2,31 +2,11 @@
 
 Branch `issue/899-w7b-daily-actions`, from W7a (`origin/issue/899-w7a-publish-through-the-door` bb6e19756) with `origin/dev` merged in (nothing newer at the start).
 
-## For PROGRESS
+## Left unfolded (a later section may contradict it; which is later could not be told)
 
-## 2026-11-21 — Undo and Redo, W7b1: the class pages' daily actions through ONE step (#899, #949)
-
-- **Add Next Class, in a New Unit, Add Classes** (`AssistWorkspace.ApplyAddClasses(plan, progress, actionKey)`): ONE step, every new page a `writeFile` with no before, read through the step (`UndoActionStep.Exists`, the mac's `fileExists`), the class folder made by the swap, never by `Directory.CreateDirectory` beforehand, no `recompute`. Keys from the tool, as the mac's `AssistToolRunner.addNextClass` names them: `add_next_class` → `addNextClass`, or `addNextClassInANewUnit` when `unit` is `next`; `add_classes` → `addClasses`. A page that cannot be planned stops every page ("Nothing was changed: …"); before, the pages before it were written. Every page appeared in between: no step, nothing written (the answer is as before).
-- **Curriculum mentions** (`ApplyCurriculumMentions`, `addCurriculumMentions`): the page through ONE step, no `recompute`. A page that cannot be written now says "Nothing was changed: Plantoir doesn’t have permission to change one of them." where `plantoir-mcp` said "Plantoir doesn’t have permission to read that." (a sentence made true).
-- **Class Dates** (`TimetableMemory.Write`, `rememberTimetable`): ONE step; the maker from the caller (the Class Dates dialog `sheet` by default; `remember_timetable` and the built-in assistant through `AssistWorkspace.RememberTimetable`, the workspace's surface on its own list); the folder made by the swap; never told to today's undo (it never was); the same dates again make no step; a file that cannot be written returns false, as before, and costs only the record (the re-date goes on). A step left part way returns true: the dates went in (the mac's sheet says them as remembered). The re-date's own timetable write is that same step for now, made by the re-date's surface (see "For W7b2").
-- **Bring Pages into Date** (`ApplySyncDates`, the Windows-only `sync_page_dates`): ONE step under Windows' own key `syncPageDates`, each page read through the step, no `recompute` (it never rewrote the front page).
-- **The Windows action on the mac's fixture** (`UndoActionStepsOnWindowsTests`, `WindowsActionsOnTheMacFixture`): the mac's `section(surface:)` laid down (each recorded step's files from their befores; the pages it does not touch checked against every recorded before that names them), the REAL Windows tool run with the mac's arguments on the mac's surface, and the one new begin line matched: key, `madeBy` word, files in order, op kinds, recomputes, each file's after. Steps 0 to 3 (W7a's) and 4 to 6, 11 and 12 run; 7 to 10 and 13 to 24 are held by name in `NamedGapLedger.UndoActionStepsOnWindows` (`Reason899W7b2`, `Reason899NoDuplicateAsNextClass`, `Reason899W7U3b`, `Reason899W8U4a`) and still fail. A held step whose Windows action exists here (`HeldButRunnable`: Make Room for Classes, Duplicate Class, Re-date Classes, How I Teach, Get Ready for the Start of the Year) is RUN with the mac's arguments and must fall short for its named reason: it changed one of the recorded step's files and left no applied begin under the recorded key (`HeldStillWritesWithoutItsStep`). One that changes nothing fails for that reason (a real failure, must-fail row 17); one that makes the recorded step reads as the gap closing. The other held steps (the sheets' records, the rollover, U4a, Duplicate as Next Class) are Windows actions (the Today's Class and Not Today sheets, the links checklist, Classes Dated Later, the menu's Duplicate as Next Class since #927) or not yet built (the rollover as one step, U4a), but have no tool this replay drives, and stop at the guard that names it.
-- **A new class page is the mac's bytes on every checkout** (#1040, merged into this branch): `ClassSkeleton` is `PageTextFromLiteral(ClassSkeletonLiteral(…))`, LF whatever the checkout, so a new page from Add Next Class, in a New Unit, and Add Classes is held byte for byte to the mac's after on the PC's CRLF checkout too. The checkout-line-ending transform the fixture and the traces once applied (`NewClassPageSteps`, `AsThisBuildWritesANewClassPage`, the raw-literal probe, `checkoutLineEndings`) is gone, and must-fail row 18 of `899w7b-mf1` with it.
-- **A refused step is begun and closed `failed` by the door** (W7a's door): a test of a refusal counts APPLIED steps (`WindowsActionsOnTheMacFixture.AppliedBegins`), never begin lines (`CurriculumMentionsOnAPageThatCannotBeWrittenChangeNothing`, `ReDateTests.SyncingIsOneStepUnderWindowsOwnKey`).
-- **The replay hands each tool a progress**, as the MCP server always does; `null` reached `PlantoirTools.Relay` and threw.
-- **The traces of a converted step run the REAL Windows action** (`UndoActionTraceContractTests`): the fixture laid in the replay's folder, the workspace's steps on the replay's own door (`AssistWorkspace.UndoDoorOfATest`), the action's `expect` and `seq` read from the newest closing line. Steps 0 to 6 so (42 traces). `rememberTimetable` keeps the recorded draft: its bytes are Windows' own (below), so the mac's hashes cannot judge it. `addCurriculumMentions` now runs the real Windows action too (#1039 gave the block the mac's heading, so its bytes are the mac's).
-- **Windows' own bytes, measured, never retyped** (the fixture asserts the difference is still there, so a difference that closes fails and its entry goes):
-  - (`addCurriculumMentions` is no longer here: since #1039 the line under `%%curriculum-start%%` is the mac's "## Curriculum connection", so `WindowsOwnLine` is gone and the page is compared byte for byte.)
-  - `rememberTimetable`: `section` and `dates` the mac's; the file is System.Text.Json indented two spaces with `"key": value`, members in the order section, dates, source, recorded, no closing newline, where the mac's `JSONSerialization` writes sorted keys, `" : "` and a closing newline; `recorded` is the day it is written (the mac's test fixed it at 2026-09-08); a source not given is Windows' "the teacher", the mac's "not recorded". Both readers look members up by name.
-- **The final review's lows:** LOW 1 (`LaterClassesKept`'s remarks say the record read is the question once more, and one planned then unwritable at the swap refuses the whole Publish Class for a Date; test `APublishClassForADateWhoseRecordCannotBeWrittenAtTheSwapChangesNothing`). LOW 3 (a plain write's label is `shadow-<pid>-<id>`, `UndoSwap.PlainLabel`, at both places, `UndoActionStep.WritePlainlyQuietly` and the door's list-failure write; every swap first tidies beside each target a GONE process's `shadow-…-new` and an `-orig` identical to its page, keeping a differing `-orig`, an only copy, and a running process's files: `UndoSwap.TidyPlainLeftoversOfTheGone`; tests `UndoPlainWriteLeftoversTests`, harness `w7-plain-kill`). LOW 5 below. LOW 4: see "For the director (both platforms)".
+- **The Windows action on the mac's fixture**, remaining sentences: Steps 0 to 3 (W7a's) and 4 to 6, 11 and 12 run; 7 to 10 and 13 to 24 are held by name in `NamedGapLedger.UndoActionStepsOnWindows` (`Reason899W7b2`, `Reason899NoDuplicateAsNextClass`, `Reason899W7U3b`, `Reason899W8U4a`) and still fail. A held step whose Windows action exists here (`HeldButRunnable`: Make Room for Classes, Duplicate Class, Re-date Classes, How I Teach, Get Ready for the Start of the Year) is RUN with the mac's arguments and must fall short for its named reason: it changed one of the recorded step's files and left no applied begin under the recorded key (`HeldStillWritesWithoutItsStep`). One that changes nothing fails for that reason (a real failure, must-fail row 17); one that makes the recorded step reads as the gap closing. The other held steps (the sheets' records, the rollover, U4a, Duplicate as Next Class) are Windows actions (the Today's Class and Not Today sheets, the links checklist, Classes Dated Later, the menu's Duplicate as Next Class since #927) or not yet built (the rollover as one step, U4a), but have no tool this replay drives, and stop at the guard that names it.
 - Writer scan: `TimetableMemory.cs`'s entry gone (no writing call left); `AssistWorkspace.cs` 5 → 4 (the class folder's `Directory.CreateDirectory` gone), its reason naming what still waits (Make Room, Re-date and its front page, Duplicate Class: W7b2; the rollover's marker: W7c).
-- Harness (`Plantoir.UndoHarness/W7Runs.cs`): `w7-add-classes-kill` (three new pages in a class folder that does not exist, killed at `afterBegin`, each `beforeSwap@i`, `beforeApplied`, shadow then live, recovered by a second process: each page absent or whole, live all one way, no staged file, nothing Hidden but a kept copy) and `w7-plain-kill` (LOW 3).
-
-## For documentation 12
-
-### What Windows has built: W7b1, the class pages' daily actions (#899, #949)
-
-The bullets above. Correction to W7a's "For W7b": the planners read through the step while `PlanningThrough` is set (an `AsyncLocal`, per flow; never `_planningThrough`, which W7a's round four replaced): an action that plans several things in one step sets it for its planning, as `Apply` and `ApplyWholeUnit` do (LOW 5). With the switch off a teacher meets the same files and the same answers as before W7b1, except that a failure is now all or none and says "Nothing was changed: …" where nothing was.
+- **LOW 5.** The re-date's and the tool's timetable steps are the workspace's (`NewUndoStep`), with its door and seams.
 
 ## For W7b2
 
@@ -75,22 +55,6 @@ Not converted in W7b1 (each still writes file by file; each held by name in `Und
 
 Merged `origin/dev` 66c9853a8 first (818f5753b; `NamedGapLedger.cs` kept both sides). The dead writer's half-written Make Room and Duplicate conversion is in `git stash` as "w7b1 half-written Make Room and Duplicate, 2026-11-21", untouched, for W7b2.
 
-### For PROGRESS
-
-- **M1, Class Dates left part way.** `TimetableMemory.WriteDown` returns a `TimetableWriteOutcome` (remembered, not saved, or remembered with what the file held kept, `StoppedPartWay` and `WhatWasKept`); `Write` keeps its bool (true when the dates are on disk) for setup callers. The Class Dates sheet says the mac's `savedWithWhatItHeldKept` words (`classDatesAreRemembered`, `undo.wording.classDatesKeptLead`, one `classDatesKeptBesideIt` per kept file) in its status line and stays open; Save again closes it, the same dates changing nothing. (The mac shows an alert; the kept-file alert is held for no W7b piece, so the sheet's own status line carries it.) `remember_timetable` answers `publishStoppedPartWay` ("the class dates", the mac's words) naming the kept file, never "Recorded". Re-date's timetable write names its kept file in the re-date's answer, refusal included.
-- **M2.** Add Classes, Add Next Class, curriculum mentions and Bring Pages into Date failing at the step go through `AssistWorkspace.RefusalForAStepThatStopped`: "Nothing was changed: …" when the door wrote nothing, the part-way sentence naming each kept file when it left one (the mac's `saidWhenTheStepStopped`: "the classes you asked for", "the curriculum mentions"; Windows' own "the pages’ dates"), always an `AssistRefusal`, never "That couldn’t be read".
-- **LOW 1.** A refused swap removes the empty folders it made (`UndoSwap.MakeTheFolderOf`, `RemoveTheEmptyFoldersMade`: innermost first, only while empty). Test `UndoAddClassesStepTests.ARefusedStepLeavesNoEmptyClassFolder`; the old test's name no longer claims it.
-- **LOW 4 measured.** A read-only curriculum page says "Nothing was changed: Plantoir doesn’t have permission to change one of them." (`UndoActionStep.Reason`'s read-only case); the earlier notes were right, and the test now asserts the whole sentence.
-- **LOW 5.** The re-date's and the tool's timetable steps are the workspace's (`NewUndoStep`), with its door and seams.
-- **LOW 6.** `Reason899W7b2` and `Reason899NoDuplicateAsNextClass` say what is true (Windows has the menu's Duplicate as Next Class since #927, still without a step); the writer-scan line's indentation; the harness child's comment says it plans the pages itself.
-- **LOW 7:** "For the director (both platforms)".
-- **Not done in this round:** LOW 2 (the `rememberTimetable` traces still replay the JSON draft; the `addCurriculumMentions` half closed with #1039, see the last section) and the rest of LOW 3 (sabotages of a before read at make time, and change-nothing steps for sync and curriculum mentions): left for the next piece on this code.
-
-### For documentation 12
-
-- A Windows step left part way is never said as "couldn’t be read" or as plainly done: every converted action says "Nothing was changed" or the part-way sentence naming each kept file; Class Dates says the dates are remembered and names the hidden file (the mac's sheet words).
-- A refused swap leaves no empty folder it made.
-
 ### Runs (PC)
 
 - `899w7b1-c3` at 2cff6e384: both builds 0; **Passed 1344, Failed 0, Skipped 1, Total 1345** (the Undo classes, the ledger, every class covering a converted action, `PublishStoppedPartWayTests`, `DateTextTests`). Kill harness, outside and inside OneDrive: `w7-publish-kill` 10/10, `w7-add-classes-kill` 10/10, `w7-plain-kill` 3/3 WHOLE, scratch removed. Re-date (5a3eae568) is proven by this run: its fixture row, `SectionVerbsTests`, `RolloverWebsiteTests` and must-fail rows 1 to 3.
@@ -113,19 +77,6 @@ Merged `origin/dev` 66c9853a8 first (818f5753b; `NamedGapLedger.cs` kept both si
 
 ## Review 2 round (2026-11-25): Re-date and Roll Over are ONE step
 
-### For PROGRESS
-
-- **M1 (the director's ruling: one teacher action is one step, as on the mac).** The timetable a re-date or rollover writes down is now a file of the re-date's own step (`reDateClasses` / `rollOver`), planned after the pages by `TimetableMemory.PlanInto` (writeFile, never told to today's undo, Windows' own bytes as before); there is no `rememberTimetable` step before it. `WriteDown` (the Class Dates sheet, `remember_timetable`) plans through the same `PlanInto` and makes its own one step. One change of behaviour: a timetable file that cannot be swapped in now refuses the whole re-date (all or none), where before it cost only the record.
-- **Pins:** `WindowsOwnStepBefore` is gone (test side only, `UndoActionStepsOnWindowsTests.cs`); in its place `WindowsOwnFileInTheStep["reDateClasses"]` measures the one file more (`courses/ICS3U/.internal/timetable/section1.json`, writeFile, after the recorded files, before the recompute), and the fixture row now asserts ONE new begin. `UndoActionTraceContractTests` reads the new dictionary (its traces still make the recorded draft). Nothing under `contracts/` and nothing in `NamedGapLedger` changed (the ledger never named the pair).
-- **M2.** A refusal leaves the timetable as it was, so "Nothing was changed" and the trail's "changed nothing" are true. `AndTheTimetableKept` is gone: a part-way stop names every kept file through `StoppedPartWay`, the timetable's included. This also settles LOW 2 (the kept-file lead's "their" is no longer appended to the re-date's answer).
-- **LOW 1.** The assistant's dates card says what is on disk however the sheet closed (`dialog.SavedDates`), so a Cancel after the part-way message no longer says "No class dates were recorded". The menu path still stops the action on Cancel and says nothing (comment updated).
-- Tests: `ReDateTests.AReDateWhosePagesAreRefusedLeavesTheTimetableAsItWas`, `ReDateTests.AReDateStoppedPartWayLeavesTheTimetableAsItWas`; `RolloverWebsiteTests.RollOverWhoseSecondPageCannotBeWritten_ChangesNothing` now checks the timetable. Harness `w7-redate-kill` (three pages and the timetable in one step, killed at afterBegin, beforeSwap@0..3, beforeApplied, shadow and live, recovered by a second process).
-- Not this round: LOW 3 (front page dated), LOW 4, LOW 5 and review 1's LOW 2 and rest of LOW 3 ride to W7b2.
-
-### For documentation 12
-
-- Re-date Classes and Roll Over are each one step on Windows: one Undo puts back the pages and the timetable they were re-dated onto.
-
 ### Runs (PC)
 
 - `899w7b1-r2a` at e025a638d (`dev` bfe28b848 merged): both builds 0; ReDateTests, RolloverWebsiteTests, SectionVerbsTests, UndoActionStepsOnWindowsTests, NamedGapLedgerTests, UndoClassDatesStepTests, UndoActionTrace/OpKinds/Website/Trace contract tests, UndoWriterScanTests: **Passed 407, Failed 0, Skipped 1**. Harness outside OneDrive: `w7-redate-kill` total=12 failures=0; scratch removed; HEAD the same, status clean.
@@ -137,19 +88,6 @@ The separate `rememberTimetable` step put back (`WriteDown` through `NewUndoStep
 ## With #1039 and #1040 merged (2026-11-25): the two Windows-own differences gone
 
 Merged `origin/issue/1039-1040-win-class-skeleton` (3fbe4eb13; no conflict). The final sweep (`vm-tools/briefs/2026-11-25-w7b1-skeleton-sweep.md`) found this branch's tests pinned the two differences that branch closes. Tests and notes only:
-
-### For PROGRESS
-
-- `WindowsOwnLine` (the `addCurriculumMentions` entry and its one-differing-line check) is gone from `UndoActionStepsOnWindowsTests.cs`, and with it its exclusion in `UndoActionTraceContractTests`, so the `addCurriculumMentions` traces run the REAL Windows action (half of review 1's LOW 2).
-- `NewClassPageSteps`, `RawLiteralProbe`, `RawLiteralsCarryCrLf`, `AsThisBuildWritesANewClassPage` and the traces' `checkoutLineEndings` are gone: `addCurriculumMentions`, `addNextClass`, `addNextClassInANewUnit` and `addClasses` are compared with the contract's recorded step with no Windows-own difference, on every checkout.
-- Must-fail row 18 of `899w7b-mf1` (the unit tag written CRLF against the fixture's transform) is retired from `vm-tools/guest/899-w7b-mustfail.json`; its place is `899-w7b1-mustfail-4.json` (below).
-
-### For documentation 12
-
-Two passages describe #550's part-way list of re-dated pages, which W7b1 removed (`ApplyReDate` is all or none). For the director to fold; this piece does not edit them.
-
-- `documentation/12-windows-app.md`, about lines 8825-8830, the bullet "**Re-date Classes… that stopped part way** (`ApplyReDate`)". Replace its first two sentences ("After the first page is written … which are the mac's words.") with: "Re-date Classes… is one step (#899 W7b1): a refusal says the mac's \"Nothing was changed: …\"; a step the door left part way says `PublishStoppedPartWay(\"the section's class dates\", …)` naming each kept file. The list \"The pages already re-dated:\" is gone with the writing page by page." The rest of the bullet (an `AssistRefusal` answered by `re_date_classes` and `roll_over_section`) stays true.
-- `documentation/10-local-ai-assistant.md`, about lines 4516-4518. Replace "Re-date Classes… that stops part way says `publishStoppedPartWay` with the pages already re-dated, on both" with "Re-date Classes… is all or none since #899 W7b1: it says \"Nothing was changed: …\", or, when a page was left holding its new date with its earlier content kept beside it, `publishStoppedPartWay` naming each kept file, on both".
 
 ### Runs (PC, CRLF checkout)
 
