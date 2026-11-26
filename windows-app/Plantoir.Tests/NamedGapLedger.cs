@@ -730,7 +730,10 @@ internal static class NamedGapLedger
              "U4b3 relink-3: a step that relinks Day 4 to Day 5, moves Day 3's page into Day 4 and writes a new Day 3 dies with both links standing: the link just made at Day 5 removed first, nothing else took effect, failed",
              "U4b3 relink-3: the same step dies with the link relinked to Day 5 and Day 3's page not yet moved: the link back at Day 4 with its old text, rolled back",
              "U4b3 relink-3: the same step dies with Day 3's page also moved into Day 4 and the new Day 3 not written: the page back at Day 3, the link back at Day 4 with its old text, rolled back",
-             "U4b3 relink-3: the undo of that step dies with the new Day 3 taken away and the page and the link not yet back: put forward again, the new page at Day 3, the link at Day 5 with its new text"),
+             "U4b3 relink-3: the undo of that step dies with the new Day 3 taken away and the page and the link not yet back: put forward again, the new page at Day 3, the link at Day 5 with its new text",
+             "Review D of U4b3: a step that relinks Day 5 to Day 6 and then Day 4 to Day 5 (the second move's new text the first's old) dies with Day 4's new link renamed in at Day 5 beside the old one: only that link removed, Day 6's kept, then rolled back with every link at its old place and text",
+             "Review D of U4b3: the same step dies before its first swap: nothing removed, Day 5's link not taken for the second move's new one, failed",
+             "Review D of U4b3: the undo of that step dies with Day 4's link made again beside Day 5's: only one link removed, then put forward again with every link at its new place and text"),
         // ---- U3c (the mac's U3c for #899, 2026-11-20): its 4 trail events, 12
         // stackCases and 10 recoveryCases were held here under the reason then
         // named Reason899W4c (Reason899U4aContentGone since, which holds only

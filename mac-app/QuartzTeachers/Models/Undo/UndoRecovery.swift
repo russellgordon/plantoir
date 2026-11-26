@@ -931,43 +931,81 @@ nonisolated enum UndoRecovery {
         return result
     }
 
-    /// U4b3 relink-3: for each relinking move of the step whose two links
-    /// both stand (`from` holding the `linkShaBefore` text, `to` the
-    /// `linkShaAfter` text), the link the interrupted swap had just made is
-    /// removed: at `to` going forward (an apply or a Redo), at `from` going
-    /// back (an Undo), once it is re-read holding that side's text. Both
-    /// texts are in the list, so neither link is an only copy; the one
-    /// removed is the swap's own change not yet complete. Read with `lstat`
-    /// and `readlink`, removed with `unlink`, never followed. A plan never
-    /// does this: a link at the other name may be the teacher's. Answers
-    /// the place that cannot be read just now (the step is then left for
-    /// the next recovery), or nil.
+    /// U4b3 relink-3: a relinking move whose two links both stand (`from`
+    /// holding the `linkShaBefore` text, `to` the `linkShaAfter` text) may
+    /// be the one whose swap was in flight when the process died; the link
+    /// that swap had just made is removed: at `to` going forward (an apply
+    /// or a Redo), at `from` going back (an Undo), once it is re-read
+    /// holding that side's text. Both texts are in the list, so neither
+    /// link is an only copy. Read with `lstat` and `readlink`, removed with
+    /// `unlink`, never followed. A plan never does this: a link at the
+    /// other name may be the teacher's. Answers the place that cannot be
+    /// read just now (the step is then left for the next recovery), or nil.
+    ///
+    /// Review D of U4b3, MEDIUM: only ONE swap can be in flight, so at most
+    /// ONE link is removed. When two relinks chain (op0 Day 5 to Day 6,
+    /// op1 Day 4 to Day 5, op1's new text op0's old), an op can look both
+    /// standing only because another op's link holds its text; removing a
+    /// link from each lost Day 5's. So an op's just-made side is passed
+    /// over when it is the side ANOTHER relink starts the work from and
+    /// that op's end side does not yet hold its end text (the link there is
+    /// that op's own, not yet moved), and of the ops left the LAST in the
+    /// work's own swap order (index order going forward, the reverse for an
+    /// Undo) is the one whose swap was in flight. Every other op is then
+    /// judged as a finished or unstarted relink by `fileStates`. The
+    /// journal writes no line inside a step, so a kill inside either of two
+    /// chained swaps can leave the folder reading alike; removing the later
+    /// op's link leaves every link of the step standing exactly once, at
+    /// one side or the other, either way.
     static func removeTheLinksJustMade(of step: UndoStep, root: URL, goingForward: Bool) -> String? {
-        for op in step.ops where op.isARelink {
+        var relinks: [(from: String, to: String, before: String, after: String, atFrom: UndoMoveSide, atTo: UndoMoveSide)] = []
+        var opIndex: Int = 0
+        while opIndex < step.ops.count {
+            let op: UndoOp = goingForward ? step.ops[opIndex] : step.ops[step.ops.count - 1 - opIndex]
+            opIndex += 1
+            if !op.isARelink {
+                continue
+            }
             guard let from = op.from, let to = op.to, let before = op.linkShaBefore, let after = op.linkShaAfter else {
                 continue
             }
             if !UndoPlaces.staysInside(root, from, namedBy: op) || !UndoPlaces.staysInside(root, to, namedBy: op) {
                 continue
             }
-            let fromURL: URL = root.appendingPathComponent(from)
-            let toURL: URL = root.appendingPathComponent(to)
-            let atFrom: UndoMoveSide = UndoMoveSide.readLink(at: fromURL, linkSha: before)
-            let atTo: UndoMoveSide = UndoMoveSide.readLink(at: toURL, linkSha: after)
+            let atFrom: UndoMoveSide = UndoMoveSide.readLink(at: root.appendingPathComponent(from), linkSha: before)
+            let atTo: UndoMoveSide = UndoMoveSide.readLink(at: root.appendingPathComponent(to), linkSha: after)
             if atFrom == .cannotRead {
                 return from
             }
             if atTo == .cannotRead {
                 return to
             }
-            if atFrom != .holdsTheContent || atTo != .holdsTheContent {
+            relinks.append((from: from, to: to, before: before, after: after, atFrom: atFrom, atTo: atTo))
+        }
+        var inFlight: (path: String, sha: String)? = nil
+        for candidate in relinks {
+            if candidate.atFrom != .holdsTheContent || candidate.atTo != .holdsTheContent {
                 continue
             }
-            let justMade: URL = goingForward ? toURL : fromURL
-            let justMadeSha: String = goingForward ? after : before
-            if UndoMoveSide.readLink(at: justMade, linkSha: justMadeSha) == .holdsTheContent && !UndoSwap.removeALink(at: justMade) {
-                return goingForward ? to : from
+            let justMadePath: String = goingForward ? candidate.to : candidate.from
+            var heldByAnother: Bool = false
+            for other in relinks {
+                let otherStartsAt: String = goingForward ? other.from : other.to
+                let otherEndHolds: Bool = goingForward ? other.atTo == .holdsTheContent : other.atFrom == .holdsTheContent
+                if otherStartsAt == justMadePath && !otherEndHolds {
+                    heldByAnother = true
+                }
             }
+            if !heldByAnother {
+                inFlight = (path: justMadePath, sha: goingForward ? candidate.after : candidate.before)
+            }
+        }
+        guard let found = inFlight else {
+            return nil
+        }
+        let justMade: URL = root.appendingPathComponent(found.path)
+        if UndoMoveSide.readLink(at: justMade, linkSha: found.sha) == .holdsTheContent && !UndoSwap.removeALink(at: justMade) {
+            return found.path
         }
         return nil
     }

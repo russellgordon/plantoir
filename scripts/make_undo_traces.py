@@ -1467,19 +1467,44 @@ def stopped_part_way(ops, backward, pages, swapped, inside=None):
 
 
 def remove_the_links_just_made(ops, pages, started_from_before):
-    """UndoRecovery.removeTheLinksJustMade (U4b3 relink-3): each relinking
+    """UndoRecovery.removeTheLinksJustMade (U4b3 relink-3): a relinking
     move with both links standing, each holding its own side's text, loses
     the link its interrupted swap had just made: at `to` going forward, at
-    `from` going back. A plan never does this."""
+    `from` going back. A plan never does this.
+
+    Review D of U4b3, MEDIUM: only one swap is ever in flight, so at most
+    ONE link is removed. A move's just-made side is passed over when it is
+    the side another relink starts the work from and that relink's end
+    does not yet hold its end text (the link there is that move's own);
+    of the moves left, the last in the work's swap order (index order
+    going forward, reversed for an Undo) is the one in flight."""
     pages = dict(pages)
-    for op in ops:
+
+    def holds(place, text_sha):
+        held = pages.get(place)
+        return isinstance(held, tuple) and held[0] == "link" and sha(held[1]) == text_sha
+
+    ordered = list(ops) if started_from_before else list(reversed(ops))
+    relinks = []
+    for op in ordered:
         if "linkShaBefore" not in op:
             continue
-        at_from, at_to = pages.get(op["from"]), pages.get(op["to"])
-        from_holds = isinstance(at_from, tuple) and at_from[0] == "link" and sha(at_from[1]) == op["linkShaBefore"]
-        to_holds = isinstance(at_to, tuple) and at_to[0] == "link" and sha(at_to[1]) == op["linkShaAfter"]
-        if from_holds and to_holds:
-            pages.pop(op["to"] if started_from_before else op["from"], None)
+        relinks.append((op, holds(op["from"], op["linkShaBefore"]), holds(op["to"], op["linkShaAfter"])))
+    in_flight = None
+    for op, from_holds, to_holds in relinks:
+        if not (from_holds and to_holds):
+            continue
+        just_made = op["to"] if started_from_before else op["from"]
+        held_by_another = False
+        for other, other_from_holds, other_to_holds in relinks:
+            starts_at = other["from"] if started_from_before else other["to"]
+            end_holds = other_to_holds if started_from_before else other_from_holds
+            if starts_at == just_made and not end_holds:
+                held_by_another = True
+        if not held_by_another:
+            in_flight = just_made
+    if in_flight is not None:
+        pages.pop(in_flight, None)
     return pages
 
 

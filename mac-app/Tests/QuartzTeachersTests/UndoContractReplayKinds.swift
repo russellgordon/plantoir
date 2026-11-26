@@ -44,7 +44,7 @@ nonisolated enum UndoContractKinds {
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
         "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
-        "relinkALink", "relinkALinkLeavingAHandedOverPlace",
+        "relinkALink", "relinkALinkLeavingAHandedOverPlace", "relinkTwoChainedLinks",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
         "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
         "makeRoomWithALaterClassThatIsABrokenLink",
@@ -82,6 +82,9 @@ nonisolated enum UndoContractKinds {
     /// U4b3 relink-3: the class pages `relinkALink` and
     /// `relinkALinkLeavingAHandedOverPlace` change, by day.
     static let relinkedDays: [Int] = [3, 4, 5]
+
+    /// Review D of U4b3: the class pages `relinkTwoChainedLinks` changes.
+    static let chainedRelinkDays: [Int] = [4, 5, 6]
 
     static func classPage(_ day: Int) -> String {
         return "courses/TST1O/section1/Unit 1, Day \(day).md"
@@ -602,6 +605,24 @@ nonisolated enum UndoContractKinds {
                 blobs.append(new)
             }
             return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: blobs, root: root, action: "insertClass"), in: journal, mode: .live, places: places))
+        case "relinkTwoChainedLinks":
+            // Review D of U4b3, MEDIUM: Day 4 a link holding `Unit 1, Day
+            // 1.md`, Day 5 one holding `Unit 1, Day 2.md`; ONE step, as
+            // Insert Class makes it, highest first: Day 5's link moved to
+            // Day 6 holding `Unit 1, Day 3.md`, then Day 4's moved to Day 5
+            // holding `Unit 1, Day 2.md` (the first move's old text).
+            let one: Data = Data("Unit 1, Day 1.md".utf8)
+            let two: Data = Data("Unit 1, Day 2.md".utf8)
+            let three: Data = Data("Unit 1, Day 3.md".utf8)
+            if !somethingIsAt(classPage(4), in: root) && !somethingIsAt(classPage(5), in: root) && !somethingIsAt(classPage(6), in: root) {
+                try layALink(classPage(4), leadingTo: "Unit 1, Day 1.md", root: root)
+                try layALink(classPage(5), leadingTo: "Unit 1, Day 2.md", root: root)
+            }
+            let ops: [UndoOp] = [
+                UndoOp.relinkLink(from: classPage(5), to: classPage(6), linkShaBefore: UndoHash.sha256(of: two), linkShaAfter: UndoHash.sha256(of: three)),
+                UndoOp.relinkLink(from: classPage(4), to: classPage(5), linkShaBefore: UndoHash.sha256(of: one), linkShaAfter: UndoHash.sha256(of: two)),
+            ]
+            return word(JournaledWrite.perform(ops: draft(ops: ops, blobs: [one, two, three], root: root, action: "insertClass"), in: journal, mode: .live, places: places))
         case "editTheHandedOverPageByHand":
             try? FileManager.default.removeItem(at: root.appendingPathComponent(classPage(3)))
             try UndoContractReplay.write("Hand.\n", to: classPage(3), in: root)

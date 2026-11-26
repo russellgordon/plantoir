@@ -1781,6 +1781,7 @@ nonisolated enum UndoContractReplay {
             let relinkCalls: [String: String] = [
                 "alone": "relinkALink",
                 "leavingAHandedOverPlace": "relinkALinkLeavingAHandedOverPlace",
+                "chained": "relinkTwoChainedLinks",
             ]
             var handedOverCall: String? = nil
             var handedOverBefore: String = ""
@@ -1800,7 +1801,7 @@ nonisolated enum UndoContractReplay {
                     continue
                 }
                 shapeCall = call
-                classDays = UndoContractKinds.relinkedDays
+                classDays = shape == "chained" ? UndoContractKinds.chainedRelinkDays : UndoContractKinds.relinkedDays
             }
             if let call = shapeCall {
                 handedOverCall = call
