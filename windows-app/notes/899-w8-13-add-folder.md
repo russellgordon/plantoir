@@ -16,15 +16,22 @@ Under "What W8 copies from U4a": Add folder is built (W8-13) as above. U4a is co
 
 ## Must-fail lines
 
-`vm-tools/guest/899-w8-13-mustfail.json`, three rows (see Runs for results).
+`vm-tools/guest/899-w8-13-mustfail.json`, three rows, on `w8-13-b` (e32573f08), each from a clean committed tree, restored byte for byte (`HEAD-AFTER … SAME`, status empty):
+
+1. folders made one by one outside the door (`step.Make()` replaced by `Directory.CreateDirectory` and `File.WriteAllText`): RED, 5 failed of 38: `TheWindowsActionLeavesTheRecordedStep(addFolder)`, `APerSectionFolderInTwoSectionsIsOneStepOfTwoTrees`, `EveryListedFileIsOneOfTheTreesBlobs`, `APathWhoseParentIsMissingIsOneTreeRootedAtTheHighestMissingFolder`, `APageThatCannotBeWrittenChangesNothing`.
+2. the tree's root the folder itself when its parent was missing: RED, 1 failed of 6: `APathWhoseParentIsMissingIsOneTreeRootedAtTheHighestMissingFolder`.
+3. a listed file missing from the blobs (the door refuses the step): RED, 5 failed of 38: `TheWindowsActionLeavesTheRecordedStep(addFolder)`, `APerSectionFolderInTwoSectionsIsOneStepOfTwoTrees`, `EveryListedFileIsOneOfTheTreesBlobs`, `APathWhoseParentIsMissingIsOneTreeRootedAtTheHighestMissingFolder`, `TheFolderCreatedTrailLineSaysWhatItSaysToday`.
 
 ## Runs
 
-(filled below)
+The PC, `899-w8-13-go.ps1` (the brief's seven classes plus `UndoOpKindsContractTests` and `UndoStackContractTests`; `UndoWriterScanTests` is among the seven), mode classes then mustfail, each under the turn lock, each lock released by its own run (`LOCK-RELEASED`).
+
+- `w8-13-a`, c0bc3215f: both builds 0; 484 of 491, 7 failed: `addFolder`'s `_DUPLICATE ME.md` carried a "Curriculum connection" the mac's has not, and action-139 to 144 failed only at `final` (the same folder's listing hash). Cause: the fixture laid its generic course, whose `Curriculum` holds `A1.1.md`, where the mac recorded on `CourseSettingsGestureScript.makeCourse`, whose `Curriculum` is empty. Must-fail 3 RED of 3 already.
+- `w8-13-b`, e32573f08 (the fixture lays the mac's settings course for `addFolder`, `LayTheSettingsCourse`): both builds 0; 491 of 491 passed; must-fail 3 RED of 3; restored 491 of 491; tree unchanged.
 
 ## Left for the next piece
 
-(filled below)
+- Nothing of Add folder. U4a is complete on Windows. No PC run is going.
 
 ## For the director
 
@@ -34,4 +41,4 @@ Under "What W8 copies from U4a": Add folder is built (W8-13) as above. U4a is co
 
 ## Self-check
 
-(filled below)
+1 to 6 (NIGHT3): one teacher action (Add folder); tests in the shared fixture and `UndoAddFolderStepTests`; no new wording (the `folder created` line and the sheet's notice unchanged); no interim state; no invisible control; pushed. 7: the fixture row `addFolder` is green, its ledger rows (the step and action-139 to 144) are gone, and `Reason899W8U4a`, which no row used any more, is removed. 8: `SpecialFolderRenamer.cs` 5 (was 6), its reason naming Rename folder, W8b; `FolderScaffold.cs`'s entry gone (no writing call left); the scan class passed. 9: no riding lows. 10: the trees in the order the folders are listed (sections in order), every before (each place absent) read at plan time, the curriculum names read once before the plan. 11: rows cleared; the comments naming `trees` as held (the ledger's `UndoActionTraces` summary and the guard comment) rewritten; no other reason named Add folder. 12: no key added to a replay's `KeysChecked`; the trace guard lost `trees`, and no held row has `trees`. 13: "at or inside" in `PlanPages` is `UndoOp.PartInside`; the tree is read by `UndoTreeReading.Read` (links by `UndoLinks.Look`). 14: no run left going; each run released its own lock; no lock removed that was not mine.
