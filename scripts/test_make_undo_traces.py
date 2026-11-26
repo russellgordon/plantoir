@@ -1366,7 +1366,7 @@ class ContractCaseTests(unittest.TestCase):
         content. The model holds no staged files, so
         keptCopyLeftInsideTheFolder is the Swift replay's alone."""
         cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAMovedFolder")]
-        self.assertEqual(len(cases), 11)
+        self.assertEqual(len(cases), 13)
         first, second = "courses/TST1O/Section 1/Classes/A.md", "courses/TST1O/Section 1/Classes/B.md"
         before_text = "---\ntitle: A\npublish: false\n---\nBody.\n"
         texts = {first: before_text, second: before_text.replace("title: A", "title: B")}
@@ -1390,11 +1390,41 @@ class ContractCaseTests(unittest.TestCase):
                 swapped = int(stop.split(":")[1]) if stop.startswith("beforeSwap:") else None
                 starting = after_pages if work == "undo" else pages
                 left = traces.stopped_part_way(ops, work == "undo", starting, swapped)
-                outcome, settled = traces.recover(ops, left, work != "undo")
+                edited = case.get("handEdit")
+                if edited is not None:
+                    left = self.edited_by_hand(left, edited, first, second)
+                outcome, settled, named = traces.recover(ops, left, work != "undo")
                 self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
-                wanted = pages if case["files"] == "before" else after_pages
-                self.assertEqual((settled.get(first), settled.get(second)), (wanted[first], wanted[second]))
+                wanted = {"before": (pages[first], pages[second]), "after": (after_pages[first], after_pages[second]),
+                          "firstBeforeSecondEdited": (pages[first], left.get(second))}[case["files"]]
+                self.assertEqual((settled.get(first), settled.get(second)), wanted)
                 self.assertEqual(self.moved_folder(type("Settled", (), {"pages": settled})), case["movedFolder"])
+                if "pathsNamed" in case:
+                    pages_named = {"first": first, "second": second}
+                    self.assertEqual(named, [pages_named.get(page, page) for page in case["pathsNamed"]])
+                else:
+                    self.assertEqual(named, [])
+
+    def edited_by_hand(self, pages, page, first, second):
+        """recoveryCasesHow's handEdit: `first` or `second`, the publish line
+        changed by hand (the traces' sameLine edit); `carried`, the line
+        `Line one: ...` of a.md set to `Line one: by hand.`, wherever its
+        folder is now (U4b2-13)."""
+        pages = dict(pages)
+        if page == "carried":
+            for folder in (self.RENAMED, self.MEDIA):
+                path = folder + "/a.md"
+                if pages.get(path) is not None:
+                    lines = pages[path].split("\n")
+                    for index, line in enumerate(lines):
+                        if line.startswith("Line one: "):
+                            lines[index] = "Line one: by hand."
+                    pages[path] = "\n".join(lines)
+                    return pages
+            self.fail("no a.md to change by hand")
+        holder = type("Edited", (), {"pages": pages})()
+        self.assertTrue(traces.Model.hand_edit_path(holder, "sameLine", {"first": first, "second": second}[page]))
+        return holder.pages
 
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;

@@ -1381,28 +1381,53 @@ def recovery_states(ops, pages):
 
 def recover(ops, pages, started_from_before):
     """UndoRecovery.settle, live: nothing took effect, completed, or what
-    took effect put back, judged by content alone; anything neither is in
-    the way. Answers (outcome, pages)."""
+    took effect put back, judged by content alone. A place that is neither
+    is in the way (changed by hand since): every place NOT in the way that
+    took effect is still put back, and the step is interrupted naming the
+    places in the way (U4b2-13, as Swift's settle does). Answers (outcome,
+    pages, the places the interrupted line names)."""
     start, end = ("before", "after") if started_from_before else ("after", "before")
     states = recovery_states(ops, pages)
-    if any(state == "neither" for state in states.values()):
-        return ("interrupted", pages)
-    if all(state == start for state in states.values()):
-        return ("nothingTookEffect", pages)
-    if all(state == end for state in states.values()):
-        return ("completed", pages)
+    in_the_way = [place for place, state in states.items() if state == "neither"]
+    if not in_the_way and all(state == start for state in states.values()):
+        return ("nothingTookEffect", pages, [])
+    if not in_the_way and all(state == end for state in states.values()):
+        return ("completed", pages, [])
+    at_end = [place for place, state in states.items() if state == end]
+    put_back = put_back_what_took_effect(ops, at_end, started_from_before, pages)
+    if put_back is None:
+        # It can never be put back: closed, naming what is left part way
+        # (Swift's couldNotPutBack line: the places at the end, sorted,
+        # then those in the way).
+        named = sorted(at_end)
+        for place in in_the_way:
+            if place not in named:
+                named.append(place)
+        return ("interrupted", pages, named)
+    if in_the_way:
+        return ("interrupted", put_back, in_the_way)
+    return ("rolledBack", put_back, [])
+
+
+def put_back_what_took_effect(ops, places, started_from_before, pages):
+    """The pages once every op whose place is in `places` is taken back the
+    way the stopped work came (one plan, as settle's opsToPutBack), or None
+    when that plan is refused. Nothing to put back leaves the pages as they
+    are."""
+    if not places:
+        return pages
     at_end = [op for op in ops if op["kind"] != "recompute"
-              and states.get(op.get("path") or op.get("from") or op.get("target")) == end]
+              and (op.get("path") or op.get("from") or op.get("target")) in places]
     result = plan(at_end, started_from_before, pages)
     if result[0] != "ready":
-        return ("interrupted", pages)
+        return None
     pages = dict(pages)
     for path, text in result[1].items():
         if text is None:
             pages.pop(path, None)
         else:
             pages[path] = text
-    return ("rolledBack", pages)
+    return pages
 
 
 def folder_of_pages(pages, place):
