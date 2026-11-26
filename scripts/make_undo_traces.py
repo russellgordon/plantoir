@@ -1385,7 +1385,19 @@ def recover(ops, pages, started_from_before):
     is in the way (changed by hand since): every place NOT in the way that
     took effect is still put back, and the step is interrupted naming the
     places in the way (U4b2-13, as Swift's settle does). Answers (outcome,
-    pages, the places the interrupted line names)."""
+    pages, the places the interrupted line names).
+
+    Two known differences from settle, which no row run through this model
+    reaches today (it runs only the withAMovedFolder rows, none of which has
+    an external op or stops after the edit inside with a hand edit), so a
+    new row of either kind must not be trusted because it passes here:
+    - the model names an external op's target among the places; settle
+      never does (`pathsOnly`);
+    - the model holds no staged files, so for a step killed after its
+      carried edit went in and then edited by hand elsewhere it puts the
+      places back, where the Mac's put-back plan, which does not leave the
+      step's own kept copy inside the folder out, is refused and the step
+      closes couldNotPutBack with nothing put back (the U7 gap)."""
     start, end = ("before", "after") if started_from_before else ("after", "before")
     states = recovery_states(ops, pages)
     in_the_way = [place for place, state in states.items() if state == "neither"]

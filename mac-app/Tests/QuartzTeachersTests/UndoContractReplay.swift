@@ -1758,6 +1758,10 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': the \(work) was not stopped (\(outcome))")
                 }
             }
+            if testCase["handEdit"] != nil && string(testCase["handEdit"]) == nil {
+                // Never skipped: a hand edit the row names is made, or the row fails.
+                failures.append("recoveryCases '\(name)': handEdit is not a string, so not a value this replay knows")
+            }
             if let page = string(testCase["handEdit"]) {
                 if page == "carried" && withAMovedFolder {
                     // U4b2-13: the page inside the moved folder, wherever
