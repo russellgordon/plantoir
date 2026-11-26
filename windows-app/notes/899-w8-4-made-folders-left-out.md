@@ -1,6 +1,6 @@
 # #899 W8-4: a folder a carried edit made is left out and removed (2026-11-26)
 
-Branch `issue/899-w8-4-made-folders-left-out`, base piece 3's head ab8702374 (which holds `origin/dev` 253f8915f). `origin/dev` did not move during the piece (253f8915f at the start and before hand-back), so no merge commit was needed; both checks are recorded here in place of the two merge commits.
+Branch `issue/899-w8-4-made-folders-left-out`, base piece 3's head ab8702374 (which holds `origin/dev` 253f8915f). `origin/dev` was 253f8915f at the start and already in the base, so the first merge was not needed. Before hand-back it had moved to 461ee3943, and it was merged in at 68f2d131a with no conflicts.
 
 ## For PROGRESS
 
@@ -47,6 +47,7 @@ All runs were on the PC, under `C:\vm-setup\wt-compare.lock`, with the brief's s
 - `899-w8-4-green` (ref 53ecc938b): 212 of 213. The second half of the refusal test undid a list that the refusal had cleared, so the test was wrong. It was split.
 - `899-w8-4-mf` (ref 093f0c115): void. The refusal test's page-based refusal comes before the move, because file targets go before whole ops when a step is taken back. It was remade with a second folder's move, which is taken back after the carrying move.
 - `899-w8-4-mf2` (ref 024b7065f): **214 passed, 0 failed**. Must-fail 7 RED of 8 (row 7 NOT RED). Restored: 214 passed. HEAD-AFTER SAME, status clean.
+- `899-w8-4-merge` (ref 68f2d131a, dev merged in): both builds 0, the brief's classes **218 passed, 0 failed**, `LOCK-RELEASED`.
 - `899-w8-4-mf3` (ref 285e8850f): **215 passed, 0 failed**. Must-fail **8 RED of 8** (166 tests in the filter). Restored: 215 passed. HEAD-AFTER SAME, status clean, `LOCK-RELEASED`. This is the head proven; the notes commit after it changes no code.
 
 ## Left for the next piece
