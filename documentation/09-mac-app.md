@@ -22801,9 +22801,15 @@ hash, and the listing as it was before the step (the folders inside in byte
 order and every file's text), the recorder checking that the listing makes
 the hash. A page the move carries is in `files` at the folder's new place,
 its before read at the old one. The ops are the moves, then the pages in
-the order the plan's walk found them (the contract asks no order among
-them; here the per-course step relinks the page outside first), then one
-`editJSON` per member. `testEveryRecordedFolderMoveHoldsTheListingItNames`
+the order of their paths after the move, then one `editJSON` per member.
+Review 1 found the plan kept its pages in the order the disk listed them
+(hashed on APFS, sorted on HFS+ and NTFS), so the recorded order was the
+volume's; `SpecialFolderRenamer.inPathOrder` now puts them in
+`ClassPages.isInPathOrder`, the one page order (lowercased path) that a
+section's pages and the door's folder listing already used, each place read
+canonical once (a carried page's place is spelled from the course, `/var`,
+the walk's from the disk, `/private/var`). Each page is judged and changed on
+its own, so the order changes no answer of the move check. `testEveryRecordedFolderMoveHoldsTheListingItNames`
 reads the committed file, so the key can fail. `scripts/make_undo_traces.py`
 leaves the two steps out of `actionTraces` by name until piece 12 makes
 their traces. A regeneration now keeps each committed `recorded` and

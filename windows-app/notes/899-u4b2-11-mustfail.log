@@ -19,3 +19,9 @@ M4 Python STEPS_WITHOUT_TRACES_YET emptied: RED, 4 failures.
   run-mf3-python.log: test_every_recorded_step_is_reproduced_by_its_ops_both_ways, test_the_rename_steps_are_recorded_and_left_without_traces_by_name, test_there_are_about_120_action_traces_and_each_starts_with_its_step, test_the_committed_traces_are_what_the_generator_writes.
 
 5 of 5 RED. Each restored with git checkout; git status clean after each.
+
+REVIEW 1 (fix committed first, e04fdff09)
+- Red first (run-r1-red.log): UndoActionStepsCourseSettings.swift:143 (pages not in path order), UndoRenameFolderStepTests testARenamePlansItsPagesInPathOrderNotTheDisksOrder :274.
+R1 the plan's pages left in walk order: RED. run-r1-mf.log: UndoActionStepsCourseSettings.swift:143, UndoActionStepsTests.swift:544, UndoRenameFolderStepTests.swift:279.
+R2 Python: "addFolder" added to STEPS_WITHOUT_TRACES_YET (traces regenerated): RED. run-r1-mf-python.log: test_the_rename_steps_are_recorded_and_left_without_traces_by_name.
+2 of 2 RED; restored with git checkout, status clean.
