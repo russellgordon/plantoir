@@ -22659,6 +22659,33 @@ are at the new name: …", L2), while the sheet's sentence is chosen by what
 could be read (no new sentence). Rejected: recording places only in a finish
 run (a start run after a killed one then forgets the earlier run's section).
 
+### U4b2: rename-sentences-in-contract
+
+The three sentences a teacher reads while a folder is being renamed are in
+`shared-rules.json` → `undo.wording`, beside the rename's other run-time
+sentences (`renameFolderUnderWay` with `{course}`,
+`renameFolderUnderWayMenuReason`, `renameFolderUnderWaySidebarRow`), and the
+Swift is pinned to them byte for byte as the block around them already is
+(`UndoSweepFindingsTests`). Replace It… refusing because a folder in the
+course is being renamed is a `referenceCourses.replacing.sequence` case
+(`folderRename: atTheStart`, `said: replaceWhileAFolderIsRenamed`, whose
+sentence is `renameFolderUnderWay`), run by `ReferenceReplacerTests` through
+a real `CourseActivity.beginFolderRename` claim. The record of an
+interrupted rename now has its format in `file-formats.json` →
+`folderRenameRecord`: `moved` is an array of strings (a name holding a line
+break is one place), the Mac reads `from`, `to` and `scope` as strings and
+every other key only in its own shape, so a key in another shape never makes
+the record unreadable (it was a map-of-strings cast). A record without `moved`
+(Windows', or an older build's) names no folder as this rename's: its places
+(a new-name folder whose old name beside it is absent or unreadable) are told
+as ones it cannot tell are this rename's, and carried forward by the next run
+as `mayHaveMoved`. With no folder known to be at the new name but such a
+place, or one that could not be read, the sheet says the new
+`renameFolderMayBeRenamedInPart` and the trail line begins "may have renamed
+the folder … only in part", never "was not renamed", which could not be
+checked (HIG, Writing: be clear, say what is known). One function,
+`SpecialFolderRenamer.partWayEnding`, chooses the line and the sentence.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

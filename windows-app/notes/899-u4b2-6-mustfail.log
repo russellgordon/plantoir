@@ -1,0 +1,10 @@
+#899 U4b2-6 must-fail log (2026-11-26). Each sabotage applied alone, built, run, failing lines below, restored with git checkout (git status clean after each).
+S1 CourseActivity.folderRenameIsUnderWay ". Try" -> "; Try" (run-mf1): RED. UndoSweepFindingsTests.swift:443 testTheRenameUnderWaySentencesAreTheContracts; :431 testTheUndoLinesSentencesAreTheContracts.
+S2 ReferenceReplacer.Problem.folderBeingRenamed.wordingKey -> "replaceWhileBusy" (run-mf2): RED. ReferenceReplacerTests.swift:602 testEverySequenceCase ("replaceWhileBusy" is not "replaceWhileAFolderIsRenamed").
+S3 a record without moved: its possible place counted as this rename's (the old fallback) (run-s3): RED. SpecialFolderRenamerTests.swift:938 testARecordWithoutItsPlacesNamesNoFolderAsThisRenames; :980 testAStartRunAfterARecordWithoutItsPlacesCarriesThemForward.
+S4 renameIsStarting writes mayHaveMoved: [] (run-s4): RED. SpecialFolderRenamerTests.swift:975 and :981 testAStartRunAfterARecordWithoutItsPlacesCarriesThemForward.
+S5 moved written as one newline-joined string (run-s5): RED. SpecialFolderRenamerTests.swift:992 testAPlaceWithALineBreakInItsNameIsOnePlace; :1038 testTheRenameRecordIsTheContractsFormat.
+S6 readRenameRecord casts as [String: String] (run-s6): RED. SpecialFolderRenamerTests.swift:1017 testTheRenameRecordIsTheContractsFormat (an example not read).
+S7 partWayEnding's cannot-tell branch removed (run-s7): RED. SpecialFolderRenamerTests.swift:869, 872, 873, 876 testAPlaceThatCannotBeReadIsToldNotTakenAsAbsent; :945, 946 testARecordWithoutItsPlacesNamesNoFolderAsThisRenames.
+S8 keepClassesDatedLater fixture place with ".md" again (run-s8): RED. UndoActionStepsTests.swift:445 testEveryDailyActionIsOneStepThroughTheDoor (contracts/undo-action-steps.json is not what the actions record).
+RED 8 of 8.
