@@ -62,6 +62,14 @@ The failing lines: the tool's row, `Assert.Throws() Failure: No exception was th
 - Review 1's round: `origin/dev` 8f73b39a4 merged in first (merge commit 0bd11c0d8). 899-w7b2-4-b on the PC (plantoir-pc), ref 9ef462962, lock taken 20:22:44, RUN_DONE 20:27:19; HEAD-AFTER 9ef462962 SAME, status clean. BUILD-APP-EXIT 0, BUILD-TESTS-EXIT 0. The same seven classes (`UndoHowITeachStepTests` now holds the two new tests): Passed 226, Failed 0, Total 226. Must-fail 10 rows, lines above.
 - 899-w7b2-4-c on the PC, ref 9ef462962, mode mustfail only (rows 3 and 5), lock taken 20:30:48 (waited its turn), RUN_DONE 20:32:09; HEAD-AFTER SAME, status clean; RESTORED 226 of 226. Lock free afterwards.
 
+- Review 2's round: 899-w7b2-4-d on the PC, ref 90c428496, lock taken 20:57:48 (waited behind the whole-suite run), RUN_DONE 20:59:51; HEAD-AFTER 90c428496 SAME, status clean; lock free afterwards. Classes `UndoHowITeachStepTests`, `HowITeachTests` and `HowITeachSettingsRowTests` only, as the coordinator asked. As printed:
+  - BUILD-APP-EXIT 0
+  - BUILD-TESTS-EXIT 0
+  - Passed!  - Failed:     0, Passed:    32, Skipped:     0, Total:    32, Duration: 7 s - Plantoir.Tests.dll (net9.0)
+  - SABOTAGE 1 build=0 test=1 RED a started page's refusal said as changed since planned (review 2, MEDIUM) :: Failed!  - Failed:     1, Passed:     0, Skipped:     0, Total:     1, Duration: 356 ms - Plantoir.Tests.dll (net9.0)
+  - RESTORED test=0 Passed!  - Failed:     0, Passed:    32, Skipped:     0, Total:    32, Duration: 6 s - Plantoir.Tests.dll (net9.0)
+  That sabotage is row 11 of `899-w7b2-4-mustfail.json`, run alone from `899-w7b2-4-mustfail-11.json` through `899-w7b2-4-go-11.ps1`. Must-fail across the piece: 11 RED of 11.
+
 ## Left for the next piece
 
 Nothing of this piece.
