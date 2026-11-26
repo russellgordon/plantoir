@@ -267,13 +267,26 @@ internal sealed class UndoScribe : IDisposable
     /// Every staged file or folder (<c>.plantoir-undo-</c> in its name) anywhere
     /// in a working folder, never through a link (W8-6: a symbolic link holding
     /// <c>../library</c>, forward slash kept, cannot be followed on Windows,
-    /// ERROR_INVALID_NAME, and what a link leads to is not the step's).
+    /// ERROR_INVALID_NAME, and what a link leads to is not the step's). A link
+    /// is what <see cref="UndoLinks.Look"/> says it is, never the bare
+    /// ReparsePoint attribute, which a OneDrive placeholder also carries
+    /// (W8-7, the review of pieces 5 and 6, L2): a placeholder folder is
+    /// walked like any other.
     /// </summary>
-    internal List<string> StagedLeftovers(string folder) =>
-        Directory.EnumerateFileSystemEntries(_folders[folder], "*",
-                     new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = false })
-                 .Where(entry => Path.GetFileName(entry).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal))
-                 .ToList();
+    internal List<string> StagedLeftovers(string folder)
+    {
+        var found = new List<string>();
+        void Walk(string place)
+        {
+            foreach (string entry in Directory.EnumerateFileSystemEntries(place))
+            {
+                if (Path.GetFileName(entry).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal)) found.Add(entry);
+                if (UndoLinks.Look(entry) == UndoLinks.What.Folder) Walk(entry);
+            }
+        }
+        Walk(_folders[folder]);
+        return found;
+    }
 
     /// <summary>The ops of one file's change, as the door works them out, with any whole-file blobs stored (for the calls that write another process's or version's lines raw).</summary>
     internal JsonArray OpsFor(string relative, byte[]? before, byte[]? after)
@@ -476,6 +489,54 @@ internal static class UndoKindsForTheCases
     }
 
     internal static string? Text(byte[]? bytes) => bytes is null ? null : Encoding.UTF8.GetString(bytes);
+
+    // ---- U4b's carrying move (stackCases' moveAFolderWithAPageEditedInside, recoveryCases' withAMovedFolder) ----
+
+    internal const string MediaFolder = "courses/TST1O/media";
+    internal const string RenamedFolder = "courses/TST1O/renamed";
+    internal const string MediaPageOld = "Intro.\nLine one: old.\nEnd.\n";
+    internal const string MediaPageNew = "Intro.\nLine one: new.\nEnd.\n";
+
+    /// <summary>courses/TST1O/media with a.md (<see cref="MediaPageOld"/>) and b.md (<c>B</c>).</summary>
+    internal static void LayTheMediaFolder(UndoScribe scribe)
+    {
+        scribe.WritePage("A", MediaFolder + "/a.md", Encoding.UTF8.GetBytes(MediaPageOld));
+        scribe.WritePage("A", MediaFolder + "/b.md", "B\n"u8.ToArray());
+    }
+
+    /// <summary>The media folder's move to renamed, its listingSha the folder's as it is (or as it was, once moved).</summary>
+    internal static JsonObject MoveTheMediaFolder(UndoScribe scribe)
+    {
+        string folder = Directory.Exists(scribe.FullPath("A", MediaFolder)) ? MediaFolder : RenamedFolder;
+        string listingSha = UndoTreeReading.Read(scribe.FullPath("A", folder)).ListingSha ?? new UndoTreeListing([], []).Sha;
+        return new JsonObject { ["kind"] = "move", ["from"] = MediaFolder, ["to"] = RenamedFolder, ["listingSha"] = listingSha };
+    }
+
+    /// <summary>The replaceText that turns a.md's <c>Line one: old.</c> into <c>new</c>, named at <paramref name="path"/>.</summary>
+    internal static JsonObject EditInside(string path) => new()
+    {
+        ["kind"] = "replaceText", ["path"] = path, ["before"] = "old", ["after"] = "new",
+        ["contextBefore"] = "Line one: ", ["contextAfter"] = ".\n",
+    };
+
+    /// <summary>What a.md holds, as <c>movedFolder</c> says it: new, old, byHand, none.</summary>
+    internal static string Holds(string? text) => text switch
+    {
+        null => "none",
+        MediaPageNew => "new",
+        MediaPageOld => "old",
+        "Hand.\n" => "byHand",
+        _ => "something else: " + text,
+    };
+
+    /// <summary><c>movedFolder</c>: which place holds the folder (renamed, media, both or neither), then what its a.md holds.</summary>
+    internal static string MovedFolder(UndoScribe scribe)
+    {
+        bool renamed = Directory.Exists(scribe.FullPath("A", RenamedFolder));
+        bool media = Directory.Exists(scribe.FullPath("A", MediaFolder));
+        string place = renamed && media ? "both" : renamed ? "renamed" : media ? "media" : "neither";
+        return place + ", " + Holds(Text(scribe.Page("A", (renamed ? RenamedFolder : MediaFolder) + "/a.md")));
+    }
 
     /// <summary>Whether the folder makeAFolder makes is there, as a folder.</summary>
     internal static bool FolderIsThere(UndoScribe scribe, string folder = "A") =>

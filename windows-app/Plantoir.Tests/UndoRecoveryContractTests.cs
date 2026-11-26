@@ -33,6 +33,8 @@ public sealed class UndoRecoveryContractTests
         "changeTheKeptOriginal", "keptOriginalsBeside", "fileInUseAtTheUndo", "leftLines", "editRacesTheSwap",
         "keptOriginalUnreadable", "contentInTheList", "contentCannotBeStored", "keptNoLongerInTheList",
         "keptOriginalsAfterTheTidy", "keptContentGoneAndCannotBeStored",
+        // U4b's (W8-7)
+        "withAMovedFolder", "movedFolder", "keptCopyLeftInsideTheFolder",
     };
 
     private const string First = "courses/TST1O/Section 1/Classes/first.md";
@@ -127,13 +129,22 @@ public sealed class UndoRecoveryContractTests
         bool withAMove = Flag(recoveryCase, "withAMove");
         bool withATree = Flag(recoveryCase, "withATree");
         bool withAPreference = Flag(recoveryCase, "withAPreference");
-        bool byOps = withAMove || withATree || withAPreference;
+        // U4b (W8-7): the two pages plus courses/TST1O/media moved to renamed
+        // and a replaceText on renamed/a.md, in that order (opKinds.wholeOps'
+        // one exception: the edit carried by the move).
+        bool withAMovedFolder = Flag(recoveryCase, "withAMovedFolder");
+        bool byOps = withAMove || withATree || withAPreference || withAMovedFolder;
         scribe.Places.Write(UndoKindsForTheCases.Preference, new UndoJson.Text("a"));
         JsonArray? ops = null;
         var blobs = new List<byte[]>();
         if (byOps)
         {
             ops = new JsonArray();
+            if (withAMovedFolder)
+            {
+                UndoKindsForTheCases.LayTheMediaFolder(scribe);
+                ops.Add(UndoKindsForTheCases.MoveTheMediaFolder(scribe));
+            }
             foreach (string path in new[] { First, Second })
             {
                 foreach (JsonNode? op in scribe.OpsFor(path, Before(path), After(path))) ops.Add(op!.DeepClone());
@@ -154,6 +165,7 @@ public sealed class UndoRecoveryContractTests
                 ops.Add(UndoKindsForTheCases.MoveFile(UndoKindsForTheCases.MarkerFrom, UndoKindsForTheCases.MarkerTo, Encoding.UTF8.GetBytes(UndoKindsForTheCases.OldMarker)));
             }
             if (withAMove) ops.Add(UndoKindsForTheCases.FrontPageRecompute());
+            if (withAMovedFolder) ops.Add(UndoKindsForTheCases.EditInside(UndoKindsForTheCases.RenamedFolder + "/a.md"));
         }
         UndoOutcome MakeTheStep(UndoDoor door) => byOps ? door.Perform(scribe.OpsDraft("A", (JsonArray)ops!.DeepClone(), blobs)) : door.Perform(draft);
 
@@ -200,7 +212,11 @@ public sealed class UndoRecoveryContractTests
 
         if (recoveryCase.TryGetProperty("handEdit", out JsonElement handEdit))
         {
-            string edited = PathOf(handEdit.GetString()!);
+            // first or second; any other value (piece 8's carried) is a gap
+            // named, never a page looked for under a name it is not.
+            string handEdited = handEdit.GetString()!;
+            if (handEdited is not ("first" or "second")) Assert.Fail("a key this replay does not check: handEdit " + handEdited);
+            string edited = PathOf(handEdited);
             string text = UndoCheck.DecodeStrictly(scribe.Page("A", edited)!)!;
             scribe.WritePage("A", edited, Encoding.UTF8.GetBytes(UndoTraceEdits.HandEdit("sameLine", text)!));
         }
@@ -235,6 +251,14 @@ public sealed class UndoRecoveryContractTests
             List<string> kept = KeptOriginals(scribe);
             Assert.NotEmpty(kept);
             foreach (string file in kept) File.AppendAllText(file, "A line added to the kept original.\n");
+        }
+        if (Flag(recoveryCase, "keptCopyLeftInsideTheFolder"))
+        {
+            // As a tidy that could not remove it leaves it: the undo's kept
+            // original of a.md inside the folder at its old place, holding
+            // what a.md held before the undo.
+            string kept = "courses/TST1O/media/.a.md" + UndoSwap.StagedMarker + seq + "-undo-orig";
+            scribe.WritePage("A", kept, Encoding.UTF8.GetBytes(UndoKindsForTheCases.MediaPageNew));
         }
         bool away = Flag(recoveryCase, "moveFolderBeforeRecovery");
         if (away) scribe.MoveFolderAway("A");
@@ -360,6 +384,8 @@ public sealed class UndoRecoveryContractTests
             var said = keptLines.SelectMany(line => line.NoLongerInTheList ?? []).OrderBy(name => name, StringComparer.Ordinal).ToList();
             Assert.Equal(noLonger.GetBoolean() ? keptNamedOnTheTrail : [], said);
         }
+        if (recoveryCase.TryGetProperty("movedFolder", out JsonElement movedFolder))
+            Assert.Equal(movedFolder.GetString(), UndoKindsForTheCases.MovedFolder(scribe));
         if (recoveryCase.TryGetProperty("keptAside", out JsonElement keptAside))
             Assert.True(keptAside.GetBoolean() == leftovers.Count > 0, "a folder kept aside: " + string.Join(", ", leftovers));
         else if (withATree)
