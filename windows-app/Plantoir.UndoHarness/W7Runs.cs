@@ -216,10 +216,6 @@ internal static class W7Runs
 
     private const string TimetablePath = "courses/ICS3U/.internal/timetable/section1.json";
 
-    private static readonly DateOnly[] NewMeetings = [new(2026, 10, 11), new(2026, 10, 12), new(2026, 10, 13)];
-
-    private static string ReDatedPage(int day) => Page(day, published: false).Replace($"2026-09-0{day}T", $"2026-10-1{day}T");
-
     /// <summary>"before", "after" or "NEITHER": the timetable's dates as laid, or as the re-date writes them down.</summary>
     private static string TimetableState(string run)
     {
@@ -249,6 +245,7 @@ internal static class W7Runs
         points.Add("beforeApplied");
         int failures = 0;
         int total = 0;
+        string[] reDated = ReDatedByTheAction(folder);
         foreach (UndoMode mode in new[] { UndoMode.Shadow, UndoMode.Live })
         {
             foreach (string point in points)
@@ -256,16 +253,14 @@ internal static class W7Runs
                 total++;
                 string run = Path.Combine(folder, "redate-" + mode + "-" + point.Replace('@', '-'));
                 MakeTheFolder(run);
-                string timetable = Full(run, TimetablePath);
-                Directory.CreateDirectory(Path.GetDirectoryName(timetable)!);
-                File.WriteAllText(timetable, "{\"section\":1,\"dates\":[\"2026-09-01\",\"2026-09-02\",\"2026-09-03\"],\"source\":\"typed in by hand\",\"recorded\":\"2026-09-01\"}");
+                WriteTheLaidTimetable(run);
                 string said = Child(["child-w7-redate", run, mode.ToString(), point], kill: true);
                 string recovered = Child(["child-w7-recover", run, mode.ToString()], kill: false);
                 var states = new List<string>();
                 for (int index = 0; index < Pages.Length; index++)
                 {
                     string text = File.Exists(Full(run, Pages[index])) ? File.ReadAllText(Full(run, Pages[index])) : "";
-                    states.Add(text == Page(index + 1, false) ? "before" : text == ReDatedPage(index + 1) ? "after" : "NEITHER");
+                    states.Add(text == Page(index + 1, false) ? "before" : text == reDated[index] && text != Page(index + 1, false) ? "after" : "NEITHER");
                 }
                 states.Add(TimetableState(run));
                 UndoFoldedStep? step = List(run, mode).Journal.Read().Folded.Steps.Values.LastOrDefault();
@@ -296,23 +291,21 @@ internal static class W7Runs
         return failures == 0 ? 0 : 1;
     }
 
-    /// <summary>The re-dating child: the three pages re-dated, then the timetable planned by TimetableMemory.PlanInto, in ONE step, as ApplyReDate plans them (it does not run ApplyReDate), made through the door.</summary>
+    /// <summary>
+    /// The re-dating child (#899 W7b2-10, review 3 L3): the REAL Re-date
+    /// Classes (<see cref="Plantoir.Core.Assist.AssistWorkspace.ApplyReDate"/>)
+    /// on the scratch course, block F's three meetings spread over its three
+    /// classes, so the step is the one the action plans (its pages in its own
+    /// order, the timetable written down after them, the front page kept
+    /// true), made through a door that stops at <paramref name="point"/>.
+    /// </summary>
     internal static int ChildReDate(string run, string mode, string point)
     {
         Console.WriteLine("STARTED");
         Console.Out.Flush();
-        UndoForThisProcess list = List(run, Enum.Parse<UndoMode>(mode));
-        var door = new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: StopAt(point), trail: list.Trail);
-        var step = new UndoActionStep(new UndoStepMaker("menu", "reDateClasses"), Root(run), "ICS3U", 1, undo: list, door: door);
-        for (int index = 0; index < Pages.Length; index++) step.Write(Full(run, Pages[index]), ReDatedPage(index + 1));
-        if (!Plantoir.Core.Assist.TimetableMemory.PlanInto(step, Root(run), "ICS3U", 1, NewMeetings, "block F", new DateOnly(2026, 9, 8)))
-        {
-            Console.WriteLine("DONE the timetable was not planned");
-            return 0;
-        }
         try
         {
-            step.Make();
+            ReDateThroughTheAction(run, List(run, Enum.Parse<UndoMode>(mode)), StopAt(point));
             Console.WriteLine("DONE made");
         }
         catch (Exception error)
@@ -320,6 +313,59 @@ internal static class W7Runs
             Console.WriteLine("DONE " + error.GetType().Name + ": " + error.Message.Replace('\n', ' '));
         }
         return 0;
+    }
+
+    /// <summary>Block F as a school calendar gives it: three meetings, 2026-10-11 to 2026-10-13.</summary>
+    private const string BlockF = "Block F,\nOct-11,1\nOct-12,2\nOct-13,3\n";
+
+    /// <summary>Plans and applies Re-date Classes as the app does, on this run's list and through these seams (none for the reference).</summary>
+    private static void ReDateThroughTheAction(string run, UndoForThisProcess list, UndoSeams? seams)
+    {
+        var workspace = new Plantoir.Core.Assist.AssistWorkspace(Root(run), new NoLauncher())
+        {
+            UndoList = list,
+            UndoSeams = seams,
+        };
+        var plan = workspace.PlanReDate("ICS3U", 1, Plantoir.Core.Assist.Timetable.Parse(BlockF, "F", 2026), [], []);
+        workspace.ApplyReDate(plan);
+    }
+
+    /// <summary>The pages as the real re-date writes them, measured once on a reference course that is never killed.</summary>
+    private static string[] ReDatedByTheAction(string folder)
+    {
+        string run = Path.Combine(folder, "redate-reference");
+        MakeTheFolder(run);
+        WriteTheLaidTimetable(run);
+        ReDateThroughTheAction(run, List(run, UndoMode.Shadow), seams: null);
+        var pages = new string[Pages.Length];
+        for (int index = 0; index < Pages.Length; index++) pages[index] = File.ReadAllText(Full(run, Pages[index]));
+        Console.WriteLine($"REFERENCE w7-redate-kill timetable={TimetableState(run)} pagesMoved={Pages.Length - Unmoved(pages)}");
+        return pages;
+    }
+
+    private static int Unmoved(string[] pages)
+    {
+        int unmoved = 0;
+        for (int index = 0; index < pages.Length; index++)
+        {
+            if (pages[index] == Page(index + 1, false)) unmoved++;
+        }
+        return unmoved;
+    }
+
+    private static void WriteTheLaidTimetable(string run)
+    {
+        string timetable = Full(run, TimetablePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(timetable)!);
+        File.WriteAllText(timetable, "{\"section\":1,\"dates\":[\"2026-09-01\",\"2026-09-02\",\"2026-09-03\"],\"source\":\"typed in by hand\",\"recorded\":\"2026-09-01\"}");
+    }
+
+    /// <summary>A launcher the re-date never calls: the harness previews and deploys nothing.</summary>
+    private sealed class NoLauncher : Plantoir.Core.Assist.ILauncherRunner
+    {
+        public Task<Plantoir.Core.Assist.LaunchOutcome> Run(string launcher, IReadOnlyList<string> arguments, string workingFolder,
+                                                           IProgress<string>? progress, CancellationToken cancellation) =>
+            Task.FromResult(new Plantoir.Core.Assist.LaunchOutcome(false, "The harness runs no launcher."));
     }
 
     /// <summary>

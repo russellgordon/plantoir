@@ -125,6 +125,30 @@ public sealed class CurriculumMentionsTests : IDisposable
 
     // ---- Writing ----------------------------------------------------------
 
+    /// <summary>
+    /// #899 W7b2-10 (review 1 L3): a mention that is already on the page
+    /// changes nothing, so the action makes no step and writes nothing, not
+    /// even its backup.
+    /// </summary>
+    [Fact]
+    public void AMentionAlreadyOnThePageMakesNoStepAndNoWrite()
+    {
+        ClassPage("Movement Concepts", "We moved.\n\n![[A2.2]]\n");
+        string list = Path.Combine(_folder, "state-undo");
+        var workspace = new AssistWorkspace(_folder, _launcher)
+        {
+            UndoList = new Plantoir.Core.Undo.UndoForThisProcess(list, Plantoir.Core.Undo.UndoMode.Shadow, null),
+        };
+        List<string> before = WindowsActionsOnTheMacFixture.EveryFileBut(_folder, list);
+
+        var plan = workspace.PlanCurriculumMentions("ADA1O", 1, "Movement Concepts", new[] { "A2.2" });
+        var result = workspace.ApplyCurriculumMentions(plan);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(0, WindowsActionsOnTheMacFixture.Begins(list));
+        Assert.Equal(before, WindowsActionsOnTheMacFixture.EveryFileBut(_folder, list));
+    }
+
     [Fact]
     public void TransclusionsGoInsideTheCurriculumMarkers()
     {
