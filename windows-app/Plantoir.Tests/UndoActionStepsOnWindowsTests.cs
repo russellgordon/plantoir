@@ -35,7 +35,7 @@ internal static class WindowsActionsOnTheMacFixture
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
         "showTodaysClassOnTheFrontPage", "notTodayOnTheFrontPage", "keepClassesDatedLater", "answerTheLinksChecklist",
-        "makeRoomForClasses", "duplicateClass",
+        "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass",
     ];
 
     /// <summary>
@@ -68,7 +68,7 @@ internal static class WindowsActionsOnTheMacFixture
             ["keepClassesDatedLater"] = (["version", "answeredAt"],
                 "Windows writes the kept classes as it always has (System.Text.Json, indented two spaces, \"key\": value, its members version, answeredAt, kept in that order, each row place then date, a slash written plainly), where the mac's JSONSerialization writes sorted keys with \" : \" and escapes the slash; and each row's place is the page's place without .md, as file-formats.json -> laterClassesKept names it, where the mac's recorded step names the page with its .md (its fixture's place). Its date is the same, 2026-09-14. Both readers look members up by name"),
             ["answerTheLinksChecklist"] = (["version", "answeredAt", "offered", "leftUnticked"],
-                "Windows writes the links checklist's answer as it always has (System.Text.Json, indented two spaces, \"key\": value, its members version, answeredAt, offered, leftUnticked in that order, a slash written plainly, an empty list as [] and no newline at the end), where the mac's JSONSerialization writes sorted keys with \" : \", escapes the slash and opens an empty list over a blank line. Every member holds the same value; both readers look members up by name"),
+                "Windows writes the links checklist's answer as it always has (System.Text.Json, indented two spaces, \"key\": value, its members version, answeredAt, offered, leftUnticked in that order, a slash written plainly, an empty list as [] and no newline at the end, and the offered and leftUnticked lists in the sheet's row order), where the mac's JSONSerialization writes sorted keys with \" : \", escapes the slash, opens an empty list over a blank line, and writes both lists sorted (LinksChecklistAnswered.write). On this fixture each list has at most one place, so every member holds the same value; both readers look members up by name and read the lists as sets"),
         };
 
     // ---- Functions -----------------------------------------------------------------
@@ -306,6 +306,7 @@ internal static class WindowsActionsOnTheMacFixture
             "getReadyForTheStartOfTheYear" => tools.PrepareForStartOfYear(Course, 1, workspace.PlanStartOfYear(Course, 1).Code),
             "makeRoomForClasses" => tools.MakeRoomForClasses(Course, 1, unit: 1, atDay: 2),
             "duplicateClass" => tools.AddNextClass(Course, 1, duplicate: "Unit 1, Day 1"),
+            "duplicateAsTheNextClass" => tools.DuplicateAsTheNextClassFromTheMenu(Course, 1, "section1/All Classes/Unit 1, Day 1.md", planning: false),
             _ => throw new InvalidOperationException($"{stepName}: no Windows action is converted for it yet"),
         };
         return string.Join("\n", answered.Content.OfType<TextContentBlock>().Select(block => block.Text));

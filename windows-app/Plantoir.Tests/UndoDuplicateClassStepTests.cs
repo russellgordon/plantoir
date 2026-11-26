@@ -207,8 +207,13 @@ public sealed class UndoDuplicateClassStepTests : IDisposable
         string later = Page("Unit 2, Day 1");
         const string byHand = "---\ntitle: Unit 2, Day 1\n---\n\nWritten by hand while it planned.\n";
 
-        Assert.Throws<AssistRefusal>(() =>
+        var refused = Assert.Throws<AssistRefusal>(() =>
             workspace.ApplyDuplicateClass(plan, new AtTheStage("Copying", () => File.WriteAllText(later, byHand))));
+
+        // Said as what it is (W7b2-2 review 1, L4): nothing was changed, the
+        // page named as changed by another program, never "couldn’t be read"
+        // or a plain "saved".
+        Assert.Equal("Nothing was changed: “Unit 2, Day 1.md” was changed by another program while it was being saved.", refused.Message);
 
         Assert.Equal(byHand, File.ReadAllText(later));
         Assert.False(File.Exists(Page("Unit 1, Day 4")), "a class was renamed");
