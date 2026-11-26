@@ -773,6 +773,19 @@ public class ReDateTests : IDisposable
     }
 
     /// <summary>
+    /// A timetable Windows refuses to read (not held by another program)
+    /// says Windows' own words after the curly apostrophe (W7b2-9 review 1,
+    /// LOW 3; the house typography, W7b2-6 review 1 L1).
+    /// </summary>
+    [Fact]
+    public void ATimetableWindowsRefusesSaysWindowsWordsAfterTheCurlyApostrophe()
+    {
+        var refused = new IOException("Access to the path is denied.", unchecked((int)0x80070005));
+        Assert.Equal("this section’s class dates could not be read. Windows said: " + HeldFiles.SystemWords(refused),
+                     TimetableMemory.WhyTheClassDatesCouldNotBeRead(refused));
+    }
+
+    /// <summary>
     /// W7b2-11 review 1, LOW 2: a folder where the timetable file belongs is
     /// Plantoir's own refusal, which carries no Windows error, so the answer
     /// quotes no "Windows said" and names no hidden path; nothing changes.

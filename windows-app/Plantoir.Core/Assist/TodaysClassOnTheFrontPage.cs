@@ -66,8 +66,8 @@ public static class TodaysClassOnTheFrontPage
     /// <summary><c>wording.kept</c>, for one kept name.</summary>
     public static string KeptSentence(string kept) => $"What the front page held a moment before is kept beside it, hidden, as “{kept}”.";
 
-    /// <summary><c>keptOnWindows.hiddenItems</c>: Microsoft's own Windows 11 path to hidden items.</summary>
-    public const string HiddenItems = "To see it in File Explorer, select View > Show, then select Hidden items.";
+    /// <summary><c>keptOnWindows.hiddenItems</c>: true in File Explorer on Windows 10 and 11 alike (View, then Hidden items).</summary>
+    public const string HiddenItems = "To see it, open View in File Explorer and turn on Hidden items.";
 
     /// <summary><c>keptOnWindows.showKept</c>: the path bar's open-the-folder action (<c>workingFolderPathBar</c>, its <c>windowsLabel</c>).</summary>
     public const string OpenKeptFolder = "Open Folder";
@@ -83,6 +83,51 @@ public static class TodaysClassOnTheFrontPage
         sentences.Add(HiddenItems);
         return string.Join(" ", sentences);
     }
+
+    /// <summary>An alert's two buttons, as the section window renders them: the action, and the one that closes (Escape).</summary>
+    public enum AlertButton { Action, Close }
+
+    /// <summary>
+    /// Everything an alert shows, in plain values, so the section window only
+    /// renders it and a test can read it (W7b2-9 review 1, MEDIUM 1). Every
+    /// alert has a visible closing button (<paramref name="CloseButton"/>,
+    /// Escape); <paramref name="ActionButton"/> is null for an alert with OK alone.
+    /// </summary>
+    public sealed record AlertDescription(string? Title, string Message, string? ActionButton, string CloseButton, AlertButton Default);
+
+    /// <summary>
+    /// The kept-file alert: what it shows (<see cref="Shows"/>) and what a
+    /// press does (<see cref="PressedAsync"/>).
+    /// </summary>
+    public sealed record KeptAlert(AlertDescription Shows, IReadOnlyList<string> KeptOriginals)
+    {
+        /// <summary>
+        /// A press: Open Folder (the action) opens the folder that holds the
+        /// kept file, or says <c>keptGone</c> through <paramref name="show"/>;
+        /// OK, Escape, or an alert that was never shown (null) does nothing.
+        /// </summary>
+        public Task PressedAsync(AlertButton? pressed, Func<AlertDescription, Task> show, Action<string> openFolder)
+        {
+            if (pressed != AlertButton.Action) return Task.CompletedTask;
+            return OpenTheKeptFolderAsync(KeptOriginals, gone => show(GoneAlert(gone)), openFolder);
+        }
+    }
+
+    /// <summary>
+    /// The ONE alert for a front page left part way (#899 W7b2-9; the mac's
+    /// U3c alert; Russell's ruling of 2026-11-25 (a)): titled with the class
+    /// the page now shows, <see cref="Offering.Show"/>; <see cref="KeptMessage"/>;
+    /// Open Folder as the action; OK as the closing button AND the default, so
+    /// Enter and Escape are both OK (an informational alert: the HIG's Alerts;
+    /// Microsoft's dialog guidance puts the safe button rightmost, on Escape).
+    /// </summary>
+    public static KeptAlert KeptAlertFor(Offering offer, Outcome.ShownWithWhatItHeldKept kept) =>
+        new(new AlertDescription(KeptTitle(offer.Show), KeptMessage(kept.KeptNames), OpenKeptFolder, "OK", AlertButton.Close),
+            kept.KeptOriginals);
+
+    /// <summary>The <c>keptGone</c> alert: the sentences alone, with OK (the mac's NSAlert; WinUI's title is optional).</summary>
+    public static AlertDescription GoneAlert(string keptGoneSentences) =>
+        new(null, keptGoneSentences, null, "OK", AlertButton.Close);
 
     /// <summary>
     /// What Open Folder does (the mac's <c>FolderActions.showInFinder(files:)</c>

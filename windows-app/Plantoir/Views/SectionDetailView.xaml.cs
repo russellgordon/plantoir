@@ -1316,7 +1316,10 @@ public sealed partial class SectionDetailView : UserControl
                     CloseButtonText = "OK",
                 });
             if (outcome is TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept kept)
-                await SayWhatTheFrontPageKeptAsync(offer.Show, kept);
+            {
+                var alert = TodaysClassOnTheFrontPage.KeptAlertFor(offer, kept);
+                await alert.PressedAsync(await ShowAlertAsync(alert.Shows), ShowAlertAsync, FolderActions.OpenFolder);
+            }
             // The page shows the class either way.
             return outcome is TodaysClassOnTheFrontPage.Outcome.Written or TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept;
         }
@@ -1329,38 +1332,28 @@ public sealed partial class SectionDetailView : UserControl
     }
 
     /// <summary>
-    /// The ONE alert when Show on Front Page went in but what the page held
-    /// is kept beside it, hidden (#899 W7b2-9; the mac's U3c alert, Russell's
-    /// ruling of 2026-11-25 (a)). Title <c>keptTitle</c>; message <c>kept</c>
-    /// and how to see hidden items, since the file stays hidden here; OK, the
-    /// default and the Close button, so Enter and Escape are both OK (an
-    /// informational alert: the HIG's Alerts, and Microsoft's dialog guidance,
-    /// whose safe button is the Close button, rightmost, on Escape); and Open
-    /// Folder, a visible button on the left, which opens the folder that holds
-    /// the kept file and never selects it. A kept file gone by then is said
-    /// with <c>keptGone</c> and nothing is opened.
+    /// Renders an alert's plain description (<see cref="TodaysClassOnTheFrontPage.AlertDescription"/>)
+    /// and nothing more: what it shows, which button is the default and what a
+    /// press does are the description's, tested without a screen
+    /// (W7b2-9 review 1, MEDIUM 1). Answers the button pressed, or null when
+    /// the alert could not be shown.
     /// </summary>
-    private async Task SayWhatTheFrontPageKeptAsync(string shown, TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept kept)
+    private async Task<TodaysClassOnTheFrontPage.AlertButton?> ShowAlertAsync(TodaysClassOnTheFrontPage.AlertDescription alert)
     {
-        var answer = await ShowDialogSafelyAsync(new ContentDialog
+        var dialog = new ContentDialog
         {
-            Title = TodaysClassOnTheFrontPage.KeptTitle(shown),
-            Content = new TextBlock { Text = TodaysClassOnTheFrontPage.KeptMessage(kept.KeptNames), TextWrapping = TextWrapping.Wrap },
-            PrimaryButtonText = TodaysClassOnTheFrontPage.OpenKeptFolder,
-            CloseButtonText = "OK",
-            DefaultButton = ContentDialogButton.Close,
-        });
-        if (answer != ContentDialogResult.Primary) return;
-        await TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync(kept.KeptOriginals,
-            // The mac's NSAlert says the sentence alone, with OK; WinUI's title
-            // is optional (Microsoft's dialog guidance), so it is the content here.
-            async gone => await ShowDialogSafelyAsync(new ContentDialog
-            {
-                Content = new TextBlock { Text = gone, TextWrapping = TextWrapping.Wrap },
-                CloseButtonText = "OK",
-                DefaultButton = ContentDialogButton.Close,
-            }),
-            FolderActions.OpenFolder);
+            Title = alert.Title,
+            Content = new TextBlock { Text = alert.Message, TextWrapping = TextWrapping.Wrap },
+            CloseButtonText = alert.CloseButton,
+            DefaultButton = alert.Default == TodaysClassOnTheFrontPage.AlertButton.Action ? ContentDialogButton.Primary : ContentDialogButton.Close,
+        };
+        if (alert.ActionButton is { } action) dialog.PrimaryButtonText = action;
+        return await ShowDialogSafelyAsync(dialog) switch
+        {
+            ContentDialogResult.Primary => TodaysClassOnTheFrontPage.AlertButton.Action,
+            ContentDialogResult.None => TodaysClassOnTheFrontPage.AlertButton.Close,
+            _ => null,
+        };
     }
 
     private async Task SayAsync(string sentence)

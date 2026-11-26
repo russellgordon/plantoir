@@ -195,31 +195,106 @@ public sealed class TodaysClassContractTests : IDisposable
     }
 
     /// <summary>
-    /// The alert as the section window builds it (read from source: the WinUI
-    /// app cannot be loaded here): <c>keptTitle</c>, the message, OK as the
-    /// default and the Close button (so Escape is OK), and a visible Open
-    /// Folder button that hands the kept files to
-    /// <see cref="TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync"/> with the
-    /// path bar's open-the-folder action, never Show in File Explorer.
+    /// The kept-file alert's make-up, read without a screen (W7b2-9 review 1,
+    /// MEDIUM 1): titled with the class the page NOW shows (<c>Show</c>, never
+    /// <c>Shows</c>), the message, Open Folder as the action, and OK as the
+    /// closing button and the default, so Enter and Escape are both OK.
     /// </summary>
     [Fact]
-    public void TheSectionWindowShowsTheKeptAlertWithOkAsTheDefaultAndOpensTheFolder()
+    public void TheKeptAlertIsTitledWithTheClassNowShownWithOkTheDefaultAndTheClose()
+    {
+        var w = Rule["wording"]!;
+        var offer = new TodaysClassOnTheFrontPage.Offering("Unit 2, Day 5", "Unit 2, Day 4", Path.Combine(_folder, "Unit 2, Day 5.md"));
+        string kept = Path.Combine(_folder, ".index.md.plantoir-undo-1-apply-orig");
+
+        var alert = TodaysClassOnTheFrontPage.KeptAlertFor(offer, new TodaysClassOnTheFrontPage.Outcome.ShownWithWhatItHeldKept([kept]));
+
+        Assert.Equal(new TodaysClassOnTheFrontPage.AlertDescription(
+                         w["keptTitle"]!.ToString().Replace("{class}", "Unit 2, Day 5"),
+                         TodaysClassOnTheFrontPage.KeptMessage([".index.md.plantoir-undo-1-apply-orig"]),
+                         Rule["keptOnWindows"]!["showKept"]!.ToString(),
+                         "OK",
+                         TodaysClassOnTheFrontPage.AlertButton.Close),
+                     alert.Shows);
+        Assert.Equal([kept], alert.KeptOriginals);
+    }
+
+    /// <summary>The <c>keptGone</c> alert: its sentences alone, with OK as the closing button and the default, and no action.</summary>
+    [Fact]
+    public void TheGoneAlertSaysItsSentenceWithOkAlone()
+    {
+        string sentence = Rule["wording"]!["keptGone"]!.ToString().Replace("{kept}", "K");
+        Assert.Equal(new TodaysClassOnTheFrontPage.AlertDescription(null, sentence, null, "OK", TodaysClassOnTheFrontPage.AlertButton.Close),
+                     TodaysClassOnTheFrontPage.GoneAlert(sentence));
+    }
+
+    /// <summary>
+    /// The section window only renders the description (read from source:
+    /// the WinUI app cannot be loaded here). Each line that maps a field to
+    /// the dialog, or wires the press, is pinned whole, and each appears once.
+    /// </summary>
+    [Fact]
+    public void TheSectionWindowOnlyRendersTheKeptAlertsDescription()
     {
         string view = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"))
-                             .Replace("\r\n", "\n");   // a Windows checkout has CRLF
-        int start = view.IndexOf("private async Task SayWhatTheFrontPageKeptAsync(", StringComparison.Ordinal);
-        Assert.True(start >= 0, "SayWhatTheFrontPageKeptAsync is gone");
-        int end = view.IndexOf("\n    }\n", start, StringComparison.Ordinal);
-        string alert = view[start..end];
-        Assert.Contains("Title = TodaysClassOnTheFrontPage.KeptTitle(", alert);
-        Assert.Contains("TodaysClassOnTheFrontPage.KeptMessage(", alert);
-        Assert.Contains("PrimaryButtonText = TodaysClassOnTheFrontPage.OpenKeptFolder", alert);
-        Assert.Contains("CloseButtonText = \"OK\"", alert);
-        Assert.Contains("DefaultButton = ContentDialogButton.Close", alert);
-        Assert.Contains("TodaysClassOnTheFrontPage.OpenTheKeptFolderAsync(", alert);
-        Assert.Contains("FolderActions.OpenFolder", alert);
-        Assert.DoesNotContain("ShowInFileExplorer", alert);
-        Assert.Contains("SayWhatTheFrontPageKeptAsync(", view[..start] + view[end..]);
+                          .Replace("\r\n", "\n");   // a Windows checkout has CRLF
+        string[] lines =
+        [
+            "                var alert = TodaysClassOnTheFrontPage.KeptAlertFor(offer, kept);\n",
+            "                await alert.PressedAsync(await ShowAlertAsync(alert.Shows), ShowAlertAsync, FolderActions.OpenFolder);\n",
+            "            Title = alert.Title,\n",
+            "            Content = new TextBlock { Text = alert.Message, TextWrapping = TextWrapping.Wrap },\n",
+            "            CloseButtonText = alert.CloseButton,\n",
+            "            DefaultButton = alert.Default == TodaysClassOnTheFrontPage.AlertButton.Action ? ContentDialogButton.Primary : ContentDialogButton.Close,\n",
+            "        if (alert.ActionButton is { } action) dialog.PrimaryButtonText = action;\n",
+            "            ContentDialogResult.Primary => TodaysClassOnTheFrontPage.AlertButton.Action,\n",
+            "            ContentDialogResult.None => TodaysClassOnTheFrontPage.AlertButton.Close,\n",
+            "            _ => null,\n",
+        ];
+        foreach (string line in lines)
+        {
+            int first = view.IndexOf(line, StringComparison.Ordinal);
+            Assert.True(first >= 0, "missing: " + line.Trim());
+            if (line.Contains("alert", StringComparison.Ordinal))
+                Assert.True(view.IndexOf(line, first + 1, StringComparison.Ordinal) < 0, "said twice: " + line.Trim());
+        }
+        Assert.DoesNotContain("ShowInFileExplorer", view[view.IndexOf("KeptAlertFor(", StringComparison.Ordinal)..view.IndexOf("ShowAlertAsync(TodaysClassOnTheFrontPage.AlertDescription", StringComparison.Ordinal)]);
+    }
+
+    /// <summary>
+    /// No sentence of the kept-file alert says a word <c>plainWordsCheck</c>
+    /// rules out (the mac's T3 list), checked FILLED; the one exception is a
+    /// name the contract lists in <c>plainWordsExceptions</c> (W7b2-9 review 1, LOW 1).
+    /// </summary>
+    [Fact]
+    public void NoKeptAlertSentenceSaysATechnicalWord()
+    {
+        string[] words = ["transclude", "transcludes", "transcluded", "transclusion", "transclusions",
+                          "embed", "embeds", "embedded", "index", "file", "frontmatter", "link"];
+        string plain = Rule["plainWordsCheck"]!.ToString();
+        foreach (string word in new[] { "transclude", "embed", "index", "file", "frontmatter", "link" })
+            Assert.Contains($"“{word}”", plain);
+        var exceptions = new List<string>();
+        foreach (JsonNode? exception in Rule["plainWordsExceptions"]!.AsArray()) exceptions.Add(exception!["name"]!.ToString());
+        Assert.Equal(["File Explorer"], exceptions);
+
+        string[] sentences =
+        [
+            TodaysClassOnTheFrontPage.KeptTitle("Unit 2, Day 5"),
+            TodaysClassOnTheFrontPage.KeptMessage(["KEPT"]),
+            TodaysClassOnTheFrontPage.OpenKeptFolder,
+            TodaysClassOnTheFrontPage.KeptGoneSentence("KEPT"),
+        ];
+        foreach (string sentence in sentences)
+        {
+            string checkedText = sentence;
+            foreach (string name in exceptions) checkedText = checkedText.Replace(name, " ", StringComparison.Ordinal);
+            var said = new HashSet<string>();
+            foreach (string piece in System.Text.RegularExpressions.Regex.Split(checkedText.ToLowerInvariant(), "[^\\p{L}]+"))
+                if (piece.Length > 0) said.Add(piece);
+            foreach (string word in words)
+                Assert.False(said.Contains(word), $"“{sentence}” says “{word}”");
+        }
     }
 
     /// <summary>

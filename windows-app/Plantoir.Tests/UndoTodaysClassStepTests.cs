@@ -224,4 +224,36 @@ public sealed class UndoTodaysClassStepTests : IDisposable
         Assert.Equal([keptGone.Replace("{kept}", kept.KeptNames[0])], said);
         Assert.Empty(opened);
     }
+
+    /// <summary>
+    /// The alert's presses (W7b2-9 review 1, MEDIUM 1): OK, Escape, or an
+    /// alert never shown opens nothing and says nothing; Open Folder opens the
+    /// folder; Open Folder with the file gone shows the keptGone alert and opens nothing.
+    /// </summary>
+    [Fact]
+    public async Task OnlyOpenFolderOpensAndAGoneFileShowsTheGoneAlert()
+    {
+        var kept = ShowPartWay();
+        var alert = TodaysClassOnTheFrontPage.KeptAlertFor(new TodaysClassOnTheFrontPage.Offering("Unit 2, Day 5", "Unit 2, Day 4", FrontPage), kept);
+        var opened = new List<string>();
+        var shown = new List<TodaysClassOnTheFrontPage.AlertDescription>();
+        Task Show(TodaysClassOnTheFrontPage.AlertDescription description) { shown.Add(description); return Task.CompletedTask; }
+
+        await alert.PressedAsync(TodaysClassOnTheFrontPage.AlertButton.Close, Show, opened.Add);
+        await alert.PressedAsync(null, Show, opened.Add);
+        Assert.Empty(opened);
+        Assert.Empty(shown);
+
+        await alert.PressedAsync(TodaysClassOnTheFrontPage.AlertButton.Action, Show, opened.Add);
+        Assert.Equal([Path.GetDirectoryName(FrontPage)!], opened);
+        Assert.Empty(shown);
+
+        opened.Clear();
+        File.Delete(kept.KeptOriginals[0]);
+        await alert.PressedAsync(TodaysClassOnTheFrontPage.AlertButton.Action, Show, opened.Add);
+        string keptGone = ContractLoader.LoadJson("class-planning.json")["todaysClassOnTheFrontPage"]!["wording"]!["keptGone"]!.ToString();
+        Assert.Equal([new TodaysClassOnTheFrontPage.AlertDescription(null, keptGone.Replace("{kept}", kept.KeptNames[0]), null, "OK",
+                                                                      TodaysClassOnTheFrontPage.AlertButton.Close)], shown);
+        Assert.Empty(opened);
+    }
 }
