@@ -208,16 +208,18 @@ internal static class UndoCheck
     /// are. <paramref name="cannotRead"/> is a test's seam (a full path that
     /// cannot be read just now).
     /// </summary>
-    /// <param name="overridingTo">For a move that carries edits, going back: each carried file, relative to its <c>to</c>, as the step's own edit leaves it once taken back (the listing override; the mac's <c>overridingTo</c>, U4b; #899 W8-2).</param>
+    /// <param name="overridingTo">For a move that carries edits, going back: each carried file, relative to its <c>to</c>, as the step's own edit leaves it once taken back (the listing override; the mac's <c>overridingTo</c>, U4b; #899 W8-2), and the step's own staged and kept files inside it as absent (W8-3).</param>
+    /// <param name="overridingFrom">For a move that carries edits: the step's own staged and kept files inside its <c>from</c>, as absent (the mac's <c>overridingFrom</c>, U4b's M1; #899 W8-3).</param>
     internal static UndoOpState WholeStateOf(UndoOp op, string root, IUndoExternalPlaces places, Func<string, bool>? cannotRead = null,
-                                             IReadOnlyDictionary<string, UndoCurrent>? overridingTo = null)
+                                             IReadOnlyDictionary<string, UndoCurrent>? overridingTo = null,
+                                             IReadOnlyDictionary<string, UndoCurrent>? overridingFrom = null)
     {
         if (!op.Readable) return UndoOpState.NotReadable;
         switch (op.Kind)
         {
             case UndoOp.Move:
             {
-                UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead);
+                UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom);
                 UndoMoveSide atTo = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo);
                 if (atFrom == UndoMoveSide.CannotRead || atTo == UndoMoveSide.CannotRead) return UndoOpState.CannotTell;
                 if (atFrom == UndoMoveSide.Free && atTo == UndoMoveSide.HoldsTheContent) return UndoOpState.After;
@@ -356,10 +358,14 @@ internal static class UndoCheck
     /// that page whose bytes hash to exactly the sha wanted (page path and sha in), or null when none matches (the mac's U3c,
     /// Russell's ruling of 2026-11-20, 15:20; <see cref="UndoRecovery.KeptOriginal"/>).</param>
     /// <param name="keptOriginalUsed">Told of each page put back from a kept original, with what the page holds at that op.</param>
+    /// <param name="ownSeq">The step's number for an Undo or a Redo (null while a step is made): a move that carries edits is
+    /// judged without the step's own staged and kept files inside its folder, from any of its swaps, on either side (the mac's
+    /// <c>ownSeq</c>, U4b's M1; #899 W8-3).</param>
     internal static PlanResult Plan(IReadOnlyList<UndoOp> ops, bool backward,
                                     Func<string, UndoCurrent> read, Func<string, byte[]?> blob,
                                     Func<bool>? folderIsReachable = null, UndoWholeReads? whole = null,
-                                    Func<string, string, byte[]?>? keptOriginal = null, Action<UndoKeptOriginalUse>? keptOriginalUsed = null)
+                                    Func<string, string, byte[]?>? keptOriginal = null, Action<UndoKeptOriginalUse>? keptOriginalUsed = null,
+                                    long? ownSeq = null)
     {
         foreach (UndoOp op in ops)
         {
@@ -384,6 +390,9 @@ internal static class UndoCheck
         Dictionary<string, UndoOp> carriers = Carriers(ops);
         var movingNow = new HashSet<string>(StringComparer.Ordinal);
         var stagedAtItsTurn = new HashSet<string>(StringComparer.Ordinal);
+        // Where each file was read: a carried file whose move goes in now is
+        // where it is before the move, and its kept original beside it there.
+        var readAt = new Dictionary<string, string>(StringComparer.Ordinal);
         var leading = new List<UndoSwapTarget>();
         foreach (UndoOp op in ordered)
         {
@@ -415,7 +424,17 @@ internal static class UndoCheck
                     if (backward && working.TryGetValue(carried, out UndoCurrent? takenBack) && UndoOp.PartInside(op.To!, carried) is { } inside)
                         (overridingTo ??= new Dictionary<string, UndoCurrent>(StringComparer.Ordinal))[inside] = takenBack;
                 }
-                UndoOpState wholeState = WholeStateOf(op, whole.Root, whole.Places, whole.CannotRead, overridingTo);
+                // The step's own staged and kept files inside the folder, from
+                // any of its swaps, on either side, are never its content (U4b,
+                // M1); a carried file's override above wins over its own.
+                Dictionary<string, UndoCurrent>? overridingFrom = null;
+                if (carriesEdits && ownSeq is { } seq)
+                {
+                    overridingFrom = UndoSwap.StepsOwnFilesInside(UndoTreeReading.Under(whole.Root, op.From!), seq);
+                    foreach ((string inside, UndoCurrent absent) in UndoSwap.StepsOwnFilesInside(UndoTreeReading.Under(whole.Root, op.To!), seq))
+                        (overridingTo ??= new Dictionary<string, UndoCurrent>(StringComparer.Ordinal)).TryAdd(inside, absent);
+                }
+                UndoOpState wholeState = WholeStateOf(op, whole.Root, whole.Places, whole.CannotRead, overridingTo, overridingFrom);
                 UndoVerdict verdict = backward ? UndoVerdictOf(wholeState) : RedoVerdictOf(wholeState);
                 if (verdict is UndoVerdict.AlreadyBack or UndoVerdict.AlreadyRedone) continue;
                 // A moved item is named where a teacher finds it now: its to
@@ -448,6 +467,7 @@ internal static class UndoCheck
                     readPath = UndoOp.PlaceBeforeTheMove(path, carrying.From!, carrying.To!);
                     stagedAtItsTurn.Add(path);
                 }
+                readAt[path] = readPath;
                 original[path] = read(readPath);
                 working[path] = original[path];
                 met.Add(path);
@@ -472,7 +492,7 @@ internal static class UndoCheck
                 {
                     // A blob the list no longer holds: put back from the kept
                     // original beside the page when its hash is the one wanted.
-                    if (keptOriginal?.Invoke(path, targetSha) is { } kept)
+                    if (keptOriginal?.Invoke(readAt[path], targetSha) is { } kept)
                     {
                         keptOriginalUsed?.Invoke(new UndoKeptOriginalUse(path, kept, backward ? op.AfterSha : op.BeforeSha, working[path]));
                         working[path] = new UndoCurrent.Bytes(kept);

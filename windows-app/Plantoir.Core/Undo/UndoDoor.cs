@@ -511,7 +511,7 @@ internal sealed class UndoDoor
             plan = UndoCheck.Plan(record.Step.Ops, backward, relative => UndoCurrent.Read(FullPath(root, relative)),
                                   _journal.Blob, () => _journal.CanReach(record.Step), new UndoWholeReads(root, _places),
                                   keptOriginal: UndoRecovery.KeptOriginal(record.Step, root, path => keptOriginalNotRead ??= path),
-                                  keptOriginalUsed: uses.Add);
+                                  keptOriginalUsed: uses.Add, ownSeq: record.Step.Seq);
         }
         catch (UndoListUnreadableException) { return new UndoOutcome(UndoOutcomeKind.ListUnavailable); }
         _seams?.AfterTheCheck?.Invoke();
@@ -588,7 +588,7 @@ internal sealed class UndoDoor
             // holds the same: the second review of U3c, MEDIUM).
             try
             {
-                UndoSwap.TidyLeftovers(seq, record.Step.Paths, root, UndoRecovery.AsideListings(record.Step, root), null,
+                UndoSwap.TidyLeftovers(seq, record.Step.PathsToTidy, root, UndoRecovery.AsideListings(record.Step, root), null,
                                        keepingOnlyCopies: true, keepingCopiesHolding: notTaken.KeptOriginalsHolding);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }

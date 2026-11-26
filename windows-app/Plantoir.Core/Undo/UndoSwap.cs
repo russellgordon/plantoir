@@ -444,8 +444,17 @@ internal static class UndoSwap
             else
             {
                 seams?.BeforeEachSwap?.Invoke(index, target.FullPath);
-                IReadOnlyDictionary<string, UndoCurrent>? ownLeftOut =
-                    target.Change is UndoSwapChange.MoveHere moving ? LetGoOwnFilesInside(moving.FromRelative) : null;
+                Dictionary<string, UndoCurrent>? ownLeftOut = null;
+                if (target.Change is UndoSwapChange.MoveHere moving)
+                {
+                    ownLeftOut = LetGoOwnFilesInside(moving.FromRelative);
+                    // And what the step's EARLIER swaps left inside it (U4b, M1; #899 W8-3).
+                    if (SeqOfLabel(label) is { } seq)
+                    {
+                        foreach ((string inside, UndoCurrent absent) in StepsOwnFilesInside(moving.FromFull, seq))
+                            ownLeftOut.TryAdd(inside, absent);
+                    }
+                }
                 refusal = root is not null && PlaceLeadingOut(target, root) is { } leadingOut
                     ? new UndoRefusal(UndoRefusalKind.ChangedSince, leadingOut)
                     : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders, ownLeftOut);
@@ -511,10 +520,12 @@ internal static class UndoSwap
                 // the place it leaves, nothing where it goes.
                 UndoMoveSide atFrom = UndoMoveSides.Read(move.Op, move.FromFull, overriding: ownLeftOut);
                 UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath);
+                // Named where a teacher finds the item now, as the plan's
+                // refusal names it (placeAsFound: the place it leaves; #899 W8-3).
                 if (atFrom == UndoMoveSide.CannotRead || atTarget == UndoMoveSide.CannotRead)
-                    return new UndoRefusal(UndoRefusalKind.CannotTellNow, target.RelativePath);
+                    return new UndoRefusal(UndoRefusalKind.CannotTellNow, move.FromRelative);
                 if (atFrom != UndoMoveSide.HoldsTheContent || atTarget != UndoMoveSide.Free)
-                    return new UndoRefusal(UndoRefusalKind.ChangedSince, target.RelativePath);
+                    return new UndoRefusal(UndoRefusalKind.ChangedSince, move.FromRelative);
                 try { Directory.CreateDirectory(Path.GetDirectoryName(target.FullPath)!); }
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException)
                 {
@@ -677,6 +688,47 @@ internal static class UndoSwap
             return true;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>
+    /// Every staged file and kept original of step <paramref name="seq"/>,
+    /// from any of its swaps (its apply, an undo, a redo, a recovery), inside
+    /// the folder at <paramref name="folderFull"/>, relative to it with
+    /// <c>/</c>, as absent: a carrying move's pair is judged without them (the
+    /// mac's <c>stepsOwnFilesInside</c>, U4b's M1; #899 W8-3). Only the
+    /// step's own names, by its marker (<see cref="IsStaged"/> with the seq as
+    /// the label, so step 11's are never step 1's); anything else inside still
+    /// counts. Never through a link (<see cref="UndoLinks.Look"/>): a place
+    /// that is a link now holds nothing of the step's.
+    /// </summary>
+    internal static Dictionary<string, UndoCurrent> StepsOwnFilesInside(string folderFull, long seq)
+    {
+        var found = new Dictionary<string, UndoCurrent>(StringComparer.Ordinal);
+        string own = seq.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        void Walk(string folder, string relative)
+        {
+            if (UndoLinks.Look(folder) != UndoLinks.What.Folder) return;
+            IEnumerable<string> entries;
+            try { entries = Directory.EnumerateFileSystemEntries(folder).ToList(); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return; }
+            foreach (string entry in entries)
+            {
+                string name = Path.GetFileName(entry);
+                string inside = relative.Length == 0 ? name : relative + "/" + name;
+                if (IsStaged(name, own)) found[inside] = new UndoCurrent.Absent();
+                else Walk(entry, inside);
+            }
+        }
+        Walk(folderFull, "");
+        return found;
+    }
+
+    /// <summary>The step's number a swap's label begins with (<c>&lt;seq&gt;-apply</c>, <c>-undo</c>, <c>-redo</c>), or null for a label of another shape.</summary>
+    internal static long? SeqOfLabel(string label)
+    {
+        int dash = label.IndexOf('-');
+        return dash > 0 && long.TryParse(label.AsSpan(0, dash), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long seq)
+            ? seq : null;
     }
 
     /// <summary>The place a staged name stands beside: the name between its leading dot and its LAST <c>.plantoir-undo-</c>, or null.</summary>

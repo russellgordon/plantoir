@@ -255,6 +255,30 @@ internal sealed record UndoStep
     }
 
     /// <summary>
+    /// Every path the tidy of its staged files looks beside: <see cref="Paths"/>,
+    /// and each edit a move carries also where it is before the move
+    /// (<see cref="UndoOp.PlaceBeforeTheMove"/>), so the step's own files
+    /// inside a moved folder are found wherever the folder is now (U4b, M1;
+    /// #899 W8-3).
+    /// </summary>
+    internal IEnumerable<string> PathsToTidy
+    {
+        get
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string path in Paths)
+            {
+                if (seen.Add(path)) yield return path;
+            }
+            foreach ((string carried, UndoOp move) in UndoCheck.Carriers(Ops))
+            {
+                string before = UndoOp.PlaceBeforeTheMove(carried, move.From!, move.To!);
+                if (seen.Add(before)) yield return before;
+            }
+        }
+    }
+
+    /// <summary>
     /// <c>opKinds.wholeOps</c>: no other op of the step names a whole op's
     /// places (a move's two, a tree's folder or anything inside it) or its
     /// target. A step that breaks it is one this version cannot read: a
