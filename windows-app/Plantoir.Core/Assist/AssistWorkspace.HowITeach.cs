@@ -269,17 +269,31 @@ public sealed partial class AssistWorkspace
                 if (movedOn) throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
                 MakeTheUndoStep(step);
             }
-            catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince)
+            catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince ||
+                                                           (created && HowITeachPage.ExistingPath(planned.Course.DirectoryPath) is not null))
             {
                 // A page that appeared, or changed, after the plan read it:
-                // never written over, and said as it always was.
+                // never written over, and said as it always was. A NEW page
+                // that appears in the last instant before the rename is
+                // refused by the rename itself ("in use" to the door), and is
+                // the same case: a page is there that the plan did not see
+                // (W7b2-4 review 1, LOW 2; the row opens it the same way).
                 throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
+            }
+            catch (UndoStepLeftPartWayException partWay)
+            {
+                // The mac's saidWhenTheStepStopped with aSectionsCopyPutsItBack
+                // false: the page sits at the top of the course, outside every
+                // section, so no Restore Section puts it back and none is
+                // named (W7b2-4 review 1, MEDIUM).
+                NoteAChangeWithNoUndoEntry();
+                throw new AssistRefusal(AssistWording.PublishStoppedPartWay("the How I Teach page", ReasonItStopped(partWay)));
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
-                // All or none: "Nothing was changed" unless the door left the
-                // page holding the new words, said as part way.
-                throw RefusalForAStepThatStopped(error, "the How I Teach page", standIn);
+                // All or none: the mac's nothing: "Nothing was saved", the
+                // How I Teach family's opening (review 1, LOW 1).
+                throw new AssistRefusal(NothingWasSaved(error));
             }
             recording.Done();
         }
@@ -291,6 +305,13 @@ public sealed partial class AssistWorkspace
 
         return new AssistResult(true, AssistWording.HowITeachSaved(planned.Course.Code), backup);
     }
+
+    /// <summary>
+    /// A How I Teach write whose step wrote nothing: the mac's
+    /// <c>saidWhenTheStepStopped(nothing: "Nothing was saved")</c> for
+    /// <c>write_how_i_teach</c>, the opening of every How I Teach refusal.
+    /// </summary>
+    internal static string NothingWasSaved(Exception error) => "Nothing was saved: " + ReasonItStopped(error);
 
     /// <summary>Whether a section's page listing leaves this file out (<c>notListedAsAPage</c>).</summary>
     internal static bool ListsAsAPage(Course course, string fullPath) =>

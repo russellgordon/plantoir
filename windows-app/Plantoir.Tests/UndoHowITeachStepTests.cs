@@ -47,9 +47,9 @@ public sealed class UndoHowITeachStepTests : IDisposable
 
     private UndoForThisProcess List() => new(ListFolder, UndoMode.Shadow, null);
 
-    private AssistWorkspace Open(UndoSeams? seams = null) => new(Folder, new FakeLauncher(), undo: _today)
+    private AssistWorkspace Open(UndoSeams? seams = null, AssistSurface surface = AssistSurface.Outside) => new(Folder, new FakeLauncher(), undo: _today)
     {
-        Surface = AssistSurface.Outside,
+        Surface = surface,
         UndoList = List(),
         UndoSeams = seams,
     };
@@ -140,7 +140,7 @@ public sealed class UndoHowITeachStepTests : IDisposable
         var unwritable = new UndoSeams { StagingWriteFailsAt = index => index == 0 };
 
         var refusal = Assert.Throws<AssistRefusal>(() => Open(unwritable).WriteHowITeach("ICS3U", "Words.", ""));
-        Assert.StartsWith("Nothing was changed: ", refusal.Message);
+        Assert.StartsWith("Nothing was saved: ", refusal.Message);
         Assert.False(File.Exists(PagePath));
         Assert.Empty(_today.Entries);
 
@@ -188,6 +188,58 @@ public sealed class UndoHowITeachStepTests : IDisposable
         Assert.Contains(Path.GetFileName(kept), refusal.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("Nothing was changed", refusal.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(AssistWording.HowITeachSaved("ICS3U"), refusal.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The same stop in Plantoir's own window: the bare part-way sentence, as
+    /// the mac's <c>aSectionsCopyPutsItBack: false</c> says it. The page sits
+    /// outside every section, so Restore Section is never named, although a
+    /// copy of the course was made (review 1, MEDIUM).
+    /// </summary>
+    [Fact]
+    public void AReplacedPageLeftPartWayInPlantoirsOwnWindowNamesNoRestoreSection()
+    {
+        Open().WriteHowITeach("ICS3U", "First words.", "");
+        string mark = HowITeachPage.MarkOf(File.ReadAllBytes(PagePath))!;
+        var partWay = new UndoSeams
+        {
+            BetweenKeepingAndRenaming = (_, fullPath) =>
+            {
+                using var inPlace = new FileStream(fullPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                byte[] edit = System.Text.Encoding.UTF8.GetBytes("Theirs.\n");
+                inPlace.Write(edit);
+                inPlace.SetLength(edit.Length);
+            },
+            PutBackFailsAt = index => index == 0,
+        };
+        AssistWorkspace ownWindow = Open(partWay, AssistSurface.LocalWindow);
+
+        var refusal = Assert.Throws<AssistRefusal>(() => ownWindow.WriteHowITeach("ICS3U", "Second words.", mark));
+
+        Assert.NotNull(ownWindow.ConversationBackupPath);
+        string kept = Assert.Single(Directory.GetFiles(CourseFolder, "." + HowITeachPage.FileName + ".plantoir-undo-*-orig"));
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the How I Teach page", ""), refusal.Message);
+        Assert.Contains(Path.GetFileName(kept), refusal.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Restore Section", refusal.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(AssistWording.RestoreFromBackupPutsItBack, refusal.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A page that appears in the last instant, after the door's check and
+    /// before its rename: the rename refuses it ("in use" to the door), the
+    /// page is not written over, and the tool says today's sentence, as for
+    /// one that appeared a moment earlier (review 1, LOW 2).
+    /// </summary>
+    [Fact]
+    public void APageThatAppearedJustBeforeTheRenameIsSaidAsAppearedMeanwhile()
+    {
+        var lastInstant = new UndoSeams { BetweenKeepingAndRenaming = (_, fullPath) => File.WriteAllText(fullPath, "Mine, just now.\n") };
+
+        var refusal = Assert.Throws<AssistRefusal>(() => Open(lastInstant).WriteHowITeach("ICS3U", "Words.", ""));
+
+        Assert.Equal("Mine, just now.\n", File.ReadAllText(PagePath));
+        Assert.Equal(AssistWording.HowITeachChangedSincePlanned("ICS3U"), refusal.Message);
+        Assert.Empty(_today.Entries);
     }
 
     [Fact]
