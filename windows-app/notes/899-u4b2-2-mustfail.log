@@ -27,3 +27,6 @@ c. placeLeavingTheFolder returns places[0] (Windows' rule): run-r1-mustfail-c, r
 d. placeLeavingTheFolder returns the last place: run-r1-mustfail-d, red: both "both" tests, testStackCases (the Undo and the Redo "both" rows).
 e. Python model naming path or from: FAILED (failures=2), the Undo and the Redo "only the new place" rows.
 RED 5 of 5 this round. Restored clean after each.
+
+Review 2 round (2026-11-25): the U2 row restored as at a03fecefd, the held old-place Undo row restored.
+f. placeLeavingTheFolder returns the last of the places whenever one leads out: run-r2-mustfail-oldrow, exit 65, red: testStackCases with rows "U4b2-2: only the move's old place ..." (the restored row), both "both" rows and the Redo "only the old place" row; testUndoNeverMovesAFileOutThroughALinkMadeAfterTheDoor, both "both" tests and the three Redo "old place" tests. Restored: mac-app clean.

@@ -52433,6 +52433,21 @@
         "onTheList": [],
         "cleared": "changedSince",
         "clearedSeq": 1,
+        "nothingMovedOutside": true
+      },
+      {
+        "name": "U4b2-2: only the move's old place leads out of the working folder (the folder it was moved out of, replaced since by a link to outside): Undo is refused as changed since and names the old place",
+        "calls": [
+          "moveThePageAside",
+          "linkItsOldFolderOutside",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 1,
         "nothingMovedOutside": true,
         "refusalNamed": "courses/TST1O/old/a.md"
       },
