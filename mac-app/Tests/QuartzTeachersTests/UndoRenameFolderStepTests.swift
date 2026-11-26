@@ -1096,6 +1096,126 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(linesForThisEnding, 1, trail())
     }
 
+    /// A course with a per-section rename of Tasks to Assessments killed at
+    /// the first swap once `movedFolder` is at its new name, with the switch
+    /// off: the folders moved by then stay moved, the settings do not know,
+    /// and the record names the rename and every place it moves. Keyed on
+    /// the disk, not on a swap's index (the step orders its swaps by path).
+    /// Section 2's page links into the folder, so a relink inside section 2
+    /// is swapped after section 2's move.
+    func courseWithAKilledRename(killedOnce movedFolder: String) async throws -> Course {
+        JournaledStep.modeOverride = .shadow
+        let course: Course = try course()
+        try "See [[Tasks/Quiz 1]].\n".write(
+            to: course.directoryURL.appendingPathComponent("section2/Tasks/Quiz 2.md"), atomically: true, encoding: .utf8
+        )
+        let moved: URL = course.directoryURL.appendingPathComponent(movedFolder)
+        UndoKillPoints.hook = { @Sendable (reached: UndoKillPoint) in
+            if case .beforeSwap = reached {
+                return FileManager.default.fileExists(atPath: moved.path)
+            }
+            return false
+        }
+        _ = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+        UndoKillPoints.hook = nil
+        try recoverInShadow()
+        return course
+    }
+
+    /// The review's scenario (review 1 of U4b2-5, M1): a per-section start
+    /// run where one section already holds a folder at the new name, made by
+    /// hand and never this rename's. Every folder is moved back, a page's
+    /// original is kept: the line and the sheet say "did not rename" and
+    /// never name the hand-made folder. MUST FAIL with every place at the new
+    /// name counted, whether this rename's or not.
+    func testAStopWithEveryFolderBackNeverNamesAFolderThatWasAlwaysAtTheNewName() async throws {
+        let course: Course = try course()
+        let section2: URL = course.directoryURL.appendingPathComponent("section2")
+        try FileManager.default.moveItem(
+            at: section2.appendingPathComponent("Tasks"), to: section2.appendingPathComponent("Assessments")
+        )
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index == 2 }
+        UndoKillPoints.putBackFailsAt = { @Sendable (index: Int) in index == 1 }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        let said: String = try XCTUnwrap(failed(result), "\(result)")
+        XCTAssertTrue(said.hasPrefix(SpecialFolderRenamer.stoppedPartWay(renaming: "Tasks", said: "")), said)
+        XCTAssertFalse(said.contains("section2/Assessments"), said)
+        let expected: String = SpecialFolderRenamer.stoppedPartWayLine(
+            renaming: "Tasks", to: "Assessments", course: "ICS3U", scope: .perSection, keptBeside: 1
+        )
+        XCTAssertTrue(trail().contains(expected), trail())
+        XCTAssertFalse(trail().contains("section2/Assessments"), trail())
+    }
+
+    /// A per-section FINISH run (review 1, L1 a): the earlier run moved both
+    /// sections, this run moves none, and its part-way ending names both
+    /// places, in section order, inside the course. MUST FAIL with the
+    /// recorded places not read.
+    func testAPerSectionFinishStoppedPartWayNamesEverySectionAtTheNewName() async throws {
+        let course: Course = try await courseWithAKilledRename(killedOnce: "section2/Assessments")
+        // This run moves nothing: its first swap is made, its second
+        // refused, and the first's put-back fails, so one original is kept.
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index >= 1 }
+        UndoKillPoints.putBackFailsAt = { @Sendable (index: Int) in index == 0 }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        let said: String = try XCTUnwrap(failed(result), "\(result)")
+        let places: [String] = ["section1/Assessments", "section2/Assessments"]
+        XCTAssertTrue(said.hasPrefix(SpecialFolderRenamer.renamedOnlyInPart(
+            renaming: "Tasks", to: "Assessments", places: places, said: ""
+        )), said)
+        let expected: String = SpecialFolderRenamer.renamedOnlyInPartLine(
+            renaming: "Tasks", to: "Assessments", course: "ICS3U", scope: .perSection,
+            places: places, keptBeside: 1
+        )
+        XCTAssertTrue(trail().contains(expected), trail())
+    }
+
+    /// A start run after a killed one (review 1, L1 b): the earlier run moved
+    /// section 1, this run moves section 2 and cannot move it back. Both are
+    /// this rename's and both are named; only this run's was before. MUST
+    /// FAIL with the earlier run's places left out of the reading or of the
+    /// record this run writes.
+    func testAStartRunAfterAKilledOneNamesTheSectionsBothRunsMoved() async throws {
+        let course: Course = try await courseWithAKilledRename(killedOnce: "section1/Assessments")
+        // The first swap after section 2's move is refused, and something
+        // appears at section 2's old name, so its move back is blocked (as
+        // `testAMoveBackBlockedAtTheOldNameStillSaysWhichFolderIsRenamed`).
+        let movedThisRun: URL = course.directoryURL.appendingPathComponent("section2/Assessments")
+        let appeared: URL = course.directoryURL.appendingPathComponent("section2/Tasks/Other.md")
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in
+            if !FileManager.default.fileExists(atPath: movedThisRun.path) {
+                return false
+            }
+            try? FileManager.default.createDirectory(
+                at: appeared.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try? "Other.\n".write(to: appeared, atomically: true, encoding: .utf8)
+            return true
+        }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        let said: String = try XCTUnwrap(failed(result), "\(result)")
+        let places: [String] = ["section1/Assessments", "section2/Assessments"]
+        XCTAssertTrue(said.hasPrefix(SpecialFolderRenamer.renamedOnlyInPart(
+            renaming: "Tasks", to: "Assessments", places: places, said: ""
+        )), said)
+        let expected: String = SpecialFolderRenamer.renamedOnlyInPartLine(
+            renaming: "Tasks", to: "Assessments", course: "ICS3U", scope: .perSection,
+            places: places, keptBeside: 0
+        )
+        XCTAssertTrue(trail().contains(expected), trail())
+        let record: Data? = recordOnDisk(of: course)
+        XCTAssertEqual(
+            SpecialFolderRenamer.placesMoved(byTheRecord: record, renaming: "Tasks", to: "Assessments", scope: .perSection),
+            places, "the record this run wrote lost the earlier run's place"
+        )
+    }
+
     // MARK: - U4b2-3: another folder's record is never this rename's to clear
 
     /// Another folder's interrupted rename, as a run killed part way leaves

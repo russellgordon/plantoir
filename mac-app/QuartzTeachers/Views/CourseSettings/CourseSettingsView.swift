@@ -1233,7 +1233,7 @@ struct CourseSettingsView: View {
             // way can be recognised and finished: with the switch off, recovery
             // records and repairs nothing (`interruptedRenameTarget`).
             if !planned.moves.isEmpty {
-                record.renameIsStarting()
+                record.renameIsStarting(moving: planned.moves)
             }
             do {
                 // The check and the swap read and hash every file in each
@@ -1259,22 +1259,27 @@ struct CourseSettingsView: View {
                 continue
             } catch let partWay as JournaledStepError {
                 if case .leftPartWay(_, _, let keptOriginals) = partWay {
-                    // Said as the disk is: a folder at its new name is named
-                    // there (part four's review, L1), whether this run moved
-                    // it or an earlier, interrupted run did (U4b2-5: a run
-                    // finishing a rename moves nothing). Each part-way ending
-                    // leaves its line on the trail BEFORE it returns (the
-                    // final sweep, M1): these are the states somebody will
-                    // be asked to explain next week. The record stays, as a
-                    // stopped rename's does.
-                    let leftRenamed: [String] = SpecialFolderRenamer.foldersAtTheirNewName(
+                    // Said as the disk is: each of this rename's folders at its
+                    // new name is named there (part four's review, L1),
+                    // whether this run moved it or an earlier, interrupted run
+                    // of it did (U4b2-5: a run finishing a rename moves
+                    // nothing), and a folder that was never this rename's is
+                    // not (review 1, M1). A place that cannot be read is told
+                    // on the trail; the sheet is said by what could be read.
+                    // Each part-way ending leaves its line on the trail BEFORE
+                    // it returns (the final sweep, M1): these are the states
+                    // somebody will be asked to explain next week. The record
+                    // stays, as a stopped rename's does.
+                    let left: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
                         renaming: oldName, to: newName, scope: scope,
-                        courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+                        courseDirectory: courseDirectory, sectionNumbers: sectionNumbers,
+                        planned: planned.moves, earlierRecord: record.earlierRecord
                     )
+                    let leftRenamed: [String] = left.places
                     if !leftRenamed.isEmpty {
                         ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.renamedOnlyInPartLine(
                             renaming: oldName, to: newName, course: course.code, scope: scope,
-                            places: leftRenamed, keptBeside: keptOriginals.count
+                            places: leftRenamed, keptBeside: keptOriginals.count, unreadable: left.unreadable
                         ))
                         return .failed(SpecialFolderRenamer.renamedOnlyInPart(
                             renaming: oldName, to: newName, places: leftRenamed, said: partWay.localizedDescription
@@ -1282,7 +1287,7 @@ struct CourseSettingsView: View {
                     }
                     ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.stoppedPartWayLine(
                         renaming: oldName, to: newName, course: course.code, scope: scope,
-                        keptBeside: keptOriginals.count
+                        keptBeside: keptOriginals.count, unreadable: left.unreadable
                     ))
                     return .failed(SpecialFolderRenamer.stoppedPartWay(
                         renaming: oldName, said: partWay.localizedDescription

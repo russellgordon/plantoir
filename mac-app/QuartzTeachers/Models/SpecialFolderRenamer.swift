@@ -75,6 +75,11 @@ nonisolated struct FolderRenamePlan: Sendable {
         let to: URL
 
         let listingSha: String
+
+        /// Whether what moves is a symbolic link (to a folder), read by
+        /// `lstat` when planned: a link at the new name is this rename's
+        /// only when the rename moved a link there (U4b2-5, review 1, L3).
+        var isALink: Bool = false
     }
 
     /// One page relinked: the bytes read and the bytes it is left holding.
@@ -278,15 +283,25 @@ enum SpecialFolderRenamer {
     /// rename's step is made and cleared once it is made (or refused with
     /// nothing changed), so its presence means one thing: a rename got part
     /// way and stopped.
+    ///
+    /// `moved` (U4b2-5) is every place, inside the course and spelled with
+    /// the new name, that this rename moves or an earlier run of it moved:
+    /// what a later part-way ending may call "still called" the new name.
+    /// One string, a place per line, so the record stays a map of strings
+    /// for every reader; left out when empty. Windows does not write it yet.
     nonisolated static func recordRenameStarting(
-        from oldName: String, to newName: String, scope: FolderScope, courseDirectory: URL
+        from oldName: String, to newName: String, scope: FolderScope, courseDirectory: URL,
+        moved: [String] = []
     ) {
         let marker: URL = renameMarkerURL(courseDirectory: courseDirectory)
-        let note: [String: String] = [
+        var note: [String: String] = [
             "from": oldName,
             "to": newName,
             "scope": scope.exclusionKey,
         ]
+        if !moved.isEmpty {
+            note["moved"] = moved.joined(separator: "\n")
+        }
         try? FileManager.default.createDirectory(
             at: marker.deletingLastPathComponent(), withIntermediateDirectories: true
         )
@@ -452,7 +467,7 @@ enum SpecialFolderRenamer {
             changesTheSettings: false
         )
         if !planned.moves.isEmpty {
-            record.renameIsStarting()
+            record.renameIsStarting(moving: planned.moves)
         }
         do {
             try step.make()
@@ -578,7 +593,8 @@ enum SpecialFolderRenamer {
                 let refusal: UndoRefusal = .cannotTellNow(path: location.path)
                 throw JournaledStepError.refused(refusal, fileName: location.lastPathComponent)
             }
-            moves.append(FolderRenamePlan.Move(from: location, to: destination, listingSha: listingSha))
+            let isALink: Bool = presence(at: location, spelledExactly: false) == .link
+            moves.append(FolderRenamePlan.Move(from: location, to: destination, listingSha: listingSha, isALink: isALink))
         }
 
         var pages: [FolderRenamePlan.Page] = []
@@ -729,7 +745,7 @@ enum SpecialFolderRenamer {
     /// kept files, never naming a page.
     nonisolated static func renamedOnlyInPartLine(
         renaming oldName: String, to newName: String, course: String, scope: FolderScope,
-        places: [String], keptBeside: Int
+        places: [String], keptBeside: Int, unreadable: [String] = []
     ) -> String {
         var joined: String = ""
         for place in places {
@@ -741,62 +757,167 @@ enum SpecialFolderRenamer {
         return "renamed the folder " + oldName + " to " + newName + " in " + course
             + " only in part, and could not put everything back (" + scope.configurationKey
             + ", still called " + newName + ": " + joined + "; " + keptBesideWords(keptBeside)
-            + ")"
+            + couldNotTellWords(unreadable) + ")"
+    }
+
+    /// The trail's clause for places whose state could not be read
+    /// (U4b2-5, review 1, L2), or nothing when every place was read.
+    nonisolated static func couldNotTellWords(_ unreadable: [String]) -> String {
+        if unreadable.isEmpty {
+            return ""
+        }
+        var joined: String = ""
+        for place in unreadable {
+            if !joined.isEmpty {
+                joined += ", "
+            }
+            joined += place
+        }
+        return "; could not tell whether these are at the new name: " + joined
     }
 
     /// The trail line (`folder renamed`) for a rename stopped part way with
     /// every folder back at its old name but files kept beside their pages
     /// (the final sweep, M1).
     nonisolated static func stoppedPartWayLine(
-        renaming oldName: String, to newName: String, course: String, scope: FolderScope, keptBeside: Int
+        renaming oldName: String, to newName: String, course: String, scope: FolderScope, keptBeside: Int,
+        unreadable: [String] = []
     ) -> String {
         return "did not rename the folder " + oldName + " to " + newName + " in " + course
             + ", and could not put everything back (" + scope.configurationKey + ", "
-            + keptBesideWords(keptBeside) + ")"
+            + keptBesideWords(keptBeside) + couldNotTellWords(unreadable) + ")"
     }
 
-    /// Each of this rename's folders that is at its new name now, by its
-    /// path inside the course, read from the disk: what a rename stopped
-    /// part way left renamed. Read from the disk, never from the run's
-    /// planned moves (U4b2-5, part nine's review, L1): a run FINISHING an
-    /// interrupted rename moves no folder, because the earlier run did, and
-    /// its folders are at the new name all the same. Whatever is at the OLD
-    /// name does not count (U4b part six's review, L1): the likeliest reason
-    /// a move back fails is that something appeared there, and the folder is
-    /// then still at its new name. The plan refused a new name that was
-    /// taken, so what is at the new name is the renamed folder.
+    /// A place inside the course, as the trail and the sheet name it.
+    nonisolated static func placeInside(_ url: URL, courseDirectory: URL) -> String {
+        let prefix: String = courseDirectory.standardizedFileURL.path + "/"
+        let path: String = url.standardizedFileURL.path
+        return path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : url.lastPathComponent
+    }
+
+    /// The places, inside the course, that a record of this same rename
+    /// says it moved (its `moved`), or nil when the record is not this
+    /// rename's or does not say (a record Windows or an earlier version
+    /// wrote).
+    nonisolated static func placesMoved(
+        byTheRecord record: Data?, renaming oldName: String, to newName: String, scope: FolderScope
+    ) -> [String]? {
+        guard recordNames(record, from: oldName, to: newName, scope: scope),
+              let record,
+              let note = try? JSONSerialization.jsonObject(with: record) as? [String: String],
+              let moved = note["moved"] else {
+            return nil
+        }
+        var places: [String] = []
+        for place in moved.components(separatedBy: "\n") {
+            if !place.isEmpty {
+                places.append(place)
+            }
+        }
+        return places
+    }
+
+    /// What a rename stopped part way left at the new name
+    /// (`foldersAtTheirNewName`).
+    nonisolated struct LeftAtTheNewName: Equatable {
+
+        // MARK: - Stored properties
+
+        /// This rename's folders at the new name now, by place inside the
+        /// course.
+        var places: [String] = []
+
+        /// This rename's places the disk could not be read at, each with
+        /// what the system said: named on the trail, never guessed at.
+        var unreadable: [String] = []
+    }
+
+    /// This rename's folders that are at the new name now, by place inside
+    /// the course: what a rename stopped part way left renamed (U4b2-5).
     ///
-    /// Presence only, by `lstat` (part six's review, L2): nothing is read
-    /// or hashed, so it costs nothing on the main actor. A rename that only
-    /// changes capitalisation counts a folder only when its directory lists
-    /// the new spelling, since the old spelling also "exists" there.
+    /// **A place counts only if it belongs to this rename AND the disk shows
+    /// it at the new name** (review 1, M1). Belongs: the destination of one
+    /// of this run's planned moves, or a place the record of the rename this
+    /// run is finishing says it moved (`placesMoved(byTheRecord:)`; a run
+    /// finishing an interrupted rename moves nothing itself, the earlier run
+    /// did). A folder that was at the new name all along (one made by hand
+    /// in a section with no folder at the old name) is never "still called"
+    /// the new name. A record that names this rename but not its places
+    /// (written by Windows or an earlier version) can only be read from the
+    /// disk as `looksLikeAnInterruptedRename` reads it: a place counts there
+    /// when the old name is absent beside it.
+    ///
+    /// The disk decides only which of those places are at the new name:
+    /// a folder, by `lstat`, never followed; a link only where this run moved
+    /// a link (review 1, L3); a capitalisation-only rename counts a place only
+    /// when its directory lists the new spelling. Whatever is at the OLD name
+    /// does not count (U4b part six's review, L1). A place that cannot be
+    /// read (a refused `lstat`, a listing that fails) is neither counted nor
+    /// taken as absent: it is returned in `unreadable` (review 1, L2).
     nonisolated static func foldersAtTheirNewName(
         renaming oldName: String, to newName: String, scope: FolderScope,
-        courseDirectory: URL, sectionNumbers: [Int]
-    ) -> [String] {
-        var result: [String] = []
-        let prefix: String = courseDirectory.standardizedFileURL.path + "/"
+        courseDirectory: URL, sectionNumbers: [Int],
+        planned moves: [FolderRenamePlan.Move], earlierRecord: Data?
+    ) -> LeftAtTheNewName {
+        var result: LeftAtTheNewName = LeftAtTheNewName()
         let isCaseOnly: Bool = oldName.caseInsensitiveCompare(newName) == .orderedSame
-        let places: [URL] = folderLocations(
+        let recorded: [String]? = placesMoved(byTheRecord: earlierRecord, renaming: oldName, to: newName, scope: scope)
+        let recordIsThisRenamesWithoutPlaces: Bool = recorded == nil
+            && recordNames(earlierRecord, from: oldName, to: newName, scope: scope)
+        let newPlaces: [URL] = folderLocations(
             named: newName, scope: scope, courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
         )
-        for place in places {
-            var isThere: Bool = somethingIsThere(at: place)
-            if isCaseOnly {
-                let listed: [String] = (try? FileManager.default.contentsOfDirectory(atPath: place.deletingLastPathComponent().path)) ?? []
-                isThere = listed.contains(place.lastPathComponent)
+        for place in newPlaces {
+            let inside: String = placeInside(place, courseDirectory: courseDirectory)
+            var movedHereThisRun: Bool = false
+            var movedALinkHere: Bool = false
+            for move in moves {
+                if move.to.standardizedFileURL.path == place.standardizedFileURL.path {
+                    movedHereThisRun = true
+                    movedALinkHere = move.isALink
+                }
             }
-            if !isThere {
+            var belongs: Bool = movedHereThisRun
+            if let recorded, recorded.contains(inside) {
+                belongs = true
+            }
+            if recordIsThisRenamesWithoutPlaces && !belongs {
+                let oldPlace: URL = place.deletingLastPathComponent().appendingPathComponent(oldName)
+                belongs = presence(at: oldPlace, spelledExactly: isCaseOnly) == .absent
+            }
+            if !belongs {
                 continue
             }
-            let path: String = place.standardizedFileURL.path
-            result.append(path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : place.lastPathComponent)
+            switch presence(at: place, spelledExactly: isCaseOnly) {
+            case .folder:
+                result.places.append(inside)
+            case .link:
+                if movedALinkHere {
+                    result.places.append(inside)
+                }
+            case .unreadable(let said):
+                result.unreadable.append(inside + " (" + said + ")")
+            case .absent, .somethingElse:
+                continue
+            }
         }
         return result
     }
 
-    /// Whether anything is at the path, a link included and never followed.
-    nonisolated static func somethingIsThere(at url: URL) -> Bool {
+    /// What is at a path, read by `lstat` and never followed.
+    nonisolated enum Presence: Equatable {
+        case absent
+        case folder
+        case link
+        case somethingElse
+        case unreadable(String)
+    }
+
+    /// What is at `url`. `spelledExactly` (a capitalisation-only rename)
+    /// also asks the directory's listing for this spelling, since another
+    /// spelling "exists" there too on a case-insensitive volume. Only "no
+    /// such file" is absent; any other refusal is `unreadable`.
+    nonisolated static func presence(at url: URL, spelledExactly: Bool) -> Presence {
         var information: stat = stat()
         let found: Int32 = url.withUnsafeFileSystemRepresentation { path in
             guard let path else {
@@ -804,7 +925,33 @@ enum SpecialFolderRenamer {
             }
             return lstat(path, &information)
         }
-        return found == 0
+        if found != 0 {
+            let code: Int32 = errno
+            if code == ENOENT || code == ENOTDIR {
+                return .absent
+            }
+            return .unreadable(String(cString: strerror(code)))
+        }
+        if spelledExactly {
+            do {
+                let listed: [String] = try FileManager.default.contentsOfDirectory(
+                    atPath: url.deletingLastPathComponent().path
+                )
+                if !listed.contains(url.lastPathComponent) {
+                    return .absent
+                }
+            } catch {
+                return .unreadable(error.localizedDescription)
+            }
+        }
+        let kind: mode_t = information.st_mode & S_IFMT
+        if kind == S_IFDIR {
+            return .folder
+        }
+        if kind == S_IFLNK {
+            return .link
+        }
+        return .somethingElse
     }
 
     /// Where a page is once the folders move: under a move's `to` when it
@@ -1077,9 +1224,26 @@ nonisolated struct RenameRecordClaim {
     // MARK: - Functions
 
     /// Written BEFORE the rename's step is made, when folders will move.
-    mutating func renameIsStarting() {
+    /// It names every place this rename has moved: this run's moves and,
+    /// when the earlier record is of this same rename, the places it says
+    /// an earlier run moved (U4b2-5), so a later ending still knows them.
+    mutating func renameIsStarting(moving moves: [FolderRenamePlan.Move]) {
+        var moved: [String] = []
+        if let recorded = SpecialFolderRenamer.placesMoved(
+            byTheRecord: earlierRecord, renaming: oldName, to: newName, scope: scope
+        ) {
+            for place in recorded {
+                moved.append(place)
+            }
+        }
+        for move in moves {
+            let place: String = SpecialFolderRenamer.placeInside(move.to, courseDirectory: courseDirectory)
+            if !moved.contains(place) {
+                moved.append(place)
+            }
+        }
         SpecialFolderRenamer.recordRenameStarting(
-            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory
+            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory, moved: moved
         )
         thisRunWroteTheRecord = true
     }

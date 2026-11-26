@@ -808,5 +808,94 @@ final class SpecialFolderRenamerTests: XCTestCase {
     private func exists(_ url: URL) -> Bool {
         return FileManager.default.fileExists(atPath: url.path)
     }
+
+    // MARK: - U4b2-5: which folders a stopped rename left at the new name
+
+    /// A record of this rename naming `moved`, as its bytes.
+    func recordBytes(from oldName: String, to newName: String, scope: FolderScope, moved: [String], in course: URL) throws -> Data {
+        SpecialFolderRenamer.recordRenameStarting(from: oldName, to: newName, scope: scope, courseDirectory: course, moved: moved)
+        return try Data(contentsOf: SpecialFolderRenamer.renameMarkerURL(courseDirectory: course))
+    }
+
+    /// A capitalisation-only FINISH run (review 1 of U4b2-5, L1 d): no
+    /// planned move, the record names "concepts". Counted only when the
+    /// directory lists the new spelling. MUST FAIL with presence read
+    /// without the listing.
+    func testACapitalisationOnlyFinishCountsTheFolderOnlyByItsNewSpelling() throws {
+        let course: URL = temporaryDirectory.appendingPathComponent("courses/ICS3U")
+        try FileManager.default.createDirectory(at: course.appendingPathComponent("concepts"), withIntermediateDirectories: true)
+        let record: Data = try recordBytes(from: "Concepts", to: "concepts", scope: .shared, moved: ["concepts"], in: course)
+
+        let renamed: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
+            renaming: "Concepts", to: "concepts", scope: .shared, courseDirectory: course, sectionNumbers: [],
+            planned: [], earlierRecord: record
+        )
+        XCTAssertEqual(renamed.places, ["concepts"])
+
+        try FileManager.default.moveItem(at: course.appendingPathComponent("concepts"), to: course.appendingPathComponent("Concepts-x"))
+        try FileManager.default.moveItem(at: course.appendingPathComponent("Concepts-x"), to: course.appendingPathComponent("Concepts"))
+        let putBack: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
+            renaming: "Concepts", to: "concepts", scope: .shared, courseDirectory: course, sectionNumbers: [],
+            planned: [], earlierRecord: record
+        )
+        XCTAssertEqual(putBack.places, [], "the old spelling was read as the new one")
+    }
+
+    /// A place the disk refuses to read is neither counted nor taken as
+    /// absent: it is returned as unreadable, and the trail line says so
+    /// (review 1, L2). MUST FAIL with a refused `lstat` read as absent.
+    func testAPlaceThatCannotBeReadIsToldNotTakenAsAbsent() throws {
+        let course: URL = temporaryDirectory.appendingPathComponent("courses/ICS3U")
+        let section1: URL = course.appendingPathComponent("section1")
+        try FileManager.default.createDirectory(at: section1.appendingPathComponent("Assessments"), withIntermediateDirectories: true)
+        let record: Data = try recordBytes(from: "Tasks", to: "Assessments", scope: .perSection, moved: ["section1/Assessments"], in: course)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: section1.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: section1.path)
+        }
+
+        let left: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
+            renaming: "Tasks", to: "Assessments", scope: .perSection, courseDirectory: course, sectionNumbers: [1],
+            planned: [], earlierRecord: record
+        )
+
+        XCTAssertEqual(left.places, [])
+        XCTAssertEqual(left.unreadable.count, 1, "\(left)")
+        XCTAssertTrue(left.unreadable.first?.hasPrefix("section1/Assessments (") == true, "\(left)")
+        let line: String = SpecialFolderRenamer.stoppedPartWayLine(
+            renaming: "Tasks", to: "Assessments", course: "ICS3U", scope: .perSection, keptBeside: 0,
+            unreadable: left.unreadable
+        )
+        XCTAssertTrue(line.contains("; could not tell whether these are at the new name: section1/Assessments ("), line)
+    }
+
+    /// A link at the new name is this rename's folder only where this run
+    /// moved a link there (review 1, L3). MUST FAIL with a link counted as
+    /// a folder.
+    func testALinkAtTheNewNameIsNotTheRenamedFolderUnlessALinkWasMoved() throws {
+        let course: URL = temporaryDirectory.appendingPathComponent("courses/ICS3U")
+        let elsewhere: URL = temporaryDirectory.appendingPathComponent("elsewhere")
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: course, withIntermediateDirectories: true)
+        let place: URL = course.appendingPathComponent("Ideas")
+        try FileManager.default.createSymbolicLink(at: place, withDestinationURL: elsewhere)
+        let record: Data = try recordBytes(from: "Concepts", to: "Ideas", scope: .shared, moved: ["Ideas"], in: course)
+
+        let recordedOnly: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
+            renaming: "Concepts", to: "Ideas", scope: .shared, courseDirectory: course, sectionNumbers: [],
+            planned: [], earlierRecord: record
+        )
+        XCTAssertEqual(recordedOnly.places, [], "a link was named as the renamed folder")
+
+        let movedALink: FolderRenamePlan.Move = FolderRenamePlan.Move(
+            from: course.appendingPathComponent("Concepts"), to: place, listingSha: "", isALink: true
+        )
+        let moved: SpecialFolderRenamer.LeftAtTheNewName = SpecialFolderRenamer.foldersAtTheirNewName(
+            renaming: "Concepts", to: "Ideas", scope: .shared, courseDirectory: course, sectionNumbers: [],
+            planned: [movedALink], earlierRecord: nil
+        )
+        XCTAssertEqual(moved.places, ["Ideas"])
+    }
+
 }
 
