@@ -22,3 +22,12 @@ S5 kept files ignored in foldersHoldingOnly (run-mf5.log, contract class only: P
 
 Total: 5 sabotages, 5 RED (S3 and S5 after the unit test was strengthened).
 Python: the model holds folders only as their files (folder_of_pages), so it has no rule to sabotage; its three rows pass with or without any Swift rule.
+
+REVIEW 1 (fix 435d8ea18; the bound test corrected in the next commit). Red first: run-r1-red.log, 8 failures (the four new rows; the mixed (a) and (b) unit cases; up-to-eight; the record removal).
+R1 all or none restored (`if false && candidates.count <= ...`) (run-r1-mf1.log): RED: rows (a), (a) undone and redone, (b); unit lines 267-268, 285-286, 294-295
+R2 the lone .DS_Store not removed (run-r1-mf2.log): RED: the Finder's record row; testAMadeFolderGoesWithTheFindersRecordButNeverWithALink line 369
+R3 bound 7 (run-r1-mf3.log): RED: testUpToEightFoldersAreDecidedOneByOne lines 294-295
+R4 bound 9: first run PASSED (run-r1-mf4.log): the test's two calls shared one folder, so it proved nothing; each call given its own folder; then RED (run-r1-mf4b.log): testBeyondEightFoldersOnlyAllOrNoneIsTried lines 307-308
+R5 the link clause off (run-r1-mf5.log): RED: testAFolderHoldingAnythingKeptIsNeverACandidate line 360
+Not sabotaged: `leavesOutEveryCandidateBelow`. It narrows the sets tried but cannot change an answer, because a set that leaves a folder out and keeps one below it never matches a real listing.
+Total review 1: 5 sabotages, 5 RED (R4 after the test was fixed). Restored each time (git checkout, status clean of it).
