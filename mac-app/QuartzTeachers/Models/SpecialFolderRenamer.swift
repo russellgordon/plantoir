@@ -284,30 +284,90 @@ enum SpecialFolderRenamer {
     /// nothing changed), so its presence means one thing: a rename got part
     /// way and stopped.
     ///
-    /// `moved` (U4b2-5) is every place, inside the course and spelled with
-    /// the new name, that this rename moves or an earlier run of it moved:
-    /// what a later part-way ending may call "still called" the new name.
-    /// One string, a place per line, so the record stays a map of strings
-    /// for every reader; left out when empty. Windows does not write it yet.
+    /// Its format is `file-formats.json` → `folderRenameRecord`. `moved`
+    /// (U4b2-5) is every place, inside the course and spelled with the new
+    /// name, that this rename moves or an earlier run of it moved: what a
+    /// later part-way ending may call "still called" the new name.
+    /// `mayHaveMoved` (U4b2-6) is every place an earlier run's record that
+    /// did not say what it moved (one Windows or an older build wrote) may
+    /// have moved: a later ending says it cannot tell whether those are this
+    /// rename's, and never names them as still called the new name. Each is
+    /// an array of strings, left out when empty.
     nonisolated static func recordRenameStarting(
         from oldName: String, to newName: String, scope: FolderScope, courseDirectory: URL,
-        moved: [String] = []
+        moved: [String] = [], mayHaveMoved: [String] = []
     ) {
         let marker: URL = renameMarkerURL(courseDirectory: courseDirectory)
-        var note: [String: String] = [
+        var note: [String: Any] = [
             "from": oldName,
             "to": newName,
             "scope": scope.exclusionKey,
         ]
         if !moved.isEmpty {
-            note["moved"] = moved.joined(separator: "\n")
+            note["moved"] = moved
+        }
+        if !mayHaveMoved.isEmpty {
+            note["mayHaveMoved"] = mayHaveMoved
         }
         try? FileManager.default.createDirectory(
             at: marker.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        if let data = try? JSONSerialization.data(withJSONObject: note, options: [.prettyPrinted]) {
+        if let data = try? JSONSerialization.data(withJSONObject: note, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: marker, options: [.atomic])
         }
+    }
+
+    /// A rename record as read (`file-formats.json` → `folderRenameRecord`).
+    nonisolated struct RenameRecordNote: Equatable {
+
+        // MARK: - Stored properties
+
+        var from: String
+        var to: String
+        var scope: String
+
+        /// The places it says it moved, or nil when it does not say (a
+        /// record Windows or an older build wrote).
+        var moved: [String]?
+
+        /// The places an earlier run may have moved, whose record did not
+        /// say (`recordRenameStarting`).
+        var mayHaveMoved: [String]
+    }
+
+    /// The record's bytes as a note, or nil when they are not a record:
+    /// `from`, `to` and `scope` must be strings. Every other key is read
+    /// only if it is an array of strings and is otherwise taken as not
+    /// said, so a key this build does not know, or one written in another
+    /// shape, never makes the whole record unreadable (U4b2-5 review 2, L5).
+    nonisolated static func readRenameRecord(_ record: Data?) -> RenameRecordNote? {
+        guard let record,
+              let object = try? JSONSerialization.jsonObject(with: record) as? [String: Any],
+              let from = object["from"] as? String,
+              let to = object["to"] as? String,
+              let scope = object["scope"] as? String else {
+            return nil
+        }
+        return RenameRecordNote(
+            from: from, to: to, scope: scope,
+            moved: stringsIn(object["moved"]),
+            mayHaveMoved: stringsIn(object["mayHaveMoved"]) ?? []
+        )
+    }
+
+    /// A JSON value as an array of strings, or nil when it is not one.
+    nonisolated static func stringsIn(_ value: Any?) -> [String]? {
+        guard let items = value as? [Any] else {
+            return nil
+        }
+        var strings: [String] = []
+        for item in items {
+            guard let text = item as? String else {
+                return nil
+            }
+            strings.append(text)
+        }
+        return strings
     }
 
     /// Clears the record. Called once the rename's step is made, at which
@@ -346,13 +406,12 @@ enum SpecialFolderRenamer {
         sectionNumbers: [Int],
         fileManager: FileManager = .default
     ) -> String? {
-        guard let data = try? Data(contentsOf: renameMarkerURL(courseDirectory: courseDirectory)),
-              let note = try? JSONSerialization.jsonObject(with: data) as? [String: String],
-              note["from"]?.caseInsensitiveCompare(oldName) == .orderedSame,
-              note["scope"] == scope.exclusionKey,
-              let target = note["to"] else {
+        guard let note = readRenameRecord(try? Data(contentsOf: renameMarkerURL(courseDirectory: courseDirectory))),
+              note.from.caseInsensitiveCompare(oldName) == .orderedSame,
+              note.scope == scope.exclusionKey else {
             return nil
         }
+        let target: String = note.to
         let agrees: Bool = looksLikeAnInterruptedRename(
             from: oldName, to: target, scope: scope,
             courseDirectory: courseDirectory, sectionNumbers: sectionNumbers,
@@ -369,11 +428,8 @@ enum SpecialFolderRenamer {
         sectionNumbers: [Int],
         fileManager: FileManager = .default
     ) -> Bool {
-        guard let data = try? Data(contentsOf: renameMarkerURL(courseDirectory: courseDirectory)),
-              let note = try? JSONSerialization.jsonObject(with: data) as? [String: String],
-              note["from"]?.caseInsensitiveCompare(oldName) == .orderedSame,
-              note["to"]?.caseInsensitiveCompare(newName) == .orderedSame,
-              note["scope"] == scope.exclusionKey else {
+        let data: Data? = try? Data(contentsOf: renameMarkerURL(courseDirectory: courseDirectory))
+        guard recordNames(data, from: oldName, to: newName, scope: scope) else {
             return false
         }
         let oldPlaces: [URL] = folderLocations(
@@ -467,7 +523,7 @@ enum SpecialFolderRenamer {
             changesTheSettings: false
         )
         if !planned.moves.isEmpty {
-            record.renameIsStarting(moving: planned.moves)
+            record.renameIsStarting(moving: planned.moves, sectionNumbers: sectionNumbers)
         }
         do {
             try step.make()
@@ -488,9 +544,8 @@ enum SpecialFolderRenamer {
         _ record: Data?, from oldName: String, to newName: String, scope: FolderScope
     ) -> Bool {
         guard recordNamesTheFolder(record, from: oldName, scope: scope),
-              let record,
-              let note = try? JSONSerialization.jsonObject(with: record) as? [String: String],
-              note["to"]?.caseInsensitiveCompare(newName) == .orderedSame else {
+              let note = readRenameRecord(record),
+              note.to.caseInsensitiveCompare(newName) == .orderedSame else {
             return false
         }
         return true
@@ -501,10 +556,9 @@ enum SpecialFolderRenamer {
     nonisolated static func recordNamesTheFolder(
         _ record: Data?, from oldName: String, scope: FolderScope
     ) -> Bool {
-        guard let record,
-              let note = try? JSONSerialization.jsonObject(with: record) as? [String: String],
-              note["from"]?.caseInsensitiveCompare(oldName) == .orderedSame,
-              note["scope"] == scope.exclusionKey else {
+        guard let note = readRenameRecord(record),
+              note.from.caseInsensitiveCompare(oldName) == .orderedSame,
+              note.scope == scope.exclusionKey else {
             return false
         }
         return true
@@ -731,6 +785,53 @@ enum SpecialFolderRenamer {
             + "Still called “\(newName)”: \(joined). \(said)"
     }
 
+    /// The sentence when a rename's step stopped part way, no folder is
+    /// known to be at its new name, and some place could not be read or may
+    /// have been moved by an earlier run whose record did not say
+    /// (`undo.wording.renameFolderMayBeRenamedInPart`, U4b2-6): never "was
+    /// not renamed", which the app could not check.
+    nonisolated static func mayBeRenamedInPart(renaming oldName: String, to newName: String, places: [String], said: String) -> String {
+        var joined: String = ""
+        for place in places {
+            if !joined.isEmpty {
+                joined += ", "
+            }
+            joined += "“" + place + "”"
+        }
+        return "“\(oldName)” may have been renamed only in part, and Plantoir could not put everything back as it was. "
+            + "Plantoir could not tell whether this rename left these called “\(newName)”: \(joined). \(said)"
+    }
+
+    /// The trail line and the sentence of a rename's step stopped part way,
+    /// from what it left at the new name (the final sweep, M1; U4b2-5;
+    /// U4b2-6): renamed only in part when a folder of this rename is known
+    /// to be at its new name; may have been renamed in part when none is but
+    /// a place could not be read or may be an earlier run's; otherwise not
+    /// renamed. The trail names every place either way.
+    nonisolated static func partWayEnding(
+        renaming oldName: String, to newName: String, course: String, scope: FolderScope,
+        left: LeftAtTheNewName, keptBeside: Int, said: String
+    ) -> (line: String, sentence: String) {
+        if !left.places.isEmpty {
+            let line: String = renamedOnlyInPartLine(
+                renaming: oldName, to: newName, course: course, scope: scope, places: left.places,
+                keptBeside: keptBeside, unreadable: left.unreadable, cannotTellWhose: left.cannotTellWhose
+            )
+            return (line: line, sentence: renamedOnlyInPart(renaming: oldName, to: newName, places: left.places, said: said))
+        }
+        if !left.cannotTell.isEmpty {
+            let line: String = mayBeRenamedInPartLine(
+                renaming: oldName, to: newName, course: course, scope: scope, keptBeside: keptBeside,
+                unreadable: left.unreadable, cannotTellWhose: left.cannotTellWhose
+            )
+            return (line: line, sentence: mayBeRenamedInPart(renaming: oldName, to: newName, places: left.cannotTell, said: said))
+        }
+        let line: String = stoppedPartWayLine(
+            renaming: oldName, to: newName, course: course, scope: scope, keptBeside: keptBeside
+        )
+        return (line: line, sentence: stoppedPartWay(renaming: oldName, said: said))
+    }
+
     /// How many files were kept beside their pages, as a trail line says it.
     nonisolated static func keptBesideWords(_ count: Int) -> String {
         if count == 1 {
@@ -745,7 +846,7 @@ enum SpecialFolderRenamer {
     /// kept files, never naming a page.
     nonisolated static func renamedOnlyInPartLine(
         renaming oldName: String, to newName: String, course: String, scope: FolderScope,
-        places: [String], keptBeside: Int, unreadable: [String] = []
+        places: [String], keptBeside: Int, unreadable: [String] = [], cannotTellWhose: [String] = []
     ) -> String {
         var joined: String = ""
         for place in places {
@@ -757,7 +858,7 @@ enum SpecialFolderRenamer {
         return "renamed the folder " + oldName + " to " + newName + " in " + course
             + " only in part, and could not put everything back (" + scope.configurationKey
             + ", still called " + newName + ": " + joined + "; " + keptBesideWords(keptBeside)
-            + couldNotTellWords(unreadable) + ")"
+            + couldNotTellWords(unreadable) + couldNotTellWhoseWords(cannotTellWhose) + ")"
     }
 
     /// The trail's clause for places whose state could not be read
@@ -776,16 +877,45 @@ enum SpecialFolderRenamer {
         return "; could not tell whether these are at the new name: " + joined
     }
 
+    /// The trail's clause for folders at the new name that an earlier run
+    /// whose record did not say what it moved may have moved (U4b2-6), or
+    /// nothing when there are none.
+    nonisolated static func couldNotTellWhoseWords(_ cannotTellWhose: [String]) -> String {
+        if cannotTellWhose.isEmpty {
+            return ""
+        }
+        var joined: String = ""
+        for place in cannotTellWhose {
+            if !joined.isEmpty {
+                joined += ", "
+            }
+            joined += place
+        }
+        return "; could not tell whether this rename moved these: " + joined
+    }
+
     /// The trail line (`folder renamed`) for a rename stopped part way with
     /// every folder back at its old name but files kept beside their pages
     /// (the final sweep, M1).
     nonisolated static func stoppedPartWayLine(
-        renaming oldName: String, to newName: String, course: String, scope: FolderScope, keptBeside: Int,
-        unreadable: [String] = []
+        renaming oldName: String, to newName: String, course: String, scope: FolderScope, keptBeside: Int
     ) -> String {
         return "did not rename the folder " + oldName + " to " + newName + " in " + course
             + ", and could not put everything back (" + scope.configurationKey + ", "
-            + keptBesideWords(keptBeside) + couldNotTellWords(unreadable) + ")"
+            + keptBesideWords(keptBeside) + ")"
+    }
+
+    /// The trail line (`folder renamed`) for a rename stopped part way with
+    /// no folder known to be at its new name but a place that could not be
+    /// read or that an earlier run whose record did not say may have moved
+    /// (U4b2-6): never "did not rename", which could not be checked.
+    nonisolated static func mayBeRenamedInPartLine(
+        renaming oldName: String, to newName: String, course: String, scope: FolderScope, keptBeside: Int,
+        unreadable: [String], cannotTellWhose: [String]
+    ) -> String {
+        return "may have renamed the folder " + oldName + " to " + newName + " in " + course
+            + " only in part, and could not put everything back (" + scope.configurationKey + ", "
+            + keptBesideWords(keptBeside) + couldNotTellWords(unreadable) + couldNotTellWhoseWords(cannotTellWhose) + ")"
     }
 
     /// A place inside the course, as the trail and the sheet name it.
@@ -803,15 +933,53 @@ enum SpecialFolderRenamer {
         byTheRecord record: Data?, renaming oldName: String, to newName: String, scope: FolderScope
     ) -> [String]? {
         guard recordNames(record, from: oldName, to: newName, scope: scope),
-              let record,
-              let note = try? JSONSerialization.jsonObject(with: record) as? [String: String],
-              let moved = note["moved"] else {
+              let note = readRenameRecord(record),
+              let moved = note.moved else {
             return nil
         }
-        var places: [String] = []
-        for place in moved.components(separatedBy: "\n") {
-            if !place.isEmpty {
-                places.append(place)
+        return moved
+    }
+
+    /// The places, inside the course, that an earlier run of this same
+    /// rename may have moved without its record saying so (U4b2-5 review 2,
+    /// L1 and L2): those its record carries as `mayHaveMoved`, and, when the
+    /// record says nothing of what it moved, each folder now at the new name
+    /// whose old name beside it is absent or cannot be read. Nothing here is
+    /// known to be this rename's: a folder made by hand at the new name
+    /// reads the same.
+    nonisolated static func placesAnEarlierRunMayHaveMoved(
+        byTheRecord record: Data?, renaming oldName: String, to newName: String, scope: FolderScope,
+        courseDirectory: URL, sectionNumbers: [Int]
+    ) -> [String] {
+        guard recordNames(record, from: oldName, to: newName, scope: scope),
+              let note = readRenameRecord(record) else {
+            return []
+        }
+        var places: [String] = note.mayHaveMoved
+        if note.moved != nil {
+            return places
+        }
+        let isCaseOnly: Bool = oldName.caseInsensitiveCompare(newName) == .orderedSame
+        let newPlaces: [URL] = folderLocations(
+            named: newName, scope: scope, courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+        )
+        for place in newPlaces {
+            let inside: String = placeInside(place, courseDirectory: courseDirectory)
+            if places.contains(inside) {
+                continue
+            }
+            let oldPlace: URL = place.deletingLastPathComponent().appendingPathComponent(oldName)
+            switch presence(at: oldPlace, spelledExactly: isCaseOnly) {
+            case .absent, .unreadable:
+                break
+            case .folder, .link, .somethingElse:
+                continue
+            }
+            switch presence(at: place, spelledExactly: isCaseOnly) {
+            case .folder, .unreadable:
+                places.append(inside)
+            case .absent, .link, .somethingElse:
+                continue
             }
         }
         return places
@@ -830,6 +998,16 @@ enum SpecialFolderRenamer {
         /// This rename's places the disk could not be read at, each with
         /// what the system said: named on the trail, never guessed at.
         var unreadable: [String] = []
+
+        /// Folders at the new name that an earlier run whose record did not
+        /// say what it moved may have moved (`placesAnEarlierRunMayHaveMoved`):
+        /// named on the trail as places it cannot tell are this rename's,
+        /// never as still called the new name.
+        var cannotTellWhose: [String] = []
+
+        /// Every place in `unreadable` and `cannotTellWhose`, bare, as the
+        /// sheet names them when nothing is known to be at the new name.
+        var cannotTell: [String] = []
     }
 
     /// This rename's folders that are at the new name now, by place inside
@@ -843,9 +1021,8 @@ enum SpecialFolderRenamer {
     /// did). A folder that was at the new name all along (one made by hand
     /// in a section with no folder at the old name) is never "still called"
     /// the new name. A record that names this rename but not its places
-    /// (written by Windows or an earlier version) can only be read from the
-    /// disk as `looksLikeAnInterruptedRename` reads it: a place counts there
-    /// when the old name is absent beside it.
+    /// (written by Windows or an earlier version) names none: the places it
+    /// may have moved are `cannotTellWhose` (U4b2-6), told, never counted.
     ///
     /// The disk decides only which of those places are at the new name:
     /// a folder, by `lstat`, never followed; a link only where this run moved
@@ -862,8 +1039,10 @@ enum SpecialFolderRenamer {
         var result: LeftAtTheNewName = LeftAtTheNewName()
         let isCaseOnly: Bool = oldName.caseInsensitiveCompare(newName) == .orderedSame
         let recorded: [String]? = placesMoved(byTheRecord: earlierRecord, renaming: oldName, to: newName, scope: scope)
-        let recordIsThisRenamesWithoutPlaces: Bool = recorded == nil
-            && recordNames(earlierRecord, from: oldName, to: newName, scope: scope)
+        let mayHaveMoved: [String] = placesAnEarlierRunMayHaveMoved(
+            byTheRecord: earlierRecord, renaming: oldName, to: newName, scope: scope,
+            courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+        )
         let newPlaces: [URL] = folderLocations(
             named: newName, scope: scope, courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
         )
@@ -881,11 +1060,20 @@ enum SpecialFolderRenamer {
             if let recorded, recorded.contains(inside) {
                 belongs = true
             }
-            if recordIsThisRenamesWithoutPlaces && !belongs {
-                let oldPlace: URL = place.deletingLastPathComponent().appendingPathComponent(oldName)
-                belongs = presence(at: oldPlace, spelledExactly: isCaseOnly) == .absent
-            }
             if !belongs {
+                if !mayHaveMoved.contains(inside) {
+                    continue
+                }
+                switch presence(at: place, spelledExactly: isCaseOnly) {
+                case .folder:
+                    result.cannotTellWhose.append(inside)
+                    result.cannotTell.append(inside)
+                case .unreadable(let said):
+                    result.unreadable.append(inside + " (" + said + ")")
+                    result.cannotTell.append(inside)
+                case .absent, .link, .somethingElse:
+                    continue
+                }
                 continue
             }
             switch presence(at: place, spelledExactly: isCaseOnly) {
@@ -897,6 +1085,7 @@ enum SpecialFolderRenamer {
                 }
             case .unreadable(let said):
                 result.unreadable.append(inside + " (" + said + ")")
+                result.cannotTell.append(inside)
             case .absent, .somethingElse:
                 continue
             }
@@ -1227,7 +1416,11 @@ nonisolated struct RenameRecordClaim {
     /// It names every place this rename has moved: this run's moves and,
     /// when the earlier record is of this same rename, the places it says
     /// an earlier run moved (U4b2-5), so a later ending still knows them.
-    mutating func renameIsStarting(moving moves: [FolderRenamePlan.Move]) {
+    ///
+    /// The places an earlier run may have moved without its record saying
+    /// so are carried forward as `mayHaveMoved` (U4b2-6), so a later ending
+    /// still says it cannot tell, rather than that nothing was renamed.
+    mutating func renameIsStarting(moving moves: [FolderRenamePlan.Move], sectionNumbers: [Int]) {
         var moved: [String] = []
         if let recorded = SpecialFolderRenamer.placesMoved(
             byTheRecord: earlierRecord, renaming: oldName, to: newName, scope: scope
@@ -1242,8 +1435,18 @@ nonisolated struct RenameRecordClaim {
                 moved.append(place)
             }
         }
+        var mayHaveMoved: [String] = []
+        for place in SpecialFolderRenamer.placesAnEarlierRunMayHaveMoved(
+            byTheRecord: earlierRecord, renaming: oldName, to: newName, scope: scope,
+            courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+        ) {
+            if !moved.contains(place) {
+                mayHaveMoved.append(place)
+            }
+        }
         SpecialFolderRenamer.recordRenameStarting(
-            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory, moved: moved
+            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory,
+            moved: moved, mayHaveMoved: mayHaveMoved
         )
         thisRunWroteTheRecord = true
     }

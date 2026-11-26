@@ -1233,7 +1233,7 @@ struct CourseSettingsView: View {
             // way can be recognised and finished: with the switch off, recovery
             // records and repairs nothing (`interruptedRenameTarget`).
             if !planned.moves.isEmpty {
-                record.renameIsStarting(moving: planned.moves)
+                record.renameIsStarting(moving: planned.moves, sectionNumbers: sectionNumbers)
             }
             do {
                 // The check and the swap read and hash every file in each
@@ -1264,8 +1264,10 @@ struct CourseSettingsView: View {
                     // whether this run moved it or an earlier, interrupted run
                     // of it did (U4b2-5: a run finishing a rename moves
                     // nothing), and a folder that was never this rename's is
-                    // not (review 1, M1). A place that cannot be read is told
-                    // on the trail; the sheet is said by what could be read.
+                    // not (review 1, M1). A place that cannot be read, or that
+                    // an earlier run whose record did not say may have moved,
+                    // is told on the trail and, when nothing is known at the
+                    // new name, on the sheet (U4b2-6).
                     // Each part-way ending leaves its line on the trail BEFORE
                     // it returns (the final sweep, M1): these are the states
                     // somebody will be asked to explain next week. The record
@@ -1275,23 +1277,12 @@ struct CourseSettingsView: View {
                         courseDirectory: courseDirectory, sectionNumbers: sectionNumbers,
                         planned: planned.moves, earlierRecord: record.earlierRecord
                     )
-                    let leftRenamed: [String] = left.places
-                    if !leftRenamed.isEmpty {
-                        ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.renamedOnlyInPartLine(
-                            renaming: oldName, to: newName, course: course.code, scope: scope,
-                            places: leftRenamed, keptBeside: keptOriginals.count, unreadable: left.unreadable
-                        ))
-                        return .failed(SpecialFolderRenamer.renamedOnlyInPart(
-                            renaming: oldName, to: newName, places: leftRenamed, said: partWay.localizedDescription
-                        ))
-                    }
-                    ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.stoppedPartWayLine(
-                        renaming: oldName, to: newName, course: course.code, scope: scope,
-                        keptBeside: keptOriginals.count, unreadable: left.unreadable
-                    ))
-                    return .failed(SpecialFolderRenamer.stoppedPartWay(
-                        renaming: oldName, said: partWay.localizedDescription
-                    ))
+                    let ending: (line: String, sentence: String) = SpecialFolderRenamer.partWayEnding(
+                        renaming: oldName, to: newName, course: course.code, scope: scope, left: left,
+                        keptBeside: keptOriginals.count, said: partWay.localizedDescription
+                    )
+                    ActivityTrail.note(.folderRenamed, ending.line)
+                    return .failed(ending.sentence)
                 }
                 if case .stoppedByATest = partWay {
                     // A process that died here leaves its record, as a kill does.

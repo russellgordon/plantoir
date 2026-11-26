@@ -424,6 +424,8 @@ final class UndoSweepFindingsTests: XCTestCase {
             "renameFolderStoppedPartWay": SpecialFolderRenamer.stoppedPartWay(renaming: "{old}", said: "{said}"),
             "renameFolderRenamedOnlyInPart": SpecialFolderRenamer.renamedOnlyInPart(renaming: "{old}", to: "{new}", places: ["{places}"], said: "{said}")
                 .replacingOccurrences(of: "“{places}”", with: "{places}"),
+            "renameFolderMayBeRenamedInPart": SpecialFolderRenamer.mayBeRenamedInPart(renaming: "{old}", to: "{new}", places: ["{places}"], said: "{said}")
+                .replacingOccurrences(of: "“{places}”", with: "{places}"),
             "renameFolderUnderWay": CourseActivity.folderRenameIsUnderWay(course: "{course}"),
             "renameFolderUnderWayMenuReason": CourseActivity.availableOnceTheFolderIsRenamed,
             "renameFolderUnderWaySidebarRow": CourseRowLabel.workUnderWay(isBeingCopied: false, isRenamingAFolder: true) ?? "",
