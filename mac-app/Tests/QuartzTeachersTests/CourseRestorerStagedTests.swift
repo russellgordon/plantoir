@@ -1,0 +1,603 @@
+import XCTest
+@testable import QuartzTeachers
+
+/// A whole-course restore through `CourseRestorer.restoreBackup`, the door
+/// every whole-course restore goes through (#909). Each test is a fault the
+/// old in-place restore reported, or reported as success, measured in the
+/// #909 plan's 1.2; each is proven red on the old restore body.
+final class CourseRestorerStagedTests: XCTestCase {
+
+    // MARK: - Functions
+
+    @MainActor
+    func testAReadOnlyFolderAtTheTopLeavesTheCourseAsItWas() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        XCTAssertEqual(chmod(fixture.courseURL.appendingPathComponent("Concepts").path, 0o555), 0)
+        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+
+        XCTAssertThrowsError(try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL)) { error in
+            XCTAssertEqual(
+                error.localizedDescription,
+                RestoreWholeCourseWording.leftAsItWasLocked(course: "ICS3U", name: "Concepts") + " " + RestoreWholeCourseWording.unlockIt
+            )
+        }
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), live, "the old restore emptied the course up to Concepts")
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    @MainActor
+    func testALockedFileAtTheTopLeavesTheCourseAsItWas() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        XCTAssertEqual(lchflags(fixture.courseURL.appendingPathComponent("index.md").path, UInt32(UF_IMMUTABLE)), 0)
+        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+
+        XCTAssertThrowsError(try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL))
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), live)
+        XCTAssertTrue(RestoreSwap.itemExists(at: fixture.courseURL.appendingPathComponent("course_config.json")),
+                      "the course is still in the sidebar")
+    }
+
+    @MainActor
+    func testALockedPageInsideStillRestoresAndLeavesNothingStaged() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let page: URL = fixture.courseURL.appendingPathComponent("section1/All Classes/Unit 1, Day 1.md")
+        XCTAssertEqual(lchflags(page.path, UInt32(UF_IMMUTABLE)), 0)
+        let liveGit: Data = try Data(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"))
+
+        // As the door runs it, with the course archived first: without an
+        // archive the old copy is kept rather than removed (the
+        // implementation review's I1), and this is about the removal.
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))
+        XCTAssertEqual(fixture.leftInRestoring(), 0, "the old copy is unlocked on its way out")
+        XCTAssertFalse(fixture.somethingWasKept(), "with an archive made first, the old copy is removed, not kept")
+    }
+
+    @MainActor
+    func testWhatBackupsLeaveOutStaysWhereItIs() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL)
+        XCTAssertEqual(
+            try String(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"), encoding: .utf8),
+            "ref: refs/heads/main\n",
+            "the old restore deleted .git, which is in neither the backup nor the archive"
+        )
+        XCTAssertEqual(try String(contentsOf: fixture.courseURL.appendingPathComponent("index.md"), encoding: .utf8), "BACKUP front page\n")
+    }
+
+    @MainActor
+    func testARenameRecordSurvivesARestoreLeftAsItWas() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        try UnitWordRenamer.recordRenameStarting(from: "Unit", to: "Module", courseDirectory: fixture.courseURL)
+        let record: URL = UnitWordRenamer.renameMarkerURL(courseDirectory: fixture.courseURL)
+        XCTAssertTrue(RestoreSwap.itemExists(at: record))
+        XCTAssertEqual(chmod(fixture.courseURL.appendingPathComponent("section1").path, 0o555), 0)
+
+        XCTAssertThrowsError(try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL))
+        XCTAssertTrue(RestoreSwap.itemExists(at: record), "a restore that did not happen must not clear the record of a rename under way")
+    }
+
+    @MainActor
+    func testASmallBackupIsRefusedUntilItsMediaIsPutBack() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture(smallBackupMarker: true)
+        defer { fixture.tearDown() }
+        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+
+        XCTAssertThrowsError(try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL)) { error in
+            XCTAssertEqual(
+                error.localizedDescription,
+                SharedMediaStore.Problem.mediaNotPutBack(fixture.zipURL.lastPathComponent).localizedDescription
+            )
+        }
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), live, "the old restore deleted Media and said nothing")
+    }
+
+    @MainActor
+    func testAnArrivalIsStagedBesideTheCourses() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        try FileManager.default.removeItem(at: fixture.courseURL)
+        var parents: [String] = []
+        let hooks: RestoreSwap.Hooks = RestoreSwap.Hooks(
+            step: { (_: String) throws in
+            },
+            move: { (source: URL, destination: URL) throws in
+                parents.append(source.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().lastPathComponent)
+                try FileManager.default.moveItem(at: source, to: destination)
+            },
+            moveBack: { (source: URL, destination: URL) throws in
+                try FileManager.default.moveItem(at: source, to: destination)
+            },
+            flushes: false
+        )
+        try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: hooks)
+        XCTAssertEqual(parents, ["restoring"], "one move, from courses/.internal/restoring/<id>/backup/")
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupFiles)
+    }
+
+    /// The third case: a name backups leave out, found deeper than the top
+    /// of the course (`section1/Sample App/.git`), is in neither the backup
+    /// nor the archive, so it is kept when the copy set aside is removed.
+    /// `.DS_Store` is not: Finder makes it again. MUST FAIL on db38ed112,
+    /// which removed the `.git`, the `build` and the `out` with the copy.
+    @MainActor
+    func testNamesBackupsLeaveOutDeeperThanTheTopAreKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let deeper: [String: String] = [
+            "section1/Sample App/.git/HEAD": "ref: refs/heads/sample\n",
+            "section1/Sample App/build/app.o": "object\n",
+            "Concepts/Unit 1/out/result.txt": "output\n",
+        ]
+        for (path, text) in deeper {
+            try WholeCourseFixture.write(text, to: fixture.courseURL.appendingPathComponent(path))
+        }
+        try WholeCourseFixture.write("finder\n", to: fixture.courseURL.appendingPathComponent("section1/.DS_Store"))
+        let liveGit: Data = try Data(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"))
+
+        // As the door runs it, with the course archived first, after every
+        // file above, so only their names can make them kept.
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))
+        var expected: [String: Data] = [:]
+        for (path, text) in deeper {
+            expected[path] = Data(text.utf8)
+        }
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), expected)
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// Round four, INCOMPLETE 1 of the round-three review: a file that
+    /// ARRIVES after the zip's scan keeps its old dates (moved, `cp -p`,
+    /// Finder's copy, a folder dragged in), so a rule of times alone found
+    /// it in neither the archive nor a kept folder. Whether a file is in
+    /// the archive is now read from the archive's own listing (path, size,
+    /// recorded time). Each arrival below is dated an hour before the
+    /// archive, and a page is replaced at its path by another of the same
+    /// size and old dates. MUST FAIL on 66f645649, which lost all five.
+    @MainActor
+    func testFilesThatArriveWithOldDatesAfterTheArchiveAreKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        let hourBefore: Date = archive.began.addingTimeInterval(-3_600)
+        let outside: URL = fixture.rootURL.appendingPathComponent("Downloads")
+        var arrivals: [String: Data] = [:]
+        func arrive(_ text: String, at inside: String) throws {
+            let source: URL = outside.appendingPathComponent(UUID().uuidString)
+            try WholeCourseFixture.write(text, to: source)
+            try FileManager.default.setAttributes([.modificationDate: hourBefore, .creationDate: hourBefore], ofItemAtPath: source.path)
+            let destination: URL = fixture.courseURL.appendingPathComponent(inside)
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            // rename(2): over a page that is there, a plain replace, as `mv` does.
+            XCTAssertEqual(rename(source.path, destination.path), 0, inside)
+            arrivals[inside] = Data(text.utf8)
+        }
+        try arrive("moved in from Downloads\n", at: "Concepts/Dropped.md")
+        try arrive("a handout dragged to the top\n", at: "Handout.md")
+        // A folder of old pages moved in whole.
+        let folder: URL = outside.appendingPathComponent("Unit 9")
+        for index in 1...2 {
+            let page: URL = folder.appendingPathComponent("Lesson \(index).md")
+            try WholeCourseFixture.write("lesson \(index)\n", to: page)
+            try FileManager.default.setAttributes([.modificationDate: hourBefore, .creationDate: hourBefore], ofItemAtPath: page.path)
+            arrivals["section1/Unit 9/Lesson \(index).md"] = Data("lesson \(index)\n".utf8)
+        }
+        try FileManager.default.moveItem(at: folder, to: fixture.courseURL.appendingPathComponent("section1/Unit 9"))
+        // The same size as the page it replaces ("LIVE front page\n").
+        try arrive("XXXX front page\n", at: "index.md")
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), arrivals)
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// Round four: a HIDDEN file changed after the archive began is the
+    /// teacher's too (the timetable, Obsidian's settings), kept by the same
+    /// rule. MUST FAIL on 66f645649, which left every hidden file out of
+    /// the rule (the round-three review: the timetable edit was lost).
+    @MainActor
+    func testAHiddenFileChangedAfterTheArchiveIsKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let timetable: URL = fixture.courseURL.appendingPathComponent(".internal/timetable/section1.json")
+        try WholeCourseFixture.write("{\"days\": 4}\n", to: timetable)
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        try WholeCourseFixture.write("{\"days\": 5, \"edited\": true}\n", to: timetable)
+        let newer: Date = archive.began.addingTimeInterval(WholeCourseFixture.secondsBeforeTheStart)
+        try WholeCourseFixture.date(timetable, changed: newer, made: newer)
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(
+            try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "),
+            [".internal/timetable/section1.json": Data("{\"days\": 5, \"edited\": true}\n".utf8)]
+        )
+    }
+
+    /// The engine's rule at the edge, pinned on purpose (director's
+    /// decision, 2026-11-26): a page whose change is dated at EXACTLY the
+    /// archive's start, to the millisecond, counts as written after it and
+    /// is kept as well. It errs toward keeping a teacher's work: the
+    /// archive may hold it too, and nothing is lost. The archive holds
+    /// this page at its path, its size and a recorded time within zip's
+    /// rounding, so the equal date is the only thing that keeps it.
+    @MainActor
+    func testAPageChangedAtExactlyTheArchivesStartIsKeptAsWell() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse(changedAtTheStart: ["index.md"])
+        let listing: RestoreSwap.ArchiveListing = try XCTUnwrap(RestoreSwap.ArchiveListing.read(archive.url))
+        let recorded: Date = try XCTUnwrap(listing.file(at: "index.md")?.recordedTime)
+        XCTAssertLessThanOrEqual(abs(recorded.timeIntervalSince(archive.began)), RestoreSwap.zipTimeRoundingSeconds, "held by the listing")
+        let changed: Date? = try fixture.courseURL.appendingPathComponent("index.md")
+            .resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        XCTAssertEqual(changed, archive.began, "changed at exactly the start")
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(
+            try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "),
+            ["index.md": Data("LIVE front page\n".utf8)]
+        )
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// Round four: whether the old copy is kept whole is decided by the
+    /// ENGINE, under its hold, in the step that writes the moves, not by
+    /// the door a moment before (the round-three review forced a gap: no
+    /// folder at the door, one page in it at the engine, the page lost).
+    /// With no archive over a folder that is there, every file is kept.
+    /// MUST FAIL on 66f645649, whose engine took the door's word (false).
+    @MainActor
+    func testTheEngineKeepsTheFolderWholeWhenNoArchiveWasMade() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        var live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        live[".git/HEAD"] = nil
+
+        try WholeCourseRestore.restore(
+            fromZipAt: fixture.zipURL, courseCode: "ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U as it was before restoring again "), live)
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// Plantoir's own Obsidian add-ons are left out of an archive on
+    /// purpose and put back by the next pass: removed with the old copy,
+    /// never kept as files the archive does not hold (12.9 MB a restore).
+    @MainActor
+    func testAddOnsLeftOutOfTheArchiveOnPurposeAreNotKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let addOn: URL = fixture.courseURL.appendingPathComponent(".obsidian/plugins/tikzjax")
+        try WholeCourseFixture.write("add-on\n", to: addOn.appendingPathComponent("main.js"))
+        try WholeCourseFixture.write("marker\n", to: addOn.appendingPathComponent(ObsidianFigureAddOns.markerName))
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertFalse(fixture.somethingWasKept(), "nothing kept: the archive holds every other file as it is")
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// An archive whose listing cannot be read holds nothing that is
+    /// known: every file of the old copy is kept, none removed.
+    @MainActor
+    func testAnArchiveThatCannotBeReadKeepsEveryFile() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        var live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        live[".git/HEAD"] = nil
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        try Data("not a zip".utf8).write(to: archive.url)
+        XCTAssertNil(RestoreSwap.ArchiveListing.read(archive.url))
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), live)
+    }
+
+    /// The listing is read from the central directory: every file's path
+    /// inside the course, in Unicode's composed form, with its size.
+    @MainActor
+    func testTheArchiveListingReadsPathsAndSizes() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let decomposed: String = "Concepts/Cafe\u{0301}.md"
+        try WholeCourseFixture.write("accent\n", to: fixture.courseURL.appendingPathComponent(decomposed))
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+
+        let listing: RestoreSwap.ArchiveListing = try XCTUnwrap(RestoreSwap.ArchiveListing.read(archive.url))
+
+        XCTAssertEqual(listing.file(at: "index.md")?.size, UInt64("LIVE front page\n".utf8.count))
+        XCTAssertEqual(listing.file(at: "Concepts/Caf\u{00E9}.md")?.size, 7, "found in either Unicode form")
+        XCTAssertNil(listing.file(at: ".git/HEAD"), "left out by the archive")
+        XCTAssertTrue(listing.holdsAnything(at: "section1/All Classes"))
+        let recorded: Date = try XCTUnwrap(listing.file(at: "index.md")?.recordedTime)
+        let changed: Date = try XCTUnwrap(
+            try fixture.courseURL.appendingPathComponent("index.md").resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate
+        )
+        XCTAssertLessThanOrEqual(abs(recorded.timeIntervalSince(changed)), RestoreSwap.zipTimeRoundingSeconds)
+    }
+
+    /// Round four, found measuring on exFAT: `skipDescendants()` after an
+    /// entry that is not a folder skips the contents of the NEXT folder the
+    /// walk meets, so a link just before a folder hid every file in it. A
+    /// link and twenty folders with a page each; whatever order the disk
+    /// lists them in, every page is judged (here, with no listing, kept).
+    /// MUST FAIL on the mutant `RestoreSwap.skip-after-a-link.swift`
+    /// (66f645649's skip after a link) whenever a folder follows the link.
+    @MainActor
+    func testAWalkAfterALinkStillSeesTheNextFolder() throws {
+        let root: URL = FileManager.default.temporaryDirectory.appendingPathComponent("walk-\(UUID().uuidString)")
+        let courses: URL = root.appendingPathComponent("courses")
+        let aside: URL = courses.appendingPathComponent(".internal/restoring/X/as-it-was")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: aside.appendingPathComponent(".merged_output"), withDestinationURL: root)
+        var pages: [String] = []
+        for index in 0..<20 {
+            let page: String = "F\(index)/page.md"
+            try WholeCourseFixture.write("page \(index)\n", to: aside.appendingPathComponent(page))
+            pages.append(page)
+        }
+        let context: RestoreSwap.Context = RestoreSwap.Context(
+            computer: "here", owner: "me", now: { () -> String in return "" }, stamp: { () -> String in return "2026-11-14_080000" },
+            keptInPlace: [], archiveURL: nil,
+            checkPayload: { (_: URL) throws in }, putMediaBack: { (_: URL, _: URL?) throws in },
+            refuseUnlessMediaWasPutBack: { (_: URL) throws in }, beforeTheSwap: { (_: URL) throws in },
+            justBeforeTheSwap: { () in }, afterCommit: { () in }, keepingWhatWasReplaced: nil
+        )
+
+        let kept: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepWhatTheArchiveMayNotHold(
+            aside, courseCode: "ICS3U", listing: nil, archiveBegan: nil, leftOutOnPurpose: [],
+            coursesDirectoryURL: courses, context: context
+        )
+
+        XCTAssertTrue(kept.everythingMoved)
+        let folder: URL = courses.appendingPathComponent("_backups/ICS3U/ICS3U not in the archive 2026-11-14_080000")
+        for page in pages {
+            XCTAssertTrue(RestoreSwap.itemExists(at: folder.appendingPathComponent(page)), page)
+        }
+    }
+
+    /// The two lists of names a backup leaves out are together exactly
+    /// `CourseArchiver.excludedFromArchives`.
+    func testTheNamesLeftOutAreTheArchivesNames() {
+        var names: Set<String> = Set(RestoreSwap.leftOutNamesKeptAtAnyDepth)
+        for name in RestoreSwap.leftOutNamesMadeAgain {
+            names.insert(name)
+        }
+        XCTAssertEqual(names, Set(CourseArchiver.excludedFromArchives))
+        XCTAssertEqual(
+            RestoreSwap.leftOutNamesKeptAtAnyDepth.count + RestoreSwap.leftOutNamesMadeAgain.count,
+            CourseArchiver.excludedFromArchives.count
+        )
+    }
+
+    /// The walk that unlocks the old copy before removing it never follows
+    /// a link (the plan review, M7): a locked file in a folder OUTSIDE the
+    /// course, reached through a link in the old copy, stays locked and in
+    /// place.
+    func testTheUnlockingRemovalNeverFollowsALink() throws {
+        let root: URL = FileManager.default.temporaryDirectory.appendingPathComponent("unlock-walk-\(UUID().uuidString)")
+        let outside: URL = root.appendingPathComponent("outside")
+        let old: URL = root.appendingPathComponent("as-it-was")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        let precious: URL = outside.appendingPathComponent("precious.md")
+        try Data("keep\n".utf8).write(to: precious)
+        XCTAssertEqual(lchflags(precious.path, UInt32(UF_IMMUTABLE)), 0)
+        try FileManager.default.createSymbolicLink(at: old.appendingPathComponent("link"), withDestinationURL: outside)
+        defer {
+            _ = lchflags(precious.path, 0)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        XCTAssertTrue(RestoreSwap.removeUnlocking(old))
+
+        var status: stat = stat()
+        XCTAssertEqual(lstat(precious.path, &status), 0, "the file behind the link is still there")
+        XCTAssertNotEqual(status.st_flags & UInt32(UF_IMMUTABLE), 0, "and still locked")
+    }
+
+    /// A working folder reached through a link on purpose: the folder is
+    /// named by the link, and a place in it is spelled by the link's target
+    /// (as a walk spells it). The place is still found inside, by the
+    /// names below the folder (#909, 2026-11-26).
+    @MainActor
+    func testAPlaceSpelledThroughTheLinkAboveTheFolderIsStillInside() throws {
+        let fixture: LinkedWorkingFolder = try LinkedWorkingFolder.make()
+        defer { fixture.remove() }
+        let realPage: URL = fixture.realCourses.appendingPathComponent("ICS3U/Unit 1/page.md")
+        try WholeCourseFixture.write("page\n", to: realPage)
+
+        XCTAssertEqual(RestoreSwap.relative(realPage, to: fixture.linkedCourses), "ICS3U/Unit 1/page.md")
+        XCTAssertEqual(RestoreSwap.placeInside(realPage, of: fixture.linkedCourses), "ICS3U/Unit 1/page.md")
+        XCTAssertNil(RestoreSwap.placeInside(fixture.outside.appendingPathComponent("elsewhere.md"), of: fixture.linkedCourses))
+        XCTAssertNil(RestoreSwap.placeInside(fixture.realCourses, of: fixture.linkedCourses), "the folder itself is not inside")
+    }
+
+    /// One walk resolves its folder once: the spelling the first entry
+    /// found is remembered, and later entries are compared as text, with
+    /// the same answers (the review after the merge, LOW 3). A memo handed
+    /// another folder starts again.
+    @MainActor
+    func testAWalkRemembersTheFoldersSpellingAndGivesTheSameAnswers() throws {
+        let fixture: LinkedWorkingFolder = try LinkedWorkingFolder.make()
+        defer { fixture.remove() }
+        let first: URL = fixture.realCourses.appendingPathComponent("ICS3U/Unit 1/page.md")
+        let second: URL = fixture.realCourses.appendingPathComponent("ICS3U/Unit 2/other.md")
+        try WholeCourseFixture.write("one\n", to: first)
+        try WholeCourseFixture.write("two\n", to: second)
+        var spellings: PlaceSpellings = PlaceSpellings()
+
+        XCTAssertEqual(RestoreSwap.placeInside(first, of: fixture.linkedCourses, remembering: &spellings), "ICS3U/Unit 1/page.md")
+        XCTAssertEqual(spellings.spellingsOfTheFolder, [RestoreSwap.trimmedPath(fixture.realCourses)], "the spelling found is remembered")
+        XCTAssertNotNil(spellings.folderOnDisk, "the folder is resolved once")
+        XCTAssertEqual(RestoreSwap.placeInside(second, of: fixture.linkedCourses, remembering: &spellings), "ICS3U/Unit 2/other.md")
+        XCTAssertEqual(spellings.spellingsOfTheFolder.count, 1, "the second entry is compared as text")
+        XCTAssertNil(RestoreSwap.placeInside(fixture.realCourses, of: fixture.linkedCourses, remembering: &spellings), "the folder itself is not inside")
+        XCTAssertNil(
+            RestoreSwap.placeInside(fixture.outside.appendingPathComponent("elsewhere.md"), of: fixture.linkedCourses, remembering: &spellings)
+        )
+
+        XCTAssertEqual(RestoreSwap.placeInside(first, of: fixture.outside, remembering: &spellings), nil)
+        XCTAssertEqual(spellings.spellingsOfTheFolder, [], "another folder starts a new memo")
+    }
+
+    /// The walk through a working folder reached by a link keeps every
+    /// file the archive does not hold, at its own place, and a link inside
+    /// the course is kept as a link: never followed, its target untouched.
+    @MainActor
+    func testAWalkThroughALinkedWorkingFolderKeepsEachFileAndALinkInsideStaysALink() throws {
+        let fixture: LinkedWorkingFolder = try LinkedWorkingFolder.make()
+        defer { fixture.remove() }
+        let aside: URL = fixture.linkedCourses.appendingPathComponent(".internal/restoring/X/as-it-was")
+        try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
+        try WholeCourseFixture.write("one\n", to: aside.appendingPathComponent("Unit 1/page.md"))
+        try WholeCourseFixture.write("two\n", to: aside.appendingPathComponent("index.md"))
+        let target: URL = fixture.outside.appendingPathComponent("Shared")
+        try WholeCourseFixture.write("theirs\n", to: target.appendingPathComponent("handout.md"))
+        try FileManager.default.createSymbolicLink(at: aside.appendingPathComponent("Shared"), withDestinationURL: target)
+        let context: RestoreSwap.Context = RestoreSwap.Context(
+            computer: "here", owner: "me", now: { () -> String in return "" }, stamp: { () -> String in return "2026-11-26_080000" },
+            keptInPlace: [], archiveURL: nil,
+            checkPayload: { (_: URL) throws in }, putMediaBack: { (_: URL, _: URL?) throws in },
+            refuseUnlessMediaWasPutBack: { (_: URL) throws in }, beforeTheSwap: { (_: URL) throws in },
+            justBeforeTheSwap: { () in }, afterCommit: { () in }, keepingWhatWasReplaced: nil
+        )
+
+        let kept: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepWhatTheArchiveMayNotHold(
+            aside, courseCode: "ICS3U", listing: nil, archiveBegan: nil, leftOutOnPurpose: [],
+            coursesDirectoryURL: fixture.linkedCourses, context: context
+        )
+
+        XCTAssertTrue(kept.everythingMoved)
+        XCTAssertEqual(kept.keptAt, "courses/_backups/ICS3U/ICS3U not in the archive 2026-11-26_080000")
+        let folder: URL = fixture.realCourses.appendingPathComponent("_backups/ICS3U/ICS3U not in the archive 2026-11-26_080000")
+        XCTAssertTrue(RestoreSwap.itemExists(at: folder.appendingPathComponent("Unit 1/page.md")))
+        XCTAssertTrue(RestoreSwap.itemExists(at: folder.appendingPathComponent("index.md")))
+        var status: stat = stat()
+        XCTAssertEqual(lstat(folder.appendingPathComponent("Shared").path, &status), 0, "the link is kept at its own place")
+        XCTAssertEqual(status.st_mode & S_IFMT, S_IFLNK, "as a link, not as a copy of what it points at")
+        XCTAssertEqual(
+            try String(contentsOf: target.appendingPathComponent("handout.md"), encoding: .utf8), "theirs\n",
+            "what the link points at is untouched"
+        )
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(atPath: folder.appendingPathComponent("Shared").path), target.path,
+            "and still pointing where it did"
+        )
+    }
+
+    /// A "not in the archive" folder that nothing could be moved into is
+    /// never named (the review after the merge, LOW 2): the files are still
+    /// in the set-aside copy, which is kept. One that some reached is named,
+    /// and still says the copy must be kept.
+    @MainActor
+    func testAKeptFolderIsNamedOnlyWhenSomethingReachedIt() throws {
+        let root: URL = FileManager.default.temporaryDirectory.appendingPathComponent("kept-named-\(UUID().uuidString)")
+        let courses: URL = root.appendingPathComponent("courses")
+        let aside: URL = courses.appendingPathComponent(".internal/restoring/X/as-it-was")
+        try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let nothingReached: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepInANotInTheArchiveFolder(
+            ["section2/.git", "section2/build"], from: aside, courseCode: "ICS3U",
+            coursesDirectoryURL: courses, stamp: "2026-11-26_080000"
+        )
+        XCTAssertNil(nothingReached.keptAt, "no folder is named when nothing moved into it")
+        XCTAssertFalse(nothingReached.everythingMoved, "so the copy is kept")
+
+        try WholeCourseFixture.write("ref\n", to: aside.appendingPathComponent("section2/.git/HEAD"))
+        let someReached: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepInANotInTheArchiveFolder(
+            ["section2/.git", "section2/build"], from: aside, courseCode: "ICS3U",
+            coursesDirectoryURL: courses, stamp: "2026-11-26_090000"
+        )
+        XCTAssertEqual(someReached.keptAt, "courses/_backups/ICS3U/ICS3U not in the archive 2026-11-26_090000")
+        XCTAssertFalse(someReached.everythingMoved, "one could not be moved, so the copy is kept")
+        XCTAssertTrue(RestoreSwap.itemExists(
+            at: courses.appendingPathComponent("_backups/ICS3U/ICS3U not in the archive 2026-11-26_090000/section2/.git/HEAD")
+        ))
+    }
+
+    // MARK: - Helpers
+
+    @MainActor
+    private func item(_ fixture: WholeCourseFixture) throws -> BackupItem {
+        return try XCTUnwrap(BackupItem.from(fileURL: fixture.zipURL, courseCode: "ICS3U"))
+    }
+}
+
+/// A working folder reached through a link made on purpose: `real` is the
+/// folder in the disk's own spelling (so the temporary folder's `/var`
+/// spelling plays no part), and `linked` is a link to it, the name the app
+/// is given. `outside` is a folder beside both, outside the working folder.
+struct LinkedWorkingFolder {
+
+    // MARK: - Stored properties
+
+    let root: URL
+    let realCourses: URL
+    let linkedCourses: URL
+    let outside: URL
+
+    // MARK: - Functions
+
+    static func make() throws -> LinkedWorkingFolder {
+        let made: URL = FileManager.default.temporaryDirectory.appendingPathComponent("linked-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: made, withIntermediateDirectories: true)
+        let root: URL = URL(fileURLWithPath: FolderIdentity.canonicalPath(made.path))
+        let real: URL = root.appendingPathComponent("real")
+        try FileManager.default.createDirectory(at: real.appendingPathComponent("courses"), withIntermediateDirectories: true)
+        let linked: URL = root.appendingPathComponent("linked")
+        try FileManager.default.createSymbolicLink(at: linked, withDestinationURL: real)
+        let outside: URL = root.appendingPathComponent("outside")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        return LinkedWorkingFolder(
+            root: root,
+            realCourses: real.appendingPathComponent("courses"),
+            linkedCourses: linked.appendingPathComponent("courses"),
+            outside: outside
+        )
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: root)
+    }
+}

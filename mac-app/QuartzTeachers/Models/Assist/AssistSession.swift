@@ -639,9 +639,9 @@ final class AssistSession {
     func restoreSection() {
         let saidSoFar: Int = agent?.entries.count ?? 0
         let backupURL: URL? = toolRunner?.conversationBackupURL
-        var settingsNotPutBack: Int = 0
+        let putBack: CourseRestorer.SectionPutBack
         do {
-            settingsNotPutBack = try AssistSectionRestore.restore(
+            putBack = try AssistSectionRestore.restoreSayingWhatWasKept(
                 backupURL: backupURL,
                 courseCode: courseCode,
                 sectionNumber: sectionNumber,
@@ -665,16 +665,20 @@ final class AssistSession {
             courseCode: courseCode, sectionNumber: sectionNumber, backupURL: backupURL
         )
         AssistSectionRestore.notePagesNotPutBack(
-            settingsNotPutBack, courseCode: courseCode, sectionNumber: sectionNumber
+            putBack.pagesNotPutBack, courseCode: courseCode, sectionNumber: sectionNumber
         )
-        restoreNotes.append(RestoreNote(
-            text: AssistSectionRestore.doneMessage(
-                courseCode: courseCode, sectionNumber: sectionNumber,
-                settingsNotPutBack: settingsNotPutBack
-            ),
-            isProblem: false,
-            saidSoFar: saidSoFar
-        ))
+        ActivityTrail.noteSectionRestoreKeptFiles(
+            keptAt: putBack.leftOutFoldersKeptAt, folders: putBack.leftOutFoldersKept.count,
+            course: courseCode, section: sectionNumber
+        )
+        // Each a line of its own: the frozen success sentence, then what
+        // was kept beside the backups, when anything was (#909).
+        let lines: [String] = AssistSectionRestore.doneLines(
+            courseCode: courseCode, sectionNumber: sectionNumber, putBack: putBack
+        )
+        for line in lines {
+            restoreNotes.append(RestoreNote(text: line, isProblem: false, saidSoFar: saidSoFar))
+        }
     }
 
     /// The window is closing. Stop the server — a model holding several

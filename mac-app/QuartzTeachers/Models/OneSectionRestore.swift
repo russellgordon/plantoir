@@ -167,6 +167,18 @@ enum OneSectionRestore {
         /// The backup's record of this section's website differs from the
         /// live one, which is left as it is.
         let websiteRecordDiffers: Bool
+
+        /// Where the folders backups leave out that were inside the section
+        /// (`.git`, `build` and the rest) were kept, as a path inside the
+        /// working folder, or nil when there were none (#909, Russell's
+        /// ruling of 2026-11-25). Said at the end of the finished line
+        /// (`OneSectionRestoreWording.leftOutKept`).
+        var leftOutFoldersKeptAt: String? = nil
+
+        /// Which of them were kept, each as its path inside the section
+        /// (".git", "Unit 1/My App/.git"): the one is named, more are
+        /// counted. Empty when none was kept.
+        var leftOutFoldersKept: [String] = []
     }
 
     // MARK: - Stored properties
@@ -378,7 +390,8 @@ nonisolated enum OneSectionRestoreWording {
         return "Section \(section) of \(course) is back"
     }
 
-    /// The finished line, with whichever of the three extra sentences apply.
+    /// The finished line, with whichever of the extra sentences apply, in
+    /// the contract's order (`doneJoin`), the kept folders last.
     static func done(section: Int, when: String, outcome: OneSectionRestore.Outcome) -> String {
         var text: String = "Section \(section) is back to how it was on \(when). Nothing in your other sections changed."
         if outcome.pagesMadeSinceHidden == 1 {
@@ -407,7 +420,29 @@ nonisolated enum OneSectionRestoreWording {
             text += "\n\nSection \(section) still goes to the website address it has now. A restore does not "
                   + "change where students read it."
         }
+        if let keptAt = outcome.leftOutFoldersKeptAt,
+           let kept = leftOutKept(inside: outcome.leftOutFoldersKept, keptAt: keptAt) {
+            text += "\n\n" + kept
+        }
         return text
+    }
+
+    /// Russell's sentence for the folders backups leave out that a
+    /// one-section restore kept beside the backups (#909, ruled
+    /// 2026-11-26): `inside` holds each kept folder's path inside the
+    /// section, `keptAt` the kept folder's path inside the working folder,
+    /// of which only its own name is said. Nil when none was kept.
+    static func leftOutKept(inside: [String], keptAt: String) -> String? {
+        let keptName: String = URL(fileURLWithPath: keptAt).lastPathComponent
+        if inside.isEmpty {
+            return nil
+        }
+        if inside.count == 1 {
+            return "Backups leave out the folder \u{201C}\(inside[0])\u{201D}, so it was not put back. "
+                 + "It is kept in \u{201C}\(keptName)\u{201D} beside your backups."
+        }
+        return "Backups leave out \(inside.count) folders in this section, so they were not put back. "
+             + "They are kept in \u{201C}\(keptName)\u{201D} beside your backups."
     }
 
     /// Said when asked to put one section back from a backup that was not

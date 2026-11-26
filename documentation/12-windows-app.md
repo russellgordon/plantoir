@@ -7109,6 +7109,79 @@ differs, and why:
 Trail: `backups deleted` (`BackupDeleter.TrailLine`). The UI test
 `AllBackupsUiTests` compiles and has never run (the desktop was locked).
 
+**A whole-course restore is staged on the mac since #909, and Windows owes
+it (#873).** The mac no longer empties a course and refills it: it unpacks the
+backup beside the course, records every move before the first, sets the
+course's items aside (settings first) and moves the backup's in (settings
+last), puts everything back on any failure, and settles a restore a crash
+interrupted at the next reading of the folder. What Windows inherits as data
+is `contracts/course-management.json` → `backups.restoreWholeCourse` and
+`file-formats.json` → `restoreRecord`; the design, the measurements and what
+was rejected are in `documentation/09-mac-app.md` → "Restoring a whole
+course: staged, and settled at the next reading (#909)". What the contract
+cannot carry and Windows must design: NTFS has no clone, so the staging
+folder must be on the course's own volume or every move is a copy; a file
+held open by another program refuses a rename on Windows where it never does
+on the Mac, so the way back will run in ordinary use (`leftAsItWasInUse`),
+with a bounded retry of a sharing violation on each move before it counts as
+a failure; `FileStream.Flush(true)` in place of `F_FULLFSYNC`; and the
+record's `/` paths normalised.
+
+The implementation review's second round (2026-11-14) added five things the
+contract now carries, all as data: the way back keeps `course_config.json`
+aside over a mix (the fault cases' `settingsInTheCourse`); the third refusal
+counts every record but the asking restore's own, which Windows' door must
+be tested end to end to catch (the mac's `WholeCourseRestoreDoorTests`); a
+record's `from` (backups or archived); the refusal `anEarlierRestoreDidNotFinish`;
+and the trail event `course restore left as it was`. One sentence differs by
+platform: `wording.unlockIt` is the placeholder `{unlockInTheFileManager}`,
+filled from `placeholders.unlockInTheFileManager.windows`, a draft for the
+Windows session to check against File Explorer. Explorer can also write
+`desktop.ini` and `Thumbs.db` into a course mid-swap, as the Finder writes
+`.DS_Store`: the way back keeps them as newcomers, and whether
+`keptInPlace` should name them is a contract case to propose.
+
+Round three (2026-11-14) adds, as data: nothing a restore removes may exist
+nowhere else (`backups.restoreWholeCourse.keptFolders`): the record's
+`keepsWhatWasReplaced`, `archiveBegan` and `writtenAfter`, the four kept
+folder names, and the trail event `course restore kept files`. And one
+mechanism the contract can only describe: of two restores of one course
+started together on one computer exactly one goes on, by an advisory lock
+on `courses\_backups\<CODE>\` taken before the first record is written.
+The mac's is `flock`, which the system releases when the process ends;
+Windows needs the same property (a file opened with `FileShare.None` and
+`DeleteOnClose` beside the folder is the likely shape, released by the
+system on exit), measured there before it is trusted. The whole-course
+confirmation's paragraph on what happens to the course as it is now is in
+the contract, one of three by what truly happens (`confirmArchived`,
+`confirmKeptWithItsBackups`, `confirmNoCourseFolder`).
+
+Round four (2026-11-14) adds, as data: whether a file is in the archive is
+read from the archive's own central directory (path, size, recorded time;
+`keptFolders.notInTheArchive` and `notInTheArchiveCases`), so Windows owes a
+zip directory reader (`System.IO.Compression.ZipArchive` lists entries
+without unpacking them; its `LastWriteTime` is the recorded local time);
+the record's `leftOutOnPurpose`; the engine, not the door, decides
+`keepsWhatWasReplaced`; a settle that keeps files says `keptWhatWasInTheFolder` or
+`keptWhatTheArchiveMayNotHold`; and the size beside Backups counts kept
+folders (`backups.keptFoldersCounted`, `wording.keptFoldersTake`).
+`documentation/09-mac-app.md` → "Round four" says what was measured and
+rejected.
+
+The one-section restore follows the same rule (#909 and #911, Russell's
+rulings of 2026-11-25): a `.git`, `node_modules`, `build`, `out` or `dist`
+at any depth inside the section is kept in `<CODE> not in the archive
+<stamp>` beside the backups (`backups.restoreOneSection.leftOutFolders`
+and its cases), and the teacher is told in Russell's words,
+`wording.leftOutKeptOne` (the folder named by its path inside the section,
+parts joined by `/`) or `leftOutKeptMany` (a count), with `{KEPT}` the
+kept folder's own name: at the end of the menu route's finished line
+(`doneJoin`), and in the assistant window as a line of its own after the
+success sentence, which is not changed. Both routes then write
+`section restore kept files` (course, section, how many, the kept
+folder's path; held for #873 in `NamedGapLedger.cs`). Until #873 Windows
+keeps such a folder in its aside copy, as #911 built it, and says nothing.
+
 **A whole course put back leaves `course restored from a backup`** — since
 step 0 of v2.0.0 (2026-11-13), the gap the mac's #572 closed on its side:
 until then a whole-course restore from Backups (Restore…) or from Archived

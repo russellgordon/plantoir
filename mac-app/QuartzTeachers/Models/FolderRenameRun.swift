@@ -133,8 +133,18 @@ final class FolderRenameRun {
     /// longer held. Called on the main actor in the same turn as the
     /// rename's own cancellation check, so the quit lands either before it
     /// (refused) or after it (the swap has begun and is waited for).
+    ///
+    /// Refused too while a whole-course restore of the same course is under
+    /// way in any window (#909, the review after the merge of `dev`, HIGH 1):
+    /// the restore moves the course's items, and a swap begun meanwhile would
+    /// move folders inside them. Every restore refuses while this rename's
+    /// claim is held, so a rename planning when a restore begins is never
+    /// halted by it; this is the other direction, asked in the same turn.
     static func swapBegins(_ claim: CourseActivity.FolderRenameRecord) -> Bool {
         if quitIsGoingAhead {
+            return false
+        }
+        if CourseActivity.courseIsBeingRestored(folderPath: claim.folderPath, courseCode: claim.courseCode) {
             return false
         }
         return CourseActivity.folderRenameSwapBegins(claim)

@@ -157,6 +157,39 @@ final class OneSectionRestoreContractTests: XCTestCase {
         XCTAssertEqual(OneSectionRestoreWording.done(section: 2, when: when, outcome: many), expectedMany)
     }
 
+    /// Russell's two sentences for the folders backups leave out (#909,
+    /// ruled 2026-11-26): the mac's, filled, are the contract's; none kept
+    /// says nothing; and the menu's finished line ends with the sentence,
+    /// after every other one, as doneJoin says.
+    @MainActor
+    func testTheLeftOutKeptSentencesAreTheContracts() throws {
+        let wording: [String: Any] = try XCTUnwrap(
+            try OneSectionRestoreContractTests.block()["wording"] as? [String: Any]
+        )
+        let keptAt: String = "courses/_backups/ICS3U/ICS3U not in the archive 2026-11-26_101500"
+        let keptName: String = "ICS3U not in the archive 2026-11-26_101500"
+        let one: String = try XCTUnwrap(wording["leftOutKeptOne"] as? String)
+            .replacingOccurrences(of: "{NAME}", with: "Unit 1/My App/.git")
+            .replacingOccurrences(of: "{KEPT}", with: keptName)
+        let many: String = try XCTUnwrap(wording["leftOutKeptMany"] as? String)
+            .replacingOccurrences(of: "{COUNT}", with: "3")
+            .replacingOccurrences(of: "{KEPT}", with: keptName)
+
+        XCTAssertNil(OneSectionRestoreWording.leftOutKept(inside: [], keptAt: keptAt))
+        XCTAssertEqual(OneSectionRestoreWording.leftOutKept(inside: ["Unit 1/My App/.git"], keptAt: keptAt), one)
+        XCTAssertEqual(OneSectionRestoreWording.leftOutKept(inside: [".git", "build", "Unit 1/dist"], keptAt: keptAt), many)
+
+        var outcome: OneSectionRestore.Outcome = OneSectionRestore.Outcome(
+            pagesNotPutBack: 1, pagesNotSaved: 0, pagesMadeSinceHidden: 1, websiteRecordDiffers: true
+        )
+        outcome.leftOutFoldersKeptAt = keptAt
+        outcome.leftOutFoldersKept = [".git", "build", "Unit 1/dist"]
+        let said: String = OneSectionRestoreWording.done(section: 2, when: "then", outcome: outcome)
+        let websiteUnchanged: String = try XCTUnwrap(wording["websiteUnchanged"] as? String)
+            .replacingOccurrences(of: "{N}", with: "2")
+        XCTAssertTrue(said.hasSuffix(websiteUnchanged + "\n\n" + many), said)
+    }
+
     /// The folders the restore never gives a key are the contract's list of
     /// folders Quartz never publishes, which the build reads too.
     @MainActor
@@ -172,6 +205,66 @@ final class OneSectionRestoreContractTests: XCTestCase {
         let files: [String: Any] = try XCTUnwrap(fences["files"] as? [String: Any])
         let notPublished: [String: Any] = try XCTUnwrap(files["notPublished"] as? [String: Any])
         XCTAssertEqual(OneSectionRestore.foldersNeverPublished, try XCTUnwrap(notPublished["folders"] as? [String]))
+    }
+
+    /// Every `leftOutFoldersCases` case, by both routes (#909, Russell's
+    /// ruling of 2026-11-25): what backups leave out inside the section is
+    /// kept beside the backups; elsewhere it is left where it is.
+    @MainActor
+    func testEveryLeftOutFoldersCase() async throws {
+        let cases: [[String: Any]] = try XCTUnwrap(
+            try OneSectionRestoreContractTests.block()["leftOutFoldersCases"] as? [[String: Any]]
+        )
+        XCTAssertFalse(cases.isEmpty)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let files: [String] = try XCTUnwrap(testCase["files"] as? [String], name)
+            let kept: [String] = try XCTUnwrap(testCase["kept"] as? [String], name)
+            let inPlace: [String] = try XCTUnwrap(testCase["inPlace"] as? [String], name)
+            for fromTheMenu in [true, false] {
+                let label: String = name + (fromTheMenu ? " (the menu)" : " (the window)")
+                let fixture: OneSectionFixture = try OneSectionFixture()
+                defer { fixture.tearDown() }
+                for path in files {
+                    try fixture.write(path, to: fixture.outside(path))
+                }
+                let item: BackupItem = try await fixture.backUp()
+                if fromTheMenu {
+                    _ = try CourseRestorer.restoreSectionFromTheMenu(
+                        2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+                    )
+                } else {
+                    try CourseRestorer.restoreSection(2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL)
+                }
+
+                var foundKept: [String: Data] = [:]
+                let shelf: URL = fixture.coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+                let prefix: String = RestoreSwap.notInTheArchiveName("ICS3U") + " "
+                var keptFolderCount: Int = 0
+                let shelfEntries: [URL] = (try? FileManager.default.contentsOfDirectory(
+                    at: shelf, includingPropertiesForKeys: nil, options: []
+                )) ?? []
+                for entry in shelfEntries where entry.lastPathComponent.hasPrefix(prefix) {
+                    keptFolderCount += 1
+                    foundKept = try OneSectionFixture.snapshot(of: entry)
+                }
+                XCTAssertEqual(keptFolderCount, kept.isEmpty ? 0 : 1, label)
+                var expectedKept: [String: Data] = [:]
+                for path in kept {
+                    expectedKept[path] = Data(path.utf8)
+                }
+                XCTAssertEqual(foundKept, expectedKept, label)
+                for path in files {
+                    let there: String? = try? String(contentsOf: fixture.outside(path), encoding: .utf8)
+                    if inPlace.contains(path) {
+                        XCTAssertEqual(there, path, "\(label): left in place, \(path)")
+                    } else {
+                        XCTAssertNil(there, "\(label): not left in the course, \(path)")
+                    }
+                }
+                XCTAssertEqual(fixture.leftInRestoring(), 0, label)
+            }
+        }
     }
 
     private static func block() throws -> [String: Any] {

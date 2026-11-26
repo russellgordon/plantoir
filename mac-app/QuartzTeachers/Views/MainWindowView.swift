@@ -188,7 +188,9 @@ struct MainWindowView: View {
                     Button("Restore…") {
                         workspace.restoreRequest = item
                     }
-                    .buttonStyle(.borderedProminent)
+                    // The accent only while it can be pressed (#457); it
+                    // waits for a Rename folder of the course (#909).
+                    .prominentButton(isEnabled: !workspace.restoreFromArchivedWaits(item.courseCode))
                     .accessibilityIdentifier("restoreArchivedButton")
                     Button("Delete Archive…") {
                         workspace.archiveDeleteRequest = item
@@ -209,7 +211,7 @@ struct MainWindowView: View {
                         workspace.backupRestoreRequest = item
                     }
                     // The accent only while it can be pressed (#457).
-                    .prominentButton(isEnabled: !workspace.isBeingCopied(item.courseCode))
+                    .prominentButton(isEnabled: !workspace.restoreOfABackupWaits(item.courseCode))
                     .accessibilityIdentifier("restoreBackupButton")
                     Button("Delete Backup…") {
                         workspace.requestDeleteBackup(item)
