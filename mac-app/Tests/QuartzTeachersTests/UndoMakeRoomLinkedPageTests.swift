@@ -502,6 +502,22 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         try checkRefused(atDay: 2, naming: "Unit 1, Day 3", in: made)
     }
 
+    /// Review C of U4b3, MEDIUM 1: Day 3 is itself a link to a file
+    /// elsewhere, and Day 4 is a link holding `Unit 1, Day 3.md`. Each hop
+    /// is judged by its own identity, not only the file at the end: Day 4's
+    /// first hop names Day 3's place, a class page of this section, so it is
+    /// refused before anything changes, naming Day 4. MUST FAIL with only
+    /// the end of the chain compared (Insert Class goes ahead, Day 5 then
+    /// leads to the old Day 2's lesson and the file elsewhere is dated
+    /// twice).
+    func testALaterClassLinkedToAClassPageThatIsItselfALinkIsRefused() throws {
+        let made = try makeCourse()
+        try makeALink("Unit 1, Day 3", holding: "../../elsewhere/L.md", in: made)
+        try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: made)
+
+        try checkRefused(atDay: 2, naming: "Unit 1, Day 4", in: made)
+    }
+
     /// A later class that is a link to a FOLDER: not a link to a file, so
     /// it is read as before, through `readText`, which cannot read it: its
     /// rename is not done and the link is left as it was.

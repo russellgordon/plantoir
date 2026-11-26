@@ -23620,10 +23620,18 @@ so two links in a row and a link below a plain class are one step too.
 `ClassInsertionPlanner.apply` decides "a link to a file" by `lstat` and the
 target's `stat` (`isALinkToAFile`); a link to a folder, or one whose target
 cannot be read, is not renamed, as before. A later class whose link leads,
-through any number of links, to another class page of the same section
-(judged by device and inode, `firstLinkThatCannotBeMoved`) is refused before
-anything changes with the refusal given before this piece ("cannot tell
-now", said as the file that could not be saved; the review round's fix 2).
+at any of its hops, to another class page of the same section is refused
+before anything changes with the refusal given before this piece ("cannot
+tell now", said as the file that could not be saved; the review round's fix
+2). Each hop is judged by the device and inode `lstat` gives of the place it
+names, a link or a file, against every class page as it stands
+(`firstLinkThatCannotBeMoved`, `leadsToAClassPage`), so Day 4 holding
+`Unit 1, Day 3.md` is caught when Day 3 is itself a link elsewhere (review C,
+MEDIUM 1; comparing only the file at the end of the chain let it through, and
+Day 5 then led to the old Day 2's lesson). Russell's ruling is that such a
+link is renamed and its text changed to the page's new name; the door cannot
+change a link's text within a step (a link is moved, never written from a
+blob), so this one arrangement stays refused until a door piece adds that.
 A later class whose link leads NOWHERE is never refused (Russell, 2026-11-26:
 "Why would it refuse? Why does it care where a later class links to?", then
 "Never refuse"; this reverses the review round's fix 3): the link is moved as

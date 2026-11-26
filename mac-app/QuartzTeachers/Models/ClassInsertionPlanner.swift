@@ -633,16 +633,25 @@ enum ClassInsertionPlanner {
     }
 
     /// The first later class that is a symbolic link this piece cannot
-    /// move, or nil: a link that leads, through any number of links, to
-    /// one of this section's own class pages, whose title and date the
-    /// step would then write onto another class (review B, MEDIUM 1). A
-    /// link that leads to nothing is never refused (Russell, 2026-11-26):
-    /// it is renamed, and nothing is written through it.
+    /// move yet, or nil: a link that leads, at any of its hops, to one of
+    /// this section's own class pages. Moved as it stands, it would lead to
+    /// another lesson once that page is renamed, and its date would be
+    /// written onto another class (reviews B and C, MEDIUM 1). Russell's
+    /// ruling (2026-11-26) is that it is renamed and its text changed to
+    /// the page's new name; the door cannot yet change a link's text within
+    /// a step (a link is moved, never written), so until it can this one
+    /// arrangement is refused. A link that leads to nothing is never refused
+    /// (Russell, 2026-11-26): it is renamed, and nothing is written through
+    /// it.
     ///
-    /// "Leads to a class page" is judged by the resolved identity of the
-    /// file, never by name or path spelling: the device and inode `stat`
-    /// gives through the link, against those of every class page of the
-    /// section that is itself a plain file.
+    /// Each hop is judged by its own identity, never by name or path
+    /// spelling (review C: "check every hop's own identity, not just the
+    /// end"): the device and inode `lstat` gives of the place each hop
+    /// names, a link or a file, against those of every class page of the
+    /// section as it stands (a plain page or a link), so a link naming a
+    /// class page that is itself a link is caught at that hop; and the file
+    /// the whole chain reaches, against every class page that is a plain
+    /// file.
     static func firstLinkThatCannotBeMoved(in plan: ClassInsertionPlan, course: Course) -> URL? {
         var places: [URL] = []
         for rename in plan.renames {
@@ -655,24 +664,52 @@ enum ClassInsertionPlanner {
         for planned in plan.added {
             places.append(planned.fileURL)
         }
-        var classPageIdentities: [ResolvedFile] = []
+        var classPagePlaces: [ResolvedFile] = []
         for page in ClassPages.list(forSection: plan.sectionNumber, in: course) {
-            if let identity = ResolvedFile.ofAPlainFile(at: page.fileURL) {
-                classPageIdentities.append(identity)
+            if let identity = ResolvedFile.ofThePlace(at: page.fileURL) {
+                classPagePlaces.append(identity)
             }
         }
         for place in places {
             guard ResolvedFile.isALink(place) else {
                 continue
             }
-            guard let leadsTo = ResolvedFile.throughLinks(at: place) else {
-                continue
-            }
-            for identity in classPageIdentities where identity == leadsTo {
+            if leadsToAClassPage(from: place, classPagePlaces: classPagePlaces) {
                 return place
             }
         }
         return nil
+    }
+
+    /// Whether the link at `place` names, at any hop, the place of one of
+    /// `classPagePlaces` (followed link by link, at most 32 hops, a relative
+    /// target against its link's folder); the link's own place is never
+    /// counted, so a chain that comes round to it leads to nothing.
+    static func leadsToAClassPage(from place: URL, classPagePlaces: [ResolvedFile]) -> Bool {
+        let ownPlace: ResolvedFile? = ResolvedFile.ofThePlace(at: place)
+        var here: URL = place
+        var hops: Int = 0
+        while ResolvedFile.isALink(here) && hops < 32 {
+            hops += 1
+            guard let written = try? FileManager.default.destinationOfSymbolicLink(atPath: here.path) else {
+                return false
+            }
+            if written.hasPrefix("/") {
+                here = URL(fileURLWithPath: written)
+            } else {
+                here = here.deletingLastPathComponent().appendingPathComponent(written)
+            }
+            guard let hop = ResolvedFile.ofThePlace(at: here) else {
+                return false
+            }
+            if hop == ownPlace {
+                return false
+            }
+            for classPage in classPagePlaces where classPage == hop {
+                return true
+            }
+        }
+        return false
     }
 
     /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".
@@ -1319,12 +1356,10 @@ struct ResolvedFile: Equatable {
         return (status.st_mode & S_IFMT) == S_IFLNK
     }
 
-    /// The file `url` names when it is a plain file (not a link), or nil.
-    static func ofAPlainFile(at url: URL) -> ResolvedFile? {
+    /// Whatever is at `url` itself, a link or a file or a folder, by its
+    /// own `lstat` identity (never followed), or nil when nothing is there.
+    static func ofThePlace(at url: URL) -> ResolvedFile? {
         guard let status = ResolvedFile.status(of: url, followingLinks: false) else {
-            return nil
-        }
-        if (status.st_mode & S_IFMT) != S_IFREG {
             return nil
         }
         return ResolvedFile(device: Int64(status.st_dev), inode: UInt64(status.st_ino))
