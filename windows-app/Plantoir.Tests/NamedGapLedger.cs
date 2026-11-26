@@ -712,7 +712,9 @@ internal static class NamedGapLedger
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its undo dies the same way with the undo's kept copy of the page still inside the folder at its old place, as a tidy that could not remove it leaves it: completed, the copy never judged part of the folder, and removed, since the list holds what it holds",
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder moved again and nothing else: put back",
              "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with the folder and both pages in and the edit inside not: put back",
-             "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with every change in but before redone: completed"),
+             "U4b: a step that moves a folder and edits a page inside it (opKinds.wholeOps' order), its redo dies with every change in but before redone: completed",
+             "U4b2-13: a step that moves a folder and edits a page inside it dies with the folder moved and the first page in, and the second page is then changed by hand: the folder and the first page are put back, the second left as edited, and the step is interrupted naming the second",
+             "U4b2-13: a step that moves a folder and edits a page inside it dies with the folder and both pages in and the edit inside not, and the page inside the moved folder is then changed by hand: both pages are put back, the folder stays where it was moved with the page as edited, and the step is interrupted naming the folder and that page"),
         // ---- U3c (the mac's U3c for #899, 2026-11-20): its 4 trail events, 12
         // stackCases and 10 recoveryCases were held here under the reason then
         // named Reason899W4c (Reason899U4aContentGone since, which holds only

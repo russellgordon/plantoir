@@ -1758,8 +1758,18 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': the \(work) was not stopped (\(outcome))")
                 }
             }
-            if let page = string(testCase["handEdit"]), let path = pathOf[page] {
-                try handEdit("sameLine", at: path, in: root)
+            if let page = string(testCase["handEdit"]) {
+                if page == "carried" && withAMovedFolder {
+                    // U4b2-13: the page inside the moved folder, wherever
+                    // the folder is now, its line `Line one: …` set by hand.
+                    if !(try UndoContractKinds.editTheCarriedPageByHand(in: root)) {
+                        failures.append("recoveryCases '\(name)': no page inside the moved folder to change by hand")
+                    }
+                } else if let path = pathOf[page] {
+                    try handEdit("sameLine", at: path, in: root)
+                } else {
+                    failures.append("recoveryCases '\(name)': handEdit '\(page)' is not a value this replay knows")
+                }
             }
             let asLeft: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
             let reachable: Bool = testCase["moveFolderBeforeRecovery"] as? Bool != true

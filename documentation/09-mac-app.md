@@ -22849,6 +22849,23 @@ same branch:
 
 No recorded step changed.
 
+### U4b2: model-recover-hand-edits
+
+The Python model's `recover` now does what `UndoRecovery.settle` does when a
+place of a stopped step was changed by hand since: every place that is not in
+the way and took effect is still put back (one plan, the ops whose place is at
+the end, as settle's `opsToPutBack`), and the step is interrupted naming the
+places in the way. Before, the model returned at the first place in the way
+and put nothing back; no row had a hand edit with a moved folder, so the two
+agreed row for row without the model modelling that branch. Two
+`recoveryCases` rows reach it now: a page outside the moved folder changed by
+hand (the folder and the other page go back), and the page inside the moved
+folder changed by hand (`handEdit: carried`), which puts the move in the way as
+well, since the folder then holds what neither side of the move recorded: both
+plain pages go back, and the folder stays where it was moved. Neither row is
+the U7 gap of a step killed after its edit inside went in (that one is still
+U7's). No product code changed.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

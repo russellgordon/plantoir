@@ -497,6 +497,28 @@ nonisolated enum UndoContractKinds {
         return place + ", " + page
     }
 
+    /// recoveryCasesHow's `handEdit: carried` (U4b2-13): a.md inside the
+    /// moved folder, wherever the folder is now (renamed if it is there,
+    /// else media), its line `Line one: …` set to `Line one: by hand.`.
+    /// False when there is no such page.
+    static func editTheCarriedPageByHand(in root: URL) throws -> Bool {
+        let folder: String = somethingIsAt(renamedFolder, in: root) ? renamedFolder : mediaFolder
+        guard let text = text(at: folder + "/a.md", in: root) else {
+            return false
+        }
+        var lines: [String] = text.components(separatedBy: "\n")
+        var changed: Bool = false
+        for index in 0..<lines.count where lines[index].hasPrefix("Line one: ") {
+            lines[index] = "Line one: by hand."
+            changed = true
+        }
+        if !changed {
+            return false
+        }
+        try Data(lines.joined(separator: "\n").utf8).write(to: root.appendingPathComponent(folder + "/a.md"))
+        return true
+    }
+
     /// U4b2-10's `madeFolder`: what the folder `sub` holds wherever the
     /// moved folder is now (renamed if it is there, else media), every name
     /// in the order of its bytes, `empty` or `none`.
