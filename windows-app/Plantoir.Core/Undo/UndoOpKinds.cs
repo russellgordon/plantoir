@@ -797,7 +797,18 @@ internal enum UndoMoveSide
 
 internal static class UndoMoveSides
 {
-    internal static UndoMoveSide Read(UndoOp op, string fullPath, Func<string, bool>? cannotRead = null)
+    /// <summary>
+    /// One side of a move as it holds now. <paramref name="overriding"/> gives,
+    /// for paths inside the place (relative to it, "" the place itself), what
+    /// to take instead of what is there (the mac's <c>UndoMoveSide.read(_:at:overriding:)</c>,
+    /// U4b; #899 W8-2): a carried page as the step's own edit would leave it
+    /// once taken back, and <see cref="UndoCurrent.Absent"/> for a file left
+    /// out of the judgement (the swap's own staged and kept files). A path is
+    /// matched to the listing by <see cref="UndoOp.PartInside"/>, the one
+    /// comparison, and keeps the disk's spelling.
+    /// </summary>
+    internal static UndoMoveSide Read(UndoOp op, string fullPath, Func<string, bool>? cannotRead = null,
+                                      IReadOnlyDictionary<string, UndoCurrent>? overriding = null)
     {
         if (op.Sha is { } sha)
         {
@@ -806,6 +817,15 @@ internal static class UndoMoveSides
                 case UndoLinks.What.Nothing: return UndoMoveSide.Free;
                 case UndoLinks.What.CannotLook: return UndoMoveSide.CannotRead;
                 case UndoLinks.What.File:
+                    if (overriding is not null && overriding.TryGetValue("", out UndoCurrent? given))
+                    {
+                        return given switch
+                        {
+                            UndoCurrent.Bytes bytes => string.Equals(UndoCheck.Sha(bytes.Content), sha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse,
+                            UndoCurrent.Absent => UndoMoveSide.Free,
+                            _ => UndoMoveSide.HoldsSomethingElse,
+                        };
+                    }
                     if (cannotRead?.Invoke(fullPath) == true) return UndoMoveSide.CannotRead;
                     return UndoLinks.HashOf(fullPath) is { } found
                         ? string.Equals(found, sha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse
@@ -813,13 +833,48 @@ internal static class UndoMoveSides
                 default: return UndoMoveSide.HoldsSomethingElse;
             }
         }
-        return UndoTreeReading.Read(fullPath, cannotRead: cannotRead) switch
+        switch (UndoTreeReading.Read(fullPath, cannotRead: cannotRead))
         {
-            UndoTreeReading.Absent => UndoMoveSide.Free,
-            UndoTreeReading.CannotRead => UndoMoveSide.CannotRead,
-            UndoTreeReading.Tree tree => string.Equals(tree.Listing.Sha, op.ListingSha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse,
-            _ => UndoMoveSide.HoldsSomethingElse,
-        };
+            case UndoTreeReading.Absent: return UndoMoveSide.Free;
+            case UndoTreeReading.CannotRead: return UndoMoveSide.CannotRead;
+            case UndoTreeReading.Tree tree:
+            {
+                if (overriding is not { Count: > 0 })
+                    return string.Equals(tree.Listing.Sha, op.ListingSha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse;
+                var files = new List<(string Path, string Sha)>();
+                var matched = new HashSet<string>(StringComparer.Ordinal);
+                foreach ((string path, string fileSha) in tree.Listing.Files)
+                {
+                    UndoCurrent? given = null;
+                    foreach ((string inside, UndoCurrent item) in overriding)
+                    {
+                        if (UndoOp.PartInside(inside, path) is not "") continue;
+                        given = item;
+                        matched.Add(inside);
+                    }
+                    switch (given)
+                    {
+                        case null: files.Add((path, fileSha)); break;
+                        case UndoCurrent.Absent: break;
+                        case UndoCurrent.Bytes bytes: files.Add((path, UndoCheck.Sha(bytes.Content))); break;
+                        default: return UndoMoveSide.HoldsSomethingElse;
+                    }
+                }
+                foreach ((string inside, UndoCurrent item) in overriding)
+                {
+                    if (matched.Contains(inside) || inside.Length == 0) continue;
+                    switch (item)
+                    {
+                        case UndoCurrent.Absent: break;
+                        case UndoCurrent.Bytes bytes: files.Add((inside, UndoCheck.Sha(bytes.Content))); break;
+                        default: return UndoMoveSide.HoldsSomethingElse;
+                    }
+                }
+                string judged = new UndoTreeListing(tree.Listing.Folders, files).Sha;
+                return string.Equals(judged, op.ListingSha, StringComparison.Ordinal) ? UndoMoveSide.HoldsTheContent : UndoMoveSide.HoldsSomethingElse;
+            }
+            default: return UndoMoveSide.HoldsSomethingElse;
+        }
     }
 }
 

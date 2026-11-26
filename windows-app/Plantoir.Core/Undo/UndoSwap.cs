@@ -45,6 +45,9 @@ internal sealed record UndoSwapTarget(string FullPath, string RelativePath, byte
 {
     /// <summary>A whole op's change (U2's kinds, W6); null for a file's content swapped.</summary>
     internal UndoSwapChange? Change { get; init; }
+
+    /// <summary>A file a move carries, going forward: staged only at its turn, once the move has made its folder, never before (#899 W8-2; the mac's <c>stagesAtItsTurn</c>).</summary>
+    internal bool StagesAtItsTurn { get; init; }
 }
 
 /// <summary>How a swap went.</summary>
@@ -248,7 +251,9 @@ internal static class UndoSwap
                 switch (target.Change)
                 {
                     case UndoSwapChange.MoveHere move:
+                        LetGoOwnFilesInside(target.RelativePath);
                         if (RenameWithRetries(target.FullPath, move.FromFull, replace: false, seams) != 0) whole = false;
+                        else FollowTheMove(target.RelativePath, move.FromRelative, move.FromFull);
                         continue;
                     case UndoSwapChange.MakeTree:
                     {
@@ -302,6 +307,83 @@ internal static class UndoSwap
             return whole;
         }
 
+        // A file's new content written beside it; false when the write failed.
+        bool StageAFile(int index)
+        {
+            UndoSwapTarget target = targets[index];
+            if (target.Replacement is not { } replacement) return true;
+            string stagedPath = BesidePath(target.FullPath, label, "new");
+            try
+            {
+                MakeTheFolderOf(target.FullPath, foldersMade);
+                TryDelete(stagedPath);
+                if (seams?.StagingWriteFailsAt?.Invoke(index) == true)
+                {
+                    // As a full disk does: the exclusive create makes the file,
+                    // then writing into it fails.
+                    using (new FileStream(stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
+                    throw new IOException("There is not enough space on the disk.", unchecked((int)0x80070070));
+                }
+                WriteDurably(stagedPath, replacement);
+                staged[index] = UndoStagedFile.Made(stagedPath);
+                return true;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                // The file the exclusive create made is this swap's own: it goes
+                // with every other. Staging writes a NEW file, which no other
+                // program can be holding, so this is never fileIsInUse.
+                TryDelete(stagedPath);
+                return false;
+            }
+        }
+
+        // Where each file target's page is now, relative to the root: its own
+        // place until a move this swap makes carries it (#899 W8-2b).
+        var placeOf = new string[count];
+        for (int index = 0; index < count; index++) placeOf[index] = targets[index].RelativePath;
+
+        // This swap's own staged and kept files inside the place a move
+        // moves, found by the one comparison (UndoOp.PartInside): their
+        // handles let go (Windows will not rename a folder with a file open
+        // below it), and each named, relative to the place, to be left out
+        // of the move's last look. Never another swap's or step's files
+        // (piece 3 judges those at the plan). #899 W8-2b.
+        Dictionary<string, UndoCurrent> LetGoOwnFilesInside(string place)
+        {
+            var leftOut = new Dictionary<string, UndoCurrent>(StringComparer.Ordinal);
+            for (int index = 0; index < count; index++)
+            {
+                foreach (UndoStagedFile? file in new[] { staged[index], originals[index] })
+                {
+                    if (file is null || UndoOp.PartInside(place, BesideRelative(placeOf[index], file.Path)) is not { } inside) continue;
+                    file.LetGo();
+                    leftOut[inside] = new UndoCurrent.Absent();
+                }
+            }
+            return leftOut;
+        }
+
+        // Once the folder has moved, this swap's own files and its pages
+        // inside it are where the folder is now, so the tidy and a reversal
+        // find them there (#899 W8-2b).
+        void FollowTheMove(string from, string to, string toFull)
+        {
+            for (int index = 0; index < count; index++)
+            {
+                if (targets[index].Change is not null || UndoOp.PartInside(from, placeOf[index]) is not { } pageInside) continue;
+                string pageWas = placeOf[index];
+                placeOf[index] = pageInside.Length == 0 ? to : to + "/" + pageInside;
+                staged[index] = Followed(staged[index], pageWas);
+                originals[index] = Followed(originals[index], pageWas);
+            }
+
+            UndoStagedFile? Followed(UndoStagedFile? file, string pageWas) =>
+                file is not null && UndoOp.PartInside(from, BesideRelative(pageWas, file.Path)) is { } inside
+                    ? file.MovedTo(Path.Combine(toFull, inside.Replace('/', Path.DirectorySeparatorChar)))
+                    : file;
+        }
+
         // 1. Stage every new content beside its target.
         for (int index = 0; index < count; index++)
         {
@@ -332,28 +414,11 @@ internal static class UndoSwap
                 continue;
             }
             if (target.Change is not null) continue;
-            if (target.Replacement is not { } replacement) continue;
-            string stagedPath = BesidePath(target.FullPath, label, "new");
-            try
+            // A file a move carries is staged at its turn, once the move has
+            // made its folder (#899 W8-2).
+            if (target.StagesAtItsTurn) continue;
+            if (!StageAFile(index))
             {
-                MakeTheFolderOf(target.FullPath, foldersMade);
-                TryDelete(stagedPath);
-                if (seams?.StagingWriteFailsAt?.Invoke(index) == true)
-                {
-                    // As a full disk does: the exclusive create makes the file,
-                    // then writing into it fails.
-                    using (new FileStream(stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
-                    throw new IOException("There is not enough space on the disk.", unchecked((int)0x80070070));
-                }
-                WriteDurably(stagedPath, replacement);
-                staged[index] = UndoStagedFile.Made(stagedPath);
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-            {
-                // The file the exclusive create made is this swap's own: it goes
-                // with every other. Staging writes a NEW file, which no other
-                // program can be holding, so this is never fileIsInUse.
-                TryDelete(stagedPath);
                 Tidy();
                 return new UndoSwapResult.Refused(new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath));
             }
@@ -366,14 +431,26 @@ internal static class UndoSwap
             if (seams?.Stops("beforeSwap", index) == true) return new UndoSwapResult.StoppedByATest();
             UndoRefusal? refusal;
             bool wentIn;
-            if (target.Change is null) refusal = SwapAFile(target, index, label, root, staged, originals, seams, out wentIn);
+            if (target.Change is null)
+            {
+                // A carried file, staged now that its folder is there.
+                if (target.StagesAtItsTurn && !StageAFile(index))
+                {
+                    refusal = new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath);
+                    wentIn = false;
+                }
+                else refusal = SwapAFile(target, index, label, root, staged, originals, seams, out wentIn);
+            }
             else
             {
                 seams?.BeforeEachSwap?.Invoke(index, target.FullPath);
+                IReadOnlyDictionary<string, UndoCurrent>? ownLeftOut =
+                    target.Change is UndoSwapChange.MoveHere moving ? LetGoOwnFilesInside(moving.FromRelative) : null;
                 refusal = root is not null && PlaceLeadingOut(target, root) is { } leadingOut
                     ? new UndoRefusal(UndoRefusalKind.ChangedSince, leadingOut)
-                    : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders);
+                    : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders, ownLeftOut);
                 wentIn = refusal is null;
+                if (wentIn && target.Change is UndoSwapChange.MoveHere moved) FollowTheMove(moved.FromRelative, target.RelativePath, target.FullPath);
             }
             if (wentIn) swapsMade++;
             if (refusal is not null)
@@ -421,8 +498,10 @@ internal static class UndoSwap
     };
 
     /// <summary>One whole op's change (the mac's swap of <c>moveHere</c>, <c>makeTree</c>, <c>takeTree</c>, <c>setExternal</c>); the refusal, or null when it went in.</summary>
+    /// <param name="ownLeftOut">For a move: this swap's own staged and kept files inside the folder, relative to it, left out of its last look (#899 W8-2b).</param>
     private static UndoRefusal? SwapAWholeOp(UndoSwapTarget target, int index, string label, UndoSeams? seams, IUndoExternalPlaces? places,
-                                             string?[] stagedFolders, string?[] asideFolders)
+                                             string?[] stagedFolders, string?[] asideFolders,
+                                             IReadOnlyDictionary<string, UndoCurrent>? ownLeftOut = null)
     {
         switch (target.Change)
         {
@@ -430,7 +509,7 @@ internal static class UndoSwap
             {
                 // The pair once more, just before the rename: the content at
                 // the place it leaves, nothing where it goes.
-                UndoMoveSide atFrom = UndoMoveSides.Read(move.Op, move.FromFull);
+                UndoMoveSide atFrom = UndoMoveSides.Read(move.Op, move.FromFull, overriding: ownLeftOut);
                 UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath);
                 if (atFrom == UndoMoveSide.CannotRead || atTarget == UndoMoveSide.CannotRead)
                     return new UndoRefusal(UndoRefusalKind.CannotTellNow, target.RelativePath);
@@ -970,6 +1049,14 @@ internal static class UndoSwap
     internal static string BesidePath(string target, string label, string role) =>
         Path.Combine(Path.GetDirectoryName(target)!, "." + Path.GetFileName(target) + StagedMarker + label + "-" + role);
 
+    /// <summary>A staged or kept file's path relative to the root: its name in the folder of <paramref name="page"/>, the page's own relative path.</summary>
+    private static string BesideRelative(string page, string stagedFullPath)
+    {
+        int slash = page.LastIndexOf('/');
+        string name = Path.GetFileName(stagedFullPath);
+        return slash < 0 ? name : page[..slash] + "/" + name;
+    }
+
     /// <summary>Whether a file name is one a swap for this label left.</summary>
     internal static bool IsStaged(string name, string label) =>
         name.StartsWith('.') && name.Contains(StagedMarker + label + "-", StringComparison.Ordinal);
@@ -1303,6 +1390,18 @@ internal sealed class UndoStagedFile
                                                   OpenExisting, OpenReparsePoint, IntPtr.Zero);
         if (byName.IsInvalid) return Marshal.GetLastWin32Error() is 2 or 3;
         return DeleteByHandle(byName);
+    }
+
+    /// <summary>
+    /// The same file once the folder it is in has been renamed: at
+    /// <paramref name="path"/> now, its identity kept, its handle let go (the
+    /// handle was let go before the folder could move). Removed by its name
+    /// and identity from then on (#899 W8-2b).
+    /// </summary>
+    internal UndoStagedFile MovedTo(string path)
+    {
+        LetGo();
+        return new UndoStagedFile(path, IsALink, null, _identity) { HiddenByTheSwap = HiddenByTheSwap };
     }
 
     /// <summary>Closes the handle without removing anything (the kept file is put back in its place, or left for recovery).</summary>

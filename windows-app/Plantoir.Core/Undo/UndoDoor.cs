@@ -899,9 +899,17 @@ internal sealed class UndoDoor
     /// <summary>The root a swap checks containment against: none for a step with no working folder (an external op alone).</summary>
     private static string? RootOrNull(string root) => root.Length == 0 ? null : root;
 
-    private static IReadOnlyList<UndoSwapTarget> TargetsOf(UndoCheck.PlanResult.Ready ready, string root)
+    /// <summary>
+    /// The swap's targets in the plan's order: a move that carries edits first
+    /// going forward (<see cref="UndoCheck.PlanResult.Ready.Leading"/>), then
+    /// every file in the order the check met it, a carried one staged only at
+    /// its turn, then the other whole ops (#899 W8-2).
+    /// </summary>
+    internal static List<UndoSwapTarget> TargetsOf(UndoCheck.PlanResult.Ready ready, string root)
     {
-        var targets = ready.InOrder.Select(change => new UndoSwapTarget(FullPath(root, change.Path), change.Path, change.Expected, change.Replacement)).ToList();
+        var targets = new List<UndoSwapTarget>(ready.Leading);
+        foreach ((string path, byte[]? expected, byte[]? replacement) in ready.InOrder)
+            targets.Add(new UndoSwapTarget(FullPath(root, path), path, expected, replacement) { StagesAtItsTurn = ready.StagedAtItsTurn.Contains(path) });
         targets.AddRange(ready.Whole);
         return targets;
     }

@@ -25,6 +25,8 @@ public sealed class UndoStackContractTests
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
         // U4b2-2's (W8-1)
         "refusalNamed",
+        // U4b's (W8-2)
+        "movedFolder",
     };
 
     public static IEnumerable<object[]> Cases() =>
@@ -102,6 +104,8 @@ public sealed class UndoStackContractTests
             Assert.Equal(Seqs(interrupted), folded.Steps.Values.Where(step => step.State == UndoStepState.Interrupted).Select(step => step.Seq).ToList());
         if (stackCase.TryGetProperty("expectLast", out JsonElement expectLast))
             Assert.Equal(expectLast.GetString(), replay.Last);
+        if (stackCase.TryGetProperty("movedFolder", out JsonElement movedFolder))
+            Assert.Equal(movedFolder.GetString(), replay.MovedFolder());
         if (stackCase.TryGetProperty("refusalNamed", out JsonElement refusalNamed))
             Assert.Equal(refusalNamed.GetString(), replay.RefusalNamed);
         if (stackCase.TryGetProperty("cleared", out JsonElement cleared))
@@ -456,6 +460,26 @@ public sealed class UndoStackContractTests
                 case "linkItsNewFolderOutside": LinkOutside("courses/TST1O/new"); return;
                 case "moveThePageIntoAFolder": MoveThePage("courses/TST1O/b.md", "courses/TST1O/new/b.md"); return;
                 case "moveThePageBetweenFolders": MoveThePage("courses/TST1O/old/c.md", "courses/TST1O/new/c.md"); return;
+                // U4b (W8-2): a folder move carrying an edit of a page inside it.
+                case "moveAFolderWithAPageEditedInside":
+                {
+                    if (_scribe.Page("A", MediaFolder + "/a.md") is null && _scribe.Page("A", RenamedFolder + "/a.md") is null)
+                    {
+                        _scribe.WritePage("A", MediaFolder + "/a.md", "Intro.\nLine one: old.\nEnd.\n"u8.ToArray());
+                        _scribe.WritePage("A", MediaFolder + "/b.md", "B\n"u8.ToArray());
+                    }
+                    Ops(new JsonArray(MoveTheMediaFolder(), EditInside(RenamedFolder + "/a.md")), []);
+                    return;
+                }
+                case "addAFileInsideTheMovedFolder": _scribe.WritePage("A", RenamedFolder + "/c.md", "C\n"u8.ToArray()); return;
+                case "editThePageInsideByHand": _scribe.WritePage("A", RenamedFolder + "/a.md", "Hand.\n"u8.ToArray()); return;
+                case "stepEditingInsideAMovesFrom":
+                {
+                    long seq = _scribe.Fold().NextSeq;
+                    _scribe.Append(_scribe.BeginLine(seq, new JsonArray(MoveTheMediaFolder(), EditInside(MediaFolder + "/a.md")), "A"));
+                    _scribe.Finish(seq);
+                    return;
+                }
                 case "begin:dead@B":
                 {
                     byte[] after = Flipped("B", _p1);
@@ -496,6 +520,41 @@ public sealed class UndoStackContractTests
                 return;
             }
             Assert.Fail("a call this replay does not know: " + call);
+        }
+
+        private const string MediaFolder = "courses/TST1O/media";
+        private const string RenamedFolder = "courses/TST1O/renamed";
+
+        /// <summary>The media folder's move to renamed, its listingSha the folder's as it is (or as it was, once moved).</summary>
+        private JsonObject MoveTheMediaFolder()
+        {
+            string folder = Directory.Exists(_scribe.FullPath("A", MediaFolder)) ? MediaFolder : RenamedFolder;
+            string listingSha = UndoTreeReading.Read(_scribe.FullPath("A", folder)).ListingSha ?? new UndoTreeListing([], []).Sha;
+            return new JsonObject { ["kind"] = "move", ["from"] = MediaFolder, ["to"] = RenamedFolder, ["listingSha"] = listingSha };
+        }
+
+        private static JsonObject EditInside(string path) => new()
+        {
+            ["kind"] = "replaceText", ["path"] = path, ["before"] = "old", ["after"] = "new",
+            ["contextBefore"] = "Line one: ", ["contextAfter"] = ".\n",
+        };
+
+        /// <summary><c>movedFolder</c>: which place holds the folder (renamed, media, both or neither), then what its a.md holds (new, old, byHand, none).</summary>
+        internal string MovedFolder()
+        {
+            bool renamed = Directory.Exists(_scribe.FullPath("A", RenamedFolder));
+            bool media = Directory.Exists(_scribe.FullPath("A", MediaFolder));
+            string place = renamed && media ? "both" : renamed ? "renamed" : media ? "media" : "neither";
+            string? text = UndoKindsForTheCases.Text(_scribe.Page("A", (renamed ? RenamedFolder : MediaFolder) + "/a.md"));
+            string holds = text switch
+            {
+                null => "none",
+                "Intro.\nLine one: new.\nEnd.\n" => "new",
+                "Intro.\nLine one: old.\nEnd.\n" => "old",
+                "Hand.\n" => "byHand",
+                _ => "something else: " + text,
+            };
+            return place + ", " + holds;
         }
 
         /// <summary>

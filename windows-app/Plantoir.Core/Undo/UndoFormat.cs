@@ -148,8 +148,41 @@ internal sealed record UndoOp
     internal static bool PlacesOverlap(string first, string second) =>
         PartInside(first, second) is not null || PartInside(second, first) is not null;
 
-    /// <summary>W8-2b, tests first: a stub for the red run.</summary>
-    internal static bool MoveCarries(UndoOp move, UndoOp edit) => false;
+    /// <summary>
+    /// Whether <paramref name="edit"/> is an edit (a <c>writeFile</c>, an
+    /// <c>editLine</c>, a <c>replaceText</c> or an <c>editJSON</c>) of the item
+    /// a <c>move</c> moved, or of a file inside the folder it moved, named at
+    /// the NEW place and naming nothing inside the old one (the mac's
+    /// <c>UndoOp.moveCarries</c>, U4b; <c>opKinds.wholeOps</c>' one exception;
+    /// #899 W8-2). Such an edit is made, and redone, after the move and taken
+    /// back before it, and the move is judged as if it were taken back.
+    /// Whether it comes AFTER the move in the step is the caller's to check.
+    /// "At or inside" is <see cref="PartInside"/>, the one comparison. A
+    /// capitalisation-only move (piece 5) and a link's move (piece 6) carry
+    /// nothing here yet: the first fails the last test (its two places
+    /// overlap), and the second is not readable on Windows.
+    /// </summary>
+    internal static bool MoveCarries(UndoOp move, UndoOp edit)
+    {
+        if (move.Kind != Move || !move.Readable || move.From is not { } from || move.To is not { } to || edit.Path is not { } path) return false;
+        if (edit.Kind is not (WriteFile or EditLine or ReplaceText or EditJson)) return false;
+        if (edit.From is not null || edit.To is not null || edit.Target is not null) return false;
+        if (PartInside(to, path) is null) return false;
+        return !PlacesOverlap(from, path);
+    }
+
+    /// <summary>The place <paramref name="path"/>, named inside a move's <paramref name="to"/>, had before the move: the same path under its <paramref name="from"/> (the mac's <c>placeBeforeTheMove</c>).</summary>
+    internal static string PlaceBeforeTheMove(string path, string from, string to) =>
+        PartInside(to, path) is not { } inside ? path : inside.Length == 0 ? from : from + "/" + inside;
+
+    /// <summary>
+    /// Where a teacher finds the item this op names now, going this way: a
+    /// <c>move</c>'s <c>to</c> before it is undone and its <c>from</c> before
+    /// it is redone (the mac's <c>placeAsFound</c>, U4b); <see cref="PlaceName"/>
+    /// for every other op.
+    /// </summary>
+    internal string PlaceAsFound(bool backward) =>
+        Kind == Move && From is { } from && To is { } to ? (backward ? to : from) : PlaceName;
 
     /// <summary>
     /// The part of <paramref name="path"/> inside <paramref name="place"/>,
@@ -225,7 +258,9 @@ internal sealed record UndoStep
     /// <c>opKinds.wholeOps</c>: no other op of the step names a whole op's
     /// places (a move's two, a tree's folder or anything inside it) or its
     /// target. A step that breaks it is one this version cannot read: a
-    /// barrier, never undone in a guessed order.
+    /// barrier, never undone in a guessed order. The one exception: an edit a
+    /// move carries (<see cref="UndoOp.MoveCarries"/>), after the move; one
+    /// inside the move's <c>from</c>, or before it, is still a barrier.
     /// </summary>
     internal static bool WholeOpsStandAlone(IReadOnlyList<UndoOp> ops)
     {
@@ -238,6 +273,10 @@ internal sealed record UndoStep
                 if (other == index) continue;
                 UndoOp second = ops[other];
                 if (op.Target is { } target && string.Equals(second.Target, target, StringComparison.Ordinal)) return false;
+                // An edit inside what a move moved, named at its new place
+                // and written after it, is the one op that may share a
+                // move's place (opKinds.wholeOps' order; #899 W8-2).
+                if (other > index && UndoOp.MoveCarries(op, second)) continue;
                 foreach (string mine in op.PathsNamed)
                 {
                     foreach (string theirs in second.PathsNamed)
