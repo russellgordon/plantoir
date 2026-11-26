@@ -1447,6 +1447,15 @@ enum SpecialFolderRenamer {
 ///   earlier record is put back if this run replaced it, and left alone if
 ///   this run wrote nothing.
 ///
+/// One more exit belongs to no run (#909, the director's decision of
+/// 2026-11-26): a whole-course restore that replaced the course KEEPS the
+/// record, whoever wrote it (`aWholeCourseRestoreReplacedTheCourse`).
+/// The record lives outside the course, so no backup holds it, and the
+/// reader (`interruptedRenameTarget`) checks it against the disk: on a
+/// restored course that does not match it, it offers nothing; on one that
+/// still matches (a backup made after a kill holds the half-renamed
+/// folders), the sheet still offers to finish the rename.
+///
 /// One window is accepted (review 1, L1): a kill between this run's write
 /// and the put-back leaves only this run's record, so the earlier one is lost,
 /// as it always was before U4b2-3. U7 drops the record altogether.
@@ -1487,6 +1496,17 @@ nonisolated struct RenameRecordClaim {
     }
 
     // MARK: - Functions
+
+    /// A whole-course restore has replaced the course under the record
+    /// (`WholeCourseRestore.afterTheCommit`, after the commit, and again by a
+    /// settle that finds the restore done). The record is kept as it is: a
+    /// restore is not the rename that wrote it, and the reader judges the
+    /// record against the restored disk. Until 2026-11-26 the restore
+    /// cleared it (and `dev` cleared it BEFORE the restore), which lost the
+    /// way to finish a rename whose half-renamed folders a later backup held.
+    static func aWholeCourseRestoreReplacedTheCourse(courseDirectory: URL) {
+        // Nothing to write: the record stays byte for byte.
+    }
 
     /// Written BEFORE the rename's step is made, when folders will move.
     /// It names every place this rename has moved: this run's moves and,

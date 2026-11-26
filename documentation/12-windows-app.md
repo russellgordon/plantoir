@@ -7109,6 +7109,79 @@ differs, and why:
 Trail: `backups deleted` (`BackupDeleter.TrailLine`). The UI test
 `AllBackupsUiTests` compiles and has never run (the desktop was locked).
 
+**A whole-course restore is staged on the mac since #909, and Windows owes
+it (#873).** The mac no longer empties a course and refills it: it unpacks the
+backup beside the course, records every move before the first, sets the
+course's items aside (settings first) and moves the backup's in (settings
+last), puts everything back on any failure, and settles a restore a crash
+interrupted at the next reading of the folder. What Windows inherits as data
+is `contracts/course-management.json` → `backups.restoreWholeCourse` and
+`file-formats.json` → `restoreRecord`; the design, the measurements and what
+was rejected are in `documentation/09-mac-app.md` → "Restoring a whole
+course: staged, and settled at the next reading (#909)". What the contract
+cannot carry and Windows must design: NTFS has no clone, so the staging
+folder must be on the course's own volume or every move is a copy; a file
+held open by another program refuses a rename on Windows where it never does
+on the Mac, so the way back will run in ordinary use (`leftAsItWasInUse`),
+with a bounded retry of a sharing violation on each move before it counts as
+a failure; `FileStream.Flush(true)` in place of `F_FULLFSYNC`; and the
+record's `/` paths normalised.
+
+The implementation review's second round (2026-11-14) added five things the
+contract now carries, all as data: the way back keeps `course_config.json`
+aside over a mix (the fault cases' `settingsInTheCourse`); the third refusal
+counts every record but the asking restore's own, which Windows' door must
+be tested end to end to catch (the mac's `WholeCourseRestoreDoorTests`); a
+record's `from` (backups or archived); the refusal `anEarlierRestoreDidNotFinish`;
+and the trail event `course restore left as it was`. One sentence differs by
+platform: `wording.unlockIt` is the placeholder `{unlockInTheFileManager}`,
+filled from `placeholders.unlockInTheFileManager.windows`, a draft for the
+Windows session to check against File Explorer. Explorer can also write
+`desktop.ini` and `Thumbs.db` into a course mid-swap, as the Finder writes
+`.DS_Store`: the way back keeps them as newcomers, and whether
+`keptInPlace` should name them is a contract case to propose.
+
+Round three (2026-11-14) adds, as data: nothing a restore removes may exist
+nowhere else (`backups.restoreWholeCourse.keptFolders`): the record's
+`keepsWhatWasReplaced`, `archiveBegan` and `writtenAfter`, the four kept
+folder names, and the trail event `course restore kept files`. And one
+mechanism the contract can only describe: of two restores of one course
+started together on one computer exactly one goes on, by an advisory lock
+on `courses\_backups\<CODE>\` taken before the first record is written.
+The mac's is `flock`, which the system releases when the process ends;
+Windows needs the same property (a file opened with `FileShare.None` and
+`DeleteOnClose` beside the folder is the likely shape, released by the
+system on exit), measured there before it is trusted. The whole-course
+confirmation's paragraph on what happens to the course as it is now is in
+the contract, one of three by what truly happens (`confirmArchived`,
+`confirmKeptWithItsBackups`, `confirmNoCourseFolder`).
+
+Round four (2026-11-14) adds, as data: whether a file is in the archive is
+read from the archive's own central directory (path, size, recorded time;
+`keptFolders.notInTheArchive` and `notInTheArchiveCases`), so Windows owes a
+zip directory reader (`System.IO.Compression.ZipArchive` lists entries
+without unpacking them; its `LastWriteTime` is the recorded local time);
+the record's `leftOutOnPurpose`; the engine, not the door, decides
+`keepsWhatWasReplaced`; a settle that keeps files says `keptWhatWasInTheFolder` or
+`keptWhatTheArchiveMayNotHold`; and the size beside Backups counts kept
+folders (`backups.keptFoldersCounted`, `wording.keptFoldersTake`).
+`documentation/09-mac-app.md` → "Round four" says what was measured and
+rejected.
+
+The one-section restore follows the same rule (#909 and #911, Russell's
+rulings of 2026-11-25): a `.git`, `node_modules`, `build`, `out` or `dist`
+at any depth inside the section is kept in `<CODE> not in the archive
+<stamp>` beside the backups (`backups.restoreOneSection.leftOutFolders`
+and its cases), and the teacher is told in Russell's words,
+`wording.leftOutKeptOne` (the folder named by its path inside the section,
+parts joined by `/`) or `leftOutKeptMany` (a count), with `{KEPT}` the
+kept folder's own name: at the end of the menu route's finished line
+(`doneJoin`), and in the assistant window as a line of its own after the
+success sentence, which is not changed. Both routes then write
+`section restore kept files` (course, section, how many, the kept
+folder's path; held for #873 in `NamedGapLedger.cs`). Until #873 Windows
+keeps such a folder in its aside copy, as #911 built it, and says nothing.
+
 **A whole course put back leaves `course restored from a backup`** — since
 step 0 of v2.0.0 (2026-11-13), the gap the mac's #572 closed on its side:
 until then a whole-course restore from Backups (Restore…) or from Archived
@@ -17982,9 +18055,10 @@ The bullets above. Correction to W7a's "For W7b": the planners read through the 
   - The file itself is never selected or revealed. There is no Show in File Explorer button, and the file stays hidden (Russell's ruling of 2026-11-25 (a)).
   - When the file is gone, nothing is opened.
 - This copies the Mac's `FolderActions.showInFinder(files:)`: its plan and its order, alert first, then Finder.
-- The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C# and pinned against `wording` by `TheSentencesAreTheContracts`, the house pattern. The app reads no contract at runtime. The two Windows words are new keys beside `wording`, not inside it:
-  - `keptOnWindows.hiddenItems`: "To see it, open View in File Explorer and turn on Hidden items." (true on Windows 10 and 11 alike; the director's wording, awaiting Russell's confirmation).
+- The words read the contract. `keptTitle` and `kept` are retyped as C# and pinned against `wording` by `TheSentencesAreTheContracts`, the house pattern; `keptGone` is Windows' own (below, ruling 9 of 2026-11-26). The app reads no contract at runtime. The three Windows words are new keys beside `wording`, not inside it:
+  - `keptOnWindows.hiddenItems`: "To see it, open View in File Explorer and turn on Hidden items." (true on Windows 10 and 11 alike; the director's wording, which Russell confirmed on 2026-11-26).
   - `keptOnWindows.showKept`: "Open Folder". It is also pinned equal to `shared-rules.json` → `workingFolderPathBar`'s open action `windowsLabel`.
+  - `keptOnWindows.keptGone`: "“{kept}” is no longer there, so the folder was not opened." (Russell's ruling 9 of 2026-11-26). Said in place of `wording.keptGone` when a kept file is gone by the time Open Folder is pressed; `KeptGoneSentence` is pinned against it by `TheSentencesAreTheContracts`, and `TheGoneAlertSaysItsSentenceWithOkAlone`, `AKeptFileGoneByThePressIsSaidAndNothingIsOpened` and `OnlyOpenFolderOpensAndAGoneFileShowsTheGoneAlert` read it. `TheSentencesAreTheContracts` also pins `keptOnWindows`' key set (`hiddenItems`, `showKept`, `keptGone`, `why`). `wording.keptGone` stays in that test's accounted-for list, as `wording.showKept` does, because Windows replaces it with its own key.
   - **Why beside `wording`:** the Mac's `TodaysClassOnTheFrontPageTests.testTheWordingIsTheContracts` compares the WHOLE `wording` dictionary with its own (`XCTAssertEqual(ours, wording)`). A Windows key inside it would turn the Mac red. The section's `fill` sentence said Windows' button "reads 'Show in File Explorer' … to be measured"; it now points at `keptOnWindows`.
   - "File Explorer" is the name of Windows' program and is listed in `plainWordsExceptions`; `NoKeptAlertSentenceSaysATechnicalWord` checks the filled sentences with that name taken out.
 - The ledger no longer holds `keptTitle`, `kept`, `showKept` and `keptGone`: `Reason899W4cKeptAlert` and its `TodaysClassWording` row are gone.
@@ -18259,3 +18333,9 @@ What Windows must do (W8), with the numbers measured here:
 - **Part-way line:** a link at the new name counts as "still called" only where this run moved a link there; any other link at a place the earlier record names or may have moved is "could not tell whether this rename moved these".
 - **Windows today:** `Plantoir.Core/Models/SpecialFolderRenamer.cs` (about 274) moves each place with `Directory.Move` outside the door, and finds the places with `Directory.Exists`, which follows a link; what `Directory.Move` does to a link to a folder on NTFS is not measured here (W8 should check it moves the link, not the target), and its page walk goes through the link (above).
 - **Review 1: two held rows.** The two `stackCases` rows "U4b2-15, Rename folder of a per-section folder that is itself a link …" are held by exact name under `Reason899W8U4b2LinkedFolder`. Each stops at "a key this replay does not check: linkedFolder" (`UndoStackContractTests.KeysChecked`), and behind it the call `renameAPerSectionFolderThatIsALink` is unknown: it runs Rename folder's own plan and apply on piece 14's link fixture and must make the one step `moveALinkToAFolder` makes.
+
+### What #909 owes Windows (W8 and #873, 2026-11-26)
+
+- **One-section restore keeps the folders backups leave out.** Windows' one-section restore (`StagedRestore.cs` section route, and the menu's #911 route): after the swap succeeds, walk the set-aside `section<N>\` (not the outside files), take every item named in `restoreWholeCourse.keptFolders.leftOutNamesKeptAtAnyDepth` at any depth, without descending into it or following a link or junction, and move it to `courses\_backups\<CODE>\<CODE> not in the archive <stamp>\section<N>\…` at its path inside the course; on any failure leave the staged copy for the next reading. Replay `restoreOneSection.leftOutFoldersCases` by both routes. This replaces "Until then Windows keeps it in the aside copy as built" once #909 merges (#873).
+- **A restore and a Rename folder never work on a course at once.** When Windows' W8 runs a Rename folder off the UI thread: every restore (whole course from Backups, a section from Archived, the window's section restore, the menu's) refuses first while a rename of the course is under way in any window, planning or swapping, with `undo.wording.renameFolderUnderWay`, and the restore commands are disabled meanwhile; a rename's passage to its swap refuses while a whole-course restore of the course holds it. Replay `refusalCases`' `folderRenameUnderWay` row then.
+- **Four trail events held for #873.** `NamedGapLedger.cs` holds "course restore left as it was", "course restore stopped part way", "unfinished restore settled" and "course restore kept files" under `Reason873` (Windows' restore will write them and does not yet); no Windows restore behaviour changed. `section restore kept files` (with the one-section sentences `leftOutKeptOne` and `leftOutKeptMany`) is held the same way.

@@ -225,7 +225,11 @@ struct AssistWindowView: View {
             Button(AssistSectionRestore.buttonTitle(sectionNumber: session.sectionNumber)) {
                 isConfirmingRestore = true
             }
-            .disabled(session.agent?.isBusy ?? false)
+            // And while a Rename folder of the course is under way in any
+            // window (#909): the restore refuses then too.
+            .disabled((session.agent?.isBusy ?? false) || AssistSectionRestore.waitsForARename(
+                courseCode: session.courseCode, coursesDirectoryURL: session.coursesDirectoryURL
+            ))
             .accessibilityIdentifier("assistRestoreSectionButton")
         }
         .padding(.horizontal, 12)

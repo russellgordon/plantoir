@@ -1,0 +1,5 @@
+2026-11-26 one-section left-out folders (fix 82c46ed52)
+1 section walk -> [] : RED 11 failures
+2 menu keepStaging removed : RED 2 failures (testAKeptFolderThatCannotBeMadeLeavesTheCopyStaged)
+3 walk stops at section top : RED 4 failures (deeper .git)
+restored: git status clean

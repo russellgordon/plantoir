@@ -2421,3 +2421,11 @@ kind of session can do, measured on the day and written for the next one:
   [UiFact]s written and UNPROVEN (desktop locked): `ClubSettingsUiTests`,
   `CourseSettingsSaveUiTests`, `ListTablesUiTests`, `MarksPoolRemovalUiTests`
   (updated).
+
+## 2026-11-26 — #899 contract small rulings (branch `issue/899-contract-small-rulings`) and #909 notes
+
+- Ruling 3 of 2026-11-26: Russell confirmed `keptOnWindows.hiddenItems` ("To see it, open View in File Explorer and turn on Hidden items."). The "awaiting Russell's confirmation" notes are gone from `contracts/class-planning.json` (`keptOnWindows.why`), documentation 12 and W7b2-9's notes; the sentence is unchanged.
+- Ruling 9 of 2026-11-26: Windows says its own `keptGone`, `todaysClassOnTheFrontPage.keptOnWindows.keptGone`: "“{kept}” is no longer there, so the folder was not opened." It replaces the mac's `wording.keptGone` on Windows only, because Windows' button opens the folder and the file stays hidden. The mac's key and code are unchanged. `TodaysClassOnTheFrontPage.KeptGoneSentence` says it.
+- `contracts/README.md`: `actionTraces` is 162 traces (27 steps in `undo-action-steps.json`, 24 distinct actions, six traces each), not 120; `UndoTraceContractTests.cs`'s summary reads "the action traces (162 today)".
+- `plainWordsCheck` names the scope of its exception: a name in `plainWordsExceptions` is taken out only of the one sentence its `in` names (today `keptOnWindows.hiddenItems`). No behaviour change.
+- #909 owes Windows (details in documentation 12, "What #909 owes Windows"): the one-section restore's left-out folders (W8/#873), the rename-under-way refusal (W8), and five restore trail events held in `NamedGapLedger.cs` under `Reason873`.

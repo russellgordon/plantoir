@@ -462,6 +462,8 @@ internal static class NamedGapLedger
     // The same hold, after the mac's stack 13 (956defd43, #800, #829, #897 piece B, #904).
     private const string Reason829 = "a lease whose start is in WHOLE seconds, compared on whole seconds (the one deploy.sh writes since the mac's #829), is #956's piece of v2.0.0 (Windows' issue for the mac's #829, now closed); until it lands nothing on Windows writes such a lease (deploy.ps1 takes none yet, and this app's own leases carry the start to the microsecond), so no hold here is read as gone this way";
     // The same hold, brought up to dev 39d83a0a7 (2026-11-18): stack 14's #901 piece 901a and #952.
+    // The mac's #909 (2026-11-26): a whole-course restore staged, with a record and a settle at the next reading.
+    private const string Reason873 = "a whole-course restore that is staged, with a record in courses/.internal/restoring and a settle at the next reading (the mac's #909, backups.restoreWholeCourse), is #873's piece of v2.0.0; Windows' restore (#873) will write these events and does not yet: until it lands Windows' whole-course restore empties the course first, stages nothing, keeps no files aside and settles nothing, so none of these four can happen here; and its one-section restore keeps the folders backups leave out in its aside copy (#911), never beside the backups, so 'section restore kept files' (the mac's #909, backups.restoreOneSection.leftOutFolders) cannot happen here either";
     private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
     private const string Reason899Measured = "Windows refuses these editJSON cases until its key order and number reading are measured to match the mac's Foundation (#899 W6 review 2): the mac sorts keys beyond ASCII by Unicode collation, takes canonically equivalent keys (an accent written two ways, the Kelvin sign and K) and a key or text with a byte-order mark in front for one, and reads a number with an exponent and more than 17 digits, or more than 38 without, as a decimal number or not at all; Windows answers cannot tell, or refuses to write, rather than guess";
@@ -750,6 +752,12 @@ internal static class NamedGapLedger
              "#901 piece 901a, shared-rules.json -> siteFiles.followed.limitsRule",
              "The same stop in a preview (siteFiles.words.followLimitStoppedPreview), lifted the same way."),
         Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921NetlifyStep, "netlifyToken"),
+        // The mac's #909 (2026-11-26): the whole-course restore is staged.
+        Owed(ActivityTrailEvents, 873, V200, Reason873,
+             "course restore left as it was", "course restore stopped part way",
+             "unfinished restore settled", "course restore kept files",
+             // The mac's #909 (2026-11-26): a one-section restore keeps the left-out folders beside the backups.
+             "section restore kept files"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")

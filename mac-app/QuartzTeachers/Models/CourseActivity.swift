@@ -92,6 +92,19 @@ enum CourseActivity {
         }
     }
 
+    /// A whole course being restored from a backup (#909), from the click
+    /// until the restore has happened or stopped. It writes a course-wide
+    /// `build` lease (`WorkLeaseRegistry.reconcile`), so another program's
+    /// build of the course declines and a publish set for later waits
+    /// (`workLeases.declining`), for the whole of the archive, the unpack
+    /// and the swap. It does NOT make the course busy for this process's own
+    /// questions: the archive's `CopyRecord` does that while the window can
+    /// still act, and the rest runs without yielding.
+    struct RestoreRecord: Equatable {
+        let folderPath: String
+        let courseCode: String
+    }
+
     /// One course's unit plans being shared, re-passworded or stopped.
     struct PlanWorkRecord: Equatable {
         let folderPath: String
@@ -124,6 +137,7 @@ enum CourseActivity {
         var previewBuildClaims: [PreviewBuildClaim] = []
         var activeCopies: [CopyRecord] = []
         var activePlanWork: [PlanWorkRecord] = []
+        var activeRestores: [RestoreRecord] = []
         var activeFolderRenames: [FolderRenameRecord] = []
         /// Whoever waits for every rename's swap to end: the quit (#899 U4b).
         @ObservationIgnored var folderRenameWaiters: [CheckedContinuation<Void, Never>] = []
@@ -168,6 +182,45 @@ enum CourseActivity {
     /// What each run of the unit plans' launcher is doing (#863).
     static var activePlanWork: [PlanWorkRecord] {
         return store.activePlanWork
+    }
+
+    /// The whole courses being restored right now (#909).
+    static var activeRestores: [RestoreRecord] {
+        return store.activeRestores
+    }
+
+    /// Records that a whole course has started being restored, and takes
+    /// its course-wide `build` lease.
+    static func beginRestore(folderPath: String, courseCode: String) {
+        store.activeRestores.append(RestoreRecord(folderPath: folderPath, courseCode: courseCode))
+        WorkLeaseRegistry.reconcile()
+    }
+
+    /// True while a whole course is being restored from Backups, in any
+    /// window (#909): a Rename folder of it may not begin its swap then
+    /// (`FolderRenameRun.swapBegins`).
+    static func courseIsBeingRestored(folderPath: String, courseCode: String) -> Bool {
+        for restore in store.activeRestores {
+            if restore.courseCode == courseCode && FolderIdentity.isSameFolder(restore.folderPath, folderPath) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Records that one restore of a course has ended, however it ended.
+    static func endRestore(folderPath: String, courseCode: String) {
+        var remaining: [RestoreRecord] = []
+        var didRemoveOne: Bool = false
+        for existing in store.activeRestores {
+            if existing.folderPath == folderPath && existing.courseCode == courseCode && !didRemoveOne {
+                didRemoveOne = true
+                continue
+            }
+            remaining.append(existing)
+        }
+        store.activeRestores = remaining
+        WorkLeaseRegistry.reconcile()
     }
 
     /// Whether any Rename folder has begun its check and swap, in any window
@@ -718,6 +771,7 @@ enum CourseActivity {
         store.previewBuildClaims = []
         store.activeCopies = []
         store.activePlanWork = []
+        store.activeRestores = []
         store.activeFolderRenames = []
         let waiters: [CheckedContinuation<Void, Never>] = store.folderRenameWaiters
         store.folderRenameWaiters = []
