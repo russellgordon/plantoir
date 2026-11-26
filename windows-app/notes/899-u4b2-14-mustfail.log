@@ -24,3 +24,17 @@ S5 (Python) move_state ignores linkSha (a link never holds): RED
   test_check_cases: "judged by the target it names", "a link leading out of the working folder"; test_stack_cases: both U4b2-14 rows
 
 5 of 5 RED.
+
+LOW 3 of review 1: the brief named the "another target" row as S1's; under S1 it passes (following never finds a link, and a non-link is something else either way), so S3 (the target's bytes ignored) is the sabotage that can turn it red, and it does: the same proof, by the one wrong reading that row can catch. S1 itself stays above, red on the rows it can reach.
+
+REVIEW 1 (fixes committed first, 7022c845e)
+RED FIRST (run-r1-red.log, the two Swift fixes stashed): 2 failures
+  testStackCases: "U4b2-14, review 1: a link's move with an edit inside its new place: a step this version cannot read, a barrier" (changedSince, not notAvailable; head nil)
+  testTheStepsOwnFilesAreNeverListedThroughALink: line 815 (the outside's file found through the link)
+R1 moveCarries carries under a link's move: RED, the barrier stack row
+R2 stepsOwnFilesInside lists through a link: RED, testTheStepsOwnFilesAreNeverListedThroughALink:815
+S4 again (run-mf-s4b.log; the check replay now asks the stays-inside check, LOW 2): RED
+  testCheckCases: "a link leading out of the working folder, to a folder that is there" and "judged by the target it names" (its ../library leads nowhere, so a resolved leaf is refused)
+  testALinkItemIsReadWithoutFollowingIt: 790, 791, 792, 795, 796
+R3 (Python) move_carries carries under a link's move: RED, the barrier stack row
+4 of 4 RED; restored each time (git status clean).

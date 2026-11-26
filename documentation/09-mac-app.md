@@ -22817,6 +22817,14 @@ clears the list), where an unknown `linkSha` leaves it with neither `sha` nor
 understand is meant to be. The writers are unchanged: Rename folder still
 refuses a per-section folder that is a link (piece 15), and Insert Class
 still refuses renaming a later class that is a link (`undo.rule.shadow`).
+Review 1 of this piece: a link's move carries no edit (`UndoOp.moveCarries`
+answers false for it), so a step pairing one with an edit under its `to` is
+outside `wholeOps`' exception and not readable, decided from its shape; and
+`UndoSwap.stepsOwnFilesInside` never lists through a link, a guard of its own.
+A relative target is kept as written, so a link moved to another depth leads
+elsewhere; nothing is touched or told, and Undo puts it back. The check
+replay now asks the plan's stays-inside check of a move's places
+(`checkCasesHow`), so the leading-out row runs it, with a target that exists.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
