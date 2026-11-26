@@ -4141,31 +4141,278 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>Carry out the insertion: rename, re-date, relink, then create the blanks.</summary>
-    public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null) =>
-        ApplyInsertClasses(plan, progress, out _, carryPastAFailedNewPage: true);
-
-    /// <param name="created">The full paths of the blank class pages this run
-    /// WROTE — a page already standing at a path is not among them. The
-    /// duplicate asks it, because it is the one question link rewriting and
-    /// date moves cannot fool (#200 A).</param>
-    /// <param name="carryPastAFailedNewPage">
-    /// True for Make Room on its own (#550): a new page whose save FAILS is
-    /// carried past and named, like every other write here, so the renames
-    /// already made are still reported and noted as a change. False for
-    /// <see cref="ApplyDuplicateClass"/>, which asks whether ITS page was
-    /// created and would otherwise tell a teacher "the place for the copy is
-    /// still taken" about a plain write failure: there the failure is noted
-    /// as a change (when anything was written) and thrown, as before.
-    /// </param>
-    private AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress, out List<string> created,
-                                            bool carryPastAFailedNewPage)
+    /// <remarks>
+    /// ONE step through the door (#899 W7b2-1; the mac's
+    /// <c>ClassInsertionPlanner.apply</c>, <c>makeRoomForClasses</c>): each
+    /// rename (the new name written, the old one removed), each link
+    /// rewritten, each date moved and each new page planned, every page read
+    /// through the step, then made together, all or none. A rename whose new
+    /// name is taken and a new page whose name is taken are still carried
+    /// past and named, at plan time; a page that cannot be read or written
+    /// changes nothing ("Nothing was changed: …"), where #550 carried a failed
+    /// write past and said the rest part way. A step the door leaves part way
+    /// says the part-way sentence, naming each kept file.
+    /// </remarks>
+    public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null)
     {
-        created = new List<string>();
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
         // A plan that adds nothing because the dates ran out also changes
         // nothing; its reason is the one actionable sentence, so it is said
         // first (the mac's makeRoomForClasses; #1027 review 2, M2).
+        if (plan.ChangesNothing && plan.Problems.Count == 0)
+            return new AssistResult(true, "Nothing needed moving.", null);
+        if (plan.Added.Count == 0)
+            throw new AssistRefusal(string.Join(" ", plan.Problems),
+                                    string.Join(" ", course.Configuration.ClassNoun == ClassNoun.Meeting
+                                        ? plan.ProblemsForAMeeting ?? plan.Problems : plan.Problems));
+
+        RefuseIfPlantoirIsBuilding(course);
+
+        string backup;
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
+        catch (Exception error)
+        {
+            throw new AssistRefusal(
+                $"{course.Code} couldn’t be backed up, so nothing was moved: {error.Message}");
+        }
+
+        var step = NewUndoStep("makeRoomForClasses", course.Code, section);
+        RoomPlanned room;
+        try
+        {
+            room = PlanTheRoom(plan, progress, step, course, section);
+            // Today's in-memory undo keeps no entry of its own for this (the
+            // mac's rule: `makeRoomForClasses` records none there either), so
+            // the menu's trail line is told when a file was written (#489, M1).
+            if (MakeTheUndoStep(step)) NoteAChangeWithNoUndoEntry();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // All or none: "Nothing was changed" unless the door left a page
+            // holding the new content, said as part way (the mac's
+            // saidWhenTheStepStopped, "the classes you made room among").
+            throw RefusalForAStepThatStopped(error, "the classes you made room among", section);
+        }
+        return room.Reply(this, plan, course, section, backup);
+    }
+
+    /// <summary>What making room planned: the counts the reply says, every one of what the step will WRITE.</summary>
+    private sealed record RoomPlanned(int Created, int Renamed, int Moved, int Links,
+                                      IReadOnlyList<string> Undated, IReadOnlyList<string> NotFinished)
+    {
+        /// <summary>The reply, said once the step is made: as Make Room has always said it.</summary>
+        internal AssistResult Reply(AssistWorkspace workspace, InsertPlan plan, Course course, int section, string backup)
+        {
+            string leftUndone = "";
+            if (Undated.Count > 0) leftUndone += " " + workspace.NewDatesCouldNotBeSet(Undated);
+            if (NotFinished.Count > 0)
+                leftUndone += " " + workspace.ChangeCouldNotFinish(NotFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+
+            string said =
+                (Created > 0 ? AssistWording.MadeRoom(Created, plan.PositionTitle) + " " : "") +
+                $"Renamed {Renamed}, moved {Moved} onto " +
+                $"later class days, and updated {Links} link" +
+                $"{(Links == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
+                AssistWording.LookTheSectionOverBeforePublishing;
+            said += leftUndone;
+
+            // Said because it is TRUE: today's in-memory undo keeps no entry
+            // for this, so "undo that" afterwards reaches back past it. The
+            // mac says the same sentence, on the same condition
+            // (`makeRoomForClasses` → `movesAnythingElse`).
+            if (plan.Renames.Count > 0 || plan.Moves.Count > 0)
+                said += "\n\n" + ClassChangeWording.OtherClassesMoved(backup);
+
+            // A club's teacher reads the mac's line (#1027 review 3, M1).
+            string? forAClubsTeacher = workspace.NounForCourse(course.Code) == ClassNoun.Meeting
+                ? AssistWording.MadeRoomForAMeeting(Created, plan.PositionTitle) + leftUndone
+                : null;
+            return new AssistResult(true, said, backup) { ForTheTeacher = forAClubsTeacher };
+        }
+    }
+
+    /// <summary>
+    /// Plans making room into <paramref name="step"/>, writing nothing: every
+    /// rename as a write of the new name and a remove of the old, every link,
+    /// date and new page, each page read through the step as it will be left.
+    /// </summary>
+    private RoomPlanned PlanTheRoom(InsertPlan plan, IProgress<string>? progress, UndoActionStep step, Course course, int section)
+    {
+        // Every count is of what is PLANNED, as the mac's
+        // ClassInsertionPlanner counts (#422): a rename skipped because its
+        // new name is taken is not "renamed", and links are counted only on a
+        // page that holds them. A page that is not finished is NAMED (by its
+        // name at that moment), never swallowed.
+        var notFinished = new List<string>();
+        int notRenamed = 0, notReDated = 0, notAdded = 0;
+
+        // Highest day first, so a rename never lands on a name still in use.
+        progress?.Report("Renaming the classes that come after…");
+        var renamed = new List<Rename>();
+        foreach (var rename in plan.Renames)
+        {
+            if (!step.Exists(rename.FromPath)) continue;   // nothing there to rename
+            // Taken (a page of the teacher's own, made after the plan was
+            // shown): never written over, and named.
+            if (step.Exists(rename.ToPath)) { notFinished.Add(rename.From); notRenamed++; continue; }
+            string text = step.ReadText(rename.FromPath);
+            step.Write(rename.ToPath, PageFrontmatter.SetTitle(text, rename.To));
+            step.Remove(rename.FromPath);
+            renamed.Add(rename);
+        }
+
+        progress?.Report("Following the links that pointed at them…");
+        int linksUpdated = RewriteLinks(course, section, renamed, step);
+
+        progress?.Report("Moving the dates…");
+        string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+        // A class the writer could not date (#308, the mac's #186) is NAMED —
+        // by its new name, since it is renamed and moved in the step.
+        var undated = new List<string>();
+        // Counted from what is PLANNED (#308 review F1, as the mac's
+        // ClassInsertionPlanner counts): a class declined or already on its
+        // date is not "moved".
+        int moved = 0;
+        // A rename that did not happen leaves its page under the OLD name — and
+        // the new name may be a page of the teacher's own (that is usually why
+        // it did not happen), which must not be given this class's date.
+        var notRenamedTo = plan.Renames.Where(r => !renamed.Contains(r))
+            .Select(r => r.To).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var move in plan.Moves)
+        {
+            string full;
+            try
+            {
+                // Renamed pages are found under their NEW name, in the step.
+                full = notRenamedTo.Contains(move.Title)
+                    ? PagePaths.ResolveInside(_folder, move.RelativePath)
+                    : Path.Combine(ClassFolder(course, section), move.Title + ".md");
+                if (!step.Exists(full)) full = PagePaths.ResolveInside(_folder, move.RelativePath);
+            }
+            catch (Exception error) when (error is not (IOException or UnauthorizedAccessException))
+            {
+                // A page whose place cannot be named (it leads outside the
+                // working folder): carried past and named, as before. A page
+                // that cannot be READ stops the action, changing nothing.
+                notFinished.Add(move.Title);
+                notReDated++;
+                continue;
+            }
+            if (!step.Exists(full)) continue;
+
+            bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+            string key = sectionLocal ? "created" : "createdSection" + section;
+            var edit = PageFrontmatter.SetCreated(step.ReadText(full), key, move.To, tail);
+            // By the name the page has in the step: renamed if its rename is planned.
+            if (edit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(Path.GetFileNameWithoutExtension(full));
+            if (edit.Changed)
+            {
+                step.Write(full, edit.Text);
+                moved++;
+            }
+        }
+        NoteSettingsLeftAsTheyWere("making room for a class", undated.Count, course.Code, section);
+
+        progress?.Report("Adding the new classes…");
+        // The class folder is made by the swap with the pages, never
+        // beforehand, so a refused step leaves no empty folder behind.
+        int created = 0;
+        foreach (var added in plan.Added)
+        {
+            string path = Path.Combine(ClassFolder(course, section), added.Title + ".md");
+            // Still taken: the class whose rename did not happen is there.
+            // Not overwritten, and named rather than counted as made.
+            if (step.Exists(path)) { notFinished.Add(added.Title); notAdded++; continue; }
+            step.Write(path, ClassSkeleton(added, plan.Naming.IsNumbered ? null : plan.Unit, plan.Added.Count, tail));
+            created++;
+        }
+
+        int unfinishedPages = notFinished.Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        if (unfinishedPages > 0)
+            ActivityTrail.Note(ActivityTrail.Event.MakingRoomDidNotFinishEveryPage,
+                $"making room for a class did not finish {(unfinishedPages == 1 ? "1 page" : $"{unfinishedPages} pages")}: " +
+                $"{notRenamed} not renamed, {notReDated} not re-dated, 0 with links not updated, " +
+                $"{notAdded} new not added",
+                course.Code, section);
+
+        return new RoomPlanned(created, renamed.Count, moved, linksUpdated, undated, notFinished);
+    }
+
+    /// <summary>
+    /// Points every link at a renamed page's new name, planned into
+    /// <paramref name="step"/> (the forms that survive are
+    /// <see cref="RewriteLinksFileByFileForDuplicate"/>'s).
+    /// </summary>
+    /// <returns>How many links are rewritten, on the pages planned into the
+    /// step (the shared rewriter's own count, as the plan counts them). Every
+    /// page is read through the step: a renamed page under its new name, never
+    /// the name it no longer has.</returns>
+    private int RewriteLinks(Course course, int section, IReadOnlyList<Rename> renames, UndoActionStep step)
+    {
+        if (renames.Count == 0) return 0;
+        var byName = renames.ToDictionary(r => r.From, r => r.To, StringComparer.OrdinalIgnoreCase);
+        var oldNames = byName.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int links = 0;
+
+        // The section's pages as the step will leave them: those on the disk,
+        // then each page the step writes that is not on the disk yet (a
+        // renamed class under its new name). A page the step removes is
+        // passed over by step.Exists below.
+        var pages = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string relative in Pages(course, section))
+        {
+            string full;
+            try { full = PagePaths.ResolveInside(_folder, relative); }
+            catch { continue; }
+            if (seen.Add(Path.GetFullPath(full))) pages.Add(full);
+        }
+        foreach (string planned in step.PlannedWithContent)
+        {
+            if (planned.EndsWith(".md", StringComparison.OrdinalIgnoreCase) && seen.Add(Path.GetFullPath(planned)))
+                pages.Add(planned);
+        }
+
+        foreach (string full in pages)
+        {
+            if (!step.Exists(full)) continue;
+            // Read through the step; a page that cannot be read stops the
+            // action before anything is written, as every converted action does.
+            string text = step.ReadText(full);
+
+            // Only the TARGET is rewritten; an alias after "|" is the
+            // teacher's own words and stays exactly as written, and so do an
+            // escaping backslash and a link inside code or a comment (#318,
+            // #339) — the one shared rewriter.
+            string updated = WikiLinks.Rewriting(text, byName);
+            if (updated == text) continue;
+
+            step.Write(full, updated);
+            links += WikiLinks.CountLinksTo(oldNames, text);
+        }
+        return links;
+    }
+
+    /// <summary>
+    /// Duplicate Class's room, written FILE BY FILE as Make Room was before
+    /// #899 W7b2-1. Kept only for <see cref="ApplyDuplicateClass"/>, which
+    /// W7b2-2 converts to ONE step and which deletes this path with
+    /// <see cref="RewriteLinksFileByFileForDuplicate"/>.
+    /// </summary>
+    /// <param name="created">The full paths of the blank class pages this run
+    /// WROTE — a page already standing at a path is not among them. The
+    /// duplicate asks it, because it is the one question link rewriting and
+    /// date moves cannot fool (#200 A).</param>
+    /// <remarks>A new page whose save fails is noted as a change (when
+    /// anything was written) and thrown, never carried past: carried past, the
+    /// duplicate would find no page of its own and tell a teacher "the place
+    /// for the copy is still taken" about a plain write failure (#550).</remarks>
+    private AssistResult InsertClassesFileByFileForDuplicate(InsertPlan plan, IProgress<string>? progress, out List<string> created)
+    {
+        created = new List<string>();
+        var course = Course(plan.CourseCode);
+        int section = Section(course, plan.SectionNumber);
         if (plan.ChangesNothing && plan.Problems.Count == 0)
             return new AssistResult(true, "Nothing needed moving.", null);
         if (plan.Added.Count == 0)
@@ -4238,7 +4485,7 @@ public sealed partial class AssistWorkspace
         }
 
         progress?.Report("Following the links that pointed at them…");
-        var (linksUpdated, linkPagesFailed) = RewriteLinks(course, section, renamed);
+        var (linksUpdated, linkPagesFailed) = RewriteLinksFileByFileForDuplicate(course, section, renamed);
         notFinished.AddRange(linkPagesFailed);
         linkPagesNotSaved = linkPagesFailed.Count;
 
@@ -4302,11 +4549,8 @@ public sealed partial class AssistWorkspace
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
-                // Until #550 this one save was not carried past, unlike the
-                // renames and the dates above: a failure here after renames
-                // threw past the note below, so the trail said "changed
-                // nothing" about a section that had been renamed.
-                if (carryPastAFailedNewPage) { notFinished.Add(added.Title); notAdded++; continue; }
+                // The duplicate's own page: noted as a change and thrown,
+                // never carried past (see the remarks).
                 if (created.Count > 0 || renamed.Count > 0 || moved > 0 || linksUpdated > 0) NoteAChangeWithNoUndoEntry();
                 throw;
             }
@@ -4452,7 +4696,8 @@ public sealed partial class AssistWorkspace
         using var recording = UndoHistory.Record(_undo,
             $"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
 
-        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress, out var created, carryPastAFailedNewPage: false);
+        // File by file until W7b2-2 makes the room and the copy ONE step.
+        AssistResult inserted = InsertClassesFileByFileForDuplicate(plan.Insertion, progress, out var created);
 
         // The one case that could destroy a lesson (#200 A, the mac's #163).
         // Asked of the PLANNER — did this run write the page standing there? —
@@ -4550,7 +4795,8 @@ public sealed partial class AssistWorkspace
     /// <returns>How many links were rewritten on pages that were SAVED (the
     /// shared rewriter's own count, as the plan counts them), and the names of
     /// the pages whose rewritten links could not be saved (#422).</returns>
-    private (int Links, List<string> NotSaved) RewriteLinks(Course course, int section, IReadOnlyList<Rename> renames)
+    /// <remarks>Duplicate Class's alone, written file by file until W7b2-2 deletes it with <see cref="InsertClassesFileByFileForDuplicate"/>.</remarks>
+    private (int Links, List<string> NotSaved) RewriteLinksFileByFileForDuplicate(Course course, int section, IReadOnlyList<Rename> renames)
     {
         var notSaved = new List<string>();
         if (renames.Count == 0) return (0, notSaved);

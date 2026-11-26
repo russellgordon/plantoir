@@ -92,6 +92,8 @@ internal sealed class UndoActionStep
     private readonly List<(string FullPath, long Section)> _frontPages = [];
     /// <summary>Planned files today's in-memory undo does not keep (a record beside the pages).</summary>
     private readonly HashSet<string> _notForToday = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Planned files the step removed at some point (a rename's old name), whatever it writes there after.</summary>
+    private readonly HashSet<string> _removedOnce = new(StringComparer.OrdinalIgnoreCase);
 
     // ---- Initializer ---------------------------------------------------------------
 
@@ -165,6 +167,30 @@ internal sealed class UndoActionStep
         if (!todaysUndoKeepsIt) _notForToday.Add(Path.GetFullPath(fullPath));
     }
 
+    /// <summary>
+    /// Plans the file's removal (the mac's <c>remove</c>): the step leaves it
+    /// absent, read as absent through the step from now on. A rename is a
+    /// <see cref="Write"/> of the new name and a remove of the old one, so a
+    /// later write of the old name in the same step (a chain of renames, or a
+    /// new page put where a renamed one stood) is ONE change of that file
+    /// (#899 W7b2-1, Make Room for Classes).
+    /// </summary>
+    internal void Remove(string fullPath) => Plan(fullPath, null);
+
+    /// <summary>Every planned file the step leaves with content, as its full path, in the order first planned.</summary>
+    internal IReadOnlyList<string> PlannedWithContent
+    {
+        get
+        {
+            var present = new List<string>();
+            foreach (string path in _order)
+            {
+                if (_after[path] is not null) present.Add(_shownAs[path]);
+            }
+            return present;
+        }
+    }
+
     /// <summary>Whether today's in-memory undo is told of this planned file.</summary>
     internal bool TodaysUndoKeeps(string fullPath) => !_notForToday.Contains(Path.GetFullPath(fullPath));
 
@@ -216,6 +242,7 @@ internal sealed class UndoActionStep
             _shownAs[key] = fullPath;
         }
         _after[key] = after;
+        if (after is null) _removedOnce.Add(key);
     }
 
     /// <summary>
@@ -337,8 +364,13 @@ internal sealed class UndoActionStep
         {
             if (Same(_before[path], _after[path])) continue;
             // A link is written through, as File.WriteAllText wrote it: the
-            // swap goes in at the file it leads to.
-            string place = PlaceWritten(path);
+            // swap goes in at the file it leads to. A link the step REMOVES
+            // (a rename of a linked page, #899 W7b2-1) is the link itself, as
+            // File.Delete removed it, and so is a page written where it stood
+            // (the next rename in the chain), as Save wrote a plain file
+            // there once the link was gone: the file it leads to is never
+            // touched.
+            string place = _removedOnce.Contains(path) ? path : PlaceWritten(path);
             // Named by its full path: no working folder is there to name it
             // inside, and the refusal's sentence checks the page it names.
             targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
