@@ -42,6 +42,7 @@ nonisolated enum UndoContractKinds {
         "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt", "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt",
         "finderRecordsAWindowInTheMadeFolder",
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
+        "moveALinkToAFolder",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -59,6 +60,14 @@ nonisolated enum UndoContractKinds {
     /// U4b2-10: the file `moveAFolderWithAFileMadeInANewFolderInside` makes,
     /// in a folder (`sub`) the step makes for it inside the moved folder.
     static let madeFolderFile: String = "courses/TST1O/renamed/sub/x.md"
+
+    /// U4b2-14: the link `moveALinkToAFolder` moves, where, what it holds,
+    /// and the folder elsewhere in the course it leads to.
+    static let linkFrom: String = "courses/TST1O/section1/media"
+    static let linkTo: String = "courses/TST1O/section1/renamed"
+    static let linkTarget: String = "../library"
+    static let linkedLibrary: String = "courses/TST1O/library"
+    static let libraryFiles: [String: String] = ["a.md": "A\n", "pictures/b.md": "B\n"]
 
     static let asidePage: String = "courses/TST1O/old/a.md"
     static let asidePageMoved: String = "courses/TST1O/a.md"
@@ -433,6 +442,22 @@ nonisolated enum UndoContractKinds {
                 return "couldNotRename"
             }
             return nil
+        case "moveALinkToAFolder":
+            // U4b2-14: one step, a link to a folder elsewhere in the course
+            // moved as itself, judged by the target it holds.
+            if !somethingIsAt(linkFrom, in: root) && !somethingIsAt(linkTo, in: root) {
+                for (name, content) in libraryFiles {
+                    try UndoContractReplay.write(content, to: linkedLibrary + "/" + name, in: root)
+                }
+                try FileManager.default.createDirectory(
+                    at: root.appendingPathComponent(linkFrom).deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try FileManager.default.createSymbolicLink(
+                    atPath: root.appendingPathComponent(linkFrom).path, withDestinationPath: linkTarget
+                )
+            }
+            let move: UndoOp = UndoOp.moveLink(from: linkFrom, to: linkTo, linkSha: UndoHash.sha256(of: Data(linkTarget.utf8)))
+            return word(JournaledWrite.perform(ops: draft(ops: [move], blobs: [], root: root, action: "renameFolder"), in: journal, mode: .live, places: places))
         case "addAFileInsideTheMovedFolder":
             try UndoContractReplay.write("C\n", to: renamedFolder + "/c.md", in: root)
             return nil
@@ -534,6 +559,37 @@ nonisolated enum UndoContractKinds {
             Array(first.utf8).lexicographicallyPrecedes(Array(second.utf8))
         }
         return inByteOrder.joined(separator: ", ")
+    }
+
+    /// U4b2-14's `linkedFolder`: which place holds the link (renamed, media,
+    /// both or neither), the target it holds there (`notALink` when what is
+    /// there is not a link), and whether the folder it leads to is exactly
+    /// as the call made it (`untouched`, else `changed`).
+    static func linkedFolder(in root: URL) -> String {
+        let atNew: Bool = somethingIsAt(linkTo, in: root)
+        let atOld: Bool = somethingIsAt(linkFrom, in: root)
+        var place: String = "neither"
+        var link: String = linkTo
+        if atNew && atOld {
+            place = "both"
+        } else if atNew {
+            place = "renamed"
+        } else if atOld {
+            place = "media"
+            link = linkFrom
+        }
+        var target: String = "notALink"
+        if let bytes = UndoTreeReading.linkTarget(at: root.appendingPathComponent(link)), let text = UndoText.decode(bytes) {
+            target = text
+        }
+        var files: [UndoTreeListing.File] = []
+        for (path, content) in libraryFiles {
+            files.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: Data(content.utf8))))
+        }
+        let made: UndoTreeListing = UndoTreeListing(folders: ["pictures"], files: files)
+        let now: String? = UndoTreeReading.read(at: root.appendingPathComponent(linkedLibrary)).listingSha
+        let library: String = now == made.sha ? "untouched" : "changed"
+        return place + ", " + target + ", " + library
     }
 
     /// The spelling courses/TST1O lists for the folder a capitalisation-only

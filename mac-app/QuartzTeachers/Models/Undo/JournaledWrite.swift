@@ -484,7 +484,7 @@ nonisolated enum JournaledWrite {
         // 2. Every path inside the working folder, its links resolved.
         for op in readBack.ops {
             for path in op.pathsNamed {
-                guard let root = draft.workingFolderURL, UndoPlaces.staysInside(root, path) else {
+                guard let root = draft.workingFolderURL, UndoPlaces.staysInside(root, path, namedBy: op) else {
                     return .refused
                 }
             }

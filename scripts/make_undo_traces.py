@@ -993,7 +993,8 @@ def tree_reading(item):
             return ("other",)
         return ("tree", listing_sha(item["tree"]))
     if "link" in item:
-        return ("other",)
+        # U4b2-14: a link is read by the bytes it holds, never followed.
+        return ("link", sha(item["link"]))
     if "treeSha" in item:
         return ("tree", item["treeSha"])
     if item.get("folder"):
@@ -1015,6 +1016,9 @@ def move_state(op, at_from, at_to, listed_as=None):
             return "free"
         if "sha" in op:
             return "holds" if reading == ("file", op["sha"]) else "else"
+        if "linkSha" in op:
+            # U4b2-14: a link moved as itself, judged by its target.
+            return "holds" if reading == ("link", op["linkSha"]) else "else"
         return "holds" if reading == ("tree", op["listingSha"]) else "else"
     source, destination = side(at_from), side(at_to)
     if source == "free" and destination == "holds":
@@ -1026,7 +1030,7 @@ def move_state(op, at_from, at_to, listed_as=None):
 
 def tree_state(op, item):
     reading = tree_reading(item)
-    if reading[0] in ("file", "other"):
+    if reading[0] in ("file", "other", "link"):
         return "neither"
     present = reading[0] == "tree"
     if present and reading[1] != op["listingSha"]:
@@ -1450,11 +1454,14 @@ DEPLOYED_MARKER = "{\"site_id\": \"this-year\"}"
 
 def page_item(value):
     """A model page as an item spec: text, a tree (("tree", listing sha)),
-    a preference value, or absent (None)."""
+    a link (("link", its target), U4b2-14), a preference value, or absent
+    (None)."""
     if value is None:
         return {"absent": True}
     if isinstance(value, tuple) and value[0] == "tree":
         return {"treeSha": value[1]}
+    if isinstance(value, tuple) and value[0] == "link":
+        return {"link": value[1]}
     return {"text": value}
 
 

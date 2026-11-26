@@ -405,7 +405,7 @@ def readable_op(op):
     for key in ("blobs",):
         if key in op and not (isinstance(op[key], list) and all(is_blob_name(name) for name in op[key])):
             return False
-    for key in ("beforeSha", "afterSha", "sha", "listingSha"):
+    for key in ("beforeSha", "afterSha", "sha", "listingSha", "linkSha"):
         if key in op and op[key] is not None and not is_blob_name(op[key]):
             return False
     if kind in ("move", "moveApart", "setAside"):
@@ -413,7 +413,8 @@ def readable_op(op):
             return False
         if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op):
             return False
-        return ("sha" in op) != ("listingSha" in op)
+        # Exactly one of sha, listingSha and linkSha (U4b2-14).
+        return [key in op for key in ("sha", "listingSha", "linkSha")].count(True) == 1
     if kind == "external":
         target = op.get("target")
         if "path" in op or not isinstance(target, str) or ":" not in target:
@@ -538,6 +539,8 @@ class ContractCaseTests(unittest.TestCase):
             op["afterSha"] = None if op.get("afterText") is None else traces.sha(op["afterText"])
         if "contentText" in op:
             op["sha"] = traces.sha(op.pop("contentText"))
+        if "linkTarget" in op:
+            op["linkSha"] = traces.sha(op.pop("linkTarget"))
         if "listing" in op:
             tree = op.pop("listing")
             op["listingSha"] = traces.listing_sha(tree)
@@ -676,7 +679,7 @@ class ContractCaseTests(unittest.TestCase):
                   "keptWhatItReplacedSays",
                   # Review 1 of U4b2-10: empty folders, which the model does
                   # not hold (folder_of_pages); the Swift replay checks it.
-                  "foldersInside"}
+                  "foldersInside", "linkedFolder"}
 
     # U4b2-4: the two pages wholeFileStepOnTwoPagesNamedIndex writes.
     TWO_PAGES_NAMED_INDEX = ("courses/TST1O/Section 1/Classes/index.md", "courses/TST1O/Section 2/Classes/index.md")
@@ -829,6 +832,15 @@ class ContractCaseTests(unittest.TestCase):
         if call == "forgetTheMaintainer":
             model.maintainer_registered = False
             return None
+        if call == "moveALinkToAFolder":
+            # U4b2-14: a link to a folder elsewhere in the course, moved as
+            # itself and judged by its target.
+            if pages.get(self.LINK_FROM) is None and pages.get(self.LINK_TO) is None:
+                for name, text in self.LIBRARY_FILES.items():
+                    pages[self.LIBRARY + "/" + name] = text
+                pages[self.LINK_FROM] = ("link", self.LINK_TARGET)
+            return model.ops_step([{"kind": "move", "from": self.LINK_FROM, "to": self.LINK_TO,
+                                    "linkSha": traces.sha(self.LINK_TARGET)}])
         if call == "moveAFolderWithAPageEditedInside":
             if traces.folder_of_pages(pages, self.MEDIA) is None and traces.folder_of_pages(pages, self.RENAMED) is None:
                 for name, text in self.MEDIA_FILES.items():
@@ -934,6 +946,30 @@ class ContractCaseTests(unittest.TestCase):
                 return spelling.rsplit("/", 1)[1] + ", " + page
         return "none"
 
+    LINK_FROM = "courses/TST1O/section1/media"
+    LINK_TO = "courses/TST1O/section1/renamed"
+    LINK_TARGET = "../library"
+    LIBRARY = "courses/TST1O/library"
+    LIBRARY_FILES = {"a.md": "A\n", "pictures/b.md": "B\n"}
+
+    def linked_folder(self, model):
+        """U4b2-14's linkedFolder: which place holds the link, its target
+        there, and whether the folder it leads to is as the call made it."""
+        at_new, at_old = model.pages.get(self.LINK_TO), model.pages.get(self.LINK_FROM)
+        place, link = "neither", at_new
+        if at_new is not None and at_old is not None:
+            place = "both"
+        elif at_new is not None:
+            place = "renamed"
+        elif at_old is not None:
+            place, link = "media", at_old
+        target = link[1] if isinstance(link, tuple) and link[0] == "link" else "notALink"
+        library = {}
+        for name in self.LIBRARY_FILES:
+            library[name] = model.pages.get(self.LIBRARY + "/" + name)
+        untouched = "untouched" if library == self.LIBRARY_FILES else "changed"
+        return place + ", " + target + ", " + untouched
+
     def moved_folder(self, model):
         """U4b's movedFolder: which place holds the folder, then what its
         a.md holds."""
@@ -985,7 +1021,8 @@ class ContractCaseTests(unittest.TestCase):
                   "leaveAKeptCopyInsideTheMovedFolder", "moveThePageIntoAFolder", "moveThePageBetweenFolders",
                   "linkItsNewFolderOutside", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder",
                   "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt",
-                  "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt", "finderRecordsAWindowInTheMadeFolder")
+                  "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt", "finderRecordsAWindowInTheMadeFolder",
+                  "moveALinkToAFolder")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -1250,6 +1287,8 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(self.moved_folder(model), case["movedFolder"])
                 if "madeFolder" in case:
                     self.assertEqual(self.made_folder(model), case["madeFolder"])
+                if "linkedFolder" in case:
+                    self.assertEqual(self.linked_folder(model), case["linkedFolder"])
                 if "caseOnlyFolder" in case:
                     self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
                 if "folderKept" in case:
