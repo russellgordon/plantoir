@@ -309,6 +309,13 @@ struct StringListEditorView: View {
                     haltARenameStillPlanning()
                 }
         }
+        // And when the list itself leaves the window (U4b2-8): the sheet
+        // goes with it, but its own `.onDisappear` is not called then
+        // (measured 2026-11-26, the list hosted off screen and taken out:
+        // the sheet closed, the rename planned on).
+        .onDisappear {
+            haltARenameStillPlanning()
+        }
     }
 
     // MARK: - The table

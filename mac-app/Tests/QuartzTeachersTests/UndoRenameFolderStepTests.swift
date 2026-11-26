@@ -1,4 +1,6 @@
 import XCTest
+import AppKit
+import SwiftUI
 @testable import QuartzTeachers
 
 /// U4b of #899: Rename folder (Course Settings) is ONE step through the
@@ -985,6 +987,205 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertTrue(source.contains("let cancelIsDisabled: Bool = !renameRun.canBeHalted"))
     }
 
+    /// The real rename sheet, hosted off screen (U4b2-8, U4b2-7 review 2's
+    /// LOW-a): its own Rename button, pressed through accessibility as
+    /// VoiceOver presses it, starts the run with the closure the sheet was
+    /// handed, the plan is held at its first page, and its own Cancel button
+    /// halts the rename at once and closes the sheet, with nothing written.
+    /// Runs the view's real chain, so a halt commented out, moved into a
+    /// fresh `Task`, or put on the wrong button fails here where a reading
+    /// of the source would pass. MUST FAIL with Cancel not halting through
+    /// the run.
+    func testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet() throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
+        let run: FolderRenameRun = FolderRenameRun()
+        let host: TableHost = hostTheRenameSheet(of: view, run: run, returned: returned)
+        defer {
+            host.close()
+        }
+        XCTAssertNotNil(host.window.attachedSheet, "the rename sheet did not open")
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(host.window)
+
+        XCTAssertTrue(RenameSheetButtons.press("Rename", inWindowTitled: host.window.title), "the sheet has no Rename button to press")
+        wait(for: [reached], timeout: 30)
+        XCTAssertTrue(run.isRenaming, "the sheet's Rename did not start its run")
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+
+        XCTAssertTrue(RenameSheetButtons.press("Cancel", inWindowTitled: host.window.title), "the sheet has no Cancel button to press")
+        // The halt is in the button's own turn: the run's task is cancelled
+        // before the press returns.
+        XCTAssertNil(run.renameTask, "Cancel did not halt the rename in its own turn")
+        let waited: XCTWaiter.Result = XCTWaiter().wait(for: [returned], timeout: 30)
+        if waited != .completed {
+            gate.open()
+            XCTFail("the sheet's Cancel did not reach the held plan")
+            return
+        }
+        host.pump(0.3)
+
+        XCTAssertFalse(run.isRenaming)
+        XCTAssertNil(host.window.attachedSheet, "Cancel did not close the sheet")
+        XCTAssertFalse(course.isRenamingAFolder, "the course is still held after Cancel")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try Data(contentsOf: course.configFileURL), settingsBefore)
+        XCTAssertEqual(try journal().read().records.count, 0)
+    }
+
+    /// The real rename sheet going away while its rename only plans
+    /// (U4b2-8, U4b2-7 review 2's LOW-a): the list it hangs from leaves the
+    /// window (as Course Settings closing takes it away), the sheet goes
+    /// with it, the sheet's own `.onDisappear` halts the run, and the rename
+    /// returns without the held read, with nothing written. The halt is the
+    /// list's own `.onDisappear`: the sheet's is not called when the list
+    /// takes it away (measured 2026-11-26). MUST FAIL with the list's
+    /// `.onDisappear` not halting.
+    func testTheRealSheetGoingAwayHaltsAHeldPlan() throws {
+        let course: Course = try course()
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        let before: [String: Data] = pages(of: course)
+        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
+        let gate: RenameHold = RenameHold(reached: reached)
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
+        let run: FolderRenameRun = FolderRenameRun()
+        let shown: RenameSheetShown = RenameSheetShown()
+        let host: TableHost = hostTheRenameSheet(of: view, run: run, returned: returned, shown: shown)
+        defer {
+            host.close()
+        }
+        XCTAssertNotNil(host.window.attachedSheet, "the rename sheet did not open")
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(host.window)
+        XCTAssertTrue(RenameSheetButtons.press("Rename", inWindowTitled: host.window.title), "the sheet has no Rename button to press")
+        wait(for: [reached], timeout: 30)
+        XCTAssertTrue(run.isRenaming, "the sheet's Rename did not start its run")
+
+        shown.isShown = false
+        let waited: XCTWaiter.Result = XCTWaiter().wait(for: [returned], timeout: 30)
+        if waited != .completed {
+            gate.open()
+            XCTFail("the sheet going away did not halt the held plan")
+            return
+        }
+        host.pump(0.3)
+
+        XCTAssertNil(host.window.attachedSheet, "the sheet did not go away with its list")
+        XCTAssertFalse(run.isRenaming)
+        XCTAssertFalse(course.isRenamingAFolder, "the course is still held after the sheet went away")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try journal().read().records.count, 0)
+    }
+
+    /// The per-section folders list as Course Settings builds it, with its
+    /// rename sheet already open on Tasks and Assessments typed, hosted off
+    /// screen. Its rename is the sheet's own closure, wrapped only to say
+    /// when it returned.
+    func hostTheRenameSheet(
+        of view: CourseSettingsView, run: FolderRenameRun, returned: XCTestExpectation,
+        shown: RenameSheetShown = RenameSheetShown()
+    ) -> TableHost {
+        let configuration: CourseConfiguration = view.course.configuration
+        let sheetRename: (String, String) async -> RenameResult = view.renameFromTheSheet(scope: .perSection)
+        let editor: StringListEditorView = StringListEditorView(
+            title: "Per-section folders",
+            removalTrail: view.removalTrail(for: .perSectionFolders),
+            items: Binding(
+                get: { return configuration.perSectionFolders },
+                set: { newValue in configuration.perSectionFolders = newValue }
+            ),
+            onRename: { oldName, newName in
+                let result: RenameResult = await sheetRename(oldName, newName)
+                returned.fulfill()
+                return result
+            },
+            renameCanNoLongerBeHalted: view.renameSwapHasBegun,
+            pendingRename: PendingRename(item: "Tasks", interruptedRenameTarget: nil),
+            proposedName: "Assessments",
+            renameRun: run
+        )
+        SheetsHungOffScreenStayThere.install()
+        let host: TableHost = TableHost(RenameSheetRoot(shown: shown, editor: editor))
+        host.window.title = "rename-sheet-\(UUID().uuidString)"
+        host.pump(0.6)
+        return host
+    }
+
+    /// A second quit request while a quit is going ahead (U4b2-8, U4b2-7
+    /// review 2's LOW-b). AppKit can ask again during a `.terminateLater`
+    /// wait (it runs the run loop in the modal panel mode, which takes a
+    /// second ⌘Q or a log out), so the request is answered `.terminateLater`
+    /// before anything is asked: never the work-under-way question again,
+    /// and never `.terminateCancel` with the latch set. Before any quit has
+    /// gone ahead, a request is answered as always. The delegate asks this
+    /// first, before the question (its first statement, comments aside).
+    /// MUST FAIL with the answer ignoring the latch, and with the delegate
+    /// not asking it first.
+    func testASecondQuitRequestWhileAQuitGoesAheadAsksNothingAndRefusesNothing() throws {
+        XCTAssertNil(AppDelegate.answerWhileAQuitGoesAhead(), "a first quit request is answered early")
+
+        _ = AppDelegate.quitWaitsAfterHaltingWhatOnlyPlans()
+
+        XCTAssertEqual(
+            AppDelegate.answerWhileAQuitGoesAhead(), .terminateLater,
+            "a second quit request while a quit goes ahead would be asked again, and could be refused"
+        )
+        let sourceURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QuartzTeachersTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mac-app
+            .appendingPathComponent("QuartzTeachers/App/AppDelegate.swift")
+        let source: String = try String(contentsOf: sourceURL, encoding: .utf8)
+        let statements: [String] = UndoRenameFolderStepTests.codeLines(
+            after: "func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {", in: source
+        )
+        XCTAssertGreaterThan(statements.count, 2)
+        if statements.count > 2 {
+            XCTAssertEqual(statements[0], "return MainActor.assumeIsolated {")
+            XCTAssertEqual(
+                statements[1], "if let answer = AppDelegate.answerWhileAQuitGoesAhead() {",
+                "the delegate does not ask about a quit already going ahead first"
+            )
+            XCTAssertEqual(statements[2], "return answer")
+        }
+    }
+
+    /// The lines of code after `signature`, trimmed, with blank lines and
+    /// comment lines left out, so a line commented out does not count.
+    static func codeLines(after signature: String, in source: String) -> [String] {
+        guard let start = source.range(of: signature) else {
+            XCTFail("no \(signature) in the source")
+            return []
+        }
+        var lines: [String] = []
+        for line in source[start.upperBound...].split(separator: "\n") {
+            let trimmed: String = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("//") {
+                continue
+            }
+            lines.append(trimmed)
+            if lines.count == 10 {
+                break
+            }
+        }
+        return lines
+    }
+
     /// The text of a function, from its signature to the next function or
     /// section in the same type.
     static func body(of signature: String, in source: String) -> String {
@@ -1728,6 +1929,77 @@ final class RenameHold: @unchecked Sendable {
         isOpen = true
         condition.broadcast()
         condition.unlock()
+    }
+}
+
+/// Whether the hosted list, and so its rename sheet, is in the window.
+@MainActor
+@Observable
+final class RenameSheetShown {
+
+    // MARK: - Stored properties
+
+    var isShown: Bool = true
+}
+
+/// The hosted list while `shown` says so, and nothing after (U4b2-8).
+struct RenameSheetRoot: View {
+
+    // MARK: - Stored properties
+
+    var shown: RenameSheetShown
+    let editor: StringListEditorView
+
+    // MARK: - Body
+
+    var body: some View {
+        if shown.isShown {
+            editor
+        } else {
+            Color.clear
+        }
+    }
+}
+
+/// Finds a button in a window by the name VoiceOver reads, and presses it
+/// the way VoiceOver does (U4b2-8): through the accessibility API an
+/// assistive app uses (`AccessibilityTree`), which is also what makes
+/// SwiftUI build the tree at all (asked in process, it has no children).
+@MainActor
+enum RenameSheetButtons {
+
+    // MARK: - Functions
+
+    /// Presses the one button named `name` in the window titled
+    /// `windowTitle`, sheet included. False when there is none.
+    static func press(_ name: String, inWindowTitled windowTitle: String) -> Bool {
+        let application: AXUIElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        var matching: [AXUIElement] = []
+        for window in AccessibilityTree.elementList(of: application, attribute: kAXWindowsAttribute) {
+            if AccessibilityTree.text(of: window, attribute: kAXTitleAttribute) == windowTitle {
+                collectButtons(named: name, under: window, into: &matching, depth: 0)
+            }
+        }
+        if matching.count != 1 {
+            return false
+        }
+        return AXUIElementPerformAction(matching[0], kAXPressAction as CFString) == .success
+    }
+
+    static func collectButtons(named name: String, under node: AXUIElement, into found: inout [AXUIElement], depth: Int) {
+        if depth > 60 {
+            return
+        }
+        if AccessibilityTree.text(of: node, attribute: kAXRoleAttribute) == kAXButtonRole {
+            let title: String = AccessibilityTree.text(of: node, attribute: kAXTitleAttribute)
+            let description: String = AccessibilityTree.text(of: node, attribute: kAXDescriptionAttribute)
+            if title == name || description == name {
+                found.append(node)
+            }
+        }
+        for child in AccessibilityTree.elementList(of: node, attribute: kAXChildrenAttribute) {
+            collectButtons(named: name, under: child, into: &found, depth: depth + 1)
+        }
     }
 }
 

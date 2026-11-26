@@ -144,6 +144,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// shrinks to nothing.
     nonisolated func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         return MainActor.assumeIsolated {
+            // A second request while a quit is already going ahead (U4b2-8,
+            // U4b2-7 review 2's LOW-b) asks nothing and starts nothing: the
+            // first quit's own answer ends the app.
+            if let answer = AppDelegate.answerWhileAQuitGoesAhead() {
+                return answer
+            }
             // Why this quit is happening, read FIRST (#560): the Apple
             // event's quit reason is only there while this request is being
             // handled, so read inside the `.terminateLater` wait below it
@@ -205,6 +211,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return AppDelegate.finishTerminating()
         }
+    }
+
+    /// The answer to a quit request that arrives while an earlier quit is
+    /// already going ahead (U4b2-8): `.terminateLater`, asking nothing,
+    /// halting nothing more and waiting for nothing new. Nil when no quit
+    /// is going ahead, and the request is answered as every quit is.
+    ///
+    /// AppKit can ask again during a `.terminateLater` wait: Apple's
+    /// documentation of `NSApplication.TerminateReply.terminateLater` says
+    /// Cocoa then runs the run loop in `NSModalPanelRunLoopMode` until
+    /// `reply(toApplicationShouldTerminate:)`, a mode in which a sheet takes
+    /// input, and nowhere says `terminate(_:)` is ignored meanwhile; so a
+    /// second ⌘Q, or a log out, may reach the delegate. Asked again, the
+    /// work-under-way question could be answered "keep working" and the
+    /// request refused with `.terminateCancel` while the first quit, with
+    /// `FolderRenameRun.quitIsGoingAhead` set and every Rename disabled,
+    /// still replies yes later. `.terminateLater` refuses nothing: the
+    /// first quit's reply (or the set-aside update's) ends the process,
+    /// whichever request AppKit is waiting on. The latch is set only once
+    /// a quit has gone ahead, and nothing clears it, so it is the one
+    /// test of "a quit is already going ahead".
+    static func answerWhileAQuitGoesAhead() -> NSApplication.TerminateReply? {
+        if FolderRenameRun.quitIsGoingAhead {
+            return .terminateLater
+        }
+        return nil
     }
 
     /// Whether a quit going ahead must first wait (`.terminateLater`) for
