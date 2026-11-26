@@ -192,10 +192,12 @@ public sealed class UndoMadeFoldersTests
             scribe.OpsFor(To + "/sub/x.md", null, X)[0]!.DeepClone());
         Assert.Equal(UndoOutcomeKind.Applied, scribe.Door().Perform(scribe.OpsDraft("A", ops, [p, X])).Kind);
         var removing = new List<string>();
+        var swapped = new List<string>();
         var seams = new UndoSeams
         {
             AfterTheCheck = () => scribe.WritePage("A", page, Encoding.UTF8.GetBytes("Hand.\n")),
             RemovingAFolderLeftOut = removing.Add,
+            BeforeEachSwap = (_, fullPath) => swapped.Add(Path.GetFullPath(fullPath)),
         };
 
         UndoOutcome undo = scribe.Door(seams).Undo();
@@ -205,12 +207,22 @@ public sealed class UndoMadeFoldersTests
         Assert.Empty(removing);
         Assert.Equal(X, scribe.Page("A", To + "/sub/x.md"));
         Assert.Empty(scribe.StagedLeftovers("A"));
+        // The move went in (and named sub) before the page's swap was refused.
+        Assert.True(swapped.IndexOf(Path.GetFullPath(scribe.FullPath("A", From))) is >= 0 and var moveAt && moveAt < swapped.IndexOf(Path.GetFullPath(scribe.FullPath("A", page))));
+    }
 
-        // The same step undone with nothing in the way names sub and removes it.
-        scribe.WritePage("A", page, p);
-        var removed = new List<string>();
-        Assert.Equal(UndoOutcomeKind.Undone, scribe.Door(new UndoSeams { RemovingAFolderLeftOut = removed.Add }).Undo().Kind);
-        Assert.Single(removed);
+    /// <summary>The same step undone with nothing in the way names sub to the tidy, which removes it.</summary>
+    [Fact]
+    public void TheTidyOfFoldersLeftOutRunsOnceEverySwapIsIn()
+    {
+        using UndoScribe scribe = MediaFolder();
+        Assert.Equal(UndoOutcomeKind.Applied, StepMaking(scribe, "sub/x.md").Kind);
+        var removing = new List<string>();
+
+        Assert.Equal(UndoOutcomeKind.Undone, scribe.Door(new UndoSeams { RemovingAFolderLeftOut = removing.Add }).Undo().Kind);
+
+        Assert.Equal([Path.GetFullPath(scribe.FullPath("A", From + "/sub"))], removing.Select(folder => Path.GetFullPath(folder)).ToList());
         Assert.False(Directory.Exists(scribe.FullPath("A", From + "/sub")));
+        Assert.Empty(scribe.StagedLeftovers("A"));
     }
 }

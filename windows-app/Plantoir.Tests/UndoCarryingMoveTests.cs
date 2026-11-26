@@ -386,7 +386,7 @@ public sealed class UndoCarryingMoveTests
         Assert.Empty(scribe.StagedLeftovers("A"));
     }
 
-    /// <summary>LOW 1: the folder's rename refused (a file inside it held open by another program) names the place it leaves, as the mac's moveHere names it, never a destination that does not exist yet.</summary>
+    /// <summary>LOW 1: the folder's rename refused (a file inside it held open by another program, readable, so the last look can still judge the folder) names the place it leaves, as the mac's moveHere names it, never a destination that does not exist yet.</summary>
     [Fact]
     public void AFolderRenameThatFailsNamesThePlaceItLeaves()
     {
@@ -398,7 +398,7 @@ public sealed class UndoCarryingMoveTests
         {
             BeforeEachSwap = (index, _) =>
             {
-                if (index == 0) held ??= new FileStream(scribe.FullPath("A", From + "/b.md"), FileMode.Open, FileAccess.Read, FileShare.None);
+                if (index == 0) held ??= new FileStream(scribe.FullPath("A", From + "/b.md"), FileMode.Open, FileAccess.Read, FileShare.Read);
             },
         };
         UndoOutcome redo;
