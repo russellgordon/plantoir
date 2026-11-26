@@ -22764,7 +22764,8 @@ whose listing matches `listingSha` is what the content lacked (two sets give
 two listings, so at most one matches). Up to eight candidates (at most 256
 hashes) every such set is tried; beyond eight only all or none, so a step
 with more, some of the content's own, is refused as changed since, which
-takes nothing back. The swap's last look before the rename names the folders
+takes nothing back and, as every change since does, clears the list (U4b2-14
+made the contract's sentence say so). The swap's last look before the rename names the folders
 left out, and once every swap has gone in and the tidy has removed the
 step's own files, `UndoSwap.removeAFolderLeftOut` removes each where it now
 is: first a lone `.DS_Store` if it is a regular file (the Finder writes one
@@ -22785,6 +22786,37 @@ with one gap: a process killed after the tidy and before the folder is
 removed leaves an empty made folder, which recovery then reads as a change
 (by review 1's reading of the code, not run) and settles the step as changed
 by hand, clearing the list and leaving the empty folder; nothing is lost.
+
+### U4b2: a-moved-link-is-judged-by-its-bytes
+
+A `move` whose item is a symbolic link now moves the link itself and is
+judged by `linkSha`, the SHA-256 of the target the link holds (read with
+`readlink`), exactly as a `link` line in a folder's listing already judged a
+link inside a moved folder (`file-formats.json` → `undoJournal.opKinds.move`).
+Before this piece the door could not say it: `UndoTreeReading.read` found no
+folder at the link and answered `.notATree`, so any move of a linked folder
+was refused. One place each: `UndoOp.linkSha` and `UndoOp.moveLink` (the op
+is readable with exactly one of `sha`, `listingSha` and `linkSha`);
+`UndoMoveSide.readLink` (an `lstat` and a `readlink` on the link, never
+followed), called first from `readNamingFoldersLeftOut`, which the check,
+the swap's last look and recovery all go through; and
+`UndoPlaces.staysInside(_:_:namedBy:)`, which resolves only the folders above
+a link move's `from` and `to`, so a link leading out of the working folder,
+or nowhere, is moved as a link and its target is never read (the plan's and
+the swap's leaves-the-folder checks and the door's own check call it). The
+swap renames the link with the same `renamex_np` it uses for any move, and no
+longer walks a link move's `from` for the step's own files, since that walk
+would read through the link. Rows: four `checkCases` (the op key
+`linkTarget`), two `stackCases` (call `moveALinkToAFolder`, key
+`linkedFolder`); held on Windows under `Reason899W8U4b`, where a move with
+neither `sha` nor `listingSha` is not readable. **Rejected:** a one-line
+listing `link <sha> .` under `listingSha`: an older reader would take it for a
+folder's listing and judge a link as a changed folder (changed since, which
+clears the list), where an unknown `linkSha` leaves it with neither `sha` nor
+`listingSha`, so it cannot read the op at all, the barrier a step it does not
+understand is meant to be. The writers are unchanged: Rename folder still
+refuses a per-section folder that is a link (piece 15), and Insert Class
+still refuses renaming a later class that is a link (`undo.rule.shadow`).
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
