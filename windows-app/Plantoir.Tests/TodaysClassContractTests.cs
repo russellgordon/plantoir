@@ -205,7 +205,8 @@ public sealed class TodaysClassContractTests : IDisposable
     [Fact]
     public void TheSectionWindowShowsTheKeptAlertWithOkAsTheDefaultAndOpensTheFolder()
     {
-        string view = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"));
+        string view = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"))
+                             .Replace("\r\n", "\n");   // a Windows checkout has CRLF
         int start = view.IndexOf("private async Task SayWhatTheFrontPageKeptAsync(", StringComparison.Ordinal);
         Assert.True(start >= 0, "SayWhatTheFrontPageKeptAsync is gone");
         int end = view.IndexOf("\n    }\n", start, StringComparison.Ordinal);
