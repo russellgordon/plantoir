@@ -72,8 +72,9 @@ enum ReferenceReplacer {
         case notOnTheShelf(course: String)
         case busy(course: String)
         /// A Rename folder of the course under way in a window (#899 U4b):
-        /// Mac only for now, no contract case (Windows has no off-thread
-        /// rename yet; W8).
+        /// the sequence case "a folder in it is being renamed", said with
+        /// `undo.wording.renameFolderUnderWay` (U4b2-6). Mac only for now:
+        /// Windows has no off-thread rename yet (W8) and no replace (#826).
         case folderBeingRenamed(course: String)
         case openInObsidian(course: String)
         case couldNotBackUp(course: String)

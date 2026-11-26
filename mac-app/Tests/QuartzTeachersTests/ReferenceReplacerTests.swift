@@ -488,6 +488,20 @@ final class ReferenceReplacerTests: XCTestCase {
         let obsidian: String? = testCase["obsidian"] as? String
         let live: Bool = testCase["live"] as? Bool ?? false
         let leavesTheShelf: Bool = testCase["leavesTheShelf"] as? String == "afterTheBackUp"
+        // A Rename folder of the course under way in a window (#899 U4b2-6).
+        var folderRename: CourseActivity.FolderRenameRecord?
+        if let renaming = testCase["folderRename"] as? String {
+            XCTAssertEqual(renaming, "atTheStart", "\(name): a folderRename this harness does not know")
+            folderRename = CourseActivity.beginFolderRename(
+                folderPath: workingFolderURL.path, courseCode: "ICS3U-2025"
+            )
+            XCTAssertNotNil(folderRename, "\(name): the rename could not begin")
+        }
+        defer {
+            if let folderRename {
+                CourseActivity.endFolderRename(folderRename)
+            }
+        }
         if testCase["asideAlreadyThere"] as? Bool ?? false {
             try FileManager.default.createDirectory(at: asideURL, withIntermediateDirectories: true)
         }

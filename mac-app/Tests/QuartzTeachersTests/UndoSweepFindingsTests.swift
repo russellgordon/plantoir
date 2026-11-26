@@ -424,8 +424,34 @@ final class UndoSweepFindingsTests: XCTestCase {
             "renameFolderStoppedPartWay": SpecialFolderRenamer.stoppedPartWay(renaming: "{old}", said: "{said}"),
             "renameFolderRenamedOnlyInPart": SpecialFolderRenamer.renamedOnlyInPart(renaming: "{old}", to: "{new}", places: ["{places}"], said: "{said}")
                 .replacingOccurrences(of: "“{places}”", with: "{places}"),
+            "renameFolderUnderWay": CourseActivity.folderRenameIsUnderWay(course: "{course}"),
+            "renameFolderUnderWayMenuReason": CourseActivity.availableOnceTheFolderIsRenamed,
+            "renameFolderUnderWaySidebarRow": CourseRowLabel.workUnderWay(isBeingCopied: false, isRenamingAFolder: true) ?? "",
         ]
         XCTAssertEqual(ours, wording)
+    }
+
+    /// The three sentences a teacher reads while a folder is being renamed
+    /// (#899 U4b2-6), as said for a course named ICS3U: the refusal at the
+    /// click, the greyed item's reason and the sidebar's row. MUST FAIL with
+    /// one byte of a Swift sentence changed.
+    func testTheRenameUnderWaySentencesAreTheContracts() throws {
+        let rules: [String: Any] = try UndoContractReplay.contract("shared-rules.json")
+        let undo: [String: Any] = try XCTUnwrap(rules["undo"] as? [String: Any])
+        let wording: [String: Any] = try XCTUnwrap(undo["wording"] as? [String: Any])
+        let refusal: String = try XCTUnwrap(wording["renameFolderUnderWay"] as? String)
+        XCTAssertEqual(
+            CourseActivity.folderRenameIsUnderWay(course: "ICS3U"),
+            refusal.replacingOccurrences(of: "{course}", with: "ICS3U")
+        )
+        XCTAssertEqual(
+            CourseActivity.availableOnceTheFolderIsRenamed,
+            try XCTUnwrap(wording["renameFolderUnderWayMenuReason"] as? String)
+        )
+        XCTAssertEqual(
+            CourseRowLabel.workUnderWay(isBeingCopied: false, isRenamingAFolder: true),
+            try XCTUnwrap(wording["renameFolderUnderWaySidebarRow"] as? String)
+        )
     }
 
     // MARK: - Computed properties
