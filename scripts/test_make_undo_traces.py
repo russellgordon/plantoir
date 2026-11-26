@@ -670,7 +670,7 @@ class ContractCaseTests(unittest.TestCase):
                   "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "caseOnlyFolder", "rederived", "nothingMovedOutside",
                   "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
                   "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
-                  "refusalNamed",
+                  "refusalNamed", "madeFolder",
                   # U4b2-4: the whole of the line's words, which the model
                   # does not write; the Swift replay checks it.
                   "keptWhatItReplacedSays"}
@@ -837,6 +837,22 @@ class ContractCaseTests(unittest.TestCase):
             edit = {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
                     "contextBefore": "Line one: ", "contextAfter": ".\n"}
             return model.ops_step([move, edit])
+        if call == "moveAFolderWithAFileMadeInANewFolderInside":
+            # U4b2-10: the same step, and a file made in a folder (sub) that
+            # was not there, inside the moved folder.
+            if traces.folder_of_pages(pages, self.MEDIA) is None and traces.folder_of_pages(pages, self.RENAMED) is None:
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.MEDIA + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.MEDIA)
+            if tree is None:
+                return "noFolderToMove"
+            move = {"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)}
+            edit = {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}
+            return model.ops_step([move, edit] + traces.ops_for_change(self.RENAMED + "/sub/x.md", None, "X\n"))
+        if call == "addAFolderInsideTheMadeFolder":
+            pages[self.RENAMED + "/sub/mine/y.md"] = "Y\n"
+            return None
         if call == "renameAFolderInCaseOnly":
             spellings = [self.CASE_ONLY_FROM, self.CASE_ONLY_TO, self.CASE_ONLY_BY_HAND]
             if all(traces.folder_of_pages(pages, spelling) is None for spelling in spellings):
@@ -909,6 +925,19 @@ class ContractCaseTests(unittest.TestCase):
             page = "new" if "Line one: new." in text else "old" if "Line one: old." in text else "byHand"
         return place + ", " + page
 
+    def made_folder(self, model):
+        """U4b2-10's madeFolder: what sub holds wherever the moved folder
+        is. The model holds folders as their files only, so a folder holding
+        nothing is not there: it never answers `empty`."""
+        folder = self.RENAMED if traces.folder_of_pages(model.pages, self.RENAMED) is not None else self.MEDIA
+        tree = traces.folder_of_pages(model.pages, folder + "/sub")
+        if tree is None:
+            return "none"
+        names = set()
+        for inside in tree["files"]:
+            names.add(inside.split("/")[0])
+        return ", ".join(sorted(names, key=lambda name: name.encode("utf-8")))
+
     def markers(self, model):
         source, destination = model.pages.get(self.MARKER_FROM), model.pages.get(self.MARKER_TO)
         if source is None and destination == self.OLD_MARKER:
@@ -927,7 +956,7 @@ class ContractCaseTests(unittest.TestCase):
                   "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
                   "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
                   "leaveAKeptCopyInsideTheMovedFolder", "moveThePageIntoAFolder", "moveThePageBetweenFolders",
-                  "linkItsNewFolderOutside")
+                  "linkItsNewFolderOutside", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -1190,6 +1219,8 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(model.starts_at_the_next_login, case["startsAtTheNextLogin"])
                 if "movedFolder" in case:
                     self.assertEqual(self.moved_folder(model), case["movedFolder"])
+                if "madeFolder" in case:
+                    self.assertEqual(self.made_folder(model), case["madeFolder"])
                 if "caseOnlyFolder" in case:
                     self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
                 if "folderKept" in case:

@@ -194,6 +194,57 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(step.namedPath(of: spelledOtherwise, under: root), "courses/TST1O/renamed/a.md")
     }
 
+    /// U4b2-10 (the part-two review of U4b, L3): the judgement alone. A
+    /// moved folder holding a folder `sub` made for a carried edit's file,
+    /// with that file left out, holds the content: `sub`, holding nothing
+    /// else, is left out with it. FAILED before, when the override kept
+    /// every folder listed.
+    func testAFolderMadeForALeftOutFileIsLeftOutOfTheMovesJudgement() throws {
+        let folder: URL = scratchURL.appendingPathComponent("renamed", isDirectory: true)
+        try UndoContractReplay.write("A\n", to: "a.md", in: folder)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: folder).listingSha)
+        try UndoContractReplay.write("X\n", to: "sub/deeper/x.md", in: folder)
+        let move: UndoOp = UndoOp.moveFolder(from: "media", to: "renamed", listingSha: listingSha)
+        let leftOut: [String: UndoItem] = ["Sub/deeper/x.md": .absent]
+
+        let reading = UndoMoveSide.readNamingFoldersLeftOut(move, at: folder, overriding: leftOut)
+        XCTAssertEqual(reading.side, .holdsTheContent)
+        XCTAssertEqual(reading.foldersLeftOut, ["sub/deeper", "sub"], "deepest first, as the disk spells them")
+        XCTAssertEqual(UndoMoveSide.read(move, at: folder, overriding: leftOut), .holdsTheContent)
+    }
+
+    /// U4b2-10: an empty folder the teacher put inside the made folder is
+    /// never left out, so the made folder is not either: changed since.
+    func testAFolderPutInsideTheMadeFolderKeepsItInTheJudgement() throws {
+        let folder: URL = scratchURL.appendingPathComponent("renamed", isDirectory: true)
+        try UndoContractReplay.write("A\n", to: "a.md", in: folder)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: folder).listingSha)
+        try UndoContractReplay.write("X\n", to: "sub/x.md", in: folder)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("sub/mine"), withIntermediateDirectories: true)
+        let move: UndoOp = UndoOp.moveFolder(from: "media", to: "renamed", listingSha: listingSha)
+
+        let reading = UndoMoveSide.readNamingFoldersLeftOut(move, at: folder, overriding: ["sub/x.md": .absent])
+        XCTAssertEqual(reading.side, .holdsSomethingElse)
+        XCTAssertEqual(reading.foldersLeftOut, [])
+    }
+
+    /// U4b2-10: a moved folder that held an empty folder of its own, in
+    /// which a carried edit then made a file, holds the content once the
+    /// file is left out; that folder is the content's, never left out (nor
+    /// tidied away).
+    func testAnEmptyFolderOfTheContentsOwnIsKeptInTheJudgement() throws {
+        let folder: URL = scratchURL.appendingPathComponent("renamed", isDirectory: true)
+        try UndoContractReplay.write("A\n", to: "a.md", in: folder)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("sub"), withIntermediateDirectories: true)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: folder).listingSha)
+        try UndoContractReplay.write("X\n", to: "sub/x.md", in: folder)
+        let move: UndoOp = UndoOp.moveFolder(from: "media", to: "renamed", listingSha: listingSha)
+
+        let reading = UndoMoveSide.readNamingFoldersLeftOut(move, at: folder, overriding: ["sub/x.md": .absent])
+        XCTAssertEqual(reading.side, .holdsTheContent)
+        XCTAssertEqual(reading.foldersLeftOut, [])
+    }
+
     /// The one comparison itself: part by part, without regard to case,
     /// the rest spelled as the path spells it.
     func testThePartInsideAPlaceIsFoundWithoutRegardToCase() {
