@@ -1,0 +1,32 @@
+row 1: quit counts every claim again
+  sabotage: QuartzTeachers/Models/CourseActivity.swift: 'return folderRenameSwapsUnderWay() > 0' -> 'return !store.activeFolderRenames.isEmpty'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:826: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAQuitWhileARenameOnlyPlansHaltsItAndDoesNotWait] : XCTAssertFalse failed - the quit waits for a rename that only plans
+  Executed 1 test, with 1 failure (0 unexpected) in 0.127 (0.128) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.127 (0.128) seconds
+  Executed 1 test, with 1 failure (0 unexpected) in 0.127 (0.128) seconds
+row 2: quit does not halt the run
+  sabotage: QuartzTeachers/App/AppDelegate.swift: '        FolderRenameRun.haltEveryRunStillPlanning()\n        return quitWaitsForWorkUnderWay(' -> '        return quitWaitsForWorkUnderWay('
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:833: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testAQuitWhileARenameOnlyPlansHaltsItAndDoesNotWait] : failed - the quit did not halt the rename while it planned
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+row 3: Cancel (haltIfStillPlanning) does not cancel renameTask
+  sabotage: QuartzTeachers/Models/FolderRenameRun.swift: '        renameTask?.cancel()\n        renameTask = nil\n        return true' -> '        renameTask = nil\n        return true'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:908: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheSheetsCancelReachesAHeldPlan] : failed - the sheet's Cancel did not reach the held plan
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+row 4: onRename awaited in a fresh Task in the run
+  sabotage: QuartzTeachers/Models/FolderRenameRun.swift: 'let result: RenameResult = await onRename(oldName, newName)' -> 'let result: RenameResult = await Task { @MainActor in await onRename(oldName, newName) }.value'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:908: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheSheetsCancelReachesAHeldPlan] : failed - the sheet's Cancel did not reach the held plan
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+row 5: renameFromTheSheet wraps renameFolder in a fresh Task
+  sabotage: QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift: 'return await renameFolder(oldName, to: newName, scope: scope)' -> 'return await Task { @MainActor in await renameFolder(oldName, to: newName, scope: scope) }.value'
+  exit 65, RED
+  /Users/russellgordon/plantoir/wt-899-u4b2-7/mac-app/Tests/QuartzTeachersTests/UndoRenameFolderStepTests.swift:908: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheSheetsCancelReachesAHeldPlan] : failed - the sheet's Cancel did not reach the held plan
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+  Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+restored: git status of mac-app/QuartzTeachers after all rows: ''
