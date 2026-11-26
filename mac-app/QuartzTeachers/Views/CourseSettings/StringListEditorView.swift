@@ -146,6 +146,10 @@ struct StringListEditorView: View {
     @State var renameFailure: String? = nil
     /// The rename under way and the one rule for halting it (#899
     /// U4b2-7): Cancel, the sheet going away and a quit all halt it there.
+    /// Course Settings hands in the run its page owns
+    /// (`CourseSettingsRenames`, U4b2-8), so that the page going away halts
+    /// it: this list's own appearance never does, since a lazily drawn row
+    /// leaving the visible area is not the rename being left.
     @State var renameRun: FolderRenameRun = FolderRenameRun()
     @State var notice: String? = nil
     @State var selectedRowID: String? = nil
@@ -308,13 +312,6 @@ struct StringListEditorView: View {
                 .onDisappear {
                     haltARenameStillPlanning()
                 }
-        }
-        // And when the list itself leaves the window (U4b2-8): the sheet
-        // goes with it, but its own `.onDisappear` is not called then
-        // (measured 2026-11-26, the list hosted off screen and taken out:
-        // the sheet closed, the rename planned on).
-        .onDisappear {
-            haltARenameStillPlanning()
         }
     }
 

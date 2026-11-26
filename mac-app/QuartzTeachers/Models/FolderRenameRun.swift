@@ -165,3 +165,35 @@ extension FolderRenameRun {
         var quitIsGoingAhead: Bool = false
     }
 }
+
+/// The renames a Course Settings page owns (#899 U4b2-8, review 1's M1):
+/// one run for each folder list that can rename. Kept by the page, never by
+/// a list or a row, because the page is what owns them going away: a list
+/// in the page's grouped `Form` is drawn lazily, and a row leaving the
+/// visible area (the window made shorter, the form scrolled) is not the
+/// teacher leaving the rename. When the page itself goes (Settings left for
+/// Planning, the course closed or switched, the window closed), every
+/// rename still only planning is halted through the one rule,
+/// `FolderRenameRun.haltIfStillPlanning`; one whose swap has begun is left
+/// to finish.
+@MainActor
+@Observable
+final class CourseSettingsRenames {
+
+    // MARK: - Stored properties
+
+    /// The shared folders list's rename.
+    let sharedFolders: FolderRenameRun = FolderRenameRun()
+
+    /// The per-section folders list's rename.
+    let perSectionFolders: FolderRenameRun = FolderRenameRun()
+
+    // MARK: - Functions
+
+    /// The page is going away: halts each of its renames that is still
+    /// only planning.
+    func pageIsGoingAway() {
+        sharedFolders.haltIfStillPlanning()
+        perSectionFolders.haltIfStillPlanning()
+    }
+}

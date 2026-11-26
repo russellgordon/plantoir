@@ -24,6 +24,10 @@ struct CourseSettingsView: View {
     @State var ownSession: CourseSettingsSession = CourseSettingsSession()
 
     @State var isShowingFoldersHelp: Bool = false
+
+    /// The renames this page owns, one per folder list that renames
+    /// (#899 U4b2-8): halted while they only plan when the page goes away.
+    @State var renames: CourseSettingsRenames = CourseSettingsRenames()
     @State var isRenamingUnitWord: Bool = false
 
     /// Counts the times this window has become key, so the page is drawn
@@ -229,7 +233,8 @@ struct CourseSettingsView: View {
                         renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
-                        }
+                        },
+                        renameRun: renames.sharedFolders
                     )
                     // Which of those hold curriculum expectations, each with a
                     // coverage map of its own (#128) — offered, never decided
@@ -289,7 +294,8 @@ struct CourseSettingsView: View {
                         renameCanNoLongerBeHalted: renameSwapHasBegun,
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .perSection)
-                        }
+                        },
+                        renameRun: renames.perSectionFolders
                     )
                     StringListEditorView(
                         title: "Per-section files",
@@ -464,6 +470,13 @@ struct CourseSettingsView: View {
         // Open in Obsidian is in the course page's toolbar
         // (`CourseDetailView`), so it is there on both tabs (#708).
         .navigationSubtitle(course.configuration.courseName)
+        // The page going away (Settings left for Planning, the course
+        // closed or switched, the window closed) halts a rename that only
+        // plans (#899 U4b2-8, review 1's M1). Here, on the page, which is
+        // not drawn lazily, never on a list inside the grouped form.
+        .onDisappear {
+            renames.pageIsGoingAway()
+        }
         .onAppear {
             // The file may have moved on since this window read it: a build
             // adds folders it discovers, and another window on the same

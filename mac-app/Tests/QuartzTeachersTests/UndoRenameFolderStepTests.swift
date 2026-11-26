@@ -1005,14 +1005,8 @@ final class UndoRenameFolderStepTests: XCTestCase {
         let view: CourseSettingsView = CourseSettingsView(course: course)
         let before: [String: Data] = pages(of: course)
         let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
-        let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
-        let gate: RenameHold = RenameHold(reached: reached)
-        addTeardownBlock {
-            gate.open()
-        }
-        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
-            gate.arrive()
-        }
+        let gate: RenameHold = holdThePlanAtItsFirstPage()
+        let reached: XCTestExpectation = gate.reached
         let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
         let run: FolderRenameRun = FolderRenameRun()
         let host: TableHost = hostTheRenameSheet(of: view, run: run, returned: returned)
@@ -1047,63 +1041,116 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertEqual(try journal().read().records.count, 0)
     }
 
-    /// The real rename sheet going away while its rename only plans
-    /// (U4b2-8, U4b2-7 review 2's LOW-a): the list it hangs from leaves the
-    /// window (as Course Settings closing takes it away), the sheet goes
-    /// with it, the sheet's own `.onDisappear` halts the run, and the rename
-    /// returns without the held read, with nothing written. The halt is the
-    /// list's own `.onDisappear`: the sheet's is not called when the list
-    /// takes it away (measured 2026-11-26). MUST FAIL with the list's
-    /// `.onDisappear` not halting.
-    func testTheRealSheetGoingAwayHaltsAHeldPlan() throws {
+    /// The real Course Settings page, its grouped `Form` and all, hosted off
+    /// screen (U4b2-8 review 1, M1): its per-section folders row's rename
+    /// pencil, the sheet's field and its Rename are used through
+    /// accessibility, and the plan is held at its first page. Making the
+    /// window much shorter, and scrolling the form to its top and its
+    /// bottom, takes the row out of view, and the rename goes on: a lazily
+    /// drawn row leaving the visible area is not the teacher leaving the
+    /// rename. Leaving the page then halts it, with nothing written. MUST
+    /// FAIL with the page's `.onDisappear` not halting, and with a list
+    /// not handed the page's run. (A list's own `.onDisappear`, as the
+    /// first round of this piece had it, did not fire here when the row
+    /// left the visible area, measured 2026-11-26; the halt lives on the
+    /// page so that it cannot, whatever a later macOS draws lazily.)
+    func testTheRealSettingsPageShrunkOrScrolledKeepsARenameAndLeavingItHalts() throws {
         let course: Course = try course()
-        let view: CourseSettingsView = CourseSettingsView(course: course)
         let before: [String: Data] = pages(of: course)
+        let gate: RenameHold = holdThePlanAtItsFirstPage()
+        let shown: RenameSheetShown = RenameSheetShown()
+        let size: NSSize = NSSize(width: 900, height: 1100)
+        let window: NSWindow = OffScreenWindow(
+            contentRect: NSRect(origin: TableHost.offScreenOrigin(for: size), size: size),
+            styleMask: [.titled, .resizable], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.animationBehavior = .none
+        window.title = "settings-page-\(UUID().uuidString)"
+        SheetsHungOffScreenStayThere.install()
+        window.contentView = NSHostingView(rootView: ShownWhile(shown: shown) {
+            CourseSettingsView(course: course)
+        })
+        window.setFrameOrigin(TableHost.offScreenOrigin(for: size))
+        window.orderFrontRegardless()
+        defer {
+            window.orderOut(nil)
+            window.close()
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(window)
+
+        XCTAssertTrue(
+            RenameSheetButtons.press(identifiedAs: "rename-Tasks", inWindowTitled: window.title),
+            "the per-section Tasks row has no one rename pencil to press"
+        )
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertNotNil(window.attachedSheet, "the rename sheet did not open")
+        XCTAssertTrue(RenameSheetButtons.type("Assessments", intoFieldIdentifiedAs: "renameField", inWindowTitled: window.title))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        XCTAssertTrue(RenameSheetButtons.press("Rename", inWindowTitled: window.title), "the sheet has no Rename button to press")
+        wait(for: [gate.reached], timeout: 30)
+        XCTAssertTrue(course.isRenamingAFolder, "the claim is held while the plan walks")
+
+        // Much shorter: the Content Structure rows leave the visible area.
+        window.setContentSize(NSSize(width: 900, height: 220))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertFalse(RenameSheetButtons.isInView("rename-Tasks", of: window), "the row is still in view in the shorter window")
+        XCTAssertTrue(course.isRenamingAFolder, "making the window shorter halted the rename")
+        XCTAssertNotNil(window.attachedSheet, "making the window shorter closed the sheet")
+        // Scrolled to the top and to the bottom of the form.
+        let scrolled: Int = RenameSheetButtons.scrollEveryScrollView(in: window, toTop: true)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        _ = RenameSheetButtons.scrollEveryScrollView(in: window, toTop: false)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertGreaterThan(scrolled, 0, "the page has no scroll view to scroll")
+        XCTAssertFalse(RenameSheetButtons.isInView("rename-Tasks", of: window), "the row is still in view after scrolling")
+        XCTAssertTrue(course.isRenamingAFolder, "scrolling the form halted the rename")
+
+        // Leaving the page (as choosing Planning, or another course, does).
+        shown.isShown = false
+        let given: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate { (object: Any?, bindings: [String: Any]?) -> Bool in
+                return MainActor.assumeIsolated {
+                    return !course.isRenamingAFolder
+                }
+            }, object: nil
+        )
+        let waited: XCTWaiter.Result = XCTWaiter().wait(for: [given], timeout: 30)
+        XCTAssertEqual(waited, .completed, "leaving the page did not halt the rename while it planned")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        XCTAssertEqual(gate.arrivedCount, 1)
+    }
+
+    /// Holds the plan at its first page until the test ends, and at the
+    /// end lets it go and waits for its walk to end before `tearDown`
+    /// clears the hooks the walk reads (U4b2-8 review 1, L5).
+    func holdThePlanAtItsFirstPage() -> RenameHold {
         let reached: XCTestExpectation = XCTestExpectation(description: "the plan reached its first page")
         let gate: RenameHold = RenameHold(reached: reached)
-        addTeardownBlock {
-            gate.open()
-        }
+        let ended: XCTestExpectation = XCTestExpectation(description: "the held plan's walk ended")
+        ended.assertForOverFulfill = false
         SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
             gate.arrive()
         }
-        let returned: XCTestExpectation = XCTestExpectation(description: "the rename returned")
-        let run: FolderRenameRun = FolderRenameRun()
-        let shown: RenameSheetShown = RenameSheetShown()
-        let host: TableHost = hostTheRenameSheet(of: view, run: run, returned: returned, shown: shown)
-        defer {
-            host.close()
+        SpecialFolderRenamer.planHasEnded = { @Sendable in
+            ended.fulfill()
         }
-        XCTAssertNotNil(host.window.attachedSheet, "the rename sheet did not open")
-        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(host.window)
-        XCTAssertTrue(RenameSheetButtons.press("Rename", inWindowTitled: host.window.title), "the sheet has no Rename button to press")
-        wait(for: [reached], timeout: 30)
-        XCTAssertTrue(run.isRenaming, "the sheet's Rename did not start its run")
-
-        shown.isShown = false
-        let waited: XCTWaiter.Result = XCTWaiter().wait(for: [returned], timeout: 30)
-        if waited != .completed {
+        addTeardownBlock { @MainActor in
             gate.open()
-            XCTFail("the sheet going away did not halt the held plan")
-            return
+            if gate.arrivedCount > 0 {
+                await self.fulfillment(of: [ended], timeout: 30)
+            }
         }
-        host.pump(0.3)
-
-        XCTAssertNil(host.window.attachedSheet, "the sheet did not go away with its list")
-        XCTAssertFalse(run.isRenaming)
-        XCTAssertFalse(course.isRenamingAFolder, "the course is still held after the sheet went away")
-        XCTAssertEqual(pages(of: course), before)
-        XCTAssertEqual(try journal().read().records.count, 0)
+        return gate
     }
 
     /// The per-section folders list as Course Settings builds it, with its
     /// rename sheet already open on Tasks and Assessments typed, hosted off
     /// screen. Its rename is the sheet's own closure, wrapped only to say
     /// when it returned.
-    func hostTheRenameSheet(
-        of view: CourseSettingsView, run: FolderRenameRun, returned: XCTestExpectation,
-        shown: RenameSheetShown = RenameSheetShown()
-    ) -> TableHost {
+    func hostTheRenameSheet(of view: CourseSettingsView, run: FolderRenameRun, returned: XCTestExpectation) -> TableHost {
         let configuration: CourseConfiguration = view.course.configuration
         let sheetRename: (String, String) async -> RenameResult = view.renameFromTheSheet(scope: .perSection)
         let editor: StringListEditorView = StringListEditorView(
@@ -1124,7 +1171,7 @@ final class UndoRenameFolderStepTests: XCTestCase {
             renameRun: run
         )
         SheetsHungOffScreenStayThere.install()
-        let host: TableHost = TableHost(RenameSheetRoot(shown: shown, editor: editor))
+        let host: TableHost = TableHost(editor)
         host.window.title = "rename-sheet-\(UUID().uuidString)"
         host.pump(0.6)
         return host
@@ -1899,6 +1946,18 @@ final class RenameHold: @unchecked Sendable {
 
     var wasOnTheMainThread: Bool? = nil
 
+    var arrivals: Int = 0
+
+    // MARK: - Computed properties
+
+    /// How many pages the plan has begun to read, held or not.
+    var arrivedCount: Int {
+        condition.lock()
+        let counted: Int = arrivals
+        condition.unlock()
+        return counted
+    }
+
     // MARK: - Initializer
 
     init(reached: XCTestExpectation) {
@@ -1909,6 +1968,7 @@ final class RenameHold: @unchecked Sendable {
 
     func arrive() {
         condition.lock()
+        arrivals += 1
         if hasArrived {
             condition.unlock()
             return
@@ -1936,7 +1996,7 @@ final class RenameHold: @unchecked Sendable {
     }
 }
 
-/// Whether the hosted list, and so its rename sheet, is in the window.
+/// Whether the hosted page, and so its rename sheet, is in the window.
 @MainActor
 @Observable
 final class RenameSheetShown {
@@ -1946,19 +2006,19 @@ final class RenameSheetShown {
     var isShown: Bool = true
 }
 
-/// The hosted list while `shown` says so, and nothing after (U4b2-8).
-struct RenameSheetRoot: View {
+/// The hosted page while `shown` says so, and nothing after (U4b2-8).
+struct ShownWhile<Content: View>: View {
 
     // MARK: - Stored properties
 
     var shown: RenameSheetShown
-    let editor: StringListEditorView
+    @ViewBuilder let content: () -> Content
 
     // MARK: - Body
 
     var body: some View {
         if shown.isShown {
-            editor
+            content()
         } else {
             Color.clear
         }
@@ -1977,17 +2037,106 @@ enum RenameSheetButtons {
     /// Presses the one button named `name` in the window titled
     /// `windowTitle`, sheet included. False when there is none.
     static func press(_ name: String, inWindowTitled windowTitle: String) -> Bool {
-        let application: AXUIElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
         var matching: [AXUIElement] = []
-        for window in AccessibilityTree.elementList(of: application, attribute: kAXWindowsAttribute) {
-            if AccessibilityTree.text(of: window, attribute: kAXTitleAttribute) == windowTitle {
-                collectButtons(named: name, under: window, into: &matching, depth: 0)
-            }
+        for window in windows(titled: windowTitle) {
+            collectButtons(named: name, under: window, into: &matching, depth: 0)
         }
         if matching.count != 1 {
             return false
         }
         return AXUIElementPerformAction(matching[0], kAXPressAction as CFString) == .success
+    }
+
+    /// Sets the text of the field identified as `identifier`, as an
+    /// assistive app types into it.
+    static func type(_ text: String, intoFieldIdentifiedAs identifier: String, inWindowTitled windowTitle: String) -> Bool {
+        let matching: [AXUIElement] = elements(identifiedAs: identifier, inWindowTitled: windowTitle)
+        if matching.count != 1 {
+            return false
+        }
+        return AXUIElementSetAttributeValue(matching[0], kAXValueAttribute as CFString, text as CFString) == .success
+    }
+
+    /// Presses the one element identified as `identifier`.
+    static func press(identifiedAs identifier: String, inWindowTitled windowTitle: String) -> Bool {
+        let matching: [AXUIElement] = elements(identifiedAs: identifier, inWindowTitled: windowTitle)
+        if matching.count != 1 {
+            return false
+        }
+        return AXUIElementPerformAction(matching[0], kAXPressAction as CFString) == .success
+    }
+
+    static func elements(identifiedAs identifier: String, inWindowTitled windowTitle: String) -> [AXUIElement] {
+        var matching: [AXUIElement] = []
+        for window in windows(titled: windowTitle) {
+            AccessibilityTree.collectElements(identifiedAs: identifier, under: window, into: &matching, depth: 0)
+        }
+        return matching
+    }
+
+    /// The windows whose title starts with `windowTitle`: a page may add a
+    /// subtitle to its window's title (Course Settings names the course).
+    static func windows(titled windowTitle: String) -> [AXUIElement] {
+        let application: AXUIElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        var found: [AXUIElement] = []
+        for window in AccessibilityTree.elementList(of: application, attribute: kAXWindowsAttribute) {
+            if AccessibilityTree.text(of: window, attribute: kAXTitleAttribute).hasPrefix(windowTitle) {
+                found.append(window)
+            }
+        }
+        return found
+    }
+
+    /// Whether the element identified as `identifier` is drawn inside the
+    /// window's frame: false when it has been scrolled or shrunk out of
+    /// view, or is not in the tree at all. Accessibility frames are in
+    /// screen points from the top of the main display.
+    static func isInView(_ identifier: String, of window: NSWindow) -> Bool {
+        let mainDisplayHeight: CGFloat = NSScreen.screens.first?.frame.height ?? 0
+        let windowFrame: CGRect = CGRect(
+            x: window.frame.minX, y: mainDisplayHeight - window.frame.maxY,
+            width: window.frame.width, height: window.frame.height
+        )
+        for element in elements(identifiedAs: identifier, inWindowTitled: window.title) {
+            if AccessibilityTree.frame(of: element).intersects(windowFrame) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Scrolls every scroll view in the window to its top or its bottom,
+    /// and says how many there were.
+    static func scrollEveryScrollView(in window: NSWindow, toTop: Bool) -> Int {
+        var scrollViews: [NSScrollView] = []
+        if let content = window.contentView {
+            collectScrollViews(in: content, into: &scrollViews)
+        }
+        for scrollView in scrollViews {
+            guard let document = scrollView.documentView else {
+                continue
+            }
+            let visibleHeight: CGFloat = scrollView.contentView.bounds.height
+            var y: CGFloat = 0
+            let bottom: CGFloat = max(0, document.frame.height - visibleHeight)
+            if document.isFlipped == toTop {
+                y = 0
+            } else {
+                y = bottom
+            }
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+        return scrollViews.count
+    }
+
+    static func collectScrollViews(in view: NSView, into found: inout [NSScrollView]) {
+        if let scrollView = view as? NSScrollView {
+            found.append(scrollView)
+        }
+        for subview in view.subviews {
+            collectScrollViews(in: subview, into: &found)
+        }
     }
 
     static func collectButtons(named name: String, under node: AXUIElement, into found: inout [AXUIElement], depth: Int) {
