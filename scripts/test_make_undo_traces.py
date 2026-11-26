@@ -411,7 +411,7 @@ def readable_op(op):
     if kind in ("move", "moveApart", "setAside"):
         if "path" in op or not safe_path(op.get("from")) or not safe_path(op.get("to")):
             return False
-        if overlap(op["from"], op["to"]):
+        if overlap(op["from"], op["to"]) and not traces.is_case_only_move(op):
             return False
         return ("sha" in op) != ("listingSha" in op)
     if kind == "external":
@@ -483,6 +483,10 @@ def readable_step(step):
                 continue
             if op.get("target") is not None and other.get("target") == op.get("target"):
                 return False
+            if other_index > index and traces.move_carries(op, other):
+                # U4b: an edit inside what a move moved, at its new place,
+                # after the move (opKinds.wholeOps' order).
+                continue
             theirs = [other[key] for key in ("path", "from", "to") if key in other]
             if any(overlap(a, b) for a in mine for b in theirs):
                 return False
@@ -661,8 +665,8 @@ class ContractCaseTests(unittest.TestCase):
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
-                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
+                  "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "caseOnlyFolder", "rederived", "nothingMovedOutside",
+                  "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
                   "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
@@ -798,7 +802,88 @@ class ContractCaseTests(unittest.TestCase):
         if call == "forgetTheMaintainer":
             model.maintainer_registered = False
             return None
+        if call == "moveAFolderWithAPageEditedInside":
+            if traces.folder_of_pages(pages, self.MEDIA) is None and traces.folder_of_pages(pages, self.RENAMED) is None:
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.MEDIA + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.MEDIA)
+            if tree is None:
+                return "noFolderToMove"
+            move = {"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)}
+            edit = {"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}
+            return model.ops_step([move, edit])
+        if call == "renameAFolderInCaseOnly":
+            spellings = [self.CASE_ONLY_FROM, self.CASE_ONLY_TO, self.CASE_ONLY_BY_HAND]
+            if all(traces.folder_of_pages(pages, spelling) is None for spelling in spellings):
+                for name, text in self.MEDIA_FILES.items():
+                    pages[self.CASE_ONLY_FROM + "/" + name] = text
+            tree = traces.folder_of_pages(pages, self.CASE_ONLY_FROM)
+            if tree is None:
+                return "noFolderToMove"
+            move = {"kind": "move", "from": self.CASE_ONLY_FROM, "to": self.CASE_ONLY_TO, "listingSha": traces.listing_sha(tree)}
+            edit = {"kind": "replaceText", "path": self.CASE_ONLY_TO + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}
+            return model.ops_step([move, edit])
+        if call == "spellTheFolderAnotherWay":
+            for path in [path for path in pages if isinstance(path, str) and path.startswith(self.CASE_ONLY_TO + "/")]:
+                pages[self.CASE_ONLY_BY_HAND + path[len(self.CASE_ONLY_TO):]] = pages.pop(path)
+            return None
+        if call == "addAFileInsideTheMovedFolder":
+            pages[self.RENAMED + "/c.md"] = "C\n"
+            return None
+        if call == "leaveAKeptCopyInsideTheMovedFolder":
+            # The model holds no staged files: the step's own kept copy is
+            # never content (opKinds.wholeOps, the part-two review's M1).
+            return None
+        if call == "editThePageInsideByHand":
+            pages[self.RENAMED + "/a.md"] = "Hand.\n"
+            return None
+        if call == "stepEditingInsideAMovesFrom":
+            ops = [{"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": "a" * 64},
+                   {"kind": "replaceText", "path": self.MEDIA + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}]
+            seq = model.begin(ops, readable=readable_step({"ops": ops}))
+            model.find(seq)["phase"] = "done"
+            return None
         self.fail("unknown call " + call)
+
+    MEDIA = "courses/TST1O/media"
+    RENAMED = "courses/TST1O/renamed"
+    MEDIA_FILES = {"a.md": "Intro.\nLine one: old.\nEnd.\n", "b.md": "B\n"}
+    CASE_ONLY_FROM = "courses/TST1O/Media"
+    CASE_ONLY_TO = "courses/TST1O/media"
+    CASE_ONLY_BY_HAND = "courses/TST1O/MEDIA"
+
+    def case_only_folder(self, model):
+        """U4b's caseOnlyFolder: the spelling the folder is listed under,
+        then what its a.md holds. The model keys pages as spelled."""
+        for spelling in (self.CASE_ONLY_FROM, self.CASE_ONLY_TO, self.CASE_ONLY_BY_HAND):
+            if traces.folder_of_pages(model.pages, spelling) is not None:
+                text = model.pages.get(spelling + "/a.md")
+                page = "none"
+                if text is not None:
+                    page = "new" if "Line one: new." in text else "old" if "Line one: old." in text else "byHand"
+                return spelling.rsplit("/", 1)[1] + ", " + page
+        return "none"
+
+    def moved_folder(self, model):
+        """U4b's movedFolder: which place holds the folder, then what its
+        a.md holds."""
+        at_new = traces.folder_of_pages(model.pages, self.RENAMED) is not None
+        at_old = traces.folder_of_pages(model.pages, self.MEDIA) is not None
+        place, folder = "neither", self.RENAMED
+        if at_new and at_old:
+            place = "both"
+        elif at_new:
+            place = "renamed"
+        elif at_old:
+            place, folder = "media", self.MEDIA
+        text = model.pages.get(folder + "/a.md")
+        page = "none"
+        if text is not None:
+            page = "new" if "Line one: new." in text else "old" if "Line one: old." in text else "byHand"
+        return place + ", " + page
 
     def markers(self, model):
         source, destination = model.pages.get(self.MARKER_FROM), model.pages.get(self.MARKER_TO)
@@ -814,7 +899,10 @@ class ContractCaseTests(unittest.TestCase):
                   "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
                   "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
                   "rollOverOntoNewWebsitesOnTwoHosts", "rollOverTurningOffASchedule", "theScheduleCannotBeSetNow",
-                  "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin")
+                  "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
+                  "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
+                  "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
+                  "leaveAKeptCopyInsideTheMovedFolder")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -932,6 +1020,13 @@ class ContractCaseTests(unittest.TestCase):
                             if op["kind"] == "writeFile" and op["path"] == p1:
                                 model.removed_texts.add(op["beforeText"])
                                 model.unstorable_texts.add(op["beforeText"])
+                    elif call == "afterContentGone":
+                        # Only the newest step's after text of p1 is gone
+                        # from the list (U4a review 1, LOW 4).
+                        newest = model.on_list()[-1]
+                        for op in newest["ops"]:
+                            if op["kind"] == "writeFile" and op["path"] == p1:
+                                model.removed_texts.add(op["afterText"])
                     elif call == "keepTheOriginal":
                         # The newest step's kept original of p1: what p1
                         # held before its whole-file op (U3c).
@@ -1042,19 +1137,62 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(self.leftover_markers(model), case["leftoverMarkers"])
                 if "startsAtTheNextLogin" in case:
                     self.assertEqual(model.starts_at_the_next_login, case["startsAtTheNextLogin"])
+                if "movedFolder" in case:
+                    self.assertEqual(self.moved_folder(model), case["movedFolder"])
+                if "caseOnlyFolder" in case:
+                    self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
                 if "folderKept" in case:
                     self.assertEqual(isinstance(model.pages.get(self.EXTRA), tuple), case["folderKept"])
                 if "rederived" in case:
                     self.assertEqual(model.rederived, case["rederived"])
                 if "keptOriginalLeft" in case:
-                    foreign = "foreignKeptOriginal" in case["calls"]
+                    # A kept copy the row itself left (a model holds none).
+                    foreign = "foreignKeptOriginal" in case["calls"] or "leaveAKeptCopyInsideTheMovedFolder" in case["calls"]
                     self.assertEqual(bool(model.kept) or foreign, case["keptOriginalLeft"])
+                if "keptBesideThePage" in case:
+                    self.assertEqual(len(model.kept.get(p1, [])), case["keptBesideThePage"])
                 if "keptWhatItReplacedLines" in case:
                     self.assertEqual(model.kept_what_it_replaced_lines, case["keptWhatItReplacedLines"])
                 if "leftApart" in case:
                     self.assertEqual(list(last[2]) if len(last) > 2 else [], case["leftApart"])
                 if "schoolYear" in case:
                     self.assertEqual(json.loads(model.pages[self.SETTINGS])["school_year"], case["schoolYear"])
+
+    def test_recovery_cases_with_a_moved_folder(self):
+        """undo.recoveryCases' U4b rows (withAMovedFolder): a step killed
+        between its move and the edits it carries settles whole, judged by
+        content. The model holds no staged files, so
+        keptCopyLeftInsideTheFolder is the Swift replay's alone."""
+        cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAMovedFolder")]
+        self.assertEqual(len(cases), 11)
+        first, second = "courses/TST1O/Section 1/Classes/A.md", "courses/TST1O/Section 1/Classes/B.md"
+        before_text = "---\ntitle: A\npublish: false\n---\nBody.\n"
+        texts = {first: before_text, second: before_text.replace("title: A", "title: B")}
+        pages = dict(texts)
+        for name, text in self.MEDIA_FILES.items():
+            pages[self.MEDIA + "/" + name] = text
+        ops = []
+        for path, text in texts.items():
+            ops += traces.ops_for_change(path, text, text.replace("publish: false", "publish: true"))
+        tree = traces.folder_of_pages(pages, self.MEDIA)
+        ops.append({"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": traces.listing_sha(tree)})
+        ops.append({"kind": "replaceText", "path": self.RENAMED + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"})
+        after_pages = traces.stopped_part_way(ops, False, pages, None)
+        phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
+                  ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done",
+                  ("redo", "nothingTookEffect"): "undone", ("redo", "completed"): "done", ("redo", "rolledBack"): "undone"}
+        for case in cases:
+            with self.subTest(case["name"]):
+                work, stop = case["work"], case["stopAt"]
+                swapped = int(stop.split(":")[1]) if stop.startswith("beforeSwap:") else None
+                starting = after_pages if work == "undo" else pages
+                left = traces.stopped_part_way(ops, work == "undo", starting, swapped)
+                outcome, settled = traces.recover(ops, left, work != "undo")
+                self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
+                wanted = pages if case["files"] == "before" else after_pages
+                self.assertEqual((settled.get(first), settled.get(second)), (wanted[first], wanted[second]))
+                self.assertEqual(self.moved_folder(type("Settled", (), {"pages": settled})), case["movedFolder"])
 
     def test_the_clear_reasons_are_the_four_written(self):
         # Rulings 17 and 18 took the deploy and the share of unit plans off;

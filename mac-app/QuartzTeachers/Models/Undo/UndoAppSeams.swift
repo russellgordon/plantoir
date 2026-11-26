@@ -100,12 +100,13 @@ nonisolated enum UndoTrail {
                 )
             )
         }
-        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow in
+        UndoTrailHook.keptWhatItReplacedLine = { course, section, isUndo, keptOriginals, keptOfWhatItHoldsNow, putBackFromAKeptOriginal in
             ActivityTrail.note(
                 .undoKeptWhatItReplaced,
                 UndoTrail.keptWhatItReplacedLine(
                     course: course, section: section, isUndo: isUndo,
-                    keptOriginals: keptOriginals, keptOfWhatItHoldsNow: keptOfWhatItHoldsNow
+                    keptOriginals: keptOriginals, keptOfWhatItHoldsNow: keptOfWhatItHoldsNow,
+                    putBackFromAKeptOriginal: putBackFromAKeptOriginal
                 )
             )
         }
@@ -164,7 +165,8 @@ nonisolated enum UndoTrail {
     /// list with both directions offered (Russell's ruling of 2026-11-20,
     /// night; the second review of U3c, MEDIUM and LOW 1).
     static func keptWhatItReplacedLine(
-        course: String, section: Int?, isUndo: Bool, keptOriginals: [String], keptOfWhatItHoldsNow: [String] = []
+        course: String, section: Int?, isUndo: Bool, keptOriginals: [String], keptOfWhatItHoldsNow: [String] = [],
+        putBackFromAKeptOriginal: [String]? = nil
     ) -> String {
         var places: [String] = []
         for kept in keptOriginals + keptOfWhatItHoldsNow {
@@ -174,9 +176,38 @@ nonisolated enum UndoTrail {
             }
         }
         let which: String = isUndo ? "Undo" : "Redo"
-        let what: String = places.isEmpty ? "a page" : places.joined(separator: ", ")
+        // Said "from what was kept beside it" of a page only when it was:
+        // an Undo or a Redo whose content came from the list, and whose
+        // outgoing bytes the list would not take
+        // (`storeWhatTheOtherDirectionNeeds`, U4a), put the page back from
+        // the list (the U4a sweep, LOW 1), decided page by page (U4b part
+        // one's review, LOW 1). Nil: every page named was.
+        var fromTheList: [String] = []
+        var fromKept: [String] = []
+        for kept in keptOriginals + keptOfWhatItHoldsNow {
+            let page: String = UndoSwap.placeOfStagedName(kept) ?? kept
+            let place: String = JournaledStepError.placeName(ofKept: kept)
+            if fromTheList.contains(place) || fromKept.contains(place) {
+                continue
+            }
+            if putBackFromAKeptOriginal == nil || putBackFromAKeptOriginal?.contains(page) == true {
+                fromKept.append(place)
+            } else {
+                fromTheList.append(place)
+            }
+        }
         var line: String = UndoTrail.prefix(course: course, section: section)
-        line += "\(which) put back \(what) from what was kept beside it, but the list could not keep a copy of all it needs for this change, "
+        if places.isEmpty {
+            line += "\(which) put back a page"
+        } else if fromKept.isEmpty {
+            line += "\(which) put back \(fromTheList.joined(separator: ", "))"
+        } else if fromTheList.isEmpty {
+            line += "\(which) put back \(fromKept.joined(separator: ", ")) from what was kept beside it"
+        } else {
+            line += "\(which) put back \(fromTheList.joined(separator: ", ")), and put back "
+            line += "\(fromKept.joined(separator: ", ")) from what was kept beside it"
+        }
+        line += ", but the list could not keep a copy of all it needs for this change, "
         line += "so what it could not keep stays beside the page, and the next Undo or Redo of this change uses it."
         for kept in keptOriginals {
             line += " What \(JournaledStepError.placeName(ofKept: kept)) held a moment before is kept beside it as the hidden file “\(kept)”."

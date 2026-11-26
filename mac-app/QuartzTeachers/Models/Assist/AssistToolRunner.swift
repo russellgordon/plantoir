@@ -2794,6 +2794,10 @@ final class AssistToolRunner {
            CourseActivity.courseIsBeingCopied(folderPath: folder.path, courseCode: course.code) {
             return AssistWording.courseIsBeingCopied(course: course.code)
         }
+        if let folder = workspace.workspaceURL,
+           CourseActivity.courseIsRenamingAFolder(folderPath: folder.path, courseCode: course.code) {
+            return CourseActivity.folderRenameIsUnderWay(course: course.code)
+        }
         // A preview of a section cannot start while this copy of Plantoir is
         // deploying that same section (#381). Asked here, before a window is
         // opened, a preview stopped or a no-window rebuild run, for the same

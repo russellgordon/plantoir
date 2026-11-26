@@ -184,9 +184,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // launcher to build from. Bounded by the copy itself (seconds
             // on this Mac; a minute on a slow one), and the window stays up
             // with its banner saying what is happening.
-            if ToolchainReadiness.shared.anyCopyIsRunning {
+            //
+            // A Rename folder under way (#899 U4b) is waited for the same
+            // way, for the same reason: it used to hold the main thread, and
+            // off the main actor a quit would leave some sections' folders
+            // moved, some pages relinked and the settings naming the old
+            // folder. Bounded by the rename itself; its sheet keeps its
+            // spinner, and a window closed meanwhile does not end it.
+            if AppDelegate.quitWaitsForWorkUnderWay(
+                toolchainCopying: ToolchainReadiness.shared.anyCopyIsRunning,
+                renamingAFolder: CourseActivity.anyFolderRenameIsUnderWay
+            ) {
                 Task { @MainActor in
-                    await ToolchainReadiness.shared.waitForAllCopies()
+                    await AppDelegate.waitForWorkUnderWay()
                     if AppDelegate.finishTerminating() == .terminateNow {
                         NSApp.reply(toApplicationShouldTerminate: true)
                     }
@@ -195,6 +205,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return AppDelegate.finishTerminating()
         }
+    }
+
+    /// Whether a quit going ahead must first wait (`.terminateLater`) for
+    /// work that may never be cut short: a copy of a folder's tools (#476)
+    /// or a Rename folder (#899 U4b). Neither asks a question; both finish.
+    static func quitWaitsForWorkUnderWay(toolchainCopying: Bool, renamingAFolder: Bool) -> Bool {
+        return toolchainCopying || renamingAFolder
+    }
+
+    /// What a quit that answered `.terminateLater` waits for before it
+    /// finishes: every tools copy (#476) and every Rename folder (#899 U4b)
+    /// to end, each an event, never a time. One function, so the quit's own
+    /// wait is what the test runs (U4b part seven's review, L6).
+    static func waitForWorkUnderWay() async {
+        await ToolchainReadiness.shared.waitForAllCopies()
+        await CourseActivity.waitForAllFolderRenames()
     }
 
     /// The trail's last word from this process (#560), written as late as

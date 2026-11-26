@@ -280,6 +280,110 @@ final class UndoCourseSettingsStepTests: XCTestCase {
         XCTAssertEqual(applied, 1)
     }
 
+    /// U4a review 1, LOW 2: ANOTHER member changed between the plan and the
+    /// make is kept by the door, and this copy then holds the file as it is,
+    /// that member included, never the plan's read. MUST FAIL with
+    /// `finishWrite` taking the plan's bytes and values.
+    func testAfterTheMakeThisCopyIsTheFileWithAnotherMemberChangedInTheGap() throws {
+        let course: Course = try course()
+        course.configuration.hiddenItems = ["Media"]
+        let configURL: URL = course.configFileURL
+        nonisolated(unsafe) var raced: Bool = false
+        UndoKillPoints.hook = { point in
+            if point == .afterBegin && !raced {
+                raced = true
+                try? UndoCourseSettingsStepTests.changeOnDisk("expandable", to: ["Tests"], at: configURL)
+            }
+            return false
+        }
+
+        try course.configuration.writeAsOneStep(to: configURL, madeBy: UndoStepMaker.sheet("saveCourseSettings"))
+
+        UndoKillPoints.hook = nil
+        XCTAssertTrue(raced)
+        XCTAssertEqual(try settings(of: course)["expandable"] as? [String], ["Tests"], "the door kept the other member")
+        XCTAssertEqual(course.configuration.expandableItems, ["Tests"])
+        XCTAssertEqual(course.configuration.hiddenItems, ["Media"])
+        XCTAssertFalse(course.configuration.hasUnsavedChanges)
+    }
+
+    /// U4a review 1, LOW 3: one of the Save's own members changed by
+    /// something else before EVERY make, four times in a row: the fourth
+    /// refusal writes nothing, the edits stay unsaved, and the form says
+    /// "Could not save: The file “course_config.json” couldn’t be saved."
+    /// MUST FAIL with a fifth try, or with the Save written anyway as
+    /// `write(to:)` did after its third read-again.
+    func testAFourthRefusalInARowWritesNothingAndKeepsTheEditsUnsaved() throws {
+        let course: Course = try course()
+        course.configuration.hiddenItems = ["Media"]
+        let configURL: URL = course.configFileURL
+        nonisolated(unsafe) var races: Int = 0
+        UndoKillPoints.hook = { point in
+            if point == .afterBegin {
+                races += 1
+                try? UndoCourseSettingsStepTests.changeOnDisk("hidden", to: ["Race \(races)"], at: configURL)
+            }
+            return false
+        }
+        let session: CourseSettingsSession = CourseSettingsSession()
+        var view: CourseSettingsView = CourseSettingsView(course: course)
+        view.session = session
+
+        view.save()
+
+        UndoKillPoints.hook = nil
+        XCTAssertEqual(races, 4, "tried four times in all")
+        XCTAssertEqual(session.saveProblem, "Could not save: The file “course_config.json” couldn’t be saved.")
+        XCTAssertEqual(try settings(of: course)["hidden"] as? [String], ["Race 4"], "only the other program's write is on disk")
+        XCTAssertTrue(course.configuration.hasUnsavedChanges)
+        XCTAssertEqual(course.configuration.hiddenItems, ["Media"])
+        var applied: Int = 0
+        for (_, record) in try journal().read().records where record.phase == .done {
+            applied += 1
+        }
+        XCTAssertEqual(applied, 0)
+    }
+
+    /// The U4a sweep, LOW 2: a settings file that is a LINK, with the switch
+    /// off. The Save writes the teacher's real file through the link and
+    /// leaves the link a link (before U4a `write(to:)` replaced the link with
+    /// a copy; U4a's first form refused it as changed since, four times, and
+    /// said "Could not save"). Run for a link to a file inside the course
+    /// and for one to a file outside the working folder. MUST FAIL with the
+    /// plan made at the link's own place.
+    func testASettingsFileThatIsALinkIsSavedThroughTheLinkWithTheSwitchOff() throws {
+        JournaledStep.modeOverride = .shadow
+        for outside in [false, true] {
+            let course: Course = try course()
+            let link: URL = course.configFileURL
+            let real: URL = outside
+                ? root.deletingLastPathComponent().appendingPathComponent("linked-config-\(UUID().uuidString).json")
+                : course.directoryURL.appendingPathComponent("real_config.json")
+            defer {
+                if outside {
+                    try? FileManager.default.removeItem(at: real)
+                }
+            }
+            try FileManager.default.moveItem(at: link, to: real)
+            try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+            let session: CourseSettingsSession = CourseSettingsSession()
+            var view: CourseSettingsView = CourseSettingsView(course: course)
+            view.session = session
+            course.configuration.hiddenItems = ["Media"]
+
+            view.save()
+
+            XCTAssertNil(session.saveProblem, "outside: \(outside)")
+            let attributes: [FileAttributeKey: Any] = try FileManager.default.attributesOfItem(atPath: link.path)
+            XCTAssertEqual(attributes[.type] as? FileAttributeType, .typeSymbolicLink, "the link is still a link")
+            let saved: Data = try Data(contentsOf: real)
+            let decoded: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: saved) as? [String: Any])
+            XCTAssertEqual(decoded["hidden"] as? [String], ["Media"], "outside: \(outside)")
+            XCTAssertFalse(course.configuration.hasUnsavedChanges)
+            try FileManager.default.removeItem(at: root)
+        }
+    }
+
     /// A Save that changes nothing on disk writes nothing and makes no step.
     func testASaveThatChangesNothingMakesNoStep() throws {
         let course: Course = try course()

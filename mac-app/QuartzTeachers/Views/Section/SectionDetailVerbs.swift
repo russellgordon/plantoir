@@ -96,7 +96,7 @@ extension SectionDetailView {
     /// (`sheetIsUp` follows AppKit's own notification), so that one flag is
     /// not asked; everything else is.
     func verbMayRunNow(_ item: SubjectMenuRules.Item, afterTheDates: Bool = false) -> Bool {
-        if verbIsRunningHere || workspace.isBeingCopied(course.code) {
+        if verbIsRunningHere || workspace.isBeingCopied(course.code) || workspace.isRenamingAFolder(course.code) {
             return false
         }
         if verbSheet != nil || linksChecklist != nil || previewAlertIsUp || healthDialog != nil || deployRefusal != nil {
@@ -567,6 +567,9 @@ extension SectionDetailView {
             return true
         }
         if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return true
+        }
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workspaceURL.path, courseCode: course.code) {
             return true
         }
         let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges

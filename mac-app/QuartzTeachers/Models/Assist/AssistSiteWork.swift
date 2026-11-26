@@ -157,6 +157,12 @@ final class AssistToolchainWork: AssistSiteWork {
                 succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
             )
         }
+        // Nor while a folder of the course is being renamed (#899 U4b).
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: CourseActivity.folderRenameIsUnderWay(course: course.code)
+            )
+        }
 
         // Recorded for ⌘Q (issue #232): the delegate cannot see this runner,
         // and a quit in the middle of it is a quit through a preview build.
@@ -266,6 +272,12 @@ final class AssistToolchainWork: AssistSiteWork {
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.courseIsBeingCopied(course: course.code)
+            )
+        }
+        // Nor while a folder of the course is being renamed (#899 U4b).
+        if CourseActivity.courseIsRenamingAFolder(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: CourseActivity.folderRenameIsUnderWay(course: course.code)
             )
         }
         if CourseActivity.busyDescription(folderPath: workspaceURL.path, courseCode: course.code) != nil {

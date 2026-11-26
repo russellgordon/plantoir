@@ -189,6 +189,12 @@ nonisolated final class JournaledStep {
     /// folder and its two pages), as one `createTree`, in the order planned.
     private(set) var plannedTrees: [(url: URL, listing: UndoTreeListing, contents: [String: Data])] = []
 
+    /// Each FOLDER planned to be moved whole (#899 U4b: Rename folder), in
+    /// the order planned, with the SHA-256 of its listing when planned. A
+    /// file planned at or inside a folder move's `to` is an edit the move
+    /// carries (`undoJournal.opKinds.wholeOps`): its `before` is read where
+    /// the file is now, under `from`, and its op goes after the move.
+    private(set) var plannedFolderMoves: [(from: URL, to: URL, listingSha: String)] = []
 
     // MARK: - Computed properties
 
@@ -203,6 +209,7 @@ nonisolated final class JournaledStep {
     /// Whether nothing has been planned.
     var isEmpty: Bool {
         return plannedOrder.isEmpty && plannedMoves.isEmpty && plannedExternals.isEmpty && plannedTrees.isEmpty
+            && plannedFolderMoves.isEmpty
     }
 
     /// Whether the step holds a move, an external op, a JSON file planned
@@ -210,6 +217,7 @@ nonisolated final class JournaledStep {
     /// (`JournaledWrite.perform(ops:)`) rather than as files.
     var isMixed: Bool {
         return !plannedMoves.isEmpty || !plannedExternals.isEmpty || !plannedMembers.isEmpty || !plannedTrees.isEmpty
+            || !plannedFolderMoves.isEmpty
     }
 
     /// The working folder: the folder holding the course's `courses` folder,
@@ -335,6 +343,73 @@ nonisolated final class JournaledStep {
         return planAMove(from, to: to, kind: .setAside)
     }
 
+    /// Plans the FOLDER at `from` to be moved whole to `to` (#899 U4b), one
+    /// rename that never replaces, judged as a pair by its listing:
+    /// `listingSha` when the caller read the listing itself (off the main
+    /// actor), else the listing now. False, planning nothing, when it
+    /// cannot be read. Plan every edit inside the folder AFTER this, at its
+    /// new place: the move carries it (`undoJournal.opKinds.wholeOps`).
+    @discardableResult
+    func moveFolder(_ from: URL, to: URL, listingSha: String? = nil) -> Bool {
+        guard let sha = listingSha ?? UndoTreeReading.read(at: from).listingSha else {
+            return false
+        }
+        plannedFolderMoves.append((from: from, to: to, listingSha: sha))
+        return true
+    }
+
+    /// Plans the file at `url` to hold these bytes, from `read`: the bytes
+    /// the caller's plan was built from, read by the caller (off the main
+    /// actor), which are the step's `before` for it. A file another program
+    /// changed after that read refuses the step instead of being written
+    /// over.
+    func write(_ data: Data, to url: URL, plannedFrom read: Data) {
+        let key: String = JournaledStep.key(of: url)
+        if plannedURL[key] == nil {
+            plannedOrder.append(key)
+            plannedURL[key] = url
+            plannedBefore[key] = .file(read)
+        }
+        plannedAfter[key] = data
+    }
+
+    /// Where a place is on the disk while the step is planned: under a
+    /// planned folder move's `from` when the place is at or inside its `to`
+    /// (U4b), else the place itself.
+    func placeOnDiskNow(_ url: URL) -> URL {
+        let path: String = JournaledStep.key(of: url)
+        for move in plannedFolderMoves {
+            let to: String = JournaledStep.key(of: move.to)
+            if path == to {
+                return move.from
+            }
+            if path.hasPrefix(to + "/") {
+                return URL(fileURLWithPath: JournaledStep.key(of: move.from) + String(path.dropFirst(to.count)))
+            }
+        }
+        return url
+    }
+
+    /// The path a step names for a place, inside the working folder: a
+    /// place at or inside a planned folder move's `to` is named from the
+    /// folder above `to`, with `to`'s own spelling, so a capitalisation-only
+    /// rename (`Media` to `media`) is not named by the spelling the disk
+    /// lists now (`realpath` would give `Media`).
+    func namedPath(of url: URL, under root: URL) -> String? {
+        let path: String = JournaledStep.key(of: url)
+        for move in plannedFolderMoves {
+            let to: String = JournaledStep.key(of: move.to)
+            if path != to && !path.hasPrefix(to + "/") {
+                continue
+            }
+            guard let above = UndoFolderPlaces.relativePath(of: move.to.deletingLastPathComponent(), under: root) else {
+                return nil
+            }
+            return above + "/" + move.to.lastPathComponent + String(path.dropFirst(to.count))
+        }
+        return UndoFolderPlaces.relativePath(of: url, under: root)
+    }
+
     /// Plans one move of the given kind, judged by its bytes now.
     private func planAMove(_ from: URL, to: URL, kind: UndoOpKind) -> Bool {
         guard case .file(let data) = UndoItem.read(at: from) else {
@@ -424,7 +499,7 @@ nonisolated final class JournaledStep {
         if let planned = plannedAfter[key] {
             return planned
         }
-        return try? Data(contentsOf: url)
+        return try? Data(contentsOf: placeOnDiskNow(url))
     }
 
     /// The file's text as the step will leave it, read the way the actions
@@ -438,7 +513,7 @@ nonisolated final class JournaledStep {
             }
             return String(data: data, encoding: .utf8)
         }
-        return try? String(contentsOf: url, encoding: .utf8)
+        return try? String(contentsOf: placeOnDiskNow(url), encoding: .utf8)
     }
 
     /// `readText`, throwing as `String(contentsOf:)` does when the disk's
@@ -451,7 +526,7 @@ nonisolated final class JournaledStep {
             }
             return text
         }
-        return try String(contentsOf: url, encoding: .utf8)
+        return try String(contentsOf: placeOnDiskNow(url), encoding: .utf8)
     }
 
     /// Whether a file will be there once the step is made.
@@ -460,7 +535,7 @@ nonisolated final class JournaledStep {
         if let planned = plannedAfter[key] {
             return planned != nil
         }
-        return FileManager.default.fileExists(atPath: url.path)
+        return FileManager.default.fileExists(atPath: placeOnDiskNow(url).path)
     }
 
     /// The `.md` files under a folder, at any depth, once the step is made:
@@ -608,7 +683,8 @@ nonisolated final class JournaledStep {
         guard let root = workingFolderURL,
               let changes = recordableChanges(under: root),
               let moveOps = recordableMoves(under: root),
-              let treeOps = recordableTrees(under: root) else {
+              let treeOps = recordableTrees(under: root),
+              let folderMoveOps = recordableFolderMoves(under: root) else {
             if currentMode == .live {
                 throw JournaledStepError.couldNotRecordTheStep
             }
@@ -622,6 +698,13 @@ nonisolated final class JournaledStep {
         var blobs: [Data] = []
         var changedFiles: Int = 0
         var changeIndex: Int = -1
+        // A folder's move goes first: every edit inside it, named at its new
+        // place, comes after it in the step and is carried by it (U4b,
+        // `opKinds.wholeOps`' order).
+        for op in folderMoveOps {
+            ops.append(op)
+            changedFiles += 1
+        }
         for change in changes {
             changeIndex += 1
             if change.before == change.after {
@@ -729,6 +812,20 @@ nonisolated final class JournaledStep {
         return result
     }
 
+    /// The folder moves as ops inside the working folder (U4b); nil when
+    /// any cannot be named in a step.
+    func recordableFolderMoves(under root: URL) -> [UndoOp]? {
+        var result: [UndoOp] = []
+        for planned in plannedFolderMoves {
+            guard let from = UndoFolderPlaces.relativePath(of: planned.from, under: root),
+                  let to = namedPath(of: planned.to, under: root) else {
+                return nil
+            }
+            result.append(UndoOp.moveFolder(from: from, to: to, listingSha: planned.listingSha))
+        }
+        return result
+    }
+
     /// Each folder to make as a `createTree` op inside the working folder,
     /// with the blobs it needs (its listing and every file's bytes); nil
     /// when any cannot be named in a step.
@@ -758,6 +855,15 @@ nonisolated final class JournaledStep {
     /// root to check against.
     func makeWithoutARecord() throws {
         var targets: [UndoSwapTarget] = []
+        // A folder's move first, and every file inside it staged only at its
+        // turn, once the folder is at its new place (U4b).
+        for planned in plannedFolderMoves {
+            let op: UndoOp = UndoOp.moveFolder(from: planned.from.path, to: planned.to.path, listingSha: planned.listingSha)
+            targets.append(UndoSwapTarget(
+                url: planned.to, relativePath: planned.to.lastPathComponent,
+                change: .moveHere(from: planned.from, fromPath: planned.from.lastPathComponent, op: op)
+            ))
+        }
         for key in plannedOrder {
             guard let url = plannedURL[key], let after = plannedAfter[key] else {
                 continue
@@ -779,7 +885,10 @@ nonisolated final class JournaledStep {
             if before == after {
                 continue
             }
-            targets.append(UndoSwapTarget(url: url, relativePath: url.lastPathComponent, expected: before, replacement: after))
+            let carried: Bool = placeOnDiskNow(url) != url
+            targets.append(UndoSwapTarget(
+                url: url, relativePath: url.lastPathComponent, expected: before, replacement: after, stagesAtItsTurn: carried
+            ))
         }
         for planned in plannedMoves {
             let op: UndoOp = UndoOp.moveFile(from: planned.from.path, to: planned.to.path, sha: planned.sha)
@@ -826,7 +935,7 @@ nonisolated final class JournaledStep {
             guard let url = plannedURL[key], let after = plannedAfter[key] else {
                 continue
             }
-            guard let relative = UndoFolderPlaces.relativePath(of: url, under: root) else {
+            guard let relative = namedPath(of: url, under: root) else {
                 return nil
             }
             if mustBeNew.contains(key) {
@@ -907,7 +1016,7 @@ nonisolated final class JournaledStep {
         if plannedURL[key] == nil {
             plannedOrder.append(key)
             plannedURL[key] = url
-            plannedBefore[key] = UndoItem.read(at: url)
+            plannedBefore[key] = UndoItem.read(at: placeOnDiskNow(url))
         }
         plannedAfter[key] = data
     }
