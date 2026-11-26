@@ -1170,12 +1170,14 @@ struct CourseSettingsView: View {
             )
         }
         var attempts: Int = 0
-        // Whether the rename record on disk is THIS run's (the final sweep,
-        // L4). A run finishing an interrupted rename moves no folder and
-        // writes no record: the record there is the earlier run's, and a
-        // refusal must leave it, or the sheet stops offering the name to
-        // finish with.
-        var thisRunWroteTheRecord: Bool = false
+        // The rename record is this run's only while this run is unfinished,
+        // and an earlier run's record (another folder's interrupted rename,
+        // or the one this run finishes) is never cleared by a refusal (the
+        // final sweep, L4; U4b2-3). Read once, before the loop writes it.
+        var record: RenameRecordClaim = RenameRecordClaim(
+            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory,
+            changesTheSettings: true
+        )
         var outcome: FolderRenameOutcome = FolderRenameOutcome(foldersMoved: 0, pagesRelinked: 0)
         while true {
             // The walk OFF the main thread: reading every page in the course
@@ -1231,10 +1233,7 @@ struct CourseSettingsView: View {
             // way can be recognised and finished: with the switch off, recovery
             // records and repairs nothing (`interruptedRenameTarget`).
             if !planned.moves.isEmpty {
-                SpecialFolderRenamer.recordRenameStarting(
-                    from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory
-                )
-                thisRunWroteTheRecord = true
+                record.renameIsStarting()
             }
             do {
                 // The check and the swap read and hash every file in each
@@ -1254,11 +1253,8 @@ struct CourseSettingsView: View {
                 // Nothing was changed (a refusal comes only once everything
                 // is put back), so the record goes before the re-plan, which
                 // may itself be refused (part four's review, L2); the next
-                // make writes it again. Only a record this run wrote.
-                if thisRunWroteTheRecord {
-                    SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
-                    thisRunWroteTheRecord = false
-                }
+                // make writes it again. Put back as it was before this run.
+                record.nothingWasChanged()
                 attempts += 1
                 continue
             } catch let partWay as JournaledStepError {
@@ -1295,16 +1291,12 @@ struct CourseSettingsView: View {
                         renaming: oldName, said: partWay.localizedDescription
                     ))
                 }
-                if thisRunWroteTheRecord {
-                    SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
-                }
+                record.stepWasNotMade(partWay)
                 return .failed(SpecialFolderRenamer.nothingWasChanged(
                     renaming: oldName, said: partWay.localizedDescription
                 ))
             } catch {
-                if thisRunWroteTheRecord {
-                    SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
-                }
+                record.nothingWasChanged()
                 return .failed(SpecialFolderRenamer.nothingWasChanged(
                     renaming: oldName, said: error.localizedDescription
                 ))
@@ -1313,9 +1305,9 @@ struct CourseSettingsView: View {
             outcome = planned.outcome
             break
         }
-        // The step is made, so the rename is whole and the record of it
-        // having started can go.
-        SpecialFolderRenamer.clearRenameRecord(courseDirectory: course.directoryURL)
+        // The step is made, so the rename is whole: its record goes, and an
+        // earlier run's record of another folder is left as it was.
+        record.renameIsWhole()
         ActivityTrail.note(
             .folderRenamed,
             "renamed the folder " + oldName + " to " + newName + " in " + course.code
