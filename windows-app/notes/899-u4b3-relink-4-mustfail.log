@@ -1,0 +1,36 @@
+== mf1
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:1054: error: -[QuartzTeachersTests.JournaledStepTests testAPageWrittenIntoThePlaceALinkLeadingOutLeavesIsOneStep] : failed: caught error: "refused(QuartzTeachers.UndoRefusal.notReadable, fileName: "")"
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:870: error: -[QuartzTeachersTests.JournaledStepTests testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone] : failed: caught error: "refused(QuartzTeachers.UndoRefusal.notReadable, fileName: "")"
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:1022: error: -[QuartzTeachersTests.JournaledStepTests testARelinkWhoseNewTextTheListRefusesGoesAheadUnrecorded] : failed: caught error: "refused(QuartzTeachers.UndoRefusal.notReadable, fileName: "")"
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:917: error: -[QuartzTeachersTests.JournaledStepTests testARelinkWhoseOldPlaceIsFilledInTheSameStepIsOneStep] : failed: caught error: "refused(QuartzTeachers.UndoRefusal.notReadable, fileName: "")"
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:952: error: -[QuartzTeachersTests.JournaledStepTests testTwoRelinksInARowAreOneStep] : failed: caught error: "refused(QuartzTeachers.UndoRefusal.notReadable, fileName: "")"
+	 Executed 27 tests, with 5 failures (5 unexpected) in 1.139 (1.143) seconds
+	 Executed 27 tests, with 5 failures (5 unexpected) in 1.139 (1.143) seconds
+	 Executed 27 tests, with 5 failures (5 unexpected) in 1.139 (1.144) seconds
+
+== mf2
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:1056: error: -[QuartzTeachersTests.JournaledStepTests testAPageWrittenIntoThePlaceALinkLeadingOutLeavesIsOneStep] : XCTAssertEqual failed: ("/var/folders/23/hdyncr1d1j74cglsgvqbd0t40000gn/T/journaled-step-outside-058E955C-0007-45DD-8489-3D82E3130C8E/old.md") is not equal to ("/var/folders/23/hdyncr1d1j74cglsgvqbd0t40000gn/T/journaled-step-outside-058E955C-0007-45DD-8489-3D82E3130C8E/new.md")
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:875: error: -[QuartzTeachersTests.JournaledStepTests testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone] : XCTAssertTrue failed - inside
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:876: error: -[QuartzTeachersTests.JournaledStepTests testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone] : XCTAssertNil failed: "836b130e2c44a5e107d4af92ce8cf11332081710bded4aa59c8e8a2aa70cf96b" - inside
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:878: error: -[QuartzTeachersTests.JournaledStepTests testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone] : XCTUnwrap failed: expected non-nil value of type "String"
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:878: error: -[QuartzTeachersTests.JournaledStepTests testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone] : XCTAssertEqual failed: threw error "UnwrappingOptional(errorCode: 105, errorUserInfo: ["XCTestErrorUserInfoKeyShouldIgnore": true])" - inside
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:879: error: -[QuartzTeachersTests.JournaledStepTests testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone] : XCTUnwrap failed: expected non-nil value of type "String"
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:879: error: -[QuartzTeachersTests.JournaledStepTests testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone] : XCTAssertEqual failed: threw error "UnwrappingOptional(errorCode: 105, errorUserInfo: ["XCTestErrorUserInfoKeyShouldIgnore": true])" - inside
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:880: error: -[QuartzTeachersTests.JournaledStepTests testARelinkAloneIsRecordedWithBothTextsAndUndoneAndRedone] : XCTAssertEqual failed: ("../../elsewhere/old.md") is not equal to ("../../elsewhere/new.md") - inside
+
+== mf3
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:1054: error: -[QuartzTeachersTests.JournaledStepTests testAPageWrittenIntoThePlaceALinkLeadingOutLeavesIsOneStep] : failed: caught error: "couldNotRecordTheStep"
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:913: error: -[QuartzTeachersTests.JournaledStepTests testARelinkWhoseOldPlaceIsFilledInTheSameStepIsOneStep] : XCTAssertFalse failed - the place the relink leaves reads as taken
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:920: error: -[QuartzTeachersTests.JournaledStepTests testARelinkWhoseOldPlaceIsFilledInTheSameStepIsOneStep] : XCTAssertEqual failed: ("0") is not equal to ("1")
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:924: error: -[QuartzTeachersTests.JournaledStepTests testARelinkWhoseOldPlaceIsFilledInTheSameStepIsOneStep] : XCTAssertEqual failed: threw error "Error Domain=NSCocoaErrorDomain Code=260 "The file “Unit 1, Day 4.md” couldn’t be opened because there is no such file." UserInfo={NSFilePath=/var/folders/23/hdyncr1d1j74cglsgvqbd0t40000gn/T/journaled-step-DD18DA60-8861-44EA-B24C-17A3C755873D/courses/ICS3U/section1/All Classes/Unit 1, Day 4.md, NSURL=file:///var/folders/23/hdyncr1d1j74cglsgvqbd0t40000gn/T/journaled-step-DD18DA60-8861-44EA-B24C-17A3C755873D/courses/ICS3U/section1/All%20Classes/Unit%201,%20Day%204.md, NSUnderlyingError=0x9e190d350 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}"
+	 Executed 27 tests, with 4 failures (2 unexpected) in 0.942 (0.947) seconds
+	 Executed 27 tests, with 4 failures (2 unexpected) in 0.942 (0.948) seconds
+	 Executed 27 tests, with 4 failures (2 unexpected) in 0.942 (0.948) seconds
+
+== mf4
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:992: error: -[QuartzTeachersTests.JournaledStepTests testAWriteAtARelinksNewNameIsRefusedBeforeAnythingChanges] : failed - not refused as cannot tell now: refused(QuartzTeachers.UndoRefusal.notReadable, fileName: "")
+/Users/russellgordon/plantoir/wt-899-u4b3/mac-app/Tests/QuartzTeachersTests/JournaledStepTests.swift:992: error: -[QuartzTeachersTests.JournaledStepTests testAWriteAtARelinksNewNameIsRefusedBeforeAnythingChanges] : failed - not refused as cannot tell now: refused(QuartzTeachers.UndoRefusal.notReadable, fileName: "")
+	 Executed 27 tests, with 2 failures (0 unexpected) in 0.987 (0.992) seconds
+	 Executed 27 tests, with 2 failures (0 unexpected) in 0.987 (0.992) seconds
+	 Executed 27 tests, with 2 failures (0 unexpected) in 0.987 (0.992) seconds
+
