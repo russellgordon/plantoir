@@ -22826,6 +22826,32 @@ elsewhere; nothing is touched or told, and Undo puts it back. The check
 replay now asks the plan's stays-inside check of a move's places
 (`checkCasesHow`), so the leading-out row runs it, with a target that exists.
 
+### U4b2: a-linked-section-folder-is-renamed
+
+Rename folder renames a per-section or shared folder that is itself a
+symbolic link as it did before U4b, now in the one step: the LINK is moved
+(its name changed, its target as written), and what it leads to is never
+read, listed or touched. Before U4b the rename tested `fileExists(atPath:
+isDirectory:)`, which follows the link, then called `moveItem`, which renames
+the link; from U4b until this piece the plan read the link as `.notATree` and
+refused "cannot tell now". Read off the old code (`5cf38d656`): the page walk
+(`markdownPages`, a `FileManager` enumerator) never goes through a link, so
+pages inside the link's target were relinked only when the target sits
+elsewhere in the course, at their own place; and a link leading out of the
+working folder was renamed like any other. Both are kept: nothing is written
+outside the working folder, so nothing was parked. The plan reads a link's
+`linkSha` with `UndoTreeReading.linkSha(at:)`, the one function the door's
+`UndoMoveSide.readLink` now judges by too, and `apply` plans it with
+`JournaledStep.moveLink`; the step names a link's `from` from the folder
+above it, since `relativePath` resolves a link to what it leads to. Riding
+low (L3 of the U4b2-6 review): a link at the new name that this run did not
+move there, at a place an earlier run's record names or may have moved, was
+dropped from the part-way line and the sheet; it is now told as a place the
+rename cannot tell it moved, since the record does not say which places were
+links. `undo.rule.shadow` no longer promises that pieces 14 and 15 settle a
+linked PAGE: they move a link only for Rename folder's folder, and Insert
+Class on the Mac still refuses renaming a later class that is a link.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
