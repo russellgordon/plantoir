@@ -223,6 +223,8 @@ final class CourseRestorerStagedTests: XCTestCase {
         try WholeCourseFixture.write("{\"days\": 4}\n", to: timetable)
         let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
         try WholeCourseFixture.write("{\"days\": 5, \"edited\": true}\n", to: timetable)
+        let newer: Date = archive.began.addingTimeInterval(WholeCourseFixture.secondsBeforeTheStart)
+        try WholeCourseFixture.date(timetable, changed: newer, made: newer)
 
         try CourseRestorer.restoreBackup(
             try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
@@ -233,6 +235,37 @@ final class CourseRestorerStagedTests: XCTestCase {
             try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "),
             [".internal/timetable/section1.json": Data("{\"days\": 5, \"edited\": true}\n".utf8)]
         )
+    }
+
+    /// The engine's rule at the edge, pinned on purpose (director's
+    /// decision, 2026-11-26): a page whose change is dated at EXACTLY the
+    /// archive's start, to the millisecond, counts as written after it and
+    /// is kept as well. It errs toward keeping a teacher's work: the
+    /// archive may hold it too, and nothing is lost. The archive holds
+    /// this page at its path, its size and a recorded time within zip's
+    /// rounding, so the equal date is the only thing that keeps it.
+    @MainActor
+    func testAPageChangedAtExactlyTheArchivesStartIsKeptAsWell() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse(changedAtTheStart: ["index.md"])
+        let listing: RestoreSwap.ArchiveListing = try XCTUnwrap(RestoreSwap.ArchiveListing.read(archive.url))
+        let recorded: Date = try XCTUnwrap(listing.file(at: "index.md")?.recordedTime)
+        XCTAssertLessThanOrEqual(abs(recorded.timeIntervalSince(archive.began)), RestoreSwap.zipTimeRoundingSeconds, "held by the listing")
+        let changed: Date? = try fixture.courseURL.appendingPathComponent("index.md")
+            .resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        XCTAssertEqual(changed, archive.began, "changed at exactly the start")
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(
+            try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "),
+            ["index.md": Data("LIVE front page\n".utf8)]
+        )
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
     }
 
     /// Round four: whether the old copy is kept whole is decided by the

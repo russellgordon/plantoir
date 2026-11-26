@@ -585,6 +585,11 @@ struct WholeCourseFixture {
 
     let previousTrail: ProblemReportStore
 
+    /// How far before the archive's start `archiveTheCourse` dates the
+    /// files it is meant to hold, and how far after it a test dates a file
+    /// it means to be newer: far beyond zip's two-second rounding.
+    static let secondsBeforeTheStart: TimeInterval = 60
+
     // MARK: - Initializer
 
     init(smallBackupMarker: Bool = false, backupSettingsUnreadable: Bool = false, reference: Bool = false) throws {
@@ -703,11 +708,26 @@ struct WholeCourseFixture {
     /// course as it is now, zipped with the app's own arguments and
     /// exclusions (`CourseArchiver.archiveRules`) into
     /// `courses/_backups/ICS3U/`, and the moment it began.
-    func archiveTheCourse() throws -> (url: URL, began: Date) {
+    ///
+    /// The order is STATED, never left to the clock (#909, 2026-11-26): the
+    /// start is a whole second, and before zipping, every file in the
+    /// course is dated `secondsBeforeTheStart` before it (made and changed),
+    /// so the archive holds each one as clearly older. A page in
+    /// `changedAtTheStart` (a path inside the course) is changed at exactly
+    /// the start instead. A test that writes a file after this call, meaning
+    /// it to be newer, dates it with `date(_:changed:made:)`. Writing the
+    /// pages a fraction of a millisecond before taking the start made the
+    /// engine judge them written after it, in 4 of 5 runs.
+    func archiveTheCourse(changedAtTheStart: [String] = []) throws -> (url: URL, began: Date) {
         let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
         try FileManager.default.createDirectory(at: shelf, withIntermediateDirectories: true)
         let archive: URL = RestoreSwap.unusedURL(shelf.appendingPathComponent("ICS3U_2026-11-14_031500.zip"))
-        let began: Date = Date()
+        let began: Date = Date(timeIntervalSince1970: (Date().timeIntervalSince1970).rounded(.down))
+        let older: Date = began.addingTimeInterval(-WholeCourseFixture.secondsBeforeTheStart)
+        for inside in try WholeCourseFixture.snapshot(of: courseURL).keys {
+            let changed: Date = changedAtTheStart.contains(inside) ? began : older
+            try WholeCourseFixture.date(courseURL.appendingPathComponent(inside), changed: changed, made: older)
+        }
         var arguments: [String] = ["-r", "-q", "-X", archive.path, "ICS3U", "-x"]
         arguments.append(contentsOf: CourseArchiver.archiveRules(forFolderAt: courseURL).zipExclusions)
         let zip: Process = Process()
@@ -773,6 +793,21 @@ struct WholeCourseFixture {
 
     /// Every file under a folder, by relative path, with its bytes. Links
     /// are not followed.
+    /// Dates a file through its attributes: changed and made. A locked
+    /// file (`uchg`) is unlocked for the moment it takes and locked again,
+    /// since a locked file's dates cannot be set.
+    static func date(_ url: URL, changed: Date, made: Date) throws {
+        var status: stat = stat()
+        let wasLocked: Bool = lstat(url.path, &status) == 0 && (status.st_flags & UInt32(UF_IMMUTABLE)) != 0
+        if wasLocked {
+            _ = lchflags(url.path, status.st_flags & ~UInt32(UF_IMMUTABLE))
+        }
+        try FileManager.default.setAttributes([.modificationDate: changed, .creationDate: made], ofItemAtPath: url.path)
+        if wasLocked {
+            _ = lchflags(url.path, status.st_flags)
+        }
+    }
+
     static func snapshot(of folder: URL) throws -> [String: Data] {
         var result: [String: Data] = [:]
         let rootPath: String = folder.standardizedFileURL.path + "/"
