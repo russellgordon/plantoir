@@ -28,13 +28,24 @@ All through `xlock.sh`, 15-minute kill, logs in `/Users/russellgordon/plantoir/w
 - `run-r0.log`, `run-m1.log` to `run-m4.log`: must-fail above.
 - Merges of `origin/dev`: before proving and before hand-back, both "Already up to date" (dev stayed at a03fecefd); no merge commit was needed.
 
+## Review 1 (M1, L1 to L5), fixed in this branch
+
+- M1: `CourseSettingsView.renameFolder` now owns its record through `RenameRecordClaim` (in `SpecialFolderRenamer.swift`, the model), the same type `rename` uses: read once before the loop; `renameIsStarting` before each make that moves folders; `nothingWasChanged` on the changed-since retry and every refusal; `stepWasNotMade` keeps it part way or killed; `renameIsWhole` on success. Four new tests in `UndoRenameFolderStepTests` (success of another folder, a rename that moves nothing, refused at the make, retry then re-plan refused), all red on the round-1 view. No interface change.
+- L1 accepted and stated in documentation 09 and the claim's doc comment: a kill between this run's write and the put-back loses the earlier record, as before; refusing instead would be a new sentence and its own contract piece; U7 drops the record.
+- L2: a put-back or clear that fails writes a `folder renamed` trail line (`SpecialFolderRenamer.renameNoteNotTidiedLine`); test `testARecordThatCannotBeTidiedIsToldOnTheTrail` (record folder made read-only during the step).
+- L3: a success that renames the recorded folder (same `from` and scope) to any name clears the earlier record (`recordNamesTheFolder`); test `testRenamingTheRecordedFolderElsewhereClearsItsRecord`.
+- L4: pinned, `testARefusedFinishOfTheRecordedRenameKeepsItsRecord`.
+- L5: `AssistCurriculumMentionsTests` sets `UndoJournalLocation.folderOverride` to a temp folder in setUp and clears it in tearDown.
+- Runs: `run-r2-good.log` SpecialFolderRenamerTests 42/0, AssistCurriculumMentionsTests 14/0, UndoRenameFolderStepTests 34/0, UndoWriterScanTests 6/0 (the allowance stays 5: the same write and remove, moved into the claim). Must-fail round 2: 5 RED of 5, plus tests first (mustfail log).
+- For documentation 12, unchanged in substance: Windows' one rename path (`SpecialFolderRenamer.Rename` writes, `CourseSettingsView.xaml.cs` clears after the settings write, about line 501) clears unconditionally on success, so it has the same M1 loss when another folder's record is on disk; when W8 makes the rename one step it should read the earlier record before writing, put it back on a refusal or on success of another folder, clear it when the recorded folder itself was renamed, keep it part way, and write a trail line if the tidy fails.
+
 ## Left for the next piece
 
-- `CourseSettingsView.renameFolder` (out of scope here): renaming a folder whose moves are non-empty while ANOTHER folder's interrupted-rename record is on disk overwrites that record with its own (`recordRenameStarting`, one file per course), then clears it on success or on a refusal at the make, so the earlier run's record is lost and the sheet no longer offers to finish the other rename. `rename` now reads and puts back the earlier record; `renameFolder` could do the same with `recordNames` and `putBackRecord` (both added here, `nonisolated static`). Its success clear is also unconditional. Not changed, as the brief puts `renameFolder` out of scope; low.
+None.
 
 ## For U7
 
-- Dropping the record removes `recordNames` and `putBackRecord` with it, and the UndoWriterScanTests allowance for SpecialFolderRenamer.swift falls back (5 today).
+- Dropping the record removes `RenameRecordClaim`, `recordNames`, `recordNamesTheFolder` and `renameNoteNotTidiedLine` with it, and the UndoWriterScanTests allowance for SpecialFolderRenamer.swift falls back (5 today).
 
 ## For the director
 
@@ -44,9 +55,9 @@ All through `xlock.sh`, 15-minute kill, logs in `/Users/russellgordon/plantoir/w
 
 1. Broke each fix and watched its test fail: R0 plus M1 to M4, every new test red under at least one (log above).
 2. No timed waits: none added; the tests use the existing kill-point seams, which fire on events.
-3. Every sentence on the failure paths is true: `rename` throws the same errors as before and says nothing itself; no sentence changed. The doc comments of `rename`, `recordNames`, `putBackRecord` say what the code does; `recordRenameStarting`'s comment ("cleared once it is made, or refused with nothing changed") is now true of both writers.
+3. Every sentence on the failure paths is true: `rename` throws the same errors as before and says nothing itself; no sentence changed. The doc comments of `rename`, `RenameRecordClaim`, `recordNames`, `recordNamesTheFolder` say what the code does; `recordRenameStarting`'s comment ("cleared once it is made, or refused with nothing changed") is now true of both writers.
 4. `dev` merged in before proving: `origin/dev` a03fecefd is the base; both merges "Already up to date".
-5. No number tuned by trial: the UndoWriterScanTests allowance 3 to 5 is the count of the two writing calls added (`write`, `removeItem` in `putBackRecord`).
+5. No number tuned by trial: the UndoWriterScanTests allowance 3 to 5 is the count of the two writing calls added (`write`, `removeItem`, now inside `RenameRecordClaim`); round 2's trail line adds no writing call.
 6. House style and contracts: no `contracts/` change; changed files are `mac-app/` Swift, documentation 09 (one paragraph at the end of the Undo section), and these notes.
 7. House style grep over added Swift lines: empty. New tests sit under their own `// MARK: -` section in the existing class.
 8. Riding low L5: fixed, tests failed first (R0).

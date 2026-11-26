@@ -22524,23 +22524,29 @@ days (the 40-day sweep case), and the second round's scan (11 checks).
 ### U4b2: rename-record-owned
 
 The interrupted-rename record (`courses/.internal/renames/<CODE>.json`)
-exists only while the rename that wrote it is unfinished, through every
-writer. `CourseSettingsView.renameFolder` kept this since U4b part nine;
-`SpecialFolderRenamer.rename`, the form for a caller with no settings to
-change (no caller in the app today), wrote the record and never cleared it,
-so its first caller would have left a record that `interruptedRenameTarget`
-reads as an interrupted rename (the final sweep's L5). It now reads the
-record already there before writing its own, and once the step is made, or
-refused with nothing changed, puts that earlier record back byte for byte
-(or removes the record when there was none); only a step left part way or
-killed keeps this run's record, and a success that finishes the recorded
-rename clears it. Chosen over removing `rename`, which five tests in
-`SpecialFolderRenamerTests` and one in `AssistCurriculumMentionsTests` call
-as the one-call rename. The one difference left from `renameFolder`: that
-function, renaming another folder that moves, replaces an earlier run's
-record with its own and then clears it on success or on a refusal at its
-make, so the earlier record is lost (out of this piece's scope; in its
-notes).
+exists only while the rename that wrote it is unfinished, and nothing clears
+a record another run wrote. Both writers, `CourseSettingsView.renameFolder`
+and `SpecialFolderRenamer.rename` (the form for a caller with no settings to
+change; no caller in the app), now decide every exit through one model type,
+`RenameRecordClaim`. The record is one file per course, so a run that writes
+its own has replaced whatever was there (another folder's interrupted
+rename); the claim reads that earlier record once, before the first write.
+Refused with nothing changed (a changed-since retry included): the earlier
+record is put back byte for byte, or no record is left when there was none.
+Stopped part way or killed: this run's record stays. Whole: a record of a
+rename of this same folder is cleared, whatever its target (this rename
+finished it, or took the old name away so it can never be finished); any
+other earlier record is put back, and a rename that moved no folder touches
+nothing. Before this, `renameFolder` cleared the file on every success, retry
+and refusal, so renaming one folder lost another folder's unfinished rename
+and the sheet stopped offering to finish it (review 1, M1; the final sweep's
+L5 for `rename`). A put-back or clear that fails writes a `folder renamed`
+trail line, since a record left by mistake greys the one-section restore.
+One window is accepted: a kill between this run's write and the put-back
+loses the earlier record, as it always did before; refusing a rename while
+another is unfinished would be a new sentence and its own contract piece,
+and U7 drops the record. Chosen over removing `rename`, which five tests in
+`SpecialFolderRenamerTests` and one in `AssistCurriculumMentionsTests` call.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

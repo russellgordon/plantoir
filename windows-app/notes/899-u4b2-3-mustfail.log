@@ -23,3 +23,20 @@ M4 the record cleared at the start of `rename`, before the plan.
 
 Must-fail: 4 RED of 4 (plus R0, tests first).
 Logs: /Users/russellgordon/plantoir/wt-899-u4b2-3/.dd/run-{r0,m1,m2,m3,m4}.log
+
+Round 2 (review 1: M1, L2 to L5), head 892eb4586. Classes: SpecialFolderRenamerTests and UndoRenameFolderStepTests. Each restored with `git checkout` (status clean).
+
+N1 tests first: CourseSettingsView.swift as at 9282e9222 (renameFolder clearing the file on success, retry and refusal).
+  RED, 4 of 4 new renameFolder tests: testASuccessfulRenameOfAnotherFolderLeavesAnEarlierRecord, testARenameThatMovesNothingLeavesAnEarlierRecord, testARefusedRenameOfAnotherFolderLeavesAnEarlierRecord, testARetryOfARenameOfAnotherFolderLeavesAnEarlierRecord: ("nil") is not equal to ("Optional(65 bytes)").
+N2 the failed tidy kept silent (`noteNotTidied` returns at once; the first try, `return` on its own line, parsed as `return ActivityTrail.note(...)` and changed nothing, so it was redone with an explicit guard).
+  RED: testARecordThatCannotBeTidiedIsToldOnTheTrail (XCTAssertTrue failed, trail printed).
+N3 renameIsWhole clearing only a record naming this same target (the round-1 code; L3).
+  RED: testRenamingTheRecordedFolderElsewhereClearsItsRecord "a record nobody can finish was left".
+N4 a refusal also clearing a record that names this rename (L4).
+  RED, 3: testARefusedFinishOfTheRecordedRenameKeepsItsRecord, UndoRenameFolderStepTests testARefusedFinishOfAnInterruptedRenameKeepsItsRecord, testAFinishRefusedAsChangedSinceOnEveryTryKeepsItsRecord.
+N5 renameIsWhole clearing unconditionally (the dev renameFolder success).
+  RED: testARenameThatMovesNothingLeavesAnEarlierRecord.
+N6 nothingWasChanged removing instead of putting back.
+  RED, 5: testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder (2 lines), testARefusedFinishOfTheRecordedRenameKeepsItsRecord, testARefusedRenameOfAnotherFolderLeavesAnEarlierRecord, testARetryOfARenameOfAnotherFolderLeavesAnEarlierRecord.
+
+Round 2 must-fail: 5 RED of 5 (N2 to N6), plus N1 tests first. Logs: /Users/russellgordon/plantoir/wt-899-u4b2-3/.dd/run-n*.log
