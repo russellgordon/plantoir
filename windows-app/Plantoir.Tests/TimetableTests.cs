@@ -741,6 +741,56 @@ public class ReDateTests : IDisposable
     }
 
     /// <summary>
+    /// #899 W7b1 review 3, LOW 1: a re-date refused because the hidden
+    /// timetable file itself is held by another program is said in plain
+    /// words naming the section's class dates, never .NET's sentence with the
+    /// hidden path; the pages and the timetable are as they were.
+    /// </summary>
+    [Fact]
+    public void AReDateWhoseTimetableIsHeldSaysTheClassDatesAndNoHiddenPath()
+    {
+        var (workspace, plan, second, timetable, timetableBefore) = AReDateOntoANewTimetable(seams: null);
+        string first = PagePaths.ResolveInside(_folder, plan.Changing.First().RelativePath);
+        byte[] firstBefore = File.ReadAllBytes(first);
+        byte[] secondBefore = File.ReadAllBytes(second);
+        // The conversation's copy already made, as it is for every change
+        // after the first in an assistant chat: the copy reads the timetable
+        // too, so without it the backup's own refusal would answer first.
+        typeof(AssistWorkspace).GetMethod("BackUpOnceForThisConversation",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .Invoke(workspace, [workspace.Course("ICS3U"), 1, null]);
+        AssistRefusal refused;
+        using (new FileStream(timetable, FileMode.Open, FileAccess.Read, FileShare.None))
+            refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
+        Assert.Equal("Nothing was changed: another program, such as a syncing service, is using this section's class dates. Try again in a moment.",
+                     refused.Message);
+        Assert.DoesNotContain(".internal", refused.Message);
+        Assert.DoesNotContain("section1.json", refused.Message);
+        Assert.DoesNotContain(_folder, refused.Message);
+        Assert.Equal(firstBefore, File.ReadAllBytes(first));
+        Assert.Equal(secondBefore, File.ReadAllBytes(second));
+        Assert.Equal(timetableBefore, File.ReadAllBytes(timetable));
+    }
+
+    /// <summary>
+    /// W7b2-11 review 1, LOW 2: a folder where the timetable file belongs is
+    /// Plantoir's own refusal, which carries no Windows error, so the answer
+    /// quotes no "Windows said" and names no hidden path; nothing changes.
+    /// </summary>
+    [Fact]
+    public void AReDateWhoseTimetableIsAFolderQuotesNoWindowsWords()
+    {
+        var (workspace, plan, second, timetable, _) = AReDateOntoANewTimetable(seams: null);
+        byte[] secondBefore = File.ReadAllBytes(second);
+        File.Delete(timetable);
+        Directory.CreateDirectory(timetable);
+        var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
+        Assert.Equal("Nothing was changed: this section's class dates could not be read.", refused.Message);
+        Assert.Equal(secondBefore, File.ReadAllBytes(second));
+        Assert.True(Directory.Exists(timetable));
+    }
+
+    /// <summary>
     /// Two classes and a remembered timetable "typed in by hand" in
     /// September, and a re-date onto block F's October meetings, so both
     /// pages and the timetable change; the plan's second page, the timetable

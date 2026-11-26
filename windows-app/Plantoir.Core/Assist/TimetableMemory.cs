@@ -312,10 +312,35 @@ public sealed class TimetableMemory
         AssistWording.ClassDatesAreRemembered(course.Code, sectionNumber.ToString(CultureInfo.InvariantCulture),
                                               course.Configuration.ClassNoun) + " " + whatWasKept;
 
-    /// <summary><c>undo.wording.classDatesKeptLead</c>.</summary>
+    /// <summary>
+    /// Why a re-date could not read the section's timetable at plan time, in
+    /// a teacher's words and naming no hidden path (#899 W7b1 review 3, LOW 1;
+    /// the held sentence is Russell's ruling, 2026-11-25), said after
+    /// "Nothing was changed: ". Another program holding it; the system's own
+    /// words without the path when Windows refused the read; and, for
+    /// Plantoir's own refusal (a folder where the file belongs, which carries
+    /// no Windows error), no "Windows said" (W7b2-11 review 1, LOW 2). In no
+    /// contract on either side: the mac's file system has no such lock.
+    /// </summary>
+    internal static string WhyTheClassDatesCouldNotBeRead(IOException error)
+    {
+        if (HeldFiles.IsSharingViolation(error))
+            return "another program, such as a syncing service, is using this section's class dates. Try again in a moment.";
+        bool windowsRefusedIt = (error.HResult & unchecked((int)0xFFFF0000)) == unchecked((int)0x80070000);
+        return windowsRefusedIt
+            ? "this section's class dates could not be read. Windows said: " + HeldFiles.SystemWords(error)
+            : "this section's class dates could not be read.";
+    }
+
+    /// <summary>
+    /// <c>undo.wording.classDatesKeptLead</c>, retyped as every contract
+    /// sentence on Windows is (as <see cref="UndoActionStep.KeptSentence"/> is
+    /// beside it) and pinned against the contract by
+    /// <c>UndoClassDatesStepTests.TheSheetsWordsForAKeptTimetableAreTheContracts</c>.
+    /// </summary>
     internal const string KeptLead = "Another program may have changed their file as they were saved.";
 
-    /// <summary><c>undo.wording.classDatesKeptBesideIt</c>; <paramref name="place"/> is already quoted.</summary>
+    /// <summary><c>undo.wording.classDatesKeptBesideIt</c>, pinned by the same test; <paramref name="place"/> is already quoted.</summary>
     internal static string KeptBesideIt(string place, string kept) =>
         $"What {place} held just before is kept beside it as the hidden file “{kept}”.";
 

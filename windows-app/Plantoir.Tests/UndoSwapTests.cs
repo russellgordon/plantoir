@@ -124,6 +124,22 @@ public sealed class UndoSwapTests : IDisposable
         Assert.Empty(StagedLeft());
     }
 
+    /// <summary>
+    /// The W7b1 review 2, LOW 5: an exception thrown out of the swap after it
+    /// made the folders a new page goes in (here a test's seam that throws,
+    /// asked just after the folder is made) leaves none of those folders
+    /// behind, as a returned refusal does not.
+    /// </summary>
+    [Fact]
+    public void AnExceptionAfterAFolderIsMadeLeavesNoEmptyFolderBehind()
+    {
+        Directory.CreateDirectory(_root);
+        var seams = new UndoSeams { StagingWriteFailsAt = index => throw new InvalidOperationException("A test's throw after the folder is made.") };
+        Assert.Throws<InvalidOperationException>(() =>
+            UndoSwap.Swap([Target("courses/B/Unit 1/b.md", null, New)], "1-undo", _root, seams));
+        Assert.False(Directory.Exists(Path.Combine(_root, "courses")), "The folders the swap made are left behind.");
+    }
+
     /// <summary>The plan review's M5: on a share every swap takes MoveFileEx, which a delete-sharing holder refuses; the refusal is the same, the earlier swap reversed.</summary>
     [Fact]
     public void TheFallbackRenameRefusesTheSameWayUnderAHolder()

@@ -3181,8 +3181,21 @@ public sealed partial class AssistWorkspace
                     if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
                 }
                 if (plan.AllMeetings.Count > 0)
-                    TimetableMemory.PlanInto(step, _folder, course.Code, section, plan.AllMeetings,
-                                             $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
+                {
+                    try
+                    {
+                        TimetableMemory.PlanInto(step, _folder, course.Code, section, plan.AllMeetings,
+                                                 $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
+                    }
+                    catch (IOException error)
+                    {
+                        // The timetable's before is read here, at plan time: a
+                        // file the teacher never sees is said as the section's
+                        // class dates, never as .NET's sentence with its hidden
+                        // path (#899 W7b1 review 3, LOW 1).
+                        throw new IOException(TimetableMemory.WhyTheClassDatesCouldNotBeRead(error), error);
+                    }
+                }
                 step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
             finally { PlanningThrough = null; }
