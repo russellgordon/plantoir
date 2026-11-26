@@ -220,4 +220,97 @@ public sealed class UndoCarryingMoveTests
         Assert.Equal(To, undo.Page);
         Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
     }
+
+    // W8-3 (U4b, M1): the step's own staged and kept files inside the moved
+    // folder, from ANY of its swaps, are never the folder's content.
+
+    private static readonly byte[] Kept = Encoding.UTF8.GetBytes("Kept.\n");
+
+    /// <summary>A file named as step <paramref name="seq"/>'s kept original of a.md from an undo, beside a.md in <paramref name="folder"/>.</summary>
+    private static string LeaveAKeptCopy(UndoScribe scribe, string folder, long seq)
+    {
+        string kept = UndoSwap.BesidePath(scribe.FullPath("A", folder + "/a.md"), $"{seq}-undo", "orig");
+        File.WriteAllBytes(kept, Kept);
+        return Path.GetFileName(kept);
+    }
+
+    /// <summary>Undone, the step's own kept copy left inside the folder at its old place, then redone: the copy moves with the folder and stays (an only copy).</summary>
+    [Fact]
+    public void AKeptCopyInsideTheFolderAtItsOldPlaceIsLeftOutOfTheRedo()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        Assert.Equal("undone", scribe.Undo().Name);
+        string name = LeaveAKeptCopy(scribe, From, 1);
+
+        Assert.Equal("redone", scribe.Redo().Name);
+        Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", From)));
+        Assert.Equal(Kept, scribe.Page("A", To + "/" + name));
+    }
+
+    /// <summary>Redone, the step's own kept copy left inside the folder at its new place, then undone.</summary>
+    [Fact]
+    public void AKeptCopyInsideTheFolderAtItsNewPlaceIsLeftOutOfTheUndo()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        Assert.Equal("undone", scribe.Undo().Name);
+        Assert.Equal("redone", scribe.Redo().Name);
+        string name = LeaveAKeptCopy(scribe, To, 1);
+
+        Assert.Equal("undone", scribe.Undo().Name);
+        Assert.Equal(OldA, scribe.Page("A", From + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", To)));
+        Assert.Equal(Kept, scribe.Page("A", From + "/" + name));
+    }
+
+    /// <summary>Another step's staged file inside the folder is something else: the Undo is refused, naming the folder where it is.</summary>
+    [Fact]
+    public void AnotherStepsStagedFileInsideTheFolderIsNotLeftOut()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        LeaveAKeptCopy(scribe, To, 2);
+
+        UndoScribe.Outcome undo = scribe.Undo();
+        Assert.Equal("changedSince", undo.Name);
+        Assert.Equal(To, undo.Page);
+        Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
+    }
+
+    /// <summary>A teacher's file named like a staged file of step 11 is not step 1's (the marker is the whole number and its dash).</summary>
+    [Fact]
+    public void ATeachersFileNamedLikeAStagedFileOfAnotherSeqIsNotLeftOut()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        LeaveAKeptCopy(scribe, To, 11);
+
+        Assert.Equal("changedSince", scribe.Undo().Name);
+        Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
+    }
+
+    /// <summary>The kept original of a carried page whose blob the list no longer holds is looked for where the page is now: before a Redo, inside the folder at its old place.</summary>
+    [Fact]
+    public void TheKeptOriginalOfACarriedPageIsLookedForWhereThePageIsNow()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        byte[] made = Encoding.UTF8.GetBytes("Made.\n");
+        var write = new JsonObject
+        {
+            ["kind"] = "writeFile", ["path"] = To + "/a.md", ["beforeSha"] = UndoCheck.Sha(OldA), ["afterSha"] = UndoCheck.Sha(made),
+        };
+        List<UndoOp> ops = [Op(MoveOf(listing)), Op(write)];
+        string root = Path.GetDirectoryName(scribe.FullPath("A", "x"))!;
+        var askedAt = new List<string>();
+
+        UndoCheck.PlanResult plan = UndoCheck.Plan(ops, backward: false,
+            relative => UndoCurrent.Read(scribe.FullPath("A", relative)), _ => null,
+            whole: new UndoWholeReads(root, new UndoMemoryPlaces()),
+            keptOriginal: (path, sha) => { askedAt.Add(path); return path == From + "/a.md" ? made : null; });
+
+        Assert.Equal([From + "/a.md"], askedAt);
+        Assert.IsType<UndoCheck.PlanResult.Ready>(plan);
+    }
 }
