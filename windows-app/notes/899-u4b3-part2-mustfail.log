@@ -1,0 +1,36 @@
+#899 U4b3 part 2, half 7a: must-fail log (2026-11-26)
+
+Red first (door-6's head behaviour, the rename loop as write + remove, with only
+the new helper present so the tests compile): .dd/run-p2-red.log
+  UndoMakeRoomLinkedPageTests: 10 run; 7 refused "cannot tell now" (caught error
+  refused(cannotTellNow ... Unit 1, Day 3.md / Day 2.md) at makeRoom, line 128):
+  the four arrangements, the leading-outside one, the names-itself one, the
+  recovery loop. The folder-link pin passed (unchanged behaviour). The dangling
+  pin failed as first written (it assumed nothing is written at the target); it
+  was corrected to pin what the code does today (see notes). The Duplicate Class
+  test is red under M1 (below), which is the same behaviour.
+
+M1  rename loop back to write + remove for a link (`if false && isALinkToAFile`)
+    .dd/run-p2-M1.log: 10 run, 12 failures (7 unexpected), 8 tests red:
+    Day3-at-Day2, Day3-at-Day3, Day2-into-plain-Day3, two-in-a-row, leading
+    outside, names-itself, recovery (refused cannotTellNow at line 128), and
+    testDuplicateClassMovesALinkedLaterClassAsALink (line 378: Day 3 not a link).
+    RED.
+M2  moveLink given the target's path (`rename.fromURL.resolvingSymlinksInPath()`)
+    .dd/run-p2-M2.log: 10 run, 12 failures (7 unexpected), the same 8 tests red
+    (seven of them by a refusal thrown out of apply at line 128; the Duplicate
+    Class test by its Day 3 not being a link).
+    RED.
+M3  retitle planned at the link's old place (`step.write(retitled, to: rename.fromURL)`)
+    .dd/run-p2-M3.log: 10 run, 21 failures, 7 tests red: the four arrangements,
+    leading outside, names-itself, Duplicate Class (a plain page written where the
+    class below belongs; the linked file keeps its old title). RED.
+M4  the clause's Mac phrase removed from undo.rule.shadow ("moves the link itself
+    to the new name" -> "moves the link to the new name")
+    substring script: 0 / 1 / 1 (the renamed Windows test's first Assert.True
+    would fail on the PC). RED.
+M5  Python model: not this half (the call and its model are 7b's).
+
+Each restored byte for byte: `cmp` of ClassInsertionPlanner.swift against the
+saved copy, and `git diff --stat contracts/` showing only the clause change.
+RED 4 of 4.

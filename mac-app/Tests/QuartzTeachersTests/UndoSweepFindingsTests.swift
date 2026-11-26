@@ -195,12 +195,13 @@ final class UndoSweepFindingsTests: XCTestCase {
     }
 
     /// The review of U4b2-1, MEDIUM 1: a step that REMOVES a page that is a
-    /// link (Insert Class renaming a later class: the new name written, the
-    /// old one removed) never follows the link, and is refused before
-    /// anything changes (`undo.rule.shadow`): the door moves a link as
-    /// itself since U4b2-14 and Rename folder uses it for a folder that is
-    /// a link (U4b2-15), but no writer of a page does yet. The link is left
-    /// as it is and the file it leads to unchanged.
+    /// link (here a hand-built step: the new name written, the old one
+    /// removed) never follows the link, and is refused before anything
+    /// changes (`undo.rule.shadow`). No writer makes such a step: Insert
+    /// Class renames a later class that is a link by MOVING the link
+    /// (U4b3, `UndoMakeRoomLinkedPageTests`), as Rename folder moves a
+    /// folder that is a link (U4b2-15); the door's rule for a removal
+    /// stays. The link is left as it is and the file it leads to unchanged.
     /// MUST FAIL with `remove` following the link (the teacher's file is
     /// removed and the link left pointing at nothing).
     func testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges() throws {

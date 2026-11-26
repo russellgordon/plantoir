@@ -268,14 +268,15 @@ public sealed class UndoMakeRoomStepTests : IDisposable
 
     /// <summary>
     /// A later class page that is a symbolic link, with the switch off. Pinned
-    /// as Windows does it, which differs from the mac by name: the mac's
-    /// clause of <c>undo.rule.shadow</c> (U4b2-1, 2026-11-25) never follows a
-    /// link it removes or renames away, so its step is refused before anything
-    /// changes. Windows writes the step plainly, as Make Room always wrote it:
-    /// a plain copy at the new name, the link itself removed (and a page the
-    /// chain writes where it stood is a plain file), the file it led to never
-    /// touched, and no step recorded. The pieces that move a link (U4b2-14
-    /// and 15) settle which of the two holds; until then this test holds the
+    /// as Windows does it, which differs from the mac by name: since U4b3
+    /// (2026-11-26) the mac's clause of <c>undo.rule.shadow</c> renames a later
+    /// class that is a link by moving the link itself to the new name, the
+    /// title and date written into the file it leads to, the place it leaves
+    /// handed over in the same step. Windows writes the step plainly, as Make
+    /// Room always wrote it: a plain copy at the new name, the link itself
+    /// removed (and a page the chain writes where it stood is a plain file),
+    /// the file it led to never touched, and no step recorded. W8b piece 22
+    /// builds the mac's way on Windows and retires this test; until then it holds the
     /// difference by name (it took the place of the ledger's
     /// Reason899W7b2MakeRoomLinkedPage row when Make Room was converted), and
     /// it reads the clause: once the contract no longer states both sides, it
@@ -286,13 +287,13 @@ public sealed class UndoMakeRoomStepTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15(bool insideTheWorkingFolder)
+    public void ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacMovesTheLink_UntilW8bPiece22(bool insideTheWorkingFolder)
     {
         string clause = UndoContract.Undo.GetProperty("rule").GetProperty("shadow").GetString()!;
-        const string settle = "undo.rule.shadow no longer states the linked-page difference this test holds: settle it (U4b2-14 and 15) and change this test to the contract's one rule";
-        Assert.True(clause.Contains("never follows the link and is refused before anything changes", StringComparison.Ordinal), settle + " (the mac's refusal is gone)");
+        const string settle = "undo.rule.shadow no longer states the linked-page difference this test holds: settle it (W8b piece 22) and change this test to the contract's one rule";
+        Assert.True(clause.Contains("moves the link itself to the new name", StringComparison.Ordinal), settle + " (the mac's link move is gone)");
         Assert.True(clause.Contains("saving a plain copy at the new name and deleting the link itself, the linked file left untouched", StringComparison.Ordinal), settle + " (Windows' plain copy is gone)");
-        Assert.True(clause.Contains("held by name in UndoMakeRoomStepTests." + nameof(ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15), StringComparison.Ordinal),
+        Assert.True(clause.Contains("held by name in UndoMakeRoomStepTests." + nameof(ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacMovesTheLink_UntilW8bPiece22), StringComparison.Ordinal),
                     "undo.rule.shadow no longer names this test as where the difference is held");
 
         WindowsActionsOnTheMacFixture.Lay(Folder, Recorded);

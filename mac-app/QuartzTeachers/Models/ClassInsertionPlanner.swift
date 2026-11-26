@@ -373,8 +373,26 @@ enum ClassInsertionPlanner {
             // The title inside the file follows the file name: a page whose
             // name and title disagree is worse than either being wrong alone.
             let retitled: String = PageFrontmatter.settingTitle(in: text, to: rename.to)
-            step.write(retitled, to: rename.toURL)
-            step.remove(rename.fromURL)
+            if isALinkToAFile(rename.fromURL) {
+                // A later class that is a symbolic link to a file (#899
+                // U4b3, `undo.rule.shadow`): the LINK is moved as itself to
+                // the new name, judged by the target it holds, never
+                // followed, as Rename folder moves a linked folder. The
+                // file it leads to is never moved, renamed or removed; the
+                // new title is written INTO it through the link at its new
+                // name, as every write through a link is. The place the
+                // link leaves is handed over, in this same step, to the
+                // class below it or the new class.
+                guard let linkSha = UndoTreeReading.linkSha(at: rename.fromURL) else {
+                    notFinished.notRenamed.append(rename.from)
+                    continue
+                }
+                step.moveLink(rename.fromURL, to: rename.toURL, linkSha: linkSha)
+                step.write(retitled, to: rename.toURL)
+            } else {
+                step.write(retitled, to: rename.toURL)
+                step.remove(rename.fromURL)
+            }
             renamed[rename.from] = rename.to
         }
 
@@ -533,6 +551,30 @@ enum ClassInsertionPlanner {
     ///
     /// In a numbered course with no gaps (a club filled one page at a time)
     /// this gives the same answer as the ordinary rule.
+    /// Whether the page at `url` is a symbolic link (read without following
+    /// it, `lstat`) whose target is a regular file. A link to a folder, a
+    /// dangling link or anything else is not, and is handled as before.
+    static func isALinkToAFile(_ url: URL) -> Bool {
+        var linkStatus: stat = stat()
+        let linkResult: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &linkStatus)
+        }
+        if linkResult != 0 || (linkStatus.st_mode & S_IFMT) != S_IFLNK {
+            return false
+        }
+        var targetStatus: stat = stat()
+        let targetResult: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return stat(path, &targetStatus)
+        }
+        return targetResult == 0 && (targetStatus.st_mode & S_IFMT) == S_IFREG
+    }
+
     static func planNumbered(
         atNumber: Int,
         count: Int,

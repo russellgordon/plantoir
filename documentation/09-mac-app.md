@@ -23559,8 +23559,8 @@ clears the list), where an unknown `linkSha` leaves it with neither `sha` nor
 `listingSha`, so it cannot read the op at all, the barrier a step it does not
 understand is meant to be. This piece left the writers unchanged: Rename folder
 went on refusing a per-section folder that is a link until piece 15 (next),
-and Insert Class still refuses renaming a later class that is a link
-(`undo.rule.shadow`).
+and Insert Class went on refusing to rename a later class that is a link
+until U4b3 (below), which moves that link too (`undo.rule.shadow`).
 Review 1 of this piece: a link's move carries no edit (`UndoOp.moveCarries`
 answers false for it), so a step pairing one with an edit under its `to` is
 outside `wholeOps`' exception and not readable, decided from its shape; and
@@ -23593,30 +23593,38 @@ move there, at a place an earlier run's record names or may have moved, was
 dropped from the part-way line and the sheet; it is now told as a place the
 rename cannot tell it moved, since the record does not say which places were
 links. `undo.rule.shadow` no longer promises that pieces 14 and 15 settle a
-linked PAGE: they move a link only for Rename folder's folder, and Insert
-Class on the Mac still refuses renaming a later class that is a link. Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
+linked PAGE: they move a link only for Rename folder's folder; Insert
+Class on the Mac refused renaming a later class that is a link until U4b3
+(below). Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
 
 ### U4b3: linked-class-page-moves-its-link
 
-Insert Class on the Mac still refuses, "cannot tell now" before anything
-changes, to rename a later class that is a symbolic link: this piece stopped
-at its first half (#899, 2026-11-26). The door could not then make the step
-the rename needs; the U4b3 door pieces (next section) build that, and Insert
-Class keeps refusing until U4b3's part 2. Insert Class renames highest day first, so the place the
-linked class's link LEAVES is filled in the same step by the class below it
-(or by the new class), and the door judges a `writeFile` at that place
-against what is there now (the link), never as freed by the step's own move;
-backward, the move back is judged against the page the step wrote there.
-What landed is the step's half: a write planned exactly at a link move's
-`to`, within the same folder, is planned at the file the link at its `from`
-leads to (`JournaledStep.placeALinkLeadsTo`, the one place), so the title and
-date go into the linked file and nothing is planned inside the link's new
-place; a write through a link moved to another folder is refused "cannot
-tell now" before anything changes (`refusedBeforeMaking`). A write at a link
-move's `from` was refused the same way until door-6 (next section), which
-plans it as a new file at the place the link leaves. No writer reaches either today; `ClassInsertionPlanner`
-is unchanged. The door's rule for a place a move leaves was parked for the
-director, who chose the general rule of a handed-over place (next section).
+Insert Class (Make Room, and Duplicate Class, which makes room through the
+same code) renames a later class page that is a symbolic link to a file by
+MOVING THE LINK ITSELF to the new name, its target as written, as one op of
+its one step (`JournaledStep.moveLink`, judged by `linkSha`, never followed),
+as Rename folder moves a linked folder (#899, 2026-11-26, Russell's ruling
+option (a); `undo.rule.shadow`). The file the link leads to is never moved,
+renamed or removed; the new title and the moved date are written into it,
+because a write planned at a link move's `to`, within the same folder, is
+planned at the file the link leads to (`JournaledStep.placeALinkLeadsTo`,
+this piece's first half), and the `[[link]]` rewrite reaches it the same way,
+once. The place the link leaves is filled in the same step by the class below
+it or by the new class, a place handed over (the door pieces, next section),
+so two links in a row and a link below a plain class are one step too.
+`ClassInsertionPlanner.apply` decides "a link to a file" by `lstat` and the
+target's `stat` (`isALinkToAFile`); a link to a folder, or one whose target
+cannot be read, is not renamed, as before, and a dangling later-class link is
+skipped as before (`fileExists` follows it), the class below then written
+through it, which makes the file it names: left for a later piece. Before
+this piece the same Insert Class was refused "cannot tell now" before
+anything changed, because the rename was planned as "write the new name,
+remove the old one" and the door's `remove` never follows a link; that rule
+for a removal stays. A write through a link moved to another folder is still
+refused "cannot tell now" before anything changes (`refusedBeforeMaking`),
+and no writer makes one. Killed before any of its swaps, the step is whole
+before or whole after once recovery has run (`UndoMakeRoomLinkedPageTests`).
+Windows still saves a plain copy and deletes the link until W8b piece 22.
 
 ### U4b3 door: a place handed over within a step
 
