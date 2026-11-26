@@ -402,10 +402,110 @@ final class CourseRestorerStagedTests: XCTestCase {
         XCTAssertNotEqual(status.st_flags & UInt32(UF_IMMUTABLE), 0, "and still locked")
     }
 
+    /// A working folder reached through a link on purpose: the folder is
+    /// named by the link, and a place in it is spelled by the link's target
+    /// (as a walk spells it). The place is still found inside, by the
+    /// names below the folder (#909, 2026-11-26).
+    @MainActor
+    func testAPlaceSpelledThroughTheLinkAboveTheFolderIsStillInside() throws {
+        let fixture: LinkedWorkingFolder = try LinkedWorkingFolder.make()
+        defer { fixture.remove() }
+        let realPage: URL = fixture.realCourses.appendingPathComponent("ICS3U/Unit 1/page.md")
+        try WholeCourseFixture.write("page\n", to: realPage)
+
+        XCTAssertEqual(RestoreSwap.relative(realPage, to: fixture.linkedCourses), "ICS3U/Unit 1/page.md")
+        XCTAssertEqual(RestoreSwap.placeInside(realPage, of: fixture.linkedCourses), "ICS3U/Unit 1/page.md")
+        XCTAssertNil(RestoreSwap.placeInside(fixture.outside.appendingPathComponent("elsewhere.md"), of: fixture.linkedCourses))
+        XCTAssertNil(RestoreSwap.placeInside(fixture.realCourses, of: fixture.linkedCourses), "the folder itself is not inside")
+    }
+
+    /// The walk through a working folder reached by a link keeps every
+    /// file the archive does not hold, at its own place, and a link inside
+    /// the course is kept as a link: never followed, its target untouched.
+    @MainActor
+    func testAWalkThroughALinkedWorkingFolderKeepsEachFileAndALinkInsideStaysALink() throws {
+        let fixture: LinkedWorkingFolder = try LinkedWorkingFolder.make()
+        defer { fixture.remove() }
+        let aside: URL = fixture.linkedCourses.appendingPathComponent(".internal/restoring/X/as-it-was")
+        try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
+        try WholeCourseFixture.write("one\n", to: aside.appendingPathComponent("Unit 1/page.md"))
+        try WholeCourseFixture.write("two\n", to: aside.appendingPathComponent("index.md"))
+        let target: URL = fixture.outside.appendingPathComponent("Shared")
+        try WholeCourseFixture.write("theirs\n", to: target.appendingPathComponent("handout.md"))
+        try FileManager.default.createSymbolicLink(at: aside.appendingPathComponent("Shared"), withDestinationURL: target)
+        let context: RestoreSwap.Context = RestoreSwap.Context(
+            computer: "here", owner: "me", now: { () -> String in return "" }, stamp: { () -> String in return "2026-11-26_080000" },
+            keptInPlace: [], archiveURL: nil,
+            checkPayload: { (_: URL) throws in }, putMediaBack: { (_: URL, _: URL?) throws in },
+            refuseUnlessMediaWasPutBack: { (_: URL) throws in }, beforeTheSwap: { (_: URL) throws in },
+            justBeforeTheSwap: { () in }, afterCommit: { () in }, keepingWhatWasReplaced: nil
+        )
+
+        let kept: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepWhatTheArchiveMayNotHold(
+            aside, courseCode: "ICS3U", listing: nil, archiveBegan: nil, leftOutOnPurpose: [],
+            coursesDirectoryURL: fixture.linkedCourses, context: context
+        )
+
+        XCTAssertTrue(kept.everythingMoved)
+        XCTAssertEqual(kept.keptAt, "courses/_backups/ICS3U/ICS3U not in the archive 2026-11-26_080000")
+        let folder: URL = fixture.realCourses.appendingPathComponent("_backups/ICS3U/ICS3U not in the archive 2026-11-26_080000")
+        XCTAssertTrue(RestoreSwap.itemExists(at: folder.appendingPathComponent("Unit 1/page.md")))
+        XCTAssertTrue(RestoreSwap.itemExists(at: folder.appendingPathComponent("index.md")))
+        var status: stat = stat()
+        XCTAssertEqual(lstat(folder.appendingPathComponent("Shared").path, &status), 0, "the link is kept at its own place")
+        XCTAssertEqual(status.st_mode & S_IFMT, S_IFLNK, "as a link, not as a copy of what it points at")
+        XCTAssertEqual(
+            try String(contentsOf: target.appendingPathComponent("handout.md"), encoding: .utf8), "theirs\n",
+            "what the link points at is untouched"
+        )
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(atPath: folder.appendingPathComponent("Shared").path), target.path,
+            "and still pointing where it did"
+        )
+    }
+
     // MARK: - Helpers
 
     @MainActor
     private func item(_ fixture: WholeCourseFixture) throws -> BackupItem {
         return try XCTUnwrap(BackupItem.from(fileURL: fixture.zipURL, courseCode: "ICS3U"))
+    }
+}
+
+/// A working folder reached through a link made on purpose: `real` is the
+/// folder in the disk's own spelling (so the temporary folder's `/var`
+/// spelling plays no part), and `linked` is a link to it, the name the app
+/// is given. `outside` is a folder beside both, outside the working folder.
+struct LinkedWorkingFolder {
+
+    // MARK: - Stored properties
+
+    let root: URL
+    let realCourses: URL
+    let linkedCourses: URL
+    let outside: URL
+
+    // MARK: - Functions
+
+    static func make() throws -> LinkedWorkingFolder {
+        let made: URL = FileManager.default.temporaryDirectory.appendingPathComponent("linked-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: made, withIntermediateDirectories: true)
+        let root: URL = URL(fileURLWithPath: FolderIdentity.canonicalPath(made.path))
+        let real: URL = root.appendingPathComponent("real")
+        try FileManager.default.createDirectory(at: real.appendingPathComponent("courses"), withIntermediateDirectories: true)
+        let linked: URL = root.appendingPathComponent("linked")
+        try FileManager.default.createSymbolicLink(at: linked, withDestinationURL: real)
+        let outside: URL = root.appendingPathComponent("outside")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        return LinkedWorkingFolder(
+            root: root,
+            realCourses: real.appendingPathComponent("courses"),
+            linkedCourses: linked.appendingPathComponent("courses"),
+            outside: outside
+        )
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: root)
     }
 }

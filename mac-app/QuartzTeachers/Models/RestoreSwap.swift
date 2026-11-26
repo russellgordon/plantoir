@@ -646,13 +646,55 @@ nonisolated enum RestoreSwap {
     /// from `/private/tmp/...` only for a path that exists, so a planned
     /// destination and its existing parent came out with different
     /// prefixes and a move was sent into `courses/private/tmp/...`.
+    ///
+    /// A URL a walk returns is NOT built that way: `FileManager`'s
+    /// enumerator hands back `/private/var/...` for a folder named
+    /// `/var/...`, and a folder reached through a link comes back under the
+    /// link's target. `placeInside(_:of:)` decides those; a URL that is not
+    /// inside comes back as its whole path, as it always did.
     static func relative(_ url: URL, to coursesDirectoryURL: URL) -> String {
-        let root: String = trimmedPath(coursesDirectoryURL) + "/"
-        let path: String = trimmedPath(url)
-        if path.hasPrefix(root) {
-            return String(path.dropFirst(root.count))
+        if let inside = placeInside(url, of: coursesDirectoryURL) {
+            return inside
         }
-        return path
+        return trimmedPath(url)
+    }
+
+    /// Where `url` sits inside `folder`, with forward slashes, or nil when
+    /// it is not inside (or is the folder itself).
+    ///
+    /// **The rule: only what lies ABOVE a place is resolved, never the
+    /// place.** First the text, as `relative` always compared it. Then each
+    /// folder ABOVE `url` in turn, in the disk's own spelling
+    /// (`FolderIdentity.canonicalPath`: links, `/private`, the firmlink,
+    /// case and Unicode form), against the folder's; the names below the
+    /// one that matches are kept exactly as written. `url` itself is never
+    /// resolved, so a link inside a course keeps its own place and is never
+    /// followed to where it points: keeping or restoring its target would
+    /// be a fault.
+    ///
+    /// Not `UndoFolderPlaces.relativePath`, which resolves `url` itself
+    /// (a link inside a course came out outside it), nor
+    /// `resolvingSymlinksInPath()`, which strips `/private` and so never
+    /// matches the enumerator's `/private/var` (#909, 2026-11-26).
+    static func placeInside(_ url: URL, of folder: URL) -> String? {
+        let folderText: String = trimmedPath(folder)
+        let path: String = trimmedPath(url)
+        let prefix: String = folderText == "/" ? "/" : folderText + "/"
+        if path.hasPrefix(prefix) {
+            let inside: String = String(path.dropFirst(prefix.count))
+            return inside.isEmpty ? nil : inside
+        }
+        let folderOnDisk: String = FolderIdentity.canonicalPath(folderText)
+        var namesBelow: [String] = [url.lastPathComponent]
+        var above: URL = url.deletingLastPathComponent()
+        while trimmedPath(above) != "/" {
+            if FolderIdentity.canonicalPath(trimmedPath(above)) == folderOnDisk {
+                return namesBelow.joined(separator: "/")
+            }
+            namesBelow.insert(above.lastPathComponent, at: 0)
+            above = above.deletingLastPathComponent()
+        }
+        return nil
     }
 
     /// A URL's path without a trailing slash.

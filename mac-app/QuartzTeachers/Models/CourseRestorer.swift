@@ -1240,13 +1240,11 @@ enum CourseRestorer {
 
     /// Where a file sits inside a folder, as a path that can be appended to
     /// another copy of that folder.
+    /// A walk's URL can be spelled differently from `root` (`/private/var`
+    /// for `/var`, a link's target), so the one rule decides it
+    /// (`RestoreSwap.placeInside`, #909).
     private static func relativePath(of url: URL, under root: URL) -> String? {
-        let rootPath: String = root.standardizedFileURL.path + "/"
-        let path: String = url.standardizedFileURL.path
-        guard path.hasPrefix(rootPath) else {
-            return nil
-        }
-        return String(path.dropFirst(rootPath.count))
+        return RestoreSwap.placeInside(url, of: root)
     }
 
     /// Adds the section number back to the course's settings, in order.
