@@ -256,7 +256,7 @@ internal static class UndoSwap
                     case UndoSwapChange.MoveHere move:
                         LetGoOwnFilesInside(target.RelativePath);
                         if (RenameWithRetries(target.FullPath, move.FromFull, replace: false, seams) != 0) whole = false;
-                        else FollowTheMove(target.RelativePath, move.FromRelative, move.FromFull);
+                        else FollowTheMove(target.RelativePath, move.FromRelative, target.FullPath, move.FromFull);
                         continue;
                     case UndoSwapChange.MakeTree:
                     {
@@ -370,9 +370,16 @@ internal static class UndoSwap
 
         // Once the folder has moved, this swap's own files and its pages
         // inside it are where the folder is now, so the tidy and a reversal
-        // find them there (#899 W8-2b).
-        void FollowTheMove(string from, string to, string toFull)
+        // find them there (#899 W8-2b); and so are the folders it made inside
+        // it, so a refused swap's tidy finds them where the folder went back
+        // to (the window 1 review's LOW 3; #899 W8-4).
+        void FollowTheMove(string from, string to, string fromFull, string toFull)
         {
+            for (int index = 0; index < foldersMade.Count; index++)
+            {
+                if (UndoOp.PartInside(fromFull.Replace('\\', '/'), foldersMade[index].Replace('\\', '/')) is not { } madeInside) continue;
+                foldersMade[index] = madeInside.Length == 0 ? toFull : Path.Combine(toFull, madeInside.Replace('/', Path.DirectorySeparatorChar));
+            }
             for (int index = 0; index < count; index++)
             {
                 if (targets[index].Change is not null || UndoOp.PartInside(from, placeOf[index]) is not { } pageInside) continue;
@@ -387,6 +394,13 @@ internal static class UndoSwap
                     ? file.MovedTo(Path.Combine(toFull, inside.Replace('/', Path.DirectorySeparatorChar)))
                     : file;
         }
+
+        // The folders a move's last look left out (a folder a carried edit
+        // made, holding only files left out), each at its place after the
+        // move, deepest first: removed, when empty, once every swap is in
+        // and the step's own files are tidied; never on a refusal (U4b2-10;
+        // #899 W8-4).
+        var foldersLeftOutOfAMove = new List<string>();
 
         // 1. Stage every new content beside its target.
         for (int index = 0; index < count; index++)
@@ -461,9 +475,9 @@ internal static class UndoSwap
                 }
                 refusal = root is not null && PlaceLeadingOut(target, root) is { } leadingOut
                     ? new UndoRefusal(UndoRefusalKind.ChangedSince, leadingOut)
-                    : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders, ownLeftOut);
+                    : SwapAWholeOp(target, index, label, seams, places, stagedFolders, asideFolders, ownLeftOut, foldersLeftOutOfAMove);
                 wentIn = refusal is null;
-                if (wentIn && target.Change is UndoSwapChange.MoveHere moved) FollowTheMove(moved.FromRelative, target.RelativePath, target.FullPath);
+                if (wentIn && target.Change is UndoSwapChange.MoveHere moved) FollowTheMove(moved.FromRelative, target.RelativePath, moved.FromFull, target.FullPath);
             }
             if (wentIn) swapsMade++;
             if (refusal is not null)
@@ -487,6 +501,11 @@ internal static class UndoSwap
             }
         }
         if (Tidy()) return new UndoSwapResult.StoppedByATest();
+        foreach (string folder in foldersLeftOutOfAMove)
+        {
+            seams?.RemovingAFolderLeftOut?.Invoke(folder);
+            RemoveAFolderLeftOut(folder);
+        }
         return new UndoSwapResult.Swapped();
     }
 
@@ -514,7 +533,7 @@ internal static class UndoSwap
     /// <param name="ownLeftOut">For a move: this swap's own staged and kept files inside the folder, relative to it, left out of its last look (#899 W8-2b).</param>
     private static UndoRefusal? SwapAWholeOp(UndoSwapTarget target, int index, string label, UndoSeams? seams, IUndoExternalPlaces? places,
                                              string?[] stagedFolders, string?[] asideFolders,
-                                             IReadOnlyDictionary<string, UndoCurrent>? ownLeftOut = null)
+                                             IReadOnlyDictionary<string, UndoCurrent>? ownLeftOut = null, List<string>? foldersLeftOutOfAMove = null)
     {
         switch (target.Change)
         {
@@ -522,7 +541,9 @@ internal static class UndoSwap
             {
                 // The pair once more, just before the rename: the content at
                 // the place it leaves, nothing where it goes.
-                UndoMoveSide atFrom = UndoMoveSides.Read(move.Op, move.FromFull, overriding: ownLeftOut);
+                // The folders it names as left out are where the folder goes,
+                // once it has moved (U4b2-10; #899 W8-4).
+                (UndoMoveSide atFrom, IReadOnlyList<string> foldersLeftOut) = UndoMoveSides.ReadNamingFoldersLeftOut(move.Op, move.FromFull, overriding: ownLeftOut);
                 UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath);
                 // Named where a teacher finds the item now, as the plan's
                 // refusal names it (placeAsFound: the place it leaves; #899 W8-3).
@@ -533,12 +554,18 @@ internal static class UndoSwap
                 try { Directory.CreateDirectory(Path.GetDirectoryName(target.FullPath)!); }
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException)
                 {
-                    return new UndoRefusal(UndoRefusalKind.CouldNotWrite, target.RelativePath);
+                    return new UndoRefusal(UndoRefusalKind.CouldNotWrite, move.FromRelative);
                 }
                 // MoveFileEx WITHOUT MOVEFILE_REPLACE_EXISTING: never over
-                // anything that appeared at the destination since.
+                // anything that appeared at the destination since. A rename
+                // refused names the place it leaves, as the mac's moveHere
+                // names it (namedAs), never a destination not there yet (the
+                // window 1 review's LOW 1; #899 W8-4).
                 int moved = RenameWithRetries(move.FromFull, target.FullPath, replace: false, seams);
-                return moved == 0 ? null : new UndoRefusal(Classify(moved, move.FromFull), target.RelativePath);
+                if (moved != 0) return new UndoRefusal(Classify(moved, move.FromFull), move.FromRelative);
+                foreach (string inside in foldersLeftOut)
+                    foldersLeftOutOfAMove?.Add(Path.Combine(target.FullPath, inside.Replace('/', Path.DirectorySeparatorChar)));
+                return null;
             }
             case UndoSwapChange.MakeTree:
             {
@@ -611,8 +638,33 @@ internal static class UndoSwap
         }
     }
 
-    /// <summary>W8-4 stub: replaced by the tidy of a folder a move's last look left out.</summary>
-    internal static void RemoveAFolderLeftOut(string folder) { }
+    /// <summary>
+    /// U4b2-10: a folder a move's last look left out, removed where it now is
+    /// when it holds nothing but, perhaps, the Finder's record of a window
+    /// (<see cref="UndoTreeListing.IgnoredName"/>, never listed), which goes
+    /// first only when it is a regular file (<see cref="UndoLinks.Look"/>) and
+    /// the folder holds nothing else; a link of that name, or anything else
+    /// inside, leaves the folder and all it holds (the mac's
+    /// <c>removeAFolderLeftOut</c>; #899 W8-4). Never a recursive delete, and
+    /// never told when it fails: every swap has gone in, and a folder that
+    /// will not go holds something put there since the last look.
+    /// </summary>
+    internal static void RemoveAFolderLeftOut(string folder)
+    {
+        // A link put at its place since is never removed, nor followed.
+        if (UndoLinks.Look(folder) != UndoLinks.What.Folder) return;
+        try
+        {
+            List<string> entries = Directory.EnumerateFileSystemEntries(folder).ToList();
+            if (entries.Count == 1 && Path.GetFileName(entries[0]) == UndoTreeListing.IgnoredName)
+            {
+                if (UndoLinks.Look(entries[0]) != UndoLinks.What.File) return;
+                File.Delete(entries[0]);
+            }
+            Directory.Delete(folder, recursive: false);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
 
     /// <summary>
     /// The name a folder taken out is renamed to before it is deleted: its
