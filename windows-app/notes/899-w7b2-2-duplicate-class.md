@@ -2,7 +2,7 @@
 
 **This branch and W7b2-1 merge together** (it is built on `issue/899-w7b2-1-make-room` 2e9026e70 and deletes the file-by-file path W7b2-1 kept for it).
 
-Branch `issue/899-w7b2-2-duplicate-class`, from `origin/issue/899-w7b2-1-make-room` 2e9026e70 (which holds `dev` da7474047). Merges of `origin/dev`: none needed at the start (`origin/dev` was da7474047, already in the base: "Already up to date"); MERGE-AT-END.
+Branch `issue/899-w7b2-2-duplicate-class`, from `origin/issue/899-w7b2-1-make-room` 2e9026e70 (which holds `dev` da7474047). Merges of `origin/dev`: none needed at the start (`origin/dev` was da7474047, already in the base: "Already up to date"); before hand-back ff6688645 (merging `origin/dev` 24fcbc718: Mac pieces touching `NamedGapLedger.cs` and contracts; no conflict, both sides kept; the `undo.rule.shadow` clause still carries the three phrases `UndoMakeRoomStepTests` reads).
 
 ## For PROGRESS
 
@@ -32,11 +32,22 @@ Branch `issue/899-w7b2-2-duplicate-class`, from `origin/issue/899-w7b2-1-make-ro
 
 File `vm-tools/guest/899-w7b2-2-mustfail.json` (ASCII anchors), run by `899-w7b2-2-go.ps1` with `899-w7b2-2-pc-run.ps1` (a copy of `899-w7b2-1-pc-run.ps1`).
 
-MUSTFAIL-RESULTS
+Run `899-w7b2-2-b` on ff6688645: **4 RED of 4**, each failing the one test named:
+
+1. The room and the copy as two steps: `UndoDuplicateClassStepTests.TheRoomAndTheCopyAreOneStepInTheMacsFileOrder`.
+2. The copy written outside the step (saved after the room's step is made): the same test (the op's `afterSha` is not the disk's).
+3. A before read at make time: `AnEditMadeWhileItPlansIsNeverWrittenOver`.
+4. The room alone making no step: `TheCopyRefusedAfterTheRoomIsPlannedMakesTheRoomAloneInOneStep`.
+
+A fifth row (W7b2-1 review 2, L1: the step's skip of an unchanged file removed) was NOT-RED in run `a`: the door skips an unchanged file too (`UndoDoor` line 211, `SameBytes`), so no single sabotage in one file shows it. Dropped; L1 stays noted (below). In run `a`, row 4 was RED only because its test was already red; run `b` is the proof.
 
 ## Runs
 
-RUNS
+All on the PC (LENOVO 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200), under the turn lock, both builds plus the brief's classes and every class a grep for `ApplyDuplicateClass`/`duplicate:` finds (ClassPlanningContractTests, ClubNounTests, FileFormatContractTests, NarrowToolsMirrorTests, NextClassUnitsTests, UnofferedToolRefusalTests); no UI class, no harness.
+
+- `899-w7b2-2-a-red`, b70ad2862 (tests only): both builds exit 0; **9 failed of 91**: six of `UndoDuplicateClassStepTests`, `InsertClassesTests.ADuplicateWhoseNewPageCouldNotBeSaved_ChangesNothingAndIsNotStillTaken`, the fixture row `TheWindowsActionLeavesTheRecordedStep(duplicateClass)`, `UndoWriterScanTests.EveryWriterIsTheDoorOrNamedWithAReason` (count 2 before the path was deleted).
+- `899-w7b2-2-a`, f44aef12d: 330 of 331; the one red was the room-alone test asserting Day 2's bytes (Make Room re-dates a class whose rename did not happen under its old name, as it always has): the test now reads its lesson and title (6d7fa0fec).
+- `899-w7b2-2-b`, ff6688645 (merged `dev` 24fcbc718): both builds exit 0; **331 of 331**; must-fail **4 RED of 4**; restored tree 331 of 331 green.
 
 ## Left for the next piece
 
@@ -51,4 +62,14 @@ RUNS
 
 ## Self-check
 
-SELFCHECK
+1. Broke each fix and watched its test fail: tests-first commit 9 red; must-fail 4 RED of 4 on the merged tree.
+2. No timed waits added.
+3. Failure-path sentences true: "Nothing was changed" (read-only page, a folder at the new page), part way with "the classes and the copy", the room alone with "the classes"; never `StoppedWhileWriting`, "couldn't be read" or a plain "saved".
+4. `dev` merged before the last proof: ff6688645 (24fcbc718).
+5. No number tuned by trial.
+6. Windows only; no `contracts/` or `mac-app/` change.
+7. Fixture row `duplicateClass` green, out of `HeldButRunnable` and the ledger; `Reason899W7b2` true (holds notTodayOnTheFrontPage, answerTheLinksChecklist, keepClassesDatedLater).
+8. Writer-scan count for `AssistWorkspace.cs` true at 2.
+9. Riding lows: review 2 L2 fixed (test renamed); L1 noted (no single-file sabotage shows it: the door also skips); review 1's harness lows noted (no harness run in this brief).
+10. File order is the mac's; every before read at plan time (must-fail row 3).
+11. The stash is untouched.
