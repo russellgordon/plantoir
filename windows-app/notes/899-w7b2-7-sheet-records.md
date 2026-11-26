@@ -1,21 +1,6 @@
 # #899 W7b2-7: a sheet's answer record is ONE step of one file (Windows #949)
 
-Branch `issue/899-w7b2-7-sheet-records`, from `origin/dev` da7474047 (W7b2-6 and W7b2-9 merged; the director's base for the night of 2026-11-25 to 26, in place of the brief's deleted W7b2-6 branch). Merge of `origin/dev` before proving: da7474047, already contained, "Already up to date" (no merge commit). Before hand-back: see "Runs". No `contracts/` change, no `mac-app/` change.
-
-## For PROGRESS
-
-- W7b2-7 (#899, Windows #949): Not Today's record (`notTodayOnTheFrontPage`) and the classes dated later kept at Deploy (`keepClassesDatedLater`) are each ONE `UndoActionStep` of that one file, made by `sheet`, never told to today's undo, Windows' own bytes unchanged. Both fixture rows are converted and out of the ledger; their six traces each run the real Windows action. A record that cannot be written costs only the record (false, no throw); the same answer again makes no step.
-- `TodaysClassOnTheFrontPage.RecordNotToday` is `internal` and takes the step from `AssistWorkspace.DeclineTodaysClass` (its list and door, `madeBy: "sheet"`); `DeclineTodaysClass` now returns whether the record was written.
-- `LaterClassesKept.KeepAtDeploy` (working folder and maker from the caller, as `TimetableMemory.WriteDown`), `LaterClassesKept.PlanInto` (the one planner, also used by `KeepTheClassesItPublished` inside Publish Class for a Date's step, where it makes no step of its own). The plain `Keep` stays for the links checklist's Publish only (W7b2-8).
-- Riding lows of W7b2-9 review 2: `ShowAlertAsync` is cut out of the view and pinned whole (L1); the "File Explorer" exception is taken out only of the sentence its `in` names, `keptOnWindows.hiddenItems` (L2).
-
-## For documentation 12
-
-**W7b2-7: the sheets' records.** A record a sheet writes to remember a teacher's answer is one step of that one file, `madeBy` `sheet`, `todaysUndoKeepsIt: false`, as the mac's `NotToday.write` and `KeptRecord.write` (each a `JournaledStep` of its own, `UndoStepMaker.sheet`). Not Today goes `SectionDetailView` → `AssistWorkspace.DeclineTodaysClass` → `TodaysClassOnTheFrontPage.RecordNotToday(…, step)`. The answer at Deploy goes `SectionDetailView.AskAboutClassesDatedLaterAsync` → `LaterClassesKept.KeepAtDeploy(_window.Workspace.WorkspacePath, code, directory, section, keeping)`; the view names the working folder, the record names its maker. Publish Class for a Date keeps planning the record into its own step through `LaterClassesKept.PlanInto` and makes no second step (W7a's `PublishClassForADateKeepsTheClassItPublishesInTheSameStep`). A record that cannot be written returns false and nothing is thrown, as the mac's `try?`: the answer stands and the question is asked once more. A step left part way has written the record and returns true; it has no sentence of its own (the trail's door line names the kept file), as on the mac. Windows' bytes differ from the mac's, measured and named in `WindowsActionsOnTheMacFixture.WindowsOwnJson`:
-- Not Today: Newtonsoft indented, `"key": value`, members version, day, class, the computer's line ends and a closing newline; `version` is the string "1" (as `file-formats.json` → `frontPageNotToday.keys.version` writes it), the mac's the number 1. Same members: day, class.
-- Kept classes: System.Text.Json indented, members version, answeredAt, kept; each place without `.md` (as `laterClassesKept.keys.kept` says), where the mac's recorded step names the page with `.md`. Same members: version, answeredAt.
-
-The links checklist's Publish still writes the kept record plainly (`LaterClassesKept.Keep`, writer scan 3), for W7b2-8.
+Branch `issue/899-w7b2-7-sheet-records`, from `origin/dev` da7474047 (W7b2-6 and W7b2-9 merged; the director's base for the night of 2026-11-25 to 26, in place of the brief's deleted W7b2-6 branch). Merge of `origin/dev` before proving: da7474047, already contained, "Already up to date" (no merge commit). Before hand-back: see "Runs". No `contracts/` change, no `mac-app/` change. (Merged on 2026-11-26 in `night25/integration-5`, c50bc8112, with W7b2-8, -1 and -2. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12. What follows says the ledger and the writer scan as this branch saw them: on the merged tree the `Reason899W7b2` row and reason, and `Reason899W7b2MakeRoomLinkedPage`, are gone, and only `Reason899NoDuplicateAsNextClass` is left of W7b2, for W7b2-3.)
 
 ## Must-fail lines
 
@@ -51,7 +36,7 @@ On "tests first": the new tests call the new `RecordNotToday(…, step)`, `KeepA
 
 ## Left for the next piece
 
-- The links checklist's Publish (W7b2-8): `KeepTheClassesItPublished` with no step still calls the plain `LaterClassesKept.Keep`; W7b2-8 plans it into that sheet's own step with `LaterClassesKept.PlanInto`, and then the writer-scan entry for `LaterClassesKept.cs` goes (its reason says so).
+- The links checklist's Publish (W7b2-8): `KeepTheClassesItPublished` with no step still calls the plain `LaterClassesKept.Keep`; W7b2-8 plans it into that sheet's own step with `LaterClassesKept.PlanInto`, and then the writer-scan entry for `LaterClassesKept.cs` goes (its reason says so). (Done by W7b2-8: `Keep` and the entry are gone.)
 
 ## For the director
 
