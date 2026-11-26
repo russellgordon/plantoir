@@ -14382,9 +14382,17 @@ Two edges. A section removed and later added again under the same number is
 offered an old backup of the section that had that number. And anything in
 `section<N>/` that backups leave out (`CourseArchiver.excludedFromArchives`:
 `build`, `out`, `dist`, `.cache`, `node_modules`, `.git` and the rest) is
-removed by the section swap and is in neither the backup nor the archive
-made first. The whole-course restore no longer does this at the top of the
-course (`keptInPlace`, below).
+in neither the backup nor the archive made first. Since #909 (Russell's
+ruling of 2026-11-25) a `.git`, `node_modules`, `build`, `out` or `dist` at
+any depth inside the section is kept in `courses/_backups/<CODE>/<CODE> not
+in the archive <stamp>/` at its path inside the course
+(`backups.restoreOneSection.leftOutFolders`), and the teacher is told, in
+Russell's words (`wording.leftOutKeptOne` and `leftOutKeptMany`): at the end
+of the menu's finished line, and in the assistant window as a line of its
+own after the success sentence #897 froze; the trail writes `section restore
+kept files` on both routes. The names made again (`.cache` and the rest) go
+with the copy. The whole-course restore does the same deeper in the course
+and leaves the top alone (`keptInPlace`, below).
 
 **Order around it** (`WorkspaceModel.restoreOneSection`): the
 `structuralRefusal` before and after, a refusal while the Section menu or the
@@ -14392,7 +14400,8 @@ assistant is changing that section, the WHOLE course archived first (so
 "nothing is lost" holds before Undo), the restore, a `section restored` line
 (`ActivityTrail.restoredOneSectionFromTheMenuLine`: the backup's and the
 archive's file names, the count of pages hidden and the count of pages that
-could not be saved), `page settings left as
+could not be saved), `section restore kept files` when folders backups
+leave out were kept from inside the section, `page settings left as
 they were` when pages could not take a key, and the finished line in the
 backup alert's slot.
 

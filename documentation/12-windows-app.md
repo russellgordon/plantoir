@@ -7168,6 +7168,20 @@ folders (`backups.keptFoldersCounted`, `wording.keptFoldersTake`).
 `documentation/09-mac-app.md` → "Round four" says what was measured and
 rejected.
 
+The one-section restore follows the same rule (#909 and #911, Russell's
+rulings of 2026-11-25): a `.git`, `node_modules`, `build`, `out` or `dist`
+at any depth inside the section is kept in `<CODE> not in the archive
+<stamp>` beside the backups (`backups.restoreOneSection.leftOutFolders`
+and its cases), and the teacher is told in Russell's words,
+`wording.leftOutKeptOne` (the folder named by its path inside the section,
+parts joined by `/`) or `leftOutKeptMany` (a count), with `{KEPT}` the
+kept folder's own name: at the end of the menu route's finished line
+(`doneJoin`), and in the assistant window as a line of its own after the
+success sentence, which is not changed. Both routes then write
+`section restore kept files` (course, section, how many, the kept
+folder's path; held for #873 in `NamedGapLedger.cs`). Until #873 Windows
+keeps such a folder in its aside copy, as #911 built it, and says nothing.
+
 **A whole course put back leaves `course restored from a backup`** — since
 step 0 of v2.0.0 (2026-11-13), the gap the mac's #572 closed on its side:
 until then a whole-course restore from Backups (Restore…) or from Archived

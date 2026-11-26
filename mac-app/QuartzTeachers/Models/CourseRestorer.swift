@@ -343,7 +343,8 @@ enum CourseRestorer {
     ///
     /// Returns how many shared pages kept their current setting for this
     /// section because there was nowhere on the page to put the backup's
-    /// back — see `restorePerSectionKeys`. Almost always 0.
+    /// back — see `restorePerSectionKeys`. Almost always 0. What else the
+    /// window says is `restoreSectionSayingWhatWasKept`'s.
     @discardableResult
     static func restoreSection(
         _ sectionNumber: Int,
@@ -351,6 +352,36 @@ enum CourseRestorer {
         coursesDirectoryURL: URL,
         hooks: SectionSwapHooks = SectionSwapHooks.real
     ) throws -> Int {
+        let putBack: SectionPutBack = try restoreSectionSayingWhatWasKept(
+            sectionNumber, from: item, coursesDirectoryURL: coursesDirectoryURL, hooks: hooks
+        )
+        return putBack.pagesNotPutBack
+    }
+
+    /// What the assistant window's Restore Section N… did, for what it says
+    /// afterwards: how many shared pages kept their setting, and where the
+    /// folders backups leave out that were inside the section were kept
+    /// (#909), each by its path inside the section.
+    struct SectionPutBack: Equatable {
+
+        // MARK: - Stored properties
+
+        let pagesNotPutBack: Int
+
+        /// A path inside the working folder, or nil when none was kept.
+        let leftOutFoldersKeptAt: String?
+
+        let leftOutFoldersKept: [String]
+    }
+
+    /// `restoreSection`, saying what it kept as well as how many shared
+    /// pages kept their setting.
+    static func restoreSectionSayingWhatWasKept(
+        _ sectionNumber: Int,
+        from item: BackupItem,
+        coursesDirectoryURL: URL,
+        hooks: SectionSwapHooks = SectionSwapHooks.real
+    ) throws -> SectionPutBack {
         let fileManager: FileManager = FileManager.default
         let courseURL: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
         if !fileManager.fileExists(atPath: courseURL.path) {
@@ -430,7 +461,11 @@ enum CourseRestorer {
             courseCode: item.courseCode,
             coursesDirectoryURL: coursesDirectoryURL
         )
-        return notPutBack
+        return SectionPutBack(
+            pagesNotPutBack: notPutBack,
+            leftOutFoldersKeptAt: leftOutKept.keptAt,
+            leftOutFoldersKept: leftOutKept.insideTheSection
+        )
     }
 
     // MARK: - Putting ONE section back, from Restore from Backup… (#897 C)
@@ -751,7 +786,8 @@ enum CourseRestorer {
             pagesNotSaved: keys.pagesNotSaved,
             pagesMadeSinceHidden: keys.pagesMadeSinceHidden,
             websiteRecordDiffers: websiteRecordDiffers,
-            leftOutFoldersKeptAt: leftOutKept.keptAt
+            leftOutFoldersKeptAt: leftOutKept.keptAt,
+            leftOutFoldersKept: leftOutKept.insideTheSection
         )
     }
 
@@ -862,7 +898,7 @@ enum CourseRestorer {
         // under #909's name before the set-aside copy goes, by the rule the
         // whole-course restore follows (Russell's ruling of 2026-11-25 on
         // #909 and #911). The course's top is never touched here.
-        let kept: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepInANotInTheArchiveFolder(
+        let kept: (keptAt: String?, everythingMoved: Bool, moved: [String]) = RestoreSwap.keepInANotInTheArchiveFolderSayingWhich(
             RestoreSwap.leftOutItemsKeptAtAnyDepth(in: asideSectionURL, insideTheCopyAt: asideURL),
             from: asideURL,
             courseCode: courseURL.lastPathComponent,
@@ -870,7 +906,21 @@ enum CourseRestorer {
             stamp: ArchiveStamp.text(for: Date())
         )
         keepingWhatWasReplaced?(asideURL)
-        return LeftOutFoldersKept(keptAt: kept.keptAt, everythingMoved: kept.everythingMoved)
+        // Each moved path is inside the set-aside copy, so inside the
+        // course ("section2/Unit 1/My App/.git"); the teacher is told its
+        // path inside the section ("Unit 1/My App/.git").
+        let sectionPrefix: String = folderName + "/"
+        var insideTheSection: [String] = []
+        for path in kept.moved {
+            if path.hasPrefix(sectionPrefix) {
+                insideTheSection.append(String(path.dropFirst(sectionPrefix.count)))
+            } else {
+                insideTheSection.append(path)
+            }
+        }
+        return LeftOutFoldersKept(
+            keptAt: kept.keptAt, everythingMoved: kept.everythingMoved, insideTheSection: insideTheSection
+        )
     }
 
     /// Where a one-section restore kept the folders backups leave out that
@@ -887,6 +937,10 @@ enum CourseRestorer {
         let keptAt: String?
 
         let everythingMoved: Bool
+
+        /// Each folder that moved there, as its path inside the section
+        /// (".git", "Unit 1/My App/.git"), in the order the walk met them.
+        let insideTheSection: [String]
     }
 
     /// Whether the backup's record of where this section's website is

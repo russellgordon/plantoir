@@ -698,6 +698,130 @@ final class OneSectionRestoreTests: XCTestCase {
         }
         XCTAssertEqual(fixture.leftInRestoring(), 0, "nothing left staged")
     }
+
+    // MARK: - The teacher is told (#909, Russell's wording of 2026-11-26)
+
+    /// Restore from Backup…'s finished line: nothing new when none was kept;
+    /// the one-folder sentence, naming the folder by its path inside the
+    /// section, for one; the many sentence, with the count, for several.
+    @MainActor
+    func testTheMenusFinishedLineSaysWhichLeftOutFoldersWereKept() async throws {
+        let none: OneSectionRestore.Outcome = try await restoreFromTheMenu(keeping: [])
+        XCTAssertEqual(none.leftOutFoldersKept, [])
+        let noneSaid: String = OneSectionRestoreWording.done(section: 2, when: "then", outcome: none)
+        XCTAssertFalse(noneSaid.contains("Backups leave out"), noneSaid)
+
+        let one: OneSectionRestore.Outcome = try await restoreFromTheMenu(keeping: ["Unit 1/My App/.git"])
+        XCTAssertEqual(one.leftOutFoldersKept, ["Unit 1/My App/.git"])
+        let keptName: String = URL(fileURLWithPath: one.leftOutFoldersKeptAt ?? "").lastPathComponent
+        XCTAssertTrue(keptName.hasPrefix("ICS3U not in the archive "), keptName)
+        XCTAssertEqual(
+            OneSectionRestoreWording.done(section: 2, when: "then", outcome: one),
+            "Section 2 is back to how it was on then. Nothing in your other sections changed.\n\n"
+                + "Backups leave out the folder \u{201C}Unit 1/My App/.git\u{201D}, so it was not put back. "
+                + "It is kept in \u{201C}\(keptName)\u{201D} beside your backups."
+        )
+
+        let several: OneSectionRestore.Outcome = try await restoreFromTheMenu(keeping: [".git", "build", "Unit 1/dist"])
+        XCTAssertEqual(several.leftOutFoldersKept.count, 3)
+        let severalName: String = URL(fileURLWithPath: several.leftOutFoldersKeptAt ?? "").lastPathComponent
+        XCTAssertEqual(
+            OneSectionRestoreWording.done(section: 2, when: "then", outcome: several),
+            "Section 2 is back to how it was on then. Nothing in your other sections changed.\n\n"
+                + "Backups leave out 3 folders in this section, so they were not put back. "
+                + "They are kept in \u{201C}\(severalName)\u{201D} beside your backups."
+        )
+    }
+
+    /// The assistant window: its success sentence, frozen by #897, is the
+    /// first line and unchanged; the kept folders are a line of their own
+    /// after it, and there is no second line when none was kept.
+    @MainActor
+    func testTheWindowSaysTheLeftOutFoldersInALineOfItsOwn() async throws {
+        let frozen: String = AssistSectionRestore.doneMessage(courseCode: "ICS3U", sectionNumber: 2)
+
+        let none: CourseRestorer.SectionPutBack = try await restoreFromTheWindow(keeping: [])
+        XCTAssertEqual(AssistSectionRestore.doneLines(courseCode: "ICS3U", sectionNumber: 2, putBack: none), [frozen])
+
+        let one: CourseRestorer.SectionPutBack = try await restoreFromTheWindow(keeping: [".git"])
+        let keptName: String = URL(fileURLWithPath: one.leftOutFoldersKeptAt ?? "").lastPathComponent
+        XCTAssertTrue(keptName.hasPrefix("ICS3U not in the archive "), keptName)
+        XCTAssertEqual(
+            AssistSectionRestore.doneLines(courseCode: "ICS3U", sectionNumber: 2, putBack: one),
+            [frozen, "Backups leave out the folder \u{201C}.git\u{201D}, so it was not put back. "
+                + "It is kept in \u{201C}\(keptName)\u{201D} beside your backups."]
+        )
+
+        let several: CourseRestorer.SectionPutBack = try await restoreFromTheWindow(keeping: ["node_modules", "Unit 1/out"])
+        let severalName: String = URL(fileURLWithPath: several.leftOutFoldersKeptAt ?? "").lastPathComponent
+        XCTAssertEqual(
+            AssistSectionRestore.doneLines(courseCode: "ICS3U", sectionNumber: 2, putBack: several),
+            [frozen, "Backups leave out 2 folders in this section, so they were not put back. "
+                + "They are kept in \u{201C}\(severalName)\u{201D} beside your backups."]
+        )
+    }
+
+    /// The trail line names the kept folder by path and counts what is in
+    /// it; nothing is written when nothing was kept.
+    @MainActor
+    func testTheTrailSaysWhereTheLeftOutFoldersWereKept() throws {
+        let keptAt: String = "courses/_backups/ICS3U/ICS3U not in the archive 2026-11-26_101500"
+        XCTAssertEqual(ActivityTrail.Event.sectionRestoreKeptFiles.rawValue, "section restore kept files")
+        XCTAssertEqual(
+            ActivityTrail.sectionRestoreKeptFilesLine(keptAt: keptAt, folders: 1),
+            "a one-section restore kept 1 folder backups leave out, from inside the section, instead of "
+                + "removing it; it is in " + keptAt
+        )
+        XCTAssertEqual(
+            ActivityTrail.sectionRestoreKeptFilesLine(keptAt: keptAt, folders: 3),
+            "a one-section restore kept 3 folders backups leave out, from inside the section, instead of "
+                + "removing them; they are in " + keptAt
+        )
+
+        let scratch: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("left-out-trail-\(UUID().uuidString)", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: scratch)
+        }
+        ActivityTrail.noteSectionRestoreKeptFiles(keptAt: nil, folders: 0, course: "ICS3U", section: 2)
+        XCTAssertFalse(ActivityTrail.store.activityText(includingPrompts: true).contains("one-section restore kept"))
+        ActivityTrail.noteSectionRestoreKeptFiles(keptAt: keptAt, folders: 2, course: "ICS3U", section: 2)
+        let written: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(written.contains("ICS3U/2"), written)
+        XCTAssertTrue(written.contains("kept 2 folders backups leave out"), written)
+        XCTAssertTrue(written.contains(keptAt), written)
+    }
+
+    /// A course whose Section 2 holds each of `inside` (paths inside the
+    /// section, each a folder holding one file), backed up, then restored
+    /// by Restore from Backup…'s Restore Section 2.
+    @MainActor
+    private func restoreFromTheMenu(keeping inside: [String]) async throws -> OneSectionRestore.Outcome {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        for path in inside {
+            try fixture.write(path, to: fixture.sectionURL(2).appendingPathComponent(path).appendingPathComponent("marker"))
+        }
+        let item: BackupItem = try await fixture.backUp()
+        return try CourseRestorer.restoreSectionFromTheMenu(2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL)
+    }
+
+    /// The same, by the assistant window's Restore Section 2….
+    @MainActor
+    private func restoreFromTheWindow(keeping inside: [String]) async throws -> CourseRestorer.SectionPutBack {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        for path in inside {
+            try fixture.write(path, to: fixture.sectionURL(2).appendingPathComponent(path).appendingPathComponent("marker"))
+        }
+        let item: BackupItem = try await fixture.backUp()
+        return try CourseRestorer.restoreSectionSayingWhatWasKept(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+    }
 }
 
 /// A course with two sections, a shared outline and a shared folder, backed

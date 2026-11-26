@@ -3230,6 +3230,10 @@ class WorkspaceModel {
                 course: item.courseCode,
                 section: sectionNumber
             )
+            ActivityTrail.noteSectionRestoreKeptFiles(
+                keptAt: outcome.leftOutFoldersKeptAt, folders: outcome.leftOutFoldersKept.count,
+                course: item.courseCode, section: sectionNumber
+            )
             if outcome.pagesNotPutBack > 0 {
                 ActivityTrail.note(
                     .pageSettingsLeftAsTheyWere,

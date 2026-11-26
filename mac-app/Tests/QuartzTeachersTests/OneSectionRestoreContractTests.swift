@@ -157,6 +157,39 @@ final class OneSectionRestoreContractTests: XCTestCase {
         XCTAssertEqual(OneSectionRestoreWording.done(section: 2, when: when, outcome: many), expectedMany)
     }
 
+    /// Russell's two sentences for the folders backups leave out (#909,
+    /// ruled 2026-11-26): the mac's, filled, are the contract's; none kept
+    /// says nothing; and the menu's finished line ends with the sentence,
+    /// after every other one, as doneJoin says.
+    @MainActor
+    func testTheLeftOutKeptSentencesAreTheContracts() throws {
+        let wording: [String: Any] = try XCTUnwrap(
+            try OneSectionRestoreContractTests.block()["wording"] as? [String: Any]
+        )
+        let keptAt: String = "courses/_backups/ICS3U/ICS3U not in the archive 2026-11-26_101500"
+        let keptName: String = "ICS3U not in the archive 2026-11-26_101500"
+        let one: String = try XCTUnwrap(wording["leftOutKeptOne"] as? String)
+            .replacingOccurrences(of: "{NAME}", with: "Unit 1/My App/.git")
+            .replacingOccurrences(of: "{KEPT}", with: keptName)
+        let many: String = try XCTUnwrap(wording["leftOutKeptMany"] as? String)
+            .replacingOccurrences(of: "{COUNT}", with: "3")
+            .replacingOccurrences(of: "{KEPT}", with: keptName)
+
+        XCTAssertNil(OneSectionRestoreWording.leftOutKept(inside: [], keptAt: keptAt))
+        XCTAssertEqual(OneSectionRestoreWording.leftOutKept(inside: ["Unit 1/My App/.git"], keptAt: keptAt), one)
+        XCTAssertEqual(OneSectionRestoreWording.leftOutKept(inside: [".git", "build", "Unit 1/dist"], keptAt: keptAt), many)
+
+        var outcome: OneSectionRestore.Outcome = OneSectionRestore.Outcome(
+            pagesNotPutBack: 1, pagesNotSaved: 0, pagesMadeSinceHidden: 1, websiteRecordDiffers: true
+        )
+        outcome.leftOutFoldersKeptAt = keptAt
+        outcome.leftOutFoldersKept = [".git", "build", "Unit 1/dist"]
+        let said: String = OneSectionRestoreWording.done(section: 2, when: "then", outcome: outcome)
+        let websiteUnchanged: String = try XCTUnwrap(wording["websiteUnchanged"] as? String)
+            .replacingOccurrences(of: "{N}", with: "2")
+        XCTAssertTrue(said.hasSuffix(websiteUnchanged + "\n\n" + many), said)
+    }
+
     /// The folders the restore never gives a key are the contract's list of
     /// folders Quartz never publishes, which the build reads too.
     @MainActor

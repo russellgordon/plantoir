@@ -113,6 +113,22 @@ enum AssistSectionRestore {
         )
     }
 
+    /// What the window says once the section is back, line by line:
+    /// `doneMessage` first, unchanged (#897 froze it), then, when the
+    /// restore kept folders backups leave out from inside the section,
+    /// Russell's sentence for them as a line of its own (#909, ruling 1 of
+    /// 2026-11-26: "the window route gets a sentence of its own").
+    static func doneLines(courseCode: String, sectionNumber: Int, putBack: CourseRestorer.SectionPutBack) -> [String] {
+        var lines: [String] = [
+            doneMessage(courseCode: courseCode, sectionNumber: sectionNumber, settingsNotPutBack: putBack.pagesNotPutBack)
+        ]
+        if let keptAt = putBack.leftOutFoldersKeptAt,
+           let kept = OneSectionRestoreWording.leftOutKept(inside: putBack.leftOutFoldersKept, keptAt: keptAt) {
+            lines.append(kept)
+        }
+        return lines
+    }
+
     /// What the breadcrumb trail records afterwards — a different audience
     /// from `doneMessage`, and a different job.
     ///
@@ -204,6 +220,21 @@ enum AssistSectionRestore {
         sectionNumber: Int,
         coursesDirectoryURL: URL?
     ) throws -> Int {
+        let putBack: CourseRestorer.SectionPutBack = try restoreSayingWhatWasKept(
+            backupURL: backupURL, courseCode: courseCode,
+            sectionNumber: sectionNumber, coursesDirectoryURL: coursesDirectoryURL
+        )
+        return putBack.pagesNotPutBack
+    }
+
+    /// `restore`, saying what it kept as well (#909), for `doneLines`.
+    @MainActor
+    static func restoreSayingWhatWasKept(
+        backupURL: URL?,
+        courseCode: String,
+        sectionNumber: Int,
+        coursesDirectoryURL: URL?
+    ) throws -> CourseRestorer.SectionPutBack {
         guard let backupURL else {
             throw Problem.nothingToRestore
         }
@@ -223,7 +254,7 @@ enum AssistSectionRestore {
         if !FileManager.default.fileExists(atPath: backupURL.path) {
             throw Problem.unreadableBackup(backupURL.lastPathComponent)
         }
-        return try CourseRestorer.restoreSection(
+        return try CourseRestorer.restoreSectionSayingWhatWasKept(
             sectionNumber, from: item, coursesDirectoryURL: coursesDirectoryURL
         )
     }

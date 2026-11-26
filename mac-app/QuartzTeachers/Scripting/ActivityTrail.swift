@@ -217,6 +217,17 @@ nonisolated enum ActivityTrail {
         /// course, why, and the path inside the working folder, never a
         /// page. The teacher is told where; this is the record of it.
         case courseRestoreKeptFiles = "course restore kept files"
+        /// A ONE-section restore that worked, from Restore from Backup…'s
+        /// Restore Section N or the assistant window's Restore Section N…,
+        /// kept the folders backups leave out (`.git`, `build` and the rest)
+        /// that were inside the section beside the backups, rather than
+        /// removing them with the copy it set aside (#909, Russell's ruling
+        /// of 2026-11-25). Carries the course, the section, how many, and
+        /// the kept folder's path inside the working folder, never a page
+        /// and never which folders. Its own event beside
+        /// `courseRestoreKeptFiles`, as `sectionRestoreStoppedPartWay` is
+        /// beside `courseRestoreStoppedPartWay`.
+        case sectionRestoreKeptFiles = "section restore kept files"
         /// A teacher added a section to a course ("Add Section…"). Carries
         /// the course, the new section, and how many pages shared by every
         /// section were given a date and a published-or-hidden setting for
@@ -1887,6 +1898,27 @@ nonisolated enum ActivityTrail {
     static func courseRestoreKeptFilesLine(keptAt: String, why: KeptBecause) -> String {
         return "a whole-course restore kept files instead of removing them, because " + why.rawValue
              + "; they are in " + keptAt
+    }
+
+    /// The words for `sectionRestoreKeptFiles`: how many, and where. A
+    /// path and a count, never a page or a folder's name.
+    static func sectionRestoreKeptFilesLine(keptAt: String, folders: Int) -> String {
+        if folders == 1 {
+            return "a one-section restore kept 1 folder backups leave out, from inside the section, instead of "
+                 + "removing it; it is in " + keptAt
+        }
+        return "a one-section restore kept \(folders) folders backups leave out, from inside the section, instead of "
+             + "removing them; they are in " + keptAt
+    }
+
+    /// Writes `sectionRestoreKeptFiles` for one section, after
+    /// `sectionRestored`, on either route; nothing when none was kept.
+    static func noteSectionRestoreKeptFiles(keptAt: String?, folders: Int, course: String, section: Int) {
+        guard let keptAt, folders > 0 else {
+            return
+        }
+        note(.sectionRestoreKeptFiles, sectionRestoreKeptFilesLine(keptAt: keptAt, folders: folders),
+             course: course, section: section)
     }
 
     /// The words for `courseRestoreStoppedPartWay` (#909): what may be

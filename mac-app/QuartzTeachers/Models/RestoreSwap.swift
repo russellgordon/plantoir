@@ -1421,17 +1421,33 @@ nonisolated enum RestoreSwap {
         coursesDirectoryURL: URL,
         stamp: String
     ) -> (keptAt: String?, everythingMoved: Bool) {
+        let kept: (keptAt: String?, everythingMoved: Bool, moved: [String]) = keepInANotInTheArchiveFolderSayingWhich(
+            picked, from: aside, courseCode: courseCode, coursesDirectoryURL: coursesDirectoryURL, stamp: stamp
+        )
+        return (kept.keptAt, kept.everythingMoved)
+    }
+
+    /// `keepInANotInTheArchiveFolder`, saying also which of `picked` moved
+    /// there, in their order: a one-section restore names or counts them
+    /// to the teacher (#909, Russell's wording of 2026-11-26).
+    static func keepInANotInTheArchiveFolderSayingWhich(
+        _ picked: [String],
+        from aside: URL,
+        courseCode: String,
+        coursesDirectoryURL: URL,
+        stamp: String
+    ) -> (keptAt: String?, everythingMoved: Bool, moved: [String]) {
         if picked.isEmpty {
-            return (nil, true)
+            return (nil, true, [])
         }
         guard let folder = newFolderInTheBackupsFolder(
             courseCode: courseCode, name: notInTheArchiveName(courseCode),
             coursesDirectoryURL: coursesDirectoryURL, stamp: stamp
         ) else {
-            return (nil, false)
+            return (nil, false, [])
         }
         var everythingMoved: Bool = true
-        var somethingMoved: Bool = false
+        var moved: [String] = []
         for inside in picked {
             let destination: URL = absolute(inside, in: folder)
             do {
@@ -1439,7 +1455,7 @@ nonisolated enum RestoreSwap {
                     at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
                 )
                 try FileManager.default.moveItem(at: absolute(inside, in: aside), to: destination)
-                somethingMoved = true
+                moved.append(inside)
             } catch {
                 everythingMoved = false
             }
@@ -1447,10 +1463,10 @@ nonisolated enum RestoreSwap {
         // A folder that nothing reached is never named (the review after
         // the merge, LOW 2): the files are still in the set-aside copy,
         // which is kept, so naming the folder would point at nothing.
-        if !somethingMoved {
-            return (nil, false)
+        if moved.isEmpty {
+            return (nil, false, [])
         }
-        return (insideTheWorkingFolder(folder, coursesDirectoryURL: coursesDirectoryURL), everythingMoved)
+        return (insideTheWorkingFolder(folder, coursesDirectoryURL: coursesDirectoryURL), everythingMoved, moved)
     }
 
     /// `skipDescendants` only for a real folder. Called after any other
