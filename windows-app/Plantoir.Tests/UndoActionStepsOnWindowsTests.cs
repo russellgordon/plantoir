@@ -285,6 +285,25 @@ internal static class WindowsActionsOnTheMacFixture
         return last;
     }
 
+    /// <summary>
+    /// Every file under <paramref name="folder"/> but the list's own
+    /// (<paramref name="listFolder"/>), each as its relative path and its
+    /// hash, sorted: two equal answers mean nothing was written, a backup
+    /// included (#899 W7b2-10, review 1 L3).
+    /// </summary>
+    internal static List<string> EveryFileBut(string folder, string listFolder)
+    {
+        var files = new List<string>();
+        string list = Path.GetFullPath(listFolder) + Path.DirectorySeparatorChar;
+        foreach (string file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+        {
+            if (Path.GetFullPath(file).StartsWith(list, StringComparison.OrdinalIgnoreCase)) continue;
+            files.Add(Path.GetRelativePath(folder, file).Replace('\\', '/') + " " + UndoCheck.Sha(File.ReadAllBytes(file)));
+        }
+        files.Sort(StringComparer.Ordinal);
+        return files;
+    }
+
     /// <summary>How many begin lines a list folder holds.</summary>
     internal static int Begins(string journalFolder)
     {

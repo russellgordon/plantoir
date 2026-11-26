@@ -637,6 +637,31 @@ public class ReDateTests : IDisposable
     }
 
     /// <summary>
+    /// #899 W7b2-10 (review 1 L3): Bring Pages into Date when every page
+    /// already carries its class's date changes nothing, so it makes no step
+    /// and writes nothing, not even its backup.
+    /// </summary>
+    [Fact]
+    public void SyncingPagesAlreadyInDateMakesNoStepAndNoWrite()
+    {
+        Class("Unit 1, Day 1", "2026-10-13", "Concept: [[Loops]]");
+        Material("Concepts/Loops.md", "2026-10-13");
+        string list = Path.Combine(_folder, "state-undo");
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher())
+        {
+            UndoList = new Plantoir.Core.Undo.UndoForThisProcess(list, Plantoir.Core.Undo.UndoMode.Shadow, null),
+        };
+        List<string> before = WindowsActionsOnTheMacFixture.EveryFileBut(_folder, list);
+
+        var plan = workspace.PlanSyncDates("ICS3U", 1, new[] { "Unit 1, Day 1" });
+        Assert.Empty(plan.Changing);
+        workspace.ApplySyncDates(plan);
+
+        Assert.Equal(0, WindowsActionsOnTheMacFixture.Begins(list));
+        Assert.Equal(before, WindowsActionsOnTheMacFixture.EveryFileBut(_folder, list));
+    }
+
+    /// <summary>
     /// #899 W7b1 review 1, MEDIUM 2: Bring Pages into Date left part way (one
     /// page moved, the next read-only, and the first cannot be put back) is
     /// said as part way, naming the kept file, never "That couldn’t be read".
