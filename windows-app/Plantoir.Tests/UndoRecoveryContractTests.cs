@@ -212,13 +212,21 @@ public sealed class UndoRecoveryContractTests
 
         if (recoveryCase.TryGetProperty("handEdit", out JsonElement handEdit))
         {
-            // first or second; any other value (piece 8's carried) is a gap
-            // named, never a page looked for under a name it is not.
+            // first or second, or (U4b2-13, W8-8) carried: the page inside the
+            // moved folder, wherever the folder is now. Any other value is a
+            // gap named, never a page looked for under a name it is not.
             string handEdited = handEdit.GetString()!;
-            if (handEdited is not ("first" or "second")) Assert.Fail("a key this replay does not check: handEdit " + handEdited);
-            string edited = PathOf(handEdited);
-            string text = UndoCheck.DecodeStrictly(scribe.Page("A", edited)!)!;
-            scribe.WritePage("A", edited, Encoding.UTF8.GetBytes(UndoTraceEdits.HandEdit("sameLine", text)!));
+            if (handEdited == "carried" && withAMovedFolder)
+            {
+                Assert.True(UndoKindsForTheCases.EditTheCarriedPageByHand(scribe), "no page inside the moved folder to change by hand");
+            }
+            else
+            {
+                if (handEdited is not ("first" or "second")) Assert.Fail("a key this replay does not check: handEdit " + handEdited);
+                string edited = PathOf(handEdited);
+                string text = UndoCheck.DecodeStrictly(scribe.Page("A", edited)!)!;
+                scribe.WritePage("A", edited, Encoding.UTF8.GetBytes(UndoTraceEdits.HandEdit("sameLine", text)!));
+            }
         }
         var edits = new Dictionary<string, byte[]?> { [First] = scribe.Page("A", First), [Second] = scribe.Page("A", Second) };
         if (Flag(recoveryCase, "contentRemovedBeforeRecovery")) scribe.RemoveContent();

@@ -519,15 +519,41 @@ internal static class UndoKindsForTheCases
         ["contextBefore"] = "Line one: ", ["contextAfter"] = ".\n",
     };
 
-    /// <summary>What a.md holds, as <c>movedFolder</c> says it: new, old, byHand, none.</summary>
-    internal static string Holds(string? text) => text switch
+    /// <summary>
+    /// What a.md holds, as <c>movedFolder</c> says it: new (it holds the line
+    /// <c>Line one: new.</c>), old (<c>Line one: old.</c>), byHand (anything
+    /// else: <c>Hand.</c>, or <c>Line one: by hand.</c>), none (no a.md), as
+    /// the mac's <c>UndoContractKinds.movedFolder</c> reads it.
+    /// </summary>
+    internal static string Holds(string? text) =>
+        text is null ? "none"
+        : text.Contains("Line one: new.", StringComparison.Ordinal) ? "new"
+        : text.Contains("Line one: old.", StringComparison.Ordinal) ? "old"
+        : "byHand";
+
+    /// <summary>
+    /// <c>recoveryCasesHow</c>' <c>handEdit: carried</c> (U4b2-13): a.md inside
+    /// the moved folder, wherever the folder is now (renamed if it is there,
+    /// else media), every line starting <c>Line one: </c> set to
+    /// <c>Line one: by hand.</c> (the mac's <c>editTheCarriedPageByHand</c>).
+    /// False when there is no such page or no such line.
+    /// </summary>
+    internal static bool EditTheCarriedPageByHand(UndoScribe scribe)
     {
-        null => "none",
-        MediaPageNew => "new",
-        MediaPageOld => "old",
-        "Hand.\n" => "byHand",
-        _ => "something else: " + text,
-    };
+        string folder = Directory.Exists(scribe.FullPath("A", RenamedFolder)) ? RenamedFolder : MediaFolder;
+        if (Text(scribe.Page("A", folder + "/a.md")) is not { } text) return false;
+        string[] lines = text.Split('\n');
+        bool changed = false;
+        for (int index = 0; index < lines.Length; index++)
+        {
+            if (!lines[index].StartsWith("Line one: ", StringComparison.Ordinal)) continue;
+            lines[index] = "Line one: by hand.";
+            changed = true;
+        }
+        if (!changed) return false;
+        scribe.WritePage("A", folder + "/a.md", Encoding.UTF8.GetBytes(string.Join('\n', lines)));
+        return true;
+    }
 
     /// <summary><c>movedFolder</c>: which place holds the folder (renamed, media, both or neither), then what its a.md holds.</summary>
     internal static string MovedFolder(UndoScribe scribe)
