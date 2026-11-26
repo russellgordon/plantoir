@@ -1295,7 +1295,7 @@ final class UndoActionStepsTests: XCTestCase {
             steps.append(entry)
         }
         let object: [String: Any] = [
-            "note": "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `moves` (U3b, only when there are any) every file it moved, in op order, from and to (the moment in a kept copy's name set to one fixed moment), its text, and whether it stands apart from the step (moveApart) or not (move); `members` (U4a, only when there are any) every editJSON op, in op order, its file, keyPath and before and after (left out: absent); `trees` (U4a, only when there are any) every folder made (createTree), in op order, its path, the folders inside it and every file's text by its path inside it; `folderMoves` (U4b2-11, Rename folder, only when there are any) every FOLDER moved (a move op with a listingSha), in op order, from and to, the listing's SHA-256 (`listingSha`) and the listing itself as it was before the step (the folders inside it, in byte order, and every file's text by its path inside it), and a page the move carries is in `files` at its NEW place (opKinds.wholeOps), its before the text it held at the old one; a rename's relinked pages are in the order of their paths after the move, compared as the lowercased path (the Mac's ClassPages.isInPathOrder, the order a section's pages are listed in), never the order the disk lists them; `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
+            "note": "Written by the mac's UndoActionStepsTests from the REAL action code (#899, U3), never by hand: each daily page action run once on a fixture, and the one step it left on the list read back. `files` is every file its content ops name, in op order, with its whole text before and after (null: absent); `moves` (U3b, only when there are any) every file it moved, in op order, from and to (the moment in a kept copy's name set to one fixed moment), its text, and whether it stands apart from the step (moveApart) or not (move); `members` (U4a, only when there are any) every editJSON op, in op order, its file, keyPath and before and after (left out: absent); `trees` (U4a, only when there are any) every folder made (createTree), in op order, its path, the folders inside it and every file's text by its path inside it; `folderMoves` (U4b2-11, Rename folder, only when there are any) every FOLDER moved (a move op with a listingSha), in op order, from and to, the listing's SHA-256 (`listingSha`) and the listing itself as it was before the step (the folders inside it, in byte order, and every file's text by its path inside it), and a page the move carries is in `files` at its NEW place (opKinds.wholeOps), its before the text it held at the old one; a rename's relinked pages are in the order of their paths after the move, compared as the lowercased path, and two paths alike once lowercased (in case or Unicode form only) by their UTF-8 bytes as spelled, no locale (the Mac's ClassPages.isInPathOrder, the order a section's pages are listed in), each page by its own place inside the course, a link never by its target, never the order the disk lists them; `recomputes` its recompute ops; `ops` the op kinds the door chose, in order. `madeBy` is the word before the first colon. scripts/make_undo_traces.py makes contracts/undo-traces.json -> actionTraces from it. Regenerate: TEST_RUNNER_PLANTOIR_WRITE_UNDO_ACTION_STEPS=1 xcodebuild test -only-testing:QuartzTeachersTests/UndoActionStepsTests/testEveryDailyActionIsOneStepThroughTheDoor, then python3 scripts/make_undo_traces.py.",
             "steps": steps,
         ]
         var data: Data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
@@ -1404,6 +1404,24 @@ final class UndoActionStepsTests: XCTestCase {
 
     // MARK: - Replaying contracts/undo-traces.json -> actionTraces
 
+    /// U4b2-12: a folder a rename moves, laid at `place` as its recorded
+    /// listing: every folder inside it (an empty one too) and every file's
+    /// bytes, by its path inside.
+    static func lay(_ place: String, folders: [String], files: [String: Data], in root: URL) throws {
+        let folderURL: URL = root.appendingPathComponent(place, isDirectory: true)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        for folder in folders {
+            try FileManager.default.createDirectory(
+                at: folderURL.appendingPathComponent(folder, isDirectory: true), withIntermediateDirectories: true
+            )
+        }
+        for (inside, data) in files {
+            let url: URL = folderURL.appendingPathComponent(inside)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url)
+        }
+    }
+
     static func replayActionTraces(under parent: URL) async throws -> (traces: Int, calls: Int, failures: [String]) {
         UndoContractReplay.registerTheFrontPageMaintainer()
         let document: [String: Any] = try UndoContractReplay.contract("undo-traces.json")
@@ -1425,15 +1443,33 @@ final class UndoActionStepsTests: XCTestCase {
             }
             let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: name)
             let root: URL = place.root
+            // U4b2-12: a folder moved whole (Rename folder) is laid at its
+            // `from` as its listing, and a page its move carries, named at
+            // the new place, is not written there.
+            var folderMoves: [(from: String, to: String, listingSha: String, folders: [String], files: [String: Data])] = []
+            for moved in step["folderMoves"] as? [[String: Any]] ?? [] {
+                var files: [String: Data] = [:]
+                for (inside, value) in moved["files"] as? [String: Any] ?? [:] {
+                    files[inside] = Data((value as? String ?? "").utf8)
+                }
+                folderMoves.append((
+                    from: moved["from"] as? String ?? "", to: moved["to"] as? String ?? "",
+                    listingSha: moved["listingSha"] as? String ?? "",
+                    folders: moved["folders"] as? [String] ?? [], files: files
+                ))
+            }
             var changes: [UndoFileChange] = []
             var paths: [String] = []
             for file in step["files"] as? [[String: Any]] ?? [] {
                 let path: String = file["path"] as? String ?? ""
                 paths.append(path)
+                let carried: Bool = UndoActionStepsTests.placeBeforeTheMoves(of: path, folderMoves: folderMoves) != path
                 var before: Data? = nil
                 if let text = file["before"] as? String {
                     before = Data(text.utf8)
-                    try UndoContractReplay.write(text, to: path, in: root)
+                    if !carried {
+                        try UndoContractReplay.write(text, to: path, in: root)
+                    }
                 }
                 var after: Data? = nil
                 if let text = file["after"] as? String {
@@ -1487,6 +1523,19 @@ final class UndoActionStepsTests: XCTestCase {
                     moveOps.append(UndoOp.moveFile(from: from, to: to, sha: sha))
                 }
             }
+            var folderMoveOps: [UndoOp] = []
+            for moved in folderMoves {
+                try UndoActionStepsTests.lay(moved.from, folders: moved.folders, files: moved.files, in: root)
+                var places: [String] = [moved.from, moved.to]
+                for inside in moved.files.keys.sorted() {
+                    places.append(moved.from + "/" + inside)
+                    places.append(moved.to + "/" + inside)
+                }
+                for place in places where !paths.contains(place) {
+                    paths.append(place)
+                }
+                folderMoveOps.append(UndoOp.moveFolder(from: moved.from, to: moved.to, listingSha: moved.listingSha))
+            }
             var recomputes: [UndoOp] = []
             for kept in step["recomputes"] as? [[String: Any]] ?? [] {
                 recomputes.append(UndoOp.recompute(
@@ -1521,13 +1570,18 @@ final class UndoActionStepsTests: XCTestCase {
                         changes: changes, recomputes: recomputes
                     )
                     let outcome: JournaledWriteOutcome
-                    if moveOps.isEmpty && memberOps.isEmpty && treeOps.isEmpty {
+                    if moveOps.isEmpty && memberOps.isEmpty && treeOps.isEmpty && folderMoveOps.isEmpty {
                         outcome = JournaledWrite.perform(draft, in: journal, mode: .live)
                     } else {
                         // U3b: a step with moves goes through the door that
                         // takes every kind, as `JournaledStep` makes it.
                         var ops: [UndoOp] = []
                         var blobs: [Data] = []
+                        // U4b2-12: each folder's move first (opKinds.wholeOps),
+                        // the pages it carries after it, named at its new place.
+                        for op in folderMoveOps {
+                            ops.append(op)
+                        }
                         for change in changes where change.before != change.after {
                             if let members = memberOps[change.relativePath] {
                                 for op in members {

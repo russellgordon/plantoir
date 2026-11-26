@@ -3793,7 +3793,7 @@
         {"call": "action", "step": "renameFolder", "expect": "applied", "seq": 1, "ops": ["move", "writeFile", "writeFile", "editJSON", "editJSON"], "head": 1, "redo": null},
         {"call": "handEdit", "kind": "deletePage", "path": "courses/ICS3U/Ideas/Loops.md", "head": 1, "redo": null},
         {"call": "note", "head": 1, "redo": null},
-        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/Concepts", "others": 0, "clearedTheList": true, "head": null, "redo": null},
+        {"call": "undo", "expect": "changedSince", "path": "courses/ICS3U/Ideas", "others": 0, "clearedTheList": true, "head": null, "redo": null},
         {"call": "undo", "expect": "nothingToUndo", "head": null, "redo": null},
         {"call": "redo", "expect": "nothingToRedo", "head": null, "redo": null}
       ],

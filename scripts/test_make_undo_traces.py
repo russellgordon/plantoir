@@ -297,6 +297,25 @@ class ActionTraceTests(unittest.TestCase):
                                  step["name"] + ": " + path + " redone")
         self.assertEqual(found, 2)
 
+    def test_a_refused_undo_of_a_rename_names_the_renamed_folder(self):
+        # U4b2-12 (UndoOp.placeAsFound, U4b): a page taken out of the folder
+        # at its new name since; the Undo is refused naming the folder where
+        # the teacher finds it, the new name, never the old one; a refused
+        # Redo names the old name, where the folder is then.
+        step = [recorded for recorded in traces.read_action_steps() if recorded["name"] == "renameFolder"][0]
+        moved = step["folderMoves"][0]
+        pages, _ = traces.action_fixture(step)
+        model = traces.Model(pages=pages)
+        self.assertEqual(traces.make_recorded_step(model, step)[0], "applied")
+        self.assertTrue(model.hand_edit_path("deletePage", moved["to"] + "/Loops.md"))
+        self.assertEqual(model.undo(), ("changedSince", moved["to"], 0))
+        pages, _ = traces.action_fixture(step)
+        model = traces.Model(pages=pages)
+        traces.make_recorded_step(model, step)
+        self.assertEqual(model.undo()[0], "undone")
+        self.assertTrue(model.hand_edit_path("body", moved["from"] + "/Loops.md"))
+        self.assertEqual(model.redo(), ("changedSince", moved["from"], 1))
+
     def test_a_rename_trace_hashes_each_folder_by_its_listing_at_both_ends(self):
         # U4b2-12: every rename trace with no hand edits ends its undos with
         # each folder's listing (its recorded listingSha) at the old name and

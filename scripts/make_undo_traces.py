@@ -1129,8 +1129,9 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
                 if leaves_apart and stands_apart(op):
                     left_apart.append(place)
                     continue
-                if place not in in_the_way:
-                    in_the_way.append(place)
+                found = place_as_found(op, backward)
+                if found not in in_the_way:
+                    in_the_way.append(found)
                 continue
             if state != wanted_from:
                 continue
@@ -1202,6 +1203,17 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
 
 
 EDIT_KINDS = ("writeFile", "editLine", "replaceText", "editJSON")
+
+
+def place_as_found(op, backward):
+    """UndoOp.placeAsFound (U4b): where a teacher finds the item a whole op
+    names now, the place a refusal names: a `move`'s `to` before it is
+    undone and its `from` before it is redone (a refused Undo of a rename
+    names the renamed folder, never its old name); for every other op its
+    path, its from, or its target."""
+    if op["kind"] == "move" and "from" in op and "to" in op:
+        return op["to"] if backward else op["from"]
+    return op.get("path") or op.get("from") or op.get("target")
 
 
 def part_inside(place, path):

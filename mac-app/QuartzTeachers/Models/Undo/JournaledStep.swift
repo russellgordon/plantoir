@@ -1103,6 +1103,33 @@ nonisolated enum UndoFolderPlaces {
         return String(path.dropFirst(rootPath.count))
     }
 
+    /// A place inside `folder` spelled the one way, its links resolved only
+    /// ABOVE the folder (U4b2-12; review 2 of U4b2-11, LOW B): the folder's
+    /// own path made canonical (`canonicalPath`, so `/var` and
+    /// `/private/var` are one), then every part of `url` below it as written.
+    /// A link inside the folder, a linked page or a linked folder, keeps its
+    /// own place and is never replaced by its target's. The part below is
+    /// found by walking up `url` to the first folder whose canonical path is
+    /// `folder`'s; nil when `url` is not inside it.
+    static func placeResolvingOnlyAbove(_ folder: URL, of url: URL) -> String? {
+        let folderPath: String = canonicalPath(of: folder)
+        var place: URL = url.standardizedFileURL
+        var below: [String] = []
+        while place.path != "/" {
+            below.insert(place.lastPathComponent, at: 0)
+            let parent: URL = place.deletingLastPathComponent()
+            if canonicalPath(of: parent) == folderPath {
+                var resolved: String = folderPath
+                for part in below {
+                    resolved = resolved.hasSuffix("/") ? resolved + part : resolved + "/" + part
+                }
+                return resolved
+            }
+            place = parent
+        }
+        return nil
+    }
+
     /// A path with every link resolved, for a file that may not exist yet:
     /// its deepest existing folder is resolved by `realpath`, and the parts
     /// below it are added back as written. Foundation's

@@ -670,7 +670,7 @@ enum SpecialFolderRenamer {
                 url: placeAfter(moves, of: pageURL), read: read, rewritten: Data(rewritten.utf8)
             ))
         }
-        return FolderRenamePlan(moves: moves, pages: inPathOrder(pages))
+        return FolderRenamePlan(moves: moves, pages: inPathOrder(pages, under: courseDirectory))
     }
 
     /// Plans a rename OFF the main actor, and gives up waiting the moment the
@@ -1159,13 +1159,18 @@ enum SpecialFolderRenamer {
     /// A rename's pages in the one order of paths (`ClassPages.isInPathOrder`),
     /// each by its place after the move, never the order the disk listed
     /// them (hashed on APFS, sorted on HFS+ and NTFS): review 1 of U4b2-11,
-    /// M1. Each place is compared canonical (`UndoFolderPlaces`), read once:
+    /// M1. Each place is read once, the course folder canonical and the page's
+    /// own path inside it as written (`UndoFolderPlaces.placeResolvingOnlyAbove`):
     /// a carried page's place is built from the course's own spelling
-    /// (`/var/...`) and a page outside from the walk's (`/private/var/...`).
-    nonisolated static func inPathOrder(_ pages: [FolderRenamePlan.Page]) -> [FolderRenamePlan.Page] {
+    /// (`/var/...`) and a page outside from the walk's (`/private/var/...`),
+    /// and a linked page is ordered by its own place, never its target's
+    /// (review 2 of U4b2-11, LOW B).
+    nonisolated static func inPathOrder(_ pages: [FolderRenamePlan.Page], under courseDirectory: URL) -> [FolderRenamePlan.Page] {
         var keyed: [(place: URL, page: FolderRenamePlan.Page)] = []
         for page in pages {
-            keyed.append((place: URL(fileURLWithPath: UndoFolderPlaces.canonicalPath(of: page.url)), page: page))
+            let place: String = UndoFolderPlaces.placeResolvingOnlyAbove(courseDirectory, of: page.url)
+                ?? UndoFolderPlaces.canonicalPath(of: page.url)
+            keyed.append((place: URL(fileURLWithPath: place), page: page))
         }
         keyed.sort { first, second in
             return ClassPages.isInPathOrder(first.place, second.place)
