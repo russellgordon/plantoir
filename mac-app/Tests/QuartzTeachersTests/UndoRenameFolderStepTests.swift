@@ -869,6 +869,8 @@ final class UndoRenameFolderStepTests: XCTestCase {
     /// awaited in a fresh `Task` (in the run or in `renameFromTheSheet`).
     func testTheSheetsCancelReachesAHeldPlan() async throws {
         let course: Course = try course()
+        // An edit not yet saved, so Save has something to be enabled for.
+        course.configuration.courseName = "Computer Science"
         let view: CourseSettingsView = CourseSettingsView(course: course)
         let before: [String: Data] = pages(of: course)
         let settingsBefore: Data = try Data(contentsOf: course.configFileURL)
