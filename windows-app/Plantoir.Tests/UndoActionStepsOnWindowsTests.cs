@@ -35,7 +35,7 @@ internal static class WindowsActionsOnTheMacFixture
         "addNextClass", "addNextClassInANewUnit", "addClasses", "addCurriculumMentions", "rememberTimetable",
         "reDateClasses", "writeHowITeach", "startHowITeachPage", "getReadyForTheStartOfTheYear",
         "showTodaysClassOnTheFrontPage", "notTodayOnTheFrontPage", "keepClassesDatedLater", "answerTheLinksChecklist",
-        "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass", "setSchoolYear",
+        "makeRoomForClasses", "duplicateClass", "duplicateAsTheNextClass", "setSchoolYear", "saveCourseSettings",
     ];
 
     /// <summary>
@@ -289,6 +289,19 @@ internal static class WindowsActionsOnTheMacFixture
         // Set School Year is the sheet's write, given the year and the day
         // the mac's SetSchoolYearSheet.write(2025, to:on:) was given, on the
         // workspace's list and door (#899 W8-11).
+        // Save of Course Settings is the sheet's Save, given the edits the
+        // mac's recording made (the first Marks tick, Tests, and the sidebar
+        // hiding Media alone), on the workspace's list and door (#899 W8-12).
+        if (stepName == "saveCourseSettings")
+        {
+            string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);
+            var course = new Plantoir.Core.Models.Course(Course, courseDirectory,
+                CourseConfiguration.Load(Path.Combine(courseDirectory, "course_config.json")));
+            course.Configuration.GradedFolders = ["Tests"];
+            course.Configuration.HiddenItems = ["Media"];
+            CourseConfiguration.SaveCourseSettings(course, workspace.UndoList, workspace.UndoDoorOfATest);
+            return "saved";
+        }
         if (stepName == "setSchoolYear")
         {
             string courseDirectory = Path.Combine(workspace.FolderPath, "courses", Course);

@@ -1334,7 +1334,11 @@ public sealed partial class CourseSettingsView : UserControl
             }
             catch { before = Config.AllDeployDestinations; }
 
-            var report = Config.Write(_course.ConfigFilePath);
+            // ONE step on the list (#899 W8-12): one editJSON per member the
+            // Save changes, planned again up to three times when a member of
+            // its own changed meanwhile; refused, nothing is written and the
+            // edits stay unsaved, said by the failure line below.
+            var report = CourseConfiguration.SaveCourseSettings(_course);
             // Every OTHER window's copy of this course with nothing unsaved
             // reads the file again (#272 / mac #265); one with unsaved changes
             // is left alone, and its own Save merges.
