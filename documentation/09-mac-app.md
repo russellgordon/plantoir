@@ -22543,10 +22543,13 @@ says the change went ahead. `writeNew` and `remove` never follow a link
 a link to a folder or to a file that cannot be read is still refused before
 anything changes. So Insert Class, which writes a later class's new name and
 removes its old one, is refused when that later class is a link, until the
-pieces that move a link (review 1, MEDIUM 1). A dangling link is written
-through (its file made where it leads), unless the file's folder is missing
-too: `plan` then reads it as cannot-tell-now, so no folder is made where a
-stray link points (review 1, LOW 1). In shadow the Mac records an inside
+pieces that move a link (review 1, MEDIUM 1); Windows' Insert Class still
+goes ahead outside the door, a plain copy at the new name and the link
+deleted, which the contract names as the Mac's alone. A dangling link is
+written through: its file is made where it leads, and the file's folder too
+when that is missing, as Windows' `UndoSwap.MakeTheFolderOf` makes it
+(review 1, LOW 1; review 2, MEDIUM A reversed a refusal of the missing
+folder). In shadow the Mac records an inside
 link as a step at its file while Windows writes it without the list; the
 contract names the difference and leaves it to U7 (LOW 2). Live, an inside
 link is now recorded at its file rather than refused, which U7 decides on

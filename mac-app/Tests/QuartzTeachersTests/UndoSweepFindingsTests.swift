@@ -261,10 +261,14 @@ final class UndoSweepFindingsTests: XCTestCase {
         }
     }
 
-    /// A dangling link whose file's FOLDER is missing too: nothing can be
-    /// made where it leads, so the step is refused and nothing is changed
-    /// (no folder is made to hold it).
-    func testAShadowStepOnADanglingLinkWhoseFolderIsMissingIsRefused() throws {
+    /// A dangling link whose file's FOLDER is missing too (review 2 of
+    /// U4b2-1, MEDIUM A, the director's decision): written through as
+    /// Windows writes it (`UndoSwap.MakeTheFolderOf`): the folder is made,
+    /// the file written where the link leads, and the link stays a link;
+    /// inside the working folder no trail line, outside it one that says the
+    /// change went ahead. MUST FAIL with the plan made at the link's own
+    /// place, or with such a link refused.
+    func testAShadowStepOnADanglingLinkWhoseFolderIsMissingMakesTheFolderAndTheFile() throws {
         JournaledStep.modeOverride = .shadow
         for outside in [false, true] {
             UndoJournalLocation.folderOverride = root.appendingPathComponent("undo-\(outside)", isDirectory: true)
@@ -281,15 +285,14 @@ final class UndoSweepFindingsTests: XCTestCase {
             let step: JournaledStep = step(for: made.course)
             step.write(published, to: made.link)
 
-            XCTAssertThrowsError(try step.make(), "outside: \(outside)") { error in
-                guard case JournaledStepError.refused(.cannotTellNow, _) = error else {
-                    return XCTFail("not refused as cannot tell now, outside: \(outside): \(error)")
-                }
-            }
+            XCTAssertNoThrow(try step.make(), "the dangling link was refused, outside: \(outside)")
 
-            XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path), "a folder was made, outside: \(outside)")
-            XCTAssertEqual(said, [.nothingWasChanged], "outside: \(outside)")
-            XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: made.link.path), made.target.path)
+            XCTAssertEqual(said, outside ? [.wentAhead] : [], "outside: \(outside)")
+            XCTAssertEqual(try? String(contentsOf: made.target, encoding: .utf8), published, "outside: \(outside)")
+            XCTAssertEqual(
+                try FileManager.default.destinationOfSymbolicLink(atPath: made.link.path), made.target.path,
+                "the link is not still a link to the same file, outside: \(outside)"
+            )
             try FileManager.default.removeItem(at: made.course.deletingLastPathComponent())
         }
     }
