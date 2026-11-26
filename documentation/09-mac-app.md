@@ -22541,10 +22541,19 @@ cannot be named and is written by `writePlainly`, with one trail line that
 says the change went ahead. `writeNew` and `remove` never follow a link
 (removing what a link leads to would leave the link pointing at nothing), and
 a link to a folder or to a file that cannot be read is still refused before
-anything changes. Rejected: one rule per action (every writer goes through
+anything changes. So Insert Class, which writes a later class's new name and
+removes its old one, is refused when that later class is a link, until the
+pieces that move a link (review 1, MEDIUM 1). A dangling link is written
+through (its file made where it leads), unless the file's folder is missing
+too: `plan` then reads it as cannot-tell-now, so no folder is made where a
+stray link points (review 1, LOW 1). In shadow the Mac records an inside
+link as a step at its file while Windows writes it without the list; the
+contract names the difference and leaves it to U7 (LOW 2). Live, an inside
+link is now recorded at its file rather than refused, which U7 decides on
+purpose (LOW 3). Rejected: one rule per action (every writer goes through
 `plan`), and refusing as U3 did (the Publish of a linked page failed for a
 teacher who had linked a class page in from elsewhere).
-`UndoSweepFindingsTests` holds the four cases.
+`UndoSweepFindingsTests` holds the cases, every planning entry point and read through the plan included.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

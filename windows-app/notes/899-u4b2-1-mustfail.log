@@ -15,3 +15,15 @@ U4b2-1 must-fail log (#899), main Mac, xcodebuild through xlock.sh, class UndoSw
    Restored with git checkout; git diff of JournaledStep.swift empty.
 
 RED 2 of 2.
+
+Review 1 fix round (class UndoSweepFindingsTests; logs .dd/run-r1-mf-*.log, run-r1-mf2-*.log)
+
+3. remove follows the link: RED. testAShadowStepThatRemovesALinkedPageIsRefusedBeforeAnythingChanges: "XCTAssertThrowsError failed: did not throw an error"; "the new name was written".
+4. placeALinkLeadsTo returns url: RED. testAShadowStepOnADanglingLinkMakesTheFileTheLinkLeadsTo: "XCTAssertNoThrow failed: threw error refused(cannotTellNow ...)" (both iterations).
+5. write(_:to:plannedFrom:) at url: RED (run-r1-mf2-plannedFrom.log). testEveryWayOfPlanningAndReadingFollowsALink: "XCTAssertNoThrow failed: threw error refused(changedSince ...)", outside: true. (First form of the test, inside link only, stayed green: the step's naming resolves an inside link, so the test was made to run outside too.)
+6. editJSON at url: RED (run-r1-mf2-editJSON.log), same test, same line, outside: true.
+7. plannedKey returns url's own key: RED. testEveryWayOfPlanningAndReadingFollowsALink "readData", "readTextOrThrow", "readText"; testAShadowStepOnADanglingLinkMakesTheFileTheLinkLeadsTo "fileExists does not find the planned file by its link".
+8. Folder-missing refusal dropped: RED. testAShadowStepOnADanglingLinkWhoseFolderIsMissingIsRefused: "did not throw an error"; "a folder was made" (both iterations).
+Each restored with git checkout of the committed file; git diff of JournaledStep.swift empty.
+
+RED 8 of 8 in all.

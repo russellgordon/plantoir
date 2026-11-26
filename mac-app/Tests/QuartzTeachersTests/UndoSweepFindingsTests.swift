@@ -301,27 +301,37 @@ final class UndoSweepFindingsTests: XCTestCase {
     /// entry point, or `plannedKey`, back at the link's own place.
     func testEveryWayOfPlanningAndReadingFollowsALink() throws {
         JournaledStep.modeOverride = .shadow
-        UndoJournalLocation.folderOverride = root.appendingPathComponent("undo", isDirectory: true)
-        let made = try linkedPage(outside: false)
-        let media: URL = made.target.deletingLastPathComponent()
-        let jsonTarget: URL = media.appendingPathComponent("real.json")
-        try Data("{\"a\":1}\n".utf8).write(to: jsonTarget)
-        let jsonLink: URL = made.course.appendingPathComponent("settings.json")
-        try FileManager.default.createSymbolicLink(at: jsonLink, withDestinationURL: jsonTarget)
-        let step: JournaledStep = step(for: made.course)
-        step.write(Data(published.utf8), to: made.link, plannedFrom: Data(draft.utf8))
-        step.editJSON(at: jsonLink, read: Data("{\"a\":1}\n".utf8), members: [], leaving: Data("{\"a\":2}\n".utf8))
+        for outside in [false, true] {
+            UndoJournalLocation.folderOverride = root.appendingPathComponent("undo-\(outside)", isDirectory: true)
+            let made = try linkedPage(outside: outside)
+            defer {
+                try? FileManager.default.removeItem(at: made.outsideFolder)
+            }
+            let jsonTarget: URL = made.target.deletingLastPathComponent().appendingPathComponent("real.json")
+            try Data("{\"a\":1}\n".utf8).write(to: jsonTarget)
+            let jsonLink: URL = made.course.appendingPathComponent("settings.json")
+            try FileManager.default.createSymbolicLink(at: jsonLink, withDestinationURL: jsonTarget)
+            let step: JournaledStep = step(for: made.course)
+            step.write(Data(published.utf8), to: made.link, plannedFrom: Data(draft.utf8))
+            step.editJSON(at: jsonLink, read: Data("{\"a\":1}\n".utf8), members: [], leaving: Data("{\"a\":2}\n".utf8))
 
-        XCTAssertEqual(step.readData(made.link), Data(published.utf8), "readData")
-        XCTAssertEqual(try? step.readTextOrThrow(made.link), published, "readTextOrThrow")
-        XCTAssertEqual(step.readText(jsonLink), "{\"a\":2}\n", "readText")
-        XCTAssertTrue(step.fileExists(made.link), "fileExists")
-        XCTAssertNoThrow(try step.make())
+            XCTAssertEqual(step.readData(made.link), Data(published.utf8), "readData, outside: \(outside)")
+            XCTAssertEqual(try? step.readTextOrThrow(made.link), published, "readTextOrThrow, outside: \(outside)")
+            XCTAssertEqual(step.readText(jsonLink), "{\"a\":2}\n", "readText, outside: \(outside)")
+            XCTAssertNoThrow(try step.make(), "outside: \(outside)")
 
-        XCTAssertEqual(try String(contentsOf: made.target, encoding: .utf8), published, "write(_:to:plannedFrom:)")
-        XCTAssertEqual(try String(contentsOf: jsonTarget, encoding: .utf8), "{\"a\":2}\n", "editJSON")
-        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: made.link.path), made.target.path)
-        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: jsonLink.path), jsonTarget.path)
+            XCTAssertEqual(try String(contentsOf: made.target, encoding: .utf8), published, "write(_:to:plannedFrom:), outside: \(outside)")
+            XCTAssertEqual(try String(contentsOf: jsonTarget, encoding: .utf8), "{\"a\":2}\n", "editJSON, outside: \(outside)")
+            XCTAssertEqual(
+                try? FileManager.default.destinationOfSymbolicLink(atPath: made.link.path), made.target.path,
+                "write(_:to:plannedFrom:) did not leave the link a link, outside: \(outside)"
+            )
+            XCTAssertEqual(
+                try? FileManager.default.destinationOfSymbolicLink(atPath: jsonLink.path), jsonTarget.path,
+                "editJSON did not leave the link a link, outside: \(outside)"
+            )
+            try FileManager.default.removeItem(at: made.course.deletingLastPathComponent())
+        }
     }
 
     /// The line a step that cannot be named and is refused says.
