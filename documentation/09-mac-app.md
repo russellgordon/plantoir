@@ -23640,11 +23640,12 @@ only through a link OUTSIDE the working folder is re-pointed straight at the
 page's new name, the link outside untouched; a link reaching a class page the
 plan leaves is moved as itself, its text kept. Nothing is written through any
 of them, no title and no date (writing this class's date through the link is
-what gave Day 3 the wrong date in review B's probe). Two arrangements still
-refuse before anything changes, as before U4b3 ("cannot tell now";
-`firstLinkThatCannotBeMoved`), because each needs a link's text changed where
-it stands, which the door cannot do yet: a link reaching a renamed page only
-through a link INSIDE the working folder that is not a class page (Russell's
+what gave Day 3 the wrong date in review B's probe). Two arrangements are the
+exception, refused before anything changes ("cannot tell now";
+`firstLinkThatCannotBeMoved`), refusals added in U4b3 until the door can
+change a link's text where it stands, which it cannot do yet: a link reaching
+a renamed page only through a link INSIDE the working folder that is not a
+class page of this section (Russell's
 ruling: that link is re-pointed where it stands), and a class the plan only
 re-dates whose link reaches a renamed page.
 A later class whose link leads NOWHERE is never refused (Russell, 2026-11-26:

@@ -1,0 +1,3 @@
+M4 fix1 Swift: old removeTheLinksJustMade -> testTwoChainedRelinksKilledAtAnyMomentLoseNoLink 7 failures (chained-apply-beforeSwap(0): links [Day 1, nil, nil]). Restored, green.
+M5 fix1 Python: old remove_the_links_just_made -> test_recovery_cases_with_a_relink 2 failures (interrupted != rolledBack, interrupted != failed). Restored, OK.
+M6 fix2 Swift: old markdownFiles -> testARePointedLessonsWikiLinkIsRewrittenAtItsOwnPage refused(cannotTellNow Day 5); JournaledStepTests 2 failures. Restored, green.
