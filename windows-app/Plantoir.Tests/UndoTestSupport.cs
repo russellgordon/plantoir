@@ -263,9 +263,15 @@ internal sealed class UndoScribe : IDisposable
         Blobs = blobs,
     };
 
-    /// <summary>Every staged file or folder (<c>.plantoir-undo-</c> in its name) anywhere in a working folder.</summary>
+    /// <summary>
+    /// Every staged file or folder (<c>.plantoir-undo-</c> in its name) anywhere
+    /// in a working folder, never through a link (W8-6: a symbolic link holding
+    /// <c>../library</c>, forward slash kept, cannot be followed on Windows,
+    /// ERROR_INVALID_NAME, and what a link leads to is not the step's).
+    /// </summary>
     internal List<string> StagedLeftovers(string folder) =>
-        Directory.EnumerateFileSystemEntries(_folders[folder], "*", SearchOption.AllDirectories)
+        Directory.EnumerateFileSystemEntries(_folders[folder], "*",
+                     new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = false })
                  .Where(entry => Path.GetFileName(entry).Contains(UndoSwap.StagedMarker, StringComparison.Ordinal))
                  .ToList();
 

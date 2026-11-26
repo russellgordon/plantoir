@@ -103,6 +103,9 @@ internal sealed class UndoSeams
     /// <summary>A test's: clearing the Hidden attribute the swap set on the kept original at this index fails, as an attribute that will not take does (W7a part two, review 1, LOW 1).</summary>
     internal Func<int, bool>? ShowingTheKeptFileFailsAt { get; init; }
 
+    /// <summary>Called with the two full paths of every rename the swap makes, before it is tried (a test counts a capitalisation-only rename's renames, #899 W8-5).</summary>
+    internal Action<string, string>? EachRename { get; init; }
+
     /// <summary>The POSIX-semantics rename answers "not supported" (87), as on a network share, so every swap takes the fallback (M5).</summary>
     internal bool PosixRenameIsNotSupported { get; init; }
 
@@ -466,8 +469,10 @@ internal static class UndoSwap
                 if (target.Change is UndoSwapChange.MoveHere moving)
                 {
                     ownLeftOut = LetGoOwnFilesInside(moving.FromRelative);
-                    // And what the step's EARLIER swaps left inside it (U4b, M1; #899 W8-3).
-                    if (SeqOfLabel(label) is { } seq)
+                    // And what the step's EARLIER swaps left inside it (U4b, M1; #899 W8-3),
+                    // never inside a link's move: nothing of the step's is there,
+                    // and what the link leads to is never walked (U4b2-14; W8-6).
+                    if (moving.Op.LinkSha is null && SeqOfLabel(label) is { } seq)
                     {
                         foreach ((string inside, UndoCurrent absent) in StepsOwnFilesInside(moving.FromFull, seq))
                             ownLeftOut.TryAdd(inside, absent);
@@ -525,7 +530,7 @@ internal static class UndoSwap
         // differ in spelling, a place the op does not name that leads out is
         // still named, by the place it changes (as the mac's fallback).
         UndoSwapChange.MoveHere move => UndoPlaces.FirstPlaceLeadingOut(root, move.Op)
-            ?? (UndoPlaces.StaysInside(root, move.FromRelative) && UndoPlaces.StaysInside(root, target.RelativePath) ? null : target.RelativePath),
+            ?? (UndoPlaces.StaysInside(root, move.FromRelative, move.Op) && UndoPlaces.StaysInside(root, target.RelativePath, move.Op) ? null : target.RelativePath),
         _ => UndoPlaces.StaysInside(root, target.RelativePath) ? null : target.RelativePath,
     };
 
@@ -545,6 +550,22 @@ internal static class UndoSwap
                 // once it has moved (U4b2-10; #899 W8-4).
                 (UndoMoveSide atFrom, IReadOnlyList<string> foldersLeftOut) = UndoMoveSides.ReadNamingFoldersLeftOut(move.Op, move.FromFull, overriding: ownLeftOut);
                 UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath);
+                if (move.Op.IsCaseOnlyMove && UndoMoveSides.SpellingListed(move.FromFull, target.FullPath) is { } spelled)
+                {
+                    // One item under two spellings (U4b; W8-5): it goes in
+                    // only while its folder lists the spelling it leaves, and
+                    // the one rename then replaces nothing (measured on the
+                    // PC: MoveFileEx without MOVEFILE_REPLACE_EXISTING renames
+                    // Media to media, a folder or a file, and answers 0; it
+                    // answers 0 too when the folder already lists the new
+                    // spelling, so the listing, not the rename, decides).
+                    atTarget = spelled switch
+                    {
+                        UndoCaseOnlySpelling.From => UndoMoveSide.Free,
+                        UndoCaseOnlySpelling.CannotRead => UndoMoveSide.CannotRead,
+                        _ => UndoMoveSide.HoldsSomethingElse,
+                    };
+                }
                 // Named where a teacher finds the item now, as the plan's
                 // refusal names it (placeAsFound: the place it leaves; #899 W8-3).
                 if (atFrom == UndoMoveSide.CannotRead || atTarget == UndoMoveSide.CannotRead)
@@ -1038,6 +1059,7 @@ internal static class UndoSwap
     private static int RenameWithRetries(string from, string onto, bool replace, UndoSeams? seams)
     {
         int error = 0;
+        seams?.EachRename?.Invoke(from, onto);
         for (int attempt = 0; attempt < RenameTries; attempt++)
         {
             error = Rename(from, onto, replace, seams);

@@ -29,24 +29,43 @@ public sealed class UndoStackContractTests
         "movedFolder",
         // U4b2-10's (W8-4)
         "madeFolder", "foldersInside",
+        // U4b part C's (W8-5)
+        "caseOnlyFolder",
+        // U4b2-14's (W8-6)
+        "linkedFolder",
     };
 
+    /// <summary>Every case but those that lay a symbolic link (<see cref="LinkCases"/>).</summary>
     public static IEnumerable<object[]> Cases() =>
         UndoContract.Undo.GetProperty("stackCases").EnumerateArray()
+            .Where(stackCase => !LaysASymbolicLink(stackCase))
             .Select(stackCase => new object[] { stackCase.GetProperty("name").GetString()! });
+
+    /// <summary>
+    /// The cases whose calls lay a symbolic link holding <c>../library</c> as
+    /// written (<c>moveALinkToAFolder</c>, U4b2-14; #899 W8-6): run where this
+    /// account may make one, SKIPPED saying why where it may not (the VMs).
+    /// </summary>
+    public static IEnumerable<object[]> LinkCases() =>
+        UndoContract.Undo.GetProperty("stackCases").EnumerateArray()
+            .Where(LaysASymbolicLink)
+            .Select(stackCase => new object[] { stackCase.GetProperty("name").GetString()! });
+
+    private static bool LaysASymbolicLink(JsonElement stackCase) =>
+        stackCase.GetProperty("calls").EnumerateArray().Any(call => call.GetString() == "moveALinkToAFolder");
 
     [Fact]
     public void TheContractHoldsTheStackCases()
     {
         // 46 when W1 was written; a count that falls is a contract change to read, never a silent pass.
         Assert.True(UndoContract.Undo.GetProperty("stackCases").GetArrayLength() >= 46);
-        Assert.Equal(UndoContract.Undo.GetProperty("stackCases").GetArrayLength(), Cases().Count());
+        Assert.Equal(UndoContract.Undo.GetProperty("stackCases").GetArrayLength(), Cases().Count() + LinkCases().Count());
     }
 
     /// <summary>Every case held open by name is a case the contract still has (none since W6).</summary>
     [Fact]
     public void EveryHeldStackCaseIsStillInTheContract() =>
-        NamedGapLedger.StillNamed(NamedGapLedger.UndoStackCases, Cases().Select(row => (string)row[0]));
+        NamedGapLedger.StillNamed(NamedGapLedger.UndoStackCases, Cases().Concat(LinkCases()).Select(row => (string)row[0]));
 
     /// <summary>
     /// Every case, asserted in full, U2's calls and keys included (W6). A case
@@ -56,6 +75,11 @@ public sealed class UndoStackContractTests
     [Theory]
     [MemberData(nameof(Cases))]
     public void EveryStackCase(string name) => RunAsTheLedgerSays(name, NamedGapLedger.All, () => WalkTheCase(name));
+
+    /// <summary><see cref="EveryStackCase"/> for the cases that lay a symbolic link.</summary>
+    [SymbolicLinkTheory]
+    [MemberData(nameof(LinkCases))]
+    public void EveryLinkStackCase(string name) => RunAsTheLedgerSays(name, NamedGapLedger.All, () => WalkTheCase(name));
 
     /// <summary>
     /// One case, walked by <paramref name="walk"/>, held or not as
@@ -108,6 +132,10 @@ public sealed class UndoStackContractTests
             Assert.Equal(expectLast.GetString(), replay.Last);
         if (stackCase.TryGetProperty("movedFolder", out JsonElement movedFolder))
             Assert.Equal(movedFolder.GetString(), replay.MovedFolder());
+        if (stackCase.TryGetProperty("linkedFolder", out JsonElement linkedFolder))
+            Assert.Equal(linkedFolder.GetString(), replay.LinkedFolder());
+        if (stackCase.TryGetProperty("caseOnlyFolder", out JsonElement caseOnlyFolder))
+            Assert.Equal(caseOnlyFolder.GetString(), replay.CaseOnlyFolder());
         if (stackCase.TryGetProperty("madeFolder", out JsonElement madeFolder))
             Assert.Equal(madeFolder.GetString(), replay.MadeFolder());
         if (stackCase.TryGetProperty("foldersInside", out JsonElement foldersInside))
@@ -494,6 +522,45 @@ public sealed class UndoStackContractTests
                 case "finderRecordsAWindowInTheMadeFolder":
                     File.WriteAllBytes(_scribe.FullPath("A", RenamedFolder + "/sub/" + UndoTreeListing.IgnoredName), "Finder"u8.ToArray());
                     return;
+                // U4b part C (W8-5): a capitalisation-only rename carrying an edit inside.
+                case "renameAFolderInCaseOnly":
+                {
+                    if (CaseOnlySpellingListed() is null)
+                    {
+                        _scribe.WritePage("A", CaseOnlyOld + "/a.md", "Intro.\nLine one: old.\nEnd.\n"u8.ToArray());
+                        _scribe.WritePage("A", CaseOnlyOld + "/b.md", "B\n"u8.ToArray());
+                    }
+                    string listingSha = UndoTreeReading.Read(_scribe.FullPath("A", CaseOnlyOld)).ListingSha!;
+                    var move = new JsonObject { ["kind"] = "move", ["from"] = CaseOnlyOld, ["to"] = MediaFolder, ["listingSha"] = listingSha };
+                    Ops(new JsonArray(move, EditInside(MediaFolder + "/a.md")), []);
+                    return;
+                }
+                // U4b2-14 (W8-6): a symbolic link to a folder moved as itself.
+                case "moveALinkToAFolder":
+                {
+                    string media = _scribe.FullPath("A", LinkPlace);
+                    if (UndoLinks.Look(media) == UndoLinks.What.Nothing && UndoLinks.Look(_scribe.FullPath("A", LinkRenamed)) == UndoLinks.What.Nothing)
+                    {
+                        _scribe.WritePage("A", LinkLibrary + "/a.md", "A"u8.ToArray());
+                        _scribe.WritePage("A", LinkLibrary + "/pictures/b.md", "B"u8.ToArray());
+                        _libraryListing = UndoTreeReading.Read(_scribe.FullPath("A", LinkLibrary)).ListingSha;
+                        Directory.CreateDirectory(Path.GetDirectoryName(media)!);
+                        Directory.CreateSymbolicLink(media, LinkTarget);
+                    }
+                    Ops(new JsonArray(TheLinksMove()), []);
+                    return;
+                }
+                // Review 1 of U4b2-14: that link's move with an edit inside its new place, changing nothing.
+                case "stepEditingInsideALinksMove":
+                {
+                    long seq = _scribe.Fold().NextSeq;
+                    _scribe.Append(_scribe.BeginLine(seq, new JsonArray(TheLinksMove(), EditInside(LinkRenamed + "/a.md")), "A"));
+                    _scribe.Finish(seq);
+                    return;
+                }
+                case "spellTheFolderAnotherWay":
+                    Assert.Equal(0, UndoSwap.Rename(_scribe.FullPath("A", MediaFolder), _scribe.FullPath("A", "courses/TST1O/MEDIA"), replace: false));
+                    return;
                 case "addAFileInsideTheMovedFolder": _scribe.WritePage("A", RenamedFolder + "/c.md", "C\n"u8.ToArray()); return;
                 case "editThePageInsideByHand": _scribe.WritePage("A", RenamedFolder + "/a.md", "Hand.\n"u8.ToArray()); return;
                 // U4b, M1 (W8-3): the newest step's own kept original from an
@@ -594,6 +661,65 @@ public sealed class UndoStackContractTests
             Ops(ops, blobs);
         }
 
+        private const string CaseOnlyOld = "courses/TST1O/Media";
+
+        private const string LinkPlace = "courses/TST1O/section1/media";
+        private const string LinkRenamed = "courses/TST1O/section1/renamed";
+        private const string LinkLibrary = "courses/TST1O/library";
+        private const string LinkTarget = "../library";
+        private string? _libraryListing;
+
+        /// <summary>The link's move from section1/media to section1/renamed, its linkSha the SHA-256 of <c>../library</c> as written.</summary>
+        private static JsonObject TheLinksMove() => new()
+        {
+            ["kind"] = "move", ["from"] = LinkPlace, ["to"] = LinkRenamed,
+            ["linkSha"] = UndoCheck.Sha(Encoding.UTF8.GetBytes(LinkTarget)),
+        };
+
+        /// <summary><c>linkedFolder</c>: which place holds the link (renamed, media, both or neither), the target the link there holds (<c>notALink</c>), then whether the library holds what the call made.</summary>
+        internal string LinkedFolder()
+        {
+            string renamedFull = _scribe.FullPath("A", LinkRenamed);
+            string mediaFull = _scribe.FullPath("A", LinkPlace);
+            bool renamed = UndoLinks.Look(renamedFull) == UndoLinks.What.Link;
+            bool media = UndoLinks.Look(mediaFull) == UndoLinks.What.Link;
+            string place = renamed && media ? "both" : renamed ? "renamed" : media ? "media" : "neither";
+            string at = renamed ? renamedFull : mediaFull;
+            string target = UndoLinks.Look(at) == UndoLinks.What.Link ? new DirectoryInfo(at).LinkTarget ?? "notALink" : "notALink";
+            string library = _libraryListing is not null && UndoTreeReading.Read(_scribe.FullPath("A", LinkLibrary)).ListingSha == _libraryListing ? "untouched" : "changed";
+            return place + ", " + target + ", " + library;
+        }
+
+        /// <summary>The spelling courses/TST1O lists for the media folder, as spelled, or null when it lists none.</summary>
+        private string? CaseOnlySpellingListed()
+        {
+            string course = _scribe.FullPath("A", "courses/TST1O");
+            if (!Directory.Exists(course)) return null;
+            foreach (string entry in Directory.EnumerateFileSystemEntries(course))
+            {
+                string name = Path.GetFileName(entry);
+                if (string.Equals(name.ToLowerInvariant(), "media", StringComparison.Ordinal)) return name;
+            }
+            return null;
+        }
+
+        /// <summary><c>caseOnlyFolder</c>: the spelling courses/TST1O lists for the folder (Media, media, MEDIA or none), then what its a.md holds, as <c>movedFolder</c> says it.</summary>
+        internal string CaseOnlyFolder()
+        {
+            string? spelled = CaseOnlySpellingListed();
+            string? text = spelled is null ? null : UndoKindsForTheCases.Text(_scribe.Page("A", "courses/TST1O/" + spelled + "/a.md"));
+            return (spelled ?? "none") + ", " + Holds(text);
+        }
+
+        private static string Holds(string? text) => text switch
+        {
+            null => "none",
+            "Intro.\nLine one: new.\nEnd.\n" => "new",
+            "Intro.\nLine one: old.\nEnd.\n" => "old",
+            "Hand.\n" => "byHand",
+            _ => "something else: " + text,
+        };
+
         /// <summary>Where the moved folder is now: renamed if it is there, else media.</summary>
         private string MovedFolderNow() => Directory.Exists(_scribe.FullPath("A", RenamedFolder)) ? RenamedFolder : MediaFolder;
 
@@ -628,15 +754,7 @@ public sealed class UndoStackContractTests
             bool media = Directory.Exists(_scribe.FullPath("A", MediaFolder));
             string place = renamed && media ? "both" : renamed ? "renamed" : media ? "media" : "neither";
             string? text = UndoKindsForTheCases.Text(_scribe.Page("A", (renamed ? RenamedFolder : MediaFolder) + "/a.md"));
-            string holds = text switch
-            {
-                null => "none",
-                "Intro.\nLine one: new.\nEnd.\n" => "new",
-                "Intro.\nLine one: old.\nEnd.\n" => "old",
-                "Hand.\n" => "byHand",
-                _ => "something else: " + text,
-            };
-            return place + ", " + holds;
+            return place + ", " + Holds(text);
         }
 
         /// <summary>
