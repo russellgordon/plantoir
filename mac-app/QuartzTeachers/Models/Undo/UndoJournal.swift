@@ -146,25 +146,69 @@ nonisolated final class UndoJournal: @unchecked Sendable {
         return try UndoIdentifierFile.readOrCreate(at: computerIDFileURL)
     }
 
-    /// Segment numbers present, in order.
+    /// Segment numbers present, in order. A folder that is not there is no
+    /// segments; one that is there and cannot be listed throws
+    /// `couldNotRead`, never an empty list (#1004-a).
     func segmentNumbers() throws -> [Int] {
         var numbers: [Int] = []
-        let names: [String]
-        do {
-            names = try FileManager.default.contentsOfDirectory(atPath: folderURL.path)
-        } catch {
-            if !FileManager.default.fileExists(atPath: folderURL.path) {
-                return []
-            }
-            throw error
-        }
-        for name in names {
+        for name in try UndoJournal.namesListed(in: folderURL) {
             if let number = UndoJournal.segmentNumber(inName: name) {
                 numbers.append(number)
             }
         }
         numbers.sort()
         return numbers
+    }
+
+    /// The names in a folder of the list, listed with `opendir` and
+    /// `readdir` so the failure is the folder's own `errno`: only `ENOENT`
+    /// or `ENOTDIR` (no such folder) is no names, and anything else throws
+    /// `couldNotRead`. Not `FileManager.contentsOfDirectory` with
+    /// `fileExists`: `fileExists` answers false for a folder it may not
+    /// look at, and measured on macOS 26 (#1004-a) Foundation reports a
+    /// folder whose parent may not be searched (`EACCES`) as Cocoa's
+    /// `fileReadNoSuchFile` over `fnfErr`, so neither can tell a folder
+    /// that is not there from one that is out of reach.
+    static func namesListed(in folder: URL) throws -> [String] {
+        var failure: Int32 = 0
+        let directory: UnsafeMutablePointer<DIR>? = folder.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                failure = ENOENT
+                return nil
+            }
+            let opened: UnsafeMutablePointer<DIR>? = opendir(path)
+            if opened == nil {
+                failure = errno
+            }
+            return opened
+        }
+        guard let directory else {
+            if failure == ENOENT || failure == ENOTDIR {
+                return []
+            }
+            throw UndoJournalError.couldNotRead
+        }
+        defer {
+            closedir(directory)
+        }
+        var names: [String] = []
+        while true {
+            errno = 0
+            guard let entry = readdir(directory) else {
+                if errno != 0 {
+                    throw UndoJournalError.couldNotRead
+                }
+                break
+            }
+            let length: Int = Int(entry.pointee.d_namlen)
+            let name: String = withUnsafeBytes(of: entry.pointee.d_name) { bytes in
+                return String(decoding: bytes.prefix(length), as: UTF8.self)
+            }
+            if name != "." && name != ".." {
+                names.append(name)
+            }
+        }
+        return names
     }
 
     func segmentURL(number: Int) -> URL {
@@ -361,6 +405,7 @@ nonisolated enum UndoFoldCache {
 
         let numbers: [Int] = try journal.segmentNumbers()
         UndoKillPoints.afterTheSegmentsAreListed?(journal.folderURL)
+        let newestListed: Int? = numbers.last
         var entry: Entry
         let readingOn: Bool
         if let cached, stillValid(cached, numbers: numbers, journal: journal) {
@@ -387,10 +432,17 @@ nonisolated enum UndoFoldCache {
         for number in numbers {
             let from: Int = entry.ends[number] ?? 0
             let url: URL = journal.segmentURL(number: number)
-            // Only a segment that is gone (pruned by another process since
-            // it was listed) is passed over; one that cannot be opened or
-            // measured is an unreadable list (the review of U2a, MEDIUM).
+            // Only an OLDER segment that is gone (pruned from the oldest end
+            // by another process since it was listed) is passed over; one
+            // that cannot be opened or measured is an unreadable list (the
+            // review of U2a, MEDIUM). The newest listed is never pruned, so
+            // the newest gone was taken by something else (a sync service,
+            // a person), and a fold without it would reuse step numbers: an
+            // unreadable list too (#1004-a; Windows' `ReadSegments` the same).
             guard let handle = try UndoFileReads.openFile(url) else {
+                if number == newestListed {
+                    throw UndoJournalError.couldNotRead
+                }
                 continue
             }
             let size: UInt64
@@ -824,6 +876,15 @@ nonisolated enum UndoFileReads {
     /// The whole of a small file of the list (a blob, an identifier file),
     /// or nil when it is gone. Throws when it is there and cannot be read.
     static func readWhole(_ url: URL) throws -> Data? {
+        return try readWholeWithStatus(url)?.data
+    }
+
+    /// The whole of a small file of the list and the status (`fstat`) of
+    /// the very descriptor that read it, so what is known of the file
+    /// (its number, size and time) is known of the file whose bytes these
+    /// are, never of whatever holds the name a moment later (#1004-a). Nil
+    /// when it is gone; a throw when it is there and cannot be read.
+    static func readWholeWithStatus(_ url: URL) throws -> (data: Data, status: stat)? {
         guard let handle = try openFile(url) else {
             return nil
         }
@@ -838,7 +899,11 @@ nonisolated enum UndoFileReads {
             }
             data.append(chunk)
         }
-        return data
+        var status: stat = stat()
+        if fstat(handle.fileDescriptor, &status) != 0 {
+            throw UndoJournalError.couldNotRead
+        }
+        return (data: data, status: status)
     }
 
     /// Up to `count` bytes from where the handle stands; empty at the end.
@@ -991,8 +1056,45 @@ nonisolated enum UndoFiles {
 /// younger than that is a creator at work: not yet, and the next attempt
 /// reads its identifier. Setting aside never takes a good identifier: the
 /// file must still be the one inspected, and a file found to hold one once
-/// it is aside is put back (the contract review's second MINOR 6).
+/// it is aside is put back (the contract review's second MINOR 6). The file
+/// inspected is the file whose bytes were read, known by the number the
+/// descriptor that read them answers, never by a second look at the name
+/// (#1004-a): the name is compared with it just before the rename, and the
+/// file moved is compared with it just after.
 nonisolated enum UndoIdentifierFile {
+
+    /// A file on its volume, whatever its name.
+    struct FileIdentity: Equatable {
+
+        // MARK: - Stored properties
+
+        var device: UInt64
+
+        var number: UInt64
+
+        // MARK: - Initializer
+
+        init(_ status: stat) {
+            device = UInt64(UInt32(bitPattern: status.st_dev))
+            number = UInt64(status.st_ino)
+        }
+    }
+
+    /// What one read of an identifier file found, all of it from the
+    /// descriptor that read the bytes.
+    struct Inspection {
+
+        // MARK: - Stored properties
+
+        /// The identifier, lower case, or nil when the bytes hold none.
+        var identifier: String?
+
+        var file: FileIdentity
+
+        var size: Int
+
+        var modified: Date
+    }
 
     // MARK: - Stored properties
 
@@ -1005,20 +1107,21 @@ nonisolated enum UndoIdentifierFile {
         // A file that is there and cannot be read (not one that holds no
         // identifier) is never set aside: a new identifier would put every
         // step under the old one out of reach for good (the review of U2a).
-        if let existing = try readStrictly(at: url) {
+        let inspection: Inspection? = try inspect(at: url)
+        if let existing = inspection?.identifier {
             return existing
         }
         UndoKillPoints.afterAnIdentifierFileIsRead?(url)
         let folder: URL = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) {
-            let size: Int = (attributes[.size] as? NSNumber)?.intValue ?? 0
-            let changed: Date = (attributes[.modificationDate] as? Date) ?? Date.distantPast
-            if size == 0 && Date().timeIntervalSince(changed) < emptyFileGraceSeconds {
+        if let inspection {
+            // Its size, time and number are the read's own (`fstat` of the
+            // descriptor that read it), so a file put at the name since is
+            // never the one judged (#1004-a).
+            if inspection.size == 0 && Date().timeIntervalSince(inspection.modified) < emptyFileGraceSeconds {
                 throw UndoJournalError.identifierBeingMade
             }
-            let inspected: UInt64 = UndoFoldCache.fileNumber(of: url)
-            if let good = setAside(url, ifStillFileNumber: inspected) {
+            if let good = setAside(url, ifStillTheFileRead: inspection.file) {
                 return good
             }
         }
@@ -1071,9 +1174,27 @@ nonisolated enum UndoIdentifierFile {
     /// The identifier, lower case, or nil when the file is missing or does
     /// not hold one; a throw when it is there and cannot be read.
     static func readStrictly(at url: URL) throws -> String? {
-        guard let data = try UndoFileReads.readWhole(url) else {
+        return try inspect(at: url)?.identifier
+    }
+
+    /// One read of the file: its identifier (or none) and what the
+    /// descriptor that read it says of the file. Nil when the file is
+    /// missing; a throw when it is there and cannot be read.
+    static func inspect(at url: URL) throws -> Inspection? {
+        guard let read = try UndoFileReads.readWholeWithStatus(url) else {
             return nil
         }
+        let seconds: Double = Double(read.status.st_mtimespec.tv_sec) + Double(read.status.st_mtimespec.tv_nsec) / 1_000_000_000
+        return Inspection(
+            identifier: identifier(in: read.data),
+            file: FileIdentity(read.status),
+            size: Int(read.status.st_size),
+            modified: Date(timeIntervalSince1970: seconds)
+        )
+    }
+
+    /// The identifier the bytes hold, lower case, or nil.
+    static func identifier(in data: Data) -> String? {
         var text: String = String(decoding: data, as: UTF8.self)
         if text.unicodeScalars.first == "\u{FEFF}" {
             text = String(String.UnicodeScalarView(text.unicodeScalars.dropFirst()))
@@ -1085,13 +1206,34 @@ nonisolated enum UndoIdentifierFile {
         return parsed.uuidString.lowercased()
     }
 
+    /// The file the name holds itself (a link is not followed), or nil
+    /// when nothing can be looked at there.
+    static func identity(at url: URL) -> FileIdentity? {
+        var status: stat = stat()
+        let result: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &status)
+        }
+        if result != 0 {
+            return nil
+        }
+        return FileIdentity(status)
+    }
+
     /// Moves a file that holds no identifier out of the way, keeping it,
-    /// only while it is still the file inspected. If what was moved turns
-    /// out to hold an identifier after all (another process made it between
-    /// the look and the move), it is put back where nothing has taken its
-    /// place since, and that identifier is the answer.
-    static func setAside(_ url: URL, ifStillFileNumber inspected: UInt64) -> String? {
-        if inspected == 0 || UndoFoldCache.fileNumber(of: url) != inspected {
+    /// only while the name still holds the very file read (`inspected`,
+    /// from the descriptor that read it). macOS has no rename by
+    /// descriptor, so the name is compared immediately before the rename,
+    /// and the file moved is compared again just after it: the window left
+    /// is the moment between that last look and the rename, the smallest a
+    /// rename by path allows. A file moved that is not the file read, or
+    /// that turns out to hold an identifier after all (another process
+    /// made it in that moment), is put back where nothing has taken its
+    /// place since, and any identifier it holds is the answer.
+    static func setAside(_ url: URL, ifStillTheFileRead inspected: FileIdentity) -> String? {
+        if identity(at: url) != inspected {
             return read(at: url)
         }
         let asideURL: URL = url.deletingLastPathComponent()
@@ -1100,7 +1242,9 @@ nonisolated enum UndoIdentifierFile {
         if (try? FileManager.default.moveItem(at: url, to: asideURL)) == nil {
             return read(at: url)
         }
-        guard let identifier = read(at: asideURL) else {
+        let movedTheFileRead: Bool = identity(at: asideURL) == inspected
+        let identifier: String? = read(at: asideURL)
+        if movedTheFileRead && identifier == nil {
             return nil
         }
         UndoKillPoints.beforeAnIdentifierFileIsPutBack?(url)

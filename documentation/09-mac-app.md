@@ -23033,6 +23033,35 @@ links. `undo.rule.shadow` no longer promises that pieces 14 and 15 settle a
 linked PAGE: they move a link only for Rename folder's folder, and Insert
 Class on the Mac still refuses renaming a later class that is a link. Review 1: the listing's `link` line takes its hash from the same `linkSha(at:)`; two `stackCases` rows (call `renameAPerSectionFolderThatIsALink`) run Rename folder's own plan on a linked section folder, held on Windows for W8; and a dangling link is skipped, as before U4b, while a link to another place of the same rename is moved as a link.
 
+### #1004-a: the journal's own files are judged by what was read
+
+A file of the list is judged only by the bytes actually read from it. A
+`folder-id` or `computer-id` that holds no identifier is now known by the
+file number, size and time of the descriptor that read it
+(`UndoFileReads.readWholeWithStatus`, `fstat`), never by a second look at
+the name: before, a good file put at the name between the read and that
+look was the one moved aside, and a third file taking the name before the
+put-back stranded every step under the good identifier. macOS has no rename
+by descriptor (Windows renames through the handle it compared), so the name
+is compared just before the rename and the file moved just after; a file
+that is not the one read is put back. The window left is the instant
+between that last `lstat` and the rename. In `UndoFoldCache.read`, a
+segment gone between the listing and its open is passed over only when it
+is not the newest listed (pruning never deletes the newest), as Windows'
+`ReadSegments` does; the newest gone is an unreadable list, never a shorter
+fold that would reuse step numbers (stack row "#1004: the newest segment
+gone after the list was listed", call `newestSegmentGoesWhileRead`). And
+`segmentNumbers` lists with `opendir` and decides from its own `errno`: only
+`ENOENT` or `ENOTDIR` is no segments, anything else is `couldNotRead`.
+Neither of Foundation's answers can tell: `fileExists` answers false for a
+folder it may not look at, and, measured on macOS 26, `contentsOfDirectory`
+reports a folder whose parent may not be searched (`EACCES`) as Cocoa's
+`fileReadNoSuchFile` (260) over `fnfErr`, so reading "the underlying error"
+would have kept the bug. A race between a read and a rename has no fair contract row (no
+replay can place the swap at the same instant on both platforms): the
+folder-id rule is held by `undoJournal.identifierFiles.unreadable` and
+`UndoJournalCoreTests`.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
