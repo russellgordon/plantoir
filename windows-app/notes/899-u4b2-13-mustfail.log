@@ -14,3 +14,8 @@ restored: git checkout scripts/make_undo_traces.py; git status clean
 	 Executed 19 tests, with 1 failure (0 unexpected) in 17.729 (17.732) seconds
 failing lines in the message: 'the step is rolledBack, not interrupted', 'the moved folder is media, old, not renamed, byHand'
 restored: git checkout mac-app/Tests/QuartzTeachersTests/UndoContractReplayKinds.swift; git status clean
+
+== M3 (review 1, LOW 2): Mac product, settle leaves a move out of opsToPutBack whenever a place is in the way (UndoRecovery.swift, the opsToPutBack loop)
+	 Executed 19 tests, with 1 failure (0 unexpected) in 17.160 (17.164) seconds
+failing line: UndoJournalContractTests.swift:142, recoveryCases row 1 ('... the step is interrupted naming the second'): the moved folder is renamed, old (not media, old); no other row failed
+restored: git checkout mac-app/QuartzTeachers/Models/Undo/UndoRecovery.swift; git status clean

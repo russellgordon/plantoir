@@ -14,7 +14,7 @@ Branch `issue/899-u4b2-13-model-recover-hand-edits`, from `origin/issue/899-u4b2
 
 ## For documentation 12
 
-- **Held:** both new rows, in `NamedGapLedger.cs`, area `UndoRecoveryCases`, under `Reason899W8U4b`, appended to the existing U4b recovery `Owed` list (2 rows; names checked by script, each appears once, byte for byte). The reason text was not changed: it already names the `recoveryCases` key `withAMovedFolder`, and leaving the string alone keeps piece 14's merge from meeting a third tail on it.
+- **Held:** both new rows, in `NamedGapLedger.cs`, area `UndoRecoveryCases`, under a reason of their own, `Reason899W8U4b2HandEditCarried` (review 1, LOW 4: it names the put-back rule, a carried page changed by hand putting its move in the way, and `handEdit: carried`), in an `Owed` entry of its own after the U4b recovery list (2 rows; names checked by script, each appears once, byte for byte). `Reason899W8U4b`'s shared sentence is untouched, and the U4b list's last line is back as piece 12 left it, so piece 14's merge meets nothing new.
 - **Why each still fails on Windows and is not red:** `UndoRecoveryContractTests.Walk` asserts every key of a row is in `KeysChecked` before it does anything, and `withAMovedFolder` is not among them, so each row fails with "a key this replay does not check: withAMovedFolder", which is the gap text `HeldCaseStillStopsAtItsGap` is given. `EveryHeldRecoveryCaseIsStillInTheContract` holds (both names exist); `TheContractHoldsTheRecoveryCases` asks `>= 41` and a self-consistent count, so 62 passes.
 - **What W3/W8 owe (check):** Windows' recovery must put back every place not in the way when another is (W3 may already: check against the two plain-page rows "a step dies part way and the page it had not reached is changed by hand" and "an undo dies part way ...", which Windows already runs). W8, once it reads `withAMovedFolder`: make `handEdit: carried` as `recoveryCasesHow` says (a.md under `courses/TST1O/renamed` if that folder exists, else under `media`; every line starting `Line one: ` set to `Line one: by hand.`), and judge a move carrying a page that is neither as in the way (its listing then matches neither side); the interrupted line names the move by its `from` (`placeName`), then the page by its path. Refuse an unknown `handEdit` value rather than skipping it.
 
@@ -27,7 +27,9 @@ Log: `windows-app/notes/899-u4b2-13-mustfail.log`. Each restored with `git check
 | M1 | Python: `recover`'s old early return (any place in the way: interrupted, nothing put back) | RED: `test_recovery_cases_with_a_moved_folder`, both new rows (the first page still `publish: true`), 2 failures |
 | M2 | Mac replay: `editTheCarriedPageByHand` writes nothing | RED: `UndoJournalContractTests.swift:142`, the carried row: "the step is rolledBack", "the moved folder is media, old" |
 
-2 of 2 RED. Python red first: before the fix (with only `recover`'s answer widened to three values), exactly the two new rows failed (`.dd/py-red.log`, `failures=2`); that run is the same sabotage as M1.
+| M3 | Mac product (review 1, LOW 2): settle leaves a move out of `opsToPutBack` whenever a place is in the way | RED: `UndoJournalContractTests.swift:142`, row 1 only: "the moved folder is renamed, old" |
+
+3 of 3 RED. Python red first: before the fix (with only `recover`'s answer widened to three values), exactly the two new rows failed (`.dd/py-red.log`, `failures=2`); that run is the same sabotage as M1.
 
 ## Runs
 
@@ -50,7 +52,17 @@ Logs in `/Users/russellgordon/plantoir/wt-899-u4b2-13/.dd/`.
 - `placeResolvingOnlyAbove` (`JournaledStep.swift`, about line 1114): the walk stops at the first ancestor whose canonical path is the course's, so `section1/self -> <course>` makes `section1/self/Concepts/Arrays.md` keyed as `<course>/Concepts/Arrays.md`. It changes only the order of relinked pages, never what is written. A test: a course with that link and two pages, `inPathOrder` must order by `section1/self/...` as written.
 - The known gap is still U7's: a step killed after its edit inside the folder went in, then a page edited by hand elsewhere: the put-back plan does not leave the step's own kept copy inside the folder out, so the folder is refused too and the step closes interrupted with nothing put back. Neither new row is that case (row 1 stops before the edit inside is swapped, row 2 too), and the Python model, which holds no staged files, would put the pages back there: the model and the Mac would differ in that one case, which is why no row reaches it.
 
+## Review 1 (fixes)
+
+- LOW 1: `recover`'s docstring names its two known differences from settle (external targets named; no staged files, the U7 gap) and why no row run through the model reaches them.
+- LOW 2: M3 above, a product sabotage that turns row 1 red on the Mac.
+- LOW 3: a `handEdit` that is not a string fails the row on the Mac (`UndoContractReplay.runRecoveryCases`), never skipped.
+- LOW 4: the reason of their own, above.
+- Runs: Python 36 OK, `--check` current, `run-green2.log` 19 tests 0 failures, `run-mf3.log` M3.
+
 ## For the director
+
+- **For W8 (review 1, LOW 5, Windows test code, not changed here):** `windows-app/Plantoir.Tests/UndoRecoveryContractTests.cs` lines 74 to 79 (`PathOf` passes an unknown name through as a path) and 201 to 205 (the hand edit reads that path): an unknown `handEdit` value fails with a bare null reference. When W8 adds `withAMovedFolder` to `KeysChecked`, refuse an unknown `handEdit` by name ("a handEdit value this replay does not know"), as the Mac does, and teach it `carried`.
 
 - `contracts/` changed: `shared-rules.json` only (two `recoveryCases` rows, one sentence in `recoveryCasesHow`). Both gates.
 - Ledger: 2 rows added, nothing else under `windows-app/Plantoir.*`.
