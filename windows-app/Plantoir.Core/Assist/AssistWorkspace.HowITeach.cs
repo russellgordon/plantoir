@@ -270,7 +270,7 @@ public sealed partial class AssistWorkspace
                 MakeTheUndoStep(step);
             }
             catch (UndoStepRefusedException refused) when (refused.Refusal.Kind == UndoRefusalKind.ChangedSince ||
-                                                           (created && HowITeachPage.ExistingPath(planned.Course.DirectoryPath) is not null))
+                                                           (planned.ExistingPath is null && HowITeachPage.ExistingPath(planned.Course.DirectoryPath) is not null))
             {
                 // A page that appeared, or changed, after the plan read it:
                 // never written over, and said as it always was. A NEW page
@@ -278,6 +278,9 @@ public sealed partial class AssistWorkspace
                 // refused by the rename itself ("in use" to the door), and is
                 // the same case: a page is there that the plan did not see
                 // (W7b2-4 review 1, LOW 2; the row opens it the same way).
+                // Only when the plan saw NO page: a started page with no
+                // words did not appear, and its refusals say their own
+                // reason (review 2, MEDIUM).
                 throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(planned.Course.Code));
             }
             catch (UndoStepLeftPartWayException partWay)

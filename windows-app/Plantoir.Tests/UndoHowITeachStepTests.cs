@@ -242,6 +242,25 @@ public sealed class UndoHowITeachStepTests : IDisposable
         Assert.Empty(_today.Entries);
     }
 
+    /// <summary>
+    /// A page the teacher started (no words yet) that the door refuses for
+    /// another reason: the plan saw that page, so it did not appear, and the
+    /// refusal says its own reason as "Nothing was saved: …", never
+    /// today's changed-since sentence (review 2, MEDIUM).
+    /// </summary>
+    [Fact]
+    public void AStartedPageRefusedForAnotherReasonSaysNothingWasSaved()
+    {
+        Assert.Equal(HowITeachSettingsRow.Outcome.Created, Press().Outcome);
+        var unwritable = new UndoSeams { StagingWriteFailsAt = index => index == 0 };
+
+        var refusal = Assert.Throws<AssistRefusal>(() => Open(unwritable).WriteHowITeach("ICS3U", "Words.", ""));
+
+        Assert.StartsWith("Nothing was saved: ", refusal.Message);
+        Assert.NotEqual(AssistWording.HowITeachChangedSincePlanned("ICS3U"), refusal.Message);
+        Assert.Equal(HowITeachSettingsRow.CreatedBytes, File.ReadAllText(PagePath));
+    }
+
     [Fact]
     public void TheSameWordsAgainMakeNoStepAndNoWrite()
     {
