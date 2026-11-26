@@ -79,27 +79,26 @@ public sealed class UndoMenuDuplicateStepTests : IDisposable
     }
 
     /// <summary>
-    /// A page that appears at the new name after the plan, at the door's
-    /// check or in the last instant before the rename: refused with today's
-    /// sentence (menuTheNextPageIsAlreadyThere), the page left as it is, no
-    /// step applied, nothing else written.
+    /// A page that appears at the new name after the step was planned, in
+    /// the last instant before the rename (the exclusive create's own case):
+    /// refused with today's sentence (menuTheNextPageIsAlreadyThere), the
+    /// page left as it is, no step applied, nothing else written. A page
+    /// there before the plan is made again is refused as changed while
+    /// saving a copy (AddClassContractTests.APageThatAppearedSinceThePlanIsNeverWrittenOver).
     /// </summary>
-    [Theory]
-    [InlineData("beforeTheBegin")]
-    [InlineData("beforeTheSwap")]
-    public void APageThatAppearedAtTheNewNameIsNeverWrittenOver(string when)
+    [Fact]
+    public void APageThatAppearedAtTheNewNameIsNeverWrittenOver()
     {
         WindowsActionsOnTheMacFixture.Lay(Folder, Recorded);
         string target = Page("Unit 2, Day 2");
         const string teachers = "---\ntitle: Unit 2, Day 2\n---\n\nMy own page.\n";
-        void Appear()
+        var workspace = Workspace(new UndoSeams
         {
-            if (!File.Exists(target)) File.WriteAllText(target, teachers);
-        }
-        var seams = when == "beforeTheBegin"
-            ? new UndoSeams { BeforeTheBegin = Appear }
-            : new UndoSeams { BeforeEachSwap = (_, _) => Appear() };
-        var workspace = Workspace(seams);
+            BeforeEachSwap = (_, _) =>
+            {
+                if (!File.Exists(target)) File.WriteAllText(target, teachers);
+            },
+        });
         var request = workspace.PlanMenuDuplicate("ICS3U", 1, SourcePath);
         List<string> before = WindowsActionsOnTheMacFixture.EveryFileBut(Section, ListFolder);
 
@@ -107,9 +106,9 @@ public sealed class UndoMenuDuplicateStepTests : IDisposable
 
         Assert.Equal(AssistWording.MenuTheNextPageIsAlreadyThere("Unit 2, Day 2"), refused.Message);
         Assert.Equal(teachers, File.ReadAllText(target));
-        List<string> after = WindowsActionsOnTheMacFixture.EveryFileBut(Section, ListFolder);
-        after.Remove(Path.GetFullPath(target));
-        before.Remove(Path.GetFullPath(target));
+        var after = new List<string>();
+        foreach (string file in WindowsActionsOnTheMacFixture.EveryFileBut(Section, ListFolder))
+            if (!file.StartsWith("All Classes/Unit 2, Day 2.md ", StringComparison.Ordinal)) after.Add(file);
         Assert.Equal(before, after);
         Assert.Empty(WindowsActionsOnTheMacFixture.AppliedBegins(ListFolder));
         Assert.Empty(_history.Entries);

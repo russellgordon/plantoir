@@ -39,7 +39,7 @@ public sealed class UndoUnchangedFileSkipTests : IDisposable
         return paths;
     }
 
-    /// <summary>The door alone: a draft holding an unchanged file names no op for it.</summary>
+    /// <summary>The door alone: a draft holding an unchanged file names no op for it and never swaps it.</summary>
     [Fact]
     public void TheDoorNamesNoOpForAFileHandedToItUnchanged()
     {
@@ -48,11 +48,18 @@ public sealed class UndoUnchangedFileSkipTests : IDisposable
         const string unchanged = "courses/TST1O/section1/b.md";
         scribe.WritePage("A", changed, Encoding.UTF8.GetBytes("A\n"));
         scribe.WritePage("A", unchanged, Encoding.UTF8.GetBytes("B\n"));
+        // Its last write set in the past: a swap of its same bytes would
+        // stamp it now (the swap copies the creation time, not this).
+        var longAgo = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(scribe.FullPath("A", unchanged), longAgo);
 
         Assert.NotNull(scribe.Step("A", [(changed, Encoding.UTF8.GetBytes("A, changed\n")), (unchanged, Encoding.UTF8.GetBytes("B\n"))]));
 
         JsonObject begin = Assert.Single(WindowsActionsOnTheMacFixture.AppliedBegins(scribe.JournalFolder));
         Assert.Equal(new List<string> { changed }, OpPaths(begin));
+        // Never swapped: the line names no op for identical bytes either way
+        // (UndoLineOps.ForAFile), so the door's skip shows only here.
+        Assert.Equal(longAgo, File.GetLastWriteTimeUtc(scribe.FullPath("A", unchanged)));
     }
 
     /// <summary>

@@ -301,7 +301,7 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
 
     /// <summary>
     /// W7b2-8 review 1, L1: a section page another program changes after the
-    /// press was planned is refused by the door, and said as the mac says it
+    /// press was planned (in the last instant before its swap) is refused by the door, and said as the mac says it
     /// (<c>linksChecklist.wording.pageChangedSince</c>, the page named as the
     /// sheet names it), never "Nothing was changed: …" with the door's words.
     /// </summary>
@@ -310,7 +310,15 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
     {
         string worksheet = _pages["Worksheet"];
         string byHand = File.ReadAllText(worksheet) + "\nWritten by hand meanwhile.\n";
-        AssistWorkspace workspace = Open(seams: new UndoSeams { BeforeTheBegin = () => File.WriteAllText(worksheet, byHand) });
+        AssistWorkspace workspace = Open(seams: new UndoSeams
+        {
+            BeforeEachSwap = (_, path) =>
+            {
+                if (string.Equals(Path.GetFullPath(path), Path.GetFullPath(worksheet), StringComparison.OrdinalIgnoreCase)
+                    && File.ReadAllText(worksheet) != byHand)
+                    File.WriteAllText(worksheet, byHand);
+            },
+        });
         LinksChecklistSheet sheet = Sheet(workspace);
 
         var refusal = Assert.Throws<AssistRefusal>(() => workspace.PublishAndRemember(sheet));
