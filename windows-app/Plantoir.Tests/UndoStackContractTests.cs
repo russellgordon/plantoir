@@ -23,6 +23,8 @@ public sealed class UndoStackContractTests
         "markers", "folderKept", "rederived", "nothingMovedOutside",
         // U3c's (W4c)
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "why",
+        // U4b2-2's (W8-1)
+        "refusalNamed",
     };
 
     public static IEnumerable<object[]> Cases() =>
@@ -100,6 +102,8 @@ public sealed class UndoStackContractTests
             Assert.Equal(Seqs(interrupted), folded.Steps.Values.Where(step => step.State == UndoStepState.Interrupted).Select(step => step.Seq).ToList());
         if (stackCase.TryGetProperty("expectLast", out JsonElement expectLast))
             Assert.Equal(expectLast.GetString(), replay.Last);
+        if (stackCase.TryGetProperty("refusalNamed", out JsonElement refusalNamed))
+            Assert.Equal(refusalNamed.GetString(), replay.RefusalNamed);
         if (stackCase.TryGetProperty("cleared", out JsonElement cleared))
             Assert.Contains(cleared.GetString(), replay.Clearings.Select(clearing => clearing.Reason));
         if (stackCase.TryGetProperty("clearedSeq", out JsonElement clearedSeq))
@@ -170,6 +174,9 @@ public sealed class UndoStackContractTests
 
         internal string? Last { get; private set; }
 
+        /// <summary>The first place the last undo or redo's changedSince refusal named (<c>refusalNamed</c>); null when it was not so refused.</summary>
+        internal string? RefusalNamed { get; private set; }
+
         /// <summary>Where <c>linkItsOldFolderOutside</c> points: a folder beside the working folder.</summary>
         internal string Outside => _scribe.FullPath("A", "").TrimEnd(Path.DirectorySeparatorChar) + "-outside";
         internal List<(string Reason, long Seq)> Clearings { get; } = [];
@@ -223,10 +230,17 @@ public sealed class UndoStackContractTests
                 {
                     UndoScribe.Outcome outcome = _scribe.Undo();
                     Last = outcome.Name;
+                    RefusalNamed = outcome.Name == "changedSince" ? outcome.Page : null;
                     if (outcome.Cleared is { } reason) Clearings.Add((reason, outcome.ClearedSeq!.Value));
                     return;
                 }
-                case "redo": Last = _scribe.Redo().Name; return;
+                case "redo":
+                {
+                    UndoScribe.Outcome outcome = _scribe.Redo();
+                    Last = outcome.Name;
+                    RefusalNamed = outcome.Name == "changedSince" ? outcome.Page : null;
+                    return;
+                }
                 case "editTheLineByHand":
                 {
                     string text = UndoCheck.DecodeStrictly(_scribe.Page("A", _p1)!)!;
@@ -436,16 +450,12 @@ public sealed class UndoStackContractTests
                     Ops(new JsonArray(UndoKindsForTheCases.MoveFile(UndoKindsForTheCases.AsidePage, UndoKindsForTheCases.AsidePageMoved, "page\n"u8.ToArray())), []);
                     return;
                 }
-                case "linkItsOldFolderOutside":
-                {
-                    // The folder the page was moved out of, replaced by a
-                    // junction to a folder outside the working folder.
-                    string old = _scribe.FullPath("A", "courses/TST1O/old");
-                    if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
-                    Directory.CreateDirectory(Outside);
-                    UndoKindsForTheCases.MakeAJunction(old, Outside);
-                    return;
-                }
+                case "linkItsOldFolderOutside": LinkOutside("courses/TST1O/old"); return;
+                // U4b2-2 (W8-1): the folder the page was moved into, replaced
+                // by a junction to the same folder outside.
+                case "linkItsNewFolderOutside": LinkOutside("courses/TST1O/new"); return;
+                case "moveThePageIntoAFolder": MoveThePage("courses/TST1O/b.md", "courses/TST1O/new/b.md"); return;
+                case "moveThePageBetweenFolders": MoveThePage("courses/TST1O/old/c.md", "courses/TST1O/new/c.md"); return;
                 case "begin:dead@B":
                 {
                     byte[] after = Flipped("B", _p1);
@@ -486,6 +496,27 @@ public sealed class UndoStackContractTests
                 return;
             }
             Assert.Fail("a call this replay does not know: " + call);
+        }
+
+        /// <summary>
+        /// The folder <paramref name="folder"/> replaced by a junction to
+        /// <see cref="Outside"/>, a folder beside the working folder
+        /// (<c>linkItsOldFolderOutside</c>, <c>linkItsNewFolderOutside</c>).
+        /// </summary>
+        private void LinkOutside(string folder)
+        {
+            string place = _scribe.FullPath("A", folder);
+            if (Directory.Exists(place)) Directory.Delete(place, recursive: true);
+            Directory.CreateDirectory(Outside);
+            UndoKindsForTheCases.MakeAJunction(place, Outside);
+        }
+
+        /// <summary>One <c>move</c> of the page at <paramref name="from"/> to <paramref name="to"/>, the page made first holding <c>page</c> when neither place holds it.</summary>
+        private void MoveThePage(string from, string to)
+        {
+            if (_scribe.Page("A", from) is null && _scribe.Page("A", to) is null)
+                _scribe.WritePage("A", from, "page\n"u8.ToArray());
+            Ops(new JsonArray(UndoKindsForTheCases.MoveFile(from, to, _scribe.Page("A", from) ?? "page\n"u8.ToArray())), []);
         }
 
         /// <summary>A step given as its ops, through the door that plans it forward as a Redo would (<c>Perform(UndoOpsDraft)</c>).</summary>
