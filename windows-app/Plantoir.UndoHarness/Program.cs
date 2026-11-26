@@ -50,6 +50,8 @@ internal static class Program
                 "child-w7-add-classes" => W7Runs.ChildAddClasses(folder, args[2], args[3]),
                 "w7-redate-kill" => W7Runs.ReDateKill(folder),
                 "child-w7-redate" => W7Runs.ChildReDate(folder, args[2], args[3]),
+                "w7-make-room-kill" => W7Runs.MakeRoomKill(folder),
+                "child-w7-make-room" => W7Runs.ChildMakeRoom(folder, args[2], args[3]),
                 "w7-plain-kill" => W7Runs.PlainKill(folder),
                 "child-w7-plain" => W7Runs.ChildPlain(folder, args[2], args[3]),
                 _ => Unknown(mode),
