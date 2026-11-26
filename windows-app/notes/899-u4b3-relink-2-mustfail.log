@@ -1,0 +1,6 @@
+# U4b3 relink-2 must-fail (#899), 2026-11-26. Each sabotage in place, built, run, restored with git checkout; git diff clean after each.
+M1 shapeIsKnown accepts equal shas (relinkShapeIsKnown without `before == after`): run-r2-mf1, UndoJournalContractTests.testCheckCases: "U4b3 relink, ...: the two texts the same: not readable": undo is canUndo, not notReadable. RED.
+M2 shapeIsKnown accepts linkSha beside the pair (`contents = 1` for the pair): run-r2-mf2, UndoRelinkTests.testARelinkWithLinkShaGivenAsWellIsABarrier: 7 failures (shapeIsKnown true, the door applies it, the barrier undone, the list 3 records). RED. (No shared row: see the notes, "For the director".)
+M3 `to` judged by linkShaBefore (linkText(isAtFrom:) returns linkShaBefore always): run-r2-mf3, testCheckCases: "...: the new link at its new place, the old place free: as the step left it": undo is changedSince, not canUndo; "...: the new place holding a link with the OLD text: changed since": undo is canUndo. RED.
+M4 Python shape model counts the pair as two (`forms += 2`): python3 scripts/test_make_undo_traces.py: test_check_cases FAIL on the seven readable "U4b3 relink" rows. RED.
+RED 4 of 4.
