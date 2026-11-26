@@ -1,0 +1,25 @@
+U4b2-3 (#899) must-fail log, 2026-11-25. Each sabotage applied to SpecialFolderRenamer.swift, built, SpecialFolderRenamerTests run, then the file restored with `git checkout` (git status clean after each).
+
+R0 tests first: `rename` body as on dev a03fecefd (record written, never cleared), helpers kept so the tests compile.
+  RED, 7 failures in 5 tests:
+  testASuccessfulRenameLeavesNoRecord: XCTAssertNil failed: "Assessments" / XCTAssertFalse failed - the record was left
+  testARenameRefusedWithNothingMovedLeavesNoRecord: XCTAssertFalse failed - the record was left
+  testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder: ("Optional(73 bytes)") is not equal to ("Optional(76 bytes)") - the earlier run's record was not left as it was; ("nil") is not equal to ("Optional("All Days")")
+  testAnEarlierRunsRecordSurvivesASuccessfulRenameOfAnotherFolder: ("Optional(73 bytes)") is not equal to ("Optional(76 bytes)")
+  testFinishingTheRecordedRenameClearsItsRecord: XCTAssertFalse failed - the finished rename's record was left
+  (part-way, killed and plan-refusal tests pass on dev: dev never clears, so they guard against over-clearing; M3 and M4 break them.)
+
+M1 the success clear removed (the `if thisRenameWasRecordedEarlier ... else if thisRunWroteTheRecord` block after the make).
+  RED, 4 failures: testASuccessfulRenameLeavesNoRecord (2 lines), testAnEarlierRunsRecordSurvivesASuccessfulRenameOfAnotherFolder, testFinishingTheRecordedRenameClearsItsRecord.
+
+M2 clear on every refusal (`clearRenameRecord` added after the put-back in both refusal branches).
+  RED, 2 failures: testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder: ("nil") is not equal to ("Optional(76 bytes)"); ("nil") is not equal to ("Optional("All Days")").
+
+M3 part way and killed treated as a refusal (put back instead of `break`).
+  RED, 2 failures: testARenameStoppedPartWayKeepsItsRecord, testARenameKilledPartWayKeepsItsRecord ("the record ... is gone or names another rename").
+
+M4 the record cleared at the start of `rename`, before the plan.
+  RED, 4 failures: testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder (2 lines), testAnEarlierRunsRecordSurvivesARenameRefusedAtItsPlan, testAnEarlierRunsRecordSurvivesASuccessfulRenameOfAnotherFolder.
+
+Must-fail: 4 RED of 4 (plus R0, tests first).
+Logs: /Users/russellgordon/plantoir/wt-899-u4b2-3/.dd/run-{r0,m1,m2,m3,m4}.log
