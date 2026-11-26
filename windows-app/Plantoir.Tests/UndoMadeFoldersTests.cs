@@ -175,40 +175,49 @@ public sealed class UndoMadeFoldersTests
     }
 
     /// <summary>
-    /// A refusal after the move went in (a page the step changed before the
-    /// move, changed by hand between the check and its swap): the swap is
-    /// reversed, and no folder the move's last look left out is tidied.
+    /// A refusal after the move went in (a second folder's move, put back
+    /// after it, finds its place taken by hand): the swap is reversed, and no
+    /// folder the move's last look left out is tidied.
     /// </summary>
     [Fact]
     public void TheTidyOfFoldersLeftOutNeverRunsOnARefusal()
     {
         using UndoScribe scribe = MediaFolder();
-        const string page = "courses/TST1O/p.md";
-        byte[] p = Encoding.UTF8.GetBytes("P\n");
+        const string other = "courses/TST1O/other";
+        const string otherMoved = "courses/TST1O/other2";
+        scribe.WritePage("A", other + "/o.md", X);
+        string otherSha = UndoTreeReading.Read(scribe.FullPath("A", other)).ListingSha!;
         string listingSha = UndoTreeReading.Read(scribe.FullPath("A", From)).ListingSha!;
+        // Taken back in the other order: the media folder's move first, then the other's.
         var ops = new JsonArray(
-            scribe.OpsFor(page, null, p)[0]!.DeepClone(),
+            new JsonObject { ["kind"] = "move", ["from"] = other, ["to"] = otherMoved, ["listingSha"] = otherSha },
             new JsonObject { ["kind"] = "move", ["from"] = From, ["to"] = To, ["listingSha"] = listingSha },
             scribe.OpsFor(To + "/sub/x.md", null, X)[0]!.DeepClone());
-        Assert.Equal(UndoOutcomeKind.Applied, scribe.Door().Perform(scribe.OpsDraft("A", ops, [p, X])).Kind);
+        Assert.Equal(UndoOutcomeKind.Applied, scribe.Door().Perform(scribe.OpsDraft("A", ops, [X])).Kind);
         var removing = new List<string>();
         var swapped = new List<string>();
+        string otherFull = Path.GetFullPath(scribe.FullPath("A", other));
         var seams = new UndoSeams
         {
-            AfterTheCheck = () => scribe.WritePage("A", page, Encoding.UTF8.GetBytes("Hand.\n")),
+            BeforeEachSwap = (_, fullPath) =>
+            {
+                swapped.Add(Path.GetFullPath(fullPath));
+                if (Path.GetFullPath(fullPath) == otherFull) scribe.WritePage("A", other + "/hand.md", X);
+            },
             RemovingAFolderLeftOut = removing.Add,
-            BeforeEachSwap = (_, fullPath) => swapped.Add(Path.GetFullPath(fullPath)),
         };
 
         UndoOutcome undo = scribe.Door(seams).Undo();
 
         Assert.Equal(UndoOutcomeKind.Refused, undo.Kind);
+        Assert.Equal(UndoRefusalKind.ChangedSince, undo.Refusal?.Kind);
         Assert.False(undo.LeftPartWay);
+        // The media folder's move went in (and named sub) before the other's was refused.
+        Assert.Equal([Path.GetFullPath(scribe.FullPath("A", From)), otherFull], swapped.Where(path => path == otherFull || path == Path.GetFullPath(scribe.FullPath("A", From))).ToList());
         Assert.Empty(removing);
         Assert.Equal(X, scribe.Page("A", To + "/sub/x.md"));
+        Assert.Equal(OldA, scribe.Page("A", To + "/a.md"));
         Assert.Empty(scribe.StagedLeftovers("A"));
-        // The move went in (and named sub) before the page's swap was refused.
-        Assert.True(swapped.IndexOf(Path.GetFullPath(scribe.FullPath("A", From))) is >= 0 and var moveAt && moveAt < swapped.IndexOf(Path.GetFullPath(scribe.FullPath("A", page))));
     }
 
     /// <summary>The same step undone with nothing in the way names sub to the tidy, which removes it.</summary>
