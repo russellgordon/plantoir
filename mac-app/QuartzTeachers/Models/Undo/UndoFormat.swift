@@ -1014,8 +1014,8 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     /// made, and redone, after the move, and taken back before it; the move
     /// is judged against what it holds once that step's own edits inside
     /// are taken back. Whether it comes after the move in the step's ops is
-    /// the caller's to check. Places compared as `placesOverlap` compares
-    /// them, without regard to case.
+    /// the caller's to check. "At or inside `to`" is `partInside`, the one
+    /// comparison, without regard to case (U4b2-9).
     static func moveCarries(_ move: UndoOp, _ edit: UndoOp) -> Bool {
         guard move.knownKind == .move, let from = move.from, let to = move.to, let path = edit.path else {
             return false
@@ -1029,15 +1029,17 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         if edit.from != nil || edit.to != nil || edit.target != nil {
             return false
         }
-        let place: String = path.lowercased()
-        let newPlace: String = to.lowercased()
-        if place != newPlace && !place.hasPrefix(newPlace + "/") {
+        if UndoOp.partInside(to, of: path) == nil {
             return false
         }
         if move.isCaseOnlyMove {
             // The two spellings are one place: the edit is named at the new
-            // spelling, never at the old one, as spelled.
-            return path != from && !path.hasPrefix(from + "/")
+            // spelling, never at the old one. Only the moved item's own part
+            // is compared as spelled, the parts above it by `partInside`
+            // (review 1 of U4b2-9, L3).
+            let fromParts: [Substring] = from.split(separator: "/", omittingEmptySubsequences: false)
+            let pathParts: [Substring] = path.split(separator: "/", omittingEmptySubsequences: false)
+            return pathParts[fromParts.count - 1] != fromParts[fromParts.count - 1]
         }
         return !UndoOp.placesOverlap(from, path)
     }
@@ -1059,23 +1061,53 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     /// The place `path`, named inside a move's `to`, had before the move:
     /// the same path under its `from`.
     static func placeBeforeTheMove(_ path: String, from: String, to: String) -> String {
-        return from + String(path.dropFirst(to.count))
+        guard let inside = UndoOp.partInside(to, of: path) else {
+            return path
+        }
+        return inside.isEmpty ? from : from + "/" + inside
+    }
+
+    /// U4b2-9: the part of `path` inside `place`, spelled as `path` spells
+    /// it: "" when `path` is `place` itself, nil when it is neither the
+    /// place nor inside it. Compared part by part WITHOUT regard to case,
+    /// the ONE comparison for "at or inside": `placesOverlap`,
+    /// `moveCarries`, a swap's own files inside a moved folder
+    /// (`ownFilesInside`) and following them when it moves
+    /// (`followTheMove`), and a carried page's place before the move. The
+    /// working folder's volume is case-insensitive on the Mac by default
+    /// and on Windows, so `Renamed/a.md` is inside `renamed` there; the
+    /// part-two review of U4b, LOW 2, found `moveCarries` matching without
+    /// regard to case while the swap compared as spelled.
+    static func partInside(_ place: String, of path: String) -> String? {
+        let placeParts: [Substring] = place.split(separator: "/", omittingEmptySubsequences: false)
+        let pathParts: [Substring] = path.split(separator: "/", omittingEmptySubsequences: false)
+        if pathParts.count < placeParts.count {
+            return nil
+        }
+        var index: Int = 0
+        while index < placeParts.count {
+            if placeParts[index].lowercased() != pathParts[index].lowercased() {
+                return nil
+            }
+            index += 1
+        }
+        var rest: [Substring] = []
+        while index < pathParts.count {
+            rest.append(pathParts[index])
+            index += 1
+        }
+        return rest.joined(separator: "/")
     }
 
     /// Whether two places are the same, or one is a folder holding the
-    /// other (compared part by part, as spelled).
+    /// other (compared part by part, by `partInside`).
     ///
     /// Compared WITHOUT regard to case: a Mac's volume (and Windows') is
     /// usually case-insensitive, so `a.json` and `A.json` are one place
     /// there, and a move between them or two ops naming them is refused as
     /// a step this version cannot read (the hard review of U2b, MEDIUM 7).
     static func placesOverlap(_ first: String, _ second: String) -> Bool {
-        let one: String = first.lowercased()
-        let other: String = second.lowercased()
-        if one == other {
-            return true
-        }
-        return one.hasPrefix(other + "/") || other.hasPrefix(one + "/")
+        return UndoOp.partInside(first, of: second) != nil || UndoOp.partInside(second, of: first) != nil
     }
 
     /// A path a step may name: relative, forward slashes, no `.` or `..`

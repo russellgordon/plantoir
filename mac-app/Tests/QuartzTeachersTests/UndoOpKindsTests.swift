@@ -92,6 +92,133 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertNil(PlantoirDefaults.shared.object(forKey: key), "the app's own store is never touched")
     }
 
+    /// U4b2-9 (the part-two review of U4b, LOW 2): an edit spelled with
+    /// other capitals than the move's `to` (`Renamed/a.md` under a move to
+    /// `renamed`) is carried by the move, and the swap that takes it back
+    /// leaves the edit's own kept files out of the move's pair and follows
+    /// them when the folder moves, by the same comparison
+    /// (`UndoOp.partInside`). The Undo of an untouched step goes back and
+    /// leaves nothing of its own behind; so does the Redo. FAILED before the
+    /// one comparison, when `ownFilesInside` and `followTheMove` compared
+    /// paths as spelled.
+    func testAnEditSpelledWithOtherCapitalsUnderACarryingMoveIsUndoneAndRedone() throws {
+        let root: URL = scratchURL.appendingPathComponent("folder", isDirectory: true)
+        let journal: UndoJournal = UndoJournal(folderURL: scratchURL.appendingPathComponent("undo", isDirectory: true))
+        let places: UndoMemoryPlaces = UndoMemoryPlaces()
+        let oldFolder: String = "courses/TST1O/media"
+        let newFolder: String = "courses/TST1O/renamed"
+        try UndoContractReplay.write("Intro.\nLine one: old.\nEnd.\n", to: oldFolder + "/a.md", in: root)
+        try UndoContractReplay.write("B\n", to: oldFolder + "/b.md", in: root)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: root.appendingPathComponent(oldFolder)).listingSha)
+        let move: UndoOp = UndoOp.moveFolder(from: oldFolder, to: newFolder, listingSha: listingSha)
+        let edit: UndoOp = UndoOp.replaceText(
+            path: "courses/TST1O/Renamed/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+        )
+        XCTAssertTrue(UndoOp.moveCarries(move, edit), "the move carries the edit, compared without regard to case")
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [move, edit], blobs: [], root: root, action: "renameFolder")
+        XCTAssertEqual(JournaledWrite.perform(ops: draft, in: journal, mode: .live, places: places), .applied(seq: 1))
+        let movedPage: URL = root.appendingPathComponent(newFolder + "/a.md")
+        XCTAssertEqual(try String(contentsOf: movedPage, encoding: .utf8), "Intro.\nLine one: new.\nEnd.\n")
+
+        XCTAssertEqual(journal.undoNewest(places: places), .undone(seq: 1))
+        let pageBack: URL = root.appendingPathComponent(oldFolder + "/a.md")
+        XCTAssertEqual(try String(contentsOf: pageBack, encoding: .utf8), "Intro.\nLine one: old.\nEnd.\n")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(newFolder).path))
+        XCTAssertEqual(namesLeftBySwaps(under: root), [], "the Undo leaves nothing of its own")
+
+        XCTAssertEqual(journal.redoNewest(places: places), .redone(seq: 1))
+        XCTAssertEqual(try String(contentsOf: movedPage, encoding: .utf8), "Intro.\nLine one: new.\nEnd.\n")
+        XCTAssertEqual(namesLeftBySwaps(under: root), [], "the Redo leaves nothing of its own")
+    }
+
+    /// Review 1 of U4b2-9, L1: an edit spelled with other capitals BELOW the
+    /// move's `to` (`Renamed/Sub/a.md` where the disk has `sub`) is matched
+    /// to the moved folder's listing by the same comparison, so the Undo of
+    /// an untouched step goes back and the Redo comes again. FAILED before,
+    /// when the override was looked up as spelled (changed since).
+    func testAnEditSpelledWithOtherCapitalsBelowTheMovesToIsUndoneAndRedone() throws {
+        let root: URL = scratchURL.appendingPathComponent("folder", isDirectory: true)
+        let journal: UndoJournal = UndoJournal(folderURL: scratchURL.appendingPathComponent("undo", isDirectory: true))
+        let places: UndoMemoryPlaces = UndoMemoryPlaces()
+        let oldFolder: String = "courses/TST1O/media"
+        let newFolder: String = "courses/TST1O/renamed"
+        try UndoContractReplay.write("Intro.\nLine one: old.\nEnd.\n", to: oldFolder + "/sub/a.md", in: root)
+        try UndoContractReplay.write("B\n", to: oldFolder + "/b.md", in: root)
+        let listingSha: String = try XCTUnwrap(UndoTreeReading.read(at: root.appendingPathComponent(oldFolder)).listingSha)
+        let move: UndoOp = UndoOp.moveFolder(from: oldFolder, to: newFolder, listingSha: listingSha)
+        let edit: UndoOp = UndoOp.replaceText(
+            path: "courses/TST1O/Renamed/Sub/a.md", before: "old", after: "new", contextBefore: "Line one: ", contextAfter: ".\n"
+        )
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [move, edit], blobs: [], root: root, action: "renameFolder")
+        XCTAssertEqual(JournaledWrite.perform(ops: draft, in: journal, mode: .live, places: places), .applied(seq: 1))
+
+        XCTAssertEqual(journal.undoNewest(places: places), .undone(seq: 1))
+        let pageBack: URL = root.appendingPathComponent(oldFolder + "/sub/a.md")
+        XCTAssertEqual(try String(contentsOf: pageBack, encoding: .utf8), "Intro.\nLine one: old.\nEnd.\n")
+        XCTAssertEqual(namesLeftBySwaps(under: root), [], "the Undo leaves nothing of its own")
+
+        XCTAssertEqual(journal.redoNewest(places: places), .redone(seq: 1))
+        let movedPage: URL = root.appendingPathComponent(newFolder + "/sub/a.md")
+        XCTAssertEqual(try String(contentsOf: movedPage, encoding: .utf8), "Intro.\nLine one: new.\nEnd.\n")
+        XCTAssertEqual(namesLeftBySwaps(under: root), [], "the Redo leaves nothing of its own")
+    }
+
+    /// Review 1 of U4b2-9, L3: under a capitalisation-only move, an edit is
+    /// carried when its part at the folder is spelled as `to`, and not when
+    /// it is spelled as `from`, whatever the capitals ABOVE the folder.
+    /// FAILED before, when the whole path was compared as spelled.
+    func testACaseOnlyMoveTellsItsSidesApartByTheFoldersOwnPart() {
+        let move: UndoOp = UndoOp.moveFolder(from: "courses/TST1O/Media", to: "courses/TST1O/media", listingSha: String(repeating: "a", count: 64))
+        let atFrom: UndoOp = UndoOp.replaceText(path: "courses/tst1o/Media/a.md", before: "old", after: "new", contextBefore: "", contextAfter: "")
+        let atTo: UndoOp = UndoOp.replaceText(path: "courses/tst1o/media/a.md", before: "old", after: "new", contextBefore: "", contextAfter: "")
+        XCTAssertFalse(UndoOp.moveCarries(move, atFrom), "named at the from spelling of the folder")
+        XCTAssertTrue(UndoOp.moveCarries(move, atTo), "named at the to spelling of the folder")
+    }
+
+    /// Review 1 of U4b2-9, L2: the writer's own judgement of a carried
+    /// place (`JournaledStep.placeOnDiskNow`, and the name it gives it,
+    /// `namedPath`) is the one comparison: a place spelled `Renamed/a.md`
+    /// under a planned move to `renamed` is read under `media` and named at
+    /// `renamed`. FAILED before, when both compared as spelled.
+    @MainActor
+    func testTheWriterJudgesACarriedPlaceByTheOneComparison() throws {
+        let root: URL = scratchURL.appendingPathComponent("folder", isDirectory: true)
+        let course: URL = root.appendingPathComponent("courses/TST1O", isDirectory: true)
+        try UndoContractReplay.write("A\n", to: "courses/TST1O/media/a.md", in: root)
+        let step: JournaledStep = JournaledStep(
+            courseCode: "TST1O", courseDirectory: course, section: nil, maker: UndoStepMaker.sheet("renameFolder")
+        )
+        XCTAssertTrue(step.moveFolder(course.appendingPathComponent("media"), to: course.appendingPathComponent("renamed")))
+        let spelledOtherwise: URL = course.appendingPathComponent("Renamed/a.md")
+        XCTAssertEqual(JournaledStep.key(of: step.placeOnDiskNow(spelledOtherwise)), JournaledStep.key(of: course.appendingPathComponent("media/a.md")))
+        XCTAssertEqual(step.namedPath(of: spelledOtherwise, under: root), "courses/TST1O/renamed/a.md")
+    }
+
+    /// The one comparison itself: part by part, without regard to case,
+    /// the rest spelled as the path spells it.
+    func testThePartInsideAPlaceIsFoundWithoutRegardToCase() {
+        XCTAssertEqual(UndoOp.partInside("courses/X/renamed", of: "courses/X/Renamed/a/b.md"), "a/b.md")
+        XCTAssertEqual(UndoOp.partInside("courses/X/renamed", of: "courses/X/RENAMED"), "")
+        XCTAssertNil(UndoOp.partInside("courses/X/renamed", of: "courses/X/renamedToo/a.md"))
+        XCTAssertNil(UndoOp.partInside("courses/X/renamed", of: "courses/X"))
+        XCTAssertEqual(UndoOp.partInside("/tmp/w/Media", of: "/tmp/w/media/.plantoir-undo-1-x"), ".plantoir-undo-1-x")
+    }
+
+    /// Every name a swap leaves beside a page (`UndoSwap.stagedMarker`)
+    /// anywhere under `root`.
+    func namesLeftBySwaps(under root: URL) -> [String] {
+        var found: [String] = []
+        guard let walker = FileManager.default.enumerator(atPath: root.path) else {
+            return found
+        }
+        while let inside = walker.nextObject() as? String {
+            if (inside as NSString).lastPathComponent.contains(UndoSwap.stagedMarker) {
+                found.append(inside)
+            }
+        }
+        return found
+    }
+
     /// A move is one rename that never replaces: with something already at
     /// the destination it refuses and both stay as they were.
     func testAMoveNeverReplacesWhatIsAtItsDestination() throws {

@@ -429,6 +429,7 @@ final class UndoSweepFindingsTests: XCTestCase {
             "renameFolderUnderWay": CourseActivity.folderRenameIsUnderWay(course: "{course}"),
             "renameFolderUnderWayMenuReason": CourseActivity.availableOnceTheFolderIsRenamed,
             "renameFolderUnderWaySidebarRow": CourseRowLabel.workUnderWay(isBeingCopied: false, isRenamingAFolder: true) ?? "",
+            "renameFolderUnderWaySpinner": CourseActivity.renamingSpinnerLabel,
         ]
         XCTAssertEqual(ours, wording)
     }
@@ -453,6 +454,12 @@ final class UndoSweepFindingsTests: XCTestCase {
         XCTAssertEqual(
             CourseRowLabel.workUnderWay(isBeingCopied: false, isRenamingAFolder: true),
             try XCTUnwrap(wording["renameFolderUnderWaySidebarRow"] as? String)
+        )
+        // U4b2-9 (review 1 of U4b2-6, L1): what VoiceOver says for the
+        // sheet's spinner.
+        XCTAssertEqual(
+            CourseActivity.renamingSpinnerLabel,
+            try XCTUnwrap(wording["renameFolderUnderWaySpinner"] as? String)
         )
     }
 

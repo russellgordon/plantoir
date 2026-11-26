@@ -2282,14 +2282,19 @@ itself — so word it deliberately rather than discovering the gap:
   setting or none of them, so "renamed N of M copies" and "the folder moved but
   the settings could not be written" are no longer said there. Windows still
   says both until its own piece (W8). What a refused rename says on the Mac is
-  in `undo.wording`, three keys: `renameFolderNothingWasChanged` (nothing was
-  changed), and two for a refused step that could not all be put back, which
+  in `undo.wording`, four keys: `renameFolderNothingWasChanged` (nothing was
+  changed), and three for a refused step that could not all be put back, which
   is still possible: `renameFolderStoppedPartWay` (none of the rename's
-  folders at its new name, files kept beside their pages) and
+  folders at its new name, files kept beside their pages),
   `renameFolderRenamedOnlyInPart` (each of the rename's folders the disk shows
   at its new name, named, whether this run moved it or an earlier, interrupted
-  run did; never a folder that was at the new name all along, U4b2-5). Both
-  write a `folder renamed` line on the trail. Windows' one part-way line until
+  run did; never a folder that was at the new name all along, U4b2-5) and
+  `renameFolderMayBeRenamedInPart` (the places it could not read, or cannot
+  tell are this rename's, when no folder is known to be at the new name;
+  never "was not renamed", U4b2-6). Each writes a `folder renamed` line on
+  the trail, the third its own "may have renamed … only in part". (The three
+  `renameFolderUnderWay…` keys, and U4b2-9's `renameFolderUnderWaySpinner`,
+  are said while a rename runs, not when one is refused.) Windows' one part-way line until
   W8 is a rename whose folders moved but whose settings could not be written
   ("renamed the folder … but could not write it to this course's settings");
   its stop after moving some of the copies writes no line.

@@ -392,9 +392,9 @@ def is_blob_name(name):
 
 
 def overlap(first, second):
-    """Without regard to case: one place on a case-insensitive volume."""
-    first, second = first.lower(), second.lower()
-    return first == second or first.startswith(second + "/") or second.startswith(first + "/")
+    """Without regard to case: one place on a case-insensitive volume, by
+    the model's one comparison (U4b2-9)."""
+    return traces.places_overlap(first, second)
 
 
 def readable_op(op):
@@ -573,7 +573,9 @@ class ContractCaseTests(unittest.TestCase):
                     # No check (opKinds.recompute): re-derived, never compared.
                     state = "after"
                 elif kind in ("move", "moveApart", "setAside"):
-                    state = traces.move_state(op, current["atFrom"], current["atTo"])
+                    # U4b2-9: listedAs, a third spelling, is the model's to
+                    # judge (move_state), never the harness's.
+                    state = traces.move_state(op, current["atFrom"], current["atTo"], current.get("listedAs"))
                 elif kind in ("createTree", "removeTree"):
                     state = traces.tree_state(op, current)
                 elif kind == "external":
@@ -1296,6 +1298,23 @@ class ContractFileReadabilityTests(unittest.TestCase):
         self.assertNotIn("editJSONCases", shared_undo())
         self.assertNotIn("editJSONCasesHow", shared_undo())
         self.assertGreaterEqual(len(json_cases()["editJSONCases"]), 16)
+
+
+class OneComparisonTests(unittest.TestCase):
+    """U4b2-9: the model's one comparison for "at or inside", and the
+    capitalisation-only move's sides told apart by the moved item's own part."""
+
+    def test_the_part_inside_a_place_is_found_without_regard_to_case(self):
+        self.assertEqual(traces.part_inside("courses/X/renamed", "courses/X/Renamed/a/b.md"), "a/b.md")
+        self.assertEqual(traces.part_inside("courses/X/renamed", "courses/X/RENAMED"), "")
+        self.assertIsNone(traces.part_inside("courses/X/renamed", "courses/X/renamedToo/a.md"))
+
+    def test_a_case_only_move_tells_its_sides_apart_by_the_folders_own_part(self):
+        move = {"kind": "move", "from": "courses/TST1O/Media", "to": "courses/TST1O/media", "listingSha": "a" * 64}
+        at_from = {"kind": "replaceText", "path": "courses/tst1o/Media/a.md"}
+        at_to = {"kind": "replaceText", "path": "courses/tst1o/media/a.md"}
+        self.assertFalse(traces.move_carries(move, at_from))
+        self.assertTrue(traces.move_carries(move, at_to))
 
 
 if __name__ == "__main__":

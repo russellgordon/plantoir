@@ -182,6 +182,10 @@ enum CourseActivity {
     /// way (#899 U4b), said under every item it greys.
     static let availableOnceTheFolderIsRenamed: String = "Available once the folder rename has finished"
 
+    /// What VoiceOver says for the Rename sheet's spinner while the rename
+    /// runs (#899 U4b2-9; `undo.wording.renameFolderUnderWaySpinner`).
+    static let renamingSpinnerLabel: String = "Renaming"
+
     // MARK: - Functions
 
     /// The sentence an act on a course is refused with at the click while a

@@ -814,7 +814,9 @@ nonisolated enum UndoRecovery {
             guard let path = edit.path, edit.isWhole == false, let carrier = carriers[path], carrier == move else {
                 continue
             }
-            let inside: String = path.count == to.count ? "" : String(path.dropFirst(to.count + 1))
+            guard let inside = UndoOp.partInside(to, of: path) else {
+                continue
+            }
             let place: URL = inside.isEmpty ? side : side.appendingPathComponent(inside)
             let current: UndoItem = overriding[inside] ?? UndoItem.read(at: place)
             guard UndoCheck.state(of: edit, in: current) == .after, let journal else {

@@ -1039,4 +1039,31 @@ final class SpecialFolderRenamerTests: XCTestCase {
         XCTAssertEqual(object["mayHaveMoved"] as? [String], ["section2/Assessments"])
     }
 
+    /// U4b2-9 (review 1 of U4b2-6, L2): the example "what the Mac writes"
+    /// is the Mac's bytes, byte for byte (Foundation escapes `/` as `\/`
+    /// and ends with no newline). MUST FAIL with one byte of the example
+    /// changed, or with the writer's options changed.
+    func testTheMacWritesTheContractsExampleByteForByte() throws {
+        let formats: [String: Any] = try UndoContractReplay.contract("file-formats.json")
+        let entry: [String: Any] = try XCTUnwrap(formats["folderRenameRecord"] as? [String: Any])
+        let examples: [[String: Any]] = try XCTUnwrap(entry["examples"] as? [[String: Any]])
+        var macExample: [String: Any]? = nil
+        for example in examples where example["name"] as? String == "what the Mac writes" {
+            macExample = example
+        }
+        let example: [String: Any] = try XCTUnwrap(macExample)
+        let bytes: String = try XCTUnwrap(example["bytes"] as? String)
+        let expect: [String: Any] = try XCTUnwrap(example["expect"] as? [String: Any])
+        let course: URL = temporaryDirectory.appendingPathComponent("courses/ICS3U")
+        try FileManager.default.createDirectory(at: course, withIntermediateDirectories: true)
+        let scope: FolderScope = try XCTUnwrap(expect["scope"] as? String) == "shared" ? .shared : .perSection
+        SpecialFolderRenamer.recordRenameStarting(
+            from: try XCTUnwrap(expect["from"] as? String), to: try XCTUnwrap(expect["to"] as? String),
+            scope: scope, courseDirectory: course,
+            moved: try XCTUnwrap(expect["moved"] as? [String]), mayHaveMoved: try XCTUnwrap(expect["mayHaveMoved"] as? [String])
+        )
+        let written: Data = try Data(contentsOf: SpecialFolderRenamer.renameMarkerURL(courseDirectory: course))
+        XCTAssertEqual(String(decoding: written, as: UTF8.self), bytes)
+    }
+
 }

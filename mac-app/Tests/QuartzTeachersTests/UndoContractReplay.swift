@@ -555,8 +555,14 @@ nonisolated enum UndoContractReplay {
                 }
                 if let to = string(given["to"]), UndoOp.isSafeRelativePath(to), to != string(given["from"]),
                    let side = current["atTo"] as? [String: Any] {
+                    // U4b2-9: `listedAs`, a third spelling the folder lists
+                    // the item under, neither from nor to.
+                    var spelling: String = to
+                    if let listedAs = string(current["listedAs"]), UndoOp.isSafeRelativePath(listedAs) {
+                        spelling = listedAs
+                    }
                     if FileManager.default.fileExists(atPath: place.root.appendingPathComponent(to).path) == false {
-                        try self.place(side, at: place.root.appendingPathComponent(to))
+                        try self.place(side, at: place.root.appendingPathComponent(spelling))
                     }
                 }
             } else if kind != "external" {
@@ -1245,8 +1251,17 @@ nonisolated enum UndoContractReplay {
                         for op in head.step.ops where op.path == path && op.knownKind == .writeFile {
                             if let sha = wantsTheFirst ? op.afterSha : op.beforeSha {
                                 let blobURL: URL = journal().blobURL(sha: sha)
-                                try FileManager.default.removeItem(at: blobURL)
                                 let prefixFolder: URL = blobURL.deletingLastPathComponent()
+                                // The two calls' contents sit in two prefix
+                                // folders, or the second remove meets the
+                                // first's read-only folder (U4b2-4 review 2,
+                                // LOW 1; U4b2-9).
+                                if foldersMadeReadOnly.contains(prefixFolder) {
+                                    failures.append("stackCases '\(name)': \(path)'s content sits in the prefix folder an earlier call made read-only")
+                                    removedOne = true
+                                    continue
+                                }
+                                try FileManager.default.removeItem(at: blobURL)
                                 try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: prefixFolder.path)
                                 foldersMadeReadOnly.append(prefixFolder)
                                 removedOne = true

@@ -515,7 +515,7 @@ struct StringListEditorView: View {
                     ProgressView()
                         .controlSize(.small)
                         .padding(.trailing, 4)
-                        .accessibilityLabel(Text("Renaming"))
+                        .accessibilityLabel(Text(CourseActivity.renamingSpinnerLabel))
                 }
                 Button("Rename") {
                     startRename(of: item, finishing: finishing)
