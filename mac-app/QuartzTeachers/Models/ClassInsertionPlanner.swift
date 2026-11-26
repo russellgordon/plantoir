@@ -333,7 +333,12 @@ enum ClassInsertionPlanner {
         if plan.added.isEmpty {
             throw Problem.wouldNotFit(plan.problems.joined(separator: " "))
         }
-
+        // Later classes this piece cannot move, refused before anything
+        // changes (#899 U4b3, `undo.rule.shadow`).
+        if let notMovable = firstLinkThatCannotBeMoved(in: plan, course: course) {
+            let refusal: UndoRefusal = .cannotTellNow(path: notMovable.path)
+            throw JournaledStepError.refused(refusal, fileName: JournaledStep.fileName(in: refusal))
+        }
 
         // ONE step through the door (#899, U3): every rename, link, date and
         // new page planned first, each read as the step will leave it, then
@@ -528,29 +533,6 @@ enum ClassInsertionPlanner {
         )
     }
 
-    /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".
-    ///
-    /// **Pages order by DATE here, and the numbers may have gaps.** Russell's
-    /// CODING club has Week 1, Week 2, Week 8 and Week 9 on weekly Thursdays,
-    /// the pages between never written. The ordinary rule — the new page takes
-    /// the day the page AT the insertion point sits on, and everything from
-    /// there along is renamed one up and packed onto the next class days —
-    /// was measured on that shape: "make room at Week 3" dated the new page
-    /// 2025-11-20 (Week 8's day, with 10-02 free) and renamed two published
-    /// meetings, Week 8 → 9 and Week 9 → 10, a week later each, to make room
-    /// in a slot that was empty.
-    ///
-    /// So, here:
-    /// * the new pages take the first free class days after the LATEST page
-    ///   numbered below the insertion point — "after Week 2";
-    /// * a page is renamed only when a new number would land on its name, and
-    ///   the run stops at the first page whose number is already clear;
-    /// * a later page keeps its date when it is already after the page before
-    ///   it, and only a page whose date COLLIDES moves — to the first class
-    ///   day after that page. Only then does the plan list a move.
-    ///
-    /// In a numbered course with no gaps (a club filled one page at a time)
-    /// this gives the same answer as the ordinary rule.
     /// Whether the page at `url` is a symbolic link (read without following
     /// it, `lstat`) whose target is a regular file. A link to a folder, a
     /// dangling link or anything else is not, and is handled as before.
@@ -575,6 +557,77 @@ enum ClassInsertionPlanner {
         return targetResult == 0 && (targetStatus.st_mode & S_IFMT) == S_IFREG
     }
 
+    /// The first later class that is a symbolic link this piece cannot
+    /// move, or nil. Such a link is refused rather than moved:
+    ///
+    /// * a link whose target is not there (a dangling link: `lstat` sees
+    ///   it, `stat` cannot follow it), which Insert Class would otherwise
+    ///   skip in silence and then write the class below THROUGH, making
+    ///   the missing file wherever it names, perhaps outside the working
+    ///   folder (review B of U4b3, MEDIUM 2);
+    /// * a link that leads, through any number of links, to one of this
+    ///   section's own class pages, whose title and date the step would
+    ///   then write onto another class (review B, MEDIUM 1).
+    ///
+    /// "Leads to a class page" is judged by the resolved identity of the
+    /// file, never by name or path spelling: the device and inode `stat`
+    /// gives through the link, against those of every class page of the
+    /// section that is itself a plain file.
+    static func firstLinkThatCannotBeMoved(in plan: ClassInsertionPlan, course: Course) -> URL? {
+        var places: [URL] = []
+        for rename in plan.renames {
+            places.append(rename.fromURL)
+            places.append(rename.toURL)
+        }
+        for move in plan.moves {
+            places.append(move.fileURL)
+        }
+        for planned in plan.added {
+            places.append(planned.fileURL)
+        }
+        var classPageIdentities: [ResolvedFile] = []
+        for page in ClassPages.list(forSection: plan.sectionNumber, in: course) {
+            if let identity = ResolvedFile.ofAPlainFile(at: page.fileURL) {
+                classPageIdentities.append(identity)
+            }
+        }
+        for place in places {
+            guard ResolvedFile.isALink(place) else {
+                continue
+            }
+            guard let leadsTo = ResolvedFile.throughLinks(at: place) else {
+                return place
+            }
+            for identity in classPageIdentities where identity == leadsTo {
+                return place
+            }
+        }
+        return nil
+    }
+
+    /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".
+    ///
+    /// **Pages order by DATE here, and the numbers may have gaps.** Russell's
+    /// CODING club has Week 1, Week 2, Week 8 and Week 9 on weekly Thursdays,
+    /// the pages between never written. The ordinary rule — the new page takes
+    /// the day the page AT the insertion point sits on, and everything from
+    /// there along is renamed one up and packed onto the next class days —
+    /// was measured on that shape: "make room at Week 3" dated the new page
+    /// 2025-11-20 (Week 8's day, with 10-02 free) and renamed two published
+    /// meetings, Week 8 → 9 and Week 9 → 10, a week later each, to make room
+    /// in a slot that was empty.
+    ///
+    /// So, here:
+    /// * the new pages take the first free class days after the LATEST page
+    ///   numbered below the insertion point — "after Week 2";
+    /// * a page is renamed only when a new number would land on its name, and
+    ///   the run stops at the first page whose number is already clear;
+    /// * a later page keeps its date when it is already after the page before
+    ///   it, and only a page whose date COLLIDES moves — to the first class
+    ///   day after that page. Only then does the plan list a move.
+    ///
+    /// In a numbered course with no gaps (a club filled one page at a time)
+    /// this gives the same answer as the ordinary rule.
     static func planNumbered(
         atNumber: Int,
         count: Int,
@@ -1173,5 +1226,63 @@ struct PlanProblem: Equatable, Sendable {
             sentences.append(problem.sentence(noun: noun))
         }
         return sentences
+    }
+}
+
+/// A file by its device and inode: one file under every name and every
+/// link that leads to it (#899 U4b3).
+struct ResolvedFile: Equatable {
+
+    // MARK: - Stored properties
+
+    let device: Int64
+
+    let inode: UInt64
+
+    // MARK: - Functions
+
+    /// Whether `url` is itself a symbolic link (`lstat`, never followed).
+    static func isALink(_ url: URL) -> Bool {
+        guard let status = ResolvedFile.status(of: url, followingLinks: false) else {
+            return false
+        }
+        return (status.st_mode & S_IFMT) == S_IFLNK
+    }
+
+    /// The file `url` names when it is a plain file (not a link), or nil.
+    static func ofAPlainFile(at url: URL) -> ResolvedFile? {
+        guard let status = ResolvedFile.status(of: url, followingLinks: false) else {
+            return nil
+        }
+        if (status.st_mode & S_IFMT) != S_IFREG {
+            return nil
+        }
+        return ResolvedFile(device: Int64(status.st_dev), inode: UInt64(status.st_ino))
+    }
+
+    /// What `url` leads to through every link (`stat`), or nil when that
+    /// is not there.
+    static func throughLinks(at url: URL) -> ResolvedFile? {
+        guard let status = ResolvedFile.status(of: url, followingLinks: true) else {
+            return nil
+        }
+        return ResolvedFile(device: Int64(status.st_dev), inode: UInt64(status.st_ino))
+    }
+
+    private static func status(of url: URL, followingLinks: Bool) -> stat? {
+        var status: stat = stat()
+        let result: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            if followingLinks {
+                return stat(path, &status)
+            }
+            return lstat(path, &status)
+        }
+        if result != 0 {
+            return nil
+        }
+        return status
     }
 }

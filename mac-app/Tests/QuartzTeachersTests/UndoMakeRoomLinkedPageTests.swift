@@ -129,24 +129,20 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         return (outcome: outcome, steps: try stepCount() - stepsBefore, couldNotRecord: lines)
     }
 
-    /// Every file and link under the course folder and the folder outside
-    /// it, by path from the working folder: a link as "-> target", a file
-    /// as its text.
+    /// Every file and link under the working folder, by path from it, never
+    /// followed through a link: a link as "-> target", a file as its text.
+    /// (Each name is the walk's own, so a link is recorded as itself and
+    /// never filed under the file it leads to: review B of U4b3, LOW 2.)
     func everything(under made: (root: URL, course: Course, classes: URL)) -> [String: String] {
         var result: [String: String] = [:]
-        let prefix: String = UndoFolderPlaces.canonicalPath(of: made.root) + "/"
-        guard let walker = FileManager.default.enumerator(at: made.root, includingPropertiesForKeys: nil) else {
+        guard let walker = FileManager.default.enumerator(atPath: made.root.path) else {
             return result
         }
-        for case let url as URL in walker {
-            let path: String = UndoFolderPlaces.canonicalPath(of: url)
-            if !path.hasPrefix(prefix) {
-                continue
-            }
-            let relative: String = String(path.dropFirst(prefix.count))
+        while let relative = walker.nextObject() as? String {
             if relative.hasPrefix("list") || relative.hasPrefix("courses/.internal") || relative.hasSuffix("course_config.json") {
                 continue
             }
+            let url: URL = made.root.appendingPathComponent(relative)
             if let target = try? FileManager.default.destinationOfSymbolicLink(atPath: url.path) {
                 result[relative] = "-> " + target
                 continue
@@ -158,6 +154,44 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
             result[relative] = (try? String(contentsOf: url, encoding: .utf8)) ?? "(unreadable)"
         }
         return result
+    }
+
+    /// Replaces the class page `title` with a link holding `target`, the
+    /// page's own text thrown away (the link leads to a page already there).
+    func replaceWithALink(_ title: String, holding target: String, in made: (root: URL, course: Course, classes: URL)) throws {
+        let pageURL: URL = made.classes.appendingPathComponent(title + ".md")
+        if (try? FileManager.default.attributesOfItem(atPath: pageURL.path)) != nil {
+            try FileManager.default.removeItem(at: pageURL)
+        }
+        try FileManager.default.createSymbolicLink(atPath: pageURL.path, withDestinationPath: target)
+    }
+
+    /// Insert Class at `day` must refuse with the refusal it gave before
+    /// U4b3 part 2 ("cannot tell now", said as the file named that could
+    /// not be saved), naming `named`, and leave the whole working folder,
+    /// links included, byte for byte as it was, with no step recorded.
+    func checkRefused(atDay day: Int, naming named: String, in made: (root: URL, course: Course, classes: URL)) throws {
+        let before: [String: String] = everything(under: made)
+        let stepsBefore: Int = try stepCount()
+        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+            unit: 1, atDay: day, count: 1, forSection: 1, in: made.course
+        )
+        do {
+            _ = try ClassInsertionPlanner.apply(plan, in: made.course)
+            XCTFail("Insert Class went ahead")
+        } catch let error as JournaledStepError {
+            guard case .refused(.cannotTellNow, let fileName) = error else {
+                return XCTFail("refused as \(error), not cannot tell now")
+            }
+            XCTAssertEqual(fileName, named + ".md")
+            XCTAssertEqual(
+                error.localizedDescription,
+                CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: named + ".md"]).localizedDescription,
+                "the words a teacher read before part 2"
+            )
+        }
+        XCTAssertEqual(everything(under: made), before, "nothing changed")
+        XCTAssertEqual(try stepCount(), stepsBefore, "no step recorded")
     }
 
     // MARK: - Tests: Insert Class moves a linked later class
@@ -307,28 +341,53 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
 
     // MARK: - Tests: what stays as it was
 
-    /// A dangling later-class link (its target is gone): `fileExists`
-    /// follows it and answers false, so its rename is skipped, as before
-    /// this piece; the link is left where it was, holding its target, and
-    /// (also as before) Day 2's rename then finds Day 3 free and writes its
-    /// lesson through the dangling link, which makes the file it names.
-    /// Pinned here; changing it is the next piece's.
-    func testADanglingLinkedLaterClassIsSkippedAsBefore() throws {
+    /// A dangling later-class link (its target is gone): Insert Class
+    /// refuses before anything changes, naming it, and never writes the
+    /// class below through it (review B of U4b3, MEDIUM 2). MUST FAIL with
+    /// the link skipped in silence and Day 2's lesson written through it,
+    /// making the file it names.
+    func testADanglingLinkedLaterClassIsRefusedAndNothingChanges() throws {
         let made = try makeCourse()
         let target: String = "../../elsewhere/Unit 1, Day 3.md"
         let file: URL = try makeALink("Unit 1, Day 3", holding: target, in: made)
         try FileManager.default.removeItem(at: file)
 
-        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
-            unit: 1, atDay: 2, count: 1, forSection: 1, in: made.course
-        )
-        _ = try? ClassInsertionPlanner.apply(plan, in: made.course)
+        try checkRefused(atDay: 2, naming: "Unit 1, Day 3", in: made)
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: made.classes.appendingPathComponent("Unit 1, Day 4.md").path),
-                       "the dangling link is not moved")
-        XCTAssertEqual(linkTarget("Unit 1, Day 3", in: made), target, "the link is left where it was")
-        let written: String = try String(contentsOf: file, encoding: .utf8)
-        XCTAssertTrue(written.contains("Two.") && written.contains("title: Unit 1, Day 3"), written)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "nothing written through the link")
+        XCTAssertEqual(linkTarget("Unit 1, Day 3", in: made), target)
+    }
+
+    /// Day 4 a link to Day 3's page, in the same run; room at Day 2: refused
+    /// before anything changes, naming Day 4 (review B of U4b3, MEDIUM 1).
+    /// MUST FAIL with Day 3 given the old Day 2's lesson and Day 5's date.
+    func testALaterClassLinkedToAnotherClassOfTheRunIsRefused() throws {
+        let made = try makeCourse()
+        try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: made)
+
+        try checkRefused(atDay: 2, naming: "Unit 1, Day 4", in: made)
+    }
+
+    /// Day 3 a link to Day 1's page, an earlier class the plan leaves; room
+    /// at Day 2: refused, naming Day 3. MUST FAIL with Day 1 retitled
+    /// "Unit 1, Day 4" and re-dated.
+    func testALaterClassLinkedToAnEarlierClassIsRefused() throws {
+        let made = try makeCourse()
+        try replaceWithALink("Unit 1, Day 3", holding: "Unit 1, Day 1.md", in: made)
+
+        try checkRefused(atDay: 2, naming: "Unit 1, Day 3", in: made)
+    }
+
+    /// The same through a link to a link: Day 3 leads to a file elsewhere
+    /// that is itself a link to Day 1's page. Judged by the file reached,
+    /// never by the name or path written in the link: refused.
+    func testALaterClassLinkedToAClassThroughAnotherLinkIsRefused() throws {
+        let made = try makeCourse()
+        let hop: URL = made.course.directoryURL.appendingPathComponent("elsewhere/hop.md")
+        try FileManager.default.createSymbolicLink(atPath: hop.path, withDestinationPath: "../section1/All Classes/Unit 1, Day 1.md")
+        try replaceWithALink("Unit 1, Day 3", holding: "../../elsewhere/hop.md", in: made)
+
+        try checkRefused(atDay: 2, naming: "Unit 1, Day 3", in: made)
     }
 
     /// A later class that is a link to a FOLDER: not a link to a file, so

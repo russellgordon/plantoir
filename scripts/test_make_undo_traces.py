@@ -1065,6 +1065,11 @@ class ContractCaseTests(unittest.TestCase):
                 + traces.ops_for_change(self.LINKED_FILE, pages[self.LINKED_FILE], self.linked_text(4, 4, body=3))
                 + traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
                 + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
+        if call == "makeRoomWithALaterClassLinkedToAnEarlierClass":
+            # Review B of U4b3, MEDIUM 1: Day 3 a link to Day 1's own page,
+            # another class page of the section: Insert Class refuses
+            # before anything changes (undo.rule.shadow), nothing begun.
+            return ("cannotTellNow",)
         if call == "handAPlaceOverAfterALinksMove":
             # U4b3 door-4, shape A: the link leaves Day 3, a new page fills it.
             if pages.get(self.day(3)) is None and pages.get(self.day(4)) is None:
@@ -1284,7 +1289,7 @@ class ContractCaseTests(unittest.TestCase):
                   "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
                   "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
                   "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
-                  "makeRoomWithALaterClassThatIsALink")
+                  "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)

@@ -1065,6 +1065,11 @@ nonisolated enum UndoContractReplay {
                     // U4b3 part 2: Insert Class runs on the main actor.
                     let stackJournal: UndoJournal = journal()
                     last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(root: root, journal: stackJournal, places: places)
+                } else if value == "makeRoomWithALaterClassLinkedToAnEarlierClass" {
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(
+                        root: root, journal: stackJournal, places: places, linkedToDay1: true
+                    )
                 } else if UndoContractKinds.calls.contains(value) {
                     if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
                         last = answered

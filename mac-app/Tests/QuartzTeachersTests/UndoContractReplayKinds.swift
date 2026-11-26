@@ -45,7 +45,7 @@ nonisolated enum UndoContractKinds {
         "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
-        "makeRoomWithALaterClassThatIsALink",
+        "makeRoomWithALaterClassThatIsALink", "makeRoomWithALaterClassLinkedToAnEarlierClass",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -777,7 +777,9 @@ nonisolated enum UndoContractKinds {
     /// U4b3 part 2's call, made on the main actor, where Insert Class runs
     /// (the replay hops there for it).
     @MainActor
-    static func makeRoomWithALaterClassThatIsALink(root: URL, journal: UndoJournal, places: UndoMemoryPlaces) throws -> String {
+    static func makeRoomWithALaterClassThatIsALink(
+        root: URL, journal: UndoJournal, places: UndoMemoryPlaces, linkedToDay1: Bool = false
+    ) throws -> String {
         // U4b3 part 2: Unit 1, Day 1 to Day 3 in section 1, Day 3 a link
         // to a file elsewhere in the course; room for one class at Day
         // 2 made by Insert Class's own plan and apply
@@ -787,6 +789,15 @@ nonisolated enum UndoContractKinds {
         // at Day 4.
         let course: URL = root.appendingPathComponent("courses/TST1O")
         let made: Course = try laidLinkedPageCourse(root: root)
+        if linkedToDay1 {
+            // Review B of U4b3, MEDIUM 1 (`makeRoomWithALaterClassLinkedToAnEarlierClass`):
+            // Day 3 a link to Day 1's own page, another class page of the
+            // same section, which Insert Class refuses before anything
+            // changes, as it did before U4b3 part 2.
+            let day3: URL = root.appendingPathComponent(linkedPageDay(3))
+            try FileManager.default.removeItem(at: day3)
+            try layALink(linkedPageDay(3), leadingTo: "Unit 1, Day 1.md", root: root)
+        }
         let plan: ClassInsertionPlan
         do {
             plan = try ClassInsertionPlanner.plan(unit: 1, atDay: 2, count: 1, forSection: 1, in: made)
@@ -809,6 +820,8 @@ nonisolated enum UndoContractKinds {
         do {
             _ = try ClassInsertionPlanner.apply(plan, in: made, into: step)
             try step.make()
+        } catch JournaledStepError.refused(.cannotTellNow, _) {
+            return "cannotTellNow"
         } catch {
             return "insertRefused"
         }
