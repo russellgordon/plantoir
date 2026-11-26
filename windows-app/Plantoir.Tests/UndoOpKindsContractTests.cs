@@ -9,8 +9,9 @@ namespace Plantoir.Tests;
 /// #899 W6: <c>shared-rules.json</c> → <c>undo.listingCases</c> (a folder's
 /// listing, byte for byte) and <c>undo-json-cases.json</c> → <c>editJSONCases</c> (an editJSON move on
 /// a file's bytes, byte for byte), every case from the JSON; and the Windows
-/// points the contract leaves to the platform: a move that changes only case,
-/// a folder another program holds open, a tree made inside OneDrive's
+/// points the contract leaves to the platform: a move that changes only case
+/// (readable in its last part since W8-5, still not above it), a folder
+/// another program holds open, a tree made inside OneDrive's
 /// attributes, an external target that cannot be set.
 /// </summary>
 public sealed class UndoOpKindsContractTests : IDisposable
@@ -227,16 +228,23 @@ public sealed class UndoOpKindsContractTests : IDisposable
     }
 
     /// <summary>
-    /// NTFS takes <c>a.json</c> and <c>A.json</c> for one place: a move that
-    /// changes only case is a step this version cannot read (a barrier), never
-    /// a rename that could be read as both places free or both full.
+    /// NTFS takes <c>a.json</c> and <c>A.json</c> for one place. Since W8-5 a
+    /// move that changes only the case of its last part is readable, as on
+    /// the mac since U4b (<c>opKinds.move</c>'s capitalisation-only rename,
+    /// <c>UndoOp.IsCaseOnlyMove</c>); a move whose case differs in a
+    /// folder above the last part is still a step this version cannot read,
+    /// never a rename that could be read as both places free or both full;
+    /// and a move between two different names is readable as any move.
     /// </summary>
     [Fact]
-    public void AMoveThatChangesOnlyCaseIsNotReadable()
+    public void AMoveThatChangesOnlyCaseInItsLastPartIsReadable()
     {
         var op = new JsonObject { ["kind"] = "move", ["from"] = "courses/TST1O/a.json", ["to"] = "courses/TST1O/A.json", ["sha"] = new string('a', 64) };
         using JsonDocument document = JsonDocument.Parse(op.ToJsonString());
-        Assert.False(UndoFormat.ReadOp(document.RootElement).Readable);
+        Assert.True(UndoFormat.ReadOp(document.RootElement).Readable);
+        op["to"] = "courses/tst1o/A.json";
+        using JsonDocument above = JsonDocument.Parse(op.ToJsonString());
+        Assert.False(UndoFormat.ReadOp(above.RootElement).Readable);
         op["to"] = "courses/TST1O/b.json";
         using JsonDocument other = JsonDocument.Parse(op.ToJsonString());
         Assert.True(UndoFormat.ReadOp(other.RootElement).Readable);

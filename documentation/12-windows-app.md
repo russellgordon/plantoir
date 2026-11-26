@@ -17697,9 +17697,9 @@ before W7 (U3) and W8 (U4).
   move is judged as a PAIR: an undo after a deploy wrote a new marker where a
   rollover's was takes nothing back and keeps both. A move is one
   `MoveFileEx` WITHOUT `MOVEFILE_REPLACE_EXISTING`, the pair re-read just
-  before it. A move that changes only case (`a.json` to `A.json`) is a step
-  this version cannot read, because places compare without case: NTFS would
-  otherwise see both places as one.
+  before it. A move that changes only case (`a.json` to `A.json`) was a step
+  W6 could not read; superseded by W8 piece 5, which reads one whose case
+  differs in its last part only, judged by the spelling its folder lists.
 - **Links on Windows.** The mac's `lstat` is three questions here
   (`UndoLinks`): a reparse point whose tag is a NAME SURROGATE (a junction,
   a symbolic link, WSL's links) is a link, never followed, "something
