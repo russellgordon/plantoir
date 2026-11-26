@@ -148,6 +148,9 @@ internal sealed record UndoOp
     internal static bool PlacesOverlap(string first, string second) =>
         PartInside(first, second) is not null || PartInside(second, first) is not null;
 
+    /// <summary>W8-2b, tests first: a stub for the red run.</summary>
+    internal static bool MoveCarries(UndoOp move, UndoOp edit) => false;
+
     /// <summary>
     /// The part of <paramref name="path"/> inside <paramref name="place"/>,
     /// spelled as <paramref name="path"/> spells it: "" when it is the place

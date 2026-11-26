@@ -91,4 +91,133 @@ public sealed class UndoCarryingMoveTests
         Assert.Equal(listing.Sha, UndoTreeReading.Read(scribe.FullPath("A", from)).ListingSha);
         Assert.IsType<UndoTreeReading.Absent>(UndoTreeReading.Read(scribe.FullPath("A", to)));
     }
+
+    // ---- Readability (opKinds.wholeOps' one exception) --------------------------------
+
+    private const string From = "courses/TST1O/media";
+    private const string To = "courses/TST1O/renamed";
+
+    private static UndoOp Op(JsonObject json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json.ToJsonString());
+        return UndoFormat.ReadOp(document.RootElement);
+    }
+
+    private static JsonObject FolderMove() =>
+        new() { ["kind"] = "move", ["from"] = From, ["to"] = To, ["listingSha"] = MediaListing().Sha };
+
+    private static JsonObject HunkAt(string path) => new()
+    {
+        ["kind"] = "replaceText", ["path"] = path, ["before"] = "old", ["after"] = "new",
+        ["contextBefore"] = "Line one: ", ["contextAfter"] = ".\n",
+    };
+
+    [Fact]
+    public void AnEditInsideAMovesToAfterTheMoveIsCarriedAndStands()
+    {
+        UndoOp move = Op(FolderMove());
+        UndoOp edit = Op(HunkAt(To + "/a.md"));
+        Assert.True(UndoOp.MoveCarries(move, edit));
+        Assert.True(UndoStep.WholeOpsStandAlone([move, edit]));
+        // Named with another case for a part: the same place on NTFS.
+        Assert.True(UndoStep.WholeOpsStandAlone([move, Op(HunkAt("courses/TST1O/Renamed/a.md"))]));
+    }
+
+    [Fact]
+    public void AnEditInsideAMovesToBeforeTheMoveIsABarrier()
+    {
+        Assert.False(UndoStep.WholeOpsStandAlone([Op(HunkAt(To + "/a.md")), Op(FolderMove())]));
+    }
+
+    [Fact]
+    public void AnEditInsideAMovesFromIsABarrier()
+    {
+        UndoOp move = Op(FolderMove());
+        UndoOp edit = Op(HunkAt(From + "/a.md"));
+        Assert.False(UndoOp.MoveCarries(move, edit));
+        Assert.False(UndoStep.WholeOpsStandAlone([move, edit]));
+    }
+
+    [Fact]
+    public void AWholeOpInsideAMovesToIsStillABarrier()
+    {
+        UndoTreeListing listing = MediaListing();
+        (JsonObject tree, _) = UndoKindsForTheCases.Tree("createTree", To + "/made", listing, []);
+        UndoOp move = Op(FolderMove());
+        Assert.False(UndoOp.MoveCarries(move, Op(tree)));
+        Assert.False(UndoStep.WholeOpsStandAlone([move, Op(tree)]));
+    }
+
+    // ---- Through the real door ----------------------------------------------------------
+
+    private static readonly byte[] OldA = Encoding.UTF8.GetBytes("Intro.\nLine one: old.\nEnd.\n");
+    private static readonly byte[] NewA = Encoding.UTF8.GetBytes("Intro.\nLine one: new.\nEnd.\n");
+
+    private static UndoScribe MediaFolder(out UndoTreeListing listing)
+    {
+        var scribe = new UndoScribe();
+        scribe.WritePage("A", From + "/a.md", OldA);
+        scribe.WritePage("A", From + "/b.md", Encoding.UTF8.GetBytes("B\n"));
+        listing = ((UndoTreeReading.Tree)UndoTreeReading.Read(scribe.FullPath("A", From))).Listing;
+        return scribe;
+    }
+
+    private static JsonObject MoveOf(UndoTreeListing listing) =>
+        new() { ["kind"] = "move", ["from"] = From, ["to"] = To, ["listingSha"] = listing.Sha };
+
+    /// <summary>Made, undone, redone and undone again: the edit after the move going forward, before it going back, and no staged file left.</summary>
+    [Fact]
+    public void ACarriedEditIsMadeUndoneRedoneAndUndoneAgainThroughTheDoor()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        UndoOutcome made = scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        Assert.Equal(UndoOutcomeKind.Applied, made.Kind);
+        Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", From)));
+
+        Assert.Equal("undone", scribe.Undo().Name);
+        Assert.Equal(OldA, scribe.Page("A", From + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", To)));
+
+        Assert.Equal("redone", scribe.Redo().Name);
+        Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", From)));
+
+        Assert.Equal("undone", scribe.Undo().Name);
+        Assert.Equal(OldA, scribe.Page("A", From + "/a.md"));
+        Assert.Empty(scribe.StagedLeftovers("A"));
+    }
+
+    /// <summary>A page the step made inside the moved folder: taken out before the move goes back (its kept original holds no handle on the folder then).</summary>
+    [Fact]
+    public void ACarriedNewPageIsTakenOutAndThenTheFolderMovedBack()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        byte[] made = Encoding.UTF8.GetBytes("Made.\n");
+        JsonArray write = scribe.OpsFor(To + "/c.md", null, made);
+        Assert.Equal(UndoOp.WriteFile, (string?)write[0]!["kind"]);
+        UndoOutcome outcome = scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), write[0]!.DeepClone()), [made]));
+        Assert.Equal(UndoOutcomeKind.Applied, outcome.Kind);
+        Assert.Equal(made, scribe.Page("A", To + "/c.md"));
+
+        Assert.Equal("undone", scribe.Undo().Name);
+        Assert.Null(scribe.Page("A", From + "/c.md"));
+        Assert.Equal(OldA, scribe.Page("A", From + "/a.md"));
+        Assert.False(Directory.Exists(scribe.FullPath("A", To)));
+        Assert.Empty(scribe.StagedLeftovers("A"));
+    }
+
+    /// <summary>A refused Undo of a carrying move names the folder where a teacher finds it now: its <c>to</c> (<c>placeAsFound</c>).</summary>
+    [Fact]
+    public void ARefusedUndoNamesTheMovedFolderWhereItIsNow()
+    {
+        using UndoScribe scribe = MediaFolder(out UndoTreeListing listing);
+        scribe.Door().Perform(scribe.OpsDraft("A", new JsonArray(MoveOf(listing), HunkAt(To + "/a.md")), []));
+        scribe.WritePage("A", To + "/c.md", Encoding.UTF8.GetBytes("C\n"));
+
+        UndoScribe.Outcome undo = scribe.Undo();
+        Assert.Equal("changedSince", undo.Name);
+        Assert.Equal(To, undo.Page);
+        Assert.Equal(NewA, scribe.Page("A", To + "/a.md"));
+    }
 }
