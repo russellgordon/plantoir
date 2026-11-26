@@ -2,17 +2,6 @@
 
 Branch `issue/899-w7b2-5-start-of-year`, from `origin/dev` a03fecefd (W7b2-4 merged; the brief's base branch is deleted, the director's correction of 2026-11-25). No `contracts/` change, no `mac-app/` change.
 
-## For PROGRESS
-
-- W7b2-5 (#899): Get Ready for the Start of the Year (`PrepareForStartOfYear`, key `getReadyForTheStartOfTheYear`) plans every page it puts into draft into ONE `UndoActionStep` and names the section front page as a `recompute` (`sectionFrontPage`), never a file of the step: all or none, the mac's `StartOfYearPlanner.apply`. The app's Go is made by `sheet` (the mac's `UndoStepMaker.sheet`); the assistant's by its conversation. The fixture row `getReadyForTheStartOfTheYear` is converted (out of `HeldButRunnable` and the ledger), and its six traces (action-091 to 096) run the real Windows action.
-- Undo Getting Ready (the sheet's own undo) now goes through today's undo, `UndoHistory`, as the mac's `StartOfYearPreparation.undo` records the held change on a fresh `AssistChangeHistory` and undoes it. `AssistWorkspace.StartOfYear.cs` has no writer of its own: its writer-scan entry is gone.
-
-## For documentation 12
-
-- The start of the year's write (12, the Undo / W7 section): one step, its files in the order of their places in the working folder (the mac's `AssistPublishPlanner.planWrites` sorts its paths, so `Concepts/Loops.md` comes before `section1/All Classes/…`); Windows' plan lists classes first, measured on the fixture (the first run failed on exactly this order), so the step sorts by the path relative to the working folder with forward slashes, ordinal. The sheet's lists, the declined sentence and Undo Getting Ready keep the plan's order (`written`), so what the teacher reads is unchanged.
-- A failure now changes nothing. A refusal answers `Nothing was changed: <reason>` (trail: "nothing was changed (writeFailed)"); a part-way stop answers `RefusalForAStepThatStopped(…, "the pages put into draft", …)`, naming each kept file (trail: "the pages could not all be written (writeFailed); backup …"). Both return `Changed: false` with nothing in `Written`, so the sheet holds no undo for them. `StartOfYearWording.WriteFailed` is no longer said by Windows; the mac still says it on any failure (its `prepareForStartOfYear` catch). The brief asked for the "Nothing was changed" family. This differs from a contract sentence: `writeFailed` is `shared-rules.json` → the start-of-year wording (about line 25787), which Windows still carries in `StartOfYearWording` but no longer says (corrected in W7b2-6, from W7b2-5 review 1 L1).
-- `NewUndoStep` takes an optional `madeBy` for a sheet's own button.
-
 ## Must-fail lines
 
 Recorded in `vm-tools/guest/899-w7b2-5-mustfail.json`, run by `899-w7b2-5-go.ps1` (a copy of `899-w7b-pc-run.ps1`'s caller). Run b, head 65b87b3d5: see "Runs" for each line.
