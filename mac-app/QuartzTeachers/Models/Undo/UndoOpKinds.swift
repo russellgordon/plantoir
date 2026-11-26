@@ -1110,8 +1110,8 @@ nonisolated extension UndoCheck {
                     return .neither
                 case .to, .from:
                     let side: UndoMoveSide = spelled == .to
-                        ? UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)
-                        : UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
+                        ? UndoMoveSide.read(op, at: root.appendingPathComponent(to), isAtFrom: false, overriding: overridingTo)
+                        : UndoMoveSide.read(op, at: root.appendingPathComponent(from), isAtFrom: true, overriding: overridingFrom)
                     if side == .cannotRead {
                         return .cannotTell
                     }
@@ -1123,11 +1123,11 @@ nonisolated extension UndoCheck {
             }
             var atFrom: UndoMoveSide = .free
             if !fromIsHandedOver {
-                atFrom = UndoMoveSide.read(op, at: root.appendingPathComponent(from), overriding: overridingFrom)
+                atFrom = UndoMoveSide.read(op, at: root.appendingPathComponent(from), isAtFrom: true, overriding: overridingFrom)
             }
             var atTo: UndoMoveSide = .free
             if !toIsHandedOver {
-                atTo = UndoMoveSide.read(op, at: root.appendingPathComponent(to), overriding: overridingTo)
+                atTo = UndoMoveSide.read(op, at: root.appendingPathComponent(to), isAtFrom: false, overriding: overridingTo)
             }
             if atFrom == .cannotRead || atTo == .cannotRead {
                 return .cannotTell
@@ -1252,17 +1252,24 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
         return .another
     }
 
-    static func read(_ op: UndoOp, at url: URL, overriding: [String: UndoItem] = [:]) -> UndoMoveSide {
-        return readNamingFoldersLeftOut(op, at: url, overriding: overriding).side
+    /// `isAtFrom` names the side read: a relinking move (U4b3 relink-1)
+    /// holds its `linkShaBefore` text at `from` and its `linkShaAfter`
+    /// text at `to`; every other move holds the same content on both.
+    static func read(_ op: UndoOp, at url: URL, isAtFrom: Bool = true, overriding: [String: UndoItem] = [:]) -> UndoMoveSide {
+        return readNamingFoldersLeftOut(op, at: url, isAtFrom: isAtFrom, overriding: overriding).side
     }
 
     /// `read`, naming too each folder inside the place that was left out
     /// of the judgement (U4b2-10), deepest first, as the disk spells it.
     static func readNamingFoldersLeftOut(
-        _ op: UndoOp, at url: URL, overriding: [String: UndoItem] = [:]
+        _ op: UndoOp, at url: URL, isAtFrom: Bool = true, overriding: [String: UndoItem] = [:]
     ) -> (side: UndoMoveSide, foldersLeftOut: [String]) {
-        if let linkSha = op.linkSha {
+        if op.isALinksMove {
             // U4b2-14: a link is the item; nothing inside it is the move's.
+            // Each side by its own text (U4b3 relink-1).
+            guard let linkSha = op.linkText(isAtFrom: isAtFrom) else {
+                return (side: .holdsSomethingElse, foldersLeftOut: [])
+            }
             return (side: UndoMoveSide.readLink(at: url, linkSha: linkSha), foldersLeftOut: [])
         }
         if let sha = op.sha {
@@ -1545,7 +1552,7 @@ nonisolated enum UndoPlaces {
     /// a link that leads out of the working folder, or nowhere, is moved as
     /// a link like any other.
     static func staysInside(_ root: URL, _ relativePath: String, namedBy op: UndoOp) -> Bool {
-        if op.linkSha == nil || (relativePath != op.from && relativePath != op.to) {
+        if !op.isALinksMove || (relativePath != op.from && relativePath != op.to) {
             return staysInside(root, relativePath)
         }
         return staysInsideAbove(root, relativePath)

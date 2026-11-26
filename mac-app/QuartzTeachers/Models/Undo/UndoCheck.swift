@@ -601,7 +601,7 @@ nonisolated enum UndoCheck {
                 let filler: UndoOp = ops[fillerIndex]
                 if let filled = UndoCheck.placeFilled(by: filler), UndoOp.partInside(place, of: filled) == "",
                    UndoCheck.handsOverAsAMove(leaver) || UndoCheck.handsOverAsAMove(filler) {
-                    let aLinkMoves: Bool = leaver.linkSha != nil || filler.linkSha != nil
+                    let aLinkMoves: Bool = leaver.isALinksMove || filler.isALinksMove
                     found.append(UndoHandover(
                         place: place, leaverIndex: leaverIndex, fillerIndex: fillerIndex, aLinkMoves: aLinkMoves
                     ))
@@ -619,7 +619,7 @@ nonisolated enum UndoCheck {
         if op.knownKind != .move || op.listingSha != nil || op.isCaseOnlyMove {
             return false
         }
-        return op.sha != nil || op.linkSha != nil
+        return op.sha != nil || op.isALinksMove
     }
 
     /// The place an op leaves: a handing-over move's `from`, or a removed
@@ -760,10 +760,27 @@ nonisolated enum UndoCheck {
             }
             let source: String = direction == .backward ? to : from
             let destination: String = direction == .backward ? from : to
+            var relink: UndoRelink? = nil
+            if op.knownKind == .move, op.isARelink, let before = op.linkShaBefore, let after = op.linkShaAfter {
+                // A relinking move (U4b3 relink-1): the link is made anew
+                // with the destination's text, so both texts come from the
+                // list. Either missing: content missing, nothing changed.
+                guard let beforeText = try journal.blobContent(sha: before),
+                      let afterText = try journal.blobContent(sha: after) else {
+                    return nil
+                }
+                let sourceIsFrom: Bool = direction == .forward
+                relink = UndoRelink(
+                    sourceText: sourceIsFrom ? beforeText : afterText,
+                    destinationText: sourceIsFrom ? afterText : beforeText,
+                    sourceIsFrom: sourceIsFrom
+                )
+            }
             return UndoSwapTarget(
                 url: root.appendingPathComponent(destination),
                 relativePath: destination,
-                change: .moveHere(from: root.appendingPathComponent(source), fromPath: source, op: op)
+                change: .moveHere(from: root.appendingPathComponent(source), fromPath: source, op: op),
+                relink: relink
             )
         case .createTree, .removeTree:
             guard let path = op.path, let listingSha = op.listingSha else {
@@ -905,6 +922,10 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
     /// judged on the folders above it only, and nothing is read through it.
     let handedOver: Bool
 
+    /// U4b3 relink-1: a relinking move's two texts, each side's own, nil
+    /// for every other change.
+    let relink: UndoRelink?
+
     // MARK: - Initializer
 
     init(
@@ -918,9 +939,10 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
         self.change = .file
         self.stagesAtItsTurn = stagesAtItsTurn
         self.handedOver = handedOver
+        self.relink = nil
     }
 
-    init(url: URL, relativePath: String, change: UndoSwapChange) {
+    init(url: URL, relativePath: String, change: UndoSwapChange, relink: UndoRelink? = nil) {
         self.url = url
         self.relativePath = relativePath
         self.expected = nil
@@ -928,7 +950,26 @@ nonisolated struct UndoSwapTarget: Equatable, Sendable {
         self.change = change
         self.stagesAtItsTurn = false
         self.handedOver = false
+        self.relink = relink
     }
+}
+
+/// A relinking move's two texts as one swap goes (U4b3 relink-1): the
+/// text the link holds where it moves from, and the text the new link is
+/// made with where it goes. Read from the list by their blobs.
+nonisolated struct UndoRelink: Equatable, Sendable {
+
+    // MARK: - Stored properties
+
+    /// The text the link at the source must hold before it is removed.
+    let sourceText: Data
+
+    /// The text the new link at the destination is made with.
+    let destinationText: Data
+
+    /// Whether the source is the op's `from` (going forward), so that each
+    /// side is read by its own sha.
+    let sourceIsFrom: Bool
 }
 
 /// The kinds of change a swap makes.
@@ -1236,7 +1277,17 @@ nonisolated enum UndoSwap {
                         }
                     }
                 case .moveHere(let from, _, _):
-                    if failsHere || !UndoSwap.renameExclusively(target.url, onto: from) {
+                    if let relink = target.relink {
+                        // Made back the same way the other way round: the
+                        // source's text made beside `from`, renamed in, the
+                        // link this swap made removed (U4b3 relink-1).
+                        if failsHere || !UndoSwap.relinkLink(
+                            leaving: target.url, holding: relink.destinationText,
+                            onto: from, holding: relink.sourceText, label: label
+                        ) {
+                            everyOnePutBack = false
+                        }
+                    } else if failsHere || !UndoSwap.renameExclusively(target.url, onto: from) {
                         everyOnePutBack = false
                     } else {
                         followTheMove(from: target.url, to: from)
@@ -1375,14 +1426,17 @@ nonisolated enum UndoSwap {
                 // the part-two review's M1.
                 var leftOut: [String: UndoItem] = ownFilesInside(from)
                 // A link's move reads nothing through the link (U4b2-14).
-                if op.linkSha == nil, let seq = UndoSwap.stepSeq(ofLabel: label) {
+                if !op.isALinksMove, let seq = UndoSwap.stepSeq(ofLabel: label) {
                     for (inside, item) in UndoSwap.stepsOwnFilesInside(from, seq: seq) {
                         leftOut[inside] = item
                     }
                 }
-                let fromReading = UndoMoveSide.readNamingFoldersLeftOut(op, at: from, overriding: leftOut)
+                // Each side by its own text for a relinking move (U4b3
+                // relink-1): the source's, then the destination's.
+                let sourceIsFrom: Bool = target.relink?.sourceIsFrom ?? true
+                let fromReading = UndoMoveSide.readNamingFoldersLeftOut(op, at: from, isAtFrom: sourceIsFrom, overriding: leftOut)
                 let atFrom: UndoMoveSide = fromReading.side
-                var atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url)
+                var atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url, isAtFrom: !sourceIsFrom)
                 if op.isCaseOnlyMove, let spelled = UndoMoveSide.spellingListed(from: from, to: target.url) {
                     // One item under two spellings (U4b): it goes in only
                     // while its folder lists the spelling it leaves, and the
@@ -1406,6 +1460,18 @@ nonisolated enum UndoSwap {
                     refusal = .changedSince(firstPath: target.relativePath, others: 0)
                 } else if atFrom != .holdsTheContent || atTarget != .free {
                     refusal = .changedSince(firstPath: namedAs, others: 0)
+                } else if let relink = target.relink {
+                    // A relinking move: the new link made beside its place,
+                    // renamed in exclusively, then the old one removed once
+                    // re-read (U4b3 relink-1). Nothing is written through
+                    // either link.
+                    makeTheFolder(for: target.url)
+                    if !UndoSwap.relinkLink(
+                        leaving: from, holding: relink.sourceText,
+                        onto: target.url, holding: relink.destinationText, label: label
+                    ) {
+                        refusal = .fileIsInUse(path: namedAs)
+                    }
                 } else {
                     makeTheFolder(for: target.url)
                     if !UndoSwap.renameExclusively(from, onto: target.url) {
@@ -1731,6 +1797,74 @@ nonisolated enum UndoSwap {
                 }
                 return renamex_np(fromPath, toPath, UInt32(RENAME_EXCL))
             }
+        }
+        return result == 0
+    }
+
+    /// U4b3 relink-1: a link moved and given a new text. A new link holding
+    /// `newText` is made under a staged name beside `new`, renamed in
+    /// exclusively (never over anything), and only then is the link at
+    /// `old` removed, once it is re-read (`lstat`, `readlink`) holding
+    /// `oldText`. Neither link is ever followed or written through. False
+    /// when any step fails; whatever this call made is then taken away
+    /// again, and the old link is left as it was.
+    static func relinkLink(leaving old: URL, holding oldText: Data, onto new: URL, holding newText: Data, label: String) -> Bool {
+        let stagedURL: URL = UndoSwap.besideURL(for: new, label: label, role: "new")
+        _ = UndoSwap.removeStaged(stagedURL)
+        if !UndoSwap.makeALink(at: stagedURL, holding: newText) {
+            _ = UndoSwap.removeStaged(stagedURL)
+            return false
+        }
+        let renameFails: Bool = UndoKillPoints.relinkRenameInFails?(new) == true
+        if renameFails || !UndoSwap.renameExclusively(stagedURL, onto: new) {
+            _ = UndoSwap.removeStaged(stagedURL)
+            return false
+        }
+        if UndoSwap.linkHolds(old, oldText) && UndoSwap.removeALink(at: old) {
+            return true
+        }
+        // The old link changed under the swap, or would not go: the new one
+        // is taken away again (it is this call's own), the old left whole.
+        if UndoSwap.linkHolds(new, newText) {
+            _ = UndoSwap.removeALink(at: new)
+        }
+        return false
+    }
+
+    /// A symbolic link at `url` holding exactly `text`, made with
+    /// `symlink`: never over anything.
+    static func makeALink(at url: URL, holding text: Data) -> Bool {
+        var bytes: [CChar] = []
+        for byte in text {
+            if byte == 0 {
+                return false
+            }
+            bytes.append(CChar(bitPattern: byte))
+        }
+        bytes.append(0)
+        let result: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return symlink(bytes, path)
+        }
+        return result == 0
+    }
+
+    /// Whether `url` is a symbolic link holding exactly `text`, read with
+    /// `lstat` and `readlink`, never followed.
+    static func linkHolds(_ url: URL, _ text: Data) -> Bool {
+        return UndoMoveSide.readLink(at: url, linkSha: UndoHash.sha256(of: text)) == .holdsTheContent
+    }
+
+    /// Removes the symbolic link at `url` itself (`unlink`), never what it
+    /// leads to.
+    static func removeALink(at url: URL) -> Bool {
+        let result: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return unlink(path)
         }
         return result == 0
     }

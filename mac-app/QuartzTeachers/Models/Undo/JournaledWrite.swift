@@ -1167,6 +1167,11 @@ nonisolated enum UndoKillPoints {
     /// Windows. Set only by tests.
     nonisolated(unsafe) static var putBackFailsAt: ((Int) -> Bool)?
 
+    /// Answers true to make renaming a relinking move's new link in fail at
+    /// this place (U4b3 relink-1), as a place taken in that instant would.
+    /// Set only by tests.
+    nonisolated(unsafe) static var relinkRenameInFails: ((URL) -> Bool)?
+
     /// Called with the list's folder once its segments are listed and
     /// before any of them is opened: a test takes a segment away there, as
     /// a sync service or a person could in that instant (#1004). Set only
