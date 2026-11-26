@@ -689,8 +689,14 @@ nonisolated final class JournaledStep {
     /// The `.md` files under a folder, at any depth, once the step is made:
     /// the disk's (`onDisk`, as a lister found them), without those the step
     /// removes, with those it makes, sorted by path as the listers sort. A
-    /// link the step moves is listed once, at its new name; the place it
-    /// leaves only when the step writes a page there (U4b3 door-6).
+    /// link the step moves or re-points is NOT listed, at either name: the
+    /// place it leaves only when the step writes a page there (U4b3
+    /// door-6), and never at its new name (review E of U4b3, MEDIUM: the
+    /// `[[link]]` rewrite visits each FILE once, at its own place, so a
+    /// page a link leads to is rewritten at its own name when it is one of
+    /// the files listed, and never through the link; writing at a
+    /// re-pointed link's new name is refused, `refusesAWrite`, and refused
+    /// the whole Insert Class).
     func markdownFiles(under folderURL: URL, onDisk: [URL]) -> [URL] {
         var result: [URL] = []
         var seen: Set<String> = []
@@ -718,14 +724,6 @@ nonisolated final class JournaledStep {
                 continue
             }
             result.append(url)
-        }
-        for move in plannedFolderMoves where JournaledStep.isALinksMove(move) {
-            let key: String = JournaledStep.key(of: move.to)
-            if seen.contains(key) || !key.hasPrefix(folderPrefix) || move.to.pathExtension.lowercased() != "md" {
-                continue
-            }
-            seen.insert(key)
-            result.append(move.to)
         }
         result.sort(by: ClassPages.isInPathOrder)
         return result

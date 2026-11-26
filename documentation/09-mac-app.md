@@ -23613,8 +23613,13 @@ course-level page, another section's folder or outside the course, every
 other date line left byte for byte; fix 4 of the review round), because
 a write planned at a link move's `to`, within the same folder, is
 planned at the file the link leads to (`JournaledStep.placeALinkLeadsTo`,
-this piece's first half), and the `[[link]]` rewrite reaches it the same way,
-once. The place the link leaves is filled in the same step by the class below
+this piece's first half). The `[[link]]` rewrite never goes through a
+link: it visits each file once, at its own place, and only the pages the
+section shows (`ClassPages.pagesOfSection`); a moved or re-pointed link is
+listed at neither of its names (`JournaledStep.markdownFiles`), so the page
+it leads to is rewritten at its own (new) name when it is one of those
+pages, and not at all otherwise (review E of U4b3: listing a re-pointed
+link's new name refused the whole Insert Class, "cannot tell now"). The place the link leaves is filled in the same step by the class below
 it or by the new class, a place handed over (the door pieces, next section),
 so two links in a row and a link below a plain class are one step too.
 `ClassInsertionPlanner.apply` decides "a link to a file" by `lstat` and the

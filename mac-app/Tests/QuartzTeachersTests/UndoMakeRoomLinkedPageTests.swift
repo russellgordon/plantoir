@@ -320,25 +320,85 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertTrue(linked.contains("createdSection1: 2026-09-16T07:00:00.000-0400"))
     }
 
-    /// A linked file that names itself (`[[Unit 1, Day 3]]`) is rewritten
-    /// once, through the link: the file holds the new name once, no plain
-    /// copy is written beside it.
-    func testALinkedPageThatNamesItselfIsRewrittenOnceThroughTheLink() throws {
+    /// A moved (not re-pointed) link whose file lies OUTSIDE the section's
+    /// class pages (course-level, `elsewhere/`) and names the class
+    /// (`[[Unit 1, Day 3]]`): the `[[link]]` rewrite covers every page the
+    /// section shows (`ClassPages.pagesOfSection`), that file among them,
+    /// so it is rewritten once at its OWN place, as released code
+    /// (461ee3943) rewrote it there too (released code also wrote a plain
+    /// copy at Day 4 in place of the link, and rewrote that). Nothing is
+    /// written at the link's new name: no op of the step writes Day 4
+    /// (review E of U4b3). Undo and Redo exact. (It passed on the door
+    /// before this fix too: there the write at Day 4 resolved to the file's
+    /// own place; it pins that this is kept.)
+    func testALinkedPageOutsideTheClassPagesIsRewrittenOnceAtItsOwnPlace() throws {
         let made = try makeCourse()
         let target: String = "../../elsewhere/Unit 1, Day 3.md"
         let file: URL = try makeALink("Unit 1, Day 3", holding: target, in: made)
         let named: String = try String(contentsOf: file, encoding: .utf8)
             .replacingOccurrences(of: "Three.", with: "Three. See [[Unit 1, Day 3]].")
         try named.write(to: file, atomically: true, encoding: .utf8)
+        let before: [String: String] = everything(under: made)
 
         let result = try makeRoom(atDay: 2, in: made)
 
         XCTAssertEqual(result.steps, 1)
+        XCTAssertEqual(result.couldNotRecord, [])
         XCTAssertEqual(linkTarget("Unit 1, Day 4", in: made), target)
         let linked: String = try String(contentsOf: file, encoding: .utf8)
         XCTAssertEqual(linked.components(separatedBy: "[[Unit 1, Day 4]]").count, 2, linked)
         XCTAssertFalse(linked.contains("[[Unit 1, Day 3]]"), linked)
         XCTAssertTrue(linked.contains("title: Unit 1, Day 3"), "its own title kept")
+        var writtenAtTheLinksName: [String] = []
+        for op in try newestOps() where op.knownKind == .writeFile {
+            if let path = op.path, path.hasSuffix("All Classes/Unit 1, Day 4.md") {
+                writtenAtTheLinksName.append(path)
+            }
+        }
+        XCTAssertEqual(writtenAtTheLinksName, [], "nothing written at the moved link's new name")
+        try checkUndoAndRedoAreExact(made, before: before)
+    }
+
+    func newestOps() throws -> [UndoOp] {
+        let fold: UndoFold = try UndoJournalLocation.standardJournal().read()
+        var newest: UndoStepRecord? = nil
+        for (_, record) in fold.records {
+            if newest == nil || record.step.seq > (newest?.step.seq ?? 0) {
+                newest = record
+            }
+        }
+        return try XCTUnwrap(newest).step.ops
+    }
+
+    /// Review E of U4b3, MEDIUM: review B's arrangement (Day 4 a link
+    /// holding `Unit 1, Day 3.md`, room at Day 2) with Day 3's lesson
+    /// linking back, `[[Unit 1, Day 2]]`. Insert Class goes ahead: the
+    /// lesson's wiki link is rewritten once, in the page itself at its new
+    /// name (Day 4), the link re-pointed at it, nothing written at the
+    /// link's name; Undo and Redo exact. MUST FAIL with the re-pointed
+    /// link's new name listed for the rewrite (refused, cannot tell now,
+    /// naming Day 5).
+    func testARePointedLessonsWikiLinkIsRewrittenAtItsOwnPage() throws {
+        let made = try makeCourse()
+        let day3URL: URL = made.classes.appendingPathComponent("Unit 1, Day 3.md")
+        try page(title: "Unit 1, Day 3", date: "2026-09-14", body: "Three. Back to [[Unit 1, Day 2]].").write(
+            to: day3URL, atomically: true, encoding: .utf8
+        )
+        try replaceWithALink("Unit 1, Day 4", holding: "Unit 1, Day 3.md", in: made)
+        let before: [String: String] = everything(under: made)
+
+        let result = try makeRoom(atDay: 2, in: made)
+
+        XCTAssertEqual(result.steps, 1, "one step")
+        XCTAssertEqual(result.couldNotRecord, [])
+        XCTAssertEqual(linkTarget("Unit 1, Day 5", in: made), "Unit 1, Day 4.md", "re-pointed at the page's new name")
+        let day4: String = try text("Unit 1, Day 4", in: made)
+        XCTAssertNil(linkTarget("Unit 1, Day 4", in: made))
+        XCTAssertEqual(day4.components(separatedBy: "[[Unit 1, Day 3]]").count, 2, "rewritten once: \(day4)")
+        XCTAssertFalse(day4.contains("[[Unit 1, Day 2]]"), day4)
+        XCTAssertEqual(try text("Unit 1, Day 5", in: made), day4, "Day 5 still leads to the same lesson")
+        XCTAssertEqual(everything(under: made).count, before.count + 1, "one new page, nothing else")
+        try checkUndoAndRedoAreExact(made, before: before)
     }
 
     /// Russell, 2026-11-26: "Shared pages never have day “x” titles in
@@ -737,6 +797,40 @@ final class UndoMakeRoomLinkedPageTests: XCTestCase {
         XCTAssertTrue(copy.contains("the words of Unit 1, Day 1"), copy)
         let linked: String = try String(contentsOf: elsewhere, encoding: .utf8)
         XCTAssertTrue(linked.contains("the linked words") && linked.contains("title: Unit 1, Day 2"), linked)
+    }
+
+    /// Review E of U4b3, MEDIUM, through Duplicate Class, its probe moved
+    /// up one day: Day 3's lesson links back (`[[Unit 1, Day 2]]`) and Day
+    /// 4 is a link holding `Unit 1, Day 3.md`; duplicating Day 1 moves Day
+    /// 2 to 3 and Day 3 to 4, and re-points the link (now Day 5) at Day 4.
+    /// It goes ahead as one step: the wiki link rewritten once in the page
+    /// at Day 4, nothing written at the link's name. (It passed on the
+    /// door before this fix too: Duplicate Class did not reach review E's
+    /// refusal in this arrangement; it pins the outcome.)
+    func testDuplicateClassRewritesARePointedLessonsWikiLinkAtItsOwnPage() async throws {
+        let made = try AssistFixture.makeRunner(surface: .local)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try DuplicateAsNextClassTests.rememberTimetable(["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16", "2026-09-18"], in: made.course)
+        try DuplicateAsNextClassTests.writeClass("Unit 1, Day 1", on: "2026-09-08", in: made.course)
+        try DuplicateAsNextClassTests.writeClass("Unit 1, Day 2", on: "2026-09-10", in: made.course)
+        let day3: URL = AssistFixture.pageURL(of: "Unit 1, Day 3", in: made.course)
+        try "---\ntitle: Unit 1, Day 3\npublish: true\ncreated: 2026-09-14T07:00:00.000-0400\n---\n\nThree. Back to [[Unit 1, Day 2]].\n"
+            .write(to: day3, atomically: true, encoding: .utf8)
+        let day4: URL = AssistFixture.pageURL(of: "Unit 1, Day 4", in: made.course)
+        try FileManager.default.createSymbolicLink(atPath: day4.path, withDestinationPath: "Unit 1, Day 3.md")
+        let day5: URL = AssistFixture.pageURL(of: "Unit 1, Day 5", in: made.course)
+
+        let stepsBefore: Int = try stepCount()
+        _ = await AssistFixture.run("add_next_class", with: ["duplicate": "Unit 1, Day 1"], on: made.runner)
+        XCTAssertEqual(try stepCount() - stepsBefore, 1, "one step")
+
+        XCTAssertEqual(try? FileManager.default.destinationOfSymbolicLink(atPath: day5.path), "Unit 1, Day 4.md", "re-pointed")
+        XCTAssertNil(try? FileManager.default.destinationOfSymbolicLink(atPath: day4.path), "the old Day 3 at Day 4 is a plain page")
+        let moved: String = (try? String(contentsOf: day4, encoding: .utf8)) ?? ""
+        XCTAssertEqual(moved.components(separatedBy: "[[Unit 1, Day 3]]").count, 2, "rewritten once: \(moved)")
+        XCTAssertFalse(moved.contains("[[Unit 1, Day 2]]"), moved)
     }
 
     // MARK: - Tests: recovery

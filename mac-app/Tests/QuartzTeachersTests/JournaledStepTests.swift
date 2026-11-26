@@ -653,7 +653,8 @@ final class JournaledStepTests: XCTestCase {
         for url in step.markdownFiles(under: made.course, onDisk: onDisk) {
             listed.append(url.lastPathComponent)
         }
-        XCTAssertEqual(listed, ["Unit 1, Day 1.md", "Unit 1, Day 2.md", "Unit 1, Day 4.md"])
+        // Review E of U4b3: a moved link is listed at neither name.
+        XCTAssertEqual(listed, ["Unit 1, Day 1.md", "Unit 1, Day 2.md"])
 
         step.write("New.\n", to: linked.link)
         XCTAssertTrue(step.fileExists(linked.link))
@@ -663,7 +664,7 @@ final class JournaledStepTests: XCTestCase {
         for url in step.markdownFiles(under: made.course, onDisk: onDisk) {
             listed.append(url.lastPathComponent)
         }
-        XCTAssertEqual(listed, ["Unit 1, Day 1.md", "Unit 1, Day 2.md", "Unit 1, Day 3.md", "Unit 1, Day 4.md"])
+        XCTAssertEqual(listed, ["Unit 1, Day 1.md", "Unit 1, Day 2.md", "Unit 1, Day 3.md"])
 
         let lines: [UndoUnrecordedChange] = try couldNotRecordLines {
             try step.make()
