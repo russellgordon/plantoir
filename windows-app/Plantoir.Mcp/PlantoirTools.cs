@@ -879,7 +879,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                                  "there. A page with that name is never written over: it may be a lesson " +
                                  "written months ago.");
 
-            var result = workspace.ApplyAddClasses(plan);
+            // The step's key, as the mac's add_next_class names it (#899 W7b1):
+            // a new unit when the unit asked for is "next", else the next class.
+            string stepKey = string.Equals(unit?.Trim(), "next", StringComparison.OrdinalIgnoreCase)
+                ? "addNextClassInANewUnit" : "addNextClass";
+            var result = workspace.ApplyAddClasses(plan, actionKey: stepKey);
             if (!result.Succeeded) return Answering(result.Message);
 
             // The teacher asked for a page. Its name and its date are the
@@ -1179,11 +1183,16 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     $"dates from {DateText.Iso(TimetableMemory.EarliestBelievable)} to " +
                     $"{TimetableMemory.YearsAheadBelievable} years from today; check the year and try again.");
 
-            if (!TimetableMemory.Write(workspace.FolderPath, found.Code, number, parsed, source,
-                                       DateOnly.FromDateTime(DateTime.Now)))
+            var written = workspace.RememberTimetable(found.Code, number, parsed, source, DateOnly.FromDateTime(DateTime.Now));
+            if (!written.Remembered)
                 throw new AssistRefusal(
                     "Those dates couldn't be saved, so they aren't remembered. Tell the teacher they may be " +
                     "asked again — don't claim otherwise.");
+            // Left part way: the part-way sentence naming the kept file, never
+            // "Recorded" (the mac's saidWhenTheStepStopped, "the class dates";
+            // #899 W7b1 review 1, MEDIUM 1).
+            if (written.StoppedPartWay is { } partWay)
+                throw new AssistRefusal(workspace.StoppedPartWay("the class dates", partWay, number));
 
             var stored = TimetableMemory.Read(workspace.FolderPath, found.Code, number)!;
             return $"Recorded {stored.Dates.Count} class dates for {found.Code} Section {number}, " +

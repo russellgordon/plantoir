@@ -452,11 +452,22 @@ public sealed class SectionScheduleDialog : ContentDialog
                 return;
             }
 
-            bool wrote = TimetableMemory.Write(_workspacePath, _course.Code, _sectionNumber, _parsedDates, source, today);
-            if (wrote)
+            var written = TimetableMemory.WriteDown(_workspacePath, _course.Code, _sectionNumber, _parsedDates, source, today);
+            if (written.Remembered)
             {
                 SavedDates = _parsedDates;
                 SavedSource = source;
+                // The dates went in and what their file held is kept beside
+                // it as a hidden file (#899 W7b1, review 1, MEDIUM 1): said
+                // here, the mac's savedWithWhatItHeldKept words, and the
+                // sheet stays open so it is read; Save again closes it, the
+                // same dates changing nothing.
+                if (written.WhatWasKept is { } kept)
+                {
+                    _statusBlock.Text = TimetableMemory.RememberedWithWhatItHeldKept(_course, _sectionNumber, kept);
+                    _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
+                    args.Cancel = true;
+                }
             }
             else
             {

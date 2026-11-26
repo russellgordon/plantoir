@@ -176,6 +176,14 @@ internal sealed class UndoActionStep
         return File.Exists(fullPath) ? File.ReadAllText(fullPath) : null;
     }
 
+    /// <summary>Whether the file is there as the step will leave it: planned with content, else on the disk (the mac's <c>fileExists</c>).</summary>
+    internal bool Exists(string fullPath)
+    {
+        string key = Path.GetFullPath(fullPath);
+        if (_after.TryGetValue(key, out byte[]? planned)) return planned is not null;
+        return File.Exists(fullPath);
+    }
+
     /// <summary>The file's text as the step will leave it: what is planned, else the disk's.</summary>
     internal string ReadText(string fullPath)
     {
@@ -336,7 +344,7 @@ internal sealed class UndoActionStep
             targets.Add(new UndoSwapTarget(place, place, _before[path], _after[path]));
         }
         HashSet<string> keptBefore = KeptOriginalsNow();
-        switch (UndoSwap.Swap(targets, "shadow", null, _plainSeams))
+        switch (UndoSwap.Swap(targets, UndoSwap.PlainLabel(), null, _plainSeams))
         {
             case UndoSwapResult.Refused { LeftPartWay: true } partWay:
                 throw LeftPartWay(partWay.Refusal, keptBefore);

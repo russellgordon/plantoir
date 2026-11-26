@@ -1182,8 +1182,12 @@ public sealed partial class AssistWindow : Window
             };
             try
             {
-                var result = await dialog.ShowWithTheFirstFocusInTheBoxAsync();
-                if (result == ContentDialogResult.Primary && dialog.SavedDates is { Count: > 0 } dates)
+                await dialog.ShowWithTheFirstFocusInTheBoxAsync();
+                // What is on disk, however the sheet was closed: a sheet that
+                // said the dates are remembered with what their file held
+                // kept stays open, and a Cancel after that leaves them
+                // remembered (#899 W7b1 review 2, LOW 1).
+                if (dialog.SavedDates is { Count: > 0 } dates)
                 {
                     Say("Assistant", ClassDatesDialogWords.Remembered(dates.Count, _course, _section));
                 }

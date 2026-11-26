@@ -81,7 +81,14 @@ public sealed class UndoActionTraceContractTests
             paths.Add(path);
             scribe.WritePage("A", path, Bytes(file.GetProperty("before")));
         }
-
+        // A converted step's action is the REAL Windows action on the mac's
+        // fixture (#899 W7b1), so each trace judges what Windows wrote; the
+        // rest still make the recorded step's draft through the door.
+        string stepName = recorded.GetProperty("name").GetString()!;
+        bool byTheWindowsAction = WindowsActionsOnTheMacFixture.Converted.Contains(stepName)
+                                  && !WindowsActionsOnTheMacFixture.WindowsOwnJson.ContainsKey(stepName)
+                                  && !WindowsActionsOnTheMacFixture.WindowsOwnFileInTheStep.ContainsKey(stepName);
+        if (byTheWindowsAction) WindowsActionsOnTheMacFixture.Lay(scribe.FullPath("A", ""), recorded);
         var calls = trace.GetProperty("calls").EnumerateArray().ToList();
         int closingRedos = 0;
         for (int index = calls.Count - 1; index >= 0 && calls[index].GetProperty("call").GetString() == "redo"; index--) closingRedos++;
@@ -97,7 +104,24 @@ public sealed class UndoActionTraceContractTests
             {
                 case "action":
                 {
-                    UndoOutcome made = Door().Perform(Draft(scribe, recorded));
+                    (string Word, long? Seq) made;
+                    if (byTheWindowsAction)
+                    {
+                        var workspace = new Plantoir.Core.Assist.AssistWorkspace(scribe.FullPath("A", ""), new FakeLauncher())
+                        {
+                            Surface = WindowsActionsOnTheMacFixture.SurfaceFor(recorded.GetProperty("madeBy").GetString()!),
+                            UndoList = new UndoForThisProcess(scribe.JournalFolder, UndoMode.Live, null, scribe.Clock),
+                            UndoDoorOfATest = Door(),
+                        };
+                        string answered = WindowsActionsOnTheMacFixture.Run(stepName, workspace);
+                        made = NewestClosing(scribe);
+                        Assert.True(made.Word != "", $"{where}: the Windows action made no step: {answered}");
+                    }
+                    else
+                    {
+                        UndoOutcome outcome = Door().Perform(Draft(scribe, recorded));
+                        made = (outcome.Word, outcome.Seq);
+                    }
                     Assert.True(call.GetProperty("expect").GetString() == made.Word, $"{where}: came to {made.Word}");
                     if (call.TryGetProperty("seq", out JsonElement seq)) Assert.True(seq.GetInt64() == made.Seq, where);
                     var expected = call.GetProperty("ops").EnumerateArray().Select(op => op.GetString()!).ToList();
@@ -204,6 +228,20 @@ public sealed class UndoActionTraceContractTests
         };
     }
 
+    /// <summary>How the newest step on the list closed (its last line's event, <c>applied</c> when it went in) and its number; empty when the list holds no step.</summary>
+    private static (string Word, long? Seq) NewestClosing(UndoScribe scribe)
+    {
+        JsonObject? last = null;
+        foreach (string segment in Directory.EnumerateFiles(scribe.JournalFolder, "journal-*.jsonl").Order(StringComparer.Ordinal))
+        {
+            foreach (string line in File.ReadAllLines(segment))
+            {
+                if (JsonNode.Parse(line) is JsonObject read && read["seq"] is not null) last = read;
+            }
+        }
+        return last is null ? ("", null) : ((string?)last["event"] ?? "", (long?)last["seq"]);
+    }
+
     /// <summary>The op kinds of the newest begin line on the list, in order.</summary>
     private static List<string> LastBeginsOpKinds(UndoScribe scribe)
     {
@@ -250,7 +288,11 @@ public sealed class UndoActionTraceContractTests
     private static Dictionary<string, string?> Hashes(UndoScribe scribe, IReadOnlyList<string> paths)
     {
         var hashes = new Dictionary<string, string?>(StringComparer.Ordinal);
-        foreach (string path in paths) hashes[path] = scribe.Page("A", path) is { } bytes ? UndoCheck.Sha(bytes) : null;
+        foreach (string path in paths)
+        {
+            byte[]? bytes = scribe.Page("A", path);
+            hashes[path] = bytes is null ? null : UndoCheck.Sha(bytes);
+        }
         return hashes;
     }
 
@@ -260,7 +302,7 @@ public sealed class UndoActionTraceContractTests
         {
             string? want = page.Value.ValueKind == JsonValueKind.Null ? null : page.Value.GetString();
             Assert.True(actual.ContainsKey(page.Name), $"{where}: {page.Name} is not a file of the step");
-            Assert.True(want == actual[page.Name], $"{where}: {page.Name}");
+            Assert.True(want == actual[page.Name], $"{where}: {page.Name} is {actual[page.Name] ?? "absent"}, the trace's {want ?? "absent"}");
         }
     }
 

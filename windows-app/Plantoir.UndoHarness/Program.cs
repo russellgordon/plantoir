@@ -46,6 +46,12 @@ internal static class Program
                 "w7-publish-kill" => W7Runs.PublishKill(folder),
                 "child-w7-publish" => W7Runs.ChildPublish(folder, args[2], args[3]),
                 "child-w7-recover" => W7Runs.ChildRecover(folder, args[2]),
+                "w7-add-classes-kill" => W7Runs.AddClassesKill(folder),
+                "child-w7-add-classes" => W7Runs.ChildAddClasses(folder, args[2], args[3]),
+                "w7-redate-kill" => W7Runs.ReDateKill(folder),
+                "child-w7-redate" => W7Runs.ChildReDate(folder, args[2], args[3]),
+                "w7-plain-kill" => W7Runs.PlainKill(folder),
+                "child-w7-plain" => W7Runs.ChildPlain(folder, args[2], args[3]),
                 _ => Unknown(mode),
             };
         }

@@ -3127,13 +3127,6 @@ public sealed partial class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so no dates were changed: {error.Message}");
         }
 
-        // Write the timetable down now the teacher has committed to it. They
-        // have just done the tedious part; asking again next week — or in the
-        // next conversation — is the tedium this is here to end.
-        if (plan.AllMeetings.Count > 0)
-            TimetableMemory.Write(_folder, course.Code, section, plan.AllMeetings,
-                $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
-
         using var recording = UndoHistory.Record(_undo,
             $"re-dated {course.Code} Section {section} onto block {plan.Block}");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
@@ -3144,71 +3137,68 @@ public sealed partial class AssistWorkspace
         // a date it could not set, and a hide it could not write.
         var undated = new List<string>();
         var notHidden = new List<string>();
-        // The pages already written, so a re-date that stops part way can name
-        // them (#550, the mac's #531).
-        var written = new List<string>();
 
+        // ONE step through the door (#899 W7b1; the mac's
+        // SectionReDatePlanner.apply): every page re-dated together, all or
+        // none, each read through the step at plan time, and the front page
+        // kept true by its rule after the step (recompute, sectionFrontPage),
+        // never written as a file of it. A rollover makes the same step under
+        // its own key; the record it releases (below) stays outside it until
+        // the rollover is one step (W7c).
+        // The timetable the teacher committed to is written down IN this
+        // step, after the pages (#899 W7b1 review 2, M1: one teacher action
+        // is one step, as the re-date is on the mac): they have just done the
+        // tedious part, and asking again next week is the tedium this ends.
+        // All or none with the pages, so a refusal leaves it as it was and
+        // "Nothing was changed" is true of it too (review 2, M2). Dates Read
+        // would not believe are not planned, which costs only the record.
+        var step = NewUndoStep(isARollover ? "rollOver" : "reDateClasses", course.Code, section);
         try
         {
-            foreach (var date in plan.Changing)
+            PlanningThrough = step;
+            try
             {
-                string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                string fileText = File.ReadAllText(full);
-                var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
-                string updated = dateEdit.Text;
-                bool changed = dateEdit.Changed;
-                if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
-                if (date.Unpublishes)
+                foreach (var date in plan.Changing)
                 {
-                    bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
-                    string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-                    var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
-                        updated, pubKey, draft: true, section);
-                    updated = draftUpdated;
-                    if (draftEdit.Changed) changed = true;
-                    if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
+                    string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                    string fileText = step.ReadText(full);
+                    var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
+                    string updated = dateEdit.Text;
+                    bool changed = dateEdit.Changed;
+                    if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
+                    if (date.Unpublishes)
+                    {
+                        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+                        string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
+                        var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
+                            updated, pubKey, draft: true, section);
+                        updated = draftUpdated;
+                        if (draftEdit.Changed) changed = true;
+                        if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
+                    }
+                    if (!changed) continue;
+                    step.Write(full, updated);
+                    if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
                 }
-                if (!changed) continue;
-                Save(full, updated);
-                written.Add(full);
-                if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
+                if (plan.AllMeetings.Count > 0)
+                    TimetableMemory.PlanInto(step, _folder, course.Code, section, plan.AllMeetings,
+                                             $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
+                step.KeepsTheFrontPageTrue(section, SectionIndex.PathFor(course, section));
             }
+            finally { PlanningThrough = null; }
+            MakeTheUndoStep(step);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            // Stopped part way: the pages before the failing one ARE re-dated
-            // and the undo entry is abandoned, so it is said as part way, with
-            // those pages named, and counted as a write (the mac's #531,
-            // ruling M3). Before any page was written it changed no page —
-            // though the timetable written above is already remembered.
-            // An AssistRefusal, so re_date_classes and roll_over_section both
-            // ANSWER it, each through its own catch (AssistRefusal); before
-            // #550 both let the IOException escape as a protocol error. Any
-            // OTHER IOException here (TimetableMemory.Write, say) still
-            // escapes; that predates #550.
-            if (written.Count == 0) throw new AssistRefusal(NothingWasChanged(error));
+            // All or none (#899 W7b1): "Nothing was changed" unless the door
+            // left a page holding its new date with its earlier content kept
+            // beside it, which is said as part way, naming each kept file
+            // (#550's list of pages written one by one is gone with the
+            // writing one by one). An AssistRefusal, so re_date_classes and
+            // roll_over_section both ANSWER it, each through its own catch.
+            if (error is not UndoStepLeftPartWayException) throw new AssistRefusal(NothingWasChanged(error));
             NoteAChangeWithNoUndoEntry();
-            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section) +
-                                    "\n\nThe pages already re-dated:\n" + ListingOf(written));
-        }
-
-        string indexPath = SectionIndex.PathFor(course, section);
-        if (File.Exists(indexPath))
-        {
-            try
-            {
-                string indexText = File.ReadAllText(indexPath);
-                string? newestPublished = SectionIndex.MostRecentPublished(course, section, ClassPages(course, section));
-                if (newestPublished is not null)
-                {
-                    if (SectionIndex.Repointed(indexText, PointerFor(course, section, newestPublished)) is { } newIndexText
-                        && newIndexText != indexText)
-                    {
-                        Save(indexPath, newIndexText);
-                    }
-                }
-            }
-            catch { }
+            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section));
         }
 
         // A ROLLOVER releases the published-pages record and the checklist's
@@ -3374,14 +3364,28 @@ public sealed partial class AssistWorkspace
 
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         int moved = 0;
-        foreach (var date in plan.Changing)
+        // ONE step through the door (#899 W7b1), Windows' own key
+        // syncPageDates: the mac has no Bring Pages into Date, so no recorded
+        // step holds it (U7's to settle). Each page read through the step, so
+        // a page named twice is moved from what the step already planned;
+        // no recompute, since this never rewrote the front page.
+        var step = NewUndoStep("syncPageDates", course.Code, section);
+        try
         {
-            string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-            var (updated, changed) = PageFrontmatter.SetCreated(
-                File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-            if (!changed) continue;
-            Save(full, updated);
-            moved++;
+            foreach (var date in plan.Changing)
+            {
+                string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                var (updated, changed) = PageFrontmatter.SetCreated(
+                    step.ReadText(full), date.FrontmatterKey, date.New, tail);
+                if (!changed) continue;
+                step.Write(full, updated);
+                moved++;
+            }
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw RefusalForAStepThatStopped(error, "the pages’ dates", section);
         }
         recording.Done();
 
@@ -3690,6 +3694,15 @@ public sealed partial class AssistWorkspace
     private const string CurriculumStart = "%%curriculum-start%%";
     private const string CurriculumEnd = "%%curriculum-end%%";
 
+    /// <summary>
+    /// The heading a new block opens with, the Mac's own
+    /// (<c>AssistCurriculumMentions.heading</c>; the Mac's output is the
+    /// <c>addCurriculumMentions</c> step in <c>contracts/undo-action-steps.json</c>).
+    /// Until #1039 Windows wrote "Today's work points here:" instead; pages that
+    /// carry that line keep it, and a block is found by its markers either way.
+    /// </summary>
+    private const string CurriculumHeading = "## Curriculum connection";
+
     /// <summary>Everything after the frontmatter fence, or the whole text if there is none.</summary>
     private static string BodyAfterFrontmatter(string pageText)
     {
@@ -3741,7 +3754,11 @@ public sealed partial class AssistWorkspace
             $"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
 
         string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
-        string text = File.ReadAllText(path);
+        // ONE step through the door (#899 W7b1; the mac's
+        // AssistCurriculumMentions.apply): the page planned, its before read
+        // now, written all or none, with no recompute.
+        var step = NewUndoStep("addCurriculumMentions", course.Code, section);
+        string text = step.ReadText(path);
         string lineEnd = text.Contains("\r\n") ? "\r\n" : "\n";
         string transclusions = string.Join(lineEnd, plan.Adding.Select(e => $"![[{e.Code}]]"));
 
@@ -3756,7 +3773,7 @@ public sealed partial class AssistWorkspace
             // A new block, before the "things to do" list if there is one —
             // that list closes a class page, and the curriculum note belongs
             // with the lesson rather than after the homework.
-            string block = CurriculumStart + lineEnd + "Today's work points here:" + lineEnd + lineEnd +
+            string block = CurriculumStart + lineEnd + CurriculumHeading + lineEnd + lineEnd +
                            transclusions + lineEnd + CurriculumEnd + lineEnd;
             int before = text.IndexOf("## Things to do", StringComparison.OrdinalIgnoreCase);
             text = before > 0
@@ -3764,7 +3781,15 @@ public sealed partial class AssistWorkspace
                 : text.TrimEnd() + lineEnd + lineEnd + block;
         }
 
-        Save(path, text);
+        try
+        {
+            step.Write(path, text);
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw RefusalForAStepThatStopped(error, "the curriculum mentions", section);
+        }
         recording.Done();
 
         return new AssistResult(true,
@@ -4749,7 +4774,8 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>Create the pages the plan describes. Backed up first, and undoable.</summary>
-    public AssistResult ApplyAddClasses(NewClassesPlan plan, IProgress<string>? progress = null)
+    /// <param name="actionKey">The step's key (<c>undo-action-steps.json</c>): <c>addClasses</c> for add_classes, <c>addNextClass</c> or <c>addNextClassInANewUnit</c> for add_next_class, as the mac's <c>AssistToolRunner.addNextClass</c> names them.</param>
+    public AssistResult ApplyAddClasses(NewClassesPlan plan, IProgress<string>? progress = null, string actionKey = "addClasses")
     {
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
@@ -4782,13 +4808,29 @@ public sealed partial class AssistWorkspace
         // use, so a new page sorts beside them rather than at midnight.
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         string folder = ClassFolder(course, section);
-        Directory.CreateDirectory(folder);
 
-        foreach (var created in plan.Classes)
+        // ONE step through the door (#899 W7b1; the mac's
+        // PlaceholderClassPlanner.apply): every new page together, all or
+        // none, each a writeFile with no before; the class folder is made by
+        // the swap with them, never beforehand, and a refused swap removes
+        // the empty folders it made, so none is left behind.
+        var step = NewUndoStep(actionKey, course.Code, section);
+        try
         {
-            string path = Path.Combine(folder, created.Title + ".md");
-            if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
-            Save(path, ClassSkeleton(created, plan.Naming.IsNumbered ? null : plan.Unit, plan.Classes.Count, tail));
+            foreach (var created in plan.Classes)
+            {
+                string path = Path.Combine(folder, created.Title + ".md");
+                if (step.Exists(path)) continue;       // checked again: the plan may be minutes old
+                step.Write(path, ClassSkeleton(created, plan.Naming.IsNumbered ? null : plan.Unit, plan.Classes.Count, tail));
+            }
+            MakeTheUndoStep(step);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // All or none: "Nothing was changed" unless the door left a page
+            // holding the new content, said as part way (the mac's
+            // saidWhenTheStepStopped, "the classes you asked for").
+            throw RefusalForAStepThatStopped(error, "the classes you asked for", section);
         }
         recording.Done();
 
@@ -4981,7 +5023,20 @@ public sealed partial class AssistWorkspace
     /// has written yet has no business appearing in the site, and the teacher
     /// asked for exactly that.
     /// </summary>
-    private static string ClassSkeleton(NewClass created, int? unit, int howMany, string tail)
+    internal static string ClassSkeleton(NewClass created, int? unit, int howMany, string tail) =>
+        PageTextFromLiteral(ClassSkeletonLiteral(created, unit, howMany, tail));
+
+    /// <summary>
+    /// A raw string literal made into the text of a teacher's page: LF line
+    /// ends, as the Mac writes (#1040). A raw literal takes its line ends from
+    /// the checkout that compiled it, so built from a <c>core.autocrlf true</c>
+    /// checkout every line of the skeleton was CRLF except the two the unit
+    /// tag adds.
+    /// </summary>
+    internal static string PageTextFromLiteral(string literal) => literal.ReplaceLineEndings("\n");
+
+    /// <summary>The skeleton as the raw literal compiles, line ends and all; <see cref="ClassSkeleton"/> is what is written.</summary>
+    internal static string ClassSkeletonLiteral(NewClass created, int? unit, int howMany, string tail)
     {
         string plural = howMany == 1 ? "This page was" : $"{howMany} of these were";
         // A numbered course has no units, so its page carries no unit tag —
@@ -5026,9 +5081,23 @@ public sealed partial class AssistWorkspace
     internal UndoActionStep NewUndoStep(string actionKey, string courseCode, int section)
     {
         UndoForThisProcess list = UndoList ?? UndoForThisProcess.Current;
-        UndoDoor? door = UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail);
+        UndoDoor? door = UndoDoorOfATest
+            ?? (UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail));
         return new(new UndoStepMaker(UndoMadeBy, actionKey), _folder, courseCode, section, undo: list, door: door);
     }
+
+    /// <summary>
+    /// Remembers a section's class dates (<c>remember_timetable</c>, #899
+    /// W7b1): <see cref="TimetableMemory.Write(string, string, int, IEnumerable{DateOnly}, string, DateOnly, string?)"/>
+    /// as ONE step made by this workspace's surface, on its list.
+    /// </summary>
+    /// <returns>Not remembered when the dates could not be saved, as before; left part way, with the kept file to name (review 1, MEDIUM 1).</returns>
+    public TimetableWriteOutcome RememberTimetable(string courseCode, int section, IEnumerable<DateOnly> dates, string source, DateOnly today) =>
+        TimetableMemory.WriteDown(_folder, courseCode, section, dates, source, today,
+                                  NewUndoStep("rememberTimetable", courseCode, section));
+
+    /// <summary>A test's own door for every step of this workspace (the contract replay's list, with its clock); none in the app.</summary>
+    internal UndoDoor? UndoDoorOfATest { get; init; }
 
     /// <summary>A test's seams for the door every step of this workspace goes through (a put-back that fails, a kill point); none in the app.</summary>
     internal UndoSeams? UndoSeams { get; init; }

@@ -171,11 +171,23 @@ internal static class UndoSwap
     internal static UndoSwapResult Swap(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams = null,
                                         IUndoExternalPlaces? places = null, IReadOnlySet<string>? keepingTheOriginalsOf = null)
     {
+        // What a plain write of a process that has gone left beside these
+        // targets is tidied first (the W7a final review's LOW 3): no journal
+        // line names it, so nothing else ever would.
+        foreach (UndoSwapTarget target in targets) TidyPlainLeftoversOfTheGone(target.FullPath);
         // Every staged file's handle is let go however the swap ends, a test's
         // kill point included, as a process that died there would let it go.
         var staged = new UndoStagedFile?[targets.Count];
         var originals = new UndoStagedFile?[targets.Count];
-        try { return SwapStaged(targets, label, root, seams, places, staged, originals, keepingTheOriginalsOf); }
+        var foldersMade = new List<string>();
+        try
+        {
+            UndoSwapResult result = SwapStaged(targets, label, root, seams, places, staged, originals, keepingTheOriginalsOf, foldersMade);
+            // A refused swap leaves no empty folder it made behind (the W7b1
+            // review's LOW 1; the digest's trap "empty folders left behind").
+            if (result is UndoSwapResult.Refused) RemoveTheEmptyFoldersMade(foldersMade);
+            return result;
+        }
         finally
         {
             foreach (UndoStagedFile? file in staged) file?.LetGo();
@@ -185,7 +197,7 @@ internal static class UndoSwap
 
     private static UndoSwapResult SwapStaged(IReadOnlyList<UndoSwapTarget> targets, string label, string? root, UndoSeams? seams,
                                              IUndoExternalPlaces? places, UndoStagedFile?[] staged, UndoStagedFile?[] originals,
-                                             IReadOnlySet<string>? keepingTheOriginalsOf)
+                                             IReadOnlySet<string>? keepingTheOriginalsOf, List<string> foldersMade)
     {
         int count = targets.Count;
         int swapsMade = 0;
@@ -302,7 +314,7 @@ internal static class UndoSwap
                 bool made;
                 try
                 {
-                    Directory.CreateDirectory(Path.GetDirectoryName(target.FullPath)!);
+                    MakeTheFolderOf(target.FullPath, foldersMade);
                     UndoLinks.RemoveFolder(stagedFolder);
                     made = UndoTreeReading.Make(tree.Listing, tree.Contents, stagedFolder, failTheWrite: seams?.StagingWriteFailsAt?.Invoke(index) == true);
                 }
@@ -321,7 +333,7 @@ internal static class UndoSwap
             string stagedPath = BesidePath(target.FullPath, label, "new");
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(target.FullPath)!);
+                MakeTheFolderOf(target.FullPath, foldersMade);
                 TryDelete(stagedPath);
                 if (seams?.StagingWriteFailsAt?.Invoke(index) == true)
                 {
@@ -880,6 +892,65 @@ internal static class UndoSwap
         }
     }
 
+    /// <summary>The first word of a plain write's label (a step swapped in without the list): <c>shadow-&lt;pid&gt;-&lt;id&gt;</c>.</summary>
+    internal const string PlainLabelWord = "shadow";
+
+    private static long _plainWrites;
+
+    /// <summary>
+    /// A label for one plain write (the step's <c>WritePlainlyQuietly</c>, the
+    /// door's write when the list cannot take a step), as the mac labels it:
+    /// <c>shadow-&lt;pid&gt;-&lt;id&gt;</c>, so its staged files name the
+    /// process that made them and a later swap can tell a gone process's
+    /// leftovers from a running one's (the W7a final review's LOW 3).
+    /// </summary>
+    internal static string PlainLabel() =>
+        $"{PlainLabelWord}-{Environment.ProcessId}-{Interlocked.Increment(ref _plainWrites)}";
+
+    /// <summary>
+    /// Removes beside <paramref name="target"/> what a plain write of a
+    /// process that is no longer running left there:
+    /// <c>.&lt;name&gt;.plantoir-undo-shadow-&lt;pid&gt;-&lt;id&gt;-new</c>
+    /// (content that never went in, or went in and is the page's now), and a
+    /// <c>-orig</c> only when it is a copy of the page (<see cref="IsACopyOfItsPlace"/>).
+    /// A differing <c>-orig</c> is an only copy and stays. A running
+    /// process's files, and a file that cannot be read now, stay.
+    /// </summary>
+    internal static void TidyPlainLeftoversOfTheGone(string target)
+    {
+        string? folder = Path.GetDirectoryName(target);
+        if (folder is null) return;
+        string prefix = "." + Path.GetFileName(target) + StagedMarker + PlainLabelWord + "-";
+        List<string> entries;
+        try { entries = Directory.EnumerateFiles(folder, prefix + "*").ToList(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return; }
+        foreach (string entry in entries)
+        {
+            string rest = Path.GetFileName(entry)[prefix.Length..];
+            string[] parts = rest.Split('-');
+            // <pid>-<id>-new, <pid>-<id>-orig or <pid>-<id>-<n>-orig.
+            if (parts.Length < 3 || !int.TryParse(parts[0], out int pid) || !long.TryParse(parts[1], out _)) continue;
+            if (ProcessIsRunning(pid)) continue;
+            bool staged = parts[^1] == "new" && parts.Length == 3;
+            bool kept = parts[^1] == "orig";
+            if (!staged && !(kept && IsACopyOfItsPlace(entry, target))) continue;
+            TryDelete(entry);
+        }
+    }
+
+    private static bool ProcessIsRunning(int pid)
+    {
+        if (pid == Environment.ProcessId) return true;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch (ArgumentException) { return false; }
+        catch (InvalidOperationException) { return false; }
+        catch (System.ComponentModel.Win32Exception) { return true; }
+    }
+
     /// <summary><c>.&lt;name&gt;.plantoir-undo-&lt;label&gt;-&lt;role&gt;</c> in the target's own folder: a dot file, so Obsidian and the website builder pass over it.</summary>
     internal static string BesidePath(string target, string label, string role) =>
         Path.Combine(Path.GetDirectoryName(target)!, "." + Path.GetFileName(target) + StagedMarker + label + "-" + role);
@@ -1011,6 +1082,44 @@ internal static class UndoSwap
             if (UndoLinks.Look(kept) == UndoLinks.What.Nothing) return false;   // not taken in that instant: the rename itself failed
         }
         return false;
+    }
+
+    /// <summary>
+    /// Makes the folder a target goes in, noting each folder that was not
+    /// there before, outermost first, in <paramref name="foldersMade"/>.
+    /// </summary>
+    private static void MakeTheFolderOf(string fullPath, List<string> foldersMade)
+    {
+        var missing = new List<string>();
+        string? folder = Path.GetDirectoryName(fullPath);
+        while (folder is not null && !Directory.Exists(folder))
+        {
+            missing.Add(folder);
+            folder = Path.GetDirectoryName(folder);
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        for (int index = missing.Count - 1; index >= 0; index--)
+        {
+            if (!foldersMade.Contains(missing[index], StringComparer.OrdinalIgnoreCase)) foldersMade.Add(missing[index]);
+        }
+    }
+
+    /// <summary>
+    /// Removes each folder a refused swap made, innermost first, only while it
+    /// is empty: a folder that holds anything (a file another program put
+    /// there meanwhile, or a page a swap could not take back) is kept.
+    /// </summary>
+    private static void RemoveTheEmptyFoldersMade(List<string> foldersMade)
+    {
+        for (int index = foldersMade.Count - 1; index >= 0; index--)
+        {
+            try
+            {
+                if (Directory.Exists(foldersMade[index]) && !Directory.EnumerateFileSystemEntries(foldersMade[index]).Any())
+                    Directory.Delete(foldersMade[index], recursive: false);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     /// <summary>Writes a file that must not be there yet, whole, and flushes it to the disk.</summary>

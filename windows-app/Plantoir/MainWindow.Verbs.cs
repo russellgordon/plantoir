@@ -242,7 +242,12 @@ public sealed partial class MainWindow
         return await ShowClassDates(folder, course, section, root, reason);
     }
 
-    /// <summary>The section's class dates dialog, in this window. True when dates were written.</summary>
+    /// <summary>
+    /// The section's class dates dialog, in this window. True when dates were
+    /// written and the sheet closed on Save; a Cancel stops the action that
+    /// asked, though dates the sheet already said are remembered stay so
+    /// (#899 W7b1 review 2, LOW 1: nothing here says otherwise).
+    /// </summary>
     private async Task<bool> ShowClassDates(string folder, Course course, int section, XamlRoot root, string reason)
     {
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);

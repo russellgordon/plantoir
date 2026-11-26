@@ -318,6 +318,34 @@ public sealed class UndoWholeUnitAndByDateStepTests : IDisposable
         finally { File.SetAttributes(PagePath("Unit 2, Day 5"), FileAttributes.Normal); }
     }
 
+    /// <summary>
+    /// The W7a final review's LOW 1: a kept record that is read when the
+    /// publish is planned and then cannot be written at the swap (marked
+    /// read-only, so its rename is refused) refuses the WHOLE Publish Class
+    /// for a Date, all or none, as <c>LaterClassesKept</c>'s remarks now say:
+    /// the class stays unpublished and the record as it was.
+    /// </summary>
+    [Fact]
+    public async Task APublishClassForADateWhoseRecordCannotBeWrittenAtTheSwapChangesNothing()
+    {
+        Class("Unit 2, Day 3", Today, published: true);
+        Class("Unit 2, Day 4", Today.AddDays(1), published: true);
+        Class("Unit 2, Day 5", Today.AddDays(3), published: false);
+        Directory.CreateDirectory(Path.GetDirectoryName(KeptPath)!);
+        File.WriteAllText(KeptPath, "{\"kept\": []}\n");
+        byte[] recordBefore = File.ReadAllBytes(KeptPath);
+        File.SetAttributes(KeptPath, FileAttributes.ReadOnly);
+        try
+        {
+            string said = await PublishOn(Open(new UndoHistory()), Today.AddDays(3));
+
+            Assert.StartsWith("Nothing was changed: ", said);
+            Assert.Contains("publish: false", File.ReadAllText(PagePath("Unit 2, Day 5")));
+            Assert.Equal(recordBefore, File.ReadAllBytes(KeptPath));
+        }
+        finally { File.SetAttributes(KeptPath, FileAttributes.Normal); }
+    }
+
     /// <summary>A class already published, named by its date: its pages need no change, and the record is a step of its own.</summary>
     [Fact]
     public async Task AClassAlreadyPublishedByItsDateIsKeptOnAStepOfItsOwn()
