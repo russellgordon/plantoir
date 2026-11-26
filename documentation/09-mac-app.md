@@ -22768,6 +22768,40 @@ swapping, so a quit waits for that re-plan and Cancel stays grey; it has
 written nothing, and once a quit is going ahead its next pass to the swap is
 refused.
 
+### U4b2: plan-read-off-the-pool
+
+A rename's planning walk runs on a Foundation `Thread` of its own, started per
+plan (`SpecialFolderRenamer.planHaltingAtCancel`), never in a `Task.detached`.
+Swift's shared pool has as many threads as the Mac has cores (12 on the Mac16,8
+this was measured on), and a read that blocks inside the system (an evicted
+iCloud page, a network volume gone away) cannot be interrupted: on the pool,
+Rename then Cancel repeated on a dead volume took one thread a round, and
+with all twelve held no other async job in the app could run. Measured with
+`testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree` (rounds = cores
++ 4 = 16, each plan held at its first page on an event): with the walk
+detached, round 13's plan never started; on its own thread, all 16 start, an
+unrelated `Task.detached` runs at once, and the process went from 7 threads
+to 23 while the 16 were held, and back to 7 when they were let go. A stuck walk
+now costs its own thread's stack (512 KB reserved, not committed) and nothing
+the app needs. Cancel is forwarded as before (`withTaskCancellationHandler`
+now cancels the thread), and `plan` asks one function,
+`stopIfThePlanIsHalted`, between folders and before and after each page:
+the task's cancellation (for `rename`'s callers) or the thread's. The caller
+still returns at Cancel without waiting, and a late result is still dropped.
+Riding lows from U4b2-7 review 2: the rename sheet is now hosted off screen
+and its own Rename and Cancel pressed through accessibility
+(`testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet`,
+`testTheRealSheetGoingAwayHaltsAHeldPlan`), which found that the sheet's
+`.onDisappear` is not called when the list that presents it leaves the
+window (the sheet closes, the plan went on): the list's own `.onDisappear`
+now halts a rename that is only planning too. And AppKit can ask again during
+a `.terminateLater` wait (Apple's `terminateLater` documentation: the run loop
+runs in `NSModalPanelRunLoopMode` until the reply, the mode in which a sheet
+takes input), so `applicationShouldTerminate` first asks
+`AppDelegate.answerWhileAQuitGoesAhead`: while the latch is set, a second
+request is answered `.terminateLater` at once, asking nothing and refusing
+nothing, and the first quit's reply ends the process.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
