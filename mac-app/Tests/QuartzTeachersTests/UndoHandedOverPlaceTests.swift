@@ -488,6 +488,115 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         XCTAssertTrue(readBack.isReadable)
     }
 
+    // MARK: - Killed and recovered (door-5)
+
+    /// Each of door-4's two shapes, made through the door and killed before
+    /// EVERY swap in turn, going forward and (its Undo) going back, until a
+    /// kill point is no longer reached: once recovery has run, the folder
+    /// is whole before or whole after, the library byte for byte as laid,
+    /// nothing staged left, the step settled.
+    func testAHandedOverStepKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery() throws {
+        try killAtEverySwap(leadingOut: false)
+    }
+
+    /// The same, the links leading OUT of the working folder: nothing
+    /// outside it read or written.
+    func testAHandedOverStepLeadingOutKilledBeforeAnyOfItsSwapsIsWholeAfterRecovery() throws {
+        try killAtEverySwap(leadingOut: true)
+    }
+
+    func killAtEverySwap(leadingOut: Bool) throws {
+        for shape in ["A", "B"] {
+            for backward in [false, true] {
+                let whole: (before: [String: String], after: [String: String]) = try madeWhole(shape, leadingOut: leadingOut)
+                var index: Int = 0
+                while try killAndRecover(shape, leadingOut: leadingOut, backward: backward, at: index, whole: whole) {
+                    index += 1
+                }
+                let swaps: Int = shape == "A" ? 2 : 4
+                XCTAssertEqual(index, swaps, "shape \(shape), backward \(backward): one kill before each swap")
+            }
+        }
+    }
+
+    /// The folder as laid, and as the step leaves it made whole.
+    func madeWhole(_ shape: String, leadingOut: Bool) throws -> (before: [String: String], after: [String: String]) {
+        let laid: LaidStep = shape == "A" ? try layShapeA(leadingOut: leadingOut) : try layShapeB(leadingOut: leadingOut)
+        let before: [String: String] = try snapshot(laid.root)
+        try makeItForward(laid)
+        return (before: before, after: try snapshot(laid.root))
+    }
+
+    /// `folderNow` but for the folder's own identifier, which each laying
+    /// makes anew.
+    func snapshot(_ root: URL) throws -> [String: String] {
+        var found: [String: String] = try folderNow(root)
+        found["courses/.internal/folder-id"] = nil
+        found["courses/.internal"] = nil
+        return found
+    }
+
+    /// Returns whether the kill point was reached (and so tested).
+    func killAndRecover(
+        _ shape: String, leadingOut: Bool, backward: Bool, at index: Int,
+        whole: (before: [String: String], after: [String: String])
+    ) throws -> Bool {
+        let laid: LaidStep = shape == "A" ? try layShapeA(leadingOut: leadingOut) : try layShapeB(leadingOut: leadingOut)
+        let outsideBefore: [String: Data] = try outsideNow()
+        var blobs: [Data] = [Data("New.\n".utf8)]
+        if shape == "B" {
+            blobs.append(Data("Three.\n".utf8))
+        }
+        let dying: UndoJournal = UndoJournal(
+            folderURL: laid.journal.folderURL, process: UndoContractReplay.goneProcess,
+            processIsAlive: { process in process.pid != UndoContractReplay.goneProcess.pid }
+        )
+        let places: UndoMemoryPlaces = UndoMemoryPlaces()
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: laid.ops, blobs: blobs, root: laid.root, action: "insertClass")
+        var reached: Bool = false
+        UndoKillPoints.hook = { point in
+            point == .beforeSwap(index)
+        }
+        if backward {
+            UndoKillPoints.hook = nil
+            let made: JournaledWriteOutcome = JournaledWrite.perform(ops: draft, in: dying, mode: .live, places: places)
+            XCTAssertEqual(try snapshot(laid.root), whole.after, "shape \(shape): the step made whole (\(made))")
+            UndoKillPoints.hook = { point in
+                point == .beforeSwap(index)
+            }
+            reached = dying.undoNewest(resolveRoot: { _ in laid.root }, places: places) == .stoppedByATest
+        } else {
+            let outcome: JournaledWriteOutcome = JournaledWrite.perform(ops: draft, in: dying, mode: .live, places: places)
+            reached = outcome == .stoppedByATest
+            if !reached && index == 0 {
+                XCTFail("shape \(shape): the step was never stopped (\(outcome))")
+            }
+        }
+        UndoKillPoints.hook = nil
+        if !reached {
+            return false
+        }
+        let survivor: UndoJournal = UndoJournal(
+            folderURL: laid.journal.folderURL,
+            processIsAlive: { process in process.pid != UndoContractReplay.goneProcess.pid }
+        )
+        try survivor.withLock { writer in
+            UndoRecovery.run(writer, mode: .live, resolveRoot: { _ in laid.root })
+        }
+        let label: String = "shape \(shape), backward \(backward), killed before swap \(index)"
+        let now: [String: String] = try snapshot(laid.root)
+        XCTAssertTrue(now == whole.before || now == whole.after, "\(label): not whole (\(now))")
+        XCTAssertEqual(try outsideNow(), outsideBefore, label)
+        if !leadingOut {
+            let library: [String] = try FileManager.default.contentsOfDirectory(atPath: laid.root.appendingPathComponent("courses/TST1O/library").path)
+            XCTAssertEqual(library.count, 1, label)
+        }
+        XCTAssertEqual(stagedLeft(under: laid.root), [], label)
+        let phase: String = (try survivor.read()).records[1]?.phase.rawValue ?? "missing"
+        XCTAssertTrue(["failed", "rolledBack", "done", "undone"].contains(phase), "\(label): the step is \(phase)")
+        return true
+    }
+
     // MARK: - Functions
 
     func day(_ number: Int) -> String {

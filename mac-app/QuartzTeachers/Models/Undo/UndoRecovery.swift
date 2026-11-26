@@ -903,6 +903,19 @@ nonisolated enum UndoRecovery {
         return op.placeName
     }
 
+    /// U4b3 door-5: for each move that hands a place over, the plain path
+    /// its judged name ("from → to") is shown as on the trail and to a
+    /// teacher: its own place (`placeName`), as every other move is named.
+    static func placesShown(of step: UndoStep) -> [String: String] {
+        let moving: Set<Int> = UndoRecovery.movesHandingOver(UndoCheck.handovers(in: step.ops), in: step.ops)
+        var shown: [String: String] = [:]
+        for index in moving {
+            let op: UndoOp = step.ops[index]
+            shown[UndoRecovery.placeJudged(of: op, at: index, movesHandingOver: moving)] = op.placeName
+        }
+        return shown
+    }
+
     /// Whether the folder (or file) a move carries edits with is at its old
     /// place now: nothing at `to` and something at `from`.
     static func isAtItsOldPlace(_ move: UndoOp, root: URL) -> Bool {
@@ -1086,9 +1099,14 @@ nonisolated enum UndoRecovery {
         // A file that could not be read now is never judged changed by hand:
         // the step is left as it is and tried again on the schedule, as for
         // a file in use (the director's ruling on U2b's review).
+        // U4b3 door-5: a move that hands a place over is judged under its
+        // two places ("from → to", `placeJudged`), but the trail and a
+        // teacher are shown a plain path: its own place (`placeName`), as
+        // every other move is named, each path once.
+        let shownAs: [String: String] = UndoRecovery.placesShown(of: step)
         for file in files where file.state == .cannotTell {
             swapRefused = true
-            leftFor = .cannotTellNow(path: file.path)
+            leftFor = .cannotTellNow(path: shownAs[file.path] ?? file.path)
             return nil
         }
         var atStart: Int = 0
@@ -1104,9 +1122,20 @@ nonisolated enum UndoRecovery {
         func pathsOnly(_ places: [String]) -> [String] {
             var result: [String] = []
             for place in places where !externalTargets.contains(place) {
-                result.append(place)
+                let shown: String = shownAs[place] ?? place
+                if !result.contains(shown) {
+                    result.append(shown)
+                }
             }
             return result
+        }
+        // How many places a count on the trail names: each shown path once.
+        func countShown(_ places: [String]) -> Int {
+            var shown: Set<String> = []
+            for place in places {
+                shown.insert(shownAs[place] ?? place)
+            }
+            return shown.count
         }
         for file in files {
             if file.state == .neither {
@@ -1216,10 +1245,10 @@ nonisolated enum UndoRecovery {
                     UndoSwap.tidyLeftovers(label: label + "-recover", beside: urls, root: root, keepingOnlyCopies: true)
                     // Said after the tidy, so it names what is on the disk.
                     UndoTrailHook.couldNotPutBackLine?(
-                        step.course ?? "", step.section, phase, leftPartWay.count,
+                        step.course ?? "", step.section, phase, countShown(leftPartWay),
                         UndoRecovery.keptOriginalsLeft(of: step, root: root)
                     )
-                    return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: .interrupted(filesInTheWay: leftPartWay.count, filesPutBack: 0))
+                    return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: .interrupted(filesInTheWay: countShown(leftPartWay), filesPutBack: 0))
                 }
                 // What the kept originals give, and what the pages hold now,
                 // into the list before the swap (the first review of U3c,
@@ -1270,13 +1299,13 @@ nonisolated enum UndoRecovery {
                 events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "partlyTookEffect", paths: pathsOnly(Array(endPaths).sorted())))
                 events.append(UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue))
             } else {
-                outcome = .interrupted(filesInTheWay: inTheWay.count, filesPutBack: putBack)
+                outcome = .interrupted(filesInTheWay: countShown(inTheWay), filesPutBack: putBack)
                 events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "changedByHand", paths: pathsOnly(inTheWay)))
                 events.append(UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue))
                 if mode == .live {
                     // In shadow nothing was put back and nothing offered was
                     // cleared: the journal holds the outcome, the trail does not.
-                    UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, putBack, inTheWay.count)
+                    UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, putBack, countShown(inTheWay))
                 }
             }
         }

@@ -481,10 +481,28 @@ nonisolated enum JournaledWrite {
               readBack.isReadable else {
             return .refused
         }
-        // 2. Every path inside the working folder, its links resolved.
+        // 2. Every path inside the working folder, its links resolved. A
+        // file change at a place a link's move hands over is judged on the
+        // folders above it only, as the plan judges it (U4b3 door-1): the
+        // link standing there is moved, never written through, wherever it
+        // leads (U4b3 door-5, a link leading out of the working folder).
+        var judgedAbove: Set<Int> = []
+        for handover in UndoCheck.handovers(in: readBack.ops) where handover.aLinkMoves {
+            judgedAbove.insert(handover.leaverIndex)
+            judgedAbove.insert(handover.fillerIndex)
+        }
+        var opIndex: Int = 0
         for op in readBack.ops {
+            let aboveOnly: Bool = judgedAbove.contains(opIndex) && !op.isWhole
+            opIndex += 1
             for path in op.pathsNamed {
-                guard let root = draft.workingFolderURL, UndoPlaces.staysInside(root, path, namedBy: op) else {
+                guard let root = draft.workingFolderURL else {
+                    return .refused
+                }
+                let inside: Bool = aboveOnly
+                    ? UndoPlaces.staysInsideAbove(root, path)
+                    : UndoPlaces.staysInside(root, path, namedBy: op)
+                if !inside {
                     return .refused
                 }
             }

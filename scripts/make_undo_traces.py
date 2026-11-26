@@ -1454,17 +1454,31 @@ def recovery_states(ops, pages):
     judged as if the step's edits inside it were taken back (U4b). The
     model holds no staged files, so it cannot show the swap's own kept
     originals inside the folder being left out: only the Swift replay
-    shows that."""
+    shows that.
+
+    A handed-over place's two ops are judged together (U4b3 door-3, the
+    one rule `handovers`): the leaver with the place free once its filler
+    stands after, the filler with the place absent while its leaver stands
+    before, again until nothing changes. A move that hands a place over is
+    judged under its two places (`place_judged`), apart from the page at
+    the same place."""
     carriers = carried_edits(ops)
-    states = {}
-    for op in ops:
+    pairs = handovers(ops)
+    moving = moves_handing_over(ops, pairs)
+    free_from, free_to, absent = set(), set(), set()
+
+    def judge(index):
+        op = ops[index]
         kind = op["kind"]
-        if kind == "recompute":
-            continue
         if kind in WHOLE_KINDS:
-            place = op.get("path") or op.get("from") or op.get("target")
             seen = pages
-            if any(carrier is op for carrier in carriers.values()):
+            if index in free_from or index in free_to:
+                seen = dict(pages)
+                if index in free_from:
+                    seen.pop(op["from"], None)
+                if index in free_to:
+                    seen.pop(op["to"], None)
+            elif any(carrier is op for carrier in carriers.values()):
                 old_place = move_is_at_its_old_place(op, pages)
                 seen = dict(pages)
                 for path, carrier in carriers.items():
@@ -1475,17 +1489,86 @@ def recovery_states(ops, pages):
                     taken_back = plan(edits, True, seen)
                     if taken_back[0] == "ready" and side in taken_back[1]:
                         seen[side] = taken_back[1][side]
-            states[place] = whole_state(op, seen)
-            continue
+            return whole_state(op, seen)
+        if index in absent:
+            return op_state(op, None)
         path = op["path"]
         read_path = path
         carrier = carriers.get(path)
         if carrier is not None and move_is_at_its_old_place(carrier, pages):
             read_path = place_before_the_move(path, carrier)
-        state = op_state(op, pages.get(read_path))
-        earlier = states.get(path)
-        states[path] = state if earlier in (None, state) else "neither"
+        current = pages.get(read_path)
+        if current is not None and not isinstance(current, str):
+            # A link or a folder where a page is named: neither of its sides.
+            return "neither"
+        return op_state(op, current)
+
+    judged = [None if op["kind"] == "recompute" else judge(index) for index, op in enumerate(ops)]
+    for _ in range(len(ops) + 1):
+        changed = False
+        for leaver, filler in pairs:
+            if judged[filler] == "after" and leaver not in free_from and leaver not in absent:
+                (free_from if ops[leaver]["kind"] in WHOLE_KINDS else absent).add(leaver)
+                judged[leaver] = judge(leaver)
+                changed = True
+            if judged[leaver] == "before" and filler not in free_to and filler not in absent:
+                (free_to if ops[filler]["kind"] in WHOLE_KINDS else absent).add(filler)
+                judged[filler] = judge(filler)
+                changed = True
+        if not changed:
+            break
+    states = {}
+    for index, op in enumerate(ops):
+        if op["kind"] == "recompute":
+            continue
+        place = place_judged(op, index, moving)
+        if op["kind"] in WHOLE_KINDS:
+            states[place] = judged[index]
+            continue
+        earlier = states.get(place)
+        states[place] = judged[index] if earlier in (None, judged[index]) else "neither"
     return states
+
+
+def moves_handing_over(ops, pairs):
+    """UndoRecovery.movesHandingOver: the indices of the step's moves that
+    leave or fill a handed-over place."""
+    found = set()
+    for leaver, filler in pairs:
+        for index in (leaver, filler):
+            if ops[index]["kind"] in WHOLE_KINDS:
+                found.add(index)
+    return found
+
+
+def place_judged(op, index, moving):
+    """UndoRecovery.placeJudged: the name recovery judges an op under: a
+    move that hands a place over by its two places ("from → to"), every
+    other op by its path, its from or its target."""
+    if index in moving:
+        return op["from"] + " → " + op["to"]
+    return op.get("path") or op.get("from") or op.get("target")
+
+
+def place_shown(ops, place):
+    """U4b3 door-5: the plain path a judged place is shown as on the trail
+    and to a teacher: a handed-over move under its own place (its from),
+    as every other move is named."""
+    moving = moves_handing_over(ops, handovers(ops))
+    for index, op in enumerate(ops):
+        if index in moving and place_judged(op, index, moving) == place:
+            return op["from"]
+    return place
+
+
+def places_shown(ops, places):
+    """Each judged place shown as a plain path, each path once, in order."""
+    shown = []
+    for place in places:
+        plain = place_shown(ops, place)
+        if plain not in shown:
+            shown.append(plain)
+    return shown
 
 
 def recover(ops, pages, started_from_before):
@@ -1493,12 +1576,13 @@ def recover(ops, pages, started_from_before):
     took effect put back, judged by content alone. A place that is neither
     is in the way (changed by hand since): every place NOT in the way that
     took effect is still put back, and the step is interrupted naming the
-    places in the way (U4b2-13, as Swift's settle does). Answers (outcome,
+    places in the way (U4b2-13, as Swift's settle does), each a plain path
+    once (`places_shown`, U4b3 door-5). Answers (outcome,
     pages, the places the interrupted line names).
 
     Two known differences from settle, which no row run through this model
-    reaches today (it runs only the withAMovedFolder rows, none of which has
-    an external op or stops after the edit inside with a hand edit), so a
+    reaches today (it runs only the withAMovedFolder and withAHandedOverPlace
+    rows, none of which has an external op or stops after the edit inside with a hand edit), so a
     new row of either kind must not be trusted because it passes here:
     - the model names an external op's target among the places; settle
       never does (`pathsOnly`);
@@ -1524,9 +1608,9 @@ def recover(ops, pages, started_from_before):
         for place in in_the_way:
             if place not in named:
                 named.append(place)
-        return ("interrupted", pages, named)
+        return ("interrupted", pages, places_shown(ops, named))
     if in_the_way:
-        return ("interrupted", put_back, in_the_way)
+        return ("interrupted", put_back, places_shown(ops, in_the_way))
     return ("rolledBack", put_back, [])
 
 
@@ -1537,8 +1621,9 @@ def put_back_what_took_effect(ops, places, started_from_before, pages):
     are."""
     if not places:
         return pages
-    at_end = [op for op in ops if op["kind"] != "recompute"
-              and (op.get("path") or op.get("from") or op.get("target")) in places]
+    moving = moves_handing_over(ops, handovers(ops))
+    at_end = [op for index, op in enumerate(ops) if op["kind"] != "recompute"
+              and place_judged(op, index, moving) in places]
     result = plan(at_end, started_from_before, pages)
     if result[0] != "ready":
         return None

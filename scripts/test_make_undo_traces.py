@@ -1581,6 +1581,51 @@ class ContractCaseTests(unittest.TestCase):
                 else:
                     self.assertEqual(named, [])
 
+    def test_recovery_cases_with_a_handed_over_place(self):
+        """undo.recoveryCases' U4b3 door-5 rows (withAHandedOverPlace): a
+        step that hands a place over, killed before any of its swaps, going
+        forward or back, settles whole, judged by content with the pair
+        judged together (door-3)."""
+        cases = [case for case in shared_undo()["recoveryCases"] if case.get("withAHandedOverPlace")]
+        self.assertEqual(len(cases), 8)
+        phases = {("step", "nothingTookEffect"): "failed", ("step", "completed"): "done", ("step", "rolledBack"): "rolledBack",
+                  ("undo", "nothingTookEffect"): "done", ("undo", "completed"): "undone", ("undo", "rolledBack"): "done"}
+        calls = {"afterALinksMove": "handAPlaceOverAfterALinksMove", "beforeALinksMove": "handAPlaceOverBeforeALinksMove"}
+        for case in cases:
+            with self.subTest(case["name"]):
+                pages = {}
+                if case["withAHandedOverPlace"] == "afterALinksMove":
+                    pages[self.HANDED_LIBRARY + "/Day 3.md"] = "Linked.\n"
+                    pages[self.day(3)] = ("link", self.handed_target(3))
+                    ops = ([{"kind": "move", "from": self.day(3), "to": self.day(4), "linkSha": traces.sha(self.handed_target(3))}]
+                           + traces.ops_for_change(self.day(3), None, "New.\n"))
+                else:
+                    self.assertEqual(calls[case["withAHandedOverPlace"]], "handAPlaceOverBeforeALinksMove")
+                    pages[self.HANDED_LIBRARY + "/Day 2.md"] = "Two.\n"
+                    pages[self.day(2)] = ("link", self.handed_target(2))
+                    pages[self.day(3)] = "Three.\n"
+                    ops = (traces.ops_for_change(self.day(4), None, "Three.\n")
+                           + traces.ops_for_change(self.day(3), "Three.\n", None)
+                           + [{"kind": "move", "from": self.day(2), "to": self.day(3), "linkSha": traces.sha(self.handed_target(2))}]
+                           + traces.ops_for_change(self.day(2), None, "New.\n"))
+                self.assertTrue(traces.handovers(ops))
+                work, stop = case["work"], case["stopAt"]
+                swapped = int(stop.split(":")[1])
+                after_pages = traces.stopped_part_way(ops, False, pages, None)
+                starting = after_pages if work == "undo" else pages
+                left = traces.stopped_part_way(ops, work == "undo", starting, swapped)
+                if case.get("handEdit") == "handedOverPlace":
+                    left = dict(left)
+                    left[self.day(3)] = "Someone else's.\n"
+                outcome, settled, named = traces.recover(ops, left, work != "undo")
+                self.assertEqual(phases.get((work, outcome), outcome), case["phase"])
+                settled_model = type("Settled", (), {"pages": settled})
+                if case["files"] != "unchecked":
+                    wanted = {"before": pages, "after": after_pages}[case["files"]]
+                    self.assertEqual(self.handed_over(settled_model), self.handed_over(type("Wanted", (), {"pages": wanted})))
+                self.assertEqual(self.handed_over(settled_model), case["handedOver"])
+                self.assertEqual(named, case.get("pathsNamed", []))
+
     def edited_by_hand(self, pages, page, first, second):
         """recoveryCasesHow's handEdit: `first` or `second`, the publish line
         changed by hand (the traces' sameLine edit); `carried`, the line

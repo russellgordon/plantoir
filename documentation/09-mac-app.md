@@ -23656,7 +23656,18 @@ to 3 were inert. Seven `stackCases` rows ("U4b3 door, …", calls
 `stepHandingOverAFoldersPlace`, key `handedOver`) pin it on the Mac and in
 the Python model (`make_undo_traces.handovers`, `plan`, `swap_groups`). They
 are held for Windows under `Reason899W8HandedOverPlace` until its door piece
-lands. Recovery's contract rows are door-5's.
+lands. Door-5, recovery proven end to end: such a step made through the
+door and killed before any of its swaps, going forward or (its Undo) back,
+is settled by `UndoRecovery.run` whole before or whole after, the library
+byte for byte as laid, nothing staged left and, with the links leading out
+of the working folder, nothing outside it touched
+(`UndoHandedOverPlaceTests`, "Killed and recovered"). Eight
+`recoveryCases` rows ("U4b3 door-5: …", key `withAHandedOverPlace`) pin it
+on the Mac and in the Python model (`recovery_states` now judges the pair
+together). A teacher and the trail are shown a handed-over move under its
+own plain place, as every other move is named, each path once; the
+`from → to` key is recovery's judgement only. They are held for Windows
+under the same reason.
 
 ### #1004-a: the journal's own files are judged by what was read
 
