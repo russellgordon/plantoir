@@ -1,4 +1,5 @@
 using Plantoir.Core.Scripting;
+using Plantoir.Core.Undo;
 
 namespace Plantoir.Core.Models;
 
@@ -11,7 +12,8 @@ namespace Plantoir.Core.Models;
 /// <remarks>
 /// <para><b>The trap that would pass review</b> is writing the page with
 /// <c>File.WriteAllText</c>: it overwrites a page the teacher made a moment
-/// earlier. <see cref="FileMode.CreateNew"/> refuses, and the page that
+/// earlier. The page is planned as new into ONE step, which the door refuses
+/// if a page appears before its swap (#899 W7b2-4), and the page that
 /// appeared between the look and the write is the teacher's and is what is
 /// opened. Exactly <see cref="CreatedBytes"/> and nothing else — no starter
 /// words, because an assistant reads the page as the teacher's own approach
@@ -44,28 +46,49 @@ public static class HowITeachSettingsRow
     public static (Outcome Outcome, string? Path, string? Problem) Press(string courseDirectory, string courseCode) =>
         Press(courseDirectory, courseCode, betweenTheLookAndTheWrite: null);
 
-    /// <param name="betweenTheLookAndTheWrite">For the test of the race: runs after the listing found no page and before the write.</param>
+    /// <param name="betweenTheLookAndTheWrite">For the test of the race: runs after the listing found no page and before the page is planned.</param>
     public static (Outcome Outcome, string? Path, string? Problem) Press(string courseDirectory, string courseCode,
-                                                                          Action? betweenTheLookAndTheWrite)
+                                                                          Action? betweenTheLookAndTheWrite) =>
+        Press(courseDirectory, courseCode, betweenTheLookAndTheWrite, undo: null, door: null);
+
+    /// <summary>
+    /// The same, on a test's own list and door (this process's when null):
+    /// the new page is ONE step through the door (#899 W7b2-4; the mac's
+    /// <c>HowITeachPage.startOrFind</c>), key <c>startHowITeachPage</c>, made
+    /// by <c>sheet</c>, held by the course (<c>holds: course</c>, no section).
+    /// </summary>
+    /// <remarks>
+    /// The exclusive create is now a check at plan time plus the door's
+    /// refusal of a file changed since then: a page already there when the
+    /// step reads its before is opened, never planned over; one that appears
+    /// after that is refused by the swap (<c>changedSince</c>) and opened.
+    /// A step of one NEW page cannot be left part way: the swap refuses only
+    /// before the page goes in, and nothing else is in the step to put back.
+    /// </remarks>
+    internal static (Outcome Outcome, string? Path, string? Problem) Press(string courseDirectory, string courseCode,
+                                                                            Action? betweenTheLookAndTheWrite,
+                                                                            UndoForThisProcess? undo, UndoDoor? door)
     {
         if (HowITeachPage.ExistingPath(courseDirectory) is { } existing) return (Outcome.Opened, existing, null);
         betweenTheLookAndTheWrite?.Invoke();
 
         string path = Path.Combine(courseDirectory, HowITeachPage.FileName);
+        var step = new UndoActionStep(new UndoStepMaker("sheet", "startHowITeachPage"), WorkingFolderOf(courseDirectory),
+                                      courseCode, section: null, holds: "course", undo: undo, door: door);
         try
         {
-            using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            {
-                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(CreatedBytes);
-                stream.Write(bytes, 0, bytes.Length);
-            }
+            step.Write(path, CreatedBytes);
+            // Plan time: the step's before is read now. A page there already
+            // (made since the look) is the teacher's, and is what is opened.
+            if (!PlannedAsANewPage(step)) return (Outcome.Opened, HowITeachPage.ExistingPath(courseDirectory) ?? path, null);
+            step.Make();
             ActivityTrail.Note(ActivityTrail.Event.HowITeachPageStarted,
                 $"{courseCode}: started an empty How I Teach page from Course Settings");
             return (Outcome.Created, path, null);
         }
-        catch (IOException) when (HowITeachPage.ExistingPath(courseDirectory) is { } appeared)
+        catch (UndoStepRefusedException) when (HowITeachPage.ExistingPath(courseDirectory) is { } appeared)
         {
-            // Made between the look and the write: the teacher's, and opened.
+            // Made between the plan and the swap: the teacher's, and opened.
             return (Outcome.Opened, appeared, null);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
@@ -74,5 +97,21 @@ public static class HowITeachSettingsRow
                 $"{courseCode}: could not start the How I Teach page from Course Settings: {error.Message}");
             return (Outcome.CouldNotCreate, null, CouldNotCreate(error.Message));
         }
+    }
+
+    /// <summary>Whether the step plans the page as new: its one file absent when first planned.</summary>
+    private static bool PlannedAsANewPage(UndoActionStep step)
+    {
+        var changed = step.ChangedFiles;
+        return changed.Count == 1 && changed[0].BeforeBytes is null;
+    }
+
+    /// <summary>The folder holding <c>courses\</c> above a course's folder, or null when the course is not inside one.</summary>
+    private static string? WorkingFolderOf(string courseDirectory)
+    {
+        string? coursesFolder = Path.GetDirectoryName(Path.GetFullPath(courseDirectory).TrimEnd(Path.DirectorySeparatorChar));
+        if (coursesFolder is null || !string.Equals(Path.GetFileName(coursesFolder), "courses", StringComparison.OrdinalIgnoreCase))
+            return null;
+        return Path.GetDirectoryName(coursesFolder);
     }
 }

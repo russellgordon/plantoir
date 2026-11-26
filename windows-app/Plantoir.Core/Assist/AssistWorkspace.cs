@@ -5087,6 +5087,20 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
+    /// A step for an action on a page that belongs to the course, not to a
+    /// section (#899 W7b2-4: the How I Teach page): held by the course
+    /// (<c>holds: course</c>) with no section, as the mac's
+    /// <c>JournaledStep(course:section: nil, holds: "course")</c>.
+    /// </summary>
+    internal UndoActionStep NewCourseUndoStep(string actionKey, string courseCode)
+    {
+        UndoForThisProcess list = UndoList ?? UndoForThisProcess.Current;
+        UndoDoor? door = UndoDoorOfATest
+            ?? (UndoSeams is null ? null : new UndoDoor(list.Journal, list.Mode, list.Maintainers, seams: UndoSeams, trail: list.Trail));
+        return new(new UndoStepMaker(UndoMadeBy, actionKey), _folder, courseCode, section: null, holds: "course", undo: list, door: door);
+    }
+
+    /// <summary>
     /// Remembers a section's class dates (<c>remember_timetable</c>, #899
     /// W7b1): <see cref="TimetableMemory.Write(string, string, int, IEnumerable{DateOnly}, string, DateOnly, string?)"/>
     /// as ONE step made by this workspace's surface, on its list.
