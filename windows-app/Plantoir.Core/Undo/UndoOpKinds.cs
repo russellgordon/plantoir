@@ -795,8 +795,58 @@ internal enum UndoMoveSide
     CannotRead,
 }
 
+/// <summary>Which spelling of a capitalisation-only move's one item its folder lists (#899 W8-5).</summary>
+internal enum UndoCaseOnlySpelling
+{
+    /// <summary>The folder lists it as the move's <c>from</c>.</summary>
+    From,
+    /// <summary>The folder lists it as the move's <c>to</c>.</summary>
+    To,
+    /// <summary>A third spelling, neither side's, or no entry at all.</summary>
+    Another,
+    /// <summary>The folder could not be listed just now.</summary>
+    CannotRead,
+}
+
 internal static class UndoMoveSides
 {
+    /// <summary>
+    /// For a capitalisation-only move (<see cref="UndoOp.IsCaseOnlyMove"/>):
+    /// which spelling the folder holding its item lists, where the two
+    /// spellings are ONE item (the same identity at both, a link never
+    /// followed; the mac's <c>UndoMoveSide.spellingListed</c>, which compares
+    /// device and inode); null where they are not one item (nothing there,
+    /// or two items, as on a case-sensitive folder), which is then judged as
+    /// any move. The entry is matched by the moved item's own part without
+    /// regard to case, then told apart from each side AS SPELLED (U4b2-9).
+    /// </summary>
+    internal static UndoCaseOnlySpelling? SpellingListed(string fromFull, string toFull, Func<string, bool>? cannotRead = null)
+    {
+        if (UndoFileIdentity.OfPlace(fromFull) is not { } atFrom || UndoFileIdentity.OfPlace(toFull) is not { } atTo || atFrom != atTo) return null;
+        string folder = Path.GetDirectoryName(fromFull)!;
+        string fromName = Path.GetFileName(fromFull);
+        string toName = Path.GetFileName(toFull);
+        if (cannotRead?.Invoke(folder) == true) return UndoCaseOnlySpelling.CannotRead;
+        List<string> names;
+        try
+        {
+            names = [];
+            foreach (string entry in Directory.EnumerateFileSystemEntries(folder)) names.Add(Path.GetFileName(entry));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return UndoCaseOnlySpelling.CannotRead;
+        }
+        foreach (string name in names)
+        {
+            if (UndoOp.PartInside(fromName, name) is not "") continue;
+            if (string.Equals(name, toName, StringComparison.Ordinal)) return UndoCaseOnlySpelling.To;
+            if (string.Equals(name, fromName, StringComparison.Ordinal)) return UndoCaseOnlySpelling.From;
+            return UndoCaseOnlySpelling.Another;
+        }
+        return UndoCaseOnlySpelling.Another;
+    }
+
     /// <summary>
     /// One side of a move as it holds now. <paramref name="overriding"/> gives,
     /// for paths inside the place (relative to it, "" the place itself), what

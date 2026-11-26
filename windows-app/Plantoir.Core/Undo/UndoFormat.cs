@@ -115,6 +115,30 @@ internal sealed record UndoOp
     /// </summary>
     internal bool IsWhole => Readable && Kind is Move or CreateTree or RemoveTree or External;
 
+    /// <summary>
+    /// A capitalisation-only rename (the mac's <c>UndoOp.isCaseOnlyMove</c>,
+    /// U4b part C; #899 W8-5): a <c>move</c> whose <c>from</c> and <c>to</c>
+    /// are spelled alike but for case and differ in their last part only
+    /// (<c>Media</c> to <c>media</c>), readable although the two places
+    /// overlap (<c>opKinds.move</c>). "Alike but for case" is
+    /// <see cref="PartInside"/>, the one comparison, giving "" (the same
+    /// place); the parts above the last are then the same as spelled, and
+    /// the two are not the same spelling. On NTFS the two spellings are one
+    /// item, judged by the spelling its folder lists
+    /// (<see cref="UndoMoveSides.SpellingListed"/>).
+    /// </summary>
+    internal bool IsCaseOnlyMove
+    {
+        get
+        {
+            if (Kind != Move || From is not { } from || To is not { } to) return false;
+            if (string.Equals(from, to, StringComparison.Ordinal) || PartInside(from, to) is not "") return false;
+            int fromSlash = from.LastIndexOf('/');
+            int toSlash = to.LastIndexOf('/');
+            return fromSlash == toSlash && string.Equals(from[..(fromSlash + 1)], to[..(toSlash + 1)], StringComparison.Ordinal);
+        }
+    }
+
     internal const string WriteFile = "writeFile";
     internal const string EditLine = "editLine";
     internal const string Recompute = "recompute";
@@ -141,9 +165,10 @@ internal sealed record UndoOp
     /// Whether two places are the same, or one is a folder holding the other,
     /// compared part by part WITHOUT regard to case (the mac's U2b hard review,
     /// MEDIUM 7): NTFS, like a Mac's volume, takes <c>a.json</c> and
-    /// <c>A.json</c> for one place, so a move between them, or two ops naming
-    /// them, is a step this version cannot read. That is also why a move that
-    /// changes only case is never made as two renames here.
+    /// <c>A.json</c> for one place, so two ops naming them, or a move between
+    /// them, is a step this version cannot read; the one exception is a move
+    /// that differs in case in its last part only (<see cref="UndoOp.IsCaseOnlyMove"/>,
+    /// W8-5), which is made by ONE rename, never two through a third name.
     /// </summary>
     internal static bool PlacesOverlap(string first, string second) =>
         PartInside(first, second) is not null || PartInside(second, first) is not null;
@@ -157,10 +182,13 @@ internal sealed record UndoOp
     /// #899 W8-2). Such an edit is made, and redone, after the move and taken
     /// back before it, and the move is judged as if it were taken back.
     /// Whether it comes AFTER the move in the step is the caller's to check.
-    /// "At or inside" is <see cref="PartInside"/>, the one comparison. A
-    /// capitalisation-only move (piece 5) and a link's move (piece 6) carry
-    /// nothing here yet: the first fails the last test (its two places
-    /// overlap), and the second is not readable on Windows.
+    /// "At or inside" is <see cref="PartInside"/>, the one comparison. For a
+    /// capitalisation-only move (<see cref="IsCaseOnlyMove"/>; W8-5) the two
+    /// spellings are one place, so the edit is told to be named at the new
+    /// spelling by the moved item's own part alone, as spelled (never the
+    /// <c>from</c> spelling), the parts above it by <see cref="PartInside"/>
+    /// (review 1 of U4b2-9, L3). A link's move (piece 6) carries nothing:
+    /// it is not readable on Windows yet.
     /// </summary>
     internal static bool MoveCarries(UndoOp move, UndoOp edit)
     {
@@ -168,6 +196,12 @@ internal sealed record UndoOp
         if (edit.Kind is not (WriteFile or EditLine or ReplaceText or EditJson)) return false;
         if (edit.From is not null || edit.To is not null || edit.Target is not null) return false;
         if (PartInside(to, path) is null) return false;
+        if (move.IsCaseOnlyMove)
+        {
+            string[] fromParts = from.Split('/');
+            string[] pathParts = path.Split('/');
+            return !string.Equals(pathParts[fromParts.Length - 1], fromParts[^1], StringComparison.Ordinal);
+        }
         return !PlacesOverlap(from, path);
     }
 
@@ -757,10 +791,11 @@ internal static class UndoFormat
         {
             case UndoOp.Move:
                 // No path: from and to follow path's rules, differ, and neither
-                // holds the other; exactly one of a file's sha and a folder's listingSha.
+                // holds the other, but for a capitalisation-only rename (U4b;
+                // W8-5); exactly one of a file's sha and a folder's listingSha.
                 if (op.Path is not null || op.From is null || op.To is null) return false;
                 if (!UndoPath.IsWithinTheRules(op.From) || !UndoPath.IsWithinTheRules(op.To)) return false;
-                if (UndoOp.PlacesOverlap(op.From, op.To)) return false;
+                if (UndoOp.PlacesOverlap(op.From, op.To) && !op.IsCaseOnlyMove) return false;
                 return (op.Sha is not null) != (op.ListingSha is not null);
             case UndoOp.External:
             {

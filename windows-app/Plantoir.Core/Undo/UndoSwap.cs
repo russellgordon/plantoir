@@ -548,6 +548,22 @@ internal static class UndoSwap
                 // once it has moved (U4b2-10; #899 W8-4).
                 (UndoMoveSide atFrom, IReadOnlyList<string> foldersLeftOut) = UndoMoveSides.ReadNamingFoldersLeftOut(move.Op, move.FromFull, overriding: ownLeftOut);
                 UndoMoveSide atTarget = UndoMoveSides.Read(move.Op, target.FullPath);
+                if (move.Op.IsCaseOnlyMove && UndoMoveSides.SpellingListed(move.FromFull, target.FullPath) is { } spelled)
+                {
+                    // One item under two spellings (U4b; W8-5): it goes in
+                    // only while its folder lists the spelling it leaves, and
+                    // the one rename then replaces nothing (measured on the
+                    // PC: MoveFileEx without MOVEFILE_REPLACE_EXISTING renames
+                    // Media to media, a folder or a file, and answers 0; it
+                    // answers 0 too when the folder already lists the new
+                    // spelling, so the listing, not the rename, decides).
+                    atTarget = spelled switch
+                    {
+                        UndoCaseOnlySpelling.From => UndoMoveSide.Free,
+                        UndoCaseOnlySpelling.CannotRead => UndoMoveSide.CannotRead,
+                        _ => UndoMoveSide.HoldsSomethingElse,
+                    };
+                }
                 // Named where a teacher finds the item now, as the plan's
                 // refusal names it (placeAsFound: the place it leaves; #899 W8-3).
                 if (atFrom == UndoMoveSide.CannotRead || atTarget == UndoMoveSide.CannotRead)

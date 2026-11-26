@@ -219,6 +219,19 @@ internal static class UndoCheck
         {
             case UndoOp.Move:
             {
+                if (op.IsCaseOnlyMove && UndoMoveSides.SpellingListed(UndoTreeReading.Under(root, op.From!), UndoTreeReading.Under(root, op.To!), cannotRead) is { } spelled)
+                {
+                    // One item under two spellings (U4b; W8-5): judged by the
+                    // spelling its folder lists, holding the content.
+                    if (spelled == UndoCaseOnlySpelling.CannotRead) return UndoOpState.CannotTell;
+                    if (spelled == UndoCaseOnlySpelling.Another) return UndoOpState.Neither;
+                    UndoMoveSide side = spelled == UndoCaseOnlySpelling.To
+                        ? UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo)
+                        : UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom);
+                    if (side == UndoMoveSide.CannotRead) return UndoOpState.CannotTell;
+                    if (side != UndoMoveSide.HoldsTheContent) return UndoOpState.Neither;
+                    return spelled == UndoCaseOnlySpelling.To ? UndoOpState.After : UndoOpState.Before;
+                }
                 UndoMoveSide atFrom = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.From!), cannotRead, overridingFrom);
                 UndoMoveSide atTo = UndoMoveSides.Read(op, UndoTreeReading.Under(root, op.To!), cannotRead, overridingTo);
                 if (atFrom == UndoMoveSide.CannotRead || atTo == UndoMoveSide.CannotRead) return UndoOpState.CannotTell;
@@ -433,6 +446,16 @@ internal static class UndoCheck
                     overridingFrom = UndoSwap.StepsOwnFilesInside(UndoTreeReading.Under(whole.Root, op.From!), seq);
                     foreach ((string inside, UndoCurrent absent) in UndoSwap.StepsOwnFilesInside(UndoTreeReading.Under(whole.Root, op.To!), seq))
                         (overridingTo ??= new Dictionary<string, UndoCurrent>(StringComparer.Ordinal)).TryAdd(inside, absent);
+                }
+                // A capitalisation-only move's two spellings are one place:
+                // one set of overrides serves whichever spelling is listed
+                // (the mac's U4b; W8-5).
+                if (op.IsCaseOnlyMove && (overridingTo is not null || overridingFrom is not null))
+                {
+                    var both = new Dictionary<string, UndoCurrent>(overridingTo ?? new Dictionary<string, UndoCurrent>(), StringComparer.Ordinal);
+                    foreach ((string inside, UndoCurrent item) in overridingFrom ?? new Dictionary<string, UndoCurrent>()) both.TryAdd(inside, item);
+                    overridingTo = both;
+                    overridingFrom = both;
                 }
                 UndoOpState wholeState = WholeStateOf(op, whole.Root, whole.Places, whole.CannotRead, overridingTo, overridingFrom);
                 UndoVerdict verdict = backward ? UndoVerdictOf(wholeState) : RedoVerdictOf(wholeState);
