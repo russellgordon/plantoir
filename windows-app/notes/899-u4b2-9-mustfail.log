@@ -30,3 +30,9 @@ S5 riding lows, four independent sabotages in one build (each read by its own te
   the replay's prefix folder counted as already read-only: stackCases 'U4b2-4: two pages named index.md in two sections ...': ... content sits in the prefix folder an earlier call made read-only
 
 RED 5 of 5 sabotage runs (plus S0 red first); by row: every case-only row RED under at least one sabotage aimed at it.
+
+Review 1 LOWs (fix 68e2bea8f), red first by the code before each fix: run-r1-red.log
+  L1 testAnEditSpelledWithOtherCapitalsBelowTheMovesToIsUndoneAndRedone: refused(changedSince(firstPath: "courses/TST1O/renamed", others: 0), clearedTheList: true) is not undone
+  L2 testTheWriterJudgesACarriedPlaceByTheOneComparison: placeOnDiskNow gave .../Renamed/a.md; namedPath "courses/TST1O/Renamed/a.md" is not "courses/TST1O/renamed/a.md"
+  L3 testACaseOnlyMoveTellsItsSidesApartByTheFoldersOwnPart: XCTAssertFalse failed - named at the from spelling of the folder; Python test_a_case_only_move_tells_its_sides_apart_by_the_folders_own_part FAIL on the old model
+  L4 Python model's .another folded into from (move_state of the item at to): run-r1-mf-python.log FAIL the third-spelling row; restored, OK

@@ -32,7 +32,7 @@ See `windows-app/notes/899-u4b2-9-mustfail.log`. In short: S0 red first (the new
 ## Left for the next piece
 
 - For pieces 14 and 15 (review 1 of U4b2-6, L3): a moved LINK from an earlier run is neither named nor told. `SpecialFolderRenamer.foldersAtTheirNewName` and `placesAnEarlierRunMayHaveMoved` skip a place in the earlier record's `moved` or `mayHaveMoved` that is a link now (`case .absent, .link, .somethingElse: continue`), because the record keeps no `isALink`. So with a linked special folder `Concepts` moved to `Ideas` by a killed run, a finish run that stops part way says "did not rename"/"was not renamed" while the link sits at `Ideas`. Rare (a linked special folder and two failures); either record which moved places are links, or tell such a place as "cannot tell".
-- `JournaledStep.namedPath` and `placeOnDiskNow` (the writer naming a place inside a planned folder move) still compare as spelled; they name places while a step is made and judge no carrying move, so they were left. If a writer ever names an edit with other capitals than its move's `to`, those two should call `partInside` too.
+- (Corrected by review 1, L2: the earlier line here said `JournaledStep.placeOnDiskNow` and `namedPath` judge no carrying move. Wrong: `placeOnDiskNow` decides where a planned edit's before is read and whether its swap target is staged after the move. Both now call `partInside`.)
 - Review 2 of U4b2-4, LOW 2 (how a "same file name" is compared beyond capitals: canonical equivalence on the Mac) is not in this brief and stays where it was.
 
 ## For the director
@@ -43,6 +43,15 @@ See `windows-app/notes/899-u4b2-9-mustfail.log`. In short: S0 red first (the new
 - The brief's must-fail "the spelling rule out of `wholeState`: EVERY case-only row fails" cannot hold for the third-spelling row: without the rule a case-only move's two sides read one item and come to neither, which is exactly `.another`'s answer, so any row whose right answer is "changed since" passes both ways. That row is pinned instead by `.another` folded into `.from` (S2), as the brief's next line asks. The MEDIA stack row turned out to fail under both S1 (the step is never made) and S2, so the review's "the swap's own check refuses it anyway" was not so for S2: it was kept, name and all.
 - Merge note: this branch touches `UndoCheck.swift`, `UndoFormat.swift`, `UndoRecovery.swift`, `CourseActivity.swift` (one constant), `StringListEditorView.swift` (one line, the spinner's label), `LinksChecklistWording.swift`, `LinksChecklistPublisher.swift` (one line), and tests. Not the rename sheet's logic, `FolderRenameRun`, `CourseSettingsView` or `AppDelegate`.
 - HIG: the spinner's VoiceOver word is unchanged ("Renaming"), only moved into the contract; no interface a teacher sees or hears changed, so no HIG section was needed.
+
+## Review 1 (LOWs; H1 waits for a base not in `dev`)
+
+- L1: `UndoMoveSide.read` matched a step's override keys to the listing as spelled; now by `partInside`, keeping the disk's spelling. Red first: `testAnEditSpelledWithOtherCapitalsBelowTheMovesToIsUndoneAndRedone` (Undo refused `changedSince(courses/TST1O/renamed)`).
+- L2: `JournaledStep.placeOnDiskNow` and `namedPath` call `partInside`. Red first: `testTheWriterJudgesACarriedPlaceByTheOneComparison` (read at `Renamed/a.md`; named `courses/TST1O/Renamed/a.md`).
+- L3: the case-only branch of `moveCarries` compares only the moved item's own part as spelled (Swift and Python). Red first: `testACaseOnlyMoveTellsItsSidesApartByTheFoldersOwnPart` and Python's `test_a_case_only_move_tells_its_sides_apart_by_the_folders_own_part`. Answers on `dev` unchanged otherwise (a third spelling is still carried, as before).
+- L4: Python's `move_state` takes `listed_as` and gives `.another`'s neither itself; the harness passes the key. Must-fail: folded into `from` in the model, the third-spelling row FAILS in Python (`run-r1-mf-python.log`).
+- For documentation 12: W8's listing override, its writer's carried place and the case-only side must use the same part-by-part comparison.
+- Runs: `run-r1-red.log` (3 red), `run-r1-green.log` (UndoOpKindsTests 29 green), `run-r1-own.log` (95 green), Python 33 OK.
 
 ## Self-check
 

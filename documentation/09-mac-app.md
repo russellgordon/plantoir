@@ -22733,8 +22733,14 @@ readability rule already says such places overlap. **Rejected:** comparing
 as spelled everywhere, which would make that step unreadable (it overlaps
 by `placesOverlap`) rather than undoable, and would leave the case-only
 rename's own edits (named at `to`, never `from`, as spelled) as they are
-anyway. `JournaledStep.namedPath` is the writer's naming, not a judgement of
-a carrying move, and is left as it is. In `checkCases`, the row "…lists it as
+anyway. Review 1 of this piece took it further: the moved folder's listing
+is matched to a step's overrides by the same function (`UndoMoveSide.read`,
+so `Renamed/Sub/a.md` meets the disk's `sub/a.md`), the writer's own carried
+judgement (`JournaledStep.placeOnDiskNow`, which decides where a planned
+edit's before is read and whether it is staged after the move, and
+`namedPath`) calls it, and a capitalisation-only move tells its two sides
+apart by the moved item's own part alone, as spelled, the parts above it by
+`partInside`. In `checkCases`, the row "…lists it as
 `to`, holding something else" gave changed since with the rule or without
 it; it is replaced by a folder row that fails without it, and a row with a
 third spelling (`current.listedAs`, `a.JSON`) pins `.another` in
