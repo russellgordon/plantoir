@@ -14,6 +14,12 @@ enum WholeCourseRestore {
 
         // MARK: - Stored properties
 
+        /// A Rename folder of the course is under way in any window, planning
+        /// or swapping (#899 U4b's claim in `CourseActivity`): asked first, as
+        /// `WorkspaceModel.structuralRefusal` asks it for every other
+        /// structural act (the review after the merge of `dev`, HIGH 1).
+        var folderRenameUnderWay: Bool = false
+
         /// This app is previewing, deploying or copying the course.
         var busyHere: Bool = false
 
@@ -37,6 +43,7 @@ enum WholeCourseRestore {
 
     /// Which refusal applies, by its wording key.
     enum Refusal: String, Equatable {
+        case folderRenameUnderWay
         case busy
         case claudeIsRevisingTheCourseRestore
         case anotherRestoreUnderWay
@@ -48,6 +55,7 @@ enum WholeCourseRestore {
     /// it (`course restore left as it was`, the implementation review's I4):
     /// a fixed phrase, never page text.
     enum DidNotGoAhead: String, Equatable {
+        case folderRename = "refused: a folder of the course is being renamed"
         case busy = "refused: the course is previewing or deploying here"
         case outsideSession = "refused: an outside assistant's session holds the course"
         case anotherRestore = "refused: another restore of the course has not finished"
@@ -65,6 +73,8 @@ enum WholeCourseRestore {
         /// The trail's kind for a refusal.
         static func refused(_ refusal: Refusal) -> DidNotGoAhead {
             switch refusal {
+            case .folderRenameUnderWay:
+                return .folderRename
             case .busy:
                 return .busy
             case .claudeIsRevisingTheCourseRestore:
@@ -132,11 +142,15 @@ enum WholeCourseRestore {
 
     // MARK: - Functions: the refusals
 
-    /// The refusal that applies, in order: this app's own work on the
+    /// The refusal that applies, in order: a Rename folder of the course
+    /// under way in any window, this app's own work on the
     /// course, an outside session's hold, an unsettled restore, another
     /// program's build. Asked before the archive, after it, and immediately
     /// before the swap (the plan review, M3).
     static func refusal(_ facts: RefusalFacts) -> Refusal? {
+        if facts.folderRenameUnderWay {
+            return .folderRenameUnderWay
+        }
         if facts.busyHere {
             return .busy
         }
@@ -158,6 +172,10 @@ enum WholeCourseRestore {
     /// The sentence for a refusal.
     static func sentence(for refusal: Refusal, courseCode: String, assistant: String?) -> String {
         switch refusal {
+        case .folderRenameUnderWay:
+            // `undo.wording.renameFolderUnderWay`: one sentence for every act
+            // a Rename folder refuses (U4b2-6).
+            return CourseActivity.folderRenameIsUnderWay(course: courseCode)
         case .busy:
             return "\(courseCode) is previewing or deploying right now. Stop that first, then restore."
         case .claudeIsRevisingTheCourseRestore:

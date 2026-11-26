@@ -2388,6 +2388,13 @@ class WorkspaceModel {
         guard let coursesDirectoryURL else {
             return
         }
+        // Never while a Rename folder of the course is under way, in any
+        // window (#909, the review after the merge of `dev`, HIGH 1): a
+        // section put back from Archived moves folders the rename is moving.
+        if restoreFromArchivedWaits(item.courseCode) {
+            restoreProblem = CourseActivity.folderRenameIsUnderWay(course: item.courseCode)
+            return
+        }
         do {
             try CourseRestorer.restore(item, coursesDirectoryURL: coursesDirectoryURL, courses: courses)
         } catch {
@@ -2435,6 +2442,23 @@ class WorkspaceModel {
             return false
         }
         return CourseActivity.courseIsBeingCopied(folderPath: workspacePath, courseCode: courseCode)
+    }
+
+    /// Whether Restore… for a backup of this course waits: a copy of the
+    /// course is being zipped (#351), or a Rename folder of it is under way
+    /// in any window (#909, the review after the merge of `dev`, HIGH 1).
+    /// The sidebar's, the window's and All Backups' Restore… are disabled
+    /// while it is true, and Course ▸ Restore from Backup… through the
+    /// backup row's `structuralHold`; each restore also refuses at the click.
+    func restoreOfABackupWaits(_ courseCode: String) -> Bool {
+        return isBeingCopied(courseCode) || isRenamingAFolder(courseCode)
+    }
+
+    /// Whether Restore… for an archive of this course waits: a Rename
+    /// folder of the course is under way in any window (#909). A section's
+    /// archive goes back into the course the rename is changing.
+    func restoreFromArchivedWaits(_ courseCode: String) -> Bool {
+        return isRenamingAFolder(courseCode)
     }
 
     /// Whether a Rename folder of this course is under way, in any window
@@ -2973,7 +2997,8 @@ class WorkspaceModel {
 
     /// Why a whole-course restore of this course may not go on now, as the
     /// refusal and the sentence the teacher reads, or nil
-    /// (`WholeCourseRestore.refusal`, in its order): this app's own preview,
+    /// (`WholeCourseRestore.refusal`, in its order): a Rename folder of the
+    /// course under way in any window; this app's own preview,
     /// deploy or copy; an outside session's hold (#458); a restore of the
     /// course that has not settled (#909), counting every record but
     /// `ownStaging`'s, the asking restore's own (the implementation review's
@@ -2988,6 +3013,13 @@ class WorkspaceModel {
             return nil
         }
         var facts: WholeCourseRestore.RefusalFacts = WholeCourseRestore.RefusalFacts()
+        // First, as `structuralRefusal` asks it (the review after the merge
+        // of `dev`, HIGH 1): the rename's check and swap run off the main
+        // actor, so a restore meanwhile would move the course's items while
+        // the rename is moving folders inside them.
+        facts.folderRenameUnderWay = CourseActivity.courseIsRenamingAFolder(
+            folderPath: workspacePath, courseCode: courseCode
+        )
         facts.busyHere = CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: courseCode)
         facts.revisingAssistant = CourseActivity.revisingAssistant(folderPath: workspacePath, courseCode: courseCode)
         refreshCoursesRevisedElsewhere()

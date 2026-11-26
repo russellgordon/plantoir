@@ -226,7 +226,7 @@ struct AllBackupsView: View {
                     workspace.backupRestoreRequest = item
                 }
             }
-            .disabled(chosen.count != 1 || workspace.isBeingCopied(chosen[0].courseCode))
+            .disabled(chosen.count != 1 || workspace.restoreOfABackupWaits(chosen[0].courseCode))
             Button("Show in Finder", systemImage: "finder") {
                 selectedIdentifiers = identifiers
                 var urls: [URL] = []

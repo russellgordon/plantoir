@@ -2378,6 +2378,18 @@
           "refusal": "anEarlierRestoreDidNotFinish"
         },
         {
+          "name": "a Rename folder of the course is under way in a window, planning or swapping (#909, the review after the merge of dev, HIGH 1): refused first, with undo.wording.renameFolderUnderWay, as every structural act is; the rename is not halted",
+          "facts": {
+            "folderRenameUnderWay": true,
+            "busyHere": true,
+            "revisingAssistant": "Claude",
+            "unsettledRestore": true,
+            "earlierRestoreLeftOver": true,
+            "buildingElsewhere": true
+          },
+          "refusal": "folderRenameUnderWay"
+        },
+        {
           "name": "several at once: the first in order is said",
           "facts": {
             "busyHere": true,
@@ -2389,7 +2401,7 @@
           "refusal": "busy"
         }
       ],
-      "refusalWhy": "Asked three times: before the archive (a refused click leaves nothing in Archived), after it (it runs off the main actor and can take a minute), and immediately before the record goes to swapping (the plan review, M3: the unpack takes seconds on a slow disk and minutes from a backup the cloud must download first). busy is the sentence the restore has always said; claudeIsRevisingTheCourseRestore is assist-wording's sessionIsRevisingTheCourse with then 'restore' (doorCourseHold.holds.structuralWork); courseIsBeingBuiltElsewhere is assist-wording's; anotherRestoreUnderWay and anEarlierRestoreDidNotFinish are this block's. A refusal before the swap removes the staging folder and leaves the archive. unsettledRestore is asked of every record of the course in courses/.internal/restoring/ OTHER than the asking restore's own: the third refusal runs after this restore has written its own record (phase unpacking), and counting it refused every whole-course restore from Backups with anotherRestoreUnderWay after the archive was made (the implementation review's W1; no contract case could see it, because the cases inject the refusal; an end-to-end test of each door does). A record counts as unsettledRestore when another process on this computer that is still running wrote it, a live settler holds it, or another computer wrote it; one this computer wrote whose writer is gone, or that this very process wrote, and that no live settler holds, is earlierRestoreLeftOver instead: nothing is restoring it, so 'being restored somewhere else' would be untrue (the review's M-d), and the next opening tries again to keep its files. Each refusal writes the trail line course restore left as it was, naming the refusal and when it was asked.",
+      "refusalWhy": "folderRenameUnderWay comes first and is the Mac's only until Windows' W8 renames a folder off the main thread (it is missing from a case's facts there, read as false): a Rename folder's check and swap run off the main actor and are refused nothing by the swap, so a restore meanwhile would move the course's items while the rename moves folders inside them; its sentence is undo.wording.renameFolderUnderWay, the one every act a Rename folder refuses says (U4b2-6), and its trail phrase is 'refused: a folder of the course is being renamed'. A rename that is only planning is refused against, never halted, as for every other structural act (only a quit halts a planning rename). Asked three times: before the archive (a refused click leaves nothing in Archived), after it (it runs off the main actor and can take a minute), and immediately before the record goes to swapping (the plan review, M3: the unpack takes seconds on a slow disk and minutes from a backup the cloud must download first). busy is the sentence the restore has always said; claudeIsRevisingTheCourseRestore is assist-wording's sessionIsRevisingTheCourse with then 'restore' (doorCourseHold.holds.structuralWork); courseIsBeingBuiltElsewhere is assist-wording's; anotherRestoreUnderWay and anEarlierRestoreDidNotFinish are this block's. A refusal before the swap removes the staging folder and leaves the archive. unsettledRestore is asked of every record of the course in courses/.internal/restoring/ OTHER than the asking restore's own: the third refusal runs after this restore has written its own record (phase unpacking), and counting it refused every whole-course restore from Backups with anotherRestoreUnderWay after the archive was made (the implementation review's W1; no contract case could see it, because the cases inject the refusal; an end-to-end test of each door does). A record counts as unsettledRestore when another process on this computer that is still running wrote it, a live settler holds it, or another computer wrote it; one this computer wrote whose writer is gone, or that this very process wrote, and that no live settler holds, is earlierRestoreLeftOver instead: nothing is restoring it, so 'being restored somewhere else' would be untrue (the review's M-d), and the next opening tries again to keep its files. Each refusal writes the trail line course restore left as it was, naming the refusal and when it was asked.",
       "spaceCases": [
         {
           "name": "room for the archive and the unpacked backup",

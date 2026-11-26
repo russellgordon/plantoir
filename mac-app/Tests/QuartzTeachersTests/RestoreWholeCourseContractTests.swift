@@ -339,11 +339,17 @@ final class RestoreWholeCourseContractTests: XCTestCase {
     @MainActor
     func testEveryRefusalCase() throws {
         let cases: [[String: Any]] = try XCTUnwrap(try RestoreWholeCourseContractTests.block()["refusalCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 7, "refusalCases has shrunk")
+        XCTAssertGreaterThanOrEqual(cases.count, 8, "refusalCases has shrunk")
+        var renameCases: Int = 0
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let facts: [String: Any] = try XCTUnwrap(testCase["facts"] as? [String: Any], name)
             var given: WholeCourseRestore.RefusalFacts = WholeCourseRestore.RefusalFacts()
+            // Missing is false: the Mac's only until Windows' W8 (#909).
+            given.folderRenameUnderWay = facts["folderRenameUnderWay"] as? Bool ?? false
+            if given.folderRenameUnderWay {
+                renameCases += 1
+            }
             given.busyHere = try XCTUnwrap(facts["busyHere"] as? Bool, name)
             given.revisingAssistant = facts["revisingAssistant"] as? String
             given.unsettledRestore = try XCTUnwrap(facts["unsettledRestore"] as? Bool, name)
@@ -351,7 +357,12 @@ final class RestoreWholeCourseContractTests: XCTestCase {
             given.buildingElsewhere = try XCTUnwrap(facts["buildingElsewhere"] as? Bool, name)
             XCTAssertEqual(WholeCourseRestore.refusal(given)?.rawValue, testCase["refusal"] as? String, name)
         }
+        XCTAssertGreaterThanOrEqual(renameCases, 1, "the rename's case is read (#909)")
         // The sentences each refusal says are the ones the contract names.
+        XCTAssertEqual(
+            WholeCourseRestore.sentence(for: .folderRenameUnderWay, courseCode: "ICS3U", assistant: nil),
+            CourseActivity.folderRenameIsUnderWay(course: "ICS3U")
+        )
         XCTAssertEqual(
             WholeCourseRestore.sentence(for: .courseIsBeingBuiltElsewhere, courseCode: "ICS3U", assistant: nil),
             AssistWording.courseIsBeingBuiltElsewhere(course: "ICS3U")

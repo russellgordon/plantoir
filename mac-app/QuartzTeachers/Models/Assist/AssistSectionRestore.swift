@@ -24,6 +24,10 @@ enum AssistSectionRestore {
         case nothingToRestore
         case noWorkingFolder
         case unreadableBackup(String)
+        /// A Rename folder of the course is under way in some window (#909,
+        /// the review after the merge of `dev`, HIGH 1): the rename's own
+        /// sentence, `undo.wording.renameFolderUnderWay`.
+        case folderRenameUnderWay(String)
 
         var errorDescription: String? {
             switch self {
@@ -33,6 +37,8 @@ enum AssistSectionRestore {
                 return "Plantoir cannot find the working folder these courses live in."
             case .unreadableBackup(let name):
                 return "The copy saved for this conversation (\(name)) could not be read."
+            case .folderRenameUnderWay(let course):
+                return CourseActivity.folderRenameIsUnderWay(course: course)
             }
         }
     }
@@ -176,6 +182,20 @@ enum AssistSectionRestore {
     /// Returns how many shared pages kept their current setting because
     /// there was nowhere on them to put the backup's back — see
     /// `doneMessage`.
+    /// Whether Restore Section N… waits for a Rename folder of the course
+    /// under way in any window (#909): the window's button is disabled while
+    /// it is true, and `restore` refuses then too.
+    @MainActor
+    static func waitsForARename(courseCode: String, coursesDirectoryURL: URL?) -> Bool {
+        guard let coursesDirectoryURL else {
+            return false
+        }
+        return CourseActivity.courseIsRenamingAFolder(
+            folderPath: coursesDirectoryURL.deletingLastPathComponent().path, courseCode: courseCode
+        )
+    }
+
+    @MainActor
     @discardableResult
     static func restore(
         backupURL: URL?,
@@ -188,6 +208,9 @@ enum AssistSectionRestore {
         }
         guard let coursesDirectoryURL else {
             throw Problem.noWorkingFolder
+        }
+        if waitsForARename(courseCode: courseCode, coursesDirectoryURL: coursesDirectoryURL) {
+            throw Problem.folderRenameUnderWay(courseCode)
         }
         guard let item = BackupItem.from(fileURL: backupURL, courseCode: courseCode) else {
             throw Problem.unreadableBackup(backupURL.lastPathComponent)

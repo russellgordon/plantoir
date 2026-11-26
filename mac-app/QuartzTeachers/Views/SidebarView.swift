@@ -212,7 +212,7 @@ struct SidebarView: View {
                                         select(SidebarSelection.backup(item.id))
                                         workspace.backupRestoreRequest = item
                                     }
-                                    .disabled(workspace.isBeingCopied(item.courseCode))
+                                    .disabled(workspace.restoreOfABackupWaits(item.courseCode))
                                     // The Import sheet, with this zip already
                                     // chosen (#572): the same door, not a
                                     // fourth one.
@@ -259,6 +259,7 @@ struct SidebarView: View {
                                         select(SidebarSelection.archived(item.id))
                                         workspace.restoreRequest = item
                                     }
+                                    .disabled(workspace.restoreFromArchivedWaits(item.courseCode))
                                     // A whole course only: a section's archive
                                     // holds no course to read (#572).
                                     if item.sectionNumber == nil {
@@ -2091,9 +2092,16 @@ struct SidebarView: View {
             situation.row = .backup
             if let item = workspace.selectedBackupItem {
                 situation.copying = workspace.isBeingCopied(item.courseCode)
+                // Restore from Backup… waits for a Rename folder of the
+                // course (#909); no course is selected on this row, so this
+                // is the only hold it reads.
+                situation.structuralHold = workspace.restoreOfABackupWaits(item.courseCode)
             }
         case .archived:
             situation.row = .archived
+            if let item = workspace.selectedArchivedItem {
+                situation.structuralHold = workspace.restoreFromArchivedWaits(item.courseCode)
+            }
         case .allBackups:
             situation.row = .allBackups
         case nil:

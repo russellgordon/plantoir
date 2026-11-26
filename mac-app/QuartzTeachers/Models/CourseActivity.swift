@@ -196,6 +196,18 @@ enum CourseActivity {
         WorkLeaseRegistry.reconcile()
     }
 
+    /// True while a whole course is being restored from Backups, in any
+    /// window (#909): a Rename folder of it may not begin its swap then
+    /// (`FolderRenameRun.swapBegins`).
+    static func courseIsBeingRestored(folderPath: String, courseCode: String) -> Bool {
+        for restore in store.activeRestores {
+            if restore.courseCode == courseCode && FolderIdentity.isSameFolder(restore.folderPath, folderPath) {
+                return true
+            }
+        }
+        return false
+    }
+
     /// Records that one restore of a course has ended, however it ended.
     static func endRestore(folderPath: String, courseCode: String) {
         var remaining: [RestoreRecord] = []
