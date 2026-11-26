@@ -957,7 +957,11 @@ final class UndoRenameFolderStepTests: XCTestCase {
     /// unit test: Cancel halts through the run, the sheet going away halts
     /// through the run, Rename starts the run with the closure it was
     /// handed, and Rename is enabled by the run's `canStart`. MUST FAIL with
-    /// any one of those calls taken out of the view.
+    /// any one of those calls taken out of the view. Backed since U4b2-8 by
+    /// the real sheet, hosted and pressed
+    /// (`testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet`,
+    /// `testTheRealSheetGoingAwayHaltsAHeldPlan`), which catch a halt
+    /// commented out or moved into a fresh `Task`.
     func testTheRenameSheetCallsItsRunForEveryWayOut() throws {
         let sourceURL: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()   // QuartzTeachersTests

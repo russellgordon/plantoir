@@ -1,0 +1,22 @@
+mf1 walk in Task.detached again: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1425: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree] : XCTAssertEqual failed: ("XCTWaiterResult(rawValue: 2)") is not equal to ("XCTWaiterR
+    UndoRenameFolderStepTests.swift:1426: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree] : XCTAssertFalse failed - round 12 still holds the course after Cancel
+    UndoRenameFolderStepTests.swift:1426: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree] : XCTAssertFalse failed - round 13 still holds the course after Cancel
+    UndoRenameFolderStepTests.swift:1428: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree] : failed - round 13's plan never started, with 12 held on a Mac of 12 cores: the stuck
+    UndoRenameFolderStepTests.swift:1453: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree] : XCTAssertTrue failed
+mf2 plan ignores the thread being cancelled: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1368: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testCancelWhileThePlanIsHeldGivesTheCourseBackAndTheHeldPlanChangesNothing] : XCTAssertEqual failed: ("4") is not equal to ("1") - the cancelled pl
+    UndoRenameFolderStepTests.swift:1447: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree] : XCTAssertEqual failed: ("64") is not equal to ("16") - a cancelled plan went on read
+mf3 Cancel closes the sheet without halting: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1029: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet] : XCTAssertNil failed: "Task<(), Never>(_task: (Opaque Value))" - Cancel did not halt the r
+    UndoRenameFolderStepTests.swift:1033: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet] : failed - the sheet's Cancel did not reach the held plan
+mf4 Cancel halts inside a fresh Task: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1029: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRealSheetsCancelHaltsAHeldPlanAndClosesTheSheet] : XCTAssertNil failed: "Task<(), Never>(_task: (Opaque Value))" - Cancel did not halt the r
+mf5 the list no longer halts as it leaves the window: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1083: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testTheRealSheetGoingAwayHaltsAHeldPlan] : failed - the sheet going away did not halt the held plan
+mf6 the answer ignores the latch: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1144: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testASecondQuitRequestWhileAQuitGoesAheadAsksNothingAndRefusesNothing] : XCTAssertEqual failed: ("nil") is not equal to ("Optional(__C.NSApplicatio
+mf7 the delegate does not ask it first: RED (exit 65)
+    UndoRenameFolderStepTests.swift:1160: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testASecondQuitRequestWhileAQuitGoesAheadAsksNothingAndRefusesNothing] : XCTAssertEqual failed: ("let closing: QuitConfirmation.ClosingReason = Qui
+    UndoRenameFolderStepTests.swift:1164: error: -[QuartzTeachersTests.UndoRenameFolderStepTests testASecondQuitRequestWhileAQuitGoesAheadAsksNothingAndRefusesNothing] : XCTAssertEqual failed: ("quitReasonCode: AppDelegate.quitReasonCode(),") i
+restored byte for byte (git diff of mac-app/QuartzTeachers empty)
