@@ -998,6 +998,7 @@ enum CourseRestorer {
         guard let walker = fileManager.enumerator(at: courseURL, includingPropertiesForKeys: nil) else {
             return (notPutBack, notSaved, madeSinceHidden)
         }
+        var spellings: PlaceSpellings = PlaceSpellings()
         while let entry = walker.nextObject() as? URL {
             let name: String = entry.lastPathComponent
             if namesASectionFolder(name) || CourseArchiver.excludedFromArchives.contains(name) {
@@ -1007,7 +1008,7 @@ enum CourseRestorer {
             if entry.pathExtension != "md" {
                 continue
             }
-            guard let relativePath = relativePath(of: entry, under: courseURL) else {
+            guard let relativePath = relativePath(of: entry, under: courseURL, remembering: &spellings) else {
                 continue
             }
             let backedUpPageURL: URL = payload.appendingPathComponent(relativePath)
@@ -1279,9 +1280,10 @@ enum CourseRestorer {
     /// another copy of that folder.
     /// A walk's URL can be spelled differently from `root` (`/private/var`
     /// for `/var`, a link's target), so the one rule decides it
-    /// (`RestoreSwap.placeInside`, #909).
-    private static func relativePath(of url: URL, under root: URL) -> String? {
-        return RestoreSwap.placeInside(url, of: root)
+    /// (`RestoreSwap.placeInside`, #909). One walk passes the same
+    /// `spellings` for every entry, so the folder is resolved once.
+    private static func relativePath(of url: URL, under root: URL, remembering spellings: inout PlaceSpellings) -> String? {
+        return RestoreSwap.placeInside(url, of: root, remembering: &spellings)
     }
 
     /// Adds the section number back to the course's settings, in order.

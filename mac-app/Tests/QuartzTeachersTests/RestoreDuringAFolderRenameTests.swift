@@ -202,13 +202,15 @@ final class RestoreDuringAFolderRenameTests: XCTestCase {
 
     // MARK: - Functions: a record left by an interrupted rename
 
-    /// Pins today's behaviour (item 4 of the piece's brief): a record left
-    /// on disk by a rename that was killed earlier (no claim is held, so
-    /// nothing is under way) does not refuse a whole-course restore, and the
-    /// restore removes it once the course is the backup's
-    /// (`WholeCourseRestore.afterTheCommit`). No record is left that could
-    /// later rename the restored folders.
-    func testARecordLeftByAnInterruptedRenameIsClearedByAWholeCourseRestore() async throws {
+    /// The director's decision of 2026-11-26: a record left on disk by a
+    /// rename that was killed earlier (no claim is held, so nothing is under
+    /// way) does not refuse a whole-course restore, and the restore KEEPS it
+    /// byte for byte (`RenameRecordClaim.aWholeCourseRestoreReplacedTheCourse`).
+    /// The rename's reader checks a record against the disk, so a record the
+    /// restored course does not match offers nothing, and one it still
+    /// matches (a backup made after the kill holds the half-renamed folders)
+    /// lets the teacher finish the rename from the sheet.
+    func testARecordLeftByAnInterruptedRenameIsKeptByAWholeCourseRestore() async throws {
         let fixture: WholeCourseFixture = try WholeCourseFixture()
         defer { fixture.tearDown() }
         let workspace: WorkspaceModel = try WholeCourseRestoreDoorTests.openWorkspace(on: fixture)
@@ -216,12 +218,28 @@ final class RestoreDuringAFolderRenameTests: XCTestCase {
             from: "Concepts", to: "Ideas", scope: .shared, courseDirectory: fixture.courseURL, moved: ["Concepts"]
         )
         let record: URL = SpecialFolderRenamer.renameMarkerURL(courseDirectory: fixture.courseURL)
-        XCTAssertTrue(RestoreSwap.itemExists(at: record))
+        let recordBefore: Data = try Data(contentsOf: record)
 
         await workspace.restoreBackup(try WholeCourseRestoreDoorTests.backup(fixture))
 
         XCTAssertNil(workspace.backupProblem, workspace.backupProblem ?? "")
-        XCTAssertFalse(RestoreSwap.itemExists(at: record), "the record goes with the pages it described")
+        XCTAssertEqual(try? Data(contentsOf: record), recordBefore, "the record is kept byte for byte")
+        XCTAssertNil(
+            SpecialFolderRenamer.interruptedRenameTarget(
+                from: "Concepts", scope: .shared, courseDirectory: fixture.courseURL, sectionNumbers: [1]
+            ),
+            "the restored course still has Concepts, so the record offers nothing"
+        )
+        try FileManager.default.moveItem(
+            at: fixture.courseURL.appendingPathComponent("Concepts"), to: fixture.courseURL.appendingPathComponent("Ideas")
+        )
+        XCTAssertEqual(
+            SpecialFolderRenamer.interruptedRenameTarget(
+                from: "Concepts", scope: .shared, courseDirectory: fixture.courseURL, sectionNumbers: [1]
+            ),
+            "Ideas",
+            "a course left half renamed still offers to finish the rename"
+        )
     }
 
     // MARK: - Helpers

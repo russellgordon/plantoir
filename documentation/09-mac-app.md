@@ -14466,8 +14466,12 @@ into the kill harness). The order is `contracts/course-management.json` →
    have left the old site for a scheduled deploy to publish over the
    restored pages).
 7. The swap. A failure runs the way back (below). Then `done`, flushed: the
-   restore has happened. Then the rename records are cleared (moved here
-   from BEFORE the restore, so a failed restore keeps them), the course is
+   restore has happened. Then the unit-word rename's record is cleared
+   (moved here from BEFORE the restore, so a failed restore keeps it); an
+   interrupted Rename folder's record is KEPT (the director's decision of
+   2026-11-26, through `RenameRecordClaim`: its reader checks it against
+   the restored disk, so it offers to finish only a course still half
+   renamed), the course is
    locked again if kept for reference, and what the old copy holds that
    exists nowhere else is KEPT (round three, below): all of it when the
    record says `keepsWhatWasReplaced`, otherwise what the archive may not

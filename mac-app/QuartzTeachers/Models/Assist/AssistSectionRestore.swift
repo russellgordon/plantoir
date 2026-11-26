@@ -174,14 +174,6 @@ enum AssistSectionRestore {
         )
     }
 
-    /// Do it — or refuse, when there is nothing saved to go back to.
-    ///
-    /// A conversation that has only READ has no backup, which is exactly the
-    /// case where a restore would be a surprise rather than a rescue.
-    ///
-    /// Returns how many shared pages kept their current setting because
-    /// there was nowhere on them to put the backup's back — see
-    /// `doneMessage`.
     /// Whether Restore Section N… waits for a Rename folder of the course
     /// under way in any window (#909): the window's button is disabled while
     /// it is true, and `restore` refuses then too.
@@ -195,6 +187,15 @@ enum AssistSectionRestore {
         )
     }
 
+    /// Do it — or refuse, when there is nothing saved to go back to, or while a
+    /// Rename folder of the course is under way (`waitsForARename`).
+    ///
+    /// A conversation that has only READ has no backup, which is exactly the
+    /// case where a restore would be a surprise rather than a rescue.
+    ///
+    /// Returns how many shared pages kept their current setting because
+    /// there was nowhere on them to put the backup's back — see
+    /// `doneMessage`.
     @MainActor
     @discardableResult
     static func restore(

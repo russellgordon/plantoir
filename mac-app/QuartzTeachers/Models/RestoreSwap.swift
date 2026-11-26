@@ -532,6 +532,15 @@ nonisolated enum RestoreSwap {
     /// site's link, Finder's `.DS_Store` and the three caches, each of which
     /// is made again and would otherwise leave a kept folder after nearly
     /// every restore.
+    ///
+    /// This list and `leftOutNamesMadeAgain` are a second declaration of
+    /// the archive's names, not a reading of them: this file is Foundation
+    /// alone (it is compiled into the kill-point harness), so it cannot
+    /// read `CourseArchiver`. Two tests hold them equal
+    /// (`CourseRestorerStagedTests.testTheNamesLeftOutAreTheArchivesNames`,
+    /// and `testTheKeptFoldersAreTheContractsAndAreNeverPruned` against the
+    /// contract), so a name added to one side alone goes red (the review
+    /// after the merge, LOW 4). Both restores read this one list.
     static let leftOutNamesKeptAtAnyDepth: [String] = ["node_modules", ".git", "dist", "build", "out"]
 
     /// The other names a backup leaves out: made again (the built site's
@@ -653,7 +662,16 @@ nonisolated enum RestoreSwap {
     /// link's target. `placeInside(_:of:)` decides those; a URL that is not
     /// inside comes back as its whole path, as it always did.
     static func relative(_ url: URL, to coursesDirectoryURL: URL) -> String {
-        if let inside = placeInside(url, of: coursesDirectoryURL) {
+        var spellings: PlaceSpellings = PlaceSpellings()
+        return relative(url, to: coursesDirectoryURL, remembering: &spellings)
+    }
+
+    /// `relative(_:to:)` for one walk, which passes the same `spellings`
+    /// for every entry, so the folder is resolved once and a spelling found
+    /// once is compared as text from then on (the review after the merge,
+    /// LOW 3).
+    static func relative(_ url: URL, to coursesDirectoryURL: URL, remembering spellings: inout PlaceSpellings) -> String {
+        if let inside = placeInside(url, of: coursesDirectoryURL, remembering: &spellings) {
             return inside
         }
         return trimmedPath(url)
@@ -677,18 +695,51 @@ nonisolated enum RestoreSwap {
     /// `resolvingSymlinksInPath()`, which strips `/private` and so never
     /// matches the enumerator's `/private/var` (#909, 2026-11-26).
     static func placeInside(_ url: URL, of folder: URL) -> String? {
+        var spellings: PlaceSpellings = PlaceSpellings()
+        return placeInside(url, of: folder, remembering: &spellings)
+    }
+
+    /// `placeInside(_:of:)` for one walk. Before any folder is resolved,
+    /// the place is compared as text with the folder and with every
+    /// spelling of it found earlier in the same walk; the folder itself is
+    /// resolved at most once. Without it, a walk through a working folder
+    /// reached by a link resolved every folder above every entry, about
+    /// five `open` calls an entry on the main actor (LOW 3). A spelling is
+    /// remembered only for the one walk that found it, so a link changed
+    /// later is never trusted from an old answer.
+    static func placeInside(_ url: URL, of folder: URL, remembering spellings: inout PlaceSpellings) -> String? {
         let folderText: String = trimmedPath(folder)
         let path: String = trimmedPath(url)
-        let prefix: String = folderText == "/" ? "/" : folderText + "/"
-        if path.hasPrefix(prefix) {
-            let inside: String = String(path.dropFirst(prefix.count))
-            return inside.isEmpty ? nil : inside
+        if spellings.folderText != folderText {
+            spellings = PlaceSpellings()
+            spellings.folderText = folderText
         }
-        let folderOnDisk: String = FolderIdentity.canonicalPath(folderText)
+        var texts: [String] = [folderText]
+        for spelling in spellings.spellingsOfTheFolder {
+            texts.append(spelling)
+        }
+        for text in texts {
+            let prefix: String = text == "/" ? "/" : text + "/"
+            if path.hasPrefix(prefix) {
+                let inside: String = String(path.dropFirst(prefix.count))
+                return inside.isEmpty ? nil : inside
+            }
+            if path == text {
+                return nil
+            }
+        }
+        let folderOnDisk: String
+        if let resolved = spellings.folderOnDisk {
+            folderOnDisk = resolved
+        } else {
+            folderOnDisk = FolderIdentity.canonicalPath(folderText)
+            spellings.folderOnDisk = folderOnDisk
+        }
         var namesBelow: [String] = [url.lastPathComponent]
         var above: URL = url.deletingLastPathComponent()
         while trimmedPath(above) != "/" {
             if FolderIdentity.canonicalPath(trimmedPath(above)) == folderOnDisk {
+                spellings.spellingsOfTheFolder.append(trimmedPath(above))
                 return namesBelow.joined(separator: "/")
             }
             namesBelow.insert(above.lastPathComponent, at: 0)
@@ -1281,8 +1332,9 @@ nonisolated enum RestoreSwap {
             return (nil, true)
         }
         var picked: [String] = []
+        var spellings: PlaceSpellings = PlaceSpellings()
         while let entry = walker.nextObject() as? URL {
-            let inside: String = relative(entry, to: aside)
+            let inside: String = relative(entry, to: aside, remembering: &spellings)
             let name: String = entry.lastPathComponent
             if isLeftOutAndKeptAtAnyDepth(name) {
                 picked.append(inside)
@@ -1346,9 +1398,10 @@ nonisolated enum RestoreSwap {
             return []
         }
         var picked: [String] = []
+        var spellings: PlaceSpellings = PlaceSpellings()
         while let entry = walker.nextObject() as? URL {
             if isLeftOutAndKeptAtAnyDepth(entry.lastPathComponent) {
-                picked.append(relative(entry, to: root))
+                picked.append(relative(entry, to: root, remembering: &spellings))
                 skipIfAFolder(walker, entry)
             }
         }
@@ -1359,8 +1412,8 @@ nonisolated enum RestoreSwap {
     /// which are paths inside the course) into a new folder
     /// `courses/_backups/<CODE>/<CODE> not in the archive <stamp>/` at the
     /// same path. Returns where, as a path inside the working folder, or
-    /// nil when nothing was picked; and false when any could not be moved,
-    /// so the copy must not be removed.
+    /// nil when nothing was picked or nothing could be moved there; and
+    /// false when any could not be moved, so the copy must not be removed.
     static func keepInANotInTheArchiveFolder(
         _ picked: [String],
         from aside: URL,
@@ -1378,6 +1431,7 @@ nonisolated enum RestoreSwap {
             return (nil, false)
         }
         var everythingMoved: Bool = true
+        var somethingMoved: Bool = false
         for inside in picked {
             let destination: URL = absolute(inside, in: folder)
             do {
@@ -1385,9 +1439,16 @@ nonisolated enum RestoreSwap {
                     at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
                 )
                 try FileManager.default.moveItem(at: absolute(inside, in: aside), to: destination)
+                somethingMoved = true
             } catch {
                 everythingMoved = false
             }
+        }
+        // A folder that nothing reached is never named (the review after
+        // the merge, LOW 2): the files are still in the set-aside copy,
+        // which is kept, so naming the folder would point at nothing.
+        if !somethingMoved {
+            return (nil, false)
         }
         return (insideTheWorkingFolder(folder, coursesDirectoryURL: coursesDirectoryURL), everythingMoved)
     }
@@ -1522,6 +1583,7 @@ nonisolated enum RestoreSwap {
                     picked.append((from: staged, inside: insideTheCourse))
                 }
             } else if let walker = fileManager.enumerator(at: staged, includingPropertiesForKeys: keys, options: []) {
+                var spellings: PlaceSpellings = PlaceSpellings()
                 while let entry = walker.nextObject() as? URL {
                     let values: URLResourceValues? = try? entry.resourceValues(forKeys: Set(keys))
                     if values?.isSymbolicLink == true {
@@ -1531,7 +1593,7 @@ nonisolated enum RestoreSwap {
                         continue
                     }
                     if wasWrittenAfter(writtenAfter, values: values, atTheTop: false) {
-                        let below: String = relative(entry, to: staged)
+                        let below: String = relative(entry, to: staged, remembering: &spellings)
                         let inside: String = insideTheCourse.isEmpty ? below : insideTheCourse + "/" + below
                         picked.append((from: entry, inside: inside))
                     }
@@ -1985,4 +2047,23 @@ nonisolated enum RestoreSwap {
         }
         return false
     }
+}
+
+/// What one walk has learned about how its folder is spelled, so that
+/// `RestoreSwap.placeInside(_:of:remembering:)` resolves the folder once and
+/// compares later entries as text. Made fresh for each walk and never kept
+/// past it.
+struct PlaceSpellings {
+
+    // MARK: - Stored properties
+
+    /// The folder these spellings belong to, as text.
+    var folderText: String? = nil
+
+    /// The folder in the disk's own spelling, once resolved.
+    var folderOnDisk: String? = nil
+
+    /// Other spellings of the folder (an entry's folder above it that
+    /// resolved to the folder), each compared as text from then on.
+    var spellingsOfTheFolder: [String] = []
 }

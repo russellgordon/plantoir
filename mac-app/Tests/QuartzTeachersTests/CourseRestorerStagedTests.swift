@@ -452,6 +452,34 @@ final class CourseRestorerStagedTests: XCTestCase {
         XCTAssertNil(RestoreSwap.placeInside(fixture.realCourses, of: fixture.linkedCourses), "the folder itself is not inside")
     }
 
+    /// One walk resolves its folder once: the spelling the first entry
+    /// found is remembered, and later entries are compared as text, with
+    /// the same answers (the review after the merge, LOW 3). A memo handed
+    /// another folder starts again.
+    @MainActor
+    func testAWalkRemembersTheFoldersSpellingAndGivesTheSameAnswers() throws {
+        let fixture: LinkedWorkingFolder = try LinkedWorkingFolder.make()
+        defer { fixture.remove() }
+        let first: URL = fixture.realCourses.appendingPathComponent("ICS3U/Unit 1/page.md")
+        let second: URL = fixture.realCourses.appendingPathComponent("ICS3U/Unit 2/other.md")
+        try WholeCourseFixture.write("one\n", to: first)
+        try WholeCourseFixture.write("two\n", to: second)
+        var spellings: PlaceSpellings = PlaceSpellings()
+
+        XCTAssertEqual(RestoreSwap.placeInside(first, of: fixture.linkedCourses, remembering: &spellings), "ICS3U/Unit 1/page.md")
+        XCTAssertEqual(spellings.spellingsOfTheFolder, [RestoreSwap.trimmedPath(fixture.realCourses)], "the spelling found is remembered")
+        XCTAssertNotNil(spellings.folderOnDisk, "the folder is resolved once")
+        XCTAssertEqual(RestoreSwap.placeInside(second, of: fixture.linkedCourses, remembering: &spellings), "ICS3U/Unit 2/other.md")
+        XCTAssertEqual(spellings.spellingsOfTheFolder.count, 1, "the second entry is compared as text")
+        XCTAssertNil(RestoreSwap.placeInside(fixture.realCourses, of: fixture.linkedCourses, remembering: &spellings), "the folder itself is not inside")
+        XCTAssertNil(
+            RestoreSwap.placeInside(fixture.outside.appendingPathComponent("elsewhere.md"), of: fixture.linkedCourses, remembering: &spellings)
+        )
+
+        XCTAssertEqual(RestoreSwap.placeInside(first, of: fixture.outside, remembering: &spellings), nil)
+        XCTAssertEqual(spellings.spellingsOfTheFolder, [], "another folder starts a new memo")
+    }
+
     /// The walk through a working folder reached by a link keeps every
     /// file the archive does not hold, at its own place, and a link inside
     /// the course is kept as a link: never followed, its target untouched.
@@ -495,6 +523,37 @@ final class CourseRestorerStagedTests: XCTestCase {
             try FileManager.default.destinationOfSymbolicLink(atPath: folder.appendingPathComponent("Shared").path), target.path,
             "and still pointing where it did"
         )
+    }
+
+    /// A "not in the archive" folder that nothing could be moved into is
+    /// never named (the review after the merge, LOW 2): the files are still
+    /// in the set-aside copy, which is kept. One that some reached is named,
+    /// and still says the copy must be kept.
+    @MainActor
+    func testAKeptFolderIsNamedOnlyWhenSomethingReachedIt() throws {
+        let root: URL = FileManager.default.temporaryDirectory.appendingPathComponent("kept-named-\(UUID().uuidString)")
+        let courses: URL = root.appendingPathComponent("courses")
+        let aside: URL = courses.appendingPathComponent(".internal/restoring/X/as-it-was")
+        try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let nothingReached: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepInANotInTheArchiveFolder(
+            ["section2/.git", "section2/build"], from: aside, courseCode: "ICS3U",
+            coursesDirectoryURL: courses, stamp: "2026-11-26_080000"
+        )
+        XCTAssertNil(nothingReached.keptAt, "no folder is named when nothing moved into it")
+        XCTAssertFalse(nothingReached.everythingMoved, "so the copy is kept")
+
+        try WholeCourseFixture.write("ref\n", to: aside.appendingPathComponent("section2/.git/HEAD"))
+        let someReached: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepInANotInTheArchiveFolder(
+            ["section2/.git", "section2/build"], from: aside, courseCode: "ICS3U",
+            coursesDirectoryURL: courses, stamp: "2026-11-26_090000"
+        )
+        XCTAssertEqual(someReached.keptAt, "courses/_backups/ICS3U/ICS3U not in the archive 2026-11-26_090000")
+        XCTAssertFalse(someReached.everythingMoved, "one could not be moved, so the copy is kept")
+        XCTAssertTrue(RestoreSwap.itemExists(
+            at: courses.appendingPathComponent("_backups/ICS3U/ICS3U not in the archive 2026-11-26_090000/section2/.git/HEAD")
+        ))
     }
 
     // MARK: - Helpers

@@ -533,13 +533,15 @@ enum WholeCourseRestore {
     }
 
     /// The steps after the commit, safe to run twice (a settle that finds
-    /// `done` runs them again): the rename records go with the pages they
-    /// described, moved here from BEFORE the restore so one that fails no
-    /// longer clears them; and the course is locked again when it is kept
-    /// for reference.
+    /// `done` runs them again): the unit-word rename's record goes with the
+    /// pages it described, moved here from BEFORE the restore so one that
+    /// fails no longer clears it; an interrupted Rename folder's record is
+    /// kept, as its owner decides (`RenameRecordClaim`, the director's
+    /// decision of 2026-11-26); and the course is locked again when it is
+    /// kept for reference.
     static func afterTheCommit(courseURL: URL) {
         UnitWordRenamer.clearRenameRecord(courseDirectory: courseURL)
-        SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseURL)
+        RenameRecordClaim.aWholeCourseRestoreReplacedTheCourse(courseDirectory: courseURL)
         CourseRestorer.lockAfterARestore(courseAt: courseURL)
     }
 
