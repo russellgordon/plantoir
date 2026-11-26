@@ -446,4 +446,76 @@ public sealed class UndoRecoveryTests
         Assert.Equal("notReadable", outcome.Word);
         Assert.Empty(scribe.Fold().Steps);
     }
+
+    // ---- U4b2-13 (W8-8): a hand edit and a step that moves a folder and edits a page inside it ----
+
+    /// <summary>
+    /// A step of courses/TST1O/media moved to renamed, the two pages, and an
+    /// edit of renamed/a.md, made by a process that is then gone, stopped
+    /// before its swap number <paramref name="stopBefore"/> (0 the folder, 1
+    /// first, 2 second, 3 the edit inside).
+    /// </summary>
+    private static long StopACarryingStep(UndoScribe scribe, int stopBefore)
+    {
+        UndoKindsForTheCases.LayTheMediaFolder(scribe);
+        var ops = new JsonArray { UndoKindsForTheCases.MoveTheMediaFolder(scribe) };
+        foreach (string path in new[] { First, Second })
+        {
+            foreach (JsonNode? op in scribe.OpsFor(path, Old(path), New(path))) ops.Add(op!.DeepClone());
+        }
+        ops.Add(UndoKindsForTheCases.EditInside(UndoKindsForTheCases.RenamedFolder + "/a.md"));
+        UndoOutcome stopped = scribe.Door(StopAt("beforeSwap", stopBefore), UndoScribe.AProcessThatIsGone).Perform(scribe.OpsDraft("A", ops, []));
+        Assert.Equal(UndoOutcomeKind.StoppedByATest, stopped.Kind);
+        return scribe.Fold().Steps.Keys.Max();
+    }
+
+    /// <summary>
+    /// The carried page changed by hand puts its move in the way: both pages
+    /// are put back, the folder stays where it was moved with the page as the
+    /// teacher left it, and the step is interrupted naming the move by its
+    /// <c>from</c>, then the page by its path.
+    /// </summary>
+    [Fact]
+    public void ACarriedPageChangedByHandPutsItsMoveInTheWayAndEverythingElseIsPutBack()
+    {
+        using UndoScribe scribe = Scribe();
+        long seq = StopACarryingStep(scribe, stopBefore: 3);
+        Assert.True(UndoKindsForTheCases.EditTheCarriedPageByHand(scribe));
+        byte[] byHand = scribe.Page("A", UndoKindsForTheCases.RenamedFolder + "/a.md")!;
+
+        scribe.Door().Recover();
+
+        Assert.Equal(UndoStepState.Interrupted, scribe.Fold().Steps[seq].State);
+        Assert.Equal(Old(First), scribe.Page("A", First));
+        Assert.Equal(Old(Second), scribe.Page("A", Second));
+        Assert.Equal("renamed, byHand", UndoKindsForTheCases.MovedFolder(scribe));
+        Assert.Equal(byHand, scribe.Page("A", UndoKindsForTheCases.RenamedFolder + "/a.md"));
+        Assert.Equal([UndoKindsForTheCases.MediaFolder, UndoKindsForTheCases.RenamedFolder + "/a.md"], UndoRecoveryContractTests.InterruptedPaths(scribe, seq));
+        Assert.Empty(UndoStepContractTests.StagedFilesUnder(scribe.FullPath("A", "")));
+    }
+
+    /// <summary>
+    /// A page outside the folder changed by hand is all that is in the way:
+    /// the folder (its move judged without the edit it had not reached) and
+    /// the first page are put back, and the step is interrupted naming only
+    /// the second page.
+    /// </summary>
+    [Fact]
+    public void APageOutsideTheFolderChangedByHandLeavesTheMoveToBePutBack()
+    {
+        using UndoScribe scribe = Scribe();
+        long seq = StopACarryingStep(scribe, stopBefore: 2);
+        string text = UndoCheck.DecodeStrictly(scribe.Page("A", Second)!)!;
+        scribe.WritePage("A", Second, Encoding.UTF8.GetBytes(UndoTraceEdits.HandEdit("sameLine", text)!));
+        byte[] edited = scribe.Page("A", Second)!;
+
+        scribe.Door().Recover();
+
+        Assert.Equal(UndoStepState.Interrupted, scribe.Fold().Steps[seq].State);
+        Assert.Equal(Old(First), scribe.Page("A", First));
+        Assert.Equal(edited, scribe.Page("A", Second));
+        Assert.Equal("media, old", UndoKindsForTheCases.MovedFolder(scribe));
+        Assert.Equal([Second], UndoRecoveryContractTests.InterruptedPaths(scribe, seq));
+        Assert.Empty(UndoStepContractTests.StagedFilesUnder(scribe.FullPath("A", "")));
+    }
 }

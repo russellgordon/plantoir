@@ -624,19 +624,9 @@ public sealed class UndoStackContractTests
         private const string MediaFolder = "courses/TST1O/media";
         private const string RenamedFolder = "courses/TST1O/renamed";
 
-        /// <summary>The media folder's move to renamed, its listingSha the folder's as it is (or as it was, once moved).</summary>
-        private JsonObject MoveTheMediaFolder()
-        {
-            string folder = Directory.Exists(_scribe.FullPath("A", MediaFolder)) ? MediaFolder : RenamedFolder;
-            string listingSha = UndoTreeReading.Read(_scribe.FullPath("A", folder)).ListingSha ?? new UndoTreeListing([], []).Sha;
-            return new JsonObject { ["kind"] = "move", ["from"] = MediaFolder, ["to"] = RenamedFolder, ["listingSha"] = listingSha };
-        }
+        private JsonObject MoveTheMediaFolder() => UndoKindsForTheCases.MoveTheMediaFolder(_scribe);
 
-        private static JsonObject EditInside(string path) => new()
-        {
-            ["kind"] = "replaceText", ["path"] = path, ["before"] = "old", ["after"] = "new",
-            ["contextBefore"] = "Line one: ", ["contextAfter"] = ".\n",
-        };
+        private static JsonObject EditInside(string path) => UndoKindsForTheCases.EditInside(path);
 
         /// <summary>courses/TST1O/media as <c>moveAFolderWithAPageEditedInside</c> makes it (and an empty sub inside it), when neither it nor renamed is there.</summary>
         private void MakeTheMediaFolder(bool withAnEmptySub)
@@ -711,14 +701,7 @@ public sealed class UndoStackContractTests
             return (spelled ?? "none") + ", " + Holds(text);
         }
 
-        private static string Holds(string? text) => text switch
-        {
-            null => "none",
-            "Intro.\nLine one: new.\nEnd.\n" => "new",
-            "Intro.\nLine one: old.\nEnd.\n" => "old",
-            "Hand.\n" => "byHand",
-            _ => "something else: " + text,
-        };
+        private static string Holds(string? text) => UndoKindsForTheCases.Holds(text);
 
         /// <summary>Where the moved folder is now: renamed if it is there, else media.</summary>
         private string MovedFolderNow() => Directory.Exists(_scribe.FullPath("A", RenamedFolder)) ? RenamedFolder : MediaFolder;
@@ -748,14 +731,7 @@ public sealed class UndoStackContractTests
         }
 
         /// <summary><c>movedFolder</c>: which place holds the folder (renamed, media, both or neither), then what its a.md holds (new, old, byHand, none).</summary>
-        internal string MovedFolder()
-        {
-            bool renamed = Directory.Exists(_scribe.FullPath("A", RenamedFolder));
-            bool media = Directory.Exists(_scribe.FullPath("A", MediaFolder));
-            string place = renamed && media ? "both" : renamed ? "renamed" : media ? "media" : "neither";
-            string? text = UndoKindsForTheCases.Text(_scribe.Page("A", (renamed ? RenamedFolder : MediaFolder) + "/a.md"));
-            return place + ", " + Holds(text);
-        }
+        internal string MovedFolder() => UndoKindsForTheCases.MovedFolder(_scribe);
 
         /// <summary>
         /// The folder <paramref name="folder"/> replaced by a junction to
