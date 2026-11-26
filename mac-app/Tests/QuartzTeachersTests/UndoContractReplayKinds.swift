@@ -45,6 +45,7 @@ nonisolated enum UndoContractKinds {
         "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
         "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
         "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
+        "makeRoomWithALaterClassThatIsALink",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -82,6 +83,23 @@ nonisolated enum UndoContractKinds {
 
     static func libraryTarget(_ day: Int) -> String {
         return "../library/Day \(day).md"
+    }
+
+    /// U4b3 part 2: the section `makeRoomWithALaterClassThatIsALink` makes
+    /// room in, its six meeting days, the later class that is a link (Day
+    /// 3, a relative target) and the file it leads to, elsewhere in the
+    /// course.
+    static let linkedPageClasses: String = "courses/TST1O/section1/All Classes"
+    static let linkedPageDates: [String] = ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16", "2026-09-18", "2026-09-22"]
+    static let linkedPageTarget: String = "../../elsewhere/Unit 1, Day 3.md"
+    static let linkedPageFile: String = "courses/TST1O/elsewhere/Unit 1, Day 3.md"
+
+    static func linkedPageDay(_ day: Int) -> String {
+        return linkedPageClasses + "/Unit 1, Day \(day).md"
+    }
+
+    static func linkedPageText(day: Int, date: String) -> String {
+        return "---\ntitle: Unit 1, Day \(day)\npublish: true\ncreated: \(date)T07:00:00.000-0400\n---\n\nDay \(day).\n"
     }
 
     static let asidePage: String = "courses/TST1O/old/a.md"
@@ -754,6 +772,129 @@ nonisolated enum UndoContractKinds {
         }
         parts.append("library: " + library)
         return parts.joined(separator: "; ")
+    }
+
+    /// U4b3 part 2's call, made on the main actor, where Insert Class runs
+    /// (the replay hops there for it).
+    @MainActor
+    static func makeRoomWithALaterClassThatIsALink(root: URL, journal: UndoJournal, places: UndoMemoryPlaces) throws -> String {
+        // U4b3 part 2: Unit 1, Day 1 to Day 3 in section 1, Day 3 a link
+        // to a file elsewhere in the course; room for one class at Day
+        // 2 made by Insert Class's own plan and apply
+        // (`ClassInsertionPlanner.plan` and `apply`), made as the app
+        // makes it, into this list. Fails if the plan refuses the link,
+        // moves or removes the file it leads to, or writes a plain page
+        // at Day 4.
+        let course: URL = root.appendingPathComponent("courses/TST1O")
+        let made: Course = try laidLinkedPageCourse(root: root)
+        let plan: ClassInsertionPlan
+        do {
+            plan = try ClassInsertionPlanner.plan(unit: 1, atDay: 2, count: 1, forSection: 1, in: made)
+        } catch {
+            return "insertRefused"
+        }
+        let step: JournaledStep = JournaledStep(
+            courseCode: "TST1O", courseDirectory: course, section: 1,
+            maker: UndoStepMaker.sheet("makeRoomForClasses"), holds: "section"
+        )
+        step.places = places
+        let folderBefore: URL? = UndoJournalLocation.folderOverride
+        let modeBefore: UndoMode? = JournaledStep.modeOverride
+        UndoJournalLocation.folderOverride = journal.folderURL
+        JournaledStep.modeOverride = .live
+        defer {
+            UndoJournalLocation.folderOverride = folderBefore
+            JournaledStep.modeOverride = modeBefore
+        }
+        do {
+            _ = try ClassInsertionPlanner.apply(plan, in: made, into: step)
+            try step.make()
+        } catch {
+            return "insertRefused"
+        }
+        return "applied"
+    }
+
+    /// U4b3 part 2: courses/TST1O as a course of one section with a
+    /// remembered timetable, Unit 1, Day 1 to Day 3 in it and Day 3 a link
+    /// (`linkedPageTarget`) to `linkedPageFile`, laid when no Day 3 or Day 4
+    /// is there yet. The timetable's own step goes to a list of its own,
+    /// never this one.
+    @MainActor
+    static func laidLinkedPageCourse(root: URL) throws -> Course {
+        let course: URL = root.appendingPathComponent("courses/TST1O")
+        let configURL: URL = course.appendingPathComponent("course_config.json")
+        if !somethingIsAt("courses/TST1O/course_config.json", in: root) {
+            let configuration: [String: Any] = [
+                "course_code": "TST1O",
+                "course_name": "Test Course",
+                "section_numbers": [1],
+                "num_sections": 1,
+                "per_section_folders": ["All Classes"],
+                "per_section_files": [],
+            ]
+            let data: Data = try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
+            try FileManager.default.createDirectory(at: course, withIntermediateDirectories: true)
+            try data.write(to: configURL)
+        }
+        let made: Course = Course(code: "TST1O", directoryURL: course, configuration: try CourseConfiguration(contentsOf: configURL))
+        if !somethingIsAt(linkedPageDay(3), in: root) && !somethingIsAt(linkedPageDay(4), in: root) {
+            let folderBefore: URL? = UndoJournalLocation.folderOverride
+            UndoJournalLocation.folderOverride = root.deletingLastPathComponent().appendingPathComponent("timetable-list", isDirectory: true)
+            defer {
+                UndoJournalLocation.folderOverride = folderBefore
+            }
+            try SectionTimetableStore.applyRememberTimetable(
+                try SectionTimetableStore.planRememberTimetable(
+                    dates: linkedPageDates, source: "timetable.xlsx, block H", forSection: 1, in: made
+                )
+            )
+            for day in [1, 2] {
+                try UndoContractReplay.write(linkedPageText(day: day, date: linkedPageDates[day - 1]), to: linkedPageDay(day), in: root)
+            }
+            try UndoContractReplay.write(linkedPageText(day: 3, date: linkedPageDates[2]), to: linkedPageFile, in: root)
+            try layALink(linkedPageDay(3), leadingTo: linkedPageTarget, root: root)
+        }
+        return made
+    }
+
+    /// U4b3 part 2's `linkedPage`: which place holds the link (`new`, Day
+    /// 4; `old`, Day 3; `both`; `neither`), the target the link there holds
+    /// (`notALink` when neither is a link), and what the file it leads to
+    /// holds: `retitledAndRedated` (Day 4's title and its meeting date, the
+    /// rest as laid), `asLaidDown`, `gone`, or `changed` (anything else).
+    static func linkedPage(in root: URL) -> String {
+        let atNew: Bool = UndoTreeReading.linkTarget(at: root.appendingPathComponent(linkedPageDay(4))) != nil
+        let atOld: Bool = UndoTreeReading.linkTarget(at: root.appendingPathComponent(linkedPageDay(3))) != nil
+        var place: String = "neither"
+        var link: String = linkedPageDay(4)
+        if atNew && atOld {
+            place = "both"
+        } else if atNew {
+            place = "new"
+        } else if atOld {
+            place = "old"
+            link = linkedPageDay(3)
+        }
+        var target: String = "notALink"
+        if let bytes = UndoTreeReading.linkTarget(at: root.appendingPathComponent(link)), let text = UndoText.decode(bytes) {
+            target = text
+        }
+        var file: String = "changed"
+        if let held = text(at: linkedPageFile, in: root) {
+            let laid: String = linkedPageText(day: 3, date: linkedPageDates[2])
+            let retitled: String = laid
+                .replacingOccurrences(of: "title: Unit 1, Day 3\n", with: "title: Unit 1, Day 4\n")
+                .replacingOccurrences(of: "created: " + linkedPageDates[2], with: "created: " + linkedPageDates[3])
+            if held == laid {
+                file = "asLaidDown"
+            } else if held == retitled {
+                file = "retitledAndRedated"
+            }
+        } else {
+            file = "gone"
+        }
+        return place + ", " + target + ", " + file
     }
 
     /// U4b2-14's `linkedFolder`: which place holds the link (renamed, media,

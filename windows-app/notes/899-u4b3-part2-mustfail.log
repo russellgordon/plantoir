@@ -29,8 +29,18 @@ M4  the clause's Mac phrase removed from undo.rule.shadow ("moves the link itsel
     to the new name" -> "moves the link to the new name")
     substring script: 0 / 1 / 1 (the renamed Windows test's first Assert.True
     would fail on the PC). RED.
-M5  Python model: not this half (the call and its model are 7b's).
+M5  (7b) Python model: the call's step made as a plain copy at Day 4 (the link's
+    move and the write into the linked file taken out)
+    python3 scripts/test_make_undo_traces.py: FAILED (failures=1): stack case
+    'U4b3, ... undone and redone, ...': 'old, ../../elsewhere/Unit 1, Day 3.md,
+    asLaidDown' != 'new, ../../elsewhere/Unit 1, Day 3.md, retitledAndRedated'.
+    (A fuller plain copy, Day 3's link also rewritten as a page, errors both rows:
+    the model cannot write a page over a link.) RED. Restored: cp of the saved copy.
+M1  (7b, again, against the new rows) the link check off in the rename loop
+    .dd/run-7b-m1.log: testStackCases red, both U4b3 rows ('the last call came to
+    nothingToUndo, not undone'; 'the linked later class is old, ..., not new, ...').
+    RED. Restored: cp of the saved copy, git diff clean.
 
 Each restored byte for byte: `cmp` of ClassInsertionPlanner.swift against the
 saved copy, and `git diff --stat contracts/` showing only the clause change.
-RED 4 of 4.
+RED 4 of 4 (7a); 7b: M5 and M1 again, RED 2 of 2.

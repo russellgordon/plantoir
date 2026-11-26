@@ -1,4 +1,4 @@
-# U4b3 part 2, half 7a (#899): Insert Class moves a linked later class as a link
+# U4b3 part 2, halves 7a and 7b (#899): Insert Class moves a linked later class as a link
 
 Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from door-6's head 4b7781ae9. `origin/dev` 461ee3943 was already merged in (by door-5) at both checks (before proving and before hand-back), so no new merge commit. **Touches `contracts/`: both gates; the renamed Windows test is proved only by the Windows gate.** This is half 7a of the order file's split (`2026-11-26-899-u4b3-ORDER.md`, "For the director", point 3).
 
@@ -18,9 +18,11 @@ Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from door-6's head 4b7
 
 ## Must-fail lines
 
-`windows-app/notes/899-u4b3-part2-mustfail.log`. Red first: 7 of the 10 new tests refused "cannot tell now" with the loop as on door-6's head, and the Duplicate Class test red under M1 (the same behaviour). M1 (write + remove for a link): 8 tests red. M2 (`moveLink` given the target's path): 8 red. M3 (retitle at the link's old place): 7 red. M4 (the Mac phrase removed from the clause): the substring script reports 0. M5 is 7b's (the Python model). RED 4 of 4.
+`windows-app/notes/899-u4b3-part2-mustfail.log`. Red first: 7 of the 10 new tests refused "cannot tell now" with the loop as on door-6's head, and the Duplicate Class test red under M1 (the same behaviour). M1 (write + remove for a link): 8 tests red. M2 (`moveLink` given the target's path): 8 red. M3 (retitle at the link's old place): 7 red. M4 (the Mac phrase removed from the clause): the substring script reports 0. M5 (7b, Python): the model's call writing a plain copy at Day 4: the undone-and-redone row fails (`'old, …, asLaidDown' != 'new, …, retitledAndRedated'`). 7b also ran M1 against the two new rows: both red. RED 5 of 5.
 
 ## Runs
+
+- 7b: `.dd/run-7b-2.log` testStackCases 0 failures; `.dd/run-7b-m1.log` (M1) both new rows red; `.dd/run-7b-proof.log` (the twelve classes of the brief's proof list but the documentation-09 readers, unchanged by 7b): 288 tests, 0 failures; `python3 scripts/test_make_undo_traces.py` 38 OK (traces not stale: `make_undo_traces.py` rewrote them byte for byte the same).
 
 - `.dd/run-p2-red.log`: UndoMakeRoomLinkedPageTests on the old loop: 10 run, 12 failures.
 - `.dd/run-p2-green2.log`: UndoMakeRoomLinkedPageTests, 10, 0 failures.
@@ -37,15 +39,25 @@ Branch `issue/899-u4b3-linked-class-page-moves-its-link`, from door-6's head 4b7
 - `grep -rn "UntilU4b2Pieces14And15\|WhereTheMacRefusesBeforeAnythingChanges" windows-app/ contracts/ documentation/` (notes aside): two hits, both in documentation 12 (18085, 18193), named above for the director.
 - `grep -n "step.remove(" mac-app/QuartzTeachers`: `ClassInsertionPlanner` (one call, the plain-page rename) and `PublishedPagesRecord` (two) only, still so.
 
-## Left for 7b
+## Half 7b (done)
 
-Exactly the order file's 7b, none of it started: the two `stackCases` rows ("U4b3, Insert Class renaming a later class that is a link: one step, the link moved as itself; undone, …" and "… undone and redone, …"); the call `makeRoomWithALaterClassThatIsALink` in `stackCasesHow` and the Mac replay (`UndoContractReplayKinds`, `UndoJournalContractTests.testStackCases`); the key `linkedPage` (`new`/`old`/`both`/`neither`, the target string or `notALink`, `retitledAndRedated`/`asLaidDown`/`gone`); the Python model of the call (`scripts/test_make_undo_traces.py`) and M5; the ledger reason `Reason899W8bLinkedClassPage` with both rows held by exact name, checked by script, and the `KeysChecked` confirmation in `UndoStackContractTests.cs`. Nothing of 7b was needed to keep 7a true: the renamed Windows test reads only the clause, and no row was added. The clause deliberately says nothing yet about Undo putting the move and the write back as one step; 7b's undone and redone rows prove it, and 7b may add that sentence with them.
+- Two `stackCases` rows: "U4b3, Insert Class renaming a later class that is a link: one step, the link moved as itself; undone, the link back at its old name with the same target and the file it leads to as laid down" and "…; undone and redone, the link moved again with the same target and the title and date written into the file it leads to again".
+- The call `makeRoomWithALaterClassThatIsALink` (in `stackCasesHow`, and on the Mac `UndoContractKinds.makeRoomWithALaterClassThatIsALink`, `@MainActor`, reached from `UndoContractReplay.runStackCases` by its own branch because Insert Class is main-actor): lays courses/TST1O as a course of one section with a remembered timetable (its own step goes to a list of its own), Day 1 and 2 pages, Day 3 a link `../../elsewhere/Unit 1, Day 3.md`; runs `ClassInsertionPlanner.plan` and `apply(into:)` for one class at Day 2, then makes the step live into the stack's list (`UndoJournalLocation.folderOverride` and `JournaledStep.modeOverride` set for the make and put back).
+- The key `linkedPage` (`new`/`old`/`both`/`neither`, the target or `notALink`, `retitledAndRedated`/`asLaidDown`/`gone`/`changed`) in the Mac replay and the Python model (`linked_page`); the Python model makes the call as the step it must make (the link's move, the linked file retitled and re-dated, Day 3 a new page, Day 2 rewritten).
+- `undo.rule.shadow`: the clause now says "Undo puts the link's name and the page's title and date back as one step, and Redo makes them again as one", which the two rows prove.
+- Ledger: `Reason899W8bLinkedClassPage` (new), the two rows held by exact name. Script check: each name 1 match in `NamedGapLedger.cs`, 1 row in the contract. Why each fails on Windows today: `UndoStackContractTests` (`KeysChecked`, line 19; the check at line 74, "a key this replay does not check") has no `linkedPage`, and its replay does not know the call.
+- Documentation 12's two stale lines (18085, 18193) now say what the Mac does and name the renamed test and the new reason.
+- `vm-tools/briefs/2026-11-26-899-w8-ORDER.md` (vm-tools d7bf0a2): piece 22's line corrected (it retires the renamed test; it does not rename it), and a new line 21a, Windows' door for a handed-over place, before piece 22 (it clears `Reason899W8HandedOverPlace`; piece 22 clears `Reason899W8bLinkedClassPage`).
 
 ## Left for the next piece
 
 - A DANGLING later-class link (pinned, `testADanglingLinkedLaterClassIsSkippedAsBefore`): `fileExists` follows it and answers false, so its rename is skipped, as before; the class below's rename then finds the place free and writes its lesson THROUGH the dangling link, which makes the file the link names (and the old page is removed). Unchanged by this piece; whether a dangling link should be moved as a link or refused is open.
 - A later class that is a link to a FOLDER (pinned): `readText` cannot read it, so it is counted not renamed, the link left as it was.
 - A link whose target is another later class of the same run: not built, pinned or run; what happens is unverified (the link would be moved as a link and its retitle planned into the other class's page, which that class's own rename also reads and writes in the same plan). Worth a pin in 7b or after.
+
+## For the reviewer
+
+- **A DANGLING later-class link is skipped, and the class below it is then written THROUGH that link, which creates the missing file.** Pinned as found by `UndoMakeRoomLinkedPageTests.testADanglingLinkedLaterClassIsSkippedAsBefore`: `fileExists` follows the link and answers false, so the dangling link's own rename is skipped (it stays at its old name); the class below's rename finds that place "free" and writes its lesson through the dangling link, which makes the file the link names (outside the class folder) and removes the class below's old page. Behaviour is unchanged by U4b3 (it was so before); judge whether it is a fault. If it is, the options are moving a dangling link as a link (it has a target string to judge by) or refusing it before anything changes.
 
 ## For the director
 
@@ -62,4 +74,5 @@ Nothing parked. No HIG section: no sentence a teacher reads was worded (the exis
 7. The grep for `DispatchQueue|.map {|.filter {|.reduce(|$0` over the added Swift lines is empty; MARK sections in the new class.
 8. Riding low night25-7 LOW 1: fixed (the test's name and settle message promise W8b piece 22; its phrase is the new clause's). It is a contract-reading test; M4 is its failing proof.
 9. The rename record is still kept and the switch is still off (not touched).
-10. No contract row added; the changed clause is read on the Mac by no test and on Windows by the renamed test (substrings 1 each); no held row needed for 7a.
+10. 7a added no contract row. 7b's two `stackCases` rows are in the Mac's replay (`testStackCases`) and the Python model, and held on Windows by exact name under `Reason899W8bLinkedClassPage` (1 match each, checked by script); the clause the renamed Windows test reads still holds each of its three substrings once.
+11. 7b scope: `UndoContractReplay.swift` and `UndoContractReplayKinds.swift` (the call, the key), `contracts/shared-rules.json` (two rows, the `stackCasesHow` sentence, one sentence in the clause), `scripts/test_make_undo_traces.py`, `NamedGapLedger.cs` (the reason and its two rows), documentation 12 (the two stale lines, as the director asked), these notes and the log; the vm-tools ORDER line separately. `origin/dev` 461ee3943 already merged, checked before proving and before hand-back. House-style grep over the added Swift lines empty.

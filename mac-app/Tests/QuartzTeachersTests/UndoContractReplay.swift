@@ -803,7 +803,7 @@ nonisolated enum UndoContractReplay {
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
         "movedFolder", "caseOnlyFolder", "refusalNamed", "keptWhatItReplacedSays", "madeFolder", "foldersInside",
-        "linkedFolder", "handedOver",
+        "linkedFolder", "handedOver", "linkedPage",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1061,6 +1061,10 @@ nonisolated enum UndoContractReplay {
                     lastLeftApart = leftApart(of: outcome)
                     lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
                     lastRefusalNamed = refusalNamed(of: outcome)
+                } else if value == "makeRoomWithALaterClassThatIsALink" {
+                    // U4b3 part 2: Insert Class runs on the main actor.
+                    let stackJournal: UndoJournal = journal()
+                    last = try await UndoContractKinds.makeRoomWithALaterClassThatIsALink(root: root, journal: stackJournal, places: places)
                 } else if UndoContractKinds.calls.contains(value) {
                     if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
                         last = answered
@@ -1442,6 +1446,9 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = string(testCase["linkedFolder"]), UndoContractKinds.linkedFolder(in: root) != wanted {
                 failures.append("stackCases '\(name)': the moved link is \(UndoContractKinds.linkedFolder(in: root)), not \(wanted)")
+            }
+            if let wanted = string(testCase["linkedPage"]), UndoContractKinds.linkedPage(in: root) != wanted {
+                failures.append("stackCases '\(name)': the linked later class is \(UndoContractKinds.linkedPage(in: root)), not \(wanted)")
             }
             if let wanted = string(testCase["handedOver"]), UndoContractKinds.handedOver(in: root) != wanted {
                 failures.append("stackCases '\(name)': the handed-over class pages are \(UndoContractKinds.handedOver(in: root)), not \(wanted)")

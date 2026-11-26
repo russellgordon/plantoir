@@ -797,7 +797,7 @@ class ContractCaseTests(unittest.TestCase):
                   "keptWhatItReplacedSays",
                   # Review 1 of U4b2-10: empty folders, which the model does
                   # not hold (folder_of_pages); the Swift replay checks it.
-                  "foldersInside", "linkedFolder"}
+                  "foldersInside", "linkedFolder", "linkedPage"}
 
     # U4b2-4: the two pages wholeFileStepOnTwoPagesNamedIndex writes.
     TWO_PAGES_NAMED_INDEX = ("courses/TST1O/Section 1/Classes/index.md", "courses/TST1O/Section 2/Classes/index.md")
@@ -1046,6 +1046,25 @@ class ContractCaseTests(unittest.TestCase):
             seq = model.begin(ops, readable=readable_step({"ops": ops}))
             model.find(seq)["phase"] = "done"
             return None
+        if call == "makeRoomWithALaterClassThatIsALink":
+            # U4b3 part 2: Insert Class's plan of room for one class at Day 2
+            # with Day 3 a link to a file elsewhere, as the step it must make
+            # (stackCasesHow): the link moved as itself to Day 4, Day 4's
+            # title and date written into the file it leads to, Day 2's page
+            # renamed into the place the link left, the new class at Day 2.
+            # The plan itself is the Swift replay's to check.
+            if pages.get(self.linked_day(3)) is None and pages.get(self.linked_day(4)) is None:
+                for number in (1, 2):
+                    pages[self.linked_day(number)] = self.linked_text(number, number)
+                pages[self.LINKED_FILE] = self.linked_text(3, 3)
+                pages[self.linked_day(3)] = ("link", self.LINKED_TARGET)
+            two = pages.get(self.linked_day(2))
+            return self.vetted_ops_step(model,
+                [{"kind": "move", "from": self.linked_day(3), "to": self.linked_day(4),
+                  "linkSha": traces.sha(self.LINKED_TARGET)}]
+                + traces.ops_for_change(self.LINKED_FILE, pages[self.LINKED_FILE], self.linked_text(4, 4, body=3))
+                + traces.ops_for_change(self.linked_day(3), None, self.linked_text(3, 3, body=2))
+                + traces.ops_for_change(self.linked_day(2), two, "New.\n"))
         if call == "handAPlaceOverAfterALinksMove":
             # U4b3 door-4, shape A: the link leaves Day 3, a new page fills it.
             if pages.get(self.day(3)) is None and pages.get(self.day(4)) is None:
@@ -1123,6 +1142,44 @@ class ContractCaseTests(unittest.TestCase):
 
     def handed_target(self, number):
         return "../library/Day %d.md" % number
+
+    LINKED_CLASSES = "courses/TST1O/section1/All Classes"
+    LINKED_DATES = ("2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16", "2026-09-18", "2026-09-22")
+    LINKED_TARGET = "../../elsewhere/Unit 1, Day 3.md"
+    LINKED_FILE = "courses/TST1O/elsewhere/Unit 1, Day 3.md"
+
+    def linked_day(self, number):
+        return self.LINKED_CLASSES + "/Unit 1, Day %d.md" % number
+
+    def linked_text(self, number, meeting, body=None):
+        """A class page of makeRoomWithALaterClassThatIsALink: its title,
+        its meeting day's date, and the body of the day it was laid as."""
+        return ("---\ntitle: Unit 1, Day %d\npublish: true\ncreated: %sT07:00:00.000-0400\n---\n\nDay %d.\n"
+                % (number, self.LINKED_DATES[meeting - 1], body or number))
+
+    def linked_page(self, model):
+        """U4b3 part 2's linkedPage: which place holds the link, its target
+        there, and what the file it leads to holds."""
+        at_new, at_old = model.pages.get(self.linked_day(4)), model.pages.get(self.linked_day(3))
+        new_is_link = isinstance(at_new, tuple) and at_new[0] == "link"
+        old_is_link = isinstance(at_old, tuple) and at_old[0] == "link"
+        place, link = "neither", None
+        if new_is_link and old_is_link:
+            place, link = "both", at_new
+        elif new_is_link:
+            place, link = "new", at_new
+        elif old_is_link:
+            place, link = "old", at_old
+        target = link[1] if link is not None else "notALink"
+        held = model.pages.get(self.LINKED_FILE)
+        file = "changed"
+        if held is None:
+            file = "gone"
+        elif held == self.linked_text(3, 3):
+            file = "asLaidDown"
+        elif held == self.linked_text(4, 4, body=3):
+            file = "retitledAndRedated"
+        return place + ", " + target + ", " + file
 
     def handed_over(self, model):
         """U4b3 door-4's handedOver: what Day 2, Day 3 and Day 4 hold, then
@@ -1226,7 +1283,8 @@ class ContractCaseTests(unittest.TestCase):
                   "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt", "finderRecordsAWindowInTheMadeFolder",
                   "moveALinkToAFolder", "stepEditingInsideALinksMove", "renameAPerSectionFolderThatIsALink",
                   "handAPlaceOverAfterALinksMove", "handAPlaceOverBeforeALinksMove", "editTheHandedOverPageByHand",
-                  "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace")
+                  "stepFillingAPlaceBeforeItIsLeft", "stepHandingOverAFoldersPlace",
+                  "makeRoomWithALaterClassThatIsALink")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -1514,6 +1572,8 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(self.linked_folder(model), case["linkedFolder"])
                 if "handedOver" in case:
                     self.assertEqual(self.handed_over(model), case["handedOver"])
+                if "linkedPage" in case:
+                    self.assertEqual(self.linked_page(model), case["linkedPage"])
                 if "caseOnlyFolder" in case:
                     self.assertEqual(self.case_only_folder(model), case["caseOnlyFolder"])
                 if "folderKept" in case:
