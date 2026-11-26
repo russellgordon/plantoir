@@ -22713,6 +22713,33 @@ the folder … only in part", never "was not renamed", which could not be
 checked (HIG, Writing: be clear, say what is known). One function,
 `SpecialFolderRenamer.partWayEnding`, chooses the line and the sentence.
 
+### U4b2: case-only-rule-pinned
+
+Whether a path is at or inside a move's `to` is ONE comparison,
+`UndoOp.partInside` (part by part, without regard to case, the rest spelled
+as the path spells it): `placesOverlap`, `moveCarries`, a swap's own files
+inside a moved folder (`ownFilesInside`), following them when it moves
+(`followTheMove`), a carried page's place before the move and the plan's and
+recovery's carried-page overrides all call it (`part_inside` in
+`scripts/make_undo_traces.py`). Before, `moveCarries` matched without regard
+to case and the swap compared as spelled, so an edit named `Renamed/a.md`
+under a move to `renamed` was carried but its kept original was neither left
+out nor followed: the Undo went back and left
+`.a.md.plantoir-undo-1-undo-orig` inside the folder
+(`UndoOpKindsTests.testAnEditSpelledWithOtherCapitalsUnderACarryingMoveIsUndoneAndRedone`,
+red before). Case-insensitive, not as spelled, because the working folder's
+volume is case-insensitive on the Mac by default and on Windows, and the
+readability rule already says such places overlap. **Rejected:** comparing
+as spelled everywhere, which would make that step unreadable (it overlaps
+by `placesOverlap`) rather than undoable, and would leave the case-only
+rename's own edits (named at `to`, never `from`, as spelled) as they are
+anyway. `JournaledStep.namedPath` is the writer's naming, not a judgement of
+a carrying move, and is left as it is. In `checkCases`, the row "…lists it as
+`to`, holding something else" gave changed since with the rule or without
+it; it is replaced by a folder row that fails without it, and a row with a
+third spelling (`current.listedAs`, `a.JSON`) pins `.another` in
+`wholeState`: folded into `.from` it says already back.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
