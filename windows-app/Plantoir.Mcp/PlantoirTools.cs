@@ -427,7 +427,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var outcome = workspace.PrepareForStartOfYear(course, section, planCode, StartOfYearAskedFrom.AnOutsideAssistant);
             if (outcome.Changed) return Answering(outcome.Message);
-            // Refused: the sentence, then the plan as it stands now with its code.
+            // Not Changed: refused before anything changed, or stopped part way
+            // (#899 W7b2-5: the part-way sentence names what was kept). Either
+            // way the sentence, then the plan as it stands NOW with its code,
+            // which after a part-way stop is what is still left to do.
             var now = workspace.PlanStartOfYear(course, section);
             return outcome.Message == now.Text
                 ? Answering(outcome.Message)
