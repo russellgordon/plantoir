@@ -71,7 +71,7 @@ final class UndoSweepFindingsTests: XCTestCase {
             step.write(published, to: made.link)
             XCTAssertEqual(step.readText(made.link), published, "the plan does not read the link as it will be, outside: \(outside)")
 
-            try step.make()
+            XCTAssertNoThrow(try step.make(), "the linked page was refused, outside: \(outside)")
 
             XCTAssertEqual(said, outside ? [.wentAhead] : [], "outside: \(outside)")
             XCTAssertEqual(try String(contentsOf: made.target, encoding: .utf8), published, "outside: \(outside)")

@@ -1,0 +1,17 @@
+U4b2-1 must-fail log (#899), main Mac, xcodebuild through xlock.sh, class UndoSweepFindingsTests
+
+1. Plan at the link's own place (placeALinkLeadsTo returns url, the U3 behaviour)
+   run-mustfail1.log / run-mustfail1b.log: RED
+   UndoSweepFindingsTests.swift testAShadowStepOnALinkWritesThroughTheLinkAndTheLinkStaysALink:
+     XCTAssertNoThrow failed: threw error "refused(cannotTellNow(path: .../courses/ICS3U/Unit 1, Day 1.md))" - the linked page was refused, outside: false (and outside: true)
+   testAShadowStepOnALinkStoppedPartWayKeepsTheFileBesideTheFileTheLinkLeadsTo:114:
+     not refused part way, outside: false: refused(cannotTellNow ...) (and outside: true)
+   Restored with git checkout; git diff of JournaledStep.swift empty.
+
+2. Folder refusal dropped (writePlainly: .notAFile planned as absent)
+   run-mustfail2.log: RED
+   testAShadowStepOnALinkToAFolderIsStillRefusedBeforeAnythingChanges:
+     not refused as cannot tell now: refused(changedSince(firstPath: .../courses/ICS3U/Media))
+   Restored with git checkout; git diff of JournaledStep.swift empty.
+
+RED 2 of 2.
