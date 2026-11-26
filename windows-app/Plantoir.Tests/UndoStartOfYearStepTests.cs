@@ -220,6 +220,12 @@ public sealed class UndoStartOfYearStepTests : IDisposable
         StartOfYearOutcome outcome = Go(workspace);
 
         Assert.False(outcome.Changed, outcome.Message);
+        // The answer names the declined pages (review 1, L3): never the done
+        // sentence, never "Nothing was changed".
+        var declined = new List<string>();
+        foreach (JsonElement file in _recorded.GetProperty("files").EnumerateArray())
+            declined.Add(Path.GetFileNameWithoutExtension(file.GetProperty("path").GetString()!));
+        Assert.Equal(AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined), outcome.Message);
         Assert.Empty(WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
         AssertSamePages(before, PagesNow());
     }

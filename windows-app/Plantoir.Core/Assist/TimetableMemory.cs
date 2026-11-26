@@ -325,7 +325,7 @@ public sealed class TimetableMemory
     internal static string WhyTheClassDatesCouldNotBeRead(IOException error)
     {
         if (HeldFiles.IsSharingViolation(error))
-            return "another program, such as a syncing service, is using this section's class dates. Try again in a moment.";
+            return "another program, such as a syncing service, is using this section’s class dates. Try again in a moment.";
         bool windowsRefusedIt = (error.HResult & unchecked((int)0xFFFF0000)) == unchecked((int)0x80070000);
         return windowsRefusedIt
             ? "this section's class dates could not be read. Windows said: " + HeldFiles.SystemWords(error)

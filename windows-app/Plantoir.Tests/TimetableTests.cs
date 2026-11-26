@@ -762,7 +762,7 @@ public class ReDateTests : IDisposable
         AssistRefusal refused;
         using (new FileStream(timetable, FileMode.Open, FileAccess.Read, FileShare.None))
             refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
-        Assert.Equal("Nothing was changed: another program, such as a syncing service, is using this section's class dates. Try again in a moment.",
+        Assert.Equal("Nothing was changed: another program, such as a syncing service, is using this section’s class dates. Try again in a moment.",
                      refused.Message);
         Assert.DoesNotContain(".internal", refused.Message);
         Assert.DoesNotContain("section1.json", refused.Message);
