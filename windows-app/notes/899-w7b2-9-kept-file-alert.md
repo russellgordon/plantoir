@@ -6,7 +6,7 @@ Branch `issue/899-w7b2-9-kept-file-alert`, from `origin/issue/899-w7b2-6-todays-
 
 ## What was built
 
-When Show on Front Page is left part way (`Outcome.ShownWithWhatItHeldKept`), the section window shows ONE alert, `SectionDetailView.SayWhatTheFrontPageKeptAsync`. It is a `ContentDialog` shown through `ShowDialogSafelyAsync`:
+When Show on Front Page is left part way (`Outcome.ShownWithWhatItHeldKept`), the section window shows ONE alert: `TodaysClassOnTheFrontPage.KeptAlertFor` describes it, and `SectionDetailView.ShowAlertAsync` renders that description (since review 1; the first round's `SayWhatTheFrontPageKeptAsync` is gone). It is a `ContentDialog` shown through `ShowDialogSafelyAsync`:
 
 - **Title:** `keptTitle`, filled with the class (`TodaysClassOnTheFrontPage.KeptTitle`).
 - **Message:** one `kept` sentence for each kept name, then the hidden-items sentence (`KeptMessage`).
@@ -37,7 +37,7 @@ The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C
   - DefaultButton is optional ("By default, no default button is set") and takes Enter. It is set to Close, because the alert is informational and the brief makes OK the default.
   - "The dialog title is the main instruction and is optional." That is why the `keptGone` alert carries its sentence as content, with no title.
   - "Don't repeat the title with slightly different wording": the message does not restate `keptTitle`.
-- **Microsoft Support, View hidden files and folders in Windows:** https://support.microsoft.com/en-us/windows/view-hidden-files-and-folders-in-windows-97fbc472-c603-9d90-91d0-1166d1d9f4b5. The Windows 11 tab reads "Select View > Show, then select Hidden items to view hidden files and folders." The sentence uses those words. The page loaded, so the fallback page was not needed.
+- **Microsoft Support, View hidden files and folders in Windows:** https://support.microsoft.com/en-us/windows/view-hidden-files-and-folders-in-windows-97fbc472-c603-9d90-91d0-1166d1d9f4b5. The Windows 11 tab reads "Select View > Show, then select Hidden items to view hidden files and folders." The first round's sentence used those words; since review 1 the sentence is the one under `keptOnWindows.hiddenItems` above, true on the page's Windows 10 and Windows 11 tabs alike. The page loaded, so the fallback page was not needed.
 - **Apple HIG, Alerts:** https://developer.apple.com/design/human-interface-guidelines/alerts. The web page renders by script, so it was read through its JSON (`/tutorials/data/design/human-interface-guidelines/alerts.json`).
   - "If the title is a complete sentence, use sentence-style capitalization and appropriate ending punctuation": `keptTitle` ends with a full stop.
   - "In informational alerts only, you can use 'OK' for acceptance."
@@ -54,18 +54,6 @@ The words read the contract. `keptTitle`, `kept` and `keptGone` are retyped as C
 - **LOW 2, fixed.** `contracts/README.md`'s row names `keptOnWindows` and `plainWordsExceptions`.
 - **LOW 3, fixed.** `ReDateTests.ATimetableWindowsRefusesSaysWindowsWordsAfterTheCurlyApostrophe` (must-fail 14).
 - **LOW 4, noted.** Tests-first still rests on the must-fail rows; with M1 fixed, each of them reads the alert's real make-up.
-
-## For PROGRESS
-
-- W7b2-9 (#899): Show on Front Page left part way (`ShownWithWhatItHeldKept`) shows ONE alert in the section window. The alert has `keptTitle`, `kept` and the hidden-items sentence (`class-planning.json` → `todaysClassOnTheFrontPage.keptOnWindows.hiddenItems`), OK as the default and Close (so Enter and Escape give OK), and Open Folder. Open Folder opens the front page's folder (`FolderActions.OpenFolder`) and never selects the file, which stays hidden (Russell's ruling of 2026-11-25 (a)). A kept file gone by the press says `keptGone` and opens nothing. The four held keys (`keptTitle`, `kept`, `showKept`, `keptGone`) and `Reason899W4cKeptAlert` are gone from the ledger.
-- The part-way trail line is pinned by a test (W7b2-6 review 1 L2). The two "could not be read" timetable sentences have the curly apostrophe (L1).
-
-## For documentation 12
-
-- **The kept-file alert (the Undo / W7 section, beside Show on Front Page as one step):** the paragraph above under "What was built", with the reason for `keptOnWindows` sitting beside `wording` (the Mac compares `wording` in full).
-- **Correction left from W7b2-6, not folded by `dev` 0a0fbe267.** Two sentences of documentation 12 are no longer true. I did not edit them, because COMMON forbids it:
-  - About line 17965, the start-of-year bullet, ends "a difference from the mac's sentence, in no contract". W7b2-6 corrected that in its notes: `writeFailed` IS a contract sentence (`shared-rules.json` → the start-of-year wording, about line 25787), which Windows carries in `StartOfYearWording` and no longer says. The fold took the older text.
-  - About line 17971, the held-timetable sentence, is quoted with a straight apostrophe ("section's class dates"). The product says "section’s" since W7b2-11 L2. `windows-app/PROGRESS.md` line 17 quotes the same sentence the same way. After this piece, the "could not be read" sentences in that bullet are curly too.
 
 ## Must-fail lines
 
@@ -116,7 +104,7 @@ Nothing of this alert.
 3. **Sweep LOW 3, `prepare_for_start_of_year` after a part-way stop.** Should the current plan follow the part-way sentence? Options:
    - (a) Keep it. **Recommended:** the plan is recomputed from disk and holds what is still to do, with a fresh code.
    - (b) Answer the sentence alone, as for Changed.
-4. **Documentation 12 and PROGRESS corrections** that the fold did not carry: the `writeFailed` "in no contract" clause, and the straight apostrophe in the quoted held-timetable sentence (see "For documentation 12").
+4. **Documentation 12 and PROGRESS corrections** that the fold did not carry: the `writeFailed` "in no contract" clause, and the straight apostrophe in the quoted held-timetable sentence. Both carried by the fold of this merge window (night25/integration-3), in documentation 12 and PROGRESS.
 5. **Awaiting Russell's confirmation: the hidden-items sentence**, "To see it, open View in File Explorer and turn on Hidden items." (the director's wording, review 1 MEDIUM 2), built as given.
 6. **The Mac gate comes back** for the `class-planning.json` change. The Mac's tests read `wording` (unchanged) and the section keys it lists (unchanged), so I expect the Mac to stay green, but the gate has not run on this change.
 
