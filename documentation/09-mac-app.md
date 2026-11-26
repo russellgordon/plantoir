@@ -22558,6 +22558,34 @@ purpose (LOW 3). Rejected: one rule per action (every writer goes through
 teacher who had linked a class page in from elsewhere).
 `UndoSweepFindingsTests` holds the cases, every planning entry point and read through the plan included.
 
+### U4b2: leaving-place-named
+
+When an Undo or a Redo is refused because one of an op's places now leads
+out of the working folder (a folder on its path replaced since by a link to
+outside), the refusal names the first of the op's places, in the order
+`path`, `from`, `to`, that leads out, never the other side of a move, which
+is as the step left it (#899, 2026-11-25). U4b part I made the Mac do this
+(`UndoCheck.plan`, `placeLeavingTheFolder`); this piece pins it, with one
+sentence in `undo.rule.stagedThenSwapped`, `stackCases` rows for Undo and
+Redo (only the new place leads out: names it; only the old: names it; both:
+names the old) read through a new key,
+`refusalNamed`, three new calls (`moveThePageIntoAFolder`,
+`moveThePageBetweenFolders`, `linkItsNewFolderOutside`), and nine
+`UndoDoorGuardTests`. Review 1 found the check made again just before each
+change (staging and swap) named the target's own path, so a link made
+between the plan and the change that took only the other side out named the
+side as the step left it; both now name the place through the same function
+the plan uses (`UndoCheck.placeLeavingTheFolder`, via
+`UndoSwap.placeLeadingOut`), tested at `afterTheCheck` and `beforeSwap(0)`.
+A check row could not carry it: `checkCasesHow` makes a place that is itself
+a link, never a folder on its path replaced after the step. Windows names a
+move's `from` always (`UndoCheck.Plan`, `op.PlaceName`), so the "only the
+new place" rows are its real gap; all six rows are held under W8 because its
+replay does not yet check `refusalNamed`. The U2 link row is left as it was,
+without the key, so Windows still runs it. Windows' staging and swap checks
+(`UndoSwap.cs`) name `target.RelativePath`, as the Mac's did before review
+1; W8 changes them too (documentation 12 notes).
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

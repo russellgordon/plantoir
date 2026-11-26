@@ -1089,13 +1089,18 @@ def plan(ops, backward, pages_by_path, content_missing=False, available=None, us
         if kind == "recompute":
             continue
         places = [op[key] for key in ("path", "from", "to") if key in op]
-        if any(place == folder or place.startswith(folder + "/") for place in places for folder in linked):
+        leading_out = None
+        for place in places:
+            if leading_out is None and any(place == folder or place.startswith(folder + "/") for folder in linked):
+                leading_out = place
+        if leading_out is not None:
             # A place that now leads outside the working folder through a
             # link: a change since, nothing moved (the second hard review of
-            # U2b, MEDIUM 2).
-            place = op.get("path") or op.get("from")
-            if place not in in_the_way:
-                in_the_way.append(place)
+            # U2b, MEDIUM 2). Named by the first of the op's places, in the
+            # order path, from, to, that leads out, never the other side of
+            # a move (U4b2-2).
+            if leading_out not in in_the_way:
+                in_the_way.append(leading_out)
             continue
         if kind in WHOLE_KINDS:
             # Judged whole against what is there (opKinds.wholeOps).
