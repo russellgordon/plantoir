@@ -22,7 +22,7 @@ namespace Plantoir.Tests;
 /// a page that is not at its path leaves it alone; no staged item is left.</para>
 ///
 /// <para>What W2 adds on top: the same traces through the real door (the
-/// lock, the staged swap, the flush), and from U3 the ~120 traces of the real
+/// lock, the staged swap, the flush), and from U3 the action traces (162 today) of the real
 /// action code.</para>
 /// </summary>
 public sealed class UndoTraceContractTests

@@ -289,7 +289,9 @@ nonisolated enum SubjectMenuRules {
             enabled.insert(.importCoursesForReference)
             enabled.insert(.reloadCourses)
         }
-        if situation.row == .archived {
+        // On a backup or archived row, `structuralHold` is the row's course
+        // under a Rename folder (#909): the restore waits for it.
+        if situation.row == .archived && !situation.structuralHold {
             enabled.insert(.restoreFromArchive)
         }
 
@@ -319,7 +321,7 @@ nonisolated enum SubjectMenuRules {
         if situation.settingsMayRevert {
             enabled.insert(.revertCourseSettings)
         }
-        if situation.row == .backup && !situation.copying {
+        if situation.row == .backup && !situation.copying && !situation.structuralHold {
             enabled.insert(.restoreFromBackup)
         }
         // The Revise and folder group acts on the course ROW only: with a

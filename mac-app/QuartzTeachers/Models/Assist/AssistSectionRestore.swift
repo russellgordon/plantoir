@@ -24,6 +24,10 @@ enum AssistSectionRestore {
         case nothingToRestore
         case noWorkingFolder
         case unreadableBackup(String)
+        /// A Rename folder of the course is under way in some window (#909,
+        /// the review after the merge of `dev`, HIGH 1): the rename's own
+        /// sentence, `undo.wording.renameFolderUnderWay`.
+        case folderRenameUnderWay(String)
 
         var errorDescription: String? {
             switch self {
@@ -33,6 +37,8 @@ enum AssistSectionRestore {
                 return "Plantoir cannot find the working folder these courses live in."
             case .unreadableBackup(let name):
                 return "The copy saved for this conversation (\(name)) could not be read."
+            case .folderRenameUnderWay(let course):
+                return CourseActivity.folderRenameIsUnderWay(course: course)
             }
         }
     }
@@ -107,6 +113,22 @@ enum AssistSectionRestore {
         )
     }
 
+    /// What the window says once the section is back, line by line:
+    /// `doneMessage` first, unchanged (#897 froze it), then, when the
+    /// restore kept folders backups leave out from inside the section,
+    /// Russell's sentence for them as a line of its own (#909, ruling 1 of
+    /// 2026-11-26: "the window route gets a sentence of its own").
+    static func doneLines(courseCode: String, sectionNumber: Int, putBack: CourseRestorer.SectionPutBack) -> [String] {
+        var lines: [String] = [
+            doneMessage(courseCode: courseCode, sectionNumber: sectionNumber, settingsNotPutBack: putBack.pagesNotPutBack)
+        ]
+        if let keptAt = putBack.leftOutFoldersKeptAt,
+           let kept = OneSectionRestoreWording.leftOutKept(inside: putBack.leftOutFoldersKept, keptAt: keptAt) {
+            lines.append(kept)
+        }
+        return lines
+    }
+
     /// What the breadcrumb trail records afterwards — a different audience
     /// from `doneMessage`, and a different job.
     ///
@@ -168,7 +190,21 @@ enum AssistSectionRestore {
         )
     }
 
-    /// Do it — or refuse, when there is nothing saved to go back to.
+    /// Whether Restore Section N… waits for a Rename folder of the course
+    /// under way in any window (#909): the window's button is disabled while
+    /// it is true, and `restore` refuses then too.
+    @MainActor
+    static func waitsForARename(courseCode: String, coursesDirectoryURL: URL?) -> Bool {
+        guard let coursesDirectoryURL else {
+            return false
+        }
+        return CourseActivity.courseIsRenamingAFolder(
+            folderPath: coursesDirectoryURL.deletingLastPathComponent().path, courseCode: courseCode
+        )
+    }
+
+    /// Do it — or refuse, when there is nothing saved to go back to, or while a
+    /// Rename folder of the course is under way (`waitsForARename`).
     ///
     /// A conversation that has only READ has no backup, which is exactly the
     /// case where a restore would be a surprise rather than a rescue.
@@ -176,6 +212,7 @@ enum AssistSectionRestore {
     /// Returns how many shared pages kept their current setting because
     /// there was nowhere on them to put the backup's back — see
     /// `doneMessage`.
+    @MainActor
     @discardableResult
     static func restore(
         backupURL: URL?,
@@ -183,11 +220,29 @@ enum AssistSectionRestore {
         sectionNumber: Int,
         coursesDirectoryURL: URL?
     ) throws -> Int {
+        let putBack: CourseRestorer.SectionPutBack = try restoreSayingWhatWasKept(
+            backupURL: backupURL, courseCode: courseCode,
+            sectionNumber: sectionNumber, coursesDirectoryURL: coursesDirectoryURL
+        )
+        return putBack.pagesNotPutBack
+    }
+
+    /// `restore`, saying what it kept as well (#909), for `doneLines`.
+    @MainActor
+    static func restoreSayingWhatWasKept(
+        backupURL: URL?,
+        courseCode: String,
+        sectionNumber: Int,
+        coursesDirectoryURL: URL?
+    ) throws -> CourseRestorer.SectionPutBack {
         guard let backupURL else {
             throw Problem.nothingToRestore
         }
         guard let coursesDirectoryURL else {
             throw Problem.noWorkingFolder
+        }
+        if waitsForARename(courseCode: courseCode, coursesDirectoryURL: coursesDirectoryURL) {
+            throw Problem.folderRenameUnderWay(courseCode)
         }
         guard let item = BackupItem.from(fileURL: backupURL, courseCode: courseCode) else {
             throw Problem.unreadableBackup(backupURL.lastPathComponent)
@@ -199,7 +254,7 @@ enum AssistSectionRestore {
         if !FileManager.default.fileExists(atPath: backupURL.path) {
             throw Problem.unreadableBackup(backupURL.lastPathComponent)
         }
-        return try CourseRestorer.restoreSection(
+        return try CourseRestorer.restoreSectionSayingWhatWasKept(
             sectionNumber, from: item, coursesDirectoryURL: coursesDirectoryURL
         )
     }

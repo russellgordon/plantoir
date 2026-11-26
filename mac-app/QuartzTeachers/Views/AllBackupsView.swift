@@ -117,6 +117,11 @@ struct AllBackupsView: View {
                 Text("These backups take \(BackupSizes.description(ofBytes: space.totalBytes)).")
                     .font(.title3)
                     .accessibilityIdentifier("allBackupsTotal")
+                if space.keptFolderBytes > 0 {
+                    Text(RestoreWholeCourseWording.keptFoldersTake(size: BackupSizes.description(ofBytes: space.keptFolderBytes)))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("allBackupsKeptFolders")
+                }
                 if space.unsizedCount > 0 {
                     Text(unsizedLine(space.unsizedCount))
                         .foregroundStyle(.secondary)
@@ -221,7 +226,7 @@ struct AllBackupsView: View {
                     workspace.backupRestoreRequest = item
                 }
             }
-            .disabled(chosen.count != 1 || workspace.isBeingCopied(chosen[0].courseCode))
+            .disabled(chosen.count != 1 || workspace.restoreOfABackupWaits(chosen[0].courseCode))
             Button("Show in Finder", systemImage: "finder") {
                 selectedIdentifiers = identifiers
                 var urls: [URL] = []

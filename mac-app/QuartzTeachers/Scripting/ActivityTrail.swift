@@ -181,6 +181,53 @@ nonisolated enum ActivityTrail {
         /// folder, never a page. Without it the trail shows nothing at all
         /// for the one restore outcome that leaves a section changed.
         case sectionRestoreStoppedPartWay = "section restore stopped part way"
+        /// A WHOLE-course restore moved a file and then could not move
+        /// every file back (#909), at the restore or at the next reading
+        /// that settled one that did not finish. The course may hold some
+        /// files from the backup and some as they were. Carries the course
+        /// and where the set-aside files were kept, as a path inside the
+        /// working folder, never a page. Its own event rather than the
+        /// section's, because a line named for a section would mislead a
+        /// reader of a whole-course report.
+        case courseRestoreStoppedPartWay = "course restore stopped part way"
+        /// A WHOLE-course restore did not go ahead and the course was left
+        /// as it was (#909, the implementation review's I4): refused (which
+        /// refusal, and when it was asked), not enough space, the disk
+        /// filled, the backup unreadable, a small backup refused, a move
+        /// that failed with every file put back, or an item or the folder
+        /// locked. Carries the course, the backup's file name, the reason
+        /// as a fixed phrase, a locked top-level item's name, and where
+        /// newcomers were kept, never a page. Without it "my restore didn't
+        /// work" next week shows nothing at all.
+        case courseRestoreLeftAsItWas = "course restore left as it was"
+        /// A reading of the working folder found a restore that did not
+        /// finish (#909) and settled it: put back as it was, finished
+        /// (it had happened), kept where a teacher can open it, or removed
+        /// (it had moved nothing); or left it alone because another
+        /// computer wrote it and the course is missing here, written once
+        /// per opening when the teacher is told. Carries the course, the
+        /// backup's file name, what was found and what was done, and any
+        /// kept path, never a page.
+        case unfinishedRestoreSettled = "unfinished restore settled"
+        /// A WHOLE-course restore that worked kept files in the course's
+        /// backups folder rather than removing them with the copy it set
+        /// aside (#909, the fix review's I-a and I-b, and the third case):
+        /// everything that was in a course folder no archive was made of,
+        /// or the files the archive made first may not hold. Carries the
+        /// course, why, and the path inside the working folder, never a
+        /// page. The teacher is told where; this is the record of it.
+        case courseRestoreKeptFiles = "course restore kept files"
+        /// A ONE-section restore that worked, from Restore from Backup…'s
+        /// Restore Section N or the assistant window's Restore Section N…,
+        /// kept the folders backups leave out (`.git`, `build` and the rest)
+        /// that were inside the section beside the backups, rather than
+        /// removing them with the copy it set aside (#909, Russell's ruling
+        /// of 2026-11-25). Carries the course, the section, how many, and
+        /// the kept folder's path inside the working folder, never a page
+        /// and never which folders. Its own event beside
+        /// `courseRestoreKeptFiles`, as `sectionRestoreStoppedPartWay` is
+        /// beside `courseRestoreStoppedPartWay`.
+        case sectionRestoreKeptFiles = "section restore kept files"
         /// A teacher added a section to a course ("Add Section…"). Carries
         /// the course, the new section, and how many pages shared by every
         /// section were given a date and a published-or-hidden setting for
@@ -1838,6 +1885,112 @@ nonisolated enum ActivityTrail {
     static func sectionRestoreStoppedPartWayLine(keptAt: String) -> String {
         return "a section restore stopped part way and could not move every file back; the section may hold "
              + "some files from the backup and some as they were; the files set aside are kept in " + keptAt
+    }
+
+    /// Why a restore that worked kept files (`courseRestoreKeptFiles`).
+    enum KeptBecause: String, Equatable, Sendable {
+        case noArchive = "no archive was made of what was in the course folder, so all of it is kept"
+        case notInTheArchive = "the archive made first does not hold them as they are (added or changed while it was made, a kind backups leave out, or an archive that could not be read)"
+    }
+
+    /// The words for `courseRestoreKeptFiles`: why, and where. A path,
+    /// never a page.
+    static func courseRestoreKeptFilesLine(keptAt: String, why: KeptBecause) -> String {
+        return "a whole-course restore kept files instead of removing them, because " + why.rawValue
+             + "; they are in " + keptAt
+    }
+
+    /// The words for `sectionRestoreKeptFiles`: how many, and where. A
+    /// path and a count, never a page or a folder's name.
+    static func sectionRestoreKeptFilesLine(keptAt: String, folders: Int) -> String {
+        if folders == 1 {
+            return "a one-section restore kept 1 folder backups leave out, from inside the section, instead of "
+                 + "removing it; it is in " + keptAt
+        }
+        return "a one-section restore kept \(folders) folders backups leave out, from inside the section, instead of "
+             + "removing them; they are in " + keptAt
+    }
+
+    /// Writes `sectionRestoreKeptFiles` for one section, after
+    /// `sectionRestored`, on either route; nothing when none was kept.
+    static func noteSectionRestoreKeptFiles(keptAt: String?, folders: Int, course: String, section: Int) {
+        guard let keptAt, folders > 0 else {
+            return
+        }
+        note(.sectionRestoreKeptFiles, sectionRestoreKeptFilesLine(keptAt: keptAt, folders: folders),
+             course: course, section: section)
+    }
+
+    /// The words for `courseRestoreStoppedPartWay` (#909): what may be
+    /// mixed, and where the set-aside files are. A path, never a page.
+    static func courseRestoreStoppedPartWayLine(keptAt: String, atTheNextReading: Bool) -> String {
+        var line: String = "a whole-course restore stopped part way and could not move every file back"
+        if atTheNextReading {
+            line += " when the restore that did not finish was put back at the next reading"
+        }
+        return line + "; the course may hold some files from the backup and some as they were; "
+             + "the files set aside are kept in " + keptAt
+    }
+
+    /// The words for `courseRestoreLeftAsItWas` (#909, the implementation
+    /// review's I4): which backup, why in a fixed phrase, the locked
+    /// item's name, when a refusal was asked, and where newcomers were
+    /// kept. Never a page.
+    static func courseRestoreLeftAsItWasLine(
+        backup: String,
+        why: String,
+        detail: String?,
+        asked: String?,
+        newcomersKeptAt: String?
+    ) -> String {
+        var line: String = "a whole-course restore from " + backup + " did not go ahead, and the course was left as it was: " + why
+        if let detail {
+            line += " (" + detail + ")"
+        }
+        if let asked {
+            line += ", asked " + asked
+        }
+        if let newcomersKeptAt {
+            line += "; files made in the course meanwhile are kept in " + newcomersKeptAt
+        }
+        return line
+    }
+
+    /// The words for `unfinishedRestoreSettled` (#909): which restore, what
+    /// was found and what was done.
+    static func unfinishedRestoreSettledLine(_ outcome: RestoreSettle.Settled) -> String {
+        var line: String = "found "
+        if let course = outcome.course {
+            line += "a restore of \(course)"
+            if let backup = outcome.backup {
+                line += " from \(backup)"
+            }
+            line += " that did not finish (\(outcome.found))"
+        } else {
+            line += "a folder a restore had set aside, with no record of it"
+        }
+        switch outcome.action {
+        case .putBack:
+            line += ": put back as it was"
+        case .finish:
+            line += ": it had happened, and what was left of it was tidied away"
+            if let keptAt = outcome.keptAt {
+                line += "; what it had set aside is kept in " + keptAt
+            }
+        case .remove:
+            line += ": it had moved nothing, and was removed"
+        case .keep:
+            line += ": kept"
+            if let keptAt = outcome.keptAt {
+                line += " in " + keptAt
+            }
+        case .leave:
+            line += ": left as it is, because another computer started it; nothing here was moved"
+        }
+        if let newcomers = outcome.newcomersKeptAt {
+            line += "; files made in the course meanwhile are kept in " + newcomers
+        }
+        return line
     }
 
     /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and

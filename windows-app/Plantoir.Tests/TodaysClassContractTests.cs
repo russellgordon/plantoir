@@ -158,18 +158,22 @@ public sealed class TodaysClassContractTests : IDisposable
         // The kept-file alert (#899 W7b2-9, Russell's ruling of 2026-11-25 (a)).
         Assert.Equal(w["keptTitle"]!.ToString().Replace("{class}", "X"), TodaysClassOnTheFrontPage.KeptTitle("X"));
         Assert.Equal(w["kept"]!.ToString().Replace("{kept}", "K"), TodaysClassOnTheFrontPage.KeptSentence("K"));
-        Assert.Equal(w["keptGone"]!.ToString().Replace("{kept}", "K"), TodaysClassOnTheFrontPage.KeptGoneSentence("K"));
-        // showKept is the one key Windows says in its own words: the button
-        // opens the folder, never the file (keptOnWindows.showKept), the path
-        // bar's open action.
+        // showKept and keptGone are the keys Windows says in its own words:
+        // the button opens the folder, never the file (keptOnWindows.showKept),
+        // the path bar's open action, and when the file is gone it says the
+        // folder was not opened (keptOnWindows.keptGone, Russell's ruling 9
+        // of 2026-11-26) in place of the mac's wording.keptGone.
         var onWindows = Rule["keptOnWindows"]!;
+        Assert.Equal(["hiddenItems", "showKept", "keptGone", "why"], onWindows.AsObject().Select(pair => pair.Key).ToList());
         Assert.Equal(onWindows["showKept"]!.ToString(), TodaysClassOnTheFrontPage.OpenKeptFolder);
+        Assert.Equal(onWindows["keptGone"]!.ToString().Replace("{kept}", "K"), TodaysClassOnTheFrontPage.KeptGoneSentence("K"));
         Assert.Equal(onWindows["hiddenItems"]!.ToString(), TodaysClassOnTheFrontPage.HiddenItems);
         var pathBarOpen = ContractLoader.LoadJson("shared-rules.json")["workingFolderPathBar"]!["actions"]!.AsArray()
             .First(action => action!["action"]!.ToString() == "open")!;
         Assert.Equal(pathBarOpen["windowsLabel"]!.ToString(), TodaysClassOnTheFrontPage.OpenKeptFolder);
 
-        // Every key the contract has is compared above or held by name in
+        // Every key the contract has is compared above, replaced above by its
+        // keptOnWindows key (showKept, keptGone), or held by name in
         // NamedGapLedger: a key added on the mac turns this red rather than
         // passing unseen. A held key fails the day it is said here.
         var saidHere = new[] { "question", "because", "show", "notToday", "notChangedTitle", "noLongerOffered", "couldNotSave",
@@ -223,7 +227,7 @@ public sealed class TodaysClassContractTests : IDisposable
     [Fact]
     public void TheGoneAlertSaysItsSentenceWithOkAlone()
     {
-        string sentence = Rule["wording"]!["keptGone"]!.ToString().Replace("{kept}", "K");
+        string sentence = Rule["keptOnWindows"]!["keptGone"]!.ToString().Replace("{kept}", "K");
         Assert.Equal(new TodaysClassOnTheFrontPage.AlertDescription(null, sentence, null, "OK", TodaysClassOnTheFrontPage.AlertButton.Close),
                      TodaysClassOnTheFrontPage.GoneAlert(sentence));
     }
@@ -312,7 +316,7 @@ public sealed class TodaysClassContractTests : IDisposable
             ("wording.kept", message[..^(" " + TodaysClassOnTheFrontPage.HiddenItems).Length]),
             ("keptOnWindows.hiddenItems", TodaysClassOnTheFrontPage.HiddenItems),
             ("keptOnWindows.showKept", TodaysClassOnTheFrontPage.OpenKeptFolder),
-            ("wording.keptGone", TodaysClassOnTheFrontPage.KeptGoneSentence("KEPT")),
+            ("keptOnWindows.keptGone", TodaysClassOnTheFrontPage.KeptGoneSentence("KEPT")),
         ];
         foreach ((string key, string sentence) in sentences)
         {
