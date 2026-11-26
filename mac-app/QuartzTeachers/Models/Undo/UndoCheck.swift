@@ -1216,7 +1216,14 @@ nonisolated enum UndoSwap {
                 switch target.change {
                 case .file:
                     if let original = originals[index] {
-                        if !failsHere && UndoSwap.rename(original, onto: target.url) {
+                        // A removal is put back EXCLUSIVELY: its place is
+                        // free unless something was written there since,
+                        // and that file is never replaced. The page stays
+                        // kept beside it for recovery (`notPutBack`), as a
+                        // move's reversal leaves both (review A of U4b3,
+                        // MEDIUM 1). A replacement puts back over the
+                        // content this swap itself put there.
+                        if !failsHere && UndoSwap.putBackAKeptOriginal(original, onto: target) {
                             originals[index] = nil
                         } else {
                             everyOnePutBack = false
@@ -1392,6 +1399,11 @@ nonisolated enum UndoSwap {
                 }
                 if atFrom == .cannotRead || atTarget == .cannotRead {
                     refusal = .cannotTellNow(path: namedAs)
+                } else if atFrom == .holdsTheContent && atTarget != .free && UndoSwap.placeIsLeftEarlier(in: targets, before: index) {
+                    // A handed-over place taken since its leaver left it:
+                    // named as the place that changed, not where the move
+                    // comes from (review A of U4b3, LOW 1).
+                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
                 } else if atFrom != .holdsTheContent || atTarget != .free {
                     refusal = .changedSince(firstPath: namedAs, others: 0)
                 } else {
@@ -1678,12 +1690,35 @@ nonisolated enum UndoSwap {
         let refusal: UndoRefusal = keptNow == .unreadable
             ? .cannotTellNow(path: target.relativePath)
             : .changedSince(firstPath: target.relativePath, others: 0)
-        if UndoKillPoints.putBackFailsAt?(index) != true && UndoSwap.rename(originalURL, onto: target.url) {
+        if UndoKillPoints.putBackFailsAt?(index) != true && UndoSwap.putBackAKeptOriginal(originalURL, onto: target) {
             originals[index] = nil
         } else {
             putBack = false
         }
         return refusal
+    }
+
+    /// Whether an earlier target of this swap is at the same place as the
+    /// target at `index`: a place handed over, which that earlier swap left.
+    static func placeIsLeftEarlier(in targets: [UndoSwapTarget], before index: Int) -> Bool {
+        var earlier: Int = 0
+        while earlier < index {
+            if targets[earlier].relativePath == targets[index].relativePath {
+                return true
+            }
+            earlier += 1
+        }
+        return false
+    }
+
+    /// A kept original put back at its page: over the new content when the
+    /// swap wrote some there, exclusively when the swap removed the page,
+    /// so a file written at an emptied place since is never replaced.
+    static func putBackAKeptOriginal(_ originalURL: URL, onto target: UndoSwapTarget) -> Bool {
+        if target.replacement == nil {
+            return UndoSwap.renameExclusively(originalURL, onto: target.url)
+        }
+        return UndoSwap.rename(originalURL, onto: target.url)
     }
 
     /// A rename that never replaces what is at the destination

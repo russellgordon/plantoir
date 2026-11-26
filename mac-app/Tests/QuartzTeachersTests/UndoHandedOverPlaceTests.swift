@@ -95,6 +95,103 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         XCTAssertEqual(stagedLeft(under: root), [section + ".Unit 1, Day 3.md" + UndoSwap.stagedMarker + "1-apply-new"])
     }
 
+    /// Shape B going forward, and a plain file put at Day 3 once its page
+    /// has been removed, before the link moves in (review A of U4b3,
+    /// MEDIUM 1): the link's move is refused naming Day 3, the place that
+    /// changed, and the removed page is never put back over the file put
+    /// there: both are left for recovery, the page kept beside Day 3.
+    func testAFileWrittenWhereAPageWasRemovedIsNeverWrittenOver() throws {
+        let laid: LaidStep = try layShapeB(leadingOut: false)
+        let targets: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: .forward, root: laid.root, journal: laid.journal))
+        let intruder: URL = laid.root.appendingPathComponent(day(3))
+        UndoKillPoints.fileInUseAtSwap = { index in
+            if index == 2 {
+                try? Data("Someone else's.\n".utf8).write(to: intruder)
+            }
+            return false
+        }
+        let result: UndoSwapResult = UndoSwap.swap(targets, label: "1-apply", root: laid.root)
+        UndoKillPoints.fileInUseAtSwap = nil
+        guard case .notPutBack(let refusal, let kept) = result else {
+            return XCTFail("the swap came to \(result), not notPutBack")
+        }
+        XCTAssertEqual(refusal, .changedSince(firstPath: day(3), others: 0))
+        XCTAssertEqual(kept.count, 1)
+        XCTAssertEqual(try String(contentsOf: intruder, encoding: .utf8), "Someone else's.\n")
+        XCTAssertTrue(try holdsSomewhere("Three.\n", root: laid.root), "the removed page is kept")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: laid.root.appendingPathComponent(day(2)).path), "../library/Day 2.md")
+    }
+
+    /// Shape A's Undo, and a plain file put at Day 3 once the new page has
+    /// been taken away, before the link goes home: the link's move is
+    /// refused naming Day 3, and the new page is never put back over it.
+    func testAFileWrittenWhereTheUndoTookAPageAwayIsNeverWrittenOver() throws {
+        let laid: LaidStep = try layShapeA(leadingOut: false)
+        try makeItForward(laid)
+        let targets: [UndoSwapTarget] = try readyTargets(UndoCheck.plan(laid.ops, direction: .backward, root: laid.root, journal: laid.journal))
+        let intruder: URL = laid.root.appendingPathComponent(day(3))
+        UndoKillPoints.fileInUseAtSwap = { index in
+            if index == 1 {
+                try? Data("Someone else's.\n".utf8).write(to: intruder)
+            }
+            return false
+        }
+        let result: UndoSwapResult = UndoSwap.swap(targets, label: "1-undo", root: laid.root)
+        UndoKillPoints.fileInUseAtSwap = nil
+        guard case .notPutBack(let refusal, let kept) = result else {
+            return XCTFail("the swap came to \(result), not notPutBack")
+        }
+        XCTAssertEqual(refusal, .changedSince(firstPath: day(3), others: 0))
+        XCTAssertEqual(kept.count, 1)
+        XCTAssertEqual(try String(contentsOf: intruder, encoding: .utf8), "Someone else's.\n")
+        XCTAssertTrue(try holdsSomewhere("New.\n", root: laid.root), "the page taken away is kept")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: laid.root.appendingPathComponent(day(4)).path), "../library/Day 3.md")
+    }
+
+    /// The first of those, made through the door and then recovered by
+    /// another process: the file put at Day 3 is still there byte for
+    /// byte, the removed page's content is still on the disk, the link
+    /// still leads to its page, and the step is settled.
+    func testAFileWrittenWhereAPageWasRemovedSurvivesRecovery() throws {
+        let laid: LaidStep = try layShapeB(leadingOut: false)
+        let dying: UndoJournal = UndoJournal(
+            folderURL: laid.journal.folderURL, process: UndoContractReplay.goneProcess,
+            processIsAlive: { process in process.pid != UndoContractReplay.goneProcess.pid }
+        )
+        let blobs: [Data] = [Data("New.\n".utf8), Data("Three.\n".utf8)]
+        let draft: UndoOpsDraft = UndoContractKinds.draft(ops: laid.ops, blobs: blobs, root: laid.root, action: "insertClass")
+        let intruder: URL = laid.root.appendingPathComponent(day(3))
+        UndoKillPoints.fileInUseAtSwap = { index in
+            if index == 2 {
+                try? Data("Someone else's.\n".utf8).write(to: intruder)
+            }
+            return false
+        }
+        let outcome: JournaledWriteOutcome = JournaledWrite.perform(ops: draft, in: dying, mode: .live, places: UndoMemoryPlaces())
+        UndoKillPoints.fileInUseAtSwap = nil
+        XCTAssertNotEqual(outcome, .stoppedByATest)
+        let survivor: UndoJournal = UndoJournal(
+            folderURL: laid.journal.folderURL,
+            processIsAlive: { process in process.pid != UndoContractReplay.goneProcess.pid }
+        )
+        try survivor.withLock { writer in
+            UndoRecovery.run(writer, mode: .live, resolveRoot: { _ in laid.root })
+        }
+        XCTAssertEqual(try String(contentsOf: intruder, encoding: .utf8), "Someone else's.\n")
+        XCTAssertTrue(try holdsSomewhere("Three.\n", root: laid.root), "the removed page is not lost")
+        XCTAssertEqual(try String(contentsOf: laid.root.appendingPathComponent("courses/TST1O/library/Day 2.md"), encoding: .utf8), "Linked.\n")
+        var linkFound: Bool = false
+        for place in [day(2), day(3)] {
+            if let destination = try? FileManager.default.destinationOfSymbolicLink(atPath: laid.root.appendingPathComponent(place).path) {
+                XCTAssertEqual(destination, "../library/Day 2.md")
+                linkFound = true
+            }
+        }
+        XCTAssertTrue(linkFound, "the link is at Day 2 or Day 3")
+        let phase: String = (try survivor.read()).records[1]?.phase.rawValue ?? "missing"
+        XCTAssertTrue(["failed", "rolledBack", "done", "undone", "interrupted"].contains(phase), "the step is \(phase)")
+    }
+
     /// Shape A, and the link replaced by a plain file between the plan and
     /// the swap: the link's move finds Day 3 changed, refused naming it, and
     /// nothing is changed.
@@ -907,6 +1004,18 @@ final class UndoHandedOverPlaceTests: XCTestCase {
         }
         let library: [String] = try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("courses/TST1O/library").path)
         XCTAssertEqual(library.count, names.count)
+    }
+
+    /// Whether any file under the root, kept originals included, holds
+    /// exactly this text. Never followed through a link.
+    func holdsSomewhere(_ text: String, root: URL) throws -> Bool {
+        let wanted: String = "file " + Data(text.utf8).base64EncodedString()
+        for (name, item) in try folderNow(root) {
+            if item == wanted && !name.hasPrefix("courses/.internal") {
+                return true
+            }
+        }
+        return false
     }
 
     /// Every name under the root holding the swap's staged marker.
