@@ -22415,7 +22415,7 @@ Part seven's review (M1) found that Cancel closed the sheet but did not stop the
 
 #### For U4b2 (the unit-word rename and Rename Course)
 
-- **Owed from U4b, carried here:** the recorded `renameFolder` trace (the recorder, `make_undo_traces.py` and the Swift and Windows action-trace replays know file moves only; folder moves with carried pages); the part-two review's L1 to L5; a per-section folder that is ITSELF a symbolic link, renamed before U4b by `moveItem` (the link moved as a link) and refused since (its place reads `.notATree`): the door's `move` needs a way to judge an item that is a link, by the bytes it holds, in the contract's `opKinds.move` and in recovery, which is a door change for both apps.
+- **Owed from U4b, carried here:** the recorded `renameFolder` trace (the recorder, `make_undo_traces.py` and the Swift and Windows action-trace replays know file moves only; folder moves with carried pages); the part-two review's L1 to L5; a per-section folder that is ITSELF a symbolic link, renamed before U4b by `moveItem` (the link moved as a link) and refused since (its place reads `.notATree`): the door's `move` needs a way to judge an item that is a link, by the bytes it holds, in the contract's `opKinds.move` and in recovery, which is a door change for both apps. (Done since: the recorded trace by U4b2-11 and U4b2-12, the door's move of a link by U4b2-14 and the linked folder's rename by U4b2-15, all below.)
 - Each one's busy claim in `CourseActivity` and the quit's wait, the way `renameFolder` does (fifth part): a Rename Course moves the whole course folder.
 - **Part seven's review, L3 and L4, carried here** (already so on `dev` before U4b, so not regressions): several readers of busy state do not read the rename's claim: Back Up Now (`SidebarView` greys on `isBeingCopied` only; `WorkspaceModel.backUp`), the unit-word rename (`UnitWordRenameSheet.busyProblem` reads `courseIsBusy`, which does not include the claim), and the outside assistant's page writes (no busy check at all); and a scheduled deploy, `Plantoir --mcp-stdio`, another copy of Plantoir and Windows do not see the claim, because the rename takes no lease file (`WorkLeaseRegistry.reconcile` derives leases from previews and publishes only). Give U4b2's claims and the rename's one way every reader sees, a lease included.
 - Each one's plan halted at Cancel the way `renameFolder`'s is (sixth part): `planHaltingAtCancel`, cancellation checked per file, the claim ended at once.
@@ -22908,10 +22908,11 @@ volume's; `SpecialFolderRenamer.inPathOrder` now puts them in
 `ClassPages.isInPathOrder`, the one page order (lowercased path) that a
 section's pages and the door's folder listing already used, each place read
 canonical once (a carried page's place is spelled from the course, `/var`,
-the walk's from the disk, `/private/var`). Each page is judged and changed on
+the walk's from the disk, `/private/var`; piece 12, next, makes only the
+course folder canonical and adds a tie-break). Each page is judged and changed on
 its own, so the order changes no answer of the move check. `testEveryRecordedFolderMoveHoldsTheListingItNames`
 reads the committed file, so the key can fail. `scripts/make_undo_traces.py`
-leaves the two steps out of `actionTraces` by name until piece 12 makes
+left the two steps out of `actionTraces` by name until piece 12 (next) made
 their traces. A regeneration now keeps each committed `recorded` and
 `answeredAt` moment on a line that is otherwise the same
 (`keepingTheCommittedMoments`), so only the steps whose recording changed
@@ -22993,9 +22994,10 @@ listing `link <sha> .` under `listingSha`: an older reader would take it for a
 folder's listing and judge a link as a changed folder (changed since, which
 clears the list), where an unknown `linkSha` leaves it with neither `sha` nor
 `listingSha`, so it cannot read the op at all, the barrier a step it does not
-understand is meant to be. The writers are unchanged: Rename folder still
-refuses a per-section folder that is a link (piece 15), and Insert Class
-still refuses renaming a later class that is a link (`undo.rule.shadow`).
+understand is meant to be. This piece left the writers unchanged: Rename folder
+went on refusing a per-section folder that is a link until piece 15 (next),
+and Insert Class still refuses renaming a later class that is a link
+(`undo.rule.shadow`).
 Review 1 of this piece: a link's move carries no edit (`UndoOp.moveCarries`
 answers false for it), so a step pairing one with an edit under its `to` is
 outside `wholeOps`' exception and not readable, decided from its shape; and

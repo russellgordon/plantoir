@@ -1,6 +1,6 @@
 # U4b2-15: a-linked-section-folder-is-renamed (#899)
 
-Branch `issue/899-u4b2-15-a-linked-section-folder-is-renamed`, from piece 14's pushed head c64e741ef (holds `dev` 811c956ce, pieces 9, 10, 14). `origin/dev` merged before proving and again before hand-back: both "Already up to date" (`dev` still 811c956ce), so no merge commit.
+Branch `issue/899-u4b2-15-a-linked-section-folder-is-renamed`, from piece 14's pushed head c64e741ef (holds `dev` 811c956ce, pieces 9, 10, 14). `origin/dev` merged before proving and again before hand-back: both "Already up to date" (`dev` still 811c956ce), so no merge commit. (Merged on 2026-11-26 in `night25/integration-7`, 69b247fd5, with U4b2-11 to U4b2-15. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12.)
 
 ## The old code's answers (read before writing, `5cf38d656`)
 
@@ -8,22 +8,6 @@ Branch `issue/899-u4b2-15-a-linked-section-folder-is-renamed`, from piece 14's p
 2. A link leading out of the working folder was renamed like any other: `fileExists(atPath:isDirectory:)` follows the link (a folder), then `moveItem` renames the link itself.
 
 Neither answer writes outside the working folder, so nothing is parked for that case: every case is built to its final state.
-
-## For PROGRESS
-
-- Mac: Rename folder renames a per-section or shared folder that is itself a symbolic link by moving the LINK, in the one step, as before U4b. `SpecialFolderRenamer.plan` reads a link (by `lstat`, after the following `fileExists` test found a folder) with `UndoTreeReading.linkSha(at:)` (new: the one function for "SHA-256 of `readlink`'s bytes"; `UndoMoveSide.readLink` now judges by it too). `FolderRenamePlan.Move.listingSha` is now `sha` (a listing's or a link's). `apply` plans a link with `JournaledStep.moveLink(_:to:linkSha:)` (new); `plannedFolderMoves` carries `listingSha?`/`linkSha?`, one op builder `JournaledStep.folderMoveOp`. The step names a link's `from` from the folder above it (`relativePath` resolves a link to its target; must-fail S5).
-- Pages: walked exactly as before (never through a link); a page in the target, when the target is inside the course, is relinked at its own place, so no edit sits inside a link's `to` (a link's move carries none, piece 14).
-- Riding L3 (`2026-11-25-899-u4b2-6-review-1.md`): a link at the new name this run did not move there, at a place an earlier run's record names (`moved`) or may have moved (`mayHaveMoved`, or the fallback for a record without `moved`), is now told as `cannotTellWhose` ("could not tell whether this rename moved these: …"; the sheet's "may have been renamed only in part"), never dropped and never named "still called". Why not a new record key (`movedLinks`): the record would need a new field in `folderRenameRecord`, its readers on both platforms and a Windows test of the field list, to tell apart a case (two failures over a linked special folder) that "cannot tell" states truthfully.
-- Per-course (shared) folders that are links take the same code path: one test, a shared `Concepts` linking OUT of the working folder (renamed, the outside folder and its page byte for byte unchanged, Undo puts the link back).
-- Contract (prose only, no row, no key): `shared-rules.json` → `activityTrail.mustRecord` `folderRenamed.carries` (the link clause), `undo.rule.shadow` (the promise "until the pieces that move a link (14 and 15) settle it" replaced, below); `file-formats.json` → `folderRenameRecord.fields.mayHaveMoved.why` ("a folder, or a link"), `undoJournal.opKinds.move` (Rename folder records a link move). No Windows test reads any changed words (checked: `UndoMakeRoomStepTests` reads three other substrings of `undo.rule.shadow`, all unchanged; `folderRenamed.carries` has no reader but the event key).
-- Recorded steps: unchanged. The `renameFolder` and `renameFolderPerSection` fixtures in `undo-action-steps.json` hold no link, so their ops are the same; nothing to regenerate at the merge with pieces 11 to 13.
-
-## For documentation 12
-
-- **W8's Rename folder moves a linked folder as a link.** For each place of the folder (one per section, or the course's own), when the place is a reparse point (symbolic link / junction) to a folder: plan a `move` with `linkSha` (SHA-256 of the UTF-8 bytes of the stored `LinkTarget`, as piece 14's paragraph says), `from` the link's own path named from the folder above it (never `ResolveLinkTarget`, which would name the target), `to` the same folder with the new name. Never list, read or move what it leads to, wherever it is (inside the course, outside the working folder, nowhere). A link whose target cannot be read refuses the rename "cannot tell now", nothing changed. A link to something that is not a folder is skipped, as a file at that place is today.
-- **Pages:** walk the course without descending into a link. Windows' walk today, `PagePaths.MarkdownPages` (`Plantoir.Core/Models/PagePaths.cs` about 165), recurses into any entry whose attributes have `FileAttributes.Directory`, which a link to a folder has too (with `ReparsePoint`), so it DOES walk through a link: for Rename folder's step it must skip an entry with `FileAttributes.ReparsePoint`. A page inside the target is relinked only where the walk finds it at its own place inside the course. Planning a page under a link's `to` makes the step one no reader can read (a link's move carries no edit).
-- **Part-way line:** a link at the new name counts as "still called" only where this run moved a link there; any other link at a place the earlier record names or may have moved is "could not tell whether this rename moved these".
-- **Windows today:** `Plantoir.Core/Models/SpecialFolderRenamer.cs` (about 274) moves each place with `Directory.Move` outside the door, and finds the places with `Directory.Exists`, which follows a link; what `Directory.Move` does to a link to a folder on NTFS is not measured here (W8 should check it moves the link, not the target), and its page walk goes through the link (above).
 
 ## Must-fail lines
 

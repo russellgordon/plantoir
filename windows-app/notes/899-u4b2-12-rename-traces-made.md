@@ -1,33 +1,6 @@
 # U4b2-12: rename-traces-made (#899)
 
-Branch `issue/899-u4b2-12-rename-traces-made`, from `origin/issue/899-u4b2-11-rename-step-recorded` e21cacb62 (holds `dev` 811c956ce and pieces 9, 10, 11). `origin/dev` was merged before proving and again before hand-back. Both times it was "Already up to date" (`dev` still 811c956ce), so there is no merge commit.
-
-## For PROGRESS
-
-- Mac: Rename folder's two recorded steps (`renameFolder`, `renameFolderPerSection`) have action traces now. There are twelve, `action-151` to `action-162`, made by `scripts/make_undo_traces.py` and replayed by `UndoActionStepsTests.testEveryActionTraceReplaysAsTheContractSays` through `JournaledWrite.perform(ops:)`. `STEPS_WITHOUT_TRACES_YET` and `steps_with_traces` are gone.
-- The model (Python):
-  - `action_fixture` lays each folder's listing at its `from` (`lay_folder_moves`). A carried page is not laid at its new place.
-  - `make_recorded_step` sends a `folderMoves` step to `Model.folder_moves_step`: one `move` (with `listingSha`) per folder first, then `change_ops` (the old inline loop of `files_step`, now one function both use), then `recompute_ops`. The step is planned forward and made by `ops_step`, the same path as any `perform(ops:)` step.
-  - `path_hashes` hashes a folder held as its files by its listing (`folder_hash`).
-- The model was wrong about one thing, and the Mac's rule was already settled (U4b, `UndoOp.placeAsFound`). A refused Undo of a move names its `to`, and a refused Redo names its `from`. The model named `from` both ways. It now uses `place_as_found`. Only `action-154` call 4 depended on this (`Concepts` became `Ideas`), and no earlier trace or case changed.
-- Riding lows from review 2 of U4b2-11, fixed:
-  - (A) `ClassPages.isInPathOrder` breaks a tie by the paths' UTF-8 bytes as spelled.
-  - (B) `SpecialFolderRenamer.inPathOrder(_:under:)` keys each page by `UndoFolderPlaces.placeResolvingOnlyAbove`, so a link is ordered by its own place.
-  - (C) the order test no longer depends on the volume's listing order.
-  - The steps file's note states the tie-break and the own-place rule. Re-recorded: only the note line changed, and no recorded step changed.
-
-## For documentation 12
-
-- **The twelve new traces are held** in `NamedGapLedger.cs`, area `UndoActionTraces`, under `Reason899W8U4b`. I checked by script that the names match the contract byte for byte (12 of 12). The reason's text now names them.
-- **Why each still fails on Windows and does not go red.** `UndoActionTraceContractTests.ReplayTheActionTrace` checks `moves`, `members`, `trees` before any door is asked. Both rename steps hold `members`, so each trace fails there with "a step this replay does not make yet (members)". `EveryCallOfEveryActionTrace` gives the held case to `HeldCaseStillStopsAtItsGap`, which wants "a step this replay does not make", and the message contains it. So all twelve fail at the guard, are held, and pass the held check. None passes, and none goes red unheld. The guard does not name `folderMoves` itself, because `members` comes first. Removing `members` from the guard alone would NOT let these traces through correctly. Without folderMoves support the replay would write each carried page's before at its NEW place and make no folder move.
-- `EveryHeldActionTraceIsStillInTheContract` passes because all twelve names exist. No other Windows test enumerates action traces or step names: `UndoTraceContractTests` reads only `traces`, and the step rows are piece 11's, still held.
-- **What W8 must do to run them:**
-  1. Lay each `folderMoves` entry's `files` (text by path inside) and `folders` at its `from`.
-  2. Write every `files` entry's `before` EXCEPT a page inside a folder move's `to` (part by part, without regard to case). That page is carried: its before is already in the listing at the old place.
-  3. Make the step as one ops step: per folder a `move` {from, to, listingSha} (no blob), then each file's ops (a carried page named at the NEW place, its before the old text, its after the recorded after), then the `editJSON` members in the recorded order.
-  4. Hash at both places each folder (its listing's SHA-256, null when absent) and each page of its listing, as the trace's `afterUndoingAll` and `final` keys name them.
-  5. Name a refused Undo of a move by its `to` and a refused Redo by its `from` (`action-154`: `courses/ICS3U/Ideas`; `action-152`: `courses/ICS3U/Concepts`, others 1).
-- **Page order for W8's own recording** (steps file's note): lowercased path, then on a tie the UTF-8 bytes as spelled, no locale. Each page is ordered by its own place inside the course (the course folder canonical, the parts below as written), never a link's target. On the Mac a file URL spells every path in one Unicode form (measured: `caf\u{E9}` and `cafe\u{301}` give the same bytes), so only a case-only pair can tie. NTFS keeps the form as written, so W8 should apply the byte tie-break as stated.
+Branch `issue/899-u4b2-12-rename-traces-made`, from `origin/issue/899-u4b2-11-rename-step-recorded` e21cacb62 (holds `dev` 811c956ce and pieces 9, 10, 11). `origin/dev` was merged before proving and again before hand-back. Both times it was "Already up to date" (`dev` still 811c956ce), so there is no merge commit. (Merged on 2026-11-26 in `night25/integration-7`, 69b247fd5, with U4b2-11 to U4b2-15. "For PROGRESS" and "For documentation 12" are folded into `windows-app/PROGRESS.md` and documentation 12.)
 
 ## Must-fail lines
 
