@@ -159,7 +159,8 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
         var history = new UndoHistory();
         AssistWorkspace workspace = Open(history);
 
-        LinksChecklistPublished published = workspace.PublishAndRemember(Sheet(workspace));
+        LinksChecklistSheet sheet = Sheet(workspace);
+        LinksChecklistPublished published = workspace.PublishAndRemember(sheet);
 
         Assert.Equal([Key], WindowsActionsOnTheMacFixture.BeginKeys(ListFolder));
         var (madeBy, paths, kinds) = NewestStep();
@@ -168,12 +169,17 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
         Assert.DoesNotContain(UndoOp.Recompute, kinds);
         Assert.Equal([UndoOp.WriteFile, UndoOp.WriteFile], kinds.TakeLast(2).ToList());
         Assert.DoesNotContain(UndoOp.WriteFile, kinds.SkipLast(2));
-        // The pages the class publishes and dates, in the plan's order, then the two records.
-        var pagesWritten = new List<string>
+        // The pages the class publishes and dates, in the plan's order (W7b2-8
+        // review 1, L4): the ticked class first, then the pages it brings in
+        // the sheet's order; then the two records.
+        var pagesWritten = new List<string> { Relative(_pages["Unit 2, Day 5"]) };
+        foreach (LinksChecklistRow row in sheet.Rows)
         {
-            Relative(_pages["Unit 2, Day 5"]), Relative(_pages["Class Notes"]), Relative(_pages["Worksheet"]),
-        };
-        Assert.Equal(pagesWritten.Order(StringComparer.Ordinal).ToList(), paths.Take(3).Order(StringComparer.Ordinal).ToList());
+            foreach (string title in new[] { "Class Notes", "Worksheet" })
+                if (string.Equals(Path.GetFileName(row.Place), title, StringComparison.Ordinal)) pagesWritten.Add(Relative(_pages[title]));
+        }
+        Assert.Equal(3, pagesWritten.Count);
+        Assert.Equal(pagesWritten, paths.Take(3).ToList());
         Assert.Equal([AnsweredPath, KeptPath], paths.Skip(3).ToList());
         Assert.Equal(3, published.Written.Count);
         foreach (string title in new[] { "Unit 2, Day 5", "Class Notes", "Worksheet" })
@@ -284,6 +290,58 @@ public sealed class UndoLinksChecklistStepTests : IDisposable
         Assert.Equal(byHand, File.ReadAllText(_pages["Worksheet"]));
         Assert.False(File.Exists(Answered));
         Assert.False(File.Exists(Kept));
+    }
+
+    /// <summary>The sheet's name for the Worksheet page, as a refusal names it.</summary>
+    private static string WorksheetOnTheSheet(LinksChecklistSheet sheet)
+    {
+        foreach (LinksChecklistRow row in sheet.Rows)
+            if (Path.GetFileName(row.Place) == "Worksheet") return sheet.RowTitles[LinksChecklist.Key(row.Place)];
+        throw new InvalidOperationException("the case's offer has no Worksheet row");
+    }
+
+    /// <summary>
+    /// W7b2-8 review 1, L1: a section page another program changes after the
+    /// press was planned is refused by the door, and said as the mac says it
+    /// (<c>linksChecklist.wording.pageChangedSince</c>, the page named as the
+    /// sheet names it), never "Nothing was changed: …" with the door's words.
+    /// </summary>
+    [Fact]
+    public void APageChangedSinceItWasCheckedIsNamedAsTheSheetNamesIt()
+    {
+        string worksheet = _pages["Worksheet"];
+        string byHand = File.ReadAllText(worksheet) + "\nWritten by hand meanwhile.\n";
+        AssistWorkspace workspace = Open(seams: new UndoSeams { BeforeTheBegin = () => File.WriteAllText(worksheet, byHand) });
+        LinksChecklistSheet sheet = Sheet(workspace);
+
+        var refusal = Assert.Throws<AssistRefusal>(() => workspace.PublishAndRemember(sheet));
+
+        Assert.Equal(LinksChecklistWording.Fill(LinksChecklistWording.PageChangedSince,
+            new Dictionary<string, string> { ["name"] = WorksheetOnTheSheet(sheet) }), refusal.Message);
+        Assert.Equal(byHand, File.ReadAllText(worksheet));
+        Assert.False(File.Exists(Answered));
+        Assert.Empty(WindowsActionsOnTheMacFixture.AppliedBegins(ListFolder));
+    }
+
+    /// <summary>
+    /// W7b2-8 review 1, L1: a page the plan cannot read, and a file the door
+    /// could not read just now that really cannot be read (held by another
+    /// program), are the mac's unreadable-page sentence naming the course; a
+    /// door refusal of a file that CAN be read is "Nothing was changed: …".
+    /// </summary>
+    [Fact]
+    public void AnUnreadablePageIsSaidAsTheMacSaysIt()
+    {
+        AssistWorkspace workspace = Open();
+        LinksChecklistSheet sheet = Sheet(workspace);
+        string unreadable = $"“{Course}” could not be read, so nothing was changed.";
+        string worksheet = Relative(_pages["Worksheet"]);
+        var cannotTell = new UndoStepRefusedException(new UndoRefusal(UndoRefusalKind.CannotTellNow, worksheet), "could not be read just now");
+
+        Assert.Equal(unreadable, workspace.RefusalForAPressThatStopped(new IOException("held"), sheet, planning: true).Message);
+        Assert.StartsWith("Nothing was changed: ", workspace.RefusalForAPressThatStopped(cannotTell, sheet, planning: false).Message, StringComparison.Ordinal);
+        using (new FileStream(_pages["Worksheet"], FileMode.Open, FileAccess.Read, FileShare.None))
+            Assert.Equal(unreadable, workspace.RefusalForAPressThatStopped(cannotTell, sheet, planning: false).Message);
     }
 
     /// <summary>

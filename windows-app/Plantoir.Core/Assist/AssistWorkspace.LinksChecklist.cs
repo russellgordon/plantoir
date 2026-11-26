@@ -308,6 +308,10 @@ public sealed partial class AssistWorkspace
     /// names each kept file, and nothing more (the mac's sheet points at no
     /// button after it).
     /// </summary>
+    /// <summary>Tests-first stub (#899 W7b2-3): the old answer for every refusal.</summary>
+    internal AssistRefusal RefusalForAPressThatStopped(Exception error, LinksChecklistSheet sheet, bool planning) =>
+        RefusalForAPressThatStopped(error);
+
     private AssistRefusal RefusalForAPressThatStopped(Exception error)
     {
         if (error is not UndoStepLeftPartWayException) return new AssistRefusal(NothingWasChanged(error));

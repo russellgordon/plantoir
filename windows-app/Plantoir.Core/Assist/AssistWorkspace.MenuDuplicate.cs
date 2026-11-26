@@ -191,4 +191,8 @@ public sealed partial class AssistWorkspace
         NoteAChangeWithNoUndoEntry();
         return AssistWording.DuplicatedFromTheMenu(request.SourceTitle, request.NewTitle, DateText.Iso(request.NewDate));
     }
+
+    /// <summary>Tests-first stub (#899 W7b2-3): the answer the old path gave any failed write.</summary>
+    internal AssistRefusal RefusalForAMenuCopyThatStopped(Exception error, MenuDuplicateRequest request) =>
+        new(NothingWasCreated(error));
 }
