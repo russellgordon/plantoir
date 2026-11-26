@@ -800,6 +800,21 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: target.appendingPathComponent("page.md"), encoding: .utf8), "outside\n")
     }
 
+    /// Review 1 of U4b2-14, MEDIUM 1: the step's own files are never looked
+    /// for through a link, so nothing a link leads to is listed, wherever a
+    /// plan or a swap asks. FAILED before the guard (the outside's file was
+    /// found through the link).
+    func testTheStepsOwnFilesAreNeverListedThroughALink() throws {
+        let outside: URL = scratchURL.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try Data("kept\n".utf8).write(to: outside.appendingPathComponent(".a.md\(UndoSwap.stagedMarker)7-undo-orig"))
+        let link: URL = scratchURL.appendingPathComponent("linked")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+
+        XCTAssertEqual(UndoSwap.stepsOwnFilesInside(outside, seq: 7).count, 1, "the control: a real folder is listed")
+        XCTAssertEqual(UndoSwap.stepsOwnFilesInside(link, seq: 7), [:], "never through a link")
+    }
+
     /// The fourth review of U2b, LOW 6: nothing is STAGED through a link
     /// that leaves the working folder, even when the plan was made before
     /// the link. Stopped just before the first swap, the swap would have

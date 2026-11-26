@@ -1047,6 +1047,12 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         guard move.knownKind == .move, let from = move.from, let to = move.to, let path = edit.path else {
             return false
         }
+        // A link's move carries nothing (U4b2-14, review 1, MEDIUM 1): a
+        // link is neither a file nor a folder the move moved, so an edit
+        // under its `to` breaks opKinds.wholeOps and the step is unreadable.
+        if move.linkSha != nil {
+            return false
+        }
         switch edit.knownKind {
         case .writeFile, .editLine, .replaceText, .editJSON:
             break

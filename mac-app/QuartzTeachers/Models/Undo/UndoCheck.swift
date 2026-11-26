@@ -1580,6 +1580,12 @@ nonisolated enum UndoSwap {
     static func stepsOwnFilesInside(_ folder: URL, seq: Int) -> [String: UndoItem] {
         var found: [String: UndoItem] = [:]
         let ownMarker: String = stagedMarker + "\(seq)-"
+        // Never through a link (review 1 of U4b2-14): a place that is a
+        // link now holds nothing of the step's, and listing it would read
+        // what it leads to.
+        if UndoTreeReading.linkTarget(at: folder) != nil {
+            return found
+        }
         guard let walker = FileManager.default.enumerator(atPath: folder.path) else {
             return found
         }

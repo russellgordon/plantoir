@@ -42,7 +42,7 @@ nonisolated enum UndoContractKinds {
         "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt", "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt",
         "finderRecordsAWindowInTheMadeFolder",
         "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
-        "moveALinkToAFolder",
+        "moveALinkToAFolder", "stepEditingInsideALinksMove",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -458,6 +458,19 @@ nonisolated enum UndoContractKinds {
             }
             let move: UndoOp = UndoOp.moveLink(from: linkFrom, to: linkTo, linkSha: UndoHash.sha256(of: Data(linkTarget.utf8)))
             return word(JournaledWrite.perform(ops: draft(ops: [move], blobs: [], root: root, action: "renameFolder"), in: journal, mode: .live, places: places))
+        case "stepEditingInsideALinksMove":
+            // Review 1 of U4b2-14: written as another version might write
+            // it, changing nothing: a link's move and an edit under its `to`.
+            let next: Int = try journal.read().highestSeq + 1
+            let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: root)
+            let moment: String = UndoMoment.text(Date())
+            let linkSha: String = UndoHash.sha256(of: Data(linkTarget.utf8))
+            let ops: String = "[{\"kind\":\"move\",\"from\":\"\(linkFrom)\",\"to\":\"\(linkTo)\",\"linkSha\":\"\(linkSha)\"},"
+                + "{\"kind\":\"replaceText\",\"path\":\"\(linkTo)/a.md\",\"before\":\"old\",\"after\":\"new\",\"contextBefore\":\"Line one: \",\"contextAfter\":\".\\n\"}]"
+            let begin: String = "{\"v\":1,\"seq\":\(next),\"event\":\"begin\",\"at\":\"\(moment)\",\"step\":{\"seq\":\(next),\"madeAt\":\"\(moment)\",\"workingFolder\":{\"id\":\"\(folderID)\",\"pathAtTheTime\":\"\(root.path)\"},\"ops\":\(ops)}}"
+            try UndoContractReplay.appendRaw(begin, to: journal)
+            try UndoContractReplay.appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\"}", to: journal)
+            return nil
         case "addAFileInsideTheMovedFolder":
             try UndoContractReplay.write("C\n", to: renamedFolder + "/c.md", in: root)
             return nil

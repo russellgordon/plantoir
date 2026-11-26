@@ -918,6 +918,14 @@ class ContractCaseTests(unittest.TestCase):
         if call == "editThePageInsideByHand":
             pages[self.RENAMED + "/a.md"] = "Hand.\n"
             return None
+        if call == "stepEditingInsideALinksMove":
+            # Review 1 of U4b2-14: a link's move and an edit under its `to`.
+            ops = [{"kind": "move", "from": self.LINK_FROM, "to": self.LINK_TO, "linkSha": traces.sha(self.LINK_TARGET)},
+                   {"kind": "replaceText", "path": self.LINK_TO + "/a.md", "before": "old", "after": "new",
+                    "contextBefore": "Line one: ", "contextAfter": ".\n"}]
+            seq = model.begin(ops, readable=readable_step({"ops": ops}))
+            model.find(seq)["phase"] = "done"
+            return None
         if call == "stepEditingInsideAMovesFrom":
             ops = [{"kind": "move", "from": self.MEDIA, "to": self.RENAMED, "listingSha": "a" * 64},
                    {"kind": "replaceText", "path": self.MEDIA + "/a.md", "before": "old", "after": "new",
@@ -1022,7 +1030,7 @@ class ContractCaseTests(unittest.TestCase):
                   "linkItsNewFolderOutside", "moveAFolderWithAFileMadeInANewFolderInside", "addAFolderInsideTheMadeFolder",
                   "moveAFolderHoldingAnEmptyFolderAndMakingAFolderInIt",
                   "moveAFolderHoldingAnEmptyFolderAndMakingFilesInItAndBesideIt", "finderRecordsAWindowInTheMadeFolder",
-                  "moveALinkToAFolder")
+                  "moveALinkToAFolder", "stepEditingInsideALinksMove")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)

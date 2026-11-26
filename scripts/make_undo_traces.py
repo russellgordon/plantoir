@@ -1245,6 +1245,9 @@ def move_carries(move, edit):
     without regard to case (U4b2-9)."""
     if move.get("kind") != "move" or edit.get("kind") not in EDIT_KINDS or "path" not in edit:
         return False
+    if "linkSha" in move:
+        # A link's move carries nothing (review 1 of U4b2-14).
+        return False
     if part_inside(move["to"], edit["path"]) is None:
         return False
     if is_case_only_move(move):

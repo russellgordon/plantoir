@@ -627,7 +627,12 @@ nonisolated enum UndoContractReplay {
             var redo: String = "notReadable"
             if op.isReadable {
                 let state: UndoOpState
-                if op.isWhole {
+                if op.isWhole && op.from != nil && UndoCheck.placeLeavingTheFolder(op, root: place.root) != nil {
+                    // A move's place that leads out of the working folder is
+                    // changed since, as the plan judges it (checkCasesHow;
+                    // review 1 of U4b2-14, LOW 2).
+                    state = .neither
+                } else if op.isWhole {
                     state = UndoCheck.wholeState(of: op, root: place.root, places: places)
                 } else {
                     state = UndoCheck.state(of: op, in: UndoItem.read(at: url))
