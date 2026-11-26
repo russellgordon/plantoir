@@ -35,7 +35,9 @@ import Foundation
 /// newest fragment cannot be read, and one with a site marker and no
 /// fragment at all: a section last deployed before the record existed
 /// (v1.4.1), or rolled over with the "same website" answer, which moves every
-/// fragment aside and keeps the marker.
+/// fragment aside and keeps the marker. So is a published-pages folder that
+/// is there and cannot be listed (#1004-b): only a folder that is not there
+/// holds no fragments, as on Windows.
 ///
 /// **Places in one form.** A place is compared after both sides are put in
 /// Unicode normalization form C, then code point for code point, so a name
