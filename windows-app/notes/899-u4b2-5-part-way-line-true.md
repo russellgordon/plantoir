@@ -2,12 +2,24 @@
 
 Branch `issue/899-u4b2-5-part-way-line-true`, from `origin/dev` bf14823ac. `origin/dev` merged before proving and before hand-back: both times already up to date at bf14823ac (no merge commit made).
 
+## Review 1 round (M1, L1 to L4), 2026-11-26
+
+- M1: a part-way line names a folder only if it belongs to this rename (a destination of this run's planned moves, or a place the record of the rename it finishes names) AND the disk shows it at the new name. One function, `SpecialFolderRenamer.foldersAtTheirNewName(…, planned:, earlierRecord:)`, returning `LeftAtTheNewName` (places, unreadable). The record gains `moved` (one string, a place per line, inside the course, new spelling), written by `RenameRecordClaim.renameIsStarting(moving:)` with this run's moves plus the earlier record's places when it is the same rename. A record without `moved` (Windows', older) falls back to: a new-name place whose old name is absent beside it.
+- L1: tests added for the review's scenario (per-section start run, hand-made `section2/Assessments`, every folder back: says `stoppedPartWay`, never names it), a per-section finish run (both sections, in order), a start run after a killed one (both runs' sections, and the record keeps both), a capitalisation-only finish (function test).
+- L2: only ENOENT/ENOTDIR read as absent; any other `lstat` refusal or a failed listing is `unreadable`, added to the trail line as "; could not tell whether these are at the new name: <place> (<what the system said>)"; the sheet's sentence is chosen by what could be read (no new sentence). Pinned by a function test (a section folder with no permissions).
+- L3: a link at the new name counts only where this run moved a link there (`FolderRenamePlan.Move.isALink`, read by `lstat` at planning). An earlier run's recorded place counts only as a real folder.
+- L4: confirmed in `windows-app/Plantoir.Core/Models/SpecialFolderRenamer.cs:270-277` and `Plantoir/Views/CourseSettingsView.xaml.cs:479-481` that Windows' "Plantoir renamed m of n copies" stop returns its message with no trail line; `carries` and README now say so. Prose only, no held row.
+- `SpecialFolderRenamer.somethingIsThere` removed (its one caller is gone; `presence(at:spelledExactly:)` is the one reading).
+- Merges: origin/dev da7474047 merged as 89cdebe53 (Windows notes and tests, `contracts/class-planning.json`, documentation 12; nothing under `mac-app/`), then the 11 classes re-run green: 239 tests, 0 failures (run-r1-merged).
+
 ## For PROGRESS
 
 - Mac: a Rename folder that stops part way (a refused step that could not all be put back) now names the folders at the new name as read from the disk, whether this run moved them or an earlier, interrupted run did. A run finishing an interrupted rename used to say "did not rename the folder Concepts to Ideas" while every folder was at "Ideas". `foldersLeftAtTheirNewName(planned.moves, …)` is replaced by one function, `SpecialFolderRenamer.foldersAtTheirNewName(renaming:to:scope:courseDirectory:sectionNumbers:)`. No sentence's wording changed.
 - `contracts/shared-rules.json` → `activityTrail.mustRecord` → `folder renamed` → `carries` reworded (no new key, no new event, count unchanged); `contracts/README.md` two passages.
 
 ## For documentation 12
+
+- (Review 1) The rename record may carry `moved`: one string, a place per line, each a path inside the course spelled with the new name (`Ideas`, `section1/Assessments`), every place this rename has moved, this run's and an earlier interrupted run's of the same rename. Windows should write it too in W8 and must keep reading a record with or without it (it is a string, so a map-of-strings reader still parses it). A part-way line names a place only when it is in `moved` or a move of this run AND the disk shows a folder there by a no-follow check (a link only when a link was moved); without `moved`, a new-name place whose old name is absent beside it. A no-follow check that fails for any reason but "no such file", or a listing that fails, is told on the trail as "could not tell whether these are at the new name: <place> (<reason>)", never read as absent.
 
 - Windows' part-way line, once W8 brings the one-step rename: in a run FINISHING an interrupted rename (the earlier run moved the folders, so this run's plan has no moves), the folders named as "still called <new>" are found from the disk: every place the folder lives at its NEW name (shared: `<course>/<new>`; per section: `<course>/section<N>/<new>` for each section number) that exists by a no-follow presence check (a link counts, nothing read). For a rename that only changes capitalisation, a place counts only when its parent directory LISTS the new spelling exactly (the old spelling "exists" there on a case-insensitive volume). Nonempty: say `undo.wording.renameFolderRenamedOnlyInPart` and write the "renamed … only in part" trail line naming those paths inside the course; empty: `renameFolderStoppedPartWay` and the "did not rename" line. The same reading is used in a start run; never choose by which run moved what.
 - Until W8, Windows' one part-way `folder renamed` line is "renamed the folder … but could not write it to this course's settings" (`CourseSettingsView.xaml.cs` about line 497), and `carries` now says so.
@@ -29,7 +41,7 @@ Branch `issue/899-u4b2-5-part-way-line-true`, from `origin/dev` bf14823ac. `orig
 
 - Piece 4 review 2 low: the replay does not check that the two removed blobs sit in different prefix folders. It is in `UndoContractReplay*.swift`, which this piece does not touch.
 - Piece 4 review 2 low: the documentation 12 note does not say the Mac treats the two Unicode forms of a name as the same. Documentation 12 is not in this piece's files (writers do not edit it; the director folds notes).
-- Edge, not changed: in a START run, a section with no folder at the old name but one already at the new name (on disk, not in the settings) would now count as "still called" after a part-way stop. The plan refuses a taken destination only where the old folder exists, and the sheet refuses a new name the settings list, so this needs a folder on disk the settings never listed. The sentence is then still true of the disk.
+- (Was an accepted edge in the first round; fixed as review 1's M1.)
 - Not done: the wording for "no folder of the course at either name" in a finish run. A finish run is offered only when the new name is on disk (`looksLikeAnInterruptedRename`), so that branch takes the existing `stoppedPartWay` sentence.
 
 ## For the director

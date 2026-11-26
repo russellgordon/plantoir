@@ -13,3 +13,22 @@ Sabotage 1: in CourseSettingsView.renameFolder, the folders taken from this run'
   The 34 other tests, the start-run part-way tests included, passed.
   Restored with `git checkout --` the file; `git diff` clean.
 RED 1 of 1.
+
+Review 1 round (2026-11-26). Each sabotage applied to the committed fix, built, run
+(UndoRenameFolderStepTests + SpecialFolderRenamerTests), restored with `git checkout --`; tree clean after each.
+  Batch A (run-mf-A), four sabotages, each reaching only its own test:
+    S1 every new-name place belongs (the pre-review reading): testAStopWithEveryFolderBackNeverNamesAFolderThatWasAlwaysAtTheNewName
+       fails :1143 (sentence), :1144 (names section2/Assessments), :1148 (line), :1149 (line names it).
+    S4 capitalisation-only read without the listing: testACapitalisationOnlyFinishCountsTheFolderOnlyByItsNewSpelling fails ("concepts" counted for "Concepts").
+    S5 a refused lstat read as absent: testAPlaceThatCannotBeReadIsToldNotTakenAsAbsent fails :863, :864, :869.
+    S6 a link counted wherever it is: testALinkAtTheNewNameIsNotTheRenamedFolderUnlessALinkWasMoved fails ("Ideas" named).
+    84 tests, 9 failures, all in those four.
+  Batch B (run-mf-S2): S2 only this run's planned moves counted (record ignored):
+    testAFinishStoppedPartWaySaysTheFolderIsAtItsNewName :1083 :1088 :1089; testAPerSectionFinishStoppedPartWayNamesEverySectionAtTheNewName :1167 :1174;
+    testAStartRunAfterAKilledOneNamesTheSectionsBothRunsMoved :1204 :1211; also the unreadable test (its place belongs only by the record). 11 failures.
+  Batch C (run-mf-S3): S3 the record this run writes drops the earlier record's places:
+    testAStartRunAfterAKilledOneNamesTheSectionsBothRunsMoved :1213 (record holds only section2/Assessments). 1 failure.
+RED 6 of 6 (with the first round: 7 of 7).
+Mistake recorded: the first restore of batch A used `git checkout --` before the fix was committed and reverted the uncommitted fix;
+it was re-applied from the same edit, rebuilt and run green (run-r1-green4, 84 of 84), and committed (a7d345d42) before batches B and C.
+Batch A's results stand: it ran against that same fix.
