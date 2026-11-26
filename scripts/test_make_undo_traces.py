@@ -667,7 +667,8 @@ class ContractCaseTests(unittest.TestCase):
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
                   "blobKept", "interrupted", "markers", "folderKept", "movedFolder", "caseOnlyFolder", "rederived", "nothingMovedOutside",
                   "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
-                  "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin"}
+                  "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
+                  "refusalNamed"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
     MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
@@ -795,6 +796,21 @@ class ContractCaseTests(unittest.TestCase):
             if pages.get(source) is None and pages.get(destination) is None:
                 pages[source] = "page\n"
             return model.ops_step([{"kind": "move", "from": source, "to": destination, "sha": traces.sha("page\n")}])
+        if call in ("moveThePageIntoAFolder", "moveThePageBetweenFolders"):
+            # U4b2-2: one move into courses/TST1O/new.
+            source, destination = {
+                "moveThePageIntoAFolder": ("courses/TST1O/b.md", "courses/TST1O/new/b.md"),
+                "moveThePageBetweenFolders": ("courses/TST1O/old/c.md", "courses/TST1O/new/c.md"),
+            }[call]
+            if pages.get(source) is None and pages.get(destination) is None:
+                pages[source] = "page\n"
+            return model.ops_step([{"kind": "move", "from": source, "to": destination, "sha": traces.sha("page\n")}])
+        if call == "linkItsNewFolderOutside":
+            model.linked_outside.add("courses/TST1O/new")
+            for inside in list(pages):
+                if inside.startswith("courses/TST1O/new/"):
+                    pages.pop(inside)
+            return None
         if call == "linkItsOldFolderOutside":
             model.linked_outside.add("courses/TST1O/old")
             pages.pop("courses/TST1O/old/a.md", None)
@@ -902,7 +918,8 @@ class ContractCaseTests(unittest.TestCase):
                   "rollOverSettingALeftoverAside", "removeTheKeptLeftover", "theScheduleStartsOnlyAtTheNextLogin",
                   "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
                   "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
-                  "leaveAKeptCopyInsideTheMovedFolder")
+                  "leaveAKeptCopyInsideTheMovedFolder", "moveThePageIntoAFolder", "moveThePageBetweenFolders",
+                  "linkItsNewFolderOutside")
 
     def leftover_markers(self, model):
         source, destination = model.pages.get(self.LEFTOVER_FROM), model.pages.get(self.LEFTOVER_TO)
@@ -1155,6 +1172,9 @@ class ContractCaseTests(unittest.TestCase):
                     self.assertEqual(model.kept_what_it_replaced_lines, case["keptWhatItReplacedLines"])
                 if "leftApart" in case:
                     self.assertEqual(list(last[2]) if len(last) > 2 else [], case["leftApart"])
+                if "refusalNamed" in case:
+                    self.assertEqual(last[0], "changedSince")
+                    self.assertEqual(last[1], case["refusalNamed"])
                 if "schoolYear" in case:
                     self.assertEqual(json.loads(model.pages[self.SETTINGS])["school_year"], case["schoolYear"])
 

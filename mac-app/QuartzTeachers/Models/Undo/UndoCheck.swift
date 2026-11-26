@@ -277,13 +277,7 @@ nonisolated enum UndoCheck {
             // the other side of a move, which is as the step left it (U4b's
             // `placeAsFound` names a moved item only when the item itself is
             // what changed).
-            var placeLeavingTheFolder: String? = nil
-            for place in op.pathsNamed where !UndoPlaces.staysInside(root, place) {
-                if placeLeavingTheFolder == nil {
-                    placeLeavingTheFolder = place
-                }
-            }
-            if let placeLeavingTheFolder {
+            if let placeLeavingTheFolder = UndoCheck.placeLeavingTheFolder(op.pathsNamed, root: root) {
                 if !inTheWay.contains(placeLeavingTheFolder) {
                     inTheWay.append(placeLeavingTheFolder)
                 }
@@ -478,6 +472,20 @@ nonisolated enum UndoCheck {
             targets.append(target)
         }
         return .ready(targets: targets, recomputes: recomputes, leftApart: leftApart)
+    }
+
+    /// The first of an op's places (`UndoOp.pathsNamed`: path, from, to)
+    /// that no longer stays inside the working folder, links resolved, or
+    /// nil when every one does. The one place a leaves-the-folder refusal
+    /// names, at the plan and again just before each change
+    /// (`undo.rule.stagedThenSwapped`; U4b2-2).
+    static func placeLeavingTheFolder(_ places: [String], root: URL) -> String? {
+        for place in places {
+            if !UndoPlaces.staysInside(root, place) {
+                return place
+            }
+        }
+        return nil
     }
 
     /// Each edit's path a move of the step carries (`UndoOp.moveCarries`,
@@ -1049,11 +1057,11 @@ nonisolated enum UndoSwap {
             originals.append(nil)
             // Nothing is staged through a link that leaves the working folder
             // (the third hard review of U2b, LOW 3).
-            if let root, !UndoSwap.staysInside(target, root: root) {
+            if let root, let leadingOut = UndoSwap.placeLeadingOut(target, root: root) {
                 staged.append(nil)
                 tidy()
                 removeTheFoldersMade()
-                return .refused(.changedSince(firstPath: target.relativePath, others: 0))
+                return .refused(.changedSince(firstPath: leadingOut, others: 0))
             }
             if case .makeTree(let listing, let contents) = target.change {
                 let stagedURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "new")
@@ -1098,8 +1106,8 @@ nonisolated enum UndoSwap {
             // the change (the second hard review of U2b, MEDIUM 2): a folder
             // on the path replaced by a link since the check is a change
             // since, and nothing moves through it.
-            if let root, !UndoSwap.staysInside(target, root: root) {
-                refusal = .changedSince(firstPath: target.relativePath, others: 0)
+            if let root, let leadingOut = UndoSwap.placeLeadingOut(target, root: root) {
+                refusal = .changedSince(firstPath: leadingOut, others: 0)
             }
             switch target.change {
             case _ where refusal != nil:
@@ -1251,6 +1259,23 @@ nonisolated enum UndoSwap {
             UndoFiles.syncFolder(target.url.deletingLastPathComponent())
         }
         return .swapped
+    }
+
+    /// The place to name when a change no longer stays inside the working
+    /// folder, links resolved (nil: it does): for a move, the first of its
+    /// op's places, in the order path, from, to, that leads out, by the
+    /// same rule the planning check uses (`UndoCheck.placeLeavingTheFolder`;
+    /// U4b2-2 review 1, MEDIUM 1), never the other side of the move; for
+    /// any other change, the place it changes.
+    static func placeLeadingOut(_ target: UndoSwapTarget, root: URL) -> String? {
+        if staysInside(target, root: root) {
+            return nil
+        }
+        if case .moveHere(_, _, let op) = target.change,
+           let leadingOut = UndoCheck.placeLeavingTheFolder(op.pathsNamed, root: root) {
+            return leadingOut
+        }
+        return target.relativePath
     }
 
     /// Whether every place a change touches is still inside the working

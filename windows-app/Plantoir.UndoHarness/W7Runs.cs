@@ -374,7 +374,11 @@ internal static class W7Runs
     ];
 
     /// <summary>The page laid at each of <see cref="RoomPages"/> (null: absent).</summary>
-    private static string? LaidRoomPage(int index) => index == 0 ? null : Page(5 - index, published: false);
+    private static string? LaidRoomPage(int index) => index == 0 ? null : RoomPage(5 - index);
+
+    /// <summary>A class page whose body names its own lesson, so a renamed page never reads as the page laid under its new name.</summary>
+    private static string RoomPage(int day) =>
+        $"---\ntitle: Unit 1, Day {day}\ncreated: 2026-09-0{day}T07:00:00.000-0400\npublish: false\n---\nLesson {day}.\n";
 
     private static void MakeTheRoomFolder(string run)
     {
@@ -383,7 +387,7 @@ internal static class W7Runs
         File.WriteAllText(Path.Combine(course, "course_config.json"),
             "{\"course_code\":\"ICS3U\",\"course_name\":\"A course\",\"num_sections\":1,\"section_numbers\":[1],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[]}");
         for (int day = 1; day <= 4; day++)
-            File.WriteAllText(Full(run, $"courses/ICS3U/section1/All Classes/Unit 1, Day {day}.md"), Page(day, published: false));
+            File.WriteAllText(Full(run, $"courses/ICS3U/section1/All Classes/Unit 1, Day {day}.md"), RoomPage(day));
         File.WriteAllText(Path.Combine(Root(run), Plantoir.Core.Models.Workspace.MarkerLauncher), "");
         string timetable = Full(run, TimetablePath);
         Directory.CreateDirectory(Path.GetDirectoryName(timetable)!);

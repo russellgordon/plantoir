@@ -245,10 +245,11 @@ public sealed class UndoMakeRoomStepTests : IDisposable
     /// chain writes where it stood is a plain file), the file it led to never
     /// touched, and no step recorded. The pieces that move a link (U4b2-14
     /// and 15) settle which of the two holds; until then this test holds the
-    /// difference.
+    /// difference by name (it took the place of the ledger's
+    /// Reason899W7b2MakeRoomLinkedPage row when Make Room was converted).
     /// </summary>
     [Fact]
-    public void ALinkedLaterClassIsCopiedAtItsNewNameWhereTheMacRefuses()
+    public void ALinkedLaterClassIsWrittenPlainlyWithTheLinkRemovedAndItsFileUntouched_WhereTheMacRefusesBeforeAnythingChanges_UntilU4b2Pieces14And15()
     {
         WindowsActionsOnTheMacFixture.Lay(Folder, Recorded);
         string linked = Page("Unit 1, Day 3");

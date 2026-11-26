@@ -21057,8 +21057,12 @@ unit as one entry.
 
 - a course not under a `courses` folder (no working folder);
 - a file reached through a link that leads outside the working folder;
-- a target that is not a plain file (a link, a folder, a file that cannot
-  be read).
+- a target that is not a plain file (a folder, a file that cannot be
+  read).
+
+A page that is a link is not among them since U4b2-1 (Russell's ruling of
+2026-11-25): it is planned at the file the link leads to, and is named in a
+step whenever that file is inside the working folder.
 
 In shadow those files are written with one trail line by
 `JournaledStep.writePlainly`, which since U3a's second round is all or none
@@ -21068,12 +21072,13 @@ changed"). It stages every file beside its target and swaps them in
 together (`UndoSwap`, under a label of its own, `shadow-<pid>-<id>`, since
 the third round), each still holding what it held when
 it was planned and a page that was absent still absent. A target that was
-a link, a folder or a file that could not be read when it was planned is
-refused before anything is written, as a live step refuses it: its content
-cannot be checked, and the old `.atomic` write over a link replaced the
-teacher's link with a regular file (measured: `Data.write(.atomic)` to a
-link leaves a regular file at the link's place and the linked file
-untouched). Chosen over making the sentence true of a part-way write,
+a folder or a file that could not be read when it was planned is refused
+before anything is written, as a live step refuses it: its content cannot
+be checked. (Until U4b2-1 a link was refused here too, because the old
+`.atomic` write over a link replaced the teacher's link with a regular file
+(measured: `Data.write(.atomic)` to a link leaves a regular file at the
+link's place and the linked file untouched); a link is now written through,
+"U4b2: linked-page-written-through" below.) Chosen over making the sentence true of a part-way write,
 because every caller would then need a part-way sentence and a trail count
 of its own, and live refuses the same targets anyway. Live (U7), the step
 is refused before anything changes.
@@ -22520,6 +22525,98 @@ shadow publish's old `relativePath` (a front page that does not exist yet,
 under a linked root, falls outside it: reproduced standalone, and red on the
 bench as `UndoShadowPublishTests.testAPublishIsRecordedInShadow`), 785a's 31
 days (the 40-day sweep case), and the second round's scan (11 checks).
+
+### U4b2: linked-page-written-through
+
+With the switch off, a daily action whose page is a symbolic link writes
+the file the link leads to, and the link stays a link: Russell's ruling on
+#899, 2026-11-25, one rule on both platforms (`undo.rule.shadow`; Windows
+already did so, `UndoActionStep.PlaceWritten`). `JournaledStep` plans every
+write at `placeALinkLeadsTo`, which follows the last component link by link
+as U4a's Save does (`CourseConfiguration.fileALinkLeadsTo`), so `before`,
+staging, swap and any kept file are all at that file, and reads through the
+plan find the page by its link as well as by its file. A link to a file in
+the working folder is named in a step at that file; one to a file outside it
+cannot be named and is written by `writePlainly`, with one trail line that
+says the change went ahead. `writeNew` and `remove` never follow a link
+(removing what a link leads to would leave the link pointing at nothing), and
+a link to a folder or to a file that cannot be read is still refused before
+anything changes. So Insert Class, which writes a later class's new name and
+removes its old one, is refused when that later class is a link, until the
+pieces that move a link (review 1, MEDIUM 1); Windows' Insert Class still
+goes ahead outside the door, a plain copy at the new name and the link
+deleted, which the contract names as the Mac's alone. A dangling link is
+written through: its file is made where it leads, and the file's folder too
+when that is missing, as Windows' `UndoSwap.MakeTheFolderOf` makes it
+(review 1, LOW 1; review 2, MEDIUM A reversed a refusal of the missing
+folder). In shadow the Mac records an inside
+link as a step at its file while Windows writes it without the list; the
+contract names the difference and leaves it to U7 (LOW 2). Live, an inside
+link is now recorded at its file rather than refused, which U7 decides on
+purpose (LOW 3). Rejected: one rule per action (every writer goes through
+`plan`), and refusing as U3 did (the Publish of a linked page failed for a
+teacher who had linked a class page in from elsewhere).
+`UndoSweepFindingsTests` holds the cases, every planning entry point and read through the plan included.
+
+### U4b2: leaving-place-named
+
+When an Undo or a Redo is refused because one of an op's places now leads
+out of the working folder (a folder on its path replaced since by a link to
+outside), the refusal names the first of the op's places, in the order
+`path`, `from`, `to`, that leads out, never the other side of a move, which
+is as the step left it (#899, 2026-11-25). U4b part I made the Mac do this
+(`UndoCheck.plan`, `placeLeavingTheFolder`); this piece pins it, with one
+sentence in `undo.rule.stagedThenSwapped`, `stackCases` rows for Undo and
+Redo (only the new place leads out: names it; only the old: names it; both:
+names the old) read through a new key,
+`refusalNamed`, three new calls (`moveThePageIntoAFolder`,
+`moveThePageBetweenFolders`, `linkItsNewFolderOutside`), and nine
+`UndoDoorGuardTests`. Review 1 found the check made again just before each
+change (staging and swap) named the target's own path, so a link made
+between the plan and the change that took only the other side out named the
+side as the step left it; both now name the place through the same function
+the plan uses (`UndoCheck.placeLeavingTheFolder`, via
+`UndoSwap.placeLeadingOut`), tested at `afterTheCheck` and `beforeSwap(0)`.
+A check row could not carry it: `checkCasesHow` makes a place that is itself
+a link, never a folder on its path replaced after the step. Windows names a
+move's `from` always (`UndoCheck.Plan`, `op.PlaceName`), so the "only the
+new place" rows are its real gap; all six rows are held under W8 because its
+replay does not yet check `refusalNamed`. The U2 link row is left as it was,
+without the key, so Windows still runs it. Windows' staging and swap checks
+(`UndoSwap.cs`) name `target.RelativePath`, as the Mac's did before review
+1; W8 changes them too (documentation 12 notes).
+
+### U4b2: rename-record-owned
+
+The interrupted-rename record (`courses/.internal/renames/<CODE>.json`)
+exists only while the rename that wrote it is unfinished, and nothing clears
+a record another run wrote. Both writers, `CourseSettingsView.renameFolder`
+and `SpecialFolderRenamer.rename` (the form for a caller with no settings to
+change; no caller in the app), now decide every exit through one model type,
+`RenameRecordClaim`. The record is one file per course, so a run that writes
+its own has replaced whatever was there (another folder's interrupted
+rename); the claim reads that earlier record once, before the first write.
+Refused with nothing changed (a changed-since retry included): the earlier
+record is put back byte for byte, or no record is left when there was none.
+Stopped part way or killed: this run's record stays. Whole: a record of
+this same rename (folder and target) is cleared, since it is finished. A
+record of this folder renamed to another name is cleared only when the old
+name is gone for good: this run moved the folders, or the caller writes the
+settings away from it (`renameFolder` does; `rename` does not, so a `rename`
+that moves nothing leaves that record, whose rename can still be finished).
+Any other earlier record is put back, and a rename that moved no folder
+touches nothing else. Before this, `renameFolder` cleared the file on every success, retry
+and refusal, so renaming one folder lost another folder's unfinished rename
+and the sheet stopped offering to finish it (review 1, M1; the final sweep's
+L5 for `rename`). A put-back or clear that fails writes a `folder renamed`
+trail line, since a record left by mistake greys the one-section restore;
+it says "did not rename" after a refusal and "renamed" only once the rename
+is whole.
+One window is accepted: a kill between this run's write and the put-back
+loses the earlier record, as it always did before; refusing a rename while
+another is unfinished would be a new sentence and its own contract piece,
+and U7 drops the record. Chosen over removing `rename`, which five tests in
+`SpecialFolderRenamerTests` and one in `AssistCurriculumMentionsTests` call.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 

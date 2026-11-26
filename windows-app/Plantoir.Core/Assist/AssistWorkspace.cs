@@ -5172,7 +5172,9 @@ public sealed partial class AssistWorkspace
         int section = Section(course, sectionNumber);
         var classes = ClassPages(course, section);
         return TodaysClassOnTheFrontPage.ShowOnTheFrontPage(course, section, classes, SectionIndex.PathFor(course, section),
-            askedOn, offering, path => PointerFor(course, section, path), SiblingTimeAndOffset(course, section, classes));
+            askedOn, offering, path => PointerFor(course, section, path), SiblingTimeAndOffset(course, section, classes),
+            // The sheet's own button (#899 W7b2-6; the mac's UndoStepMaker.sheet), on this workspace's list and door.
+            () => NewUndoStep("showTodaysClassOnTheFrontPage", course.Code, section, madeBy: "sheet"));
     }
 
     /// <summary>Not Today, remembered for this section, day and class.</summary>

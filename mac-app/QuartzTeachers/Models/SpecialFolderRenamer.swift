@@ -425,6 +425,10 @@ enum SpecialFolderRenamer {
     /// caller's to plan into the same step (`CourseSettingsView.renameFolder`
     /// plans `course_config.json` too); this form, for a caller with no
     /// settings to change, makes the step itself.
+    ///
+    /// The rename record is this run's only while this run is unfinished
+    /// (#899 U4b2-3): `RenameRecordClaim` decides every exit, the same one
+    /// `CourseSettingsView.renameFolder` uses.
     @discardableResult
     nonisolated static func rename(
         _ oldName: String,
@@ -443,11 +447,71 @@ enum SpecialFolderRenamer {
             section: nil, maker: UndoStepMaker.sheet("renameFolder"), holds: "course"
         )
         apply(planned, to: step)
+        var record: RenameRecordClaim = RenameRecordClaim(
+            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory,
+            changesTheSettings: false
+        )
         if !planned.moves.isEmpty {
-            recordRenameStarting(from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory)
+            record.renameIsStarting()
         }
-        try step.make()
+        do {
+            try step.make()
+        } catch let stopped as JournaledStepError {
+            record.stepWasNotMade(stopped)
+            throw stopped
+        } catch {
+            record.nothingWasChanged()
+            throw error
+        }
+        record.renameIsWhole()
         return planned.outcome
+    }
+
+    /// Whether a record's bytes name this rename: the same folder, the same
+    /// target, the same scope.
+    nonisolated static func recordNames(
+        _ record: Data?, from oldName: String, to newName: String, scope: FolderScope
+    ) -> Bool {
+        guard recordNamesTheFolder(record, from: oldName, scope: scope),
+              let record,
+              let note = try? JSONSerialization.jsonObject(with: record) as? [String: String],
+              note["to"]?.caseInsensitiveCompare(newName) == .orderedSame else {
+            return false
+        }
+        return true
+    }
+
+    /// Whether a record's bytes name a rename OF this folder, to any name:
+    /// the same folder, the same scope.
+    nonisolated static func recordNamesTheFolder(
+        _ record: Data?, from oldName: String, scope: FolderScope
+    ) -> Bool {
+        guard let record,
+              let note = try? JSONSerialization.jsonObject(with: record) as? [String: String],
+              note["from"]?.caseInsensitiveCompare(oldName) == .orderedSame,
+              note["scope"] == scope.exclusionKey else {
+            return false
+        }
+        return true
+    }
+
+    /// The trail line (`folder renamed`) when the record could not be left
+    /// as this run must leave it (review 1 of U4b2-3, L2): a record left
+    /// behind by mistake greys the one-section restore and may be read as an
+    /// unfinished rename, so it is told rather than kept quiet.
+    /// Said as the disk is (review 2, L-B): "renamed" only once the rename
+    /// is whole, "did not rename" after a refusal that changed nothing.
+    nonisolated static func renameNoteNotTidiedLine(
+        renaming oldName: String, to newName: String, course: String, wasRenamed: Bool, said: String
+    ) -> String {
+        let whatHappened: String
+        if wasRenamed {
+            whatHappened = "renamed the folder " + oldName + " to " + newName + " in " + course + ", but"
+        } else {
+            whatHappened = "did not rename the folder " + oldName + " to " + newName + " in " + course + ", and"
+        }
+        return whatHappened
+            + " could not tidy the note kept while a folder rename is unfinished (" + said + ")"
     }
 
     /// What a rename will do, read from the disk and written nowhere: each
@@ -930,5 +994,148 @@ enum SpecialFolderRenamer {
             }
         }
         return result
+    }
+}
+
+/// Who owns the interrupted-rename record during one rename (#899 U4b2-3).
+///
+/// **The record exists only while the rename that wrote it is unfinished,
+/// and nothing clears a record another run wrote.** The record is one file
+/// per course, so a run that writes its own has replaced whatever was there:
+/// another folder's interrupted rename. This reads that earlier record before
+/// anything is written and, on every exit, leaves the file as the rule says:
+///
+/// - refused with nothing changed (`nothingWasChanged`, which a changed-since
+///   retry calls too before it plans again): the earlier record put back byte
+///   for byte, or no record when there was none;
+/// - stopped part way (`leftPartWay`) or killed (`stoppedByATest`, as a
+///   process that died): this run's record kept, so the rename can be
+///   recognised and finished (`interruptedRenameTarget`);
+/// - whole (`renameIsWhole`): a record of THIS rename (same folder, same
+///   target) is cleared, since this run finished it. A record of a rename of
+///   this folder to ANOTHER name is cleared only when the old name is gone
+///   for good: when this run moved the folders, or when the caller changes
+///   the settings away from the old name (`changesTheSettings`, true from
+///   `renameFolder`), so the sheet for that name never opens again (review
+///   1, L3). A `rename` that moved nothing and changes no settings leaves
+///   that record, because the settings still name the old folder and the
+///   recorded rename can still be finished (review 2, L-A). Any other
+///   earlier record is put back if this run replaced it, and left alone if
+///   this run wrote nothing.
+///
+/// One window is accepted (review 1, L1): a kill between this run's write
+/// and the put-back leaves only this run's record, so the earlier one is lost,
+/// as it always was before U4b2-3. U7 drops the record altogether.
+nonisolated struct RenameRecordClaim {
+
+    // MARK: - Stored properties
+
+    let oldName: String
+    let newName: String
+    let scope: FolderScope
+    let courseDirectory: URL
+    let marker: URL
+
+    /// Whether the caller writes the settings away from the old name when
+    /// the rename is whole (`renameFolder` does; `rename` does not).
+    let changesTheSettings: Bool
+
+    /// The record on disk before this run wrote anything, if any.
+    let earlierRecord: Data?
+
+    /// Whether the record on disk is this run's own.
+    private(set) var thisRunWroteTheRecord: Bool = false
+
+    // MARK: - Initializer
+
+    /// Read once, before the record is written for the first time.
+    init(
+        from oldName: String, to newName: String, scope: FolderScope, courseDirectory: URL,
+        changesTheSettings: Bool
+    ) {
+        self.oldName = oldName
+        self.newName = newName
+        self.scope = scope
+        self.courseDirectory = courseDirectory
+        self.changesTheSettings = changesTheSettings
+        self.marker = SpecialFolderRenamer.renameMarkerURL(courseDirectory: courseDirectory)
+        self.earlierRecord = try? Data(contentsOf: marker)
+    }
+
+    // MARK: - Functions
+
+    /// Written BEFORE the rename's step is made, when folders will move.
+    mutating func renameIsStarting() {
+        SpecialFolderRenamer.recordRenameStarting(
+            from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory
+        )
+        thisRunWroteTheRecord = true
+    }
+
+    /// The step was not made: kept when it stopped part way or was killed,
+    /// otherwise nothing was changed.
+    mutating func stepWasNotMade(_ stopped: JournaledStepError) {
+        switch stopped {
+        case .leftPartWay, .stoppedByATest:
+            return
+        default:
+            nothingWasChanged()
+        }
+    }
+
+    /// Refused with nothing changed: the record as it was before this run.
+    mutating func nothingWasChanged() {
+        if thisRunWroteTheRecord {
+            putBackTheEarlierRecord(renameIsWhole: false)
+            thisRunWroteTheRecord = false
+        }
+    }
+
+    /// The step is made, so this rename is whole.
+    mutating func renameIsWhole() {
+        let finishesTheRecordedRename: Bool = SpecialFolderRenamer.recordNames(
+            earlierRecord, from: oldName, to: newName, scope: scope
+        )
+        let recordsThisFolder: Bool = SpecialFolderRenamer.recordNamesTheFolder(
+            earlierRecord, from: oldName, scope: scope
+        )
+        let oldNameIsGone: Bool = thisRunWroteTheRecord || changesTheSettings
+        if finishesTheRecordedRename || (recordsThisFolder && oldNameIsGone) {
+            removeTheRecord(renameIsWhole: true)
+        } else if thisRunWroteTheRecord {
+            putBackTheEarlierRecord(renameIsWhole: true)
+        }
+        thisRunWroteTheRecord = false
+    }
+
+    /// The earlier run's bytes written back, or no record when there was none.
+    private func putBackTheEarlierRecord(renameIsWhole: Bool) {
+        guard let earlierRecord else {
+            removeTheRecord(renameIsWhole: renameIsWhole)
+            return
+        }
+        do {
+            try earlierRecord.write(to: marker, options: [.atomic])
+        } catch {
+            noteNotTidied(error, renameIsWhole: renameIsWhole)
+        }
+    }
+
+    private func removeTheRecord(renameIsWhole: Bool) {
+        if !FileManager.default.fileExists(atPath: marker.path) {
+            return
+        }
+        do {
+            try FileManager.default.removeItem(at: marker)
+        } catch {
+            noteNotTidied(error, renameIsWhole: renameIsWhole)
+        }
+    }
+
+    private func noteNotTidied(_ error: Error, renameIsWhole: Bool) {
+        ActivityTrail.note(.folderRenamed, SpecialFolderRenamer.renameNoteNotTidiedLine(
+            renaming: oldName, to: newName, course: courseDirectory.lastPathComponent,
+            wasRenamed: renameIsWhole, said: error.localizedDescription
+        ))
     }
 }

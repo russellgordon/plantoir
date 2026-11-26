@@ -1058,6 +1058,80 @@ final class UndoRenameFolderStepTests: XCTestCase {
         )
         XCTAssertEqual(target, "Ideas", "a refused retry cleared the earlier run's record")
     }
+
+    // MARK: - U4b2-3: another folder's record is never this rename's to clear
+
+    /// Another folder's interrupted rename, as a run killed part way leaves
+    /// it: its record's bytes, for comparing after.
+    func recordAnotherFoldersInterruptedRename(in course: Course) throws -> Data {
+        SpecialFolderRenamer.recordRenameStarting(
+            from: "Concepts", to: "Ideas", scope: .shared, courseDirectory: course.directoryURL
+        )
+        return try Data(contentsOf: SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL))
+    }
+
+    func recordOnDisk(of course: Course) -> Data? {
+        return try? Data(contentsOf: SpecialFolderRenamer.renameMarkerURL(courseDirectory: course.directoryURL))
+    }
+
+    /// A successful rename of another folder leaves the earlier record as it
+    /// was (review 1 of U4b2-3, M1, scenario A). MUST FAIL with the success
+    /// clearing the record unconditionally, or this run's record not put back.
+    func testASuccessfulRenameOfAnotherFolderLeavesAnEarlierRecord() async throws {
+        let course: Course = try course()
+        let earlier: Data = try recordAnotherFoldersInterruptedRename(in: course)
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        XCTAssertNotNil(renamed(result), "\(result)")
+        XCTAssertEqual(recordOnDisk(of: course), earlier, "the earlier run's record was not left as it was")
+    }
+
+    /// A rename that moves no folder (a per-section folder no section has)
+    /// writes no record and clears none (M1, scenario B).
+    func testARenameThatMovesNothingLeavesAnEarlierRecord() async throws {
+        let course: Course = try course()
+        let earlier: Data = try recordAnotherFoldersInterruptedRename(in: course)
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("All Classes", to: "All Days", scope: .perSection)
+
+        XCTAssertNotNil(renamed(result), "\(result)")
+        XCTAssertEqual(recordOnDisk(of: course), earlier, "the earlier run's record was not left as it was")
+    }
+
+    /// A rename of another folder refused at its make, with nothing
+    /// changed, puts the earlier record back.
+    func testARefusedRenameOfAnotherFolderLeavesAnEarlierRecord() async throws {
+        let course: Course = try course()
+        let earlier: Data = try recordAnotherFoldersInterruptedRename(in: course)
+        UndoKillPoints.fileInUseAtSwap = { @Sendable (index: Int) in index == 1 }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        XCTAssertNotNil(failed(result), "\(result)")
+        XCTAssertEqual(recordOnDisk(of: course), earlier, "the earlier run's record was not left as it was")
+    }
+
+    /// Refused as changed since, planned again, and the re-plan refused:
+    /// the earlier record is back, not cleared by the retry.
+    func testARetryOfARenameOfAnotherFolderLeavesAnEarlierRecord() async throws {
+        let course: Course = try course()
+        let earlier: Data = try recordAnotherFoldersInterruptedRename(in: course)
+        let mine: URL = course.directoryURL.appendingPathComponent("section1/Tasks/Mine.md")
+        let appeared: URL = course.directoryURL.appendingPathComponent("section2/Assessments")
+        UndoKillPoints.hook = { @Sendable (reached: UndoKillPoint) in
+            if reached == .afterBegin && !FileManager.default.fileExists(atPath: appeared.path) {
+                try? "Mine.\n".write(to: mine, atomically: true, encoding: .utf8)
+                try? FileManager.default.createDirectory(at: appeared, withIntermediateDirectories: true)
+            }
+            return false
+        }
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+
+        XCTAssertNotNil(failed(result), "\(result)")
+        XCTAssertEqual(recordOnDisk(of: course), earlier, "the retry cleared the earlier run's record")
+    }
 }
 
 /// Holds a rename's swap at its first page until the main actor opens it,

@@ -1,0 +1,51 @@
+U4b2-3 (#899) must-fail log, 2026-11-25. Each sabotage applied to SpecialFolderRenamer.swift, built, SpecialFolderRenamerTests run, then the file restored with `git checkout` (git status clean after each).
+
+R0 tests first: `rename` body as on dev a03fecefd (record written, never cleared), helpers kept so the tests compile.
+  RED, 7 failures in 5 tests:
+  testASuccessfulRenameLeavesNoRecord: XCTAssertNil failed: "Assessments" / XCTAssertFalse failed - the record was left
+  testARenameRefusedWithNothingMovedLeavesNoRecord: XCTAssertFalse failed - the record was left
+  testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder: ("Optional(73 bytes)") is not equal to ("Optional(76 bytes)") - the earlier run's record was not left as it was; ("nil") is not equal to ("Optional("All Days")")
+  testAnEarlierRunsRecordSurvivesASuccessfulRenameOfAnotherFolder: ("Optional(73 bytes)") is not equal to ("Optional(76 bytes)")
+  testFinishingTheRecordedRenameClearsItsRecord: XCTAssertFalse failed - the finished rename's record was left
+  (part-way, killed and plan-refusal tests pass on dev: dev never clears, so they guard against over-clearing; M3 and M4 break them.)
+
+M1 the success clear removed (the `if thisRenameWasRecordedEarlier ... else if thisRunWroteTheRecord` block after the make).
+  RED, 4 failures: testASuccessfulRenameLeavesNoRecord (2 lines), testAnEarlierRunsRecordSurvivesASuccessfulRenameOfAnotherFolder, testFinishingTheRecordedRenameClearsItsRecord.
+
+M2 clear on every refusal (`clearRenameRecord` added after the put-back in both refusal branches).
+  RED, 2 failures: testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder: ("nil") is not equal to ("Optional(76 bytes)"); ("nil") is not equal to ("Optional("All Days")").
+
+M3 part way and killed treated as a refusal (put back instead of `break`).
+  RED, 2 failures: testARenameStoppedPartWayKeepsItsRecord, testARenameKilledPartWayKeepsItsRecord ("the record ... is gone or names another rename").
+
+M4 the record cleared at the start of `rename`, before the plan.
+  RED, 4 failures: testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder (2 lines), testAnEarlierRunsRecordSurvivesARenameRefusedAtItsPlan, testAnEarlierRunsRecordSurvivesASuccessfulRenameOfAnotherFolder.
+
+Must-fail: 4 RED of 4 (plus R0, tests first).
+Logs: /Users/russellgordon/plantoir/wt-899-u4b2-3/.dd/run-{r0,m1,m2,m3,m4}.log
+
+Round 2 (review 1: M1, L2 to L5), head 892eb4586. Classes: SpecialFolderRenamerTests and UndoRenameFolderStepTests. Each restored with `git checkout` (status clean).
+
+N1 tests first: CourseSettingsView.swift as at 9282e9222 (renameFolder clearing the file on success, retry and refusal).
+  RED, 4 of 4 new renameFolder tests: testASuccessfulRenameOfAnotherFolderLeavesAnEarlierRecord, testARenameThatMovesNothingLeavesAnEarlierRecord, testARefusedRenameOfAnotherFolderLeavesAnEarlierRecord, testARetryOfARenameOfAnotherFolderLeavesAnEarlierRecord: ("nil") is not equal to ("Optional(65 bytes)").
+N2 the failed tidy kept silent (`noteNotTidied` returns at once; the first try, `return` on its own line, parsed as `return ActivityTrail.note(...)` and changed nothing, so it was redone with an explicit guard).
+  RED: testARecordThatCannotBeTidiedIsToldOnTheTrail (XCTAssertTrue failed, trail printed).
+N3 renameIsWhole clearing only a record naming this same target (the round-1 code; L3).
+  RED: testRenamingTheRecordedFolderElsewhereClearsItsRecord "a record nobody can finish was left".
+N4 a refusal also clearing a record that names this rename (L4).
+  RED, 3: testARefusedFinishOfTheRecordedRenameKeepsItsRecord, UndoRenameFolderStepTests testARefusedFinishOfAnInterruptedRenameKeepsItsRecord, testAFinishRefusedAsChangedSinceOnEveryTryKeepsItsRecord.
+N5 renameIsWhole clearing unconditionally (the dev renameFolder success).
+  RED: testARenameThatMovesNothingLeavesAnEarlierRecord.
+N6 nothingWasChanged removing instead of putting back.
+  RED, 5: testAnEarlierRunsRecordSurvivesARefusedRenameOfAnotherFolder (2 lines), testARefusedFinishOfTheRecordedRenameKeepsItsRecord, testARefusedRenameOfAnotherFolderLeavesAnEarlierRecord, testARetryOfARenameOfAnotherFolderLeavesAnEarlierRecord.
+
+Round 2 must-fail: 5 RED of 5 (N2 to N6), plus N1 tests first. Logs: /Users/russellgordon/plantoir/wt-899-u4b2-3/.dd/run-n*.log
+
+Round 3 (review 2: L-A, L-B). Class: SpecialFolderRenamerTests. Each restored to the tested source (status clean but for the round's own commit).
+
+P1 the round-2 rule: any record of this folder cleared on success, moved or not (L-A).
+  RED: testARenameThatMovesNothingKeepsTheRecordOfThisFoldersUnfinishedRename ("nil") is not equal to ("Optional(71 bytes)") - the record of a rename that can still be finished was cleared; ("nil") is not equal to ("Optional("All Days")").
+P2 the tidy-failure line always saying "renamed the folder" (L-B).
+  RED: testARecordThatCannotBeTidiedIsToldOnTheTrail, both the contains and the not-contains assertions.
+
+Round 3 must-fail: 2 RED of 2. Logs: /Users/russellgordon/plantoir/wt-899-u4b2-3/.dd/run-p1.log, run-p2.log

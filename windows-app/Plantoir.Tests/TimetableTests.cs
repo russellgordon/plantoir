@@ -762,7 +762,7 @@ public class ReDateTests : IDisposable
         AssistRefusal refused;
         using (new FileStream(timetable, FileMode.Open, FileAccess.Read, FileShare.None))
             refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
-        Assert.Equal("Nothing was changed: another program, such as a syncing service, is using this section's class dates. Try again in a moment.",
+        Assert.Equal("Nothing was changed: another program, such as a syncing service, is using this section’s class dates. Try again in a moment.",
                      refused.Message);
         Assert.DoesNotContain(".internal", refused.Message);
         Assert.DoesNotContain("section1.json", refused.Message);
@@ -770,6 +770,19 @@ public class ReDateTests : IDisposable
         Assert.Equal(firstBefore, File.ReadAllBytes(first));
         Assert.Equal(secondBefore, File.ReadAllBytes(second));
         Assert.Equal(timetableBefore, File.ReadAllBytes(timetable));
+    }
+
+    /// <summary>
+    /// A timetable Windows refuses to read (not held by another program)
+    /// says Windows' own words after the curly apostrophe (W7b2-9 review 1,
+    /// LOW 3; the house typography, W7b2-6 review 1 L1).
+    /// </summary>
+    [Fact]
+    public void ATimetableWindowsRefusesSaysWindowsWordsAfterTheCurlyApostrophe()
+    {
+        var refused = new IOException("Access to the path is denied.", unchecked((int)0x80070005));
+        Assert.Equal("this section’s class dates could not be read. Windows said: " + HeldFiles.SystemWords(refused),
+                     TimetableMemory.WhyTheClassDatesCouldNotBeRead(refused));
     }
 
     /// <summary>
@@ -785,7 +798,7 @@ public class ReDateTests : IDisposable
         File.Delete(timetable);
         Directory.CreateDirectory(timetable);
         var refused = Assert.Throws<AssistRefusal>(() => workspace.ApplyReDate(plan));
-        Assert.Equal("Nothing was changed: this section's class dates could not be read.", refused.Message);
+        Assert.Equal("Nothing was changed: this section’s class dates could not be read.", refused.Message);
         Assert.Equal(secondBefore, File.ReadAllBytes(second));
         Assert.True(Directory.Exists(timetable));
     }
