@@ -215,9 +215,15 @@ public sealed partial class AssistWorkspace
                     continue;
                 }
                 if (after == before) continue;
-                step.Write(full, after);
                 written[full] = (before, after);
             }
+            // Into the step in the order of their places in the working
+            // folder, as the mac's planWrites sorts its paths; the sheet's
+            // lists and Undo Getting Ready keep the plan's order (written).
+            var places = new List<string>(written.Keys);
+            places.Sort((one, other) => string.CompareOrdinal(PlaceInTheFolder(one), PlaceInTheFolder(other)));
+            foreach (string full in places)
+                step.Write(full, written[full].After);
             // The front page catches up AFTER the hides, by its rule, or it
             // keeps embedding the class just put into draft.
             step.KeepsTheFrontPageTrue(section, index);
@@ -267,6 +273,10 @@ public sealed partial class AssistWorkspace
               + (declinedSentence is null ? "" : " " + declinedSentence);
         return new StartOfYearOutcome(written.Count > 0, message, backup, written);
     }
+
+    /// <summary>A page's place in the working folder, with forward slashes: the key the mac's paths are sorted by.</summary>
+    private string PlaceInTheFolder(string fullPath) =>
+        Path.GetRelativePath(_folder, fullPath).Replace('\\', '/');
 
     /// <summary>
     /// The edit Go makes to one page: its own key set to draft, and a stray
