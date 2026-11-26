@@ -1172,6 +1172,86 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertFalse(course.isRenamingAFolder)
     }
 
+    /// Rename-then-Cancel, again and again, on a dead volume (U4b2-8, part
+    /// eight's L2): each round's plan is held at its first page on an event,
+    /// as a read stuck inside the system would hold it, and is cancelled
+    /// there. There are four more rounds than this Mac has cores, so more
+    /// than the threads Swift's shared pool has. Each round's plan still
+    /// starts, and with every one of them stuck an unrelated `Task` still
+    /// runs at once: the stuck reads hold none of the pool. MUST FAIL with
+    /// the walk run in a detached task.
+    ///
+    /// Synchronous on purpose: its waits spin the main run loop and need no
+    /// thread of the pool, so a starved pool fails the test on its bounds
+    /// rather than hanging it (measured 2026-11-26: written `async`, with
+    /// the walk detached, the run hung in XCTest's async wait with all
+    /// twelve of the pool's threads held in the plans).
+    func testRenameThenCancelOnADeadVolumeLeavesTheSharedThreadsFree() throws {
+        let course: Course = try course()
+        let before: [String: Data] = pages(of: course)
+        let cores: Int = ProcessInfo.processInfo.activeProcessorCount
+        let rounds: Int = cores + 4
+        let gate: EveryPlanHold = EveryPlanHold()
+        addTeardownBlock {
+            gate.open()
+        }
+        SpecialFolderRenamer.planReadsAPage = { @Sendable (page: URL) in
+            gate.arrive()
+        }
+        let ended: XCTestExpectation = XCTestExpectation(description: "every held plan stopped once let go")
+        ended.expectedFulfillmentCount = rounds
+        SpecialFolderRenamer.planHasEnded = { @Sendable in
+            ended.fulfill()
+        }
+        let threadsBefore: Int = ThreadCount.inThisProcess()
+
+        var roundsHeld: Int = 0
+        while roundsHeld < rounds {
+            let round: Int = roundsHeld + 1
+            let reached: XCTestExpectation = XCTestExpectation(description: "round \(round)'s plan reached its first page")
+            gate.nextArrival(fulfils: reached)
+            let returned: XCTestExpectation = XCTestExpectation(description: "round \(round)'s rename returned")
+            let renaming: Task<Void, Never> = Task { @MainActor in
+                let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Assessments", scope: .perSection)
+                XCTAssertNotNil(self.failed(result), "\(result)")
+                returned.fulfill()
+            }
+            // The event is the plan reaching its first page; the bound only
+            // turns a plan that never started into a failure, not a hang.
+            let started: XCTWaiter.Result = XCTWaiter().wait(for: [reached], timeout: 30)
+            renaming.cancel()
+            let came: XCTWaiter.Result = XCTWaiter().wait(for: [returned], timeout: 30)
+            XCTAssertEqual(came, .completed, "round \(round)'s rename did not return after Cancel")
+            XCTAssertFalse(course.isRenamingAFolder, "round \(round) still holds the course after Cancel")
+            if started != .completed {
+                XCTFail("round \(round)'s plan never started, with \(roundsHeld) held on a Mac of \(cores) cores: the stuck reads hold the shared threads")
+                break
+            }
+            roundsHeld += 1
+        }
+        let threadsHeld: Int = ThreadCount.inThisProcess()
+
+        let unrelated: XCTestExpectation = XCTestExpectation(description: "an unrelated task ran")
+        Task.detached {
+            unrelated.fulfill()
+        }
+        // A free pool runs it at once; the bound turns a starved pool into a
+        // failure rather than a hang.
+        let ran: XCTWaiter.Result = XCTWaiter().wait(for: [unrelated], timeout: 10)
+        XCTAssertEqual(ran, .completed, "an unrelated task did not run while \(roundsHeld) plans were held")
+
+        gate.open()
+        if roundsHeld == rounds {
+            wait(for: [ended], timeout: 30)
+            XCTAssertEqual(gate.arrivals, rounds, "a cancelled plan went on reading pages")
+        }
+        let threadsAfter: Int = ThreadCount.inThisProcess()
+        print("U4b2-8 threads: cores \(cores), rounds \(rounds), before \(threadsBefore), with \(roundsHeld) plans held \(threadsHeld), after they were let go \(threadsAfter)")
+        XCTAssertEqual(pages(of: course), before)
+        XCTAssertEqual(try journal().read().records.count, 0)
+        XCTAssertTrue(CourseActivity.store.activeFolderRenames.isEmpty)
+    }
+
     /// An ended claim is never taken up again (part seven's review, M1):
     /// the swap refuses a rename whose claim has been given back, so a plan
     /// whose rename was cancelled can never reach it. MUST FAIL with
@@ -1648,6 +1728,77 @@ final class RenameHold: @unchecked Sendable {
         isOpen = true
         condition.broadcast()
         condition.unlock()
+    }
+}
+
+/// Holds EVERY plan at its first page until the test opens it, as reads
+/// stuck on a dead volume would hold them (U4b2-8). Each arrival fulfils
+/// the expectation the test named for it, and is counted.
+final class EveryPlanHold: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    let condition: NSCondition = NSCondition()
+
+    var waitingFor: XCTestExpectation? = nil
+
+    var arrived: Int = 0
+
+    var isOpen: Bool = false
+
+    // MARK: - Computed properties
+
+    var arrivals: Int {
+        condition.lock()
+        let counted: Int = arrived
+        condition.unlock()
+        return counted
+    }
+
+    // MARK: - Functions
+
+    /// The expectation the next plan to arrive fulfils.
+    func nextArrival(fulfils expectation: XCTestExpectation) {
+        condition.lock()
+        waitingFor = expectation
+        condition.unlock()
+    }
+
+    func arrive() {
+        condition.lock()
+        arrived += 1
+        let reached: XCTestExpectation? = waitingFor
+        waitingFor = nil
+        condition.unlock()
+        reached?.fulfill()
+        condition.lock()
+        while !isOpen {
+            condition.wait()
+        }
+        condition.unlock()
+    }
+
+    func open() {
+        condition.lock()
+        isOpen = true
+        condition.broadcast()
+        condition.unlock()
+    }
+}
+
+/// How many threads this process has now, as the system counts them.
+enum ThreadCount {
+
+    // MARK: - Functions
+
+    static func inThisProcess() -> Int {
+        var info: proc_taskinfo = proc_taskinfo()
+        let size: Int32 = Int32(MemoryLayout<proc_taskinfo>.size)
+        let filled: Int32 = proc_pidinfo(getpid(), PROC_PIDTASKINFO, 0, &info, size)
+        if filled != size {
+            return -1
+        }
+        return Int(info.pti_threadnum)
     }
 }
 
