@@ -22521,6 +22521,25 @@ under a linked root, falls outside it: reproduced standalone, and red on the
 bench as `UndoShadowPublishTests.testAPublishIsRecordedInShadow`), 785a's 31
 days (the 40-day sweep case), and the second round's scan (11 checks).
 
+### U4b2: leaving-place-named
+
+When an Undo or a Redo is refused because one of an op's places now leads
+out of the working folder (a folder on its path replaced since by a link to
+outside), the refusal names the first of the op's places, in the order
+`path`, `from`, `to`, that leads out, never the other side of a move, which
+is as the step left it (#899, 2026-11-25). U4b part I made the Mac do this
+(`UndoCheck.plan`, `placeLeavingTheFolder`); this piece pins it, with one
+sentence in `undo.rule.stagedThenSwapped`, three `stackCases` rows (only the
+new place leads out: names it; only the old: names it; both: names the old)
+read through a new key, `refusalNamed`, and three new calls
+(`moveThePageIntoAFolder`, `moveThePageBetweenFolders`,
+`linkItsNewFolderOutside`), and five `UndoDoorGuardTests` covering both
+directions. A check row could not carry it: `checkCasesHow` makes a place
+that is itself a link, never a folder on its path replaced after the step.
+Windows names a move's `from` always (`UndoCheck.Plan`, `op.PlaceName`), so
+the "only the new place" row is its real gap; all three rows are held under
+W8 because its replay does not yet check `refusalNamed`.
+
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),

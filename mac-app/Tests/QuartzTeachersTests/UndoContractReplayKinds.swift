@@ -39,6 +39,7 @@ nonisolated enum UndoContractKinds {
         "moveAFolderWithAPageEditedInside", "addAFileInsideTheMovedFolder", "editThePageInsideByHand",
         "stepEditingInsideAMovesFrom", "renameAFolderInCaseOnly", "spellTheFolderAnotherWay",
         "leaveAKeptCopyInsideTheMovedFolder",
+        "moveThePageIntoAFolder", "moveThePageBetweenFolders", "linkItsNewFolderOutside",
     ]
 
     /// U4b: the three spellings of the folder a capitalisation-only rename
@@ -55,6 +56,14 @@ nonisolated enum UndoContractKinds {
 
     static let asidePage: String = "courses/TST1O/old/a.md"
     static let asidePageMoved: String = "courses/TST1O/a.md"
+
+    /// U4b2-2: the pages `moveThePageIntoAFolder` and
+    /// `moveThePageBetweenFolders` move, and where; `linkItsNewFolderOutside`
+    /// replaces the folder both move into.
+    static let pageIntoAFolder: String = "courses/TST1O/b.md"
+    static let pageIntoAFolderMoved: String = "courses/TST1O/new/b.md"
+    static let pageBetweenFolders: String = "courses/TST1O/old/c.md"
+    static let pageBetweenFoldersMoved: String = "courses/TST1O/new/c.md"
 
     /// Where `linkItsOldFolderOutside` points: beside the working folder.
     static func outside(of root: URL) -> URL {
@@ -76,6 +85,25 @@ nonisolated enum UndoContractKinds {
             ops: ops,
             blobs: blobs
         )
+    }
+
+    /// One step of one `move`: the page at `from` (made first, holding
+    /// `page`, when neither place holds it) to `to`.
+    static func moveAPage(from: String, to: String, root: URL, journal: UndoJournal, places: UndoMemoryPlaces) throws -> String {
+        if text(at: from, in: root) == nil && text(at: to, in: root) == nil {
+            try UndoContractReplay.write("page\n", to: from, in: root)
+        }
+        let op: UndoOp = UndoOp.moveFile(from: from, to: to, sha: UndoHash.sha256(of: Data("page\n".utf8)))
+        return word(JournaledWrite.perform(ops: draft(ops: [op], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+    }
+
+    /// The folder at `folder`, replaced by a link to the folder beside the
+    /// working folder (the second hard review of U2b, MEDIUM 2; U4b2-2).
+    static func linkOutside(_ folder: String, root: URL) throws {
+        let place: URL = root.appendingPathComponent(folder)
+        try? FileManager.default.removeItem(at: place)
+        try FileManager.default.createDirectory(at: outside(of: root), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: place, withDestinationURL: outside(of: root))
     }
 
     static func word(_ outcome: JournaledWriteOutcome) -> String {
@@ -268,10 +296,16 @@ nonisolated enum UndoContractKinds {
             // The folder the page was moved out of, replaced by a link to a
             // folder outside the working folder (the second hard review of
             // U2b, MEDIUM 2).
-            let old: URL = root.appendingPathComponent("courses/TST1O/old")
-            try? FileManager.default.removeItem(at: old)
-            try FileManager.default.createDirectory(at: outside(of: root), withIntermediateDirectories: true)
-            try FileManager.default.createSymbolicLink(at: old, withDestinationURL: outside(of: root))
+            try linkOutside("courses/TST1O/old", root: root)
+            return nil
+        case "moveThePageIntoAFolder":
+            return try moveAPage(from: pageIntoAFolder, to: pageIntoAFolderMoved, root: root, journal: journal, places: places)
+        case "moveThePageBetweenFolders":
+            return try moveAPage(from: pageBetweenFolders, to: pageBetweenFoldersMoved, root: root, journal: journal, places: places)
+        case "linkItsNewFolderOutside":
+            // U4b2-2: the folder a page was moved into, replaced by a link to
+            // the same folder outside the working folder.
+            try linkOutside("courses/TST1O/new", root: root)
             return nil
         case "moveAFolderWithAPageEditedInside":
             // U4b: one step, the folder moved and then a page inside it

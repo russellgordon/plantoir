@@ -228,6 +228,15 @@ nonisolated enum UndoContractReplay {
         }
     }
 
+    /// The place an undo's or a redo's changed-since refusal named first
+    /// (U4b2-2), or nothing.
+    static func refusalNamed(of outcome: UndoOutcome) -> String? {
+        if case .refused(.changedSince(let firstPath, _), _) = outcome {
+            return firstPath
+        }
+        return nil
+    }
+
     static func outcomeWord(_ outcome: UndoOutcome) -> String {
         switch outcome {
         case .undone:
@@ -771,7 +780,7 @@ nonisolated enum UndoContractReplay {
         "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
         "keptOriginalLeft", "foreignKeptOriginalUntouched", "keptWhatItReplacedLines", "keptBesideThePage", "why",
         "leftApart", "schoolYear", "cloudflareMarkers", "leftoverMarkers", "startsAtTheNextLogin",
-        "movedFolder", "caseOnlyFolder",
+        "movedFolder", "caseOnlyFolder", "refusalNamed",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -835,6 +844,7 @@ nonisolated enum UndoContractReplay {
             var last: String = ""
             var lastLeftApart: [String] = []
             var lastStartsAtTheNextLogin: [String] = []
+            var lastRefusalNamed: String? = nil
             var linesBeforeTheDeploy: Int = -1
             var linesAfterTheDeploy: Int = -1
             let held: HeldStep = HeldStep()
@@ -991,11 +1001,13 @@ nonisolated enum UndoContractReplay {
                     last = outcomeWord(outcome)
                     lastLeftApart = leftApart(of: outcome)
                     lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
+                    lastRefusalNamed = refusalNamed(of: outcome)
                 } else if value == "redo" {
                     let outcome: UndoOutcome = await journal().redoNewestAndRederive(resolveRoot: { folder in UndoReach.root(for: folder) }, places: places)
                     last = outcomeWord(outcome)
                     lastLeftApart = leftApart(of: outcome)
                     lastStartsAtTheNextLogin = startsAtTheNextLogin(of: outcome)
+                    lastRefusalNamed = refusalNamed(of: outcome)
                 } else if UndoContractKinds.calls.contains(value) {
                     if let answered = try UndoContractKinds.call(value, root: root, journal: journal(), places: places) {
                         last = answered
@@ -1333,6 +1345,9 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = testCase["startsAtTheNextLogin"] as? [String], lastStartsAtTheNextLogin != wanted {
                 failures.append("stackCases '\(name)': starts at the next login \(lastStartsAtTheNextLogin), not \(wanted)")
+            }
+            if let wanted = string(testCase["refusalNamed"]), lastRefusalNamed != wanted {
+                failures.append("stackCases '\(name)': the refusal named \(lastRefusalNamed ?? "no place"), not \(wanted)")
             }
             if let wanted = testCase["leftApart"] as? [String], lastLeftApart != wanted {
                 failures.append("stackCases '\(name)': left apart \(lastLeftApart), not \(wanted)")
