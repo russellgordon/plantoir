@@ -1,6 +1,6 @@
 # U4b3 relink-4 (#899): `JournaledStep` records a link's move that changes its text
 
-Brief `vm-tools/briefs/2026-11-26-899-u4b3-relink-4-journaled-step-records-a-relink.md`, from relink-3's pushed head 969a9ae99 on `issue/899-u4b3-linked-class-page-moves-its-link` (clean). `origin/dev` still 06e067fbe (already merged in) before proving and before handing back: no merge needed. **`contracts/` not touched.**
+Brief `vm-tools/briefs/2026-11-26-899-u4b3-relink-4-journaled-step-records-a-relink.md`, from relink-3's pushed head 969a9ae99 on `issue/899-u4b3-linked-class-page-moves-its-link` (clean). `origin/dev` was 06e067fbe (already merged in) when proving; before handing back it had moved to 96a3d2b73 (W8-7 and W8-8, Windows files and documentation 12 only), merged in as b05948880, one conflict in `NamedGapLedger.cs` resolved by keeping this branch's three U4b3 reasons and their held rows and dev's removal of the U4b recovery rows, the U4b2-13 hand-edit rows and their reason (W8-7, W8-8 cleared them) and dev's reworded `Reason899W8U4b`. No Mac source or contract changed in the merge, so the Mac proof stands; `python3 scripts/test_make_undo_traces.py` (which reads the ledger) OK, 40. **`contracts/` not touched.**
 
 ## For PROGRESS
 
