@@ -787,6 +787,67 @@ final class UndoRenameFolderStepTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(index, 4, "two moves, three pages and the settings: at least four swaps")
     }
 
+    /// A dangling link at a section's place (it leads nowhere) is skipped,
+    /// as before U4b, where `fileExists` followed it and found nothing: the
+    /// other section's folder is renamed, the link is left at its old name
+    /// with its target, and the step holds one move (review 1 of U4b2-15,
+    /// L2). MUST FAIL with a dangling link planned as a link's move.
+    func testADanglingLinkAtASectionsPlaceIsSkippedAsBeforeU4b() async throws {
+        let course: Course = try course()
+        let sectionTwo: URL = course.directoryURL.appendingPathComponent("section2/Tasks")
+        try FileManager.default.removeItem(at: sectionTwo)
+        try FileManager.default.createSymbolicLink(atPath: sectionTwo.path, withDestinationPath: "../nowhere/Tasks")
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Activities", scope: .perSection)
+
+        XCTAssertNotNil(renamed(result), "\(result)")
+        XCTAssertEqual(linkTarget(course, "section2/Tasks"), "../nowhere/Tasks", "the dangling link was moved or changed")
+        XCTAssertNil(linkTarget(course, "section2/Activities"))
+        XCTAssertEqual(pages(of: course)["section1/Activities/Quiz 1.md"], Data("See [[Activities/Quiz 2]].\n".utf8))
+        var moves: Int = 0
+        for op in try newestOps() where op.kind == "move" {
+            moves += 1
+        }
+        XCTAssertEqual(moves, 1, "only section 1's folder moves")
+    }
+
+    /// Section 2's `Tasks` a link to section 1's `Tasks`, the other place of
+    /// the same rename: both are planned, the folder by its listing and the
+    /// link by its target, kept as written, as before U4b (`moveItem` moved
+    /// the folder, then renamed the link, which then led to the old name).
+    /// One step; Undo puts the folder and the link back, Redo again (review 1
+    /// of U4b2-15, L2). MUST FAIL with a link's `from` resolved to what it
+    /// leads to (it would name section 1's folder, the other move's `from`).
+    func testALinkToAnotherSectionsFolderOfTheSameRenameIsMovedAsALink() async throws {
+        let course: Course = try course()
+        let sectionTwo: URL = course.directoryURL.appendingPathComponent("section2/Tasks")
+        try FileManager.default.removeItem(at: sectionTwo)
+        try FileManager.default.createSymbolicLink(atPath: sectionTwo.path, withDestinationPath: "../section1/Tasks")
+        let pagesBefore: [String: Data] = pages(of: course)
+
+        let result: RenameResult = await CourseSettingsView(course: course).renameFolder("Tasks", to: "Activities", scope: .perSection)
+
+        XCTAssertNotNil(renamed(result), "\(result)")
+        XCTAssertEqual(linkTarget(course, "section2/Activities"), "../section1/Tasks", "the link was not moved as a link")
+        XCTAssertNil(linkTarget(course, "section2/Tasks"))
+        XCTAssertEqual(pages(of: course)["section1/Activities/Quiz 1.md"], Data("See [[Activities/Quiz 2]].\n".utf8))
+        let ops: [UndoOp] = try newestOps()
+        XCTAssertEqual(ops[0].from, "courses/ICS3U/section1/Tasks")
+        XCTAssertNotNil(ops[0].listingSha)
+        XCTAssertEqual(ops[1].from, "courses/ICS3U/section2/Tasks", "the link's move named what it leads to")
+        XCTAssertNotNil(ops[1].linkSha)
+        let pagesAfter: [String: Data] = pages(of: course)
+
+        XCTAssertEqual(journal().undoNewest(resolveRoot: { _ in self.root }), .undone(seq: 1))
+        XCTAssertEqual(linkTarget(course, "section2/Tasks"), "../section1/Tasks")
+        XCTAssertNil(linkTarget(course, "section2/Activities"))
+        XCTAssertEqual(pages(of: course), pagesBefore)
+        XCTAssertEqual(journal().redoNewest(resolveRoot: { _ in self.root }), .redone(seq: 1))
+        XCTAssertEqual(linkTarget(course, "section2/Activities"), "../section1/Tasks")
+        XCTAssertEqual(pages(of: course), pagesAfter)
+        XCTAssertFalse(UndoContractReplay.staysBeside(root), "a staged file was left")
+    }
+
     /// The same code path for a SHARED folder that is a link, here one
     /// leading OUT of the working folder: renamed by moving the link, as
     /// before U4b (`moveItem` renamed any link), and what it leads to is
